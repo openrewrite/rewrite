@@ -34,6 +34,9 @@ public class HyphenRange extends LatestRelease {
     private static final Pattern NODE_HYPHEN_PATTERN = Pattern.compile(
             "^\\s*(" + XRange.XRANGE_PLAIN + ")\\s+-\\s+(" + XRange.XRANGE_PLAIN + ")\\s*$");
 
+    private static final Pattern NODE_HYPHEN_PATTERN_LOOSE = Pattern.compile(
+            "^\\s*(" + XRange.XRANGE_PLAIN_LOOSE + ")\\s+-\\s+(" + XRange.XRANGE_PLAIN_LOOSE + ")\\s*$");
+
     private final String upper;
     private final String lower;
 
@@ -85,7 +88,11 @@ public class HyphenRange extends LatestRelease {
 
     // Port of node-semver range.js hyphenReplace; non-hyphen groups pass through.
     static String hyphenReplace(String group, boolean incPre) {
-        Matcher m = NODE_HYPHEN_PATTERN.matcher(group);
+        return hyphenReplace(group, incPre, false);
+    }
+
+    static String hyphenReplace(String group, boolean incPre, boolean loose) {
+        Matcher m = (loose ? NODE_HYPHEN_PATTERN_LOOSE : NODE_HYPHEN_PATTERN).matcher(group);
         if (!m.matches()) {
             return group;
         }

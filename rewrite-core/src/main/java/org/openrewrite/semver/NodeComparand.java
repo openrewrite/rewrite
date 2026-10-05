@@ -34,6 +34,10 @@ final class NodeComparand {
                     "(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")" +
                     ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)$");
 
+    // node-semver re.js COMPARATORLOOSE.
+    static final Pattern COMPARATOR_LOOSE = Pattern.compile(
+            "^((?:<|>)?=?)\\s*(" + ParsedVersion.LOOSE_PLAIN + ")$|^$");
+
     enum Op {
         LT("<"), LTE("<="), GT(">"), GTE(">="), EQ("=");
 
@@ -56,19 +60,23 @@ final class NodeComparand {
         this.version = version;
     }
 
+    static @Nullable NodeComparand parse(String token) {
+        return parse(token, false);
+    }
+
     /**
      * @return the parsed comparand, or {@code null}, which invalidates the whole range.
      */
-    static @Nullable NodeComparand parse(String token) {
-        String t = token.trim();
+    static @Nullable NodeComparand parse(String token, boolean loose) {
+        String t = token.trim().replaceAll("\\s+", " ");
         if (t.isEmpty()) {
             return new NodeComparand(Op.GTE, null);
         }
-        Matcher m = COMPARATOR.matcher(t);
-        if (!m.matches()) {
+        Matcher m = (loose ? COMPARATOR_LOOSE : COMPARATOR).matcher(t);
+        if (!m.matches() || m.group(2) == null) {
             return null;
         }
-        ParsedVersion version = ParsedVersion.parse(m.group(2));
+        ParsedVersion version = ParsedVersion.parseNode(m.group(2), loose);
         if (!version.isStrictSemver()) {
             return null;
         }
@@ -108,6 +116,20 @@ final class NodeComparand {
         return version;
     }
 
+    // node-semver's Comparator.operator: "" for equality and for ANY.
+    String operator() {
+        return version == null || op == Op.EQ ? "" : op.symbol;
+    }
+
+    // node-semver's Comparator.value.
+    String value() {
+        return version == null ? "" : operator() + version.nodeVersion();
+    }
+
+    boolean isNullSet() {
+        return "<0.0.0-0".equals(value());
+    }
+
     boolean test(ParsedVersion candidate) {
         if (version == null) {
             return true;
@@ -127,13 +149,51 @@ final class NodeComparand {
         }
     }
 
+    // Port of node-semver classes/comparator.js intersects.
+    boolean intersects(NodeComparand comp, boolean loose, boolean includePrerelease) {
+        if (operator().isEmpty()) {
+            if (value().isEmpty()) {
+                return true;
+            }
+            UnionRange range = UnionRange.parse(comp.value(), includePrerelease, loose);
+            return range != null && range.test(value(), loose);
+        } else if (comp.operator().isEmpty()) {
+            if (comp.value().isEmpty()) {
+                return true;
+            }
+            UnionRange range = UnionRange.parse(value(), includePrerelease, loose);
+            return range != null && range.test(comp.getVersion());
+        }
+
+        if (includePrerelease && ("<0.0.0-0".equals(value()) || "<0.0.0-0".equals(comp.value()))) {
+            return false;
+        }
+        if (!includePrerelease && (value().startsWith("<0.0.0") || comp.value().startsWith("<0.0.0"))) {
+            return false;
+        }
+
+        String thisOp = operator();
+        String compOp = comp.operator();
+        if (thisOp.startsWith(">") && compOp.startsWith(">")) {
+            return true;
+        }
+        if (thisOp.startsWith("<") && compOp.startsWith("<")) {
+            return true;
+        }
+        if (getVersion().nodeVersion().equals(comp.getVersion().nodeVersion()) &&
+                thisOp.contains("=") && compOp.contains("=")) {
+            return true;
+        }
+        int c = getVersion().comparePrecedence(comp.getVersion());
+        if (c < 0 && thisOp.startsWith(">") && compOp.startsWith("<")) {
+            return true;
+        }
+        return c > 0 && thisOp.startsWith("<") && compOp.startsWith(">");
+    }
+
     @Override
     public String toString() {
-        if (version == null) {
-            return "";
-        }
-        // node-semver renders "=" and "" operators as just the version.
-        return (op == Op.EQ ? "" : op.symbol) + version.strictToString();
+        return value();
     }
 
     // num + 1; a result beyond long range fails strict parsing later, invalidating the range as node does.

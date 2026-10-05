@@ -35,6 +35,8 @@ public class TildeRange extends LatestRelease {
     // The npm tilde grammar; unlike TILDE_RANGE_PATTERN, no 4th component, wildcards allowed.
     private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN + "$");
 
+    private static final Pattern NODE_TILDE_PATTERN_LOOSE = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN_LOOSE + "$");
+
     private final String upperExclusive;
     private final String lower;
     private final boolean requireRelease;
@@ -115,25 +117,28 @@ public class TildeRange extends LatestRelease {
 
     // Port of node-semver range.js replaceTilde; non-tilde tokens pass through.
     static String replaceTilde(String token, boolean incPre) {
-        Matcher m = NODE_TILDE_PATTERN.matcher(token);
+        return replaceTilde(token, incPre, false);
+    }
+
+    static String replaceTilde(String token, boolean incPre, boolean loose) {
+        Matcher m = (loose ? NODE_TILDE_PATTERN_LOOSE : NODE_TILDE_PATTERN).matcher(token);
         if (!m.matches()) {
             return token;
         }
         String mj = m.group(1), mn = m.group(2), p = m.group(3), pr = m.group(4);
-        String z = incPre ? "-0" : "";
         if (XRange.isX(mj)) {
             return "";
         }
         if (XRange.isX(mn)) {
-            return ">=" + mj + ".0.0" + z + " <" + NodeComparand.incr(mj) + ".0.0-0";
+            return ">=" + mj + ".0.0 <" + NodeComparand.incr(mj) + ".0.0-0";
         }
         if (XRange.isX(p)) {
-            return ">=" + mj + "." + mn + ".0" + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+            return ">=" + mj + "." + mn + ".0 <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
         if (pr != null) {
             return ">=" + mj + "." + mn + "." + p + "-" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return ">=" + mj + "." + mn + "." + p + z + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
+        return ">=" + mj + "." + mn + "." + p + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
     }
 
     @Override

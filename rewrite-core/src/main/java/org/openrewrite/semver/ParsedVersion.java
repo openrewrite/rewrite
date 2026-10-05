@@ -57,11 +57,26 @@ final class ParsedVersion {
     static final String PRERELEASE_GROUP = "(?:-(" + PRERELEASE_ID + "(?:\\." + PRERELEASE_ID + ")*))";
     static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
 
+    static final String PRERELEASE_ID_LOOSE = "(?:\\d*[a-zA-Z-][0-9a-zA-Z-]*|\\d+)";
+    static final String PRERELEASE_GROUP_LOOSE = "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE + ")*))";
+    static final String LOOSE_PLAIN = "[v=\\s]*(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)" + PRERELEASE_GROUP_LOOSE + "?" + BUILD + "?";
+
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
     private static final Pattern STRICT_PATTERN = Pattern.compile(
             "^v?(" + NUMERIC_ID + ")\\.(" + NUMERIC_ID + ")\\.(" + NUMERIC_ID + ")" +
                     "(?:-(" + PRERELEASE_ID + "(?:\\." + PRERELEASE_ID + ")*))?" +
                     "(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
+
+    // node-semver re.js LOOSE: leading v/=/whitespace, leading zeros, and a prerelease without its hyphen.
+    private static final Pattern LOOSE_PATTERN = Pattern.compile(
+            "^[v=\\s]*(\\d+)\\.(\\d+)\\.(\\d+)" +
+                    "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE + ")*))?" +
+                    "(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
+
+    private static final int MAX_LENGTH = 256;
+    private static final long MAX_SAFE_INTEGER = 9007199254740991L;
+
+    private static final Map<String, ParsedVersion> LOOSE_CACHE = LruCache.bounded(1_024);
 
     // Producer backpatches in the OSERA shape, e.g. 2.14.1.1-osera-00001 or 5.2.19.RELEASE-backpatch-00001.
     private static final Pattern BACKPATCH = Pattern.compile("(.+)-(?:osera|backpatch)-\\d+", Pattern.CASE_INSENSITIVE);
@@ -153,39 +168,88 @@ final class ParsedVersion {
             }
         }
 
-        Matcher strict = STRICT_PATTERN.matcher(version.trim());
-        if (strict.matches()) {
-            // node-semver permits large numerics; anything overflowing a long is treated as
-            // unparseable (not strict) rather than crashing the caller.
-            try {
-                long major = Long.parseLong(strict.group(1));
-                long minor = Long.parseLong(strict.group(2));
-                long patch = Long.parseLong(strict.group(3));
-                List<Object> prerelease = emptyList();
-                if (strict.group(4) != null) {
-                    prerelease = new ArrayList<>();
-                    for (String id : strict.group(4).split("\\.")) {
-                        prerelease.add(isNumeric(id) ? (Object) Long.parseLong(id) : id);
-                    }
-                }
-                List<String> build = emptyList();
-                if (strict.group(5) != null) {
-                    build = new ArrayList<>();
-                    for (String id : strict.group(5).split("\\.")) {
-                        build.add(id);
-                    }
-                }
-                return new ParsedVersion(matches, groups, qualifier, preReleaseEnding, patchedVersion,
-                        true, major, minor, patch, prerelease, build);
-            } catch (NumberFormatException overflow) {
-                // fall through to the non-strict result
-            }
+        ParsedVersion strict = nodeView(STRICT_PATTERN, version, matches, groups, qualifier, preReleaseEnding, patchedVersion);
+        if (strict != null) {
+            return strict;
         }
         if (!matches) {
             return NO_MATCH;
         }
         return new ParsedVersion(true, groups, qualifier, preReleaseEnding, patchedVersion,
                 false, 0, 0, 0, emptyList(), emptyList());
+    }
+
+    /**
+     * node-semver's {@code new SemVer(version, loose)}: the strict view of {@link #parse}, or the
+     * LOOSE grammar's when {@code loose}. Unparseable input yields a non-strict result.
+     */
+    static ParsedVersion parseNode(String version, boolean loose) {
+        if (!loose) {
+            return parse(version);
+        }
+        ParsedVersion cached = LOOSE_CACHE.get(version);
+        if (cached != null) {
+            return cached;
+        }
+        ParsedVersion parsed = nodeView(LOOSE_PATTERN, version, false, null, null, false, null);
+        if (parsed == null) {
+            parsed = NO_MATCH;
+        }
+        LOOSE_CACHE.put(version, parsed);
+        return parsed;
+    }
+
+    private static @Nullable ParsedVersion nodeView(Pattern grammar, String version, boolean matches,
+                                                    @Nullable String @Nullable [] groups, @Nullable String qualifier,
+                                                    boolean preReleaseEnding, @Nullable String patchedVersion) {
+        if (version.length() > MAX_LENGTH) {
+            return null;
+        }
+        Matcher m = grammar.matcher(version.trim());
+        if (!m.matches()) {
+            return null;
+        }
+        // node-semver rejects components beyond Number.MAX_SAFE_INTEGER.
+        try {
+            long major = Long.parseLong(m.group(1));
+            long minor = Long.parseLong(m.group(2));
+            long patch = Long.parseLong(m.group(3));
+            if (major > MAX_SAFE_INTEGER || minor > MAX_SAFE_INTEGER || patch > MAX_SAFE_INTEGER) {
+                return null;
+            }
+            List<Object> prerelease = emptyList();
+            if (m.group(4) != null) {
+                prerelease = new ArrayList<>();
+                for (String id : m.group(4).split("\\.")) {
+                    prerelease.add(numericIdentifier(id));
+                }
+            }
+            List<String> build = emptyList();
+            if (m.group(5) != null) {
+                build = new ArrayList<>();
+                for (String id : m.group(5).split("\\.")) {
+                    build.add(id);
+                }
+            }
+            return new ParsedVersion(matches, groups, qualifier, preReleaseEnding, patchedVersion,
+                    true, major, minor, patch, prerelease, build);
+        } catch (NumberFormatException overflow) {
+            return null;
+        }
+    }
+
+    private static Object numericIdentifier(String id) {
+        if (isNumeric(id)) {
+            try {
+                long num = Long.parseLong(id);
+                if (num < MAX_SAFE_INTEGER) {
+                    return num;
+                }
+            } catch (NumberFormatException ignored) {
+                // a numeric identifier beyond long range stays alphanumeric, as in node-semver
+            }
+        }
+        return id;
     }
 
     private static boolean isNumeric(String s) {
@@ -276,6 +340,18 @@ final class ParsedVersion {
         }
         if (!strictBuild.isEmpty()) {
             sb.append('+').append(join(strictBuild));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * node-semver's {@code SemVer.version}: the strict rendering without build metadata.
+     */
+    String nodeVersion() {
+        StringBuilder sb = new StringBuilder();
+        sb.append(strictMajor).append('.').append(strictMinor).append('.').append(strictPatch);
+        if (!strictPrerelease.isEmpty()) {
+            sb.append('-').append(join(strictPrerelease));
         }
         return sb.toString();
     }

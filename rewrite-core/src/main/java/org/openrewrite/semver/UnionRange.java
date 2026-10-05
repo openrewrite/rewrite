@@ -20,8 +20,11 @@ import org.openrewrite.Validated;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 /**
  * An npm range as node-semver models it: an OR ({@code ||}) of AND-groups of {@link NodeComparand}
@@ -35,16 +38,33 @@ class UnionRange implements VersionComparator {
     private static final Map<String, UnionRange> CACHE = LruCache.bounded(MAX_CACHE_SIZE);
     private static final UnionRange INVALID = new UnionRange("", false, new ArrayList<>(), null);
 
+    // node-semver re.js fragments used by Range.parseRange.
+    private static final Pattern BUILD_STRIP = Pattern.compile("\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*");
+    private static final Pattern COMPARATOR_TRIM = Pattern.compile(
+            "(\\s*)((?:<|>)?=?)\\s*(" + ParsedVersion.LOOSE_PLAIN + "|" + XRange.XRANGE_PLAIN + ")");
+    private static final Pattern TILDE_TRIM = Pattern.compile("(\\s*)(?:~>?)\\s+");
+    private static final Pattern CARET_TRIM = Pattern.compile("(\\s*)(?:\\^)\\s+");
+    private static final Pattern STAR = Pattern.compile("(<|>)?=?\\s*\\*");
+    private static final Pattern GTE0 = Pattern.compile("^\\s*>=\\s*0\\.0\\.0\\s*$");
+    private static final Pattern GTE0_PRE = Pattern.compile("^\\s*>=\\s*0\\.0\\.0-0\\s*$");
+
     private final String raw;
     private final boolean includePrerelease;
+    private final boolean loose;
     private final List<List<NodeComparand>> set;
 
     private final @Nullable String metadataPattern;
 
     private UnionRange(String raw, boolean includePrerelease, List<List<NodeComparand>> set,
                        @Nullable String metadataPattern) {
+        this(raw, includePrerelease, false, set, metadataPattern);
+    }
+
+    private UnionRange(String raw, boolean includePrerelease, boolean loose, List<List<NodeComparand>> set,
+                       @Nullable String metadataPattern) {
         this.raw = raw;
         this.includePrerelease = includePrerelease;
+        this.loose = loose;
         this.set = set;
         this.metadataPattern = metadataPattern;
     }
@@ -59,75 +79,190 @@ class UnionRange implements VersionComparator {
     }
 
     static @Nullable UnionRange parse(@Nullable String range, boolean includePrerelease) {
+        return parse(range, includePrerelease, false);
+    }
+
+    static @Nullable UnionRange parse(@Nullable String range, boolean includePrerelease, boolean loose) {
         if (range == null) {
             return null;
         }
-        String key = (includePrerelease ? "1" : "0") + ' ' + range;
+        String key = (includePrerelease ? "1" : "0") + (loose ? "1" : "0") + ' ' + range;
         UnionRange cached = CACHE.get(key);
         if (cached != null) {
             return cached == INVALID ? null : cached;
         }
-        UnionRange parsed = doParse(range, includePrerelease);
+        UnionRange parsed = doParse(range, includePrerelease, loose);
         CACHE.put(key, parsed == null ? INVALID : parsed);
         return parsed;
     }
 
-    private static @Nullable UnionRange doParse(String range, boolean includePrerelease) {
+    // Port of node-semver classes/range.js constructor.
+    private static @Nullable UnionRange doParse(String range, boolean includePrerelease, boolean loose) {
+        String raw = range.trim().replaceAll("\\s+", " ");
         List<List<NodeComparand>> set = new ArrayList<>();
-        for (String group : range.trim().split("\\|\\|", -1)) {
-            List<NodeComparand> comparands = parseGroup(group, includePrerelease);
+        for (String group : raw.split("\\|\\|", -1)) {
+            List<NodeComparand> comparands = parseRange(group.trim(), includePrerelease, loose);
             if (comparands == null) {
                 return null;
             }
-            set.add(comparands);
+            if (!comparands.isEmpty()) {
+                set.add(comparands);
+            }
         }
-        return new UnionRange(range, includePrerelease, set, null);
-    }
-
-    private static @Nullable List<NodeComparand> parseGroup(String groupStr, boolean incPre) {
-        String g = trimOperators(HyphenRange.hyphenReplace(groupStr.trim(), incPre)).trim();
-        String[] pieces = g.isEmpty() ? new String[]{""} : g.split("\\s+");
-        List<NodeComparand> comparands = new ArrayList<>();
-        for (String piece : pieces) {
-            String s = CaretRange.replaceCaret(piece, incPre);
-            s = mapTokens(s, incPre, TildeRange::replaceTilde);
-            s = mapTokens(s, incPre, XRange::replaceXRange);
-            s = mapTokens(s, incPre, (token, ignored) -> XRange.replaceStar(token));
-            String st = s.trim();
-            if (st.isEmpty()) {
-                comparands.add(NodeComparand.parse(""));
-            } else {
-                for (String tok : st.split("\\s+")) {
-                    NodeComparand c = NodeComparand.parse(tok);
-                    if (c == null) {
-                        return null;
+        if (set.isEmpty()) {
+            return null;
+        }
+        if (set.size() > 1) {
+            List<NodeComparand> first = set.get(0);
+            List<List<NodeComparand>> notNull = new ArrayList<>();
+            for (List<NodeComparand> c : set) {
+                if (!c.get(0).isNullSet()) {
+                    notNull.add(c);
+                }
+            }
+            set = notNull;
+            if (set.isEmpty()) {
+                set.add(first);
+            } else if (set.size() > 1) {
+                for (List<NodeComparand> c : set) {
+                    if (c.size() == 1 && c.get(0).isAny()) {
+                        set = new ArrayList<>();
+                        set.add(c);
+                        break;
                     }
-                    comparands.add(c);
                 }
             }
         }
-        return comparands;
+        return new UnionRange(range, includePrerelease, loose, set, null);
     }
 
-    private interface TokenFn {
-        String apply(String token, boolean incPre);
+    // Port of node-semver classes/range.js parseRange; null when a comparator is invalid.
+    private static @Nullable List<NodeComparand> parseRange(String range, boolean incPre, boolean loose) {
+        range = BUILD_STRIP.matcher(range).replaceAll("");
+        range = HyphenRange.hyphenReplace(range, incPre, loose);
+        range = COMPARATOR_TRIM.matcher(range).replaceAll("$1$2$3");
+        range = TILDE_TRIM.matcher(range).replaceAll("$1~");
+        range = CARET_TRIM.matcher(range).replaceAll("$1^");
+
+        String[] comps = range.split(" ", -1);
+        StringBuilder joined = new StringBuilder();
+        for (int i = 0; i < comps.length; i++) {
+            if (i > 0) {
+                joined.append(' ');
+            }
+            joined.append(parseComparator(comps[i], incPre, loose));
+        }
+        List<String> rangeList = new ArrayList<>();
+        for (String comp : joined.toString().split("\\s+", -1)) {
+            rangeList.add((incPre ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
+        }
+        if (loose) {
+            rangeList.removeIf(comp -> !NodeComparand.COMPARATOR_LOOSE.matcher(comp).find());
+        }
+
+        Map<String, NodeComparand> rangeMap = new LinkedHashMap<>();
+        for (String comp : rangeList) {
+            NodeComparand c = NodeComparand.parse(comp, loose);
+            if (c == null) {
+                return null;
+            }
+            if (c.isNullSet()) {
+                List<NodeComparand> nullSet = new ArrayList<>();
+                nullSet.add(c);
+                return nullSet;
+            }
+            rangeMap.put(c.value(), c);
+        }
+        if (rangeMap.size() > 1) {
+            rangeMap.remove("");
+        }
+        return new ArrayList<>(rangeMap.values());
     }
 
-    private static String mapTokens(String s, boolean incPre, TokenFn fn) {
-        String[] parts = s.trim().split("\\s+");
+    private static String parseComparator(String comp, boolean incPre, boolean loose) {
+        comp = BUILD_STRIP.matcher(comp).replaceFirst("");
+        comp = mapTokens(comp.trim(), token -> CaretRange.replaceCaret(token, incPre, loose));
+        comp = mapTokens(comp.trim(), token -> TildeRange.replaceTilde(token, incPre, loose));
+        comp = mapTokens(comp, token -> XRange.replaceXRange(token, incPre, loose));
+        return STAR.matcher(comp.trim()).replaceFirst("");
+    }
+
+    private static String mapTokens(String s, UnaryOperator<String> fn) {
         StringBuilder sb = new StringBuilder();
-        for (String part : parts) {
-            if (sb.length() > 0) {
+        String[] parts = s.split("\\s+", -1);
+        for (int i = 0; i < parts.length; i++) {
+            if (i > 0) {
                 sb.append(' ');
             }
-            sb.append(fn.apply(part, incPre));
+            sb.append(fn.apply(parts[i]));
         }
         return sb.toString();
     }
 
-    private static String trimOperators(String s) {
-        String out = s.replaceAll("(~>?|\\^)\\s+", "$1");
-        return out.replaceAll("(<=?|>=?|=)\\s+", "$1");
+    // Port of node-semver classes/range.js intersects.
+    boolean intersects(UnionRange range) {
+        for (List<NodeComparand> thisComparators : set) {
+            if (!isSatisfiable(thisComparators)) {
+                continue;
+            }
+            for (List<NodeComparand> rangeComparators : range.set) {
+                if (isSatisfiable(rangeComparators) && allIntersect(thisComparators, rangeComparators)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean allIntersect(List<NodeComparand> thisComparators, List<NodeComparand> rangeComparators) {
+        for (NodeComparand thisComparator : thisComparators) {
+            for (NodeComparand rangeComparator : rangeComparators) {
+                if (!thisComparator.intersects(rangeComparator, loose, includePrerelease)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean isSatisfiable(List<NodeComparand> comparators) {
+        List<NodeComparand> remaining = new ArrayList<>(comparators);
+        NodeComparand testComparator = remaining.remove(remaining.size() - 1);
+        boolean result = true;
+        while (result && !remaining.isEmpty()) {
+            for (NodeComparand other : remaining) {
+                if (!testComparator.intersects(other, loose, includePrerelease)) {
+                    result = false;
+                    break;
+                }
+            }
+            testComparator = remaining.remove(remaining.size() - 1);
+        }
+        return result;
+    }
+
+    // node-semver Range.test(string): the version parses under this range's looseness.
+    boolean test(String version, boolean loose) {
+        ParsedVersion v = ParsedVersion.parseNode(version, loose);
+        return v.isStrictSemver() && test(v);
+    }
+
+    // node-semver Range.range.
+    String range() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < set.size(); i++) {
+            if (i > 0) {
+                sb.append("||");
+            }
+            List<NodeComparand> comps = set.get(i);
+            for (int k = 0; k < comps.size(); k++) {
+                if (k > 0) {
+                    sb.append(' ');
+                }
+                sb.append(comps.get(k).value().trim());
+            }
+        }
+        return sb.toString();
     }
 
     boolean test(ParsedVersion version) {
@@ -186,25 +321,7 @@ class UnionRange implements VersionComparator {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < set.size(); i++) {
-            if (i > 0) {
-                sb.append("||");
-            }
-            StringBuilder group = new StringBuilder();
-            for (NodeComparand c : set.get(i)) {
-                String v = c.toString();
-                if (v.isEmpty()) {
-                    continue;
-                }
-                if (group.length() > 0) {
-                    group.append(' ');
-                }
-                group.append(v);
-            }
-            sb.append(group);
-        }
-        return sb.toString();
+        return range();
     }
 
     // --- corpus-facing operations (exercised by the node-semver conformance suite) ---

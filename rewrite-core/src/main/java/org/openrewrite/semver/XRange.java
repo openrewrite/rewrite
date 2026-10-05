@@ -39,8 +39,17 @@ public class XRange extends LatestRelease {
             "[v=\\s]*(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")(?:\\.(" + XRANGE_ID + ")" +
                     ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)?)?";
 
+    static final String XRANGE_ID_LOOSE = "\\d+|x|X|\\*";
+
+    // node-semver XRANGEPLAINLOOSE.
+    static final String XRANGE_PLAIN_LOOSE =
+            "[v=\\s]*(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")(?:\\.(" + XRANGE_ID_LOOSE + ")" +
+                    ParsedVersion.PRERELEASE_GROUP_LOOSE + "?" + ParsedVersion.BUILD + "?)?)?";
+
     // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
     private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
+
+    private static final Pattern NODE_X_RANGE_PATTERN_LOOSE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN_LOOSE + "$");
 
     private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
 
@@ -159,12 +168,20 @@ public class XRange extends LatestRelease {
 
     // Port of node-semver range.js replaceXRange; tokens without wildcard or partial components pass through.
     static String replaceXRange(String token, boolean incPre) {
-        Matcher m = NODE_X_RANGE_PATTERN.matcher(token.trim());
+        return replaceXRange(token, incPre, false);
+    }
+
+    static String replaceXRange(String token, boolean incPre, boolean loose) {
+        String comp = token.trim();
+        Matcher m = (loose ? NODE_X_RANGE_PATTERN_LOOSE : NODE_X_RANGE_PATTERN).matcher(comp);
         if (!m.matches()) {
-            return token;
+            return comp;
         }
         String gtlt = m.group(1);
         String mj = m.group(2), mn = m.group(3), p = m.group(4);
+        if ((isX(mj) && !isX(mn)) || (isX(mn) && p != null && !isX(p))) {
+            return comp;
+        }
         boolean xM = isX(mj);
         boolean xm = xM || isX(mn);
         boolean xp = xm || isX(p);
@@ -211,7 +228,7 @@ public class XRange extends LatestRelease {
         if (xp) {
             return ">=" + mj + "." + mn + ".0" + pr + " <" + mj + "." + NodeComparand.incr(mn) + ".0-0";
         }
-        return token;
+        return comp;
     }
 
     // node-semver's star replacement: a bare or operator-prefixed * collapses to the ANY clause.
