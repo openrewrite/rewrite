@@ -1,10 +1,7 @@
 """Facade orchestration: one isolated child per bundle.
 
-An installed bundle is keyed by distribution name and lives in a venv under the install root. An
-attached bundle is keyed by the absolute path of a venv its caller built, so it never shares a venv
-or child with a published namesake. Recipe ownership is first-wins across installed bundles, and an
-attached bundle takes over the recipes it lists. ``venv_ops`` and ``spawn`` are injectable for
-testing.
+Installed bundles are keyed by distribution name, attached ones by the path of the venv their caller
+built. Recipe ownership is first-wins across installed bundles, and an attached bundle overrides it.
 """
 import os
 from pathlib import Path

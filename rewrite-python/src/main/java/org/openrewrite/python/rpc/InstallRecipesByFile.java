@@ -25,9 +25,6 @@ import java.nio.file.Path;
 class InstallRecipesByFile implements RpcRequest {
     Path recipes;
 
-    /**
-     * A venv the caller built with {@link #recipes} installed, or null to have the server install it.
-     */
     @Nullable
     Path venv;
 }
