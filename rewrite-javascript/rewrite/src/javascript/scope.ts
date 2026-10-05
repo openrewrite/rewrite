@@ -559,6 +559,8 @@ export function declarationsOf(statement: J | undefined): J.VariableDeclarations
  * variable, a type parameter — nor one drawn from a namespace of its own: a statement label,
  * declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop. Position is all this
  * reads: an import specifier's own name answers true, and a type position reads alike to a value.
+ * A shorthand property `{x}` answers false though it also reads `x`, since a rename has to expand
+ * it to `{x: y}`.
  */
 export function isValueReference(cursor: Cursor, identifier: J.Identifier): boolean {
     let c: Cursor | undefined = cursor.parent;
@@ -597,10 +599,7 @@ function holds(slot: unknown, identifier: J.Identifier): boolean {
     return slot === identifier || (slot as { element?: unknown } | undefined)?.element === identifier;
 }
 
-/**
- * As {@link references}, for a collector rather than a renamer: a shorthand property's name slot is
- * also the value it reads, which a rename has to expand rather than follow.
- */
+/** As {@link references}, for a collector rather than a renamer, so a shorthand property counts. */
 function reads(identifier: J.Identifier, parent: unknown): boolean {
     const owner = parent as { kind?: string; initializer?: unknown } | undefined;
     return (owner?.kind === JS.Kind.PropertyAssignment && owner.initializer === undefined) ||

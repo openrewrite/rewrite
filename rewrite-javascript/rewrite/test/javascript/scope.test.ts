@@ -361,4 +361,8 @@ describe('isValueReference', () => {
             expect(await targetsReference(source)).not.toContain(false);
         }
     });
+
+    test('a shorthand property answers as the name it is, though it also reads the binding', async () => {
+        expect(await targetsReference('const o = {target};')).toEqual([false]);
+    });
 });
