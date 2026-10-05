@@ -33,21 +33,33 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Port of @npmcli/arborist test/yarn-lock.js. The yarn-stuff fixture, the trees and what arborist
+ * Port of @npmcli/arborist test/yarn-lock.js. Its two yarn.lock fixtures, the trees and what arborist
  * writes for them are in the yarn-lock-dumps fixture (npm-arborist/generate/yarn-lock-dumps.js).
  */
 class YarnLockTest {
 
     private static final JsonNode DUMPS = fixture("yarn-lock-dumps");
 
-    @Test
-    void yarnStuff() {
-        JsonNode yarnStuff = DUMPS.get("fixture");
-        YarnLock yarnLock = new YarnLock().parse(yarnStuff.get("input").asText());
+    static Stream<Arguments> fixtures() {
+        List<Arguments> fixtures = new ArrayList<>();
+        for (JsonNode f : DUMPS.get("fixtures")) {
+            String[] output = f.get("input").asText().split("\n", -1);
+            for (JsonNode changed : f.get("changedLines")) {
+                output[changed.get(0).asInt()] = changed.get(1).asText();
+            }
+            fixtures.add(Arguments.of(f.get("name").asText(), f.get("input").asText(), String.join("\n", output),
+                    NpmTreeSupport.<List<String>>json(f.get("specs"))));
+        }
+        return fixtures.stream();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("fixtures")
+    void yarnLockFixture(String name, String input, String output, List<String> specs) {
+        YarnLock yarnLock = new YarnLock().parse(input);
         String lockOutput = yarnLock.toString();
-        assertThat(lockOutput).as("generated output from input").isEqualTo(yarnStuff.get("output").asText());
-        assertThat(new ArrayList<>(yarnLock.getEntries().keySet()))
-          .isEqualTo(NpmTreeSupport.<List<String>>json(yarnStuff.get("specs")));
+        assertThat(lockOutput).as("generated output from input").isEqualTo(output);
+        assertThat(new ArrayList<>(yarnLock.getEntries().keySet())).isEqualTo(specs);
 
         YarnLock yarnLock2 = new YarnLock().parse(lockOutput);
         assertThat(yarnLock2.getEntries().keySet()).as("same parsed result from string output")

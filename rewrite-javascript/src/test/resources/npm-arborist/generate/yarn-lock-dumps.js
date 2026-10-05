@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Expectations for YarnLockTest, from the arborist npm bundles: test/yarn-lock.js's yarn-stuff fixture
-// (input and regenerated output) and the yarn.lock arborist writes for the trees that test declares inline.
+// Expectations for YarnLockTest, from the arborist npm bundles: test/yarn-lock.js's two fixtures (the input,
+// and the lines of the regenerated output that differ from it) and the yarn.lock arborist writes for the
+// trees that test declares inline.
 // Usage: node yarn-lock-dumps.js <npm/cli checkout>/workspaces/arborist > ../yarn-lock-dumps
 const fs = require('fs')
 const path = require('path')
@@ -22,9 +23,23 @@ const npm = require('./npm-modules.js')
 const Node = npm('@npmcli/arborist/lib/node.js')
 const YarnLock = npm('@npmcli/arborist/lib/yarn-lock.js')
 
-const input = fs.readFileSync(path.join(process.argv[2], 'test/fixtures/yarn-stuff/yarn.lock'), 'utf8')
+const fixtures = ['tap-with-yarn-lock', 'yarn-stuff'].map(name => {
+  const input = fs.readFileSync(path.join(process.argv[2], 'test/fixtures', name, 'yarn.lock'), 'utf8')
+  const parsed = new YarnLock().parse(input)
+  const before = input.split('\n')
+  const after = parsed.toString().split('\n')
+  if (before.length !== after.length) {
+    throw new Error(`${name}: ${before.length} lines in, ${after.length} out`)
+  }
+  const changedLines = []
+  after.forEach((line, i) => {
+    if (line !== before[i]) {
+      changedLines.push([i, line])
+    }
+  })
+  return { name, input, changedLines, specs: [...parsed.entries.keys()] }
+})
 process.chdir('/')
-const parsed = new YarnLock().parse(input)
 
 const trees = [
   {
@@ -133,7 +148,4 @@ for (const t of trees) {
   t.expected = new YarnLock().fromTree(new Node(JSON.parse(JSON.stringify(t.tree)))).toString()
 }
 
-console.log(JSON.stringify({
-  fixture: { input, output: parsed.toString(), specs: [...parsed.entries.keys()] },
-  trees,
-}, null, 1))
+console.log(JSON.stringify({ fixtures, trees }, null, 1))
