@@ -29,6 +29,22 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+
+    // Zinc's util-logging still pins log4j 2.17.1 (as of sbt 2.0.0-M2), so raise it here.
+    // Log4j publishes 3.0.0 betas as releases, hence the 2.x range rather than latest.release.
+    constraints {
+        zinc("org.apache.logging.log4j:log4j-api:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-49844")
+        }
+        zinc("org.apache.logging.log4j:log4j-core:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-34480, CVE-2025-68161, CVE-2026-49844")
+        }
+    }
+}
+
+// sbt's JLine 2 fork (CVE-2023-50572) only backs util-logging's interactive terminal, which Gradle's Zinc integration never opens.
+configurations.named("zinc") {
+    exclude(group = "org.scala-sbt.jline", module = "jline")
 }
 
 // Scala publishes release candidates as full Maven Central releases (3.10.0-RC1 today), with a
