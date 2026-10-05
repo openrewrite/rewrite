@@ -220,6 +220,41 @@ class SpecTest {
         assertThat(Spec.npa("./package.tar gz").getType()).isEqualTo(Spec.Type.DIRECTORY);
     }
 
+    // test/invalid-url.js
+    @Test
+    void unsupportedProtocol() {
+        assertThatThrownBy(() -> Spec.npa("foo@gopher://goodluckwiththat"))
+          .isInstanceOf(Spec.InvalidSpecException.class)
+          .satisfies(e -> assertThat(((Spec.InvalidSpecException) e).getCode()).isEqualTo("EUNSUPPORTEDPROTOCOL"));
+    }
+
+    // test/realize-package-specifier.js
+    @Test
+    void realizePackageSpecifier() {
+        assertThat(Spec.npa("a.tar.gz", "/test/a/b").getType()).as("local tarball").isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.npa("d", "/test/a/b").getType()).as("remote package").isEqualTo(Spec.Type.RANGE);
+        assertThat(Spec.npa("file:./a.tar.gz", "/test/a/b").getType()).as("local tarball").isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.npa("file:./b", "/test/a/b").getType()).as("local package directory").isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(Spec.npa("file:./c", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(Spec.npa("file:./d", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
+    }
+
+    @Test
+    void namedRealizePackageSpecifier() {
+        assertThat(Spec.npa("a@a.tar.gz", "/test/a/b").getType()).as("named local tarball").isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.npa("d@d", "/test/a/b").getType()).as("remote package").isEqualTo(Spec.Type.TAG);
+        assertThat(Spec.npa("a@file:./a.tar.gz", "/test/a/b").getType()).isEqualTo(Spec.Type.FILE);
+        assertThat(Spec.npa("b@file:./b", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(Spec.npa("c@file:./c", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(Spec.npa("d@file:./d", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
+        Spec hosted = Spec.npa("e@e/2", "test/a/b");
+        assertThat(hosted.getType()).as("hosted package dependency is git").isEqualTo(Spec.Type.GIT);
+        assertThat(hosted.getHosted()).isNotNull();
+        assertThat(hosted.getHosted().getType()).as("github package dependency").isEqualTo("github");
+        assertThat(Spec.npa("e@1", "/test/a/b").getType()).as("range like specifier is never a local file").isEqualTo(Spec.Type.RANGE);
+        assertThat(Spec.npa("e@1.0.0", "/test/a/b").getType()).as("version like specifier is never a local file").isEqualTo(Spec.Type.VERSION);
+    }
+
     @Test
     void posixFileSpecs() {
         Spec local = Spec.npa("./local");
