@@ -1,0 +1,12 @@
+{
+  "name": "version-selector-miss",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-odd": "3.0.1"
+  },
+  "overrides": {
+    "is-odd@^2.0.0": {
+      "is-number": "7.0.0"
+    }
+  }
+}

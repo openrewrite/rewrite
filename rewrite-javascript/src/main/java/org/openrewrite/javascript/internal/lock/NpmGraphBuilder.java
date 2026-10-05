@@ -67,14 +67,6 @@ public final class NpmGraphBuilder {
      */
     private final Map<String, Set<String>> lockedVersions;
 
-    private final Map<String, String> overrides;
-
-    private final Set<String> appliedOverrides = new LinkedHashSet<>();
-
-    public Set<String> getAppliedOverrides() {
-        return appliedOverrides;
-    }
-
     /**
      * A peer whose name resolves to several versions is satisfied per placement: each placement of its
      * requirer sees the nearest copy up its {@code node_modules} chain. Only a serializer that models placement can
@@ -82,6 +74,8 @@ public final class NpmGraphBuilder {
      * to verify; otherwise it defers.
      */
     private final boolean placedPeerForks;
+
+    private final Map<String, String> overrides;
 
     public NpmGraphBuilder(Registry registry) {
         this(registry, false);
@@ -155,7 +149,8 @@ public final class NpmGraphBuilder {
             Map<String, String> importerResolved = new LinkedHashMap<>();
             for (Map<String, String> scope : decl.scopes.values()) {
                 for (Map.Entry<String, String> dep : scope.entrySet()) {
-                    importerResolved.put(dep.getKey(), resolvedVersionOf(dep.getKey(), dep.getValue(), chosen));
+                    importerResolved.put(dep.getKey(),
+                            resolvedVersionOf(dep.getKey(), overrides.getOrDefault(dep.getKey(), dep.getValue()), chosen));
                 }
             }
             // peerDependencies trails the resolved scopes so the writer mirrors npm's root-entry field order.
@@ -206,11 +201,7 @@ public final class NpmGraphBuilder {
                           Map<String, Set<String>> chosen, Map<String, VersionManifest> manifests,
                           Deque<String[]> work) {
         // Must precede the dedupe below: an override applied after it would lose to an already-chosen version.
-        String override = overrides.get(name);
-        if (override != null) {
-            appliedOverrides.add(name);
-            range = override;
-        }
+        range = overrides.getOrDefault(name, range);
         String deduped = Semver.maxSatisfying(chosen.getOrDefault(name, emptySet()), range, NODE);
         if (deduped != null) {
             return deduped;
@@ -254,7 +245,6 @@ public final class NpmGraphBuilder {
             // npm 11 does not apply an override keyed on the real name to an aliased slot, so only the alias
             // name refuses here; selectAlias bypasses select, so it would otherwise be skipped in silence.
             if (overrides.containsKey(name)) {
-                appliedOverrides.add(name);
                 throw new EngineFailure(RESOLUTION_REQUIRED, name,
                         "override of aliased dependency " + name + " (" + spec + ") is not supported");
             }
@@ -561,7 +551,6 @@ public final class NpmGraphBuilder {
         for (String[] miss : missing) {
             // resolveLeafPeer bypasses select, so an override naming this peer would be skipped silently.
             if (overrides.containsKey(miss[1])) {
-                appliedOverrides.add(miss[1]);
                 throw new EngineFailure(RESOLUTION_REQUIRED, miss[1],
                         "override of auto-installed peer " + miss[1] + " (required by " + miss[0] + ") is not supported");
             }

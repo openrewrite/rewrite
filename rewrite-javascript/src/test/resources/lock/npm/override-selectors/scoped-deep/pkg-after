@@ -1,0 +1,12 @@
+{
+  "name": "scoped-deep",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-even": "1.0.0"
+  },
+  "overrides": {
+    "is-even": {
+      "is-number": "7.0.0"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "x",
+  "dependencies": {
+    "is-number": "7.0.0",
+    "kind-of": "3.2.2"
+  },
+  "resolutions": {
+    "is-buffer": "2.0.0"
+  }
+}

@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.EntryMetadata;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.internal.registry.VersionManifest;
+import org.openrewrite.semver.Semver;
 import org.yaml.snakeyaml.Yaml;
 
 import java.util.*;
@@ -44,10 +45,17 @@ final class YarnBerryLockDiff {
     private YarnBerryLockDiff() {
     }
 
-    static List<PackageEdit> diff(ResolutionGraph graph, String existingLock) {
+    /**
+     * @param overrides    applied resolutions by package name; an edge they reach is keyed by the resolution's
+     *                     range, not the requirer's, as berry records it
+     * @param scopedParent for a {@code parent/child} resolution, the parent (optionally {@code @range}) whose own
+     *                     edges it reaches
+     */
+    static List<PackageEdit> diff(ResolutionGraph graph, String existingLock, Map<String, String> overrides,
+                                  Map<String, String> scopedParent) {
         ResolutionGraph.Importer root = singleRootImporter(graph);
         Lock lock = Lock.parse(existingLock);
-        Map<String, Set<String>> descriptors = collectDescriptors(graph);
+        Map<String, Set<String>> descriptors = collectDescriptors(graph, overrides, scopedParent);
 
         Map<String, ResolvedNode> byName = new LinkedHashMap<>();
         for (Map.Entry<String, ResolvedNode> e : graph.getNodes().entrySet()) {
@@ -122,6 +130,7 @@ final class YarnBerryLockDiff {
                 .newVersion(m.getVersion())
                 .newResolved(dist.getTarball())
                 .newDependencies(notEmpty(m.getDependencies()) ? m.getDependencies() : null)
+                .newConstraint(targetRanges.iterator().next())
                 .metadata(peerMetadata(m))
                 .scope(declaringScope(root, m.getName()))
                 .importerDir(null)
@@ -222,7 +231,8 @@ final class YarnBerryLockDiff {
      * For each resolved node, the merged set of ranges — the importer's declared one and every transitive
      * requirer's — that resolved to it.
      */
-    private static Map<String, Set<String>> collectDescriptors(ResolutionGraph graph) {
+    private static Map<String, Set<String>> collectDescriptors(ResolutionGraph graph, Map<String, String> overrides,
+                                                               Map<String, String> scopedParent) {
         Map<String, Set<String>> byNode = new TreeMap<>();
         for (ResolutionGraph.Importer imp : graph.getImporters()) {
             for (Map.Entry<String, Map<String, String>> scope : imp.getDeclared().entrySet()) {
@@ -230,7 +240,9 @@ final class YarnBerryLockDiff {
                     continue;
                 }
                 for (Map.Entry<String, String> dep : scope.getValue().entrySet()) {
-                    add(byNode, dep.getKey(), imp.getResolved().get(dep.getKey()), dep.getValue());
+                    String range = scopedParent.containsKey(dep.getKey()) ? dep.getValue() :
+                            overrides.getOrDefault(dep.getKey(), dep.getValue());
+                    add(byNode, dep.getKey(), imp.getResolved().get(dep.getKey()), range);
                 }
             }
         }
@@ -238,11 +250,24 @@ final class YarnBerryLockDiff {
             Map<String, String> deps = node.getManifest().getDependencies();
             if (deps != null) {
                 for (Map.Entry<String, String> dep : deps.entrySet()) {
-                    add(byNode, dep.getKey(), node.getResolvedEdges().get(dep.getKey()), dep.getValue());
+                    String parent = scopedParent.get(dep.getKey());
+                    boolean reached = overrides.containsKey(dep.getKey()) && (parent == null ||
+                            parentOf(parent, node.getManifest()));
+                    add(byNode, dep.getKey(), node.getResolvedEdges().get(dep.getKey()),
+                            reached ? overrides.get(dep.getKey()) : dep.getValue());
                 }
             }
         }
         return byNode;
+    }
+
+    /** Whether {@code m} is the {@code name[@range]} a {@code parent/child} resolution names. */
+    private static boolean parentOf(String parent, VersionManifest m) {
+        int at = parent.lastIndexOf('@');
+        return at > 0 ?
+                parent.substring(0, at).equals(m.getName()) &&
+                Semver.satisfies(m.getVersion(), parent.substring(at + 1), Semver.Ecosystem.NODE) :
+                parent.equals(m.getName());
     }
 
     private static void add(Map<String, Set<String>> byNode, String name, @Nullable String version, String range) {

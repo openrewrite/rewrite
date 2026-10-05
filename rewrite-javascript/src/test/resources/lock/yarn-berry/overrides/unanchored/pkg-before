@@ -1,0 +1,6 @@
+{
+  "name": "x",
+  "dependencies": {
+    "is-odd": "0.1.2"
+  }
+}

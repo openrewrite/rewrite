@@ -121,9 +121,15 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         return root;
     }
 
-    /** The merged {@code name@npm:range} descriptor: every range that resolves to this member, sorted. */
+    /**
+     * The merged {@code name@npm:range} descriptor: every range that resolves to this member, sorted. A range the
+     * diff already settled (a resolution's, which replaces every requirer's own) is used as is.
+     */
     private static String descriptorFor(PackageEdit edit, List<PackageEdit> adds, @Nullable String editedPackageJson) {
         String name = edit.getName();
+        if (edit.getNewConstraint() != null) {
+            return name + "@npm:" + edit.getNewConstraint();
+        }
         Set<String> ranges = new TreeSet<>();
         String declared = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
         if (declared != null) {
@@ -509,6 +515,11 @@ public final class YarnBerryLockPatcher implements LockPatcher {
         body = LockYaml.setScalar(body, "version", edit.getNewVersion());
         body = LockYaml.setScalar(body, "resolution", name + "@npm:" + edit.getNewVersion());
         body = LockYaml.setScalar(body, "checksum", edit.getNewBerryChecksum());
+        body = rewriteDependencies(body, edit.getNewDependencies(), name);
+        if (edit.isPrunesOrphans()) {
+            recordDroppedEdges(body, edit.getNewDependencies());
+            body = pruneDependencies(body, edit.getNewDependencies());
+        }
         return LockYaml.replaceEntry(root, oldDescriptor,
                 LockYaml.renameKey(entry, name + "@npm:" + edit.getNewConstraint()).withValue(body));
     }

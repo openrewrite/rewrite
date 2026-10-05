@@ -31,17 +31,13 @@ import static org.openrewrite.javascript.internal.lock.YarnLock.unwrap;
  * expresses the difference as {@link PackageEdit}s for {@link YarnClassicLockPatcher} — so untouched blocks keep
  * their bytes and only what the resolution actually changed is rewritten. yarn v1 is flat: one block per resolved
  * {@code name@version}, headed by every {@code name@range} selector that resolves to it. Nodes match blocks of the
- * same name version-by-version (a lone leftover pair is an in-place move); a matched block whose selector set
- * gained a range merges it in place, unmatched graph nodes become sorted block inserts, and unmatched lock blocks
- * are removals. yarn records no peer surface at all, so a satisfied-peer closure diffs like a peer-free one. A
- * difference the patcher cannot express byte-exactly — a merged header that must split, a block gaining a
- * dependency line, an {@code optionalDependencies} section — fails loud rather than guess.
+ * same name version-by-version (a lone leftover pair is an in-place move); the graph is the whole closure, so each
+ * changed, moved or inserted block carries its complete selector set for the patcher to write, and unmatched lock
+ * blocks are removals. yarn records no peer surface at all, so a satisfied-peer closure diffs like a peer-free one.
+ * A difference the patcher cannot express byte-exactly — a block gaining a dependency line, an
+ * {@code optionalDependencies} section — fails loud rather than guess.
  */
 final class YarnClassicLockDiff {
-
-    /** The scope precedence {@code LockManifests.declaredConstraint} uses when the patcher re-reads the manifest. */
-    private static final List<String> MANIFEST_SCOPES = Arrays.asList(
-            "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
 
     private YarnClassicLockDiff() {
     }
@@ -69,7 +65,7 @@ final class YarnClassicLockDiff {
                     edits, fresh, orphaned);
         }
         for (String nodeKey : fresh) {
-            edits.add(addEdit(graph, root, selectors, nodeKey, fresh));
+            edits.add(addEdit(graph, root, selectors, nodeKey));
         }
         for (Block block : orphaned) {
             for (String range : block.ranges) {
@@ -132,75 +128,38 @@ final class YarnClassicLockDiff {
     }
 
     /**
-     * The edit for a node whose block already holds its version: nothing when the selector set matches; a
-     * selector-merge when the block only gained a range; a header re-pin when a lone selector was replaced.
-     * A merged header that must drop a selector needs splitting, which defers.
+     * The edit for a node whose block already holds its version: nothing when the selector set matches, else a
+     * re-head to exactly the ranges that now resolve to it.
      */
     private static @Nullable PackageEdit boundEdit(ResolutionGraph graph, ResolutionGraph.Importer root,
                                                    Map<String, Set<String>> selectors, String name,
                                                    String nodeKey, Block block) {
         Set<String> expected = expectedSelectors(selectors, name, nodeKey);
-        Set<String> installed = new LinkedHashSet<>(block.ranges);
-        if (expected.equals(installed)) {
+        if (expected.equals(new LinkedHashSet<>(block.ranges))) {
             return null;
         }
-        Set<String> lost = new LinkedHashSet<>(installed);
-        lost.removeAll(expected);
-        Set<String> gained = new LinkedHashSet<>(expected);
-        gained.removeAll(installed);
-        String version = versionOf(nodeKey);
-        String scope = declaringScope(root, name);
-
-        if (lost.isEmpty()) {
-            if (gained.size() > 1) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        name + " gains more than one selector; resolution required");
-            }
-            String range = gained.iterator().next();
-            String patcherRange = patcherDeclaredRange(root, scope, name);
-            if (patcherRange != null && !patcherRange.equals(range)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        name + " gains a selector the edited manifest does not declare; resolution required");
-            }
-            return PackageEdit.builder()
-                    .name(name)
-                    .oldVersion(block.version)
-                    .newVersion(version)
-                    .newConstraint(range)
-                    .scope(scope)
-                    .importerDir(null)
-                    .kind(PackageEdit.Kind.PROMOTION)
-                    .build();
-        }
-        if (installed.size() == 1 && expected.size() == 1) {
-            return PackageEdit.builder()
-                    .name(name)
-                    .oldVersion(block.version)
-                    .newVersion(version)
-                    .oldConstraint(block.ranges.get(0))
-                    .newConstraint(expected.iterator().next())
-                    .scope(scope)
-                    .importerDir(null)
-                    .kind(PackageEdit.Kind.FORCED_MOVE)
-                    .build();
-        }
-        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                name + " keeps a merged header that must drop a selector; resolution required");
+        // The graph is the whole closure, so the selector set is every requirer's range: re-head to exactly it.
+        return PackageEdit.builder()
+                .name(name)
+                .oldVersion(block.version)
+                .newVersion(versionOf(nodeKey))
+                .oldConstraint(block.ranges.get(0))
+                .selectors(new ArrayList<>(expected))
+                .scope(declaringScope(root, name))
+                .importerDir(null)
+                .kind(PackageEdit.Kind.PROMOTION)
+                .build();
     }
 
     /**
      * A lone unmatched node/block pair of one name moves in place: a bump when the root declares it, a
-     * forced move for a transitive. The patcher rewrites only a single-selector header, never adds a
-     * dependency line, and has no verified {@code optionalDependencies} serialization — those defer.
+     * forced move for a transitive, re-headed to its full selector set. The patcher never adds a dependency line
+     * and has no verified {@code optionalDependencies} serialization — those defer.
      */
     private static PackageEdit moveEdit(ResolutionGraph graph, ResolutionGraph.Importer root,
                                         Map<String, Set<String>> selectors, String name,
                                         String nodeKey, Block block) {
         Set<String> expected = expectedSelectors(selectors, name, nodeKey);
-        if (block.ranges.size() != 1 || expected.size() != 1) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " moves on a merged selector list; resolution required");
-        }
         ResolvedNode node = graph.getNodes().get(nodeKey);
         VersionManifest m = node.getManifest();
         if (block.hasOptionalSection || notEmpty(m.getOptionalDependencies())) {
@@ -214,14 +173,8 @@ final class YarnClassicLockDiff {
         }
 
         String version = versionOf(nodeKey);
-        String newRange = expected.iterator().next();
         String scope = declaringScope(root, name);
         boolean rootDeclared = version.equals(root.getResolved().get(name)) && declaredRange(root, name) != null;
-        if (rootDeclared && !newRange.equals(patcherDeclaredRange(root, scope, name))) {
-            // applyEdit re-reads the new selector from the edited manifest; it must agree with the resolution.
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " moves under a selector the edited manifest does not declare; resolution required");
-        }
         VersionManifest.Dist dist = requireLocator(m);
         return PackageEdit.builder()
                 .name(name)
@@ -232,7 +185,7 @@ final class YarnClassicLockDiff {
                 .newShasum(dist.getShasum())
                 .newDependencies(notEmpty(m.getDependencies()) ? m.getDependencies() : null)
                 .oldConstraint(block.ranges.get(0))
-                .newConstraint(rootDeclared ? null : newRange)
+                .selectors(new ArrayList<>(expected))
                 .scope(scope)
                 .importerDir(null)
                 .kind(rootDeclared ? PackageEdit.Kind.BUMP : PackageEdit.Kind.FORCED_MOVE)
@@ -241,12 +194,10 @@ final class YarnClassicLockDiff {
     }
 
     /**
-     * A fresh node inserts as a new sorted block. The patcher derives the header from the edited manifest's
-     * declared range plus the sibling inserts' dependency ranges, so that derivation must land exactly on the
-     * resolved selector set; any other requirer shape defers.
+     * A fresh node inserts as a new sorted block headed by every range that resolves to it.
      */
     private static PackageEdit addEdit(ResolutionGraph graph, ResolutionGraph.Importer root,
-                                       Map<String, Set<String>> selectors, String nodeKey, List<String> fresh) {
+                                       Map<String, Set<String>> selectors, String nodeKey) {
         String name = nameOf(nodeKey);
         VersionManifest m = graph.getNodes().get(nodeKey).getManifest();
         if (notEmpty(m.getOptionalDependencies())) {
@@ -255,21 +206,6 @@ final class YarnClassicLockDiff {
         }
         Set<String> expected = expectedSelectors(selectors, name, nodeKey);
         String scope = declaringScope(root, name);
-        Set<String> derivable = new LinkedHashSet<>();
-        String declared = patcherDeclaredRange(root, scope, name);
-        if (declared != null) {
-            derivable.add(declared);
-        }
-        for (String sibling : fresh) {
-            Map<String, String> deps = graph.getNodes().get(sibling).getManifest().getDependencies();
-            if (deps != null && deps.containsKey(name)) {
-                derivable.add(deps.get(name));
-            }
-        }
-        if (!derivable.equals(expected)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + "'s block header cannot be derived from the edit; resolution required");
-        }
         VersionManifest.Dist dist = requireLocator(m);
         return PackageEdit.builder()
                 .name(name)
@@ -279,6 +215,7 @@ final class YarnClassicLockDiff {
                 .newIntegrity(dist.getIntegrity())
                 .newShasum(dist.getShasum())
                 .newDependencies(notEmpty(m.getDependencies()) ? m.getDependencies() : null)
+                .selectors(new ArrayList<>(expected))
                 .scope(scope)
                 .importerDir(null)
                 .kind(PackageEdit.Kind.ADD)
@@ -350,22 +287,6 @@ final class YarnClassicLockDiff {
         for (Map.Entry<String, Map<String, String>> scope : root.getDeclared().entrySet()) {
             if (scope.getValue().containsKey(name) && !"peerDependencies".equals(scope.getKey())) {
                 return scope.getValue().get(name);
-            }
-        }
-        return null;
-    }
-
-    /** The range {@code LockManifests.declaredConstraint} yields the patcher for {@code name}, or {@code null}. */
-    private static @Nullable String patcherDeclaredRange(ResolutionGraph.Importer root, String preferredScope,
-                                                         String name) {
-        Map<String, String> preferred = root.getDeclared().get(preferredScope);
-        if (preferred != null && preferred.containsKey(name)) {
-            return preferred.get(name);
-        }
-        for (String scope : MANIFEST_SCOPES) {
-            Map<String, String> deps = root.getDeclared().get(scope);
-            if (deps != null && deps.containsKey(name)) {
-                return deps.get(name);
             }
         }
         return null;

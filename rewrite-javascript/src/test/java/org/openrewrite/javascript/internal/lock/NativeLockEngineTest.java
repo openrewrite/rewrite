@@ -797,7 +797,7 @@ class NativeLockEngineTest {
         // No registry is stubbed here, so the whole-closure fallback in resolveAndPatch cannot run: its
         // packument fetch 404s and the NodeRegistryException is swallowed back into this per-dependency
         // deferral. The deferral asserted below is therefore the unreachable-registry path, not proof
-        // that an override defers in general -- see overrideOfALockedTransitiveMustNotSilentlySucceed.
+        // of how an override resolves -- see globalOverrideWithSeveralRequirersResolves.
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
@@ -808,57 +808,18 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
     }
 
-    /** Resolved without the override, the closure would come out unchanged over a lock pinning the old version. */
-    @Test
-    void overrideOfALockedTransitiveMustNotSilentlySucceed() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"name\":\"lodash\",\"dist-tags\":{},\"versions\":{\"4.17.20\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{\"tslib\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\"," +
-                        "\"integrity\":\"sha512-LODASH\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/1.0.0",
-                "{\"name\":\"tslib\",\"version\":\"1.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB1\"}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB2\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib\":\"^2.0.0\"}}",
-                """
-                {
-                  "name": "x",
-                  "lockfileVersion": 3,
-                  "packages": {
-                    "": {"name": "x", "dependencies": {"lodash": "^4.17.20"}},
-                    "node_modules/lodash": {"version": "4.17.20", "dependencies": {"tslib": "^1.0.0"}},
-                    "node_modules/tslib": {"version": "1.0.0"}
-                  }
-                }
-                """);
-
-        // Honoring the override or deferring are both defensible; claiming success is not.
-        assertThat(result.isSuccess() && result.getLockFileContent().contains("\"version\": \"1.0.0\""))
-                .as("must not report success while the lock still pins the overridden transitive")
-                .isFalse();
-    }
-
-    /** One level of nesting is applied; anything deeper the resolver cannot express. */
+    /** One level of nesting is applied; anything deeper the resolver cannot express, so it refuses once reached. */
     @Test
     void deeplyNestedOverrideFailsLoud() {
+        versionedParentRoutes();
+
         Result result = regen(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":{\"b\":{\"c\":\"1.0.0\"}}}}",
-                npmLock("4.17.20"));
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash\":{\"tslib\":{\"c\":\"1.0.0\"}}}}",
+                versionedParentLock());
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).contains("override nested under a");
+        assertThat(result.getFailure().getDetail()).contains("override lodash reaches tslib");
     }
 
     /**
@@ -958,6 +919,26 @@ class NativeLockEngineTest {
                 .isEqualTo("override of tslib references $missing, which is not a direct dependency");
     }
 
+    /** A version-selected leaf key is valid npm this engine does not apply: inert until the closure reaches it. */
+    @Test
+    void versionSelectedLeafKeyIsInertUntilReached() {
+        versionedParentRoutes();
+
+        Result unreached = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"is-odd@1\":\"2.0.0\"}}",
+                versionedParentLock());
+        Result reached = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"tslib@1\":\"2.0.0\"}}",
+                versionedParentLock());
+
+        assertThat(unreached.isSuccess()).as(String.valueOf(unreached.getErrorMessage())).isTrue();
+        assertThat(unreached.getLockFileContent()).isEqualTo(versionedParentLock());
+        assertThat(reached.isSuccess()).isFalse();
+        assertThat(reached.getFailure().getDetail()).contains("override tslib@1 reaches tslib");
+    }
+
     /** Only npm applies overrides so far; the rest refuse rather than emit an untested lock. */
     @Test
     void unrelatedAddIsUnaffectedByAnExistingPnpmOverride() {
@@ -982,6 +963,18 @@ class NativeLockEngineTest {
     void unrelatedAddIsUnaffectedByAnExistingBunOverride() {
         assertUnrelatedAddSucceeds(PackageManager.Bun, "\"overrides\":{\"shared\":\"^2.0.0\"}",
                 bunUnrelatedAddLock("  \"overrides\": {\n    \"shared\": \"^2.0.0\",\n  },\n"));
+    }
+
+    /** bun records every override in its lock and only flat keys are reproduced, so a nested one refuses unreached. */
+    @Test
+    void nestedBunOverrideFailsLoud() {
+        Result result = regen(PackageManager.Bun,
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"overrides\":{\"alpha\":{\"shared\":\"^2.0.0\"}}}",
+                bunUnrelatedAddLock(""));
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("override alpha is not yet applied for Bun");
     }
 
     /**
@@ -1153,10 +1146,7 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).contains("no longer resolved");
     }
 
-    /**
-     * An aliased dependency resolves through selectAlias, which keys the slot by the alias name and never
-     * reaches select, so an override naming it would be skipped without trace. Refuse instead.
-     */
+    /** npm fails with EOVERRIDE: the override rewrites the root's {@code npm:} spec. */
     @Test
     void overrideOfAnAliasedDependencyFailsLoud() {
         routes.put("https://registry.npmjs.org/tslib",
@@ -1176,6 +1166,43 @@ class NativeLockEngineTest {
                   "packages": {
                     "": {"name": "x", "dependencies": {"foo": "npm:tslib@^1.0.0"}},
                     "node_modules/foo": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"}
+                  }
+                }
+                """);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("foo").contains("direct dependency");
+    }
+
+    /**
+     * A dependency's own {@code npm:} alias edge is out of EOVERRIDE's reach, but selectAlias bypasses select, so
+     * a root override naming the alias would be skipped without trace. Refuse instead.
+     */
+    @Test
+    void overrideOfATransitiveAliasFailsLoud() {
+        routes.put("https://registry.npmjs.org/lib",
+                "{\"name\":\"lib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/lib/1.0.0",
+                "{\"name\":\"lib\",\"version\":\"1.0.0\",\"dependencies\":{\"foo\":\"npm:tslib@^1.0.0\"}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lib/-/lib-1.0.0.tgz\",\"integrity\":\"sha512-LIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib",
+                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
+        routes.put("https://registry.npmjs.org/tslib/1.0.0",
+                "{\"name\":\"tslib\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz\",\"integrity\":\"sha512-TSLIB100\"}}");
+        routes.put("https://registry.npmjs.org/tslib/2.0.0",
+                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\",\"integrity\":\"sha512-TSLIB200\"}}");
+
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"lib\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"lib\":\"^1.0.0\"},\"overrides\":{\"foo\":\"^2.0.0\"}}",
+                """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "dependencies": {"lib": "^1.0.0"}},
+                    "node_modules/foo": {"name": "tslib", "version": "1.0.0", "resolved": "https://registry.npmjs.org/tslib/-/tslib-1.0.0.tgz", "integrity": "sha512-TSLIB100"},
+                    "node_modules/lib": {"version": "1.0.0", "resolved": "https://registry.npmjs.org/lib/-/lib-1.0.0.tgz", "integrity": "sha512-LIB100", "dependencies": {"foo": "npm:tslib@^1.0.0"}}
                   }
                 }
                 """);
@@ -1299,7 +1326,7 @@ class NativeLockEngineTest {
      * sees as out of date with its manifest.
      */
     @Test
-    void anOverrideTheLockDoesNotRecordRefuses() {
+    void anAddedOverrideIsRecordedInTheLock() {
         routes.put("https://registry.npmjs.org/alpha",
                 "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
         routes.put("https://registry.npmjs.org/alpha/1.0.0",
@@ -1318,9 +1345,9 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"alpha\":\"^1.0.0\"},\"pnpm\":{\"overrides\":{\"not-in-this-tree\":\"^9.0.0\"}}}",
                 lock);
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail())
-                .isEqualTo("the edit may change the lock's overrides section, which is not written yet");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(lock.replace("\nimporters:",
+                "\noverrides:\n  not-in-this-tree: ^9.0.0\n\nimporters:"));
     }
 
     @Test
@@ -1363,11 +1390,11 @@ class NativeLockEngineTest {
 
     /**
      * PackageJsonOverrides writes a {@code name@version} parent key when a dependencyPath segment carries a
-     * version, and npm applies such an override only while the parent resolves to that version. When it does,
-     * the selector adds nothing to the scoped case already handled.
+     * version. Such a key also overrides the parent itself to that version, so against a direct {@code ^4.17.20}
+     * npm fails with EOVERRIDE.
      */
     @Test
-    void versionedParentKeyAppliesWhenTheParentMatches() {
+    void versionedParentKeyIntersectingADirectRangeRefuses() {
         versionedParentRoutes();
 
         Result result = regen(PackageManager.Npm,
@@ -1375,8 +1402,8 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@4.17.20\":{\"tslib\":\"^2.0.0\"}}}",
                 versionedParentLock());
 
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("tslib-2.0.0.tgz").doesNotContain("tslib-1.0.0.tgz");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("lodash").contains("direct dependency");
     }
 
     @Test
@@ -1397,9 +1424,9 @@ class NativeLockEngineTest {
                 .replace("sha512-TSLIB100", "sha512-TSLIB200"));
     }
 
-    /** The parent resolves to a different version, so npm would not apply it and neither can this. */
+    /** The key's version is outside the declared range, so npm ignores the rule and so does this. */
     @Test
-    void versionedParentKeyRefusesWhenTheParentDiffers() {
+    void versionedParentKeyOutsideADirectRangeIsInert() {
         versionedParentRoutes();
 
         Result result = regen(PackageManager.Npm,
@@ -1407,10 +1434,8 @@ class NativeLockEngineTest {
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"lodash@9.9.9\":{\"tslib\":\"^2.0.0\"}}}",
                 versionedParentLock());
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail())
-                .as("refused for the version mismatch, not for the selector shape")
-                .contains("resolved to 4.17.20");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(versionedParentLock());
     }
 
     @Test
@@ -1509,19 +1534,6 @@ class NativeLockEngineTest {
         assertThat(result.getLockFileContent()).contains("beta");
     }
 
-    /** The other direction: a glob that does name what the edit adds still routes to the scope that refuses it. */
-    @Test
-    void addReachingAGlobResolutionStillFailsLoud() {
-        unrelatedAddRoutes();
-        String ov = "\"resolutions\":{\"**/beta\":\"^1.0.0\"}";
-        Result result = regen(PackageManager.YarnClassic,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}," + ov + "}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}," + ov + "}",
-                yarnClassicLock());
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
-    }
 
     /** A selector bounding no name could select anything, so no edit can be shown to be unrelated to it. */
     @Test
@@ -1551,34 +1563,22 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).isEqualTo("an override selector bounds no package name");
     }
 
-    /**
-     * The whole-closure scope is reached here because there is no pre-edit manifest to scope the edit with. A
-     * glob it cannot read still leaves the closure alone when nothing it could select is in it.
-     */
-    @Test
-    void aGlobResolutionOutsideTheClosureKeepsWholeClosureRegeneration() {
-        Result result = regenWholeClosureUnderResolution("\"resolutions\":{\"**/nowhere\":\"^2.0.0\"}");
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("beta@^1.0.0");
-    }
 
     /** Yarn has no {@code $name} syntax, so to this engine the value is just a spec it cannot read. */
     @Test
-    void anUnresolvableReferenceOutsideTheClosureKeepsWholeClosureRegeneration() {
+    void aReferenceResolutionRefusesWhereYarnClassicWouldRequestIt() {
         Result result = regenWholeClosureUnderResolution("\"resolutions\":{\"nowhere\":\"$nowhere\"}");
 
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("beta@^1.0.0");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).isEqualTo("override nowhere is not yet applied for YarnClassic");
     }
 
     @Test
-    void aGlobResolutionInsideTheClosureRefusesOnTheClosurePath() {
+    void aGlobResolutionInsideTheClosureIsApplied() {
         Result result = regenWholeClosureUnderResolution("\"resolutions\":{\"**/shared\":\"^2.0.0\"}");
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail())
-                .isEqualTo("the closure contains shared, which an override selector reaches");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("shared@^1.0.0, shared@^2.0.0:\n  version \"2.0.0\"");
     }
 
     private Result regenWholeClosureUnderResolution(String resolutions) {
@@ -1612,8 +1612,8 @@ class NativeLockEngineTest {
         Result result = unrelatedAdd(PackageManager.Pnpm, "\"resolutions\":{\"beta\":\"^1.0.0\"}",
                 pnpmUnrelatedAddLock("overrides:\n  beta: ^1.0.0\n\n"));
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).isEqualTo("overrides are not yet applied for Pnpm");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("beta");
     }
 
     /** The unsatisfiable range is the one only pnpm.overrides declares, so reaching it proves that one won. */
@@ -1632,8 +1632,8 @@ class NativeLockEngineTest {
         Result result = unrelatedAdd(PackageManager.Bun, "\"resolutions\":{\"beta\":\"^1.0.0\"}",
                 bunUnrelatedAddLock("  \"overrides\": {\n    \"beta\": \"^1.0.0\",\n  },\n"));
 
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).isEqualTo("overrides are not yet applied for Bun");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).contains("beta");
     }
 
     /** Bun does not merge: an overrides field, even an empty one, hides resolutions whole, so beta is not overridden. */
@@ -1661,7 +1661,7 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail())
-                .isEqualTo("the edit may change the lock's overrides section, which is not written yet");
+                .isEqualTo("override alpha is not yet recorded for Pnpm");
     }
 
     /**
@@ -1676,7 +1676,7 @@ class NativeLockEngineTest {
 
                 """));
         assertThat(pnpm.isSuccess()).isFalse();
-        assertThat(pnpm.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
+        assertThat(pnpm.getFailure().getDetail()).isEqualTo("the lock's overrides section disagrees with the manifest");
 
         Result bun = unrelatedAdd(PackageManager.Bun, "\"private\":true", bunUnrelatedAddLock("""
                   "overrides": {
@@ -1684,14 +1684,14 @@ class NativeLockEngineTest {
                   },
                 """));
         assertThat(bun.isSuccess()).isFalse();
-        assertThat(bun.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
+        assertThat(bun.getFailure().getDetail()).isEqualTo("the lock's overrides section disagrees with the manifest");
 
         Result pnpmFlow = unrelatedAdd(PackageManager.Pnpm, "\"private\":true", pnpmUnrelatedAddLock("""
                 overrides: {beta: ^1.0.0}
 
                 """));
         assertThat(pnpmFlow.isSuccess()).isFalse();
-        assertThat(pnpmFlow.getFailure().getDetail()).isEqualTo("the closure contains beta, which an override selector reaches");
+        assertThat(pnpmFlow.getFailure().getDetail()).isEqualTo("the lock's overrides section disagrees with the manifest");
     }
 
     private Result unrelatedAdd(PackageManager pm, String overrides, String lock) {
@@ -1807,11 +1807,10 @@ class NativeLockEngineTest {
 
 
 
-    // --- requireOverridesHold against a hand-built graph ---------------------------------------------------
+    // --- requireScopedOverridesHold against a hand-built graph ---------------------------------------------
     //
     // A scoped override is applied to the whole closure and proven equivalent afterwards, so every branch of
-    // that proof is a property of the graph alone. Through regen() each needs a registry route and a lock
-    // fixture, and the two direct-dependency branches cannot be told apart by their message.
+    // that proof is a property of the graph alone.
 
     @Test
     void scopedOverrideHoldsWhenTheParentIsTheSoleRequirer() {
@@ -1819,8 +1818,8 @@ class NativeLockEngineTest {
                 node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
                 node("accepts", "1.3.8", emptyMap()));
 
-        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")));
+        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireScopedOverridesHold(graph,
+                singletonMap("accepts", "express")));
     }
 
     @Test
@@ -1831,8 +1830,8 @@ class NativeLockEngineTest {
                 node("accepts", "1.3.8", emptyMap()));
 
         assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")))
+                .isThrownBy(() -> NativeLockEngine.requireScopedOverridesHold(graph,
+                        singletonMap("accepts", "express")))
                 .withMessageContaining("koa also requires it");
     }
 
@@ -1845,44 +1844,47 @@ class NativeLockEngineTest {
                 node("accepts", "1.3.8", emptyMap()));
 
         assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express")))
+                .isThrownBy(() -> NativeLockEngine.requireScopedOverridesHold(graph,
+                        singletonMap("accepts", "express")))
                 .withMessageContaining("koa also requires it");
     }
 
+    /** Decided from the manifest alone, before anything resolves, so no registry route is needed. */
     @Test
     void overrideRefusesWhenAnImporterDeclaresTheNameAtAnotherRange() {
-        ResolutionGraph graph = graphOf(
-                singletonMap("dependencies", singletonMap("accepts", "^1.0.0")),
-                node("accepts", "1.3.8", emptyMap()));
+        Result result = regen(PackageManager.Npm,
+                "{\"dependencies\":{\"accepts\":\"^1.0.0\"}}",
+                "{\"dependencies\":{\"accepts\":\"^1.0.0\"},\"overrides\":{\"accepts\":\"^2.0.0\"}}",
+                npmLock("4.17.20"));
 
-        assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                        singletonMap("accepts", "^2.0.0"), emptyMap()))
-                .withMessageContaining("conflicts with it as a direct dependency (^1.0.0)");
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).contains("conflicts with it as a direct dependency (^1.0.0)");
     }
 
+    /** npm resolves a name declared in several scopes through its devDependencies edge, which the override matches. */
     @Test
     void overrideMatchingTheEffectiveEdgeHoldsBesideAWiderPeerRange() {
-        Map<String, Map<String, String>> declared = new LinkedHashMap<>();
-        declared.put("devDependencies", singletonMap("react", "^18.2.0"));
-        declared.put("peerDependencies", singletonMap("react", "^18"));
-        ResolutionGraph graph = graphOf(declared, node("react", "18.3.1", emptyMap()));
+        routes.put("https://registry.npmjs.org/react",
+                "{\"name\":\"react\",\"dist-tags\":{},\"versions\":{\"18.3.1\":{}}}");
+        routes.put("https://registry.npmjs.org/react/18.3.1",
+                "{\"name\":\"react\",\"version\":\"18.3.1\"," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/react/-/react-18.3.1.tgz\",\"integrity\":\"sha512-REACT\"}}");
+        String manifest = "{\"devDependencies\":{\"react\":\"^18.2.0\"},\"peerDependencies\":{\"react\":\"^18\"}";
+        String lock = """
+                {
+                  "name": "x",
+                  "lockfileVersion": 3,
+                  "packages": {
+                    "": {"name": "x", "devDependencies": {"react": "^18.2.0"}, "peerDependencies": {"react": "^18"}},
+                    "node_modules/react": {"version": "18.3.1", "resolved": "https://registry.npmjs.org/react/-/react-18.3.1.tgz", "integrity": "sha512-REACT", "dev": true}
+                  }
+                }
+                """;
 
-        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                singletonMap("react", "^18.2.0"), emptyMap()));
-    }
+        Result result = regen(PackageManager.Npm, manifest + "}",
+                manifest + ",\"overrides\":{\"react\":\"^18.2.0\"}}", lock);
 
-    @Test
-    void versionSelectedParentRefusesWhenItResolvedToAnotherVersion() {
-        ResolutionGraph graph = graphOf(emptyMap(),
-                node("express", "5.0.0", singletonMap("accepts", "1.3.8")),
-                node("accepts", "1.3.8", emptyMap()));
-
-        assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                        singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express@4.18.2")))
-                .withMessageContaining("express resolved to 5.0.0");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
     }
 
     /** npm reads the selector as a range, as it does any spec after the {@code @}. */
@@ -1892,8 +1894,8 @@ class NativeLockEngineTest {
                 node("express", "4.18.2", singletonMap("accepts", "1.3.8")),
                 node("accepts", "1.3.8", emptyMap()));
 
-        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireOverridesHold(graph,
-                singletonMap("accepts", "1.3.8"), singletonMap("accepts", "express@^4.0.0")));
+        assertThatNoException().isThrownBy(() -> NativeLockEngine.requireScopedOverridesHold(graph,
+                singletonMap("accepts", "express@^4.0.0")));
     }
 
     private static ResolutionGraph graphOf(Map<String, Map<String, String>> rootDeclared, ResolvedNode... nodes) {

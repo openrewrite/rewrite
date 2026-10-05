@@ -95,6 +95,7 @@ public final class PnpmLockPatcher implements LockPatcher {
             }
             if (edit.getKind() == FORCED_MOVE) {
                 root = applyForcedMove(root, edit, major);
+                anyPrune |= edit.isPrunesOrphans();
                 continue;
             }
             if (edit.isPrunesOrphans() && major < 9) {
@@ -426,17 +427,33 @@ public final class PnpmLockPatcher implements LockPatcher {
         return LockYaml.replaceEntry(body, "resolution", entry.withValue(scalar.withValue(value)));
     }
 
+    /** Set {@code engines} to the new version's, which pnpm writes directly after {@code resolution}, or drop it. */
     private Yaml.Mapping editEngines(Yaml.Mapping body, PackageEdit edit) {
         EntryMetadata metadata = edit.getMetadata();
-        if (metadata == null || metadata.getEngines() == null) {
+        if (metadata == null || !metadata.isEnginesChanged() && metadata.getEngines() == null) {
             return body;
         }
         Yaml.Mapping.Entry entry = LockYaml.findEntry(body, "engines");
-        if (entry == null || !(entry.getValue() instanceof Yaml.Scalar)) {
-            return body; // engines absent in the raw entry — cannot synthesize the flow map safely
+        if (metadata.getEngines() == null) {
+            return entry == null ? body : removeEntries(body, "engines");
         }
-        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
-        return LockYaml.replaceEntry(body, "engines", entry.withValue(scalar.withValue(renderEngines(metadata.getEngines()))));
+        requireQuotableEngines(edit.getName(), metadata.getEngines());
+        String engines = renderEngines(metadata.getEngines());
+        if (entry != null) {
+            if (!(entry.getValue() instanceof Yaml.Scalar)) {
+                throw fail(Reason.RESOLUTION_REQUIRED, edit.getName(), edit.getName() + " engines is not a flow-scalar");
+            }
+            return LockYaml.replaceEntry(body, "engines", entry.withValue(((Yaml.Scalar) entry.getValue()).withValue(engines)));
+        }
+        List<Yaml.Mapping.Entry> entries = new ArrayList<>(body.getEntries());
+        for (int i = 0; i < entries.size(); i++) {
+            if ("resolution".equals(LockYaml.keyOf(entries.get(i)))) {
+                entries.add(i + 1, LockYaml.graft("entry:\n  engines: " + engines + "\n", "entry", "engines")
+                        .withPrefix(entries.get(i).getPrefix()));
+                return body.withEntries(entries);
+            }
+        }
+        throw fail(Reason.MALFORMED_LOCK, edit.getName(), edit.getName() + " has no resolution to place engines after");
     }
 
     /** pnpm writes {@code engines} through, but {@code license}/{@code deprecated}/{@code bin} deltas are not modeled, so fail loud rather than silently drop them. */
@@ -641,7 +658,24 @@ public final class PnpmLockPatcher implements LockPatcher {
 
     /** Root section order in a pnpm lock; a created section slots in with pnpm's blank-line prefix. */
     private static final List<String> ROOT_SECTIONS =
-            Arrays.asList("lockfileVersion", "settings", "importers", "packages", "snapshots");
+            Arrays.asList("lockfileVersion", "settings", "overrides", "importers", "packages", "snapshots");
+
+    /** Set the lock's {@code overrides} section to {@code declared}, which pnpm records verbatim in declaration order. */
+    static String withOverrides(String lock, Map<String, String> declared) {
+        Yaml.Documents docs = LockYaml.parse(lock, null);
+        Yaml.Document document = docs.getDocuments().get(0);
+        Yaml.Mapping root = removeEntries((Yaml.Mapping) document.getBlock(), "overrides");
+        if (!declared.isEmpty()) {
+            StringBuilder section = new StringBuilder("overrides:");
+            for (Map.Entry<String, String> e : declared.entrySet()) {
+                section.append("\n  ").append(yamlToken(e.getKey())).append(": ").append(yamlToken(e.getValue()));
+            }
+            root = insertRootSection(root, "overrides", LockYaml.graft(section.append('\n').toString(), "overrides"));
+        }
+        List<Yaml.Document> documents = new ArrayList<>(docs.getDocuments());
+        documents.set(0, document.withBlock(root));
+        return docs.withDocuments(documents).printAll();
+    }
 
     private static Yaml.Mapping insertRootSection(Yaml.Mapping root, String name, Yaml.Mapping.Entry sectionEntry) {
         int order = ROOT_SECTIONS.indexOf(name);
