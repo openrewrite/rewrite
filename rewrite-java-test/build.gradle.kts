@@ -16,6 +16,9 @@ dependencies {
     implementation(project(":rewrite-test"))
 
     testImplementation("org.junit-pioneer:junit-pioneer:latest.release")
+    // The shadowed :rewrite-java brings no transitive dependencies within this build, and
+    // Assertions.addTypesToSourceSet still uses the deprecated ClassGraph-based JavaSourceSet.build
+    testRuntimeOnly("io.github.classgraph:classgraph:latest.release")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.apache.hbase:hbase-shaded-client:2.4.11")
     testRuntimeOnly("com.google.guava:guava:latest.release")
