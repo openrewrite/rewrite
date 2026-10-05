@@ -21,11 +21,12 @@ class BundleChildren:
         self._on_child_replaced = on_child_replaced or (lambda bundle_dist: None)
         self._spawn = spawn or ChildConnection.spawn
         self._venv_ops = venv_ops or venv_manager
-        self._children = {}     # bundle_dist -> child connection
-        self._descriptors = {}  # bundle_dist -> list[marketplace row]
-        self._owner = {}        # recipe name -> bundle_dist (first-wins)
-        self._versions = {}     # bundle_dist -> resolved version (what pip actually installed)
-        self._attribution = {}  # bundle_dist -> attribution name (a local install's supplied path)
+        # A bundle is a distribution name or an attached venv's path.
+        self._children = {}     # bundle -> child connection
+        self._descriptors = {}  # bundle -> list[marketplace row]
+        self._owner = {}        # recipe name -> bundle (see _claim_owners)
+        self._versions = {}     # bundle -> resolved version
+        self._attribution = {}  # bundle -> attribution name (a local install's supplied path)
         self._attached = {}     # attached venv path -> its normalized distribution name
         self._data_table_store = None  # cached SetDataTableStore params, broadcast to every child
 
@@ -80,37 +81,38 @@ class BundleChildren:
             self._on_child_replaced(bundle_dist)
             self._venv_ops.create_venv(self._python, venv_dir, clear=venv_dir.exists())
         self._venv_ops.install_into_venv(venv_dir, spec, force=force)
-        return self._load(bundle_dist, venv_dir)
+        return self._load(bundle_dist, self._venv_ops.installed_version(venv_dir, bundle_dist))
 
     def attach(self, bundle_dist: str, venv: str, attribution_name: str):
         """Spawn the bundle's child on ``venv``, a venv the caller built and keeps current.
 
-        Every attach starts a fresh child, because the caller may have rebuilt the venv in place. An
-        earlier venv attached under the same ``attribution_name`` is let go.
+        Every attach starts a fresh child, because the caller may have rebuilt the venv in place. Any
+        other bundle under the same ``attribution_name`` is let go.
         """
         if not os.path.isabs(venv) or not self._venv_ops.is_usable_venv(Path(venv)):
             raise ValueError(f"'{venv}' is not a usable venv")
         key = self._key(venv)
         bundle_dist = _normalize_package_name(bundle_dist)
-        if self._venv_ops.installed_version(Path(key), bundle_dist) is None:
+        version = self._venv_ops.installed_version(Path(key), bundle_dist)
+        if version is None:
             raise ValueError(f"'{bundle_dist}' is not installed in '{venv}'")
-        self._forget_attached(attribution_name)
-        self._forget(key)
+        for previous in {key, *(k for k, a in self._attribution.items() if a == attribution_name)}:
+            self._forget(previous)
         self._attached[key] = bundle_dist
         self._attribution[key] = attribution_name
-        return self._load(key, Path(key))
+        try:
+            return self._load(key, version)
+        except BaseException:
+            self._forget(key)
+            raise
 
     def _forget_attached(self, attribution_name: str) -> None:
         for key in [k for k in self._attached if self._attribution.get(k) == attribution_name]:
             self._forget(key)
 
-    def _load(self, key: str, venv_dir: Path):
-        try:
-            self._versions[key] = self._venv_ops.installed_version(venv_dir, self._attached.get(key, key))
-            self._descriptors[key] = self._ensure_child(key).request("GetMarketplace", {})
-        except BaseException:
-            self._forget(key)
-            raise
+    def _load(self, key: str, version):
+        self._versions[key] = version
+        self._descriptors[key] = self._ensure_child(key).request("GetMarketplace", {})
         self._claim_owners()
         return self._descriptors[key]
 

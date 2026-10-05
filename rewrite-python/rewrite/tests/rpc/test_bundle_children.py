@@ -335,7 +335,7 @@ def test_every_attach_restarts_the_bundles_child(tmp_path):
         bc.request(str(first), "Visit", {})                      # never respawned on the old venv
 
 
-def test_a_later_install_of_the_same_source_path_lets_go_of_its_attached_venv(tmp_path):
+def test_a_source_path_is_either_installed_or_attached_never_both(tmp_path):
     spawned = []
     bc, _, _ = _spawning_children(tmp_path, spawned)
     venv = tmp_path / "prebuilt"
@@ -343,9 +343,25 @@ def test_a_later_install_of_the_same_source_path_lets_go_of_its_attached_venv(tm
 
     bc.attach("pkg", str(venv), attribution_name="/src/pkg")
     bc.install("pkg", "/src/pkg", force=True, attribution_name="/src/pkg")
-
     assert spawned[0].closed
     assert bc.owner("pkg.R") == "pkg"
+
+    bc.attach("pkg", str(venv), attribution_name="/src/pkg")
+    assert spawned[1].closed
+    assert [r["packageName"] for r in bc.marketplace()] == ["/src/pkg"]
+
+
+def test_a_failed_reinstall_keeps_the_installed_bundle_serving(tmp_path):
+    spawned = []
+    bc, _, _ = _spawning_children(tmp_path, spawned)
+    bc.install("pkg", "pkg==1.0")
+    child = spawned[0]
+    child.request = lambda method, params: (_ for _ in ()).throw(RuntimeError("transient"))
+
+    with pytest.raises(RuntimeError, match="transient"):
+        bc.install("pkg", "pkg==1.1")
+
+    assert bc.owner("pkg.R") == "pkg" and not child.closed
 
 
 def test_attach_rejects_a_venv_without_the_distribution_and_keeps_the_current_one(tmp_path):
