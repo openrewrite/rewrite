@@ -53,10 +53,25 @@ export interface RpcCodec<T> {
 }
 
 /**
+ * Converts a type that has no {@link RpcCodec} on either side, and so travels as one inline value,
+ * between its shape here and the one the peer's serializer gives it.
+ */
+export interface RpcValueCodec<T> {
+    /**
+     * @param value The value as the peer serialized it, with its `kind` and without its top-level serializer keys.
+     */
+    fromValue(value: any): T;
+
+    toValue(after: T): any;
+}
+
+/**
  * A registry for managing RPC codecs based on object types.
  */
 export class RpcCodecs {
     private static nonTreeCodecs = new Map<string, RpcCodec<any>>();
+
+    private static valueCodecs = new Map<string, RpcValueCodec<any>>();
 
     /**
      * The first key is on sourceFileType and the second on object type
@@ -96,6 +111,14 @@ export class RpcCodecs {
             return treeCodec || this.nonTreeCodecs.get(type);
         }
         return this.nonTreeCodecs.get(type);
+    }
+
+    static registerValueCodec(type: string, codec: RpcValueCodec<any>): void {
+        this.valueCodecs.set(type, codec);
+    }
+
+    static valueCodecForType(type: string): RpcValueCodec<any> | undefined {
+        return this.valueCodecs.get(type);
     }
 
     /**
@@ -204,7 +227,7 @@ export class RpcSendQueue {
                 await this.add(after, onChange);
             } else {
                 let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
-                this.put({state: RpcObjectState.CHANGE, value: onChange || afterCodec ? undefined : after});
+                this.put(this.valueMessage(RpcObjectState.CHANGE, after, !onChange && !afterCodec));
                 await this.doChange(after, before, onChange, afterCodec);
             }
         });
@@ -239,7 +262,7 @@ export class RpcSendQueue {
                         const afterCodec = onChangeRun ? undefined : RpcCodecs.forInstance(anAfter, this.sourceFileType);
                         // Without an onChange callback or codec, no property messages follow, so the
                         // value must travel inline (as in send()) or the receiver keeps the stale element
-                        this.put({state: RpcObjectState.CHANGE, value: onChangeRun || afterCodec ? undefined : anAfter});
+                        this.put(this.valueMessage(RpcObjectState.CHANGE, anAfter, !onChangeRun && !afterCodec));
                         await this.doChange(anAfter, aBefore, onChangeRun, afterCodec);
                     }
                 }
@@ -288,12 +311,21 @@ export class RpcSendQueue {
         }
         let afterCodec = onChange ? undefined : RpcCodecs.forInstance(after, this.sourceFileType);
         this.put({
-            state: RpcObjectState.ADD,
+            ...this.valueMessage(RpcObjectState.ADD, after, !onChange && !afterCodec),
             valueType: this.getValueType(after),
-            value: onChange || afterCodec ? undefined : after,
             ref: ref
         });
         await this.doChange(after, undefined, onChange, afterCodec);
+    }
+
+    // An inline value carries its type even in a CHANGE, as the peer needs it to decode the value
+    private valueMessage(state: RpcObjectState, after: any, inline: boolean): RpcObjectData {
+        if (!inline) {
+            return {state};
+        }
+        const valueType = this.getValueType(after);
+        const valueCodec = valueType === undefined ? undefined : RpcCodecs.valueCodecForType(valueType);
+        return {state, valueType, value: valueCodec ? valueCodec.toValue(after) : after};
     }
 
     private async doChange(after: any, before: any, onChange?: () => Promise<void>, afterCodec?: RpcCodec<any>): Promise<void> {
@@ -526,7 +558,7 @@ export class RpcReceiveQueue {
                     after = await codec.rpcReceive(before, this);
                 } else if (message.value !== undefined) {
                     after = message.valueType ?
-                        {kind: this.internedStrings.internType(message.valueType), ...withoutSerializerKeys(message.value)} :
+                        this.inlineValue(message.valueType, message.value) :
                         typeof message.value === "string" ? this.internedStrings.internValue(message.value) : message.value;
                 } else if (message.state === RpcObjectState.ADD && message.valueType) {
                     throw new Error(
@@ -606,6 +638,13 @@ export class RpcReceiveQueue {
             default:
                 throw new Error(`${message.state} is not supported for lists.`);
         }
+    }
+
+    private inlineValue(valueType: string, value: any): any {
+        const kind = this.internedStrings.internType(valueType);
+        const valueCodec = RpcCodecs.valueCodecForType(kind);
+        const typed = {kind, ...withoutSerializerKeys(value)};
+        return valueCodec ? valueCodec.fromValue(typed) : typed;
     }
 
     private newObj<T>(type: string): T {
