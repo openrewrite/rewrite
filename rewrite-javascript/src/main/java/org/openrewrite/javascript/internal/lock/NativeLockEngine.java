@@ -449,7 +449,10 @@ public final class NativeLockEngine {
     private static String withResolutionRequests(String manifestJson, Overrides overrides, Map<String, String> declared) {
         try {
             JsonNode root = JSON.readTree(manifestJson);
-            ObjectNode deps = root.has("dependencies") && root.get("dependencies").isObject() ?
+            if (!root.isObject()) {
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null, "manifest is not a JSON object");
+            }
+            ObjectNode deps = root.path("dependencies").isObject() ?
                     (ObjectNode) root.get("dependencies") : ((ObjectNode) root).putObject("dependencies");
             boolean changed = false;
             for (Map.Entry<String, String> e : overrides.ranges.entrySet()) {
@@ -525,10 +528,7 @@ public final class NativeLockEngine {
      * doing that for are reproduced, and a request that collides with a direct dependency's own is not.
      */
     private static void requireReproducibleResolutionRequests(Overrides overrides, Map<String, String> declared) {
-        for (Map.Entry<String, String> e : overrides.unsupported.entrySet()) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
-                    "override " + e.getValue() + " is not yet requested for " + PackageManager.YarnClassic);
-        }
+        requireNoUnsupported(PackageManager.YarnClassic, overrides);
         for (Map.Entry<String, String> e : overrides.ranges.entrySet()) {
             String parent = overrides.scopedParent.get(e.getKey());
             if (parent != null && parentVersion(parent) != null) {
@@ -540,6 +540,15 @@ public final class NativeLockEngine {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, e.getKey(),
                         "resolution of " + e.getKey() + " collides with its direct dependency (" + spec + ")");
             }
+        }
+    }
+
+    /** Refuse any override this engine only records, reached or not. */
+    private static void requireNoUnsupported(PackageManager pm, Overrides overrides) {
+        if (!overrides.unsupported.isEmpty()) {
+            Map.Entry<String, String> first = overrides.unsupported.entrySet().iterator().next();
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, first.getKey(),
+                    "override " + first.getValue() + " is not yet applied for " + pm);
         }
     }
 
@@ -642,12 +651,8 @@ public final class NativeLockEngine {
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
         Overrides overrides = declaredOverrides(PackageManager.Bun, editedPackageJson);
-        if (!overrides.unsupported.isEmpty()) {
-            // bun records every declared override in the lock, and only flat ones are reproduced here.
-            Map.Entry<String, String> first = overrides.unsupported.entrySet().iterator().next();
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, first.getKey(),
-                    "override " + first.getValue() + " is not yet applied for " + PackageManager.Bun);
-        }
+        // bun records every declared override in the lock, and only flat ones are reproduced here.
+        requireNoUnsupported(PackageManager.Bun, overrides);
         ResolutionGraph graph = buildWithoutPeerInstall(registry, lockedVersionsBun(existingLock), editedPackageJson,
                 overrides.ranges);
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
@@ -683,10 +688,8 @@ public final class NativeLockEngine {
                 collectBunOverrides(node, overrides);
             } else if (pm == PackageManager.Pnpm) {
                 collectPnpmOverrides(node, overrides);
-            } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
-                collectYarnOverrides(node, overrides, pm == PackageManager.YarnClassic);
             } else {
-                collectKeyedOverrides(node, null, overrides);
+                collectYarnOverrides(node, overrides, pm == PackageManager.YarnClassic);
             }
         }
         return overrides;
@@ -785,7 +788,6 @@ public final class NativeLockEngine {
         return requireOverrideName(key, parentName(key));
     }
 
-    /** Keys this engine does not apply: each name a key selects is only recorded. */
     /** pnpm: a plain key applies to every requirer, {@code parent>child} (plain names) to the parent's own edges. */
     private static void collectPnpmOverrides(JsonNode node, Overrides overrides) {
         for (Map.Entry<String, JsonNode> property : node.properties()) {
@@ -928,13 +930,7 @@ public final class NativeLockEngine {
         return new NpmGraphBuilder(registry, false, locked, false, ranges).build(singletonMap("", manifestJson));
     }
 
-    private static void collectKeyedOverrides(JsonNode node, @Nullable String top, Overrides overrides) {
-        for (Map.Entry<String, JsonNode> property : node.properties()) {
-            recordKeyedOverride(property.getKey(), property.getValue(), top == null ? property.getKey() : top,
-                    overrides);
-        }
-    }
-
+    /** A key this engine does not apply: each name it (or a key nested under it) selects is only recorded. */
     private static void recordKeyedOverride(String key, JsonNode value, String owner, Overrides overrides) {
         String[] segments = KEY_SEPARATOR.split(key);
         boolean named = false;
@@ -950,7 +946,9 @@ public final class NativeLockEngine {
             requireOverrideName(key, key);
         }
         if (value.isObject()) {
-            collectKeyedOverrides(value, owner, overrides);
+            for (Map.Entry<String, JsonNode> nested : value.properties()) {
+                recordKeyedOverride(nested.getKey(), nested.getValue(), owner, overrides);
+            }
         }
     }
 

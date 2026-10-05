@@ -212,14 +212,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             blocks.set(bi, newHeader + ":" + block.substring(block.indexOf('\n')));
             return blocks.reconstruct();
         }
-        if (edit.isPrunesOrphans()) {
-            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
-            for (String dep : blockDepNames(blocks.get(bi))) {
-                if (!kept.contains(dep)) {
-                    droppedTargets.add(dep);
-                }
-            }
-        }
+        recordDroppedEdges(blocks.get(bi), edit);
         blocks.set(bi, inPlace(blocks.get(bi), newHeader, edit));
         return blocks.reconstruct();
     }
@@ -249,14 +242,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             return blocks.reconstruct();
         }
 
-        if (edit.isPrunesOrphans()) {
-            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
-            for (String dep : blockDepNames(blocks.get(bi))) {
-                if (!kept.contains(dep)) {
-                    droppedTargets.add(dep);
-                }
-            }
-        }
+        recordDroppedEdges(blocks.get(bi), edit);
 
         String newConstraint = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
         if (newConstraint == null) {
@@ -284,6 +270,18 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             splitOut(blocks, bi, oldDescriptor, newDescriptor, edit);
         }
         return blocks.reconstruct();
+    }
+
+    /** A pruning move's dropped edges become orphan candidates for the GC. */
+    private void recordDroppedEdges(String block, PackageEdit edit) {
+        if (edit.isPrunesOrphans()) {
+            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
+            for (String dep : blockDepNames(block)) {
+                if (!kept.contains(dep)) {
+                    droppedTargets.add(dep);
+                }
+            }
+        }
     }
 
     /** Re-head a block to {@code newHeader}, rewrite the resolution lines on a move, and re-pin changed deps. */
