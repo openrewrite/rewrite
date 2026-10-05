@@ -683,6 +683,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Variable
         const variable = {
             kind: Type.Kind.Variable,
+            flags: 0,
             name: actualSymbol.getName(),
             owner: ownerType,
             type: mappedType,
@@ -1632,6 +1633,7 @@ export class JavaScriptTypeMapping {
                 const propType = this.checker.getTypeOfSymbolAtLocation(prop, declaration);
                 const variable: Type.Variable = {
                     kind: Type.Kind.Variable,
+                    flags: 0,
                     name: prop.getName(),
                     owner: classType,  // Cyclic reference to the containing class (already in cache)
                     type: this.getType(propType), // This will find classType in cache if it's recursive

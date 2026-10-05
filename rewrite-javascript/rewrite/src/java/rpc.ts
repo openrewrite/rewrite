@@ -43,6 +43,7 @@ class TypeSender extends TypeVisitor<RpcSendQueue> {
     }
 
     protected async visitVariable(variable: Type.Variable, q: RpcSendQueue): Promise<Type | undefined> {
+        await q.getAndSend(variable, v => v.flags);
         await q.getAndSend(variable, v => v.name);
         await q.getAndSend(variable, v => v.owner ? asRef(v.owner) : undefined, owner => this.visit(owner, q));
         await q.getAndSend(variable, v => asRef(v.type), t => this.visit(t, q));
@@ -169,6 +170,7 @@ class TypeReceiver extends TypeVisitor<RpcReceiveQueue> {
     }
 
     protected async visitVariable(variable: Type.Variable, q: RpcReceiveQueue): Promise<Type | undefined> {
+        variable.flags = await q.receive(variable.flags);
         variable.name = await q.receive(variable.name);
         variable.owner = await q.receive(variable.owner, owner => this.visit(owner, q));
         variable.type = await q.receive(variable.type, t => this.visit(t, q));
