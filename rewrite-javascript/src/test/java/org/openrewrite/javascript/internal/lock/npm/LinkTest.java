@@ -1,0 +1,232 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.describe;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.link;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.treeDump;
+
+/**
+ * Port of @npmcli/arborist test/link.js. The snapshots are compared with arborist's own dump of the
+ * same trees; the shrinkwrap metadata upstream attaches is not part of this tree model.
+ */
+class LinkTest {
+
+    @Test
+    void instantiateWithoutProvidingTarget() {
+        node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path"));
+        Link l1 = link(opts().pkg(obj("name", "root")).path("/home/user/some/other/path")
+          .realpath("/home/user/projects/some/kind/of/path"));
+        assertThat(describe(l1)).isEqualTo(treeDump("instantiate without providing target"));
+        assertThat(l1.isLink()).isTrue();
+        assertThat(l1.getChildren().size()).isZero();
+        l1.getChildren().set("asdf", node(opts().path("/asdf")));
+        assertThat(l1.getChildren().size()).as("children still empty after setting value").isZero();
+    }
+
+    @Test
+    void mustProvideRealpath() {
+        assertThatThrownBy(() -> link(opts().path("/x"))).hasMessage("must provide realpath for Link node");
+    }
+
+    @Test
+    void resolvedIsRelpathToRealpath() {
+        Link resolver = link(opts().path("/x/y/z").realpath("/x/z/y/a/b/c"));
+        assertThat(resolver.getResolved()).isEqualTo("file:../z/y/a/b/c");
+        resolver.setPath(null);
+        assertThat(resolver.getResolved()).as("link resolved depends on path").isNull();
+        resolver.setPath("/x/z/y/a/b/d");
+        assertThat(resolver.getResolved()).as("updates when path changes").isEqualTo("file:c");
+    }
+
+    @Test
+    void instantiateWithTargetSpecified() {
+        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path"));
+        Link link = link(opts().path("/home/user/some/other/path").target(root));
+        assertThat(describe(link.getRoot())).isEqualTo(treeDump("instantiate with target specified"));
+    }
+
+    @Test
+    void linkTargetSetter() {
+        Link link = link(opts().path("/path/to/link").realpath("/node-a").pkg(obj("name", "node-a", "version", "1.2.3")));
+        Node oldTarget = link.getTarget();
+        assertThat(oldTarget).isNotNull();
+        assertThat(oldTarget.getLinksIn()).as("target takes note of link").contains(link);
+        assertThat(link.getPackage()).as("link has same package as target").isSameAs(oldTarget.getPackage());
+
+        Node newTarget = node(opts().path("/node-b").realpath("/node-b").pkg(obj("name", "node-b", "version", "1.2.3")));
+        link.setTarget(newTarget);
+        assertThat(oldTarget.getLinksIn()).as("old target has no links in now").isEmpty();
+        assertThat(link.getTarget()).isSameAs(newTarget);
+        assertThat(newTarget.getLinksIn()).as("new target notes the link").contains(link);
+        assertThat(link.getPackage()).as("link package is new target package").isSameAs(newTarget.getPackage());
+
+        link.setTarget(null);
+        assertThat(link.getTarget()).isNull();
+        assertThat(link.getPackage()).as("no package without link").isEqualTo(new LinkedHashMap<>());
+        assertThat(oldTarget.getLinksIn()).isEmpty();
+        assertThat(newTarget.getLinksIn()).isEmpty();
+
+        link.setTarget(null);
+        assertThat(link.getTarget()).isNull();
+        assertThat(link.getPackage()).isEqualTo(new LinkedHashMap<>());
+    }
+
+    @Nested
+    class GetRootFromVariousPlaces {
+
+        private final Node root = node(opts().path("/path/to/root"));
+
+        @Test
+        void getFromRoot() {
+            Link fromRoot = link(opts().pkg(obj("name", "from-root")).path("/path/to/root/from-root")
+              .realpath("/path/to/root/from-root-target").root(root));
+            assertThat(fromRoot.getRoot()).isSameAs(root);
+            assertThat(fromRoot.getFsParent()).isSameAs(root);
+            assertThat(fromRoot.getParent()).isNull();
+            assertThat(fromRoot.getTarget().getRoot()).isSameAs(root);
+            assertThat(fromRoot.getTarget().getFsParent()).isSameAs(root);
+            assertThat(fromRoot.getTarget().getParent()).isNull();
+        }
+
+        @Test
+        void getFromFsParent() {
+            Link fromFsParent = link(opts().pkg(obj("name", "from-fs-parent")).path("/path/to/root/from-fs-parent")
+              .realpath("/path/to/root/from-root-fs-parent").fsParent(root));
+            assertThat(fromFsParent.getRoot()).isSameAs(root);
+            assertThat(fromFsParent.getFsParent()).isSameAs(root);
+            assertThat(fromFsParent.getParent()).isNull();
+            assertThat(fromFsParent.getTarget().getRoot()).isSameAs(root);
+            assertThat(fromFsParent.getTarget().getFsParent()).isSameAs(root);
+            assertThat(fromFsParent.getTarget().getParent()).isNull();
+        }
+
+        @Test
+        void getFromParent() {
+            Link fromParent = link(opts().pkg(obj("name", "from-parent")).parent(root)
+              .realpath("/path/to/root/from-root-parent"));
+            assertThat(fromParent.getRoot()).isSameAs(root);
+            assertThat(fromParent.getFsParent()).isNull();
+            assertThat(fromParent.getParent()).isSameAs(root);
+            assertThat(fromParent.getTarget().getRoot()).isSameAs(root);
+            assertThat(fromParent.getTarget().getFsParent()).isSameAs(root);
+            assertThat(fromParent.getTarget().getParent()).isNull();
+        }
+    }
+
+    @Test
+    void temporaryLinkNodePendingAttachmentToATree() {
+        Node root = node(opts().path("/path/to/node"));
+        Link link = link(opts().name("foo").realpath("/this/will/change"));
+        Node target = node(opts().path("/path/to/node/foo"));
+        assertThat(link.getRoot()).isSameAs(link);
+        assertThat(target.getRoot()).isSameAs(target);
+        assertThat(link.getRealpath()).isEqualTo("/this/will/change");
+        link.setTarget(target);
+        assertThat(target.getRoot()).isSameAs(link);
+        assertThat(link.getRealpath()).isEqualTo(target.getPath());
+        assertThat(link.getPath()).isNull();
+        link.setParent(root);
+        assertThat(link.getRealpath()).isEqualTo(target.getPath());
+        assertThat(link.getPath()).isEqualTo("/path/to/node/node_modules/foo");
+        assertThat(link.getRoot()).isSameAs(root);
+        assertThat(target.getRoot()).isSameAs(root);
+        assertThat(target.getFsParent()).isSameAs(root);
+
+        Link link2 = link(opts().name("bar").realpath("/this/will/change"));
+        Node target2 = node(opts().name("bar"));
+        link2.setTarget(target2);
+        assertThat(target2.getPath()).isEqualTo("/this/will/change");
+        link2.setTarget(null);
+        target2.setPath("/path/to/node/bar");
+        target2.setRealpath("/path/to/node/bar");
+        link2.setTarget(target2);
+        assertThat(link2.getRealpath()).isEqualTo(target2.getPath());
+        link2.setParent(root);
+        assertThat(target2.getFsParent()).isSameAs(root);
+    }
+
+    @Test
+    void linkGetsVersionFromTarget() {
+        Link link = link(opts().realpath("/some/real/path").path("/other/path"));
+        assertThat(link.getVersion()).isEmpty();
+        link.setTarget(null);
+        link.setPackage(obj("name", "bar", "version", "2.3.4"));
+        assertThat(link.getVersion()).isEqualTo("2.3.4");
+        link.setPackage(obj());
+        assertThat(link.getVersion()).isEmpty();
+        node(opts().pkg(obj("name", "foo", "version", "1.2.3")).path("/some/real/path").root(link));
+        assertThat(link.getVersion()).isEqualTo("1.2.3");
+    }
+
+    @Test
+    void recalculateOutEdgesOverridesForwardsOverridesToTarget() {
+        Node root = node(opts().path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+          "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar", "2.0.0"))));
+        Node target = node(opts().path("/path/to/store/foo").root(root)
+          .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("bar", "1.0.0"))));
+        Link link = link(opts().pkg(obj("name", "foo", "version", "1.0.0")).path("/path/to/root/node_modules/foo")
+          .realpath("/path/to/store/foo").target(target).parent(root));
+
+        assertThat(root.getOverrides()).as("root has overrides").isNotNull();
+        assertThat(link.getOverrides()).as("link received overrides from root edge").isNotNull();
+        assertThat(link.getTarget().getOverrides()).as("target received overrides forwarded from link").isNotNull();
+
+        Edge barEdge = link.getTarget().getEdgesOut().get("bar");
+        assertThat(barEdge).as("target has edge to bar").isNotNull();
+        assertThat(barEdge.getOverrides()).as("bar edge has overrides").isNotNull();
+        assertThat(barEdge.getSpec()).isEqualTo("2.0.0");
+        assertThat(barEdge.getRawSpec()).isEqualTo("1.0.0");
+
+        link.setTarget(null);
+        assertThatCode(link::recalculateOutEdgesOverrides).as("no-op when target is null").doesNotThrowAnyException();
+    }
+
+    @Test
+    void recalculateOutEdgesOverridesDoesNotForwardWhenNoRuleMatchesATargetDep() {
+        Node root = node(opts().path("/path/to/root").loadOverrides(true).pkg(obj("name", "root",
+          "dependencies", obj("foo", "1.0.0"), "overrides", obj("bar", "2.0.0"))));
+        Node target = node(opts().path("/path/to/store/foo").root(root)
+          .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("baz", "1.0.0"))));
+        link(opts().pkg(obj("name", "foo", "version", "1.0.0")).path("/path/to/root/node_modules/foo")
+          .realpath("/path/to/store/foo").target(target).parent(root));
+
+        assertThat(root.getOverrides()).isNotNull();
+        assertThat(target.getOverrides()).as("target.overrides stays undefined when no rule matches a target dep").isNull();
+        Edge bazEdge = target.getEdgesOut().get("baz");
+        assertThat(bazEdge).isNotNull();
+        assertThat(bazEdge.getOverrides()).as("unrelated edge keeps edge.overrides undefined").isNull();
+        assertThat(bazEdge.getSpec()).isEqualTo("1.0.0");
+    }
+
+    @Test
+    void linkToRootPathGetsRootAsTarget() {
+        Node root = node(opts().path("/project/root").pkg(obj("name", "root", "dependencies", obj("root", "file:."))));
+        Link link = link(opts().parent(root).realpath(root.getPath()).pkg(new LinkedHashMap<>(root.getPackage())));
+        assertThat(link.getTarget()).isSameAs(root);
+    }
+}

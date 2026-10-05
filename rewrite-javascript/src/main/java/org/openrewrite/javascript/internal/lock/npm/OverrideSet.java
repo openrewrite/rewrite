@@ -1,0 +1,305 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+import lombok.Getter;
+import lombok.Setter;
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.semver.NodeSemver;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
+
+/**
+ * Port of @npmcli/arborist lib/override-set.js (npm 11.17.0).
+ */
+@Getter
+public final class OverrideSet {
+
+    @Setter
+    private @Nullable OverrideSet parent;
+
+    private final Map<String, OverrideSet> children = new LinkedHashMap<>();
+
+    @Setter
+    private @Nullable String name;
+
+    private @Nullable String key;
+    private @Nullable String keySpec;
+
+    @Setter
+    private @Nullable String value;
+
+    /**
+     * @param overrides a package's {@code overrides}: a spec string or a map of keys to nested overrides.
+     */
+    public OverrideSet(Object overrides) {
+        this(overrides, null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    OverrideSet(Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+        this.parent = parent;
+
+        Map<String, Object> rules;
+        if (overrides instanceof String) {
+            rules = new LinkedHashMap<>();
+            rules.put(".", overrides);
+        } else if (overrides instanceof Map) {
+            rules = (Map<String, Object>) overrides;
+        } else {
+            rules = Collections.emptyMap();
+        }
+
+        if ("".equals(rules.get("."))) {
+            rules.put(".", "*");
+        }
+
+        if (parent != null) {
+            Spec spec = Spec.npa(key);
+            if (spec.getName() == null || spec.getName().isEmpty()) {
+                throw new IllegalArgumentException("Override without name: " + key);
+            }
+            this.name = spec.getName();
+            this.key = key;
+            this.keySpec = spec.withoutName().toString();
+            Object dot = rules.get(".");
+            this.value = dot instanceof String && !((String) dot).isEmpty() ? (String) dot : this.keySpec;
+        }
+
+        for (Map.Entry<String, Object> entry : rules.entrySet()) {
+            if (".".equals(entry.getKey())) {
+                continue;
+            }
+            OverrideSet child = new OverrideSet(entry.getValue(), entry.getKey(), this);
+            children.put(child.key, child);
+        }
+    }
+
+    boolean childrenAreEqual(OverrideSet other) {
+        if (children.size() != other.children.size()) {
+            return false;
+        }
+        for (String key : children.keySet()) {
+            if (!other.children.containsKey(key)) {
+                return false;
+            }
+            if (!equal(children.get(key).value, other.children.get(key).value)) {
+                return false;
+            }
+            if (!children.get(key).childrenAreEqual(other.children.get(key))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    public boolean isEqual(@Nullable OverrideSet other) {
+        if (this == other) {
+            return true;
+        }
+        if (other == null) {
+            return false;
+        }
+        if (!equal(key, other.key) || !equal(value, other.value)) {
+            return false;
+        }
+        if (!childrenAreEqual(other)) {
+            return false;
+        }
+        if (parent == null) {
+            return other.parent == null;
+        }
+        return parent.isEqual(other.parent);
+    }
+
+    public OverrideSet getEdgeRule(Edge edge) {
+        String rawSpec = edge.getRawSpec();
+        return getEdgeRule(edge.getName(), rawSpec.isEmpty() ? edge.getSpec() : rawSpec);
+    }
+
+    public OverrideSet getEdgeRule(String edgeName, String edgeSpec) {
+        for (OverrideSet rule : getRuleset().values()) {
+            if (!equal(rule.name, edgeName)) {
+                continue;
+            }
+
+            if ("*".equals(rule.keySpec)) {
+                return rule;
+            }
+
+            Spec spec = Spec.npa(edgeName + "@" + edgeSpec);
+            if (spec.getType() == Spec.Type.ALIAS) {
+                spec = spec.getSubSpec();
+            }
+
+            if (spec.getType() == Spec.Type.GIT) {
+                if (spec.getGitRange() != null && !spec.getGitRange().isEmpty() &&
+                    NodeSemver.intersects(spec.getGitRange(), rule.keySpec, DEFAULT)) {
+                    return rule;
+                }
+                continue;
+            }
+
+            if (spec.getType() == Spec.Type.RANGE || spec.getType() == Spec.Type.VERSION) {
+                if (NodeSemver.intersects(spec.getFetchSpec(), rule.keySpec, DEFAULT)) {
+                    return rule;
+                }
+                continue;
+            }
+
+            return rule;
+        }
+        return this;
+    }
+
+    public OverrideSet getNodeRule(Node node) {
+        return getNodeRule(node.getName(), node.getVersion());
+    }
+
+    public OverrideSet getNodeRule(@Nullable String nodeName, String version) {
+        OverrideSet rule = getMatchingRule(nodeName, version);
+        return rule != null ? rule : this;
+    }
+
+    public @Nullable OverrideSet getMatchingRule(Node node) {
+        return getMatchingRule(node.getName(), node.getVersion());
+    }
+
+    public @Nullable OverrideSet getMatchingRule(@Nullable String nodeName, String version) {
+        for (OverrideSet rule : getRuleset().values()) {
+            if (!equal(rule.name, nodeName)) {
+                continue;
+            }
+            if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) || NodeSemver.satisfies(version, rule.value, DEFAULT)) {
+                return rule;
+            }
+        }
+        return null;
+    }
+
+    public List<OverrideSet> ancestry() {
+        List<OverrideSet> ancestry = new ArrayList<>();
+        for (OverrideSet ancestor = this; ancestor != null; ancestor = ancestor.parent) {
+            ancestry.add(ancestor);
+        }
+        return ancestry;
+    }
+
+    public boolean isRoot() {
+        return parent == null;
+    }
+
+    public Map<String, OverrideSet> getRuleset() {
+        Map<String, OverrideSet> ruleset = new LinkedHashMap<>();
+        for (OverrideSet override : ancestry()) {
+            for (OverrideSet kid : override.children.values()) {
+                ruleset.putIfAbsent(kid.key, kid);
+            }
+            if (!override.isRoot()) {
+                ruleset.putIfAbsent(override.key, override);
+            }
+        }
+        return ruleset;
+    }
+
+    public static @Nullable OverrideSet findSpecificOverrideSet(@Nullable OverrideSet first, @Nullable OverrideSet second) {
+        if (contains(second, first)) {
+            return second;
+        }
+        if (contains(first, second)) {
+            return first;
+        }
+        if (haveConflictingRules(first, second)) {
+            return null;
+        }
+        return findCommonAncestor(first, second);
+    }
+
+    private static boolean contains(@Nullable OverrideSet set, @Nullable OverrideSet ancestor) {
+        for (OverrideSet overrideSet = set; overrideSet != null; overrideSet = overrideSet.parent) {
+            if (overrideSet.isEqual(ancestor)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static @Nullable OverrideSet findCommonAncestor(OverrideSet first, OverrideSet second) {
+        List<OverrideSet> firstAncestors = first.ancestry();
+        for (OverrideSet secondAnc : second.ancestry()) {
+            for (OverrideSet firstAnc : firstAncestors) {
+                if (firstAnc.isEqual(secondAnc)) {
+                    return firstAnc;
+                }
+            }
+        }
+        return null;
+    }
+
+    // findSpecificOverrideSet's undefined (conflicting rules) and null (no common ancestor) are one value here.
+    public static boolean doOverrideSetsConflict(OverrideSet first, OverrideSet second) {
+        if (contains(second, first) || contains(first, second)) {
+            return false;
+        }
+        return haveConflictingRules(first, second);
+    }
+
+    public static boolean haveConflictingRules(OverrideSet first, OverrideSet second) {
+        Map<String, OverrideSet> firstRules = first.getRuleset();
+        Map<String, OverrideSet> secondRules = second.getRuleset();
+
+        for (Map.Entry<String, OverrideSet> entry : firstRules.entrySet()) {
+            OverrideSet firstRule = entry.getValue();
+            OverrideSet secondRule = secondRules.get(entry.getKey());
+            if (secondRule == null) {
+                continue;
+            }
+            if (firstRule == secondRule || firstRule.isEqual(secondRule)) {
+                continue;
+            }
+
+            String firstValue = firstRule.value;
+            String secondValue = secondRule.value;
+            if (firstValue.startsWith("$") || secondValue.startsWith("$")) {
+                continue;
+            }
+
+            try {
+                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstValue);
+                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondValue);
+                if ((firstSpec.getType() == Spec.Type.RANGE || firstSpec.getType() == Spec.Type.VERSION) &&
+                    (secondSpec.getType() == Spec.Type.RANGE || secondSpec.getType() == Spec.Type.VERSION)) {
+                    if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(), DEFAULT)) {
+                        return true;
+                    }
+                }
+            } catch (IllegalArgumentException ignored) {
+                // an unparseable rule cannot be shown to conflict
+            }
+        }
+        return false;
+    }
+
+    private static boolean equal(@Nullable Object a, @Nullable Object b) {
+        return a == null ? b == null : a.equals(b);
+    }
+}
