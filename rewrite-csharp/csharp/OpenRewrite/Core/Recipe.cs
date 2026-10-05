@@ -42,6 +42,11 @@ public abstract class Recipe
 
     public virtual TimeSpan? EstimatedEffortPerOccurrence => TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// Whether changes made by this recipe should trigger another recipe cycle.
+    /// </summary>
+    public virtual bool CausesAnotherCycle => false;
+
     public virtual IReadOnlyList<DataTableDescriptor> DataTables => [];
 
     public virtual List<Recipe> GetRecipeList() => [];

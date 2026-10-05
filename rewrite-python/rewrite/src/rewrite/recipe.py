@@ -238,6 +238,11 @@ class Recipe(ABC):
         return 5
 
     @property
+    def causes_another_cycle(self) -> bool:
+        """Whether changes made by this recipe should trigger another recipe cycle."""
+        return False
+
+    @property
     def data_tables(self) -> List[DataTable]:
         """
         Return data tables this recipe produces.
