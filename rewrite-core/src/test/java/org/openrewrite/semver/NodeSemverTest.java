@@ -34,7 +34,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * node-semver 7.8.4's own fixtures (test/fixtures), dumped by .lockwork/bin/dump-semver-fixtures.js.
+ * node-semver 7.8.4's own fixtures (test/fixtures), dumped by node-semver/dump-fixtures.js.
  */
 class NodeSemverTest {
 
