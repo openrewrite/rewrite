@@ -4,7 +4,7 @@ import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from rewrite.utils import lst_dataclass
-from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
+from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any, Self
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -32,7 +32,7 @@ class Marker(ABC):
         if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
             object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
-    def replace(self, **kwargs) -> 'Marker':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this marker, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 

@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type
+from typing import Optional, Any, TypeVar, cast, TYPE_CHECKING, Generic, ClassVar, Callable, Type, Self
 from uuid import UUID
 
 from .markers import Markers
@@ -76,7 +76,7 @@ class Tree(ABC):
     def __hash__(self) -> int:
         return hash(self._id)  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
 
-    def replace(self, **kwargs) -> 'Tree':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this tree node, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 

@@ -4,7 +4,7 @@ import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast, Self
 from uuid import UUID
 
 from rewrite import Markers
@@ -74,7 +74,7 @@ class Comment(ABC):
     def markers(self) -> Markers:
         return self._markers
 
-    def replace(self, **kwargs) -> 'Comment':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this Comment, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 

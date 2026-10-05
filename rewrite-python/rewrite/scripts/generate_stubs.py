@@ -787,7 +787,8 @@ def generate_stub_content(source_path: Path) -> str:
     # Exclude names shadowed by local class/function/import definitions; a bare
     # annotation referencing them resolves to the local name, not typing.
     detected_typing = collect_typing_names(tree) - collect_defined_names(tree)
-    extra_typing = sorted(detected_typing - set(always_typing) - set(trailing_typing))
+    # The header imports Self from typing_extensions.
+    extra_typing = sorted(detected_typing - set(always_typing) - set(trailing_typing) - {'Self'})
     trailing = [name for name in trailing_typing if typevars or name in detected_typing]
     typing_line = "from typing import " + ", ".join(always_typing + extra_typing + trailing)
 
