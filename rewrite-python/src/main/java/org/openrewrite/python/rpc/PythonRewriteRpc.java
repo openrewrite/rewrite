@@ -131,7 +131,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     public InstallRecipesResponse installRecipes(File recipes, Path venv) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), venv.toAbsolutePath().normalize()),
+                new InstallRecipesByFile(recipes.toPath().toAbsolutePath().normalize(), venv.toAbsolutePath().normalize()),
                 InstallRecipesResponse.class
         );
     }

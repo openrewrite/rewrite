@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from rewrite.rpc import venv_manager
 from rewrite.rpc.bundle_children import BundleChildren
 
 
@@ -293,7 +294,7 @@ def test_attach_runs_the_bundle_on_the_callers_venv_beside_its_published_namesak
     # nothing created or installed for the attached venv, and its child runs on that venv
     assert created == [tmp_path / "venvs" / "pkg"]
     assert installed == [tmp_path / "venvs" / "pkg"]
-    assert attached.cmd[0] == str(_fake_venv_python(venv))
+    assert attached.cmd[0] == str(venv_manager.venv_python(venv))
     assert attached.cmd[attached.cmd.index("--child-bundle") + 1] == "pkg"
     assert rows == [{"descriptor": {"name": "pkg.R"}, "packageName": "/src/pkg"}]
 
@@ -306,6 +307,11 @@ def test_attach_runs_the_bundle_on_the_callers_venv_beside_its_published_namesak
     # a recipe both bundles define runs from the attached build
     assert bc.owner("pkg.R") == str(venv)
     assert bc.resolved_version(str(venv)) == "1.0.0"
+
+    # letting go of the attached bundle hands its recipes back and leaves the caller's venv alone
+    bc.uninstall(str(venv))
+    assert attached.closed and venv.exists()
+    assert bc.owner("pkg.R") == "pkg"
 
 
 def test_every_attach_restarts_the_bundles_child(tmp_path):
@@ -328,7 +334,53 @@ def test_every_attach_restarts_the_bundles_child(tmp_path):
         bc.request(str(first), "Visit", {})                      # never respawned on the old venv
 
 
-def test_attach_rejects_a_directory_that_is_not_a_venv(tmp_path):
-    bc, _, _ = _spawning_children(tmp_path, [])
+def test_a_later_install_of_the_same_source_path_lets_go_of_its_attached_venv(tmp_path):
+    spawned = []
+    bc, _, _ = _spawning_children(tmp_path, spawned)
+    venv = tmp_path / "prebuilt"
+    _make_venv(venv)
+
+    bc.attach("pkg", str(venv), attribution_name="/src/pkg")
+    bc.install("pkg", "/src/pkg", force=True, attribution_name="/src/pkg")
+
+    assert spawned[0].closed
+    assert bc.owner("pkg.R") == "pkg"
+
+
+def test_attach_rejects_a_venv_without_the_distribution_and_keeps_the_current_one(tmp_path):
+    spawned = []
+    bc, _, _ = _spawning_children(tmp_path, spawned)
+    current, empty = tmp_path / "current", tmp_path / "empty"
+    _make_venv(current)
+    _make_venv(empty)
+    bc.attach("pkg", str(current), attribution_name="/src/pkg")
+    bc._venv_ops.installed_version = lambda d, dist: None if d == empty else "1.0.0"
+
     with pytest.raises(ValueError, match="not a usable venv"):
         bc.attach("pkg", str(tmp_path / "missing"), attribution_name="/src/pkg")
+
+    with pytest.raises(ValueError, match="'pkg' is not installed"):
+        bc.attach("pkg", str(empty), attribution_name="/src/pkg")
+
+    assert not spawned[0].closed
+    assert bc.owner("pkg.R") == str(current)
+
+
+def test_a_failed_attach_reaps_its_child_and_registers_nothing(tmp_path):
+    def failing_spawn(cmd, upstream=None, exclude_paths=()):
+        child = _FakeChild([])
+        child.request = lambda method, params: (_ for _ in ()).throw(RuntimeError("child died"))
+        failed.append(child)
+        return child
+
+    failed = []
+    bc = BundleChildren("py", tmp_path / "venvs", upstream=lambda m, p: None, spawn=failing_spawn,
+                        venv_ops=_ops_recording([], []))
+    venv = tmp_path / "prebuilt"
+    _make_venv(venv)
+
+    with pytest.raises(RuntimeError, match="child died"):
+        bc.attach("pkg", str(venv), attribution_name="/src/pkg")
+
+    assert failed[0].closed
+    assert bc._children == {} and bc._attached == {}

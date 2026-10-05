@@ -72,6 +72,8 @@ class BundleChildren:
         local install's supplied path); by default they carry the distribution's own name.
         """
         bundle_dist = _normalize_package_name(bundle_dist)
+        if attribution_name:
+            self._forget_attached(attribution_name)
         self._attribution[bundle_dist] = attribution_name   # None for a registry spec
         venv_dir = self._venv_dir(bundle_dist)
         if not self._venv_ops.is_usable_venv(venv_dir):
@@ -92,16 +94,26 @@ class BundleChildren:
         if not os.path.isabs(venv) or not self._venv_ops.is_usable_venv(Path(venv)):
             raise ValueError(f"'{venv}' is not a usable venv")
         key = self._key(venv)
-        for previous in [k for k in self._attached if self._attribution.get(k) == attribution_name]:
-            self._forget(previous)
+        bundle_dist = _normalize_package_name(bundle_dist)
+        if self._venv_ops.installed_version(Path(key), bundle_dist) is None:
+            raise ValueError(f"'{bundle_dist}' is not installed in '{venv}'")
+        self._forget_attached(attribution_name)
         self._forget(key)
-        self._attached[key] = _normalize_package_name(bundle_dist)
+        self._attached[key] = bundle_dist
         self._attribution[key] = attribution_name
         return self._load(key, Path(key))
 
+    def _forget_attached(self, attribution_name: str) -> None:
+        for key in [k for k in self._attached if self._attribution.get(k) == attribution_name]:
+            self._forget(key)
+
     def _load(self, key: str, venv_dir: Path):
-        self._versions[key] = self._venv_ops.installed_version(venv_dir, self._attached.get(key, key))
-        self._descriptors[key] = self._ensure_child(key).request("GetMarketplace", {})
+        try:
+            self._versions[key] = self._venv_ops.installed_version(venv_dir, self._attached.get(key, key))
+            self._descriptors[key] = self._ensure_child(key).request("GetMarketplace", {})
+        except BaseException:
+            self._forget(key)
+            raise
         self._claim_owners()
         return self._descriptors[key]
 
@@ -150,10 +162,14 @@ class BundleChildren:
             raise ValueError(f"No bundle '{bundle}' is installed")
         return self._ensure_child(key).request(method, params)
 
-    def uninstall(self, bundle_dist: str) -> None:
-        bundle_dist = _normalize_package_name(bundle_dist)
-        self._forget(bundle_dist)
-        self._venv_ops.remove_venv(self._venv_dir(bundle_dist))
+    def uninstall(self, bundle: str) -> None:
+        """Drop the bundle and its child. An attached venv belongs to its caller, so it stays on disk."""
+        key = self._key(bundle)
+        attached = key in self._attached
+        venv_dir = self._venv_dir(key)
+        self._forget(key)
+        if not attached:
+            self._venv_ops.remove_venv(venv_dir)
 
     def shutdown(self) -> None:
         for child in self._children.values():
