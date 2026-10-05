@@ -38,3 +38,41 @@ def test_committed_stub_matches_generator(source: Path):
     assert stub.exists() and stub.read_text() == expected, (
         f"{stub.relative_to(PROJECT_ROOT)} is stale; regenerate with: python scripts/generate_stubs.py"
     )
+
+
+def test_enum_stub_keeps_public_properties_and_methods(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from dataclasses import dataclass
+from enum import Enum
+
+
+class Holder(ABC):
+    class Kind(Enum):
+        A = 0
+
+        @property
+        def label(self) -> str:
+            return self.name
+
+        def _missing_(cls, value):
+            return None
+
+
+@dataclass(frozen=True)
+class Node:
+    _style: Style
+
+    class Style(Enum):
+        SINGLE = 0
+
+        def quote(self, doubled: bool) -> str:
+            return "'"
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "        @property\n        def label(self) -> str: ..." in stub
+    assert "_missing_" not in stub
+
+    assert "        def quote(self, doubled: bool) -> str: ..." in stub

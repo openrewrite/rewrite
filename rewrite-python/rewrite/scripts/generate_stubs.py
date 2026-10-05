@@ -320,6 +320,28 @@ def extract_enum_members(node: ast.ClassDef) -> List[str]:
     return members
 
 
+def generate_enum_stub(node: ast.ClassDef, indent: str = "") -> List[str]:
+    """Generate stub for an Enum class with its members and its public properties and methods."""
+    bases = get_class_bases(node)
+    lines = [f"{indent}class {node.name}({bases}):" if bases else f"{indent}class {node.name}:"]
+
+    # Members are instances of the enum class
+    for member in extract_enum_members(node):
+        lines.append(f"{indent}    {member}: {node.name}")
+
+    for name, return_type in extract_property_methods(node):
+        lines.append(f"{indent}    @property")
+        lines.append(f"{indent}    def {name}(self) -> {return_type}: ...")
+
+    for name, params, return_type in extract_regular_methods(node):
+        params_str = "".join(f", {p[0]}: {p[1]}" for p in params)
+        lines.append(f"{indent}    def {name}(self{params_str}) -> {return_type}: ...")
+
+    if len(lines) == 1:
+        lines.append(f"{indent}    pass")
+    return lines
+
+
 def generate_nested_class_stub(node: ast.ClassDef, indent: str = "") -> List[str]:
     """Generate stub for a nested class (enum, dataclass, or plain class)."""
     lines = []
@@ -329,18 +351,7 @@ def generate_nested_class_stub(node: ast.ClassDef, indent: str = "") -> List[str
     is_enum = any(isinstance(base, ast.Name) and base.id == 'Enum' for base in node.bases)
 
     if is_enum:
-        if bases:
-            lines.append(f"{indent}class {node.name}({bases}):")
-        else:
-            lines.append(f"{indent}class {node.name}:")
-
-        # Extract and include enum members - members are instances of the enum class
-        members = extract_enum_members(node)
-        if members:
-            for member in members:
-                lines.append(f"{indent}    {member}: {node.name}")
-        else:
-            lines.append(f"{indent}    pass")
+        lines.extend(generate_enum_stub(node, indent))
     elif is_dataclass(node):
         # Use the full dataclass stub generator
         lines.extend(generate_stub_class(node, indent))
@@ -707,19 +718,7 @@ def generate_stub_class(node: ast.ClassDef, indent: str = "") -> List[str]:
 
     # Generate nested enum stubs first (with enum members)
     for nested in nested_enums:
-        bases = get_class_bases(nested)
-        if bases:
-            lines.append(f"{indent}    class {nested.name}({bases}):")
-        else:
-            lines.append(f"{indent}    class {nested.name}:")
-
-        # Extract and include enum members - members are instances of the enum class
-        members = extract_enum_members(nested)
-        if members:
-            for member in members:
-                lines.append(f"{indent}        {member}: {nested.name}")
-        else:
-            lines.append(f"{indent}        pass")
+        lines.extend(generate_enum_stub(nested, indent + "    "))
         lines.append("")
 
     # Generate nested dataclass stubs
