@@ -3832,6 +3832,42 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    _HOOK = '''
+        class Hook:
+            count: int = 0
+            def __init__(self) -> None:
+                self.x = 1
+            def __setattr__(self, k: str, v: object) -> None: ...
+            @property
+            def y(self) -> int: return 1
+            def m(self) -> None:
+                self
+        h = Hook(); h.x; h.y
+    '''
+
+    @staticmethod
+    def _assert_hook_fields(cls):
+        by_name = {v._name: v for v in cls._members or []}
+        assert sorted(by_name) == ['count', 'x', 'y']
+        assert by_name['x']._type == JavaType.Primitive.Int
+        assert by_name['y']._type == JavaType.Primitive.Int
+
+    def test_properties_and_self_assigned_attributes_are_fields(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self._assert_hook_fields(mapping.type(tree.body[1].targets[0]))
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_fields_are_reachable_through_self(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self_type = mapping.type(tree.body[0].body[-1].body[-1].value)
+            assert isinstance(self_type, JavaType.GenericTypeVariable)
+            self._assert_hook_fields(self_type._bounds[0])
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
 
 @requires_ty_types_cli
 class TestTypedDictMembers:

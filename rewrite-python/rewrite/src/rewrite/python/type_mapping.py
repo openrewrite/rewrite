@@ -740,6 +740,12 @@ class PythonTypeMapping:
                     if method is None:
                         continue
                     methods.append(method)
+                elif member_desc.get('kind') == 'property':
+                    # A property is a field typed by what its getter returns.
+                    getter_id = member_desc.get('getter')
+                    variables.append(JavaType.Variable(
+                        _name=member_name, _owner=class_type,
+                        _type=(self._resolve_type(getter_id) if getter_id is not None else None) or _UNKNOWN))
                 elif self._is_variable_descriptor(member_desc):
                     # A member typed as the owning class resolves through
                     # `_resolve_type`'s cycle guard.
