@@ -10,6 +10,7 @@ import weakref
 from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
+from .visitor import PythonVisitor
 from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space, JavaSourceFile, TypeTree, TypedTree, NameTree, Expression, Statement, Block, Identifier, Import, TypeParameter
 from rewrite.python.support_types import Py as Py, P as P
@@ -74,14 +75,14 @@ class Await(Py, Expression):
 @dataclass(frozen=True)
 class Binary(Py, Expression, TypedTree):
     class Type(Enum):
-        In: Type
-        Is: Type
-        IsNot: Type
-        NotIn: Type
-        FloorDivision: Type
-        MatrixMultiplication: Type
-        Power: Type
-        StringConcatenation: Type
+        In = ...
+        Is = ...
+        IsNot = ...
+        NotIn = ...
+        FloorDivision = ...
+        MatrixMultiplication = ...
+        Power = ...
+        StringConcatenation = ...
 
     @dataclass(frozen=True)
     class PaddingHelper:
@@ -443,9 +444,9 @@ class DictLiteral(Py, Expression, TypedTree):
 @dataclass(frozen=True)
 class CollectionLiteral(Py, Expression, TypedTree):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        TUPLE: Kind
+        LIST = ...
+        SET = ...
+        TUPLE = ...
 
     @dataclass(frozen=True)
     class PaddingHelper:
@@ -486,9 +487,9 @@ class FormattedString(Py, Expression, TypedTree):
     @dataclass(frozen=True)
     class Value(Py, Expression, TypedTree):
         class Conversion(Enum):
-            STR: Conversion
-            REPR: Conversion
-            ASCII: Conversion
+            STR = ...
+            REPR = ...
+            ASCII = ...
 
         @dataclass(frozen=True)
         class PaddingHelper:
@@ -611,10 +612,10 @@ class TrailingElseWrapper(Py, Statement):
 @dataclass(frozen=True)
 class ComprehensionExpression(Py, Expression):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        DICT: Kind
-        GENERATOR: Kind
+        LIST = ...
+        SET = ...
+        DICT = ...
+        GENERATOR = ...
 
     @dataclass(frozen=True)
     class Condition(Py):
@@ -812,8 +813,8 @@ class UnionType(Py, Expression, TypeTree):
 @dataclass(frozen=True)
 class VariableScope(Py, Statement):
     class Kind(Enum):
-        GLOBAL: Kind
-        NONLOCAL: Kind
+        GLOBAL = ...
+        NONLOCAL = ...
 
     @dataclass(frozen=True)
     class PaddingHelper:
@@ -879,8 +880,8 @@ class Del(Py, Statement):
 @dataclass(frozen=True)
 class SpecialParameter(Py, TypeTree):
     class Kind(Enum):
-        KWARGS: Kind
-        ARGS: Kind
+        KWARGS = ...
+        ARGS = ...
 
     _id: UUID
     _prefix: Space
@@ -907,8 +908,8 @@ class SpecialParameter(Py, TypeTree):
 @dataclass(frozen=True)
 class Star(Py, Expression, TypeTree):
     class Kind(Enum):
-        LIST: Kind
-        DICT: Kind
+        LIST = ...
+        DICT = ...
 
     _id: UUID
     _prefix: Space
@@ -1042,22 +1043,22 @@ class MatchCase(Py, Expression):
     @dataclass(frozen=True)
     class Pattern(Py, Expression):
         class Kind(Enum):
-            AS: Kind
-            CAPTURE: Kind
-            CLASS: Kind
-            DOUBLE_STAR: Kind
-            GROUP: Kind
-            KEY_VALUE: Kind
-            KEYWORD: Kind
-            LITERAL: Kind
-            MAPPING: Kind
-            OR: Kind
-            SEQUENCE: Kind
-            SEQUENCE_LIST: Kind
-            SEQUENCE_TUPLE: Kind
-            STAR: Kind
-            VALUE: Kind
-            WILDCARD: Kind
+            AS = ...
+            CAPTURE = ...
+            CLASS = ...
+            DOUBLE_STAR = ...
+            GROUP = ...
+            KEY_VALUE = ...
+            KEYWORD = ...
+            LITERAL = ...
+            MAPPING = ...
+            OR = ...
+            SEQUENCE = ...
+            SEQUENCE_LIST = ...
+            SEQUENCE_TUPLE = ...
+            STAR = ...
+            VALUE = ...
+            WILDCARD = ...
 
         @dataclass(frozen=True)
         class PaddingHelper:

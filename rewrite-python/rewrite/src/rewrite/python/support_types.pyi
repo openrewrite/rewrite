@@ -14,6 +14,7 @@ J2 = TypeVar('J2', bound=J)
 from rewrite import TreeVisitor, Markers
 from rewrite.java.tree import J
 from rewrite.java import Comment
+from .visitor import PythonVisitor
 
 class Py(J):
     def accept(self, v: TreeVisitor[Any, P], p: P) -> Optional[Any]: ...

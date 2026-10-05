@@ -33,6 +33,7 @@ dev = [
     "tox>=4.0.0",
     "black>=24.0.0",
     "ruff>=0.1.0",
+    "ty==0.0.49",  # Pinned: tests/test_generated_stubs.py asserts its diagnostics
 ]
 publish = [
     "build>=1.0.0",

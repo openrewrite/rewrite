@@ -10,6 +10,9 @@ import weakref
 M = TypeVar('M', bound=Marker)
 
 from abc import ABC, abstractmethod
+from .parser import Parser
+from .visitor import Cursor
+from .utils import id_to_int as id_to_int, random_id as random_id, list_map as list_map, replace_if_changed as replace_if_changed
 
 class Marker(ABC):
     @property

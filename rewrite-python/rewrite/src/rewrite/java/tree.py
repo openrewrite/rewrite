@@ -3341,20 +3341,20 @@ class Parentheses(Expression, Generic[J2]):
         return None
 
     @dataclass
-    class PaddingHelper:
-        _t: Parentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: Parentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> Parentheses[J2]:
+        def replace(self, **kwargs) -> Parentheses[J3]:
             return replace_if_changed(self._t, **kwargs)
 
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
+    _padding: Optional[weakref.ReferenceType[Parentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
+    def padding(self) -> Parentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = Parentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))
@@ -3397,20 +3397,20 @@ class ControlParentheses(Expression, Generic[J2]):
 
 
     @dataclass
-    class PaddingHelper:
-        _t: ControlParentheses[J2]
+    class PaddingHelper(Generic[J3]):
+        _t: ControlParentheses[J3]
 
         @property
-        def tree(self) -> JRightPadded[J2]:
+        def tree(self) -> JRightPadded[J3]:
             return self._t._tree
 
-        def replace(self, **kwargs) -> ControlParentheses[J2]:
+        def replace(self, **kwargs) -> ControlParentheses[J3]:
             return replace_if_changed(self._t, **kwargs)
 
-    _padding: Optional[weakref.ReferenceType[PaddingHelper]] = None
+    _padding: Optional[weakref.ReferenceType[ControlParentheses.PaddingHelper[J2]]] = None
 
     @property
-    def padding(self) -> PaddingHelper:
+    def padding(self) -> ControlParentheses.PaddingHelper[J2]:
         if self._padding is None:
             p = ControlParentheses[J2].PaddingHelper(self)
             object.__setattr__(self, '_padding', weakref.ref(p))

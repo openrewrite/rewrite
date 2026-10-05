@@ -4,7 +4,7 @@ import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast, Self
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
 from rewrite import Markers
@@ -235,7 +235,7 @@ if not TYPE_CHECKING:
     _JavaTypePlaceholder = JavaType
 
 
-class JavaType(ABC):
+class JavaType:
     __slots__ = ()
 
     class FullyQualified(JavaType):
@@ -409,21 +409,21 @@ class JavaType(ABC):
 
     @dataclass(slots=True)
     class GenericTypeVariable(JavaType):
-        _name: str = field(default="")
-        _variance: GenericTypeVariable.Variance = field(default=None)
-        _bounds: Optional[List[JavaType]] = field(default=None)
-
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+        _name: str = field(default="")
+        _variance: JavaType.GenericTypeVariable.Variance = field(default=Variance.Invariant)
+        _bounds: Optional[List[JavaType]] = field(default=None)
 
         @property
         def name(self) -> str:
             return self._name
 
         @property
-        def variance(self) -> GenericTypeVariable.Variance:
+        def variance(self) -> JavaType.GenericTypeVariable.Variance:
             return self._variance
 
         @property
@@ -617,7 +617,7 @@ class JRightPadded(Generic[T]):
         return [x.element for x in padded_list]
 
     @classmethod
-    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[Union[J2, JRightPadded[J2]]]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2 | JRightPadded[J2]]) -> List[JRightPadded[J2]]:
         # Helper to extract element - handles both wrapped JRightPadded and unwrapped elements
         def get_element(t):
             return t.element if isinstance(t, JRightPadded) else t

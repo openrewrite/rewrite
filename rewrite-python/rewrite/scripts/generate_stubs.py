@@ -237,15 +237,9 @@ def is_frozen_dataclass(node: ast.ClassDef) -> bool:
     return False
 
 
-def is_abc_base_class(node: ast.ClassDef) -> bool:
-    """
-    Check if a class is an ABC-like base class (inherits from known base types
-    like J, Statement, Expression, TypedTree, etc.) but is not a dataclass.
-
-    These are typically abstract base classes like TypeTree, NameTree, TypedTree.
-    """
-    if is_frozen_dataclass(node):
-        return False
+def is_plain_public_class(node: ast.ClassDef) -> bool:
+    """Check if a class is public and not a frozen dataclass, whatever its bases."""
+    return not is_frozen_dataclass(node) and not node.name.startswith('_')
 
     # Known base types that indicate this is an ABC or generic class
     known_bases = {
@@ -288,9 +282,9 @@ def generate_enum_stub(node: ast.ClassDef, indent: str = "") -> List[str]:
     bases = get_class_bases(node)
     lines = [f"{indent}class {node.name}({bases}):" if bases else f"{indent}class {node.name}:"]
 
-    # Members are instances of the enum class
+    # An assignment declares a member. An annotation alone would declare a non-member attribute.
     for member in extract_enum_members(node):
-        lines.append(f"{indent}    {member}: {node.name}")
+        lines.append(f"{indent}    {member} = ...")
 
     for name, return_type in extract_property_methods(node):
         lines.append(f"{indent}    @property")
@@ -534,8 +528,18 @@ def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[s
     Returns list of (import_statement, should_reexport) tuples.
     Sibling module imports (same package) should be re-exported.
     """
+    # Module-level imports, including those under `if TYPE_CHECKING:`. A function-local
+    # import breaks an import cycle and names nothing a signature uses.
+    nodes = []
+    for node in tree.body:
+        if isinstance(node, ast.If):
+            type_checking = "TYPE_CHECKING" in ast.unparse(node.test)
+            nodes.extend((child, type_checking) for child in node.body)
+        else:
+            nodes.append((node, False))
+
     imports = []
-    for node in ast.walk(tree):
+    for node, type_checking in nodes:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imp = f"import {alias.name}" + (f" as {alias.asname}" if alias.asname else "")
@@ -551,6 +555,8 @@ def extract_imports(tree: ast.Module, current_package: str = "") -> List[Tuple[s
                 is_sibling = module.startswith(current_package + ".")
             elif level == ".":  # relative import from same package
                 is_sibling = True
+            # The module never binds a TYPE_CHECKING import at runtime, so the stub doesn't export it
+            is_sibling = is_sibling and not type_checking
 
             # Build import statement, using X as X pattern for re-exports
             if is_sibling:
@@ -817,9 +823,9 @@ def generate_stub_content(source_path: Path) -> str:
         if "__future__" in imp or "from typing import" in imp:
             continue
         # Add imports that might be needed for type annotations
-        # Include: rewrite modules, pathlib, enum, datetime, abc, and relative module imports (from . import X)
+        # Include: rewrite modules, pathlib, enum, datetime, abc, and relative imports
         if ("from rewrite" in imp or "from pathlib" in imp or "from enum" in imp or
-            "from datetime" in imp or "from abc" in imp or imp.startswith("from . import")):
+            "from datetime" in imp or "from abc" in imp or imp.startswith("from .")):
             stub_lines.append(imp)
 
     stub_lines.append("")
@@ -848,9 +854,9 @@ def generate_stub_content(source_path: Path) -> str:
             stub_lines.append(")")
             stub_lines.append("")
 
-    # Find all ABC-like base classes at module level (before dataclasses)
+    # Plain public classes at module level (before dataclasses)
     for node in tree.body:
-        if isinstance(node, ast.ClassDef) and is_abc_base_class(node):
+        if isinstance(node, ast.ClassDef) and is_plain_public_class(node):
             class_lines = generate_abc_stub_class(node)
             stub_lines.extend(class_lines)
             stub_lines.append("")

@@ -17,6 +17,8 @@ for its ``.py``. Type checkers read the stub in preference to the source, so dri
 types while the code runs fine."""
 
 import importlib.util
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -38,6 +40,17 @@ def test_committed_stub_matches_generator(source: Path):
     assert stub.exists() and stub.read_text() == expected, (
         f"{stub.relative_to(PROJECT_ROOT)} is stale; regenerate with: python scripts/generate_stubs.py"
     )
+
+
+def test_stubs_type_check():
+    stubs = sorted(str(p.relative_to(PROJECT_ROOT)) for p in (PROJECT_ROOT / "src").rglob("*.pyi"))
+    result = subprocess.run(
+        [sys.executable, "-m", "ty", "check", "--python", sys.prefix, "--output-format", "concise",
+         # The project ignores these two for its own sources. A stub must pass them.
+         "--error", "unresolved-reference", "--error", "invalid-argument-type", *stubs],
+        cwd=PROJECT_ROOT, capture_output=True, text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_enum_stub_keeps_public_properties_and_methods(tmp_path: Path):
@@ -72,6 +85,7 @@ class Node:
 ''')
     stub = generate_stubs.generate_stub_content(source)
 
+    assert "    class Kind(Enum):\n        A = ...\n" in stub
     assert "        @property\n        def label(self) -> str: ..." in stub
     assert "_missing_" not in stub
 
@@ -156,3 +170,29 @@ class ParseErrorVisitor(TreeVisitor[Tree, P]):
     assert "    def append(self, text: Optional[str]=...) -> 'PrintOutputCapture': ..." in stub
 
     assert "class ParseErrorVisitor(TreeVisitor[Tree, P]):\n    def is_acceptable(self, source_file: Any, p: P) -> bool: ..." in stub
+
+
+def test_stub_imports_follow_runtime_bindings(tmp_path: Path):
+    source = tmp_path / "tree.py"
+    source.write_text('''\
+from abc import ABC
+from typing import TYPE_CHECKING
+
+from .markers import Markers
+
+if TYPE_CHECKING:
+    from .visitor import Visitor
+
+
+class Tree(ABC):
+    def accept(self, v: Visitor) -> Markers:
+        from .printer import Printer
+        return Printer().print(self)
+''')
+    stub = generate_stubs.generate_stub_content(source)
+
+    assert "from .markers import Markers as Markers\n" in stub
+
+    assert "from .visitor import Visitor\n" in stub
+
+    assert "Printer" not in stub
