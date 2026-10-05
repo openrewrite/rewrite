@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.internal.ChangeStringLiteral;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.DependencyNotation;
-import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -33,7 +32,9 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -96,7 +97,7 @@ public class ChangeDependencyClassifier extends Recipe {
 
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                 if (g != cu) {
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
+                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject, ctx)));
                 }
                 return g;
             }
@@ -130,9 +131,8 @@ public class ChangeDependencyClassifier extends Recipe {
                     String version = null;
                     String classifier = null;
 
-                    String groupDelimiter = "'";
+                    J.Literal groupLiteral = null;
                     G.MapEntry mapEntry = null;
-                    String classifierStringDelimiter = null;
                     int index = 0;
                     for (Expression e : depArgs) {
                         if (!(e instanceof G.MapEntry)) {
@@ -151,9 +151,7 @@ public class ChangeDependencyClassifier extends Recipe {
                         String valueValue = (String) value.getValue();
                         if ("group".equals(keyValue)) {
                             groupId = valueValue;
-                            if (value.getValueSource() != null) {
-                                groupDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
+                            groupLiteral = value;
                         } else if ("name".equals(keyValue)) {
                             if (index > 0 && mapEntry == null) {
                                 mapEntry = arg;
@@ -162,9 +160,6 @@ public class ChangeDependencyClassifier extends Recipe {
                         } else if ("version".equals(keyValue)) {
                             version = valueValue;
                         } else if ("classifier".equals(keyValue)) {
-                            if (value.getValueSource() != null) {
-                                classifierStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
                             classifierEntry = arg;
                             classifier = valueValue;
                         }
@@ -175,10 +170,11 @@ public class ChangeDependencyClassifier extends Recipe {
                     }
 
                     if (classifier == null) {
-                        String delimiter = groupDelimiter;
+                        J.Literal groupStyle = groupLiteral;
                         List<Expression> args = m.getArguments();
                         J.Literal keyLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getKey().getPrefix(), Markers.EMPTY, "classifier", "classifier", null, JavaType.Primitive.String);
-                        J.Literal valueLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix(), Markers.EMPTY, newClassifier, delimiter + newClassifier + delimiter, null, JavaType.Primitive.String);
+                        J.Literal valueLiteral = classifierLiteral(groupStyle, newClassifier)
+                                .withPrefix(mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix());
                         args.add(new G.MapEntry(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null));
                         m = m.withArguments(args);
                     } else {
@@ -186,12 +182,10 @@ public class ChangeDependencyClassifier extends Recipe {
                         if (newClassifier == null) {
                             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> arg == finalClassifier ? null : arg));
                         } else {
-                            String delimiter = classifierStringDelimiter; // `classifierStringDelimiter` cannot be null
                             m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                                 if (arg == finalClassifier) {
-                                    return finalClassifier.withValue(((J.Literal) finalClassifier.getValue())
-                                            .withValue(newClassifier)
-                                            .withValueSource(delimiter + newClassifier + delimiter));
+                                    return finalClassifier.withValue(ChangeStringLiteral.withStringValue(
+                                            (J.Literal) finalClassifier.getValue(), newClassifier));
                                 }
                                 return arg;
                             }));
@@ -204,9 +198,8 @@ public class ChangeDependencyClassifier extends Recipe {
                     String artifactId = null;
                     String classifier = null;
 
-                    String groupDelimiter = "'";
+                    J.Literal groupLiteral = null;
                     G.MapEntry mapEntry = null;
-                    String classifierStringDelimiter = null;
                     int index = 0;
                     for (G.MapEntry arg : map.getElements()) {
                         if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
@@ -221,18 +214,13 @@ public class ChangeDependencyClassifier extends Recipe {
                         String valueValue = (String) value.getValue();
                         if ("group".equals(keyValue)) {
                             groupId = valueValue;
-                            if (value.getValueSource() != null) {
-                                groupDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
+                            groupLiteral = value;
                         } else if ("name".equals(keyValue)) {
                             if (index > 0 && mapEntry == null) {
                                 mapEntry = arg;
                             }
                             artifactId = valueValue;
                         } else if ("classifier".equals(keyValue)) {
-                            if (value.getValueSource() != null) {
-                                classifierStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
                             classifierEntry = arg;
                             classifier = valueValue;
                         }
@@ -243,10 +231,11 @@ public class ChangeDependencyClassifier extends Recipe {
                     }
 
                     if (classifier == null) {
-                        String delimiter = groupDelimiter;
+                        J.Literal groupStyle = groupLiteral;
                         G.MapEntry finalMapEntry = mapEntry;
                         J.Literal keyLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getKey().getPrefix(), Markers.EMPTY, "classifier", "classifier", null, JavaType.Primitive.String);
-                        J.Literal valueLiteral = new J.Literal(Tree.randomId(), mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix(), Markers.EMPTY, newClassifier, delimiter + newClassifier + delimiter, null, JavaType.Primitive.String);
+                        J.Literal valueLiteral = classifierLiteral(groupStyle, newClassifier)
+                                .withPrefix(mapEntry == null ? Space.EMPTY : mapEntry.getValue().getPrefix());
                         m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                             G.MapLiteral mapLiteral = (G.MapLiteral) arg;
                             return mapLiteral.withElements(ListUtils.concat(mapLiteral.getElements(), new G.MapEntry(Tree.randomId(), finalMapEntry == null ? Space.EMPTY : finalMapEntry.getPrefix(), Markers.EMPTY, JRightPadded.build(keyLiteral), valueLiteral, null)));
@@ -259,14 +248,12 @@ public class ChangeDependencyClassifier extends Recipe {
                                 return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> e == finalClassifier ? null : e));
                             }));
                         } else {
-                            String delimiter = classifierStringDelimiter; // `classifierStringDelimiter` cannot be null
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                                 G.MapLiteral mapLiteral = (G.MapLiteral) arg;
                                 return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
                                     if (e == finalClassifier) {
-                                        return finalClassifier.withValue(((J.Literal) finalClassifier.getValue())
-                                                .withValue(newClassifier)
-                                                .withValueSource(delimiter + newClassifier + delimiter));
+                                        return finalClassifier.withValue(ChangeStringLiteral.withStringValue(
+                                                (J.Literal) finalClassifier.getValue(), newClassifier));
                                     }
                                     return e;
                                 }));
@@ -278,37 +265,41 @@ public class ChangeDependencyClassifier extends Recipe {
                 return m;
             }
 
-            private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    if (!StringUtils.isBlank(configuration) && !configuration.equals(gdc.getName())) {
-                        newNameToConfiguration.put(gdc.getName(), gdc);
-                        continue;
+            private GradleProject updateGradleModel(GradleProject gp, ExecutionContext ctx) {
+                if (!StringUtils.isBlank(configuration)) {
+                    if (gp.getConfiguration(configuration) == null) {
+                        return gp;
                     }
-
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                        if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId()) && !Objects.equals(requested.getClassifier(), newClassifier)) {
-                            return requested.withClassifier(newClassifier);
-                        }
-                        return requested;
-                    }));
-                    newGdc = newGdc.withDirectResolved(ListUtils.map(gdc.getDirectResolvedShallow(), resolved -> {
-                        if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId()) && !Objects.equals(resolved.getClassifier(), newClassifier)) {
-                            return resolved.withClassifier(newClassifier);
-                        }
-                        return resolved;
-                    }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
+                    return gp.mapConfiguration(configuration,
+                            conf -> conf.mapDependencies(requested -> {
+                                if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())
+                                        && !Objects.equals(requested.getClassifier(), newClassifier)) {
+                                    return requested.withClassifier(newClassifier);
+                                }
+                                return requested;
+                            }, gp.getMavenRepositories(), ctx),
+                            ctx);
                 }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
-                }
-                return gp;
+                return gp.mapConfigurations(
+                        conf -> conf.mapDependencies(requested -> {
+                            if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())
+                                    && !Objects.equals(requested.getClassifier(), newClassifier)) {
+                                return requested.withClassifier(newClassifier);
+                            }
+                            return requested;
+                        }, gp.getMavenRepositories(), ctx),
+                        ctx);
             }
         });
+    }
+
+    /**
+     * A classifier literal quoted like the group entry it joins, single quoted when that entry has no spelling.
+     */
+    private static J.Literal classifierLiteral(J.@Nullable Literal groupStyle, String classifier) {
+        if (groupStyle == null) {
+            return new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, classifier, "'" + classifier + "'", null, JavaType.Primitive.String);
+        }
+        return ChangeStringLiteral.withStringValue(groupStyle, classifier).withId(Tree.randomId());
     }
 }

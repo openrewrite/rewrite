@@ -16,7 +16,9 @@
 package org.openrewrite.java.internal.template;
 
 import lombok.AccessLevel;
+import lombok.Getter;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -39,6 +41,14 @@ public abstract class JavaTemplateLanguageExtension {
     Tree insertionPoint;
     Space.Location loc;
     JavaCoordinates.Mode mode;
+
+    /**
+     * Whether the mixin visitor found {@link #insertionPoint} and applied the template to it. When this remains
+     * {@code false} after the visit, the template silently made no change, which callers almost never expect.
+     */
+    @Getter
+    @NonFinal
+    boolean substituted;
 
     public JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
                                          String substitutedTemplate, JavaCoordinates coordinates) {

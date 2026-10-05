@@ -23,10 +23,11 @@ This processes the same JSON format that Python sends:
 ]
 """
 from collections import deque
-from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, TypeVar, cast
+from typing import Any, Callable, Deque, Dict, List, NamedTuple, Optional, Set, TypeVar, cast
 
 from rewrite import Markers
 from rewrite.rpc.send_queue import RpcObjectState
+from rewrite.utils import assign_fields, replace_if_changed
 
 T = TypeVar('T')
 
@@ -34,6 +35,24 @@ T = TypeVar('T')
 # metaclass-driven O(n) value scan in stdlib `enum`; a plain dict is ~5-10×
 # faster, and at ~70M calls per medium-set sequential run that matters.
 _STATE_BY_VALUE: Dict[str, RpcObjectState] = {s.value: s for s in RpcObjectState}
+
+
+class _FrozenList(list):
+    """A shared immutable empty ``list`` to deduplicate the many empty child
+    collections in a received LST (memory optimization). Subclassing ``list``
+    keeps ``isinstance(x, list)`` true; the mutators raise so a stray in-place
+    write fails loudly instead of corrupting every node that shares it."""
+
+    __slots__ = ()
+
+    def _immutable(self, *_args: Any, **_kwargs: Any) -> Any:
+        raise TypeError("empty received list is immutable and shared")
+
+    __setitem__ = __delitem__ = __iadd__ = __imul__ = _immutable  # type: ignore[assignment]
+    append = extend = insert = remove = pop = clear = sort = reverse = _immutable  # type: ignore[assignment]
+
+
+_EMPTY_LIST: List[Any] = _FrozenList()
 
 
 class RpcObjectData(NamedTuple):
@@ -79,6 +98,12 @@ class RpcReceiveQueue:
         self._source_file_type = source_file_type
         self._pull = pull
         self._trace = trace
+        # Ids of the objects this queue built and has not published yet. A child
+        # is added and dropped inside its own frame, so this holds one entry per
+        # level of the tree being received rather than one per node.
+        self._fresh: Set[int] = set()
+        # Refs this queue recorded, for roll_back_refs.
+        self._received_refs: List[int] = []
 
     def take(self) -> RpcObjectData:
         """Take the next message from the queue, fetching more if needed."""
@@ -164,21 +189,47 @@ class RpcReceiveQueue:
                 # New object or forward declaration with ref
                 if message.value_type is None:
                     before = message.value
+                    fresh = False
                 else:
                     before = self._new_obj(message.value_type)
+                    fresh = True
 
                 if ref is not None:
                     # Store for future references (handles cyclic graphs)
                     self._refs[ref] = before
+                    self._received_refs.append(ref)
 
             # Fall through to CHANGE for field-by-field deserialization
-            return self._do_change(before, on_change, message, ref)
+            if not fresh:
+                return self._do_change(before, on_change, message, ref)
+            self._fresh.add(id(before))
+            try:
+                return self._do_change(before, on_change, message, ref)
+            finally:
+                self._fresh.discard(id(before))
 
         elif message.state == RpcObjectState.CHANGE:
             return self._do_change(before, on_change, message, message.ref)
 
         else:
             raise RuntimeError(f"Unknown state type: {message.state}")
+
+    def roll_back_refs(self) -> None:
+        """Drop the refs received through this queue, for when what it was receiving did not
+        arrive whole. The sender of a failed transfer forgets the refs it assigned in it as well."""
+        for ref in self._received_refs:
+            self._refs.pop(ref, None)
+        self._received_refs.clear()
+
+    def apply(self, obj: T, **kwargs) -> T:
+        """Give a node the fields just read off the wire.
+
+        A node this queue is still building is filled in place; one the caller
+        already holds is copied, because a visitor may be sharing it.
+        """
+        if id(obj) in self._fresh:
+            return assign_fields(obj, **kwargs)
+        return replace_if_changed(obj, **kwargs)
 
     def _do_change(
         self,
@@ -197,7 +248,10 @@ class RpcReceiveQueue:
             if codec is not None:
                 after = codec(before, self)
             elif message.value is not None:
-                if message.value_type:
+                reader = _value_readers.get(message.value_type) if message.value_type else None
+                if reader is not None:
+                    after = reader(message.value)
+                elif message.value_type:
                     after = {'kind': message.value_type, **message.value} if isinstance(message.value, dict) else message.value
                 else:
                     after = message.value
@@ -284,7 +338,7 @@ class RpcReceiveQueue:
             item = self.receive(b, on_change)
             after.append(item)
 
-        return after
+        return after if after else _EMPTY_LIST
 
     def receive_markers(self, markers: Optional['Markers'] = None) -> 'Markers':
         """Receive and deserialize Markers.
@@ -307,7 +361,7 @@ class RpcReceiveQueue:
             new_id = self.receive_defined(m.id)
             new_markers_list = self.receive_list(list(m.markers) if m.markers else None)
 
-            return Markers(new_id, new_markers_list or [])
+            return Markers.build(new_id, new_markers_list or [])
 
         return self.receive(markers, on_change) or Markers.EMPTY
 
@@ -344,6 +398,9 @@ _codec_factories: Dict[str, Dict[str, Callable[[], Any]]] = {}
 _send_codecs: Dict[type, Callable[[Any, Any], None]] = {}
 # Reverse mapping: Python class -> Java type name (used by sender)
 _python_to_java_type: Dict[type, str] = {}
+# Types the host has no codec for, which cross whole as the value of one message
+_value_readers: Dict[str, Callable[[Any], Any]] = {}
+_value_writers: Dict[type, Callable[[Any], Any]] = {}
 
 
 def register_receive_codec(
@@ -413,6 +470,30 @@ def register_send_codec(
     _send_codecs[python_class] = codec
 
 
+def register_value_codec(
+    java_type: str,
+    python_class: type,
+    reader: Callable[[Any], Any],
+    writer: Callable[[Any], Any]
+) -> None:
+    """Register a type that travels as one inline value, in the JSON form the host gives it.
+
+    Args:
+        java_type: Java type name
+        python_class: The Python class
+        reader: Function to build the object from its value: (value) -> obj
+        writer: Function to produce that value: (obj) -> value
+    """
+    _value_readers[java_type] = reader
+    _value_writers[python_class] = writer
+    _python_to_java_type[python_class] = java_type
+
+
+def get_value_writer(obj: Any) -> Optional[Callable[[Any], Any]]:
+    """Get the function that turns an object into its inline value, or None if it has none."""
+    return _value_writers.get(type(obj))
+
+
 def get_send_codec(obj: Any) -> Optional[Callable[[Any, Any], None]]:
     """Get the send codec for an object.
 
@@ -432,7 +513,7 @@ def _receive_markers(markers: 'Markers', q: RpcReceiveQueue) -> 'Markers':
     new_id = q.receive_defined(markers.id)
     new_markers_list = q.receive_list(list(markers.markers) if markers.markers else None)
 
-    return Markers(new_id, new_markers_list or [])
+    return Markers.build(new_id, new_markers_list or [])
 
 
 # ============================================================================

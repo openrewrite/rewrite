@@ -29,7 +29,10 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -78,10 +81,17 @@ public class RemoveMethodThrows extends Recipe {
         return Preconditions.check(precondition, new JavaIsoVisitor<ExecutionContext>() {
                     @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                        J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-                        boolean matches = enclosingClass != null ?
-                                methodMatcher.matches(method, enclosingClass) :
-                                methodMatcher.matches(method.getMethodType());
+                        Iterator<Object> enclosingPath = getCursor().getPath(o ->
+                                o instanceof J.ClassDeclaration || o instanceof J.NewClass);
+                        Object enclosing = enclosingPath.hasNext() ? enclosingPath.next() : null;
+                        boolean matches;
+                        if (enclosing instanceof J.NewClass) {
+                            matches = methodMatcher.matches(method, (J.NewClass) enclosing);
+                        } else if (enclosing instanceof J.ClassDeclaration) {
+                            matches = methodMatcher.matches(method, (J.ClassDeclaration) enclosing);
+                        } else {
+                            matches = methodMatcher.matches(method.getMethodType());
+                        }
                         getCursor().putMessage(METHOD_MATCHES_KEY, matches);
 
                         J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
@@ -89,7 +99,7 @@ public class RemoveMethodThrows extends Recipe {
                         List<J.Annotation> originalAnnotations = method.getLeadingAnnotations();
                         if (removedAnnotation != null && originalAnnotations.size() == 1 &&
                                 originalAnnotations.get(0) == removedAnnotation) {
-                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosingClass == null);
+                            m = collapseBlankLineLeftByRemovedAnnotation(m, enclosing == null);
                         }
                         if (!matches || m.getThrows() == null) {
                             return m;
@@ -141,12 +151,18 @@ public class RemoveMethodThrows extends Recipe {
                         return a.withArguments(remaining);
                     }
 
+                    /**
+                     * A method type reached once as {@code J.MethodDeclaration#methodType} and again as
+                     * its name's type has to come back as one instance, which the LST is asserted on.
+                     */
+                    private final Map<JavaType.Method, JavaType.Method> rewritten = new IdentityHashMap<>();
+
                     @Override
                     public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
                         JavaType jt = super.visitType(javaType, ctx);
                         if (jt instanceof JavaType.Method && methodMatcher.matches((JavaType.Method) jt)) {
-                            JavaType.Method mt = (JavaType.Method) jt;
-                            return mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te)));
+                            return rewritten.computeIfAbsent((JavaType.Method) jt, mt ->
+                                    mt.withThrownExceptions(ListUtils.filter(mt.getThrownExceptions(), te -> !typeMatcher.matches(te))));
                         }
                         return jt;
                     }

@@ -18,10 +18,10 @@ import {RewriteRpc, RpcRecipe} from "@openrewrite/rewrite/rpc";
 import {ChangeText} from "./change-text";
 
 /**
- * Mirrors the shape of a real-world composite recipe (e.g. Angular's
- * `UpgradeToAngular21`) whose `recipeList()` mixes locally-defined recipes with
- * recipes that were prepared on a remote RPC peer (via `prepareJavaRecipe` /
- * `rpc.prepareRecipe`, which return {@link RpcRecipe} instances).
+ * Mirrors the shape of a real-world framework-upgrade composite whose
+ * `recipeList()` mixes locally-defined recipes with recipes that were prepared
+ * on a remote RPC peer (via `rpc.prepareRecipe`, which returns {@link RpcRecipe}
+ * instances).
  *
  * The remote sub-recipe must not be re-installed by its constructor during
  * `PrepareRecipe` — `RpcRecipe` is a proxy that cannot be constructed without

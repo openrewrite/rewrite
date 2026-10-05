@@ -269,7 +269,12 @@ public class ParenthesizeVisitor<P> extends JavaVisitor<P> {
         if (needsParentheses(t, parent.getValue())) {
             return parenthesize(t);
         } else if (parent.getValue() instanceof J.Binary ||
-                   parent.getValue() instanceof J.InstanceOf) {
+                   parent.getValue() instanceof J.InstanceOf ||
+                   parent.getValue() instanceof J.TypeCast) {
+            return parenthesize(t);
+        } else if (parent.getValue() instanceof J.Ternary &&
+                   t.isScope(((J.Ternary) parent.getValue()).getCondition())) {
+            // `a ? b : c ? d : e` groups as `a ? b : (c ? d : e)`, so a ternary condition needs parentheses
             return parenthesize(t);
         }
 

@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "f-markers"
+version = "0.1.0"
+description = "conditional marker dep"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+tomli = {version = "2.0.1", markers = "python_version < '3.11'"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

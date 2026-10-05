@@ -18,17 +18,23 @@ package org.openrewrite.golang;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.golang.internal.ModuleCache;
 import org.openrewrite.golang.marker.GoProject;
+import org.openrewrite.golang.marker.GoResolutionResult;
 import org.openrewrite.golang.tree.Go;
 import org.openrewrite.golang.tree.GoMod;
+import org.openrewrite.golang.tree.GoSum;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
-import org.openrewrite.text.PlainText;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.function.Consumer;
+
+import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 public final class Assertions {
     private Assertions() {
@@ -82,25 +88,13 @@ public final class Assertions {
         return goMod;
     }
 
-    /**
-     * Wrap go.sum content as a sibling SourceSpec. When placed inside a
-     * {@link #goProject(String, SourceSpecs...)} alongside a
-     * {@link #goMod(String)}, the parser reads the sibling go.sum off disk
-     * during parse (via {@link GoModParser#parseSumContent}) and populates
-     * {@code GoResolutionResult.resolvedDependencies}.
-     * <p>
-     * Today there is no dedicated parser for go.sum — content round-trips as
-     * a {@link PlainText}. The marker side-effect happens during go.mod
-     * parsing.
-     */
     public static SourceSpecs goSum(@Nullable String before) {
         return goSum(before, s -> {
         });
     }
 
-    public static SourceSpecs goSum(@Nullable String before, Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goSum = new SourceSpec<>(PlainText.class, null,
-                org.openrewrite.text.PlainTextParser.builder(), before, null);
+    public static SourceSpecs goSum(@Nullable String before, Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, null);
         goSum.path("go.sum");
         spec.accept(goSum);
         return goSum;
@@ -112,9 +106,8 @@ public final class Assertions {
     }
 
     public static SourceSpecs goSum(@Nullable String before, String after,
-                                    Consumer<SourceSpec<PlainText>> spec) {
-        SourceSpec<PlainText> goSum = new SourceSpec<>(PlainText.class, null,
-                org.openrewrite.text.PlainTextParser.builder(), before, s -> after);
+                                    Consumer<SourceSpec<GoSum>> spec) {
+        SourceSpec<GoSum> goSum = new SourceSpec<>(GoSum.class, null, GoSumParser.builder(), before, s -> after);
         goSum.path("go.sum");
         spec.accept(goSum);
         return goSum;
@@ -128,13 +121,50 @@ public final class Assertions {
      * not nested inside one another. Recipes that need module-level
      * dependency information look up the sibling go.mod's
      * {@link org.openrewrite.golang.marker.GoResolutionResult}.
+     * <p>
+     * A sibling {@code go.mod} also gives the {@code .go} sources their module
+     * context, so imports of the modules it requires carry real types.
      */
     public static SourceSpecs goProject(String project, SourceSpecs... sources) {
         return goProject(project, spec -> project(spec, project), sources);
     }
 
     public static SourceSpecs goProject(String project, Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... sources) {
+        moduleContext(sources);
         return SourceSpecs.dir(project, spec, sources);
+    }
+
+    /**
+     * The module path and go.mod content of the sibling go.mod, onto the parser of every {@code .go} spec.
+     */
+    private static void moduleContext(SourceSpecs... sources) {
+        String goModContent = null;
+        // Iterating a nested SourceSpecs is what applies its directory prefix, and that is not
+        // idempotent, so only direct children are examined.
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec) {
+                Path sourcePath = ((SourceSpec<?>) multiSpec).getSourcePath();
+                if (sourcePath != null && "go.mod".equals(sourcePath.getFileName().toString())) {
+                    goModContent = trimIndentPreserveCRLF(((SourceSpec<?>) multiSpec).getBefore());
+                    break;
+                }
+            }
+        }
+        if (goModContent == null) {
+            return;
+        }
+        GoResolutionResult resolution = GoModParser.parseMarker(goModContent, Paths.get("go.mod"));
+        if (resolution == null) {
+            return;
+        }
+        ModuleCache.download(goModContent, resolution.getRequires());
+        for (SourceSpecs multiSpec : sources) {
+            if (multiSpec instanceof SourceSpec && ((SourceSpec<?>) multiSpec).getParser() instanceof GolangParser.Builder) {
+                ((GolangParser.Builder) ((SourceSpec<?>) multiSpec).getParser())
+                        .module(resolution.getModulePath())
+                        .goMod(goModContent);
+            }
+        }
     }
 
     /**
@@ -143,15 +173,15 @@ public final class Assertions {
      * child source.
      */
     public static SourceSpec<?> project(SourceSpec<?> sourceSpec, String projectName) {
-        return sourceSpec.markers(new GoProject(Tree.randomId(), projectName));
+        return sourceSpec.markers(new GoProject(Tree.randomId(), projectName, null));
     }
 
     /**
      * Walk {@code root} and assert that the first {@link J.Identifier} whose
      * {@code simpleName} equals {@code name} carries a non-null
      * {@link JavaType.FullyQualified} type whose fully-qualified name equals
-     * {@code expectedFqn}. Use this for class/struct/parameterized types; for
-     * primitives use {@link #expectPrimitiveType(Tree, String, String)}.
+     * {@code expectedFqn}. Go's basic types are attributed under their own Go
+     * names, so this covers them too: {@code "int32"}, {@code "string"}.
      *
      * @throws AssertionError when no such identifier exists, its type is
      *                       null, or the type is not fully qualified.
@@ -172,31 +202,6 @@ public final class Assertions {
         String got = ((JavaType.FullyQualified) finder.type).getFullyQualifiedName();
         if (!got.equals(expectedFqn)) {
             throw new AssertionError("expectType(\"" + name + "\"): FQN = \"" + got + "\", want \"" + expectedFqn + "\"");
-        }
-    }
-
-    /**
-     * Walk {@code root} and assert that the first {@link J.Identifier} whose
-     * {@code simpleName} equals {@code name} carries a {@link JavaType.Primitive}
-     * whose keyword equals {@code expectedKeyword} (e.g. {@code "int"},
-     * {@code "String"}, {@code "boolean"}).
-     */
-    public static void expectPrimitiveType(Tree root, String name, String expectedKeyword) {
-        IdentifierTypeFinder finder = new IdentifierTypeFinder(name);
-        finder.visit(root, 0);
-        if (!finder.found) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): no identifier with that name in tree");
-        }
-        if (finder.type == null) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): identifier has null type");
-        }
-        if (!(finder.type instanceof JavaType.Primitive)) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): identifier type is " +
-                    finder.type.getClass().getSimpleName() + ", want Primitive");
-        }
-        String got = ((JavaType.Primitive) finder.type).getKeyword();
-        if (!got.equals(expectedKeyword)) {
-            throw new AssertionError("expectPrimitiveType(\"" + name + "\"): keyword = \"" + got + "\", want \"" + expectedKeyword + "\"");
         }
     }
 

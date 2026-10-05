@@ -100,29 +100,33 @@ public class ScalaParserVisitor {
             }
         }
 
-        // If we didn't get any statements and have source content, create an Unknown node
-        // But skip if we already have a package declaration (to avoid duplication)
-        if (statements.isEmpty() && !source.trim().isEmpty() && packageDecl == null) {
-            J.Unknown.Source unknownSource = new J.Unknown.Source(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                source
-            );
-
-            J.Unknown unknown = new J.Unknown(
-                randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                unknownSource
-            );
-
-            statements.add(unknown);
-        }
-
-        // Get remaining source for EOF
         String remainingSource = converter.getRemainingSource(parseResult, source, result.getLastCursorPosition());
-        Space eof = remainingSource.isEmpty() ? EMPTY : Space.build(remainingSource, Collections.emptyList());
+        Space eof = remainingSource.isEmpty() ? EMPTY : ScalaSpace.format(remainingSource);
+
+        if (statements.isEmpty() && packageDecl == null) {
+            Space whole = ScalaSpace.format(source);
+            if (isWhitespaceAndComments(whole)) {
+                // A file of only whitespace and comments has no statements; it is modeled entirely by EOF.
+                eof = whole;
+            } else {
+                J.Unknown.Source unknownSource = new J.Unknown.Source(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    source
+                );
+
+                J.Unknown unknown = new J.Unknown(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    unknownSource
+                );
+
+                statements.add(unknown);
+                eof = EMPTY;
+            }
+        }
 
         // Build S.CompilationUnit
         return new S.CompilationUnit(
@@ -138,5 +142,17 @@ public class ScalaParserVisitor {
             JRightPadded.withElements(Collections.emptyList(), statements),
             eof                            // Space eof
         );
+    }
+
+    private static boolean isWhitespaceAndComments(Space space) {
+        if (!space.getWhitespace().trim().isEmpty()) {
+            return false;
+        }
+        for (Comment comment : space.getComments()) {
+            if (!comment.getSuffix().trim().isEmpty()) {
+                return false;
+            }
+        }
+        return true;
     }
 }

@@ -166,10 +166,10 @@ public class JsonPathMatcher {
         public Object visitJsonPath(JsonPathParser.JsonPathContext ctx) {
             if (ctx.ROOT() != null || "[".equals(ctx.start.getText())) {
                 scope = cursorPath.stream()
-                        .filter(t -> t instanceof Hcl.Block)
+                        .filter(Hcl.Block.class::isInstance)
                         .findFirst()
                         .orElseGet(() -> cursorPath.stream()
-                                .filter(t -> t instanceof Hcl.ConfigFile)
+                                .filter(Hcl.ConfigFile.class::isInstance)
                                 .findFirst()
                                 .orElse(null));
             }

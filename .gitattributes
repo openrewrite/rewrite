@@ -35,6 +35,7 @@
 *.fla           binary
 *.swf           binary
 *.gz            binary
+*.tgz           binary
 *.zip           binary
 *.jar           binary
 *.tar           binary

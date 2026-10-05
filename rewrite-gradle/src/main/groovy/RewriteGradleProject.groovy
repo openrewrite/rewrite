@@ -39,6 +39,7 @@ import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
 
 interface DependencyHandlerSpec extends DependencyHandler {
+    @Override
     ProjectDependency project(String path)
     ProjectDependency project(String path, String configuration)
     Dependency annotationProcessor(Object... dependencyNotation)

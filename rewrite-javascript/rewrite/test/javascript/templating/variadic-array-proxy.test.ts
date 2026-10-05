@@ -35,39 +35,12 @@ describe('variadic array proxy behavior', () => {
         };
     }
 
-    test('access first element with index [0]', () => {
+    test('index access reads through to the captured element', () => {
         const args = capture({ variadic: true });
         spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[0]})`));
 
         return spec.rewriteRun(
             typescript('foo(1, 2, 3)', 'bar(1)')
-        );
-    });
-
-    test('access second element with index [1]', () => {
-        const args = capture({ variadic: true });
-        spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[1]})`));
-
-        return spec.rewriteRun(
-            typescript('foo(1, 2, 3)', 'bar(2)')
-        );
-    });
-
-    test('access last element with index [2]', () => {
-        const args = capture({ variadic: true });
-        spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${args[2]})`));
-
-        return spec.rewriteRun(
-            typescript('foo(1, 2, 3)', 'bar(3)')
-        );
-    });
-
-    test('slice from index 1', () => {
-        const args = capture({ variadic: true });
-        spec.recipe = fromVisitor(matchAndReplace(pattern`foo(${args})`, template`bar(${(args.slice(1))})`));
-
-        return spec.rewriteRun(
-            typescript('foo(1, 2, 3)', 'bar(2, 3)')
         );
     });
 

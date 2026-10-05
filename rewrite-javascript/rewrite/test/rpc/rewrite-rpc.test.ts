@@ -23,6 +23,8 @@ import {RecipeSpec} from "../../src/test";
 import {PassThrough} from "node:stream";
 import * as rpc from "vscode-jsonrpc/node";
 import {activate} from "../../fixtures/example-recipe";
+import {activate as activateCompositeWithJavaDelegate} from "../../fixtures/composite-with-java-delegate";
+import {activate as activateJavaDelegatePrecondition} from "../../fixtures/java-delegate-precondition";
 import {
     findNodeResolutionResult,
     javascript,
@@ -35,11 +37,16 @@ import {
 import {J} from "../../src/java";
 import {withDir} from "tmp-promise";
 import {PrepareRecipe, PrepareRecipeResponse} from "../../src/rpc/request/prepare-recipe";
+import {Print} from "../../src/rpc/request/print";
+import {RpcObjectState} from "../../src/rpc/queue";
+import * as fs from "fs";
+import * as path from "path";
 
 describe("Rewrite RPC", () => {
     const spec = new RecipeSpec();
 
     let server: RewriteRpc;
+    let serverMarketplace: RecipeMarketplace;
     let client: RewriteRpc;
 
     beforeEach(async () => {
@@ -59,10 +66,10 @@ describe("Rewrite RPC", () => {
             new rpc.StreamMessageReader(clientToServer),
             new rpc.StreamMessageWriter(serverToClient)
         );
-        const marketplace = new RecipeMarketplace();
-        await activate(marketplace);
+        serverMarketplace = new RecipeMarketplace();
+        await activate(serverMarketplace);
         server = new RewriteRpc(serverConnection, {
-            marketplace: marketplace
+            marketplace: serverMarketplace
         });
     });
 
@@ -97,6 +104,35 @@ describe("Rewrite RPC", () => {
         }
     ));
 
+    test("print subtrees whose text depends on what encloses them", () => spec.rewriteRun(
+        {
+            //language=typescript
+            ...typescript("const literal = { a: 1, b: 2 }, cast = <string>literal, first = items?.[0], called = a?.b();"),
+            beforeRecipe: async (cu: JS.CompilationUnit) => {
+                const printed: string[] = [];
+                const withoutCursor: string[] = [];
+                await (new class extends JavaScriptVisitor<any> {
+                    protected async preVisit(tree: J, _: any): Promise<J | undefined> {
+                        const parent = this.cursor.parentTree()?.value?.kind;
+                        if (tree.kind === J.Kind.Block && parent === J.Kind.NewClass ||
+                            tree.kind === J.Kind.ControlParentheses && parent === J.Kind.TypeCast ||
+                            tree.kind === J.Kind.Identifier && (parent === J.Kind.ArrayAccess || parent === J.Kind.MethodInvocation) &&
+                            tree.markers.markers.length > 0) {
+                            printed.push(await client.print(tree, this.cursor.parent!));
+                            client.localObjects.set(tree.id.toString(), tree);
+                            withoutCursor.push(await client.connection.sendRequest(
+                                new rpc.RequestType<Print, string, Error>("Print"), new Print(tree.id, cu.kind)));
+                        }
+                        return tree;
+                    }
+                }).visit(cu, 0);
+                expect(printed).toEqual(["{ a: 1, b: 2 }", "<string>", "items?.", "a"]);
+                expect(withoutCursor).toEqual(["{ a: 1 b: 2 }", "(string)", "items?", "a?"]);
+                return cu;
+            }
+        }
+    ));
+
     test("parse", async () => {
         const sourceFile = (await client.parse([{
             text: "console.info('hello',)",
@@ -105,6 +141,34 @@ describe("Rewrite RPC", () => {
         expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
         expect(sourceFile.sourcePath).toEqual("hello.js");
         return sourceFile;
+    });
+
+    test("parse an input that names a file without giving its text", async () => {
+        await withDir(async dir => {
+            fs.writeFileSync(path.join(dir.path, "hello.ts"), "console.info('hello')");
+            const sourceFile = (await client.parse(
+                [{text: null, sourcePath: path.join(dir.path, "hello.ts")} as any],
+                JS.Kind.CompilationUnit, dir.path))[0];
+            expect(sourceFile.kind).toEqual(JS.Kind.CompilationUnit);
+            expect(sourceFile.sourcePath).toEqual("hello.ts");
+            expect(await client.print(sourceFile)).toEqual("console.info('hello')");
+        }, {unsafeCleanup: true});
+    });
+
+    test("a receive failure surfaces when the peer cannot roll it back, and the refs it sent are kept", async () => {
+        const toPeer = new PassThrough();
+        const fromPeer = new PassThrough();
+        // a peer that predates AbortGetObject answers it with "method not found", and still counts ref 3 as sent
+        const peer = rpc.createMessageConnection(new rpc.StreamMessageReader(toPeer), new rpc.StreamMessageWriter(fromPeer));
+        peer.onRequest("GetObject", (request: { id: string }) => request.id === "1" ?
+            [{state: RpcObjectState.ADD, value: "shared", ref: 3}, {state: RpcObjectState.ADD, ref: 7}, {state: RpcObjectState.END_OF_OBJECT}] :
+            [{state: RpcObjectState.ADD, ref: 3}, {state: RpcObjectState.END_OF_OBJECT}]);
+        peer.listen();
+
+        const receiver = new RewriteRpc(rpc.createMessageConnection(
+            new rpc.StreamMessageReader(fromPeer), new rpc.StreamMessageWriter(toPeer)), {});
+        await expect(receiver.getObject("1")).rejects.toThrow("Expected END_OF_OBJECT but got: ADD");
+        expect(await receiver.getObject("2")).toEqual("shared");
     });
 
     test("parse package.json with PackageJsonParser", async () => {
@@ -269,10 +333,10 @@ describe("Rewrite RPC", () => {
 
     test("prepareRecipeWithRpcSubRecipeInRecipeList", async () => {
         // A composite recipe whose recipeList() mixes a local recipe with an
-        // already-prepared remote (RpcRecipe) sub-recipe — the shape of e.g.
-        // Angular's UpgradeToAngular21, which lists upgradeDependencyVersion()
-        // (a Java recipe prepared over RPC). Preparing it must not try to
-        // re-install the RpcRecipe by its (no-arg-incompatible) constructor.
+        // already-prepared remote (RpcRecipe) sub-recipe — the shape of a
+        // framework-upgrade composite listing a Java recipe prepared over RPC.
+        // Preparing it must not try to re-install the RpcRecipe by its
+        // (no-arg-incompatible) constructor.
         const recipe = await client.prepareRecipe("org.openrewrite.example.text.with-rpc-sub-recipe");
         const descriptor = await recipe.descriptor();
         expect(descriptor.recipeList.map(r => r.name)).toContain(
@@ -280,14 +344,26 @@ describe("Rewrite RPC", () => {
         );
     });
 
+    test("sameTypeChildrenPreserveDistinctOptions", async () => {
+        // A composite whose recipeList() yields multiple instances of the same recipe class with
+        // different option values must keep each prepared child its own options, rather than
+        // collapsing them.
+        const recipe = await client.prepareRecipe("org.openrewrite.example.text.same-type-children");
+        const descriptor = await recipe.descriptor();
+
+        expect(descriptor.recipeList.map(r => r.name)).toEqual([
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text",
+            "org.openrewrite.example.text.change-text"
+        ]);
+
+        const texts = descriptor.recipeList.map(
+            r => r.options.find(o => o.name === "text")?.value
+        );
+        expect(texts).toEqual(["a", "b", "c"]);
+    });
+
     test("preparing an unknown recipe id delegates to the host instead of failing", async () => {
-        // When the host builds RpcRecipe.getRecipeList() it re-prepares every child by
-        // id over RPC. A child that delegates to a Java recipe (e.g. Angular's
-        // upgradeDependencyVersion() -> org.openrewrite.javascript.UpgradeDependencyVersion)
-        // is an RpcRecipe that installSubRecipes intentionally does NOT register in this
-        // marketplace, so findRecipe misses. Rather than throwing "Could not find recipe
-        // with id ...", the server must tell the host to resolve it locally via delegatesTo
-        // (the Java recipe is on the host's classpath).
         const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
             new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
             new PrepareRecipe("org.openrewrite.javascript.UpgradeDependencyVersion", {newVersion: "19.x"})
@@ -296,6 +372,29 @@ describe("Rewrite RPC", () => {
             recipeName: "org.openrewrite.javascript.UpgradeDependencyVersion",
             options: {newVersion: "19.x"}
         });
+    });
+
+    test("a composite's Java-delegate children are emitted as delegatesTo with the options as passed", async () => {
+        await activateCompositeWithJavaDelegate(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.composite-with-java-delegate")
+        );
+        expect(response.recipeList!.map(child => child.delegatesTo)).toEqual([
+            {recipeName: "org.openrewrite.example.host.replace-hello", options: {}},
+            {recipeName: "org.openrewrite.text.FindAndReplace", options: {find: "goodbye", replace: "farewell"}}
+        ]);
+    });
+
+    test("a Java-delegate precondition is sent as a named visitor for the host to gate on", async () => {
+        await activateJavaDelegatePrecondition(serverMarketplace);
+        const response: PrepareRecipeResponse = await (client as any).connection.sendRequest(
+            new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"),
+            new PrepareRecipe("org.openrewrite.example.npm.find-identifier-gated-by-java-recipe")
+        );
+        expect(response.editPreconditions).toContainEqual(
+            {visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "gate"}}
+        );
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {

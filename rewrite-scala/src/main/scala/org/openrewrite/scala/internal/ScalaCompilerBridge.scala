@@ -62,7 +62,8 @@ class ScalaCompilerBridge {
     fresh.setReporter(reporter)
     // Send compiler output to a designated dir so .class files don't pollute cwd.
     if (outputDir != null) {
-      fresh.setSetting(fresh.settings.outputDir, dotty.tools.io.AbstractFile.getDirectory(outputDir))
+      fresh.setSetting(fresh.settings.outputDir,
+        new dotty.tools.io.PlainDirectory(new dotty.tools.io.Directory(Paths.get(outputDir))))
     }
     if (classpath.nonEmpty) {
       fresh.setSetting(fresh.settings.classpath, classpath)
@@ -106,7 +107,7 @@ class ScalaCompilerBridge {
     // on a `fresh` of the same base would have no effect. Only if the retry
     // also fails do we fall back to a bare context, where `with` types fail
     // per-file.
-    val (runOpt, parseContext): (Option[Run], Context) =
+    val (runOpt, parseContext) =
       try {
         val r = (new Compiler()).newRun(using configuredCtx)
         (Some(r), r.runContext)
@@ -272,16 +273,38 @@ class ScalaCompilerBridge {
       else if (isSimpleExpression(content)) Wrapping.Expression
       else Wrapping.None
 
-    val source = SourceFile.virtual(path, wrapping.wrap(content))
-    val unit = CompilationUnit(source)
-    val parser = new Parsers.Parser(source)(using ctx.fresh.setCompilationUnit(unit))
-    val rawTree = parser.parse()
-
-    val finalTree = wrapping match {
-      case Wrapping.Expression if !rawTree.isEmpty => extractExpression(rawTree).getOrElse(rawTree)
-      case _ => rawTree
+    // Each attempt parses under its own reporter so a failed attempt's syntax
+    // errors don't surface on the file when a later attempt parses cleanly.
+    def attempt(sourceVersion: Option[String]): (ParsedUnit, List[Diagnostic]) = {
+      val reporter = new StoreReporter(null)
+      val source = SourceFile.virtual(path, wrapping.wrap(content))
+      val unit = CompilationUnit(source)
+      val pctx = ctx.fresh.setCompilationUnit(unit).setReporter(reporter)
+      sourceVersion.foreach(v => pctx.setSetting(pctx.settings.source, v))
+      val parser = new Parsers.Parser(source)(using pctx)
+      val rawTree = parser.parse()
+      val finalTree = wrapping match {
+        case Wrapping.Expression if !rawTree.isEmpty => extractExpression(rawTree)(using pctx).getOrElse(rawTree)
+        case _ => rawTree
+      }
+      (ParsedUnit(rawTree, finalTree, unit, wrapping), reporter.removeBufferedMessages(using pctx))
     }
-    ParsedUnit(rawTree, finalTree, unit, wrapping)
+    def hasSyntaxErrors(diags: List[Diagnostic]): Boolean = diags.exists(_.level >= 2)
+
+    // Parse under the configured source version first. On syntax errors, retry
+    // under `3.0-migration`, where Dotty's scanner treats the Scala 3 keywords
+    // `enum`, `given` and `erased` as plain identifiers — Scala 2 sources
+    // legitimately use them as names. Keep the first attempt when the retry
+    // doesn't parse cleanly either.
+    val (first, firstDiags) = attempt(None)
+    val (chosen, chosenDiags) =
+      if (hasSyntaxErrors(firstDiags)) {
+        val (second, secondDiags) = attempt(Some("3.0-migration"))
+        if (hasSyntaxErrors(secondDiags)) (first, firstDiags) else (second, secondDiags)
+      } else (first, firstDiags)
+
+    chosenDiags.foreach(d => ctx.reporter.report(d))
+    chosen
   }
 
   private def buildResult(parsed: ParsedUnit, warnings: JList[ScalaWarning])(using ctx: Context): ScalaParseResult =

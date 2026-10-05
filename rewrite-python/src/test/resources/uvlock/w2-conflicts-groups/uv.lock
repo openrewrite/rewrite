@@ -1,0 +1,57 @@
+version = 1
+revision = 3
+requires-python = ">=3.9"
+conflicts = [[
+    { package = "confproj", extra = "cpu" },
+    { package = "confproj", extra = "cuda" },
+], [
+    { package = "confproj", group = "g1" },
+    { package = "confproj", group = "g2" },
+]]
+
+[[package]]
+name = "bar"
+version = "0.1.0"
+source = { directory = "libs/bar" }
+
+[[package]]
+name = "baz"
+version = "0.1.0"
+source = { directory = "libs/baz" }
+
+[[package]]
+name = "confproj"
+version = "0.1.0"
+source = { virtual = "." }
+
+[package.optional-dependencies]
+cpu = [
+    { name = "foo" },
+]
+cuda = [
+    { name = "bar" },
+]
+
+[package.dev-dependencies]
+g1 = [
+    { name = "baz" },
+]
+g2 = [
+    { name = "foo" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "bar", marker = "extra == 'cuda'", directory = "libs/bar" },
+    { name = "foo", marker = "extra == 'cpu'", directory = "libs/foo" },
+]
+provides-extras = ["cpu", "cuda"]
+
+[package.metadata.requires-dev]
+g1 = [{ name = "baz", directory = "libs/baz" }]
+g2 = [{ name = "foo", directory = "libs/foo" }]
+
+[[package]]
+name = "foo"
+version = "0.1.0"
+source = { directory = "libs/foo" }

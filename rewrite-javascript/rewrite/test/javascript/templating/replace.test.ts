@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, pattern, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, pattern, rewrite, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {create as produce} from "mutative";
-import {produceAsync} from "../../../src";
+import {findMarker, markers, produceAsync} from "../../../src";
 
 describe('template2 replace', () => {
     const spec = new RecipeSpec();
@@ -174,3 +174,128 @@ describe('template2 replace', () => {
         );
     });
 });
+
+describe('markers on a spliced capture', () => {
+    const spec = new RecipeSpec();
+
+    /** `t ? true : false` -> `t`: the captured test is handed straight back. */
+    function keepTernaryTest() {
+        const rule = rewrite(() => {
+            const t = capture();
+            return {before: pattern`${t} ? true : false`, after: template`${t}`};
+        });
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitTernary(ternary: J.Ternary, p: any): Promise<J | undefined> {
+                const visited = await super.visitTernary(ternary, p) as J.Ternary;
+                return await rule.tryOn(this.cursor, visited) || visited;
+            }
+        });
+    }
+
+    test('keeps a non-null assertion the source wrote', () => {
+        spec.recipe = keepTernaryTest();
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                'const a = x! ? true : false;',
+                'const a = x!;'
+            )
+        );
+    });
+
+    test('keeps a non-null assertion spliced into a larger template', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`f(${arg})`, after: template`g(${arg})`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('f(x!);', 'g(x!);')
+        );
+    });
+
+    test('a rule that means to drop the assertion still can', () => {
+        const withoutNonNull = (n: J): J => ({
+            ...n,
+            markers: markers(...n.markers.markers.filter(m => m.kind !== JS.Markers.NonNullAssertion))
+        });
+        const o = capture({constraint: (n: J) => !!findMarker(n, JS.Markers.NonNullAssertion)});
+        const rule = rewrite(() => ({
+            before: pattern`${o}.oldApi()`,
+            after: match => template`${withoutNonNull(match.get(o) as J)}.newApi()`
+        }));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    x!.oldApi();
+                    y.oldApi();
+                `,
+                `
+                    x.newApi();
+                    y.oldApi();
+                `
+            )
+        );
+    });
+
+    test('adds a non-null assertion the template writes, without doubling it', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`f(${arg})`, after: template`g(${arg}!)`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    f(x);
+                    f(y!);
+                `,
+                `
+                    g(x!);
+                    g(y!);
+                `
+            )
+        );
+    });
+
+    test('a marker the value owns stays inside parentheses the slot needs', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`g(${arg})`, after: template`new ${arg}()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('g(f()!);', 'new (f()!)();')
+        );
+    });
+
+    test('a marker the template writes wraps those parentheses', () => {
+        const arg = capture();
+        const rule = rewrite(() => ({before: pattern`f(${arg})`, after: template`${arg}!.m()`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, method) || method;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('f(a + b);', '(a + b)!.m();')
+        );
+    });
+});
+

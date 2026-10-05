@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "g-git"
+version = "0.1.0"
+description = "six from git"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+six = {git = "https://github.com/benjaminp/six.git", tag = "1.17.0"}
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

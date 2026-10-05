@@ -1,0 +1,9 @@
+{
+  "name": "peer-fork-required",
+  "version": "1.0.0",
+  "dependencies": {
+    "ajv": "6.15.0",
+    "debug": "4.4.3",
+    "schema-utils": "4.5.0"
+  }
+}

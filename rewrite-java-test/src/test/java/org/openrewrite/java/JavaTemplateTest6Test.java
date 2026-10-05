@@ -270,6 +270,51 @@ class JavaTemplateTest6Test implements RewriteTest {
         );
     }
 
+    @Test
+    void replaceParametersResolvesSimpleNamesThroughSourceFileImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  if (method.getParameters().getFirst() instanceof J.Empty) {
+                      return JavaTemplate.builder("List<String> names")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceParameters());
+                  }
+                  return super.visitMethodDeclaration(method, p);
+              }
+          })).afterRecipe(run -> {
+              var cu = (J.CompilationUnit) run.getChangeset().getAllResults().getFirst().getAfter();
+              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().getFirst().getBody().getStatements().getFirst()).getMethodType();
+              assertThat(type).isNotNull();
+              assertThat(type.getParameterTypes().getFirst())
+                .as("The parameter's type should resolve through the source file's `java.util.List` import")
+                .matches(t -> TypeUtils.isOfClassType(t, "java.util.List"));
+          }),
+          java(
+            """
+              import java.util.List;
+
+              class Test {
+
+                  void test() {
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              class Test {
+
+                  void test(List<String> names) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Disabled
     @Test
     void replaceMethodTypeParameters() {

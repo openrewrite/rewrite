@@ -35,6 +35,26 @@ func PrintGoModWithMarkers(gm *golang.GoMod, mp MarkerPrinter) string {
 	return printGoMod(gm, NewPrintOutputCaptureWithMarkers(mp))
 }
 
+func (p *GoPrinter) VisitGoMod(gm *golang.GoMod, param any) java.Tree {
+	printGoMod(gm, param.(*PrintOutputCapture))
+	return gm
+}
+
+func (p *GoPrinter) VisitGoModDirective(d *golang.GoModDirective, param any) java.Tree {
+	printGoModDirective(d, param.(*PrintOutputCapture))
+	return d
+}
+
+func (p *GoPrinter) VisitGoModBlock(b *golang.GoModBlock, param any) java.Tree {
+	printGoModBlock(b, param.(*PrintOutputCapture))
+	return b
+}
+
+func (p *GoPrinter) VisitGoModValue(v *golang.GoModValue, param any) java.Tree {
+	printGoModValue(v, param.(*PrintOutputCapture))
+	return v
+}
+
 func printGoMod(gm *golang.GoMod, out *PrintOutputCapture) string {
 	out.BeforePrefix(gm.Markers)
 	printGoModSpace(gm.Prefix, out)
@@ -95,9 +115,5 @@ func printGoModBlock(b *golang.GoModBlock, out *PrintOutputCapture) {
 }
 
 func printGoModSpace(space java.Space, out *PrintOutputCapture) {
-	out.Append(space.Whitespace)
-	for _, comment := range space.Comments {
-		out.Append(comment.Text)
-		out.Append(comment.Suffix)
-	}
+	printSpace(space, out)
 }

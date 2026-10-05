@@ -28,10 +28,10 @@ import org.openrewrite.text.PlainText;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
@@ -72,10 +72,10 @@ class SetupCfgParserTest {
         SetupCfgParser parser = new SetupCfgParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("setup.cfg"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         PlainText text = (PlainText) parsed.get(0);

@@ -25,12 +25,10 @@ import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 
 public class LombokSupport {
 
@@ -121,7 +119,7 @@ public class LombokSupport {
 
         @Override
         public Enumeration<URL> getResources(String name) throws IOException {
-            return Collections.emptyEnumeration();
+            return emptyEnumeration();
         }
 
         @Override

@@ -17,14 +17,12 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
-import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.table.ParseFailures;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 import org.openrewrite.text.Find;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 

@@ -21,7 +21,6 @@ dependencies {
     implementation("dev.failsafe:failsafe:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
-    implementation("com.fasterxml.jackson.module:jackson-module-jaxb-annotations")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jdk8")
 
     // needed by AddDependency
@@ -31,13 +30,13 @@ dependencies {
     compileOnly(project(":rewrite-yaml"))
     implementation(project(":rewrite-properties"))
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:latest.release")
 
     implementation("org.apache.commons:commons-text:latest.release")
 
     // Align kotlin-stdlib-jdk7/-jdk8/-common with kotlin-stdlib
     // (maven-resolver and friends would otherwise pull mixed 1.8.21/1.9.x stdlibs).
-    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.3.20"))
+    testImplementation(platform("org.jetbrains.kotlin:kotlin-bom:2.4.20"))
 
     testImplementation(project(":rewrite-test"))
 

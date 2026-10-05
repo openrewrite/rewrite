@@ -46,6 +46,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
@@ -90,8 +91,20 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     @NonFinal
     long runTimeoutNanos = -1;
 
+    /**
+     * Resolved lazily like {@link #runTimeoutNanos}. {@link Long#MAX_VALUE} when no
+     * {@link ExecutionContext#SOURCE_FILE_TIMEOUT} is set.
+     */
+    @NonFinal
+    long sourceFileTimeoutNanos = -1;
+
     @Getter
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
+
+    /**
+     * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
+     */
+    Set<Recipe> incompleteScans = newSetFromMap(new IdentityHashMap<>());
 
     public int getRecipePosition() {
         return allRecipeStack.getRecipePosition();
@@ -112,18 +125,61 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         if (System.nanoTime() - cycleStartTime > runTimeoutNanos) {
             if (thrownErrorOnTimeout.compareAndSet(false, true)) {
                 RecipeTimeoutException t = new RecipeTimeoutException(recipe);
-                ctx.getOnError().accept(t);
-                ctx.getOnTimeout().accept(t, ctx);
+                try {
+                    ctx.getOnError().accept(t);
+                } finally {
+                    ctx.getOnTimeout().accept(t, ctx);
+                }
             }
             return true;
         }
         return false;
     }
 
+    private void runScan(Recipe recipe, SourceFile source, Callable<SourceFile> scan) throws Exception {
+        SourceFileDeadline deadline = startSourceFileDeadline(recipe, source);
+        if (deadline == null) {
+            recipeRunStats.recordScan(recipe, scan);
+            return;
+        }
+        try (SourceFileDeadline ignored = deadline) {
+            recipeRunStats.recordScan(recipe, scan);
+            deadline.throwIfAbandoned();
+        } finally {
+            if (deadline.isAbandoned()) {
+                incompleteScans.add(recipe);
+            }
+        }
+    }
+
+    private @Nullable SourceFile runEdit(Recipe recipe, SourceFile source, Callable<SourceFile> edit) throws Exception {
+        SourceFileDeadline deadline = startSourceFileDeadline(recipe, source);
+        if (deadline == null) {
+            return recipeRunStats.recordEdit(recipe, edit);
+        }
+        try (SourceFileDeadline ignored = deadline) {
+            SourceFile after = recipeRunStats.recordEdit(recipe, edit);
+            // A recipe that swallowed the timeout may have returned a half-finished edit
+            deadline.throwIfAbandoned();
+            return after;
+        }
+    }
+
+    private @Nullable SourceFileDeadline startSourceFileDeadline(Recipe recipe, SourceFile sourceFile) {
+        if (sourceFileTimeoutNanos < 0) {
+            Duration timeout = ctx.getMessage(ExecutionContext.SOURCE_FILE_TIMEOUT);
+            sourceFileTimeoutNanos = timeout == null ? Long.MAX_VALUE : Math.max(0, timeout.toNanos());
+        }
+        return sourceFileTimeoutNanos == Long.MAX_VALUE ? null :
+                SourceFileDeadline.start(recipe, sourceFile, sourceFileTimeoutNanos);
+    }
+
     public LSS scanSources(LSS sourceSet) {
         if (isScanningRequired()) {
             return sourceSetEditor.apply(sourceSet, sourceFile -> {
                 BatchState scanBatch = new BatchState();
+                Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
+                Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
                 SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
                     Recipe recipe = leaf(recipeStack);
@@ -134,43 +190,51 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     SourceFile after = source;
 
                     if (recipe instanceof ScanningRecipe) {
-                        // Check if this is a batchable RPC scanning recipe
-                        RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
-                        String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
-
-                        if (currentRpc != null && scanVisitorName != null) {
-                            // Flush if switching to a different RPC instance
-                            if (scanBatch.rpc != null && scanBatch.rpc != currentRpc) {
-                                flushScanBatch(scanBatch, source);
-                            }
-
-                            Recipe nextRecipe = allRecipeStack.getNextRecipe();
-                            RewriteRpc nextRpc = nextRecipe instanceof RpcRecipe ? ((RpcRecipe) nextRecipe).getRpc() : null;
-                            @Nullable String nextScanVisitor = nextRecipe instanceof RpcRecipe ? ((RpcRecipe) nextRecipe).getScanVisitor() : null;
-                            boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
-
-                            if (isInBatch) {
-                                scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
-                                scanBatch.recipeStacks.add(recipeStack);
-                                if (scanBatch.originalBeforeBatch == null) {
-                                    scanBatch.originalBeforeBatch = source;
-                                }
-                                scanBatch.rpc = currentRpc;
-
-                                // If this is the last recipe in the batch, flush now
-                                if (nextRpc != currentRpc || nextScanVisitor == null) {
-                                    flushScanBatch(scanBatch, source);
-                                }
+                        try {
+                            if (isTimedOut(recipe)) {
                                 return source;
                             }
-                        }
 
-                        // Non-RPC or single-recipe path
-                        try {
+                            // Check if this is a batchable RPC scanning recipe
+                            RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
+                            String scanVisitorName = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getScanVisitor() : null;
+
+                            if (scanVisitorName != null) {
+                                captureRpc(currentRpc, touched, refCheckpoints);
+                            }
+
+                            if (currentRpc != null && scanVisitorName != null) {
+                                // Flush if switching to a different RPC instance
+                                if (scanBatch.rpc != null && scanBatch.rpc != currentRpc) {
+                                    flushScanBatch(scanBatch, source);
+                                }
+
+                                Recipe nextRecipe = allRecipeStack.getNextRecipe();
+                                RewriteRpc nextRpc = nextRecipe instanceof RpcRecipe ? ((RpcRecipe) nextRecipe).getRpc() : null;
+                                @Nullable String nextScanVisitor = nextRecipe instanceof RpcRecipe ? ((RpcRecipe) nextRecipe).getScanVisitor() : null;
+                                boolean isInBatch = nextRpc == currentRpc && nextScanVisitor != null || scanBatch.rpc == currentRpc;
+
+                                if (isInBatch) {
+                                    scanBatch.items.add(new BatchVisit.BatchVisitItem(scanVisitorName, null));
+                                    scanBatch.recipeStacks.add(recipeStack);
+                                    if (scanBatch.originalBeforeBatch == null) {
+                                        scanBatch.originalBeforeBatch = source;
+                                    }
+                                    scanBatch.rpc = currentRpc;
+
+                                    // If this is the last recipe in the batch, flush now
+                                    if (nextRpc != currentRpc || nextScanVisitor == null) {
+                                        flushScanBatch(scanBatch, source);
+                                    }
+                                    return source;
+                                }
+                            }
+
+                            // Non-RPC or single-recipe path
                             //noinspection unchecked
                             ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                             Object acc = scanningRecipe.getAccumulator(rootCursor, ctx);
-                            recipeRunStats.recordScan(recipe, () -> {
+                            runScan(recipe, source, () -> {
                                 TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                                 if (scanner.isAcceptable(source, ctx)) {
                                     Tree maybeMutated = scanner.visit(source, ctx, rootCursor);
@@ -198,6 +262,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                     flushScanBatch(scanBatch, result);
                 }
 
+                evictSourceFile(sourceFile, touched, refCheckpoints);
                 return result;
             });
         }
@@ -222,37 +287,76 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         batch.clear();
     }
 
+    /**
+     * Record a peer this file touched, snapshotting its ref high-water on first sight so
+     * {@link #evictSourceFile} can roll back exactly the refs this file introduced.
+     */
+    private static void captureRpc(@Nullable RewriteRpc rpc, Set<RewriteRpc> touched,
+                                   Map<RewriteRpc, int[]> refCheckpoints) {
+        if (rpc != null && touched.add(rpc)) {
+            refCheckpoints.put(rpc, rpc.refCheckpoint());
+        }
+    }
+
+    /**
+     * Drop this source file's tree from every RPC peer that visited it, rolling each peer's
+     * ref maps back to the pre-file checkpoint. Bounds RPC-server memory to ~one file at a time.
+     */
+    private static void evictSourceFile(@Nullable SourceFile sourceFile, Set<RewriteRpc> touched,
+                                        Map<RewriteRpc, int[]> refCheckpoints) {
+        if (sourceFile == null || touched.isEmpty()) {
+            return;
+        }
+        String id = sourceFile.getId().toString();
+        for (RewriteRpc rpc : touched) {
+            int[] cp = refCheckpoints.get(rpc);
+            rpc.evict(id, cp[0], cp[1]);
+        }
+    }
+
     public LSS generateSources(LSS sourceSet) {
         if (isScanningRequired()) {
             List<SourceFile> generatedInThisCycle = allRecipeStack.reduce(sourceSet, recipe, ctx, (acc, recipeStack) -> {
                 Recipe recipe = leaf(recipeStack);
                 if (recipe instanceof ScanningRecipe) {
                     assert acc != null;
-                    //noinspection unchecked
-                    ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                    // If some sources have already been generated by prior recipes, scan them now
-                    // This helps to avoid recipes having inconsistent knowledge of which files exist
-                    if (!acc.isEmpty()) {
-                        for (SourceFile source : acc) {
-                            try {
-                                recipeRunStats.recordScan(recipe, () -> {
-                                    TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(scanningRecipe.getAccumulator(rootCursor, ctx));
-                                    if (scanner.isAcceptable(source, ctx)) {
-                                        scanner.visit(source, ctx, rootCursor);
-                                    }
-                                    return source;
-                                });
-                            } catch (Throwable t) {
-                                handleError(recipe, source, source, t);
+                    try {
+                        if (isTimedOut(recipe)) {
+                            return acc;
+                        }
+                        //noinspection unchecked
+                        ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                        // If some sources have already been generated by prior recipes, scan them now
+                        // This helps to avoid recipes having inconsistent knowledge of which files exist
+                        if (!acc.isEmpty()) {
+                            for (SourceFile source : acc) {
+                                try {
+                                    runScan(recipe, source, () -> {
+                                        TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(scanningRecipe.getAccumulator(rootCursor, ctx));
+                                        if (scanner.isAcceptable(source, ctx)) {
+                                            scanner.visit(source, ctx, rootCursor);
+                                        }
+                                        return source;
+                                    });
+                                } catch (Throwable t) {
+                                    handleError(recipe, source, source, t);
+                                }
                             }
                         }
-                    }
-                    try {
+                        if (incompleteScans.contains(recipe)) {
+                            return acc;
+                        }
                         List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), unmodifiableList(acc), ctx));
                         generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                         Set<Path> seenInThisBatch = new HashSet<>();
                         generated.removeIf(source -> {
                             Path sourcePath = source.getSourcePath();
+                            if (!PathUtils.isValidSourcePath(sourcePath)) {
+                                sourceSet.onGenerateInvalidPath(sourcePath);
+                                handleError(recipe, source, null, new IllegalStateException(
+                                        "Recipe " + recipe.getName() + " generated a source file with an invalid path: " + sourcePath));
+                                return true;
+                            }
                             if (sourceSet.getBefore(sourcePath) != null) {
                                 sourceSet.onGenerateCollision(sourcePath, true);
                                 return true;
@@ -299,8 +403,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
      */
     private static class BatchState {
         @Nullable RewriteRpc rpc;
+
         final List<BatchVisit.BatchVisitItem> items = new ArrayList<>();
         final List<List<Recipe>> recipeStacks = new ArrayList<>();
+
         @Nullable SourceFile originalBeforeBatch;
 
         void clear() {
@@ -314,6 +420,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     protected @Nullable SourceFile editSource(LSS sourceSet, SourceFile sourceFile) {
         recipeRunStats.recordSourceVisited(sourceFile);
         BatchState batch = new BatchState();
+        Set<RewriteRpc> touched = newSetFromMap(new IdentityHashMap<>());
+        Map<RewriteRpc, int[]> refCheckpoints = new IdentityHashMap<>();
 
         SourceFile result = allRecipeStack.reduce(sourceSet, recipe, ctx, (source, recipeStack) -> {
             Recipe recipe = leaf(recipeStack);
@@ -322,6 +430,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             }
 
             RewriteRpc currentRpc = recipe instanceof RpcRecipe ? ((RpcRecipe) recipe).getRpc() : null;
+            captureRpc(currentRpc, touched, refCheckpoints);
 
             // Flush batch if switching to a different RPC or non-RPC recipe
             if (batch.rpc != null && batch.rpc != currentRpc) {
@@ -349,6 +458,10 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 }
 
                 if (ctx.getMessage(PANIC) != null) {
+                    return src;
+                }
+
+                if (incompleteScans.contains(recipe)) {
                     return src;
                 }
 
@@ -404,7 +517,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
                 visitor.setCursor(rootCursor);
 
-                after = recipeRunStats.recordEdit(recipe, () -> {
+                after = runEdit(recipe, src, () -> {
                     if (visitor.isAcceptable(src, ctx)) {
                         // propagate shared root cursor
                         //noinspection DataFlowIssue
@@ -444,6 +557,8 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             result = flushBatch(batch, result);
         }
 
+        // Recipe errors are handled inside the reduce, so this runs on every normal return.
+        evictSourceFile(sourceFile, touched, refCheckpoints);
         return result;
     }
 
@@ -461,18 +576,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         try {
             response = rpc.batchVisit(originalBefore, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
-            if (!batch.recipeStacks.isEmpty()) {
-                SourceFile beforeError = source;
-                if (!(t instanceof RecipeRunException)) {
-                    source = Markup.error(source, t);
-                }
-                source = handleError(leaf(batch.recipeStacks.get(0)), originalBefore, source, t);
-                if (source != null && source != beforeError) {
-                    source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
-                }
-            }
-            batch.clear();
-            return source;
+            return batchFailed(batch, originalBefore, source, t);
         }
 
         // Build attribution map: SearchResult UUID → recipe name
@@ -509,12 +613,17 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             return null;
         }
 
-        SourceFile fetched;
+        SourceFile fetched = source;
         if (anyModified) {
-            // Fetch final tree state from remote
-            fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
-        } else {
-            fetched = source;
+            try {
+                fetched = rpc.getObject(originalBefore.getId().toString(), DynamicDispatchRpcCodec.canonicalSourceFileType(originalBefore.getClass()));
+                if (fetched == null) {
+                    // A batch reports its deletions in its results, so a missing tree here is one the remote lost.
+                    throw new IllegalStateException("Remote reported " + originalBefore.getSourcePath() + " as modified but no longer holds it");
+                }
+            } catch (Throwable t) {
+                return batchFailed(batch, originalBefore, source, t);
+            }
         }
 
         if (anyModified) {
@@ -541,6 +650,21 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
 
         batch.clear();
         return fetched;
+    }
+
+    private @Nullable SourceFile batchFailed(BatchState batch, SourceFile originalBefore, SourceFile source, Throwable t) {
+        if (!batch.recipeStacks.isEmpty()) {
+            SourceFile beforeError = source;
+            if (!(t instanceof RecipeRunException)) {
+                source = Markup.error(source, t);
+            }
+            source = handleError(leaf(batch.recipeStacks.get(0)), originalBefore, source, t);
+            if (source != null && source != beforeError) {
+                source = addRecipesThatMadeChanges(batch.recipeStacks.get(0), source);
+            }
+        }
+        batch.clear();
+        return source;
     }
 
     /**
@@ -615,7 +739,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             for (Map.Entry<UUID, String> entry : newSearchResultDescriptions.entrySet()) {
                 UUID id = entry.getKey();
                 String creator = attributionMap.get(id);
-                if (creator == null) continue;
+                if (creator == null) {
+                    continue;
+                }
 
                 String fence = "{{" + id + "}}";
                 int start = fenced.indexOf(fence);
@@ -805,8 +931,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         return afterFile.withMarkers(afterFile.getMarkers().computeByType(
                 RecipesThatMadeChanges.create(recipeStack),
                 (r1, r2) -> {
-                    r1.getRecipes().addAll(r2.getRecipes());
-                    return r1;
+                    List<List<Recipe>> merged = new ArrayList<>(r1.getRecipes());
+                    merged.addAll(r2.getRecipes());
+                    return r1.withRecipes(merged);
                 })
         );
     }

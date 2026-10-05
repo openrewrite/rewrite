@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.golang.tree.GoMod;
 import org.openrewrite.golang.tree.GoMod.GoModStatement;
+import org.openrewrite.golang.tree.GoModTree;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
@@ -31,9 +32,10 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
+import static org.openrewrite.rpc.Reference.asRef;
 
 /**
- * RPC codec for the {@link GoMod} SourceFile. The field order here is the single
+ * RPC codec for a {@link GoMod} and for any one of its nodes. The field order here is the single
  * source of truth shared with the Go-side {@code sendGoMod}/{@code receiveGoMod}
  * (pkg/rpc/gomod_codec.go) — both must agree exactly or the cross-language queue
  * desyncs.
@@ -45,7 +47,7 @@ import java.util.UUID;
  * {@code RpcCodec}, and the statement/value structure is walked explicitly.
  */
 @Getter
-public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
+public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoModTree> {
 
     @Override
     public String getSourceFileType() {
@@ -53,16 +55,27 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     }
 
     @Override
-    public Class<? extends GoMod> getType() {
-        return GoMod.class;
+    public Class<? extends GoModTree> getType() {
+        return GoModTree.class;
     }
 
+    // A peer that names a node by id, to print or visit it, is sent that node on its own.
     @Override
-    public void rpcSend(GoMod after, RpcSendQueue q) {
+    public void rpcSend(GoModTree after, RpcSendQueue q) {
         GolangSender sender = new GolangSender();
+        if (after instanceof GoMod) {
+            sendGoMod(sender, (GoMod) after, q);
+        } else if (after instanceof GoModStatement) {
+            sendStatement(sender, (GoModStatement) after, q);
+        } else if (after instanceof GoMod.Value) {
+            sendValue(sender, (GoMod.Value) after, q);
+        }
+    }
+
+    private static void sendGoMod(GolangSender sender, GoMod after, RpcSendQueue q) {
         q.getAndSend(after, Tree::getId);
         q.getAndSend(after, GoMod::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(after, Tree::getMarkers);
+        q.getAndSend(after, mk -> asRef(mk.getMarkers()));
         q.getAndSend(after, (GoMod g) -> g.getSourcePath().toString());
         q.getAndSend(after, (GoMod g) -> g.getCharset().name());
         q.getAndSend(after, GoMod::isCharsetBomMarked);
@@ -77,7 +90,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendRightPadded(GolangSender sender, JRightPadded<GoModStatement> rp, RpcSendQueue q) {
         q.getAndSend(rp, JRightPadded::getElement, el -> sendStatement(sender, el, q));
         q.getAndSend(rp, JRightPadded::getAfter, space -> sender.visitSpace(space, q));
-        q.getAndSend(rp, JRightPadded::getMarkers);
+        q.getAndSend(rp, mk -> asRef(mk.getMarkers()));
     }
 
     private static void sendStatement(GolangSender sender, GoModStatement s, RpcSendQueue q) {
@@ -91,7 +104,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendDirective(GolangSender sender, GoMod.Directive d, RpcSendQueue q) {
         q.getAndSend(d, GoMod.Directive::getId);
         q.getAndSend(d, GoMod.Directive::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(d, GoMod.Directive::getMarkers);
+        q.getAndSend(d, mk -> asRef(mk.getMarkers()));
         q.getAndSend(d, GoMod.Directive::getKeyword);
         q.getAndSendList(d, GoMod.Directive::getValues, GoMod.Value::getId, v -> sendValue(sender, v, q));
     }
@@ -99,7 +112,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendBlock(GolangSender sender, GoMod.Block b, RpcSendQueue q) {
         q.getAndSend(b, GoMod.Block::getId);
         q.getAndSend(b, GoMod.Block::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(b, GoMod.Block::getMarkers);
+        q.getAndSend(b, mk -> asRef(mk.getMarkers()));
         q.getAndSend(b, GoMod.Block::getKeyword);
         q.getAndSend(b, GoMod.Block::getBeforeLParen, space -> sender.visitSpace(space, q));
         q.getAndSendList(b, GoMod.Block::getEntries,
@@ -111,13 +124,24 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
     private static void sendValue(GolangSender sender, GoMod.Value v, RpcSendQueue q) {
         q.getAndSend(v, GoMod.Value::getId);
         q.getAndSend(v, GoMod.Value::getPrefix, space -> sender.visitSpace(space, q));
-        q.getAndSend(v, GoMod.Value::getMarkers);
+        q.getAndSend(v, mk -> asRef(mk.getMarkers()));
         q.getAndSend(v, GoMod.Value::getText);
     }
 
     @Override
-    public GoMod rpcReceive(GoMod before, RpcReceiveQueue q) {
+    public GoModTree rpcReceive(GoModTree before, RpcReceiveQueue q) {
         GolangReceiver receiver = new GolangReceiver();
+        if (before instanceof GoMod) {
+            return receiveGoMod(receiver, (GoMod) before, q);
+        } else if (before instanceof GoModStatement) {
+            return receiveStatement(receiver, (GoModStatement) before, q);
+        } else if (before instanceof GoMod.Value) {
+            return receiveValue(receiver, (GoMod.Value) before, q);
+        }
+        return before;
+    }
+
+    private static GoMod receiveGoMod(GolangReceiver receiver, GoMod before, RpcReceiveQueue q) {
         GoMod t = before;
         t = t.withId(q.receiveAndGet(t.getId(), UUID::fromString));
         t = t.withPrefix(q.receive(t.getPrefix(), space -> receiver.visitSpace(space, q)));
@@ -128,8 +152,7 @@ public class GoModRpcCodec extends DynamicDispatchRpcCodec<GoMod> {
         t = t.withChecksum(q.receive(t.getChecksum()));
         t = t.withFileAttributes(q.receive(t.getFileAttributes()));
         t = t.withStatements(q.receiveList(t.getStatements(), rp -> receiveRightPadded(receiver, rp, q)));
-        t = t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
-        return t;
+        return t.withEof(q.receive(t.getEof(), space -> receiver.visitSpace(space, q)));
     }
 
     private static JRightPadded<GoModStatement> receiveRightPadded(GolangReceiver receiver,

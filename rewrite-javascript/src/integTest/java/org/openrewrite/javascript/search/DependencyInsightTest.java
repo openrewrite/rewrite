@@ -207,6 +207,44 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Test
+    void findDeepTransitiveDependency(@TempDir Path tempDir) {
+        // is-buffer is reachable only via is-even -> is-odd -> is-number -> kind-of -> is-buffer,
+        // so a match requires recursing well below the direct dependency's own requests.
+        rewriteRun(
+          spec -> spec
+            .recipe(new DependencyInsight("is-buffer", null, null))
+            .dataTable(NodeDependenciesInUse.Row.class, rows -> {
+                assertThat(rows).hasSize(1);
+                NodeDependenciesInUse.Row row = rows.getFirst();
+                assertThat(row.getPackageName()).isEqualTo("is-buffer");
+                assertThat(row.getDirect()).isFalse();
+            }),
+          npm(tempDir,
+            packageJson(
+              """
+                {
+                  "name": "my-app",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    "is-even": "^1.0.0"
+                  }
+                }
+                """,
+              """
+                {
+                  "name": "my-app",
+                  "version": "1.0.0",
+                  "dependencies": {
+                    /*~~>*/"is-even": "^1.0.0"
+                  }
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
     void onlyDirectExcludesTransitiveDependencies(@TempDir Path tempDir) {
         // With onlyDirect=true, should not find chalk (transitive dependency of jest)
         rewriteRun(

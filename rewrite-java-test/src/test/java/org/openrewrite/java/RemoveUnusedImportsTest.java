@@ -159,7 +159,9 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import lombok.val;
 
               public class Foo {
-                  val myField = 10.0;
+                  void test() {
+                      val myVariable = 10.0;
+                  }
               }
               """
           )

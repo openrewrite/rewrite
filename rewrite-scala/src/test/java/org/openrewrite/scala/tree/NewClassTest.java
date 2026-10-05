@@ -49,6 +49,23 @@ class NewClassTest implements RewriteTest {
     }
 
     @Test
+    void newClassWithMultiLineChainedArgument() {
+        rewriteRun(
+          scala(
+            """
+            object Test {
+              val fmt = new CollectionInputFormat[Row](
+                values.asJava,
+                fromDataTypeToTypeInfo(getProducedDataType)
+                  .createSerializer(new SerializerConfigImpl)
+                  .asInstanceOf[TypeSerializer[Row]])
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void newClassWithoutParentheses() {
         rewriteRun(
           scala(

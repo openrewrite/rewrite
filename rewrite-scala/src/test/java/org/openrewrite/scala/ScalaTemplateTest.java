@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.scala.tree.S;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -132,6 +133,76 @@ class ScalaTemplateTest implements RewriteTest {
             """
               class Test {
                   println("static")
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceSplatExpression() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitSplatExpression(S.SplatExpression splat, ExecutionContext ctx) {
+                  if (splat.getExpression().toString().contains("ys")) {
+                      return super.visitSplatExpression(splat, ctx);
+                  }
+                  return ScalaTemplate.apply("ys: _*", getCursor(), splat.getCoordinates().replace());
+              }
+          })),
+          scala(
+            """
+              object Test {
+                  def f(xs: Int*): Unit = {}
+                  val ys = Seq(1, 2, 3)
+                  val xs = Seq(4, 5, 6)
+                  f(xs: _*)
+              }
+              """,
+            """
+              object Test {
+                  def f(xs: Int*): Unit = {}
+                  val ys = Seq(1, 2, 3)
+                  val xs = Seq(4, 5, 6)
+                  f(ys: _*)
+              }
+              """
+          ));
+    }
+
+    @Test
+    void replaceAnnotationArgumentsOnMethodWithNestedClassSibling() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new ScalaVisitor<>() {
+              @Override
+              public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                  if ("deprecated".equals(annotation.getSimpleName()) &&
+                      annotation.getArguments() != null &&
+                      annotation.getArguments().stream().noneMatch(a -> a.toString().contains("new"))) {
+                      return ScalaTemplate.builder("\"new\"")
+                        .build()
+                        .apply(getCursor(), annotation.getCoordinates().replaceArguments());
+                  }
+                  return annotation;
+              }
+          })),
+          scala(
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("old")
+                  def foo(): Unit = {}
+              }
+              """,
+            """
+              class Test {
+                  class Sibling {
+                  }
+
+                  @deprecated("new")
+                  def foo(): Unit = {}
               }
               """
           ));

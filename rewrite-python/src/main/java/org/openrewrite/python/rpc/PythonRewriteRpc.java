@@ -20,18 +20,24 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
 import org.openrewrite.python.*;
 import org.openrewrite.python.marker.PythonResolutionResult;
-import org.openrewrite.python.marker.PythonResolutionResult.Dependency;
 import org.openrewrite.python.marker.PythonResolutionResult.ResolvedDependency;
 import org.openrewrite.python.tree.Py;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
+import org.openrewrite.rpc.request.ParseResponse;
 import org.openrewrite.toml.TomlParser;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -50,6 +56,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import static java.util.Collections.*;
 
 @Getter
 public class PythonRewriteRpc extends RewriteRpc {
@@ -136,6 +144,30 @@ public class PythonRewriteRpc extends RewriteRpc {
     }
 
     /**
+     * Parser options forwarded to the Python server with every parse request, carrying
+     * this context's {@link ExecutionContext#REQUIRE_PRINT_EQUALS_INPUT} setting.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx) {
+        return parseOptions(ctx, null);
+    }
+
+    /**
+     * The same options, plus the per-parse language version a {@link PythonParser} carries.
+     *
+     * @param languageLevel The version string to parse with, or {@code null} to leave the
+     *                      server on its own default.
+     */
+    public static Map<String, String> parseOptions(ExecutionContext ctx, @Nullable String languageLevel) {
+        Map<String, String> options = new HashMap<>();
+        options.put(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT,
+                String.valueOf(ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)));
+        if (languageLevel != null) {
+            options.put("languageLevel", languageLevel);
+        }
+        return options;
+    }
+
+    /**
      * Parses an entire Python project directory.
      * Discovers and parses all relevant source files.
      *
@@ -170,7 +202,8 @@ public class PythonRewriteRpc extends RewriteRpc {
      *
      * @param projectPath Path to the project directory to parse
      * @param exclusions  Optional glob patterns to exclude from parsing
-     * @param relativeTo  Optional path to make source file paths relative to
+     * @param relativeTo  Optional path to make source file paths relative to. If not specified,
+     *                    paths are relative to projectPath.
      * @param ctx         Execution context for parsing
      * @return Stream of parsed source files
      * @deprecated Use {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)} instead.
@@ -196,7 +229,8 @@ public class PythonRewriteRpc extends RewriteRpc {
      */
     public Stream<SourceFile> parseProject(Path projectPath, ParseProjectOptions options, ExecutionContext ctx) {
         @Nullable List<String> exclusions = options.getExclusions();
-        @Nullable Path relativeTo = options.getRelativeTo();
+        // The server relativizes only against this, so without it source paths land on the LST absolute.
+        Path relativeTo = options.getRelativeTo() == null ? projectPath : options.getRelativeTo();
         @Nullable Path dependencyPath = options.getDependencyPath();
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
@@ -208,7 +242,10 @@ public class PythonRewriteRpc extends RewriteRpc {
             public boolean tryAdvance(Consumer<? super SourceFile> action) {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting project parsing: " + projectPath);
-                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath), ParseProjectResponse.class);
+                    response = send("ParseProject", new ParseProject(projectPath, exclusions, relativeTo, dependencyPath, parseOptions(ctx)), ParseProjectResponse.class);
+                    // A setup.py-only project's resolution rides on setup.py, so it leads like any other manifest.
+                    response.sort(Comparator.comparing((ParseProjectResponse.Item item) ->
+                            !"setup.py".equals(Paths.get(item.getSourcePath()).getFileName().toString())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.size()));
                 }
 
@@ -219,6 +256,15 @@ public class PythonRewriteRpc extends RewriteRpc {
                 ParseProjectResponse.Item item = response.get(index);
                 index++;
 
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the Python side declined to parse; build the Quark
+                    // locally from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(item.getSourcePath());
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(relativeTo.resolve(sourcePath))));
+                    return true;
+                }
+
                 SourceFile sourceFile;
                 try {
                     sourceFile = getObject(item.getId(), item.getSourceFileType());
@@ -226,7 +272,7 @@ public class PythonRewriteRpc extends RewriteRpc {
                 } catch (Exception e) {
                     sourceFile = new ParseError(
                             Tree.randomId(),
-                            new Markers(Tree.randomId(), Collections.singletonList(
+                            new Markers(Tree.randomId(), singletonList(
                                     ParseExceptionResult.build(PythonParser.class, e, null))),
                             Paths.get(item.getSourcePath()),
                             null,
@@ -277,8 +323,147 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
         }
 
-        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, ctx);
-        return Stream.concat(rpcStream, manifestStream);
+        Stream<SourceFile> manifestStream = parseManifest(projectPath, relativeTo, dependencyPath, ctx);
+        // Manifests first, so a consumer can read the resolved dependencies before the sources.
+        return Stream.concat(manifestStream, rpcStream);
+    }
+
+    /**
+     * Parses an explicit list of Python files.
+     * <p>
+     * Unlike {@link #parseProject(Path, ParseProjectOptions, ExecutionContext)}, which walks a
+     * directory and resolves the project's manifests, this parses exactly the files given and does
+     * no manifest discovery. The key capability is that {@code ty} (the type resolver) is rooted at
+     * a caller-chosen directory rather than at the files' own, so first-party imports resolve
+     * against a broader workspace root. This lets a caller parse a handful of files (e.g. the
+     * {@code .py} files of a single build target) while cross-package first-party imports still
+     * resolve against the monorepo root, without parsing the rest of the tree.
+     *
+     * @param inputs  The files to parse.
+     * @param options Where {@code ty} is rooted, what source paths are relative to, the dependency
+     *                environment, and any per-parse options; see {@link ParseOptions}.
+     * @param ctx     Execution context for parsing.
+     * @return Stream of parsed source files, in the same order as {@code inputs}.
+     */
+    public Stream<SourceFile> parse(List<Path> inputs, ParseOptions options, ExecutionContext ctx) {
+        if (inputs.isEmpty()) {
+            return Stream.empty();
+        }
+
+        Parse request = parseRequest(inputs, options, ctx);
+
+        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        String sourceFileType = Py.CompilationUnit.class.getName();
+
+        return StreamSupport.stream(new Spliterator<SourceFile>() {
+            private int index = 0;
+            private @Nullable List<String> ids;
+
+            @Override
+            public boolean tryAdvance(Consumer<? super SourceFile> action) {
+                if (ids == null) {
+                    parsingListener.intermediateMessage(String.format("Starting parsing of %,d files", inputs.size()));
+                    ids = send("Parse", request, ParseResponse.class);
+                    if (ids.size() != inputs.size()) {
+                        throw new IllegalStateException("Parse returned " + ids.size() +
+                                " results for " + inputs.size() + " inputs");
+                    }
+                }
+
+                if (index >= inputs.size()) {
+                    return false;
+                }
+
+                Path input = inputs.get(index);
+                String id = ids.get(index);
+                index++;
+
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(id, sourceFileType);
+                    parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
+                } catch (Exception e) {
+                    sourceFile = new ParseError(
+                            Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(
+                                    ParseExceptionResult.build(PythonParser.class, e, null))),
+                            relativizeToBase(input, options.getRelativeTo()),
+                            null,
+                            StandardCharsets.UTF_8.name(),
+                            false,
+                            null,
+                            e.getMessage(),
+                            null
+                    );
+                }
+                action.accept(sourceFile);
+                return true;
+            }
+
+            @Override
+            public @Nullable Spliterator<SourceFile> trySplit() {
+                return null;
+            }
+
+            @Override
+            public long estimateSize() {
+                return ids == null ? Long.MAX_VALUE : inputs.size() - index;
+            }
+
+            @Override
+            public int characteristics() {
+                return ids == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
+            }
+        }, false);
+    }
+
+    /**
+     * Stream the public types the {@code dependency} defines: its defined FQNs to {@code onFqns}
+     * first, then each type to {@code onType}; referenced-but-undefined types come back shallow.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
+    }
+
+    static Parse parseRequest(List<Path> inputs, ParseOptions options, ExecutionContext ctx) {
+        List<Parse.Input> mappedInputs = new ArrayList<>(inputs.size());
+        for (Path input : inputs) {
+            mappedInputs.add(new Parse.Input(input));
+        }
+        return new Parse(mappedInputs, options.getRelativeTo(), options.getProjectRoot(),
+                options.getDependencyPath(), rpcOptions(options, ctx));
+    }
+
+    /**
+     * The per-parse options the server receives: this context's settings, which a caller's own
+     * {@link ParseOptions#getOptions()} then override key by key.
+     */
+    static Map<String, String> rpcOptions(ParseOptions options, ExecutionContext ctx) {
+        Map<String, String> merged = new HashMap<>(parseOptions(ctx));
+        if (options.getOptions() != null) {
+            merged.putAll(options.getOptions());
+        }
+        return merged;
+    }
+
+    /**
+     * The path a failed input is reported under, matching the relativization the server applies to
+     * the files it did return. An input from outside {@code relativeTo} stays absolute, as it does
+     * there.
+     */
+    private static Path relativizeToBase(Path input, Path relativeTo) {
+        return input.startsWith(relativeTo) ? relativeTo.relativize(input) : input;
     }
 
     private @Nullable PythonResolutionResult createSetupPyMarker(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
@@ -304,7 +489,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             return null;
         }
 
-        List<Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
+        List<PythonResolutionResult.Dependency> deps = RequirementsTxtParser.dependenciesFromResolved(resolvedDeps);
 
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
         String path = effectiveRelativeTo.relativize(setupPyPath).toString();
@@ -318,19 +503,20 @@ public class PythonRewriteRpc extends RewriteRpc {
                 path,
                 null,
                 null,
-                Collections.emptyList(),
+                emptyList(),
                 deps,
-                Collections.emptyMap(),
-                Collections.emptyMap(),
-                Collections.emptyList(),
-                Collections.emptyList(),
+                emptyMap(),
+                emptyMap(),
+                emptyList(),
+                emptyList(),
                 resolvedDeps,
                 PythonResolutionResult.PackageManager.Uv,
                 null
         );
     }
 
-    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo, ExecutionContext ctx) {
+    private Stream<SourceFile> parseManifest(Path projectPath, @Nullable Path relativeTo,
+                                             @Nullable Path dependencyPath, ExecutionContext ctx) {
         Path effectiveRelativeTo = relativeTo != null ? relativeTo : projectPath;
 
         // Priority: pyproject.toml > Pipfile > setup.cfg > requirements.txt
@@ -339,14 +525,14 @@ public class PythonRewriteRpc extends RewriteRpc {
         Path pyprojectPath = projectPath.resolve("pyproject.toml");
         if (Files.exists(pyprojectPath)) {
             Parser.Input pyprojectInput = Parser.Input.fromFile(pyprojectPath);
-            Stream<SourceFile> result = new PyProjectTomlParser().parseInputs(
-                    Collections.singletonList(pyprojectInput), effectiveRelativeTo, ctx);
+            Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
+                    singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
             Path uvLockPath = projectPath.resolve("uv.lock");
             if (Files.exists(uvLockPath)) {
                 Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
                 Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
-                        Collections.singletonList(uvLockInput), effectiveRelativeTo, ctx);
+                        singletonList(uvLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, uvLockStream);
             }
             return result;
@@ -356,13 +542,13 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (Files.exists(pipfilePath)) {
             Parser.Input pipfileInput = Parser.Input.fromFile(pipfilePath);
             Stream<SourceFile> result = new PipfileParser().parseInputs(
-                    Collections.singletonList(pipfileInput), effectiveRelativeTo, ctx);
+                    singletonList(pipfileInput), effectiveRelativeTo, ctx);
 
             Path pipfileLockPath = projectPath.resolve("Pipfile.lock");
             if (Files.exists(pipfileLockPath)) {
                 Parser.Input pipfileLockInput = Parser.Input.fromFile(pipfileLockPath);
                 Stream<SourceFile> pipfileLockStream = new JsonParser().parseInputs(
-                        Collections.singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
+                        singletonList(pipfileLockInput), effectiveRelativeTo, ctx);
                 result = Stream.concat(result, pipfileLockStream);
             }
             return result;
@@ -372,7 +558,7 @@ public class PythonRewriteRpc extends RewriteRpc {
         if (Files.exists(setupCfgPath)) {
             Parser.Input input = Parser.Input.fromFile(setupCfgPath);
             return new SetupCfgParser(commandEnv).parseInputs(
-                    Collections.singletonList(input), effectiveRelativeTo, ctx);
+                    singletonList(input), effectiveRelativeTo, ctx);
         }
 
         RequirementsTxtParser reqsParser = new RequirementsTxtParser(commandEnv);
@@ -399,7 +585,7 @@ public class PythonRewriteRpc extends RewriteRpc {
     @RequiredArgsConstructor
     public static class Builder implements Supplier<PythonRewriteRpc> {
         private RecipeMarketplace marketplace = new RecipeMarketplace();
-        private List<RecipeBundleResolver> resolvers = Collections.emptyList();
+        private List<RecipeBundleResolver> resolvers = emptyList();
         private final Map<String, String> environment = new HashMap<>();
         // Default to looking for a venv python, falling back to system python
         private Supplier<@Nullable Path> pythonPathSupplier = Builder::findDefaultPythonPath;
@@ -413,13 +599,15 @@ public class PythonRewriteRpc extends RewriteRpc {
         private static Path findDefaultPythonPath() {
             // Try to find a venv in the project structure
             Path basePath = Paths.get(System.getProperty("user.dir"));
+            String venvPython = System.getProperty("os.name").startsWith("Windows") ?
+                    ".venv/Scripts/python.exe" : ".venv/bin/python";
             Path[] searchPaths = {
                 // From rewrite root dir
-                basePath.resolve("rewrite-python/rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite-python/rewrite/" + venvPython),
                 // From rewrite-python dir
-                basePath.resolve("rewrite/.venv/bin/python"),
+                basePath.resolve("rewrite/" + venvPython),
                 // From rewrite-python/rewrite dir
-                basePath.resolve(".venv/bin/python")
+                basePath.resolve(venvPython)
             };
 
             for (Path path : searchPaths) {
@@ -467,8 +655,10 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the path to the Python executable. The supplier is invoked at most
-         * once, when the RPC is first started. Returning {@code null} uses the built-in
+         * Supplies the path to the Python executable. The supplier is invoked once per
+         * thread that starts an RPC, since {@link RewriteRpcProcessManager} holds one RPC
+         * per thread; invocations are serialized across threads (see
+         * {@link #resolveUnderInstallLock}). Returning {@code null} uses the built-in
          * default (same as not configuring the path at all). Exceptions thrown by the
          * supplier propagate out of the RPC-start call.
          *
@@ -578,7 +768,8 @@ public class PythonRewriteRpc extends RewriteRpc {
         }
 
         /**
-         * Supplies the engine install directory, resolved at most once when the RPC first starts.
+         * Supplies the engine install directory, resolved once per thread that starts an RPC and
+         * serialized across threads (see {@link #resolveUnderInstallLock}).
          * Returning {@code null} means "no pre-provisioned engine" (fall back to normal detection).
          * Because it runs at start, the supplier is the right place to do lazy, on-demand work such
          * as installing the engine before returning its directory.
@@ -619,7 +810,7 @@ public class PythonRewriteRpc extends RewriteRpc {
 
         @Override
         public PythonRewriteRpc get() {
-            Path pythonPath = pythonPathSupplier.get();
+            Path pythonPath = resolveUnderInstallLock(pythonPathSupplier);
             if (pythonPath == null) {
                 pythonPath = findDefaultPythonPath();
             }
@@ -633,7 +824,7 @@ public class PythonRewriteRpc extends RewriteRpc {
             // already provisioned out-of-band. Resolved lazily here so any such work only happens
             // when the RPC actually starts; when present, use it directly and skip all
             // bootstrap/detection — no network, no interpreter probes. Null → normal path.
-            Path engineInstallDir = engineInstallDirSupplier.get();
+            Path engineInstallDir = resolveUnderInstallLock(engineInstallDirSupplier);
             if (engineInstallDir != null) {
                 resolvedPipPackagesPath = engineInstallDir;
             } else if (!isDevBuild) {
@@ -681,17 +872,10 @@ public class PythonRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // Set the Python version for the parser
-            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
+            env.put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
@@ -736,9 +920,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             if (!pythonPathParts.isEmpty()) {
-                process.environment().put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
+                env.put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("python")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {
@@ -750,6 +940,14 @@ public class PythonRewriteRpc extends RewriteRpc {
                         .log(log == null ? null : new PrintStream(Files.newOutputStream(log, StandardOpenOption.APPEND, StandardOpenOption.CREATE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
+            }
+        }
+
+        private static final Object INSTALL_LOCK = new Object();
+
+        static @Nullable Path resolveUnderInstallLock(Supplier<@Nullable Path> supplier) {
+            synchronized (INSTALL_LOCK) {
+                return supplier.get();
             }
         }
 

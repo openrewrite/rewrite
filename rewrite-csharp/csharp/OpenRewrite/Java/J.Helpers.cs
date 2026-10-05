@@ -23,20 +23,47 @@ public partial interface J
 {
     private static readonly ConcurrentDictionary<Type, MethodInfo?> WithPrefixCache = new();
     private static readonly ConcurrentDictionary<Type, MethodInfo?> WithIdCache = new();
+    private static readonly ConcurrentDictionary<Type, MethodInfo?> WithMarkersCache = new();
 
     /// <summary>
     /// Call WithPrefix on any J node via cached reflection, preserving the concrete type.
-    /// Returns the original node unchanged if the type doesn't have WithPrefix.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The concrete type exposes no <c>WithPrefix(Space)</c>. Every LST node carries a prefix, so a
+    /// missing wither is a modelling defect in that node, not a runtime condition to absorb: silently
+    /// returning the node unchanged turns a formatting bug into invisible whitespace loss much further
+    /// downstream. <c>EveryJTypeExposesWithers</c> in <c>JWitherContractTests</c> keeps every type in
+    /// this assembly out of this branch.
+    /// </exception>
     public static T SetPrefix<T>(T node, Space prefix) where T : J
     {
         var method = WithPrefixCache.GetOrAdd(node.GetType(), type =>
             type.GetMethod("WithPrefix", [typeof(Space)]));
 
-        if (method != null)
-            return (T)method.Invoke(node, [prefix])!;
+        if (method == null)
+            throw new InvalidOperationException(
+                $"{node.GetType().FullName} does not expose WithPrefix(Space), so its prefix cannot be set.");
 
-        return node;
+        return (T)method.Invoke(node, [prefix])!;
+    }
+
+    /// <summary>
+    /// Call WithMarkers on any J node via cached reflection, preserving the concrete type.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The concrete type exposes no <c>WithMarkers(Markers)</c>. See <see cref="SetPrefix{T}"/> for why
+    /// this throws rather than returning the node unchanged.
+    /// </exception>
+    public static T SetMarkers<T>(T node, Markers markers) where T : J
+    {
+        var method = WithMarkersCache.GetOrAdd(node.GetType(), type =>
+            type.GetMethod("WithMarkers", [typeof(Markers)]));
+
+        if (method == null)
+            throw new InvalidOperationException(
+                $"{node.GetType().FullName} does not expose WithMarkers(Markers), so markers cannot be attached to it.");
+
+        return (T)method.Invoke(node, [markers])!;
     }
 
     /// <summary>

@@ -22,6 +22,9 @@ import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.python.marker.PythonResolutionResult;
 import org.openrewrite.python.rpc.PythonRewriteRpc;
@@ -33,8 +36,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -90,7 +93,7 @@ class ParseProjectIntegTest {
         // Parse the project
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         assertThat(sources)
@@ -111,7 +114,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(2);
         // Source paths must be relative to the project directory
@@ -132,7 +135,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
         assertThat(sources.get(0).getSourcePath().toString()).doesNotContain("__pycache__");
@@ -146,7 +149,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).isEmpty();
     }
@@ -163,9 +166,41 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(absolutePath, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources).hasSize(1);
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void manifestsPrecedeSources() throws Exception {
+        Path pyprojectDir = tempDir.resolve("pyproject_first");
+        Files.createDirectories(pyprojectDir);
+        Files.writeString(pyprojectDir.resolve("a.py"), "x = 1");
+        Files.writeString(pyprojectDir.resolve("b.py"), "y = 2");
+        Files.writeString(pyprojectDir.resolve("pyproject.toml"), """
+                [project]
+                name = "myapp"
+                version = "1.0.0"
+                """);
+
+        assertThat(client().parseProject(pyprojectDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("pyproject.toml");
+
+        Path setupPyDir = tempDir.resolve("setup_py_first");
+        Files.createDirectories(setupPyDir);
+        Files.writeString(setupPyDir.resolve("a.py"), "x = 1");
+        Files.writeString(setupPyDir.resolve("setup.py"), """
+                from setuptools import setup
+                setup(name="myapp", version="1.0.0")
+                """);
+
+        assertThat(client().parseProject(setupPyDir, new InMemoryExecutionContext()).findFirst())
+                .get()
+                .extracting(sf -> sf.getSourcePath().getFileName().toString())
+                .isEqualTo("setup.py");
     }
 
     @Test
@@ -184,7 +219,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -212,7 +247,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -247,7 +282,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -286,7 +321,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         // pyproject.toml should be included but not requirements.txt
         assertThat(sources)
@@ -312,7 +347,7 @@ class ParseProjectIntegTest {
 
         List<SourceFile> sources = client()
                 .parseProject(projectDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+                .collect(toList());
 
         assertThat(sources)
                 .extracting(sf -> sf.getSourcePath().getFileName().toString())
@@ -338,6 +373,38 @@ class ParseProjectIntegTest {
         // Each file should have its own distinct marker pointing to its own path
         assertThat(baseMarker.getPath()).isEqualTo("requirements.txt");
         assertThat(devMarker.getPath()).isEqualTo("requirements-dev.txt");
+    }
+
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    void complexLiteralKeepsOnlyItsSource() throws Exception {
+        Path projectDir = tempDir.resolve("complex_literal");
+        Files.createDirectories(projectDir);
+        Files.writeString(projectDir.resolve("main.py"), "x = 0j\n");
+
+        List<SourceFile> sources = client()
+                .parseProject(projectDir, new InMemoryExecutionContext())
+                .collect(toList());
+
+        SourceFile main = sources.stream()
+                .filter(sf -> sf.getSourcePath().getFileName().toString().equals("main.py"))
+                .findFirst()
+                .orElseThrow();
+
+        List<J.Literal> literals = new java.util.ArrayList<>();
+        new JavaIsoVisitor<Integer>() {
+            @Override
+            public J.Literal visitLiteral(J.Literal literal, Integer p) {
+                literals.add(literal);
+                return literal;
+            }
+        }.visit(main, 0);
+
+        assertThat(literals).hasSize(1);
+        assertThat(literals.get(0).getValueSource()).isEqualTo("0j");
+        // no JSON number carries a complex, and no primitive names one
+        assertThat(literals.get(0).getValue()).isNull();
+        assertThat(literals.get(0).getType()).isEqualTo(JavaType.Primitive.None);
     }
 
     private PythonRewriteRpc client() {

@@ -201,11 +201,28 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        /**
+         * @param profiles Profile ids to activate, using the same notation as {@code mvn -P}: an id prefixed with
+         *                 {@code !} or {@code -} deactivates that profile instead, suppressing it even when it
+         *                 would have activated itself.
+         */
         public Builder activeProfiles(@Nullable String... profiles) {
             //noinspection ConstantConditions
             if (profiles != null) {
                 addAll(this.activeProfiles, profiles);
             }
+            return this;
+        }
+
+        /**
+         * Parse poms the way a {@code mvn} invocation that picks up this {@code .mvn/maven.config} would.
+         */
+        public Builder mavenConfig(MavenConfig mavenConfig) {
+            this.activeProfiles.addAll(mavenConfig.getActiveProfiles());
+            for (String inactiveProfile : mavenConfig.getInactiveProfiles()) {
+                this.activeProfiles.add("!" + inactiveProfile);
+            }
+            this.properties.putAll(mavenConfig.getProperties());
             return this;
         }
 

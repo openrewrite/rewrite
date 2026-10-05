@@ -16,6 +16,9 @@
 import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
+import {maybeBind} from '../binding';
+import {ContextBinding} from './engine';
+import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
@@ -92,7 +95,8 @@ export class TemplateBuilder {
     /**
      * Adds a parameter to the template.
      *
-     * @param value The parameter value (Capture, Tree, or primitive)
+     * @param value The parameter value (Capture, Tree, or primitive); may be added more than once
+     *              (see {@link template})
      * @returns This builder for chaining
      */
     param(value: TemplateParameter): this {
@@ -142,11 +146,11 @@ export class TemplateBuilder {
  *
  * @example
  * // Generate a literal AST node
- * const result = template`2`.apply(cursor, coordinates);
+ * const result = await template`2`.apply(node, cursor);
  *
  * @example
  * // Generate an AST node with a parameter
- * const result = template`${capture()}`.apply(cursor, coordinates);
+ * const result = await template`${capture()}`.apply(node, cursor);
  *
  * @example
  * // Access properties of captured nodes in templates
@@ -154,10 +158,10 @@ export class TemplateBuilder {
  * const pat = pattern`foo(${method})`;
  * const tmpl = template`bar(${method.name})`; // Access the 'name' property
  *
- * const match = await pat.match(someNode);
+ * const match = await pat.match(someNode, cursor);
  * if (match) {
  *     // The template will insert just the 'name' subtree from the captured method
- *     const result = await tmpl.apply(cursor, someNode, match);
+ *     const result = await tmpl.apply(someNode, cursor, { values: match });
  * }
  *
  * @example
@@ -173,6 +177,7 @@ export class TemplateBuilder {
 export class Template {
     private options: TemplateOptions = {};
     private _cachedTemplate?: J;
+    private _contextBindings?: Promise<ContextBinding[]>;
 
     /**
      * Creates a new template.
@@ -217,9 +222,16 @@ export class Template {
      *     })
      */
     configure(options: TemplateOptions): Template {
+        // The `never` applies only where a caller typechecks against it, so JavaScript and pre-#8685
+        // typings reach here, where a silently dropped option leaves the template's names unbound.
+        if ((options as { bindings?: unknown }).bindings !== undefined) {
+            throw new Error("Template option 'bindings' is now 'context': name each module as the " +
+                "import it stands for, e.g. context: [`import {vi} from 'vitest';`].");
+        }
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
         this._cachedTemplate = undefined;
+        this._contextBindings = undefined;
         return this;
     }
 
@@ -236,10 +248,10 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<JS.CompilationUnit> {
+    private async getTemplateTree(): Promise<J> {
         // Level 1: Instance cache (fastest path)
         if (this._cachedTemplate) {
-            return this._cachedTemplate as JS.CompilationUnit;
+            return this._cachedTemplate;
         }
 
         // Generate cache key for global lookup
@@ -257,15 +269,17 @@ export class Template {
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
-            contextStatements,
-            this.options.dependencies || {}
+            // As in Pattern.getAstPattern: a parameter's type reaches the parse as a declaration
+            [...contextStatements, ...TemplateEngine.parameterPreamble(this.parameters)],
+            this.options.dependencies || {},
+            this.options.types
         );
 
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached as JS.CompilationUnit;
-            return cached as JS.CompilationUnit;
+            this._cachedTemplate = cached;
+            return cached;
         }
 
         // Level 3: Compute via TemplateEngine (slow path)
@@ -273,14 +287,62 @@ export class Template {
             this.templateParts,
             this.parameters,
             contextStatements,
-            this.options.dependencies || {}
-        ) as JS.CompilationUnit;
+            this.options.dependencies || {},
+            this.options.types
+        );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
         this._cachedTemplate = result;
 
         return result;
+    }
+
+    /**
+     * Binds every module this template declares in the file `visitor` is traversing, and returns
+     * the local names to hand back through {@link ApplyOptions.bindings}. A module the dependencies
+     * cannot resolve is bound whether or not the template goes on to reference it, so call this
+     * where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern matched.
+     */
+    async resolveBindings(visitor: JavaScriptVisitor<any>): Promise<Record<string, string>> {
+        const resolved: Record<string, string> = {};
+        for (const binding of await this.contextBindings()) {
+            // Recognising the reference the template splices in takes attribution, so a module the
+            // workspace could not resolve is bound whether or not the template turns out to use it.
+            const onlyIfReferenced = binding.attributed;
+            const bound = maybeBind(visitor, {
+                module: binding.module!,
+                member: binding.member,
+                typeOnly: binding.typeOnly,
+                preferredName: binding.name,
+                onlyIfReferenced
+            });
+            // An unresolved binding is left out rather than recorded as `undefined`, so `apply()`'s
+            // own "applied without a local name" check catches it, same as a caller-omitted one.
+            if (bound !== undefined) {
+                resolved[binding.name] = bound;
+            }
+        }
+        return resolved;
+    }
+
+    /** Whether the context binds a module, which applying this template therefore has to resolve. */
+    async bindsModules(): Promise<boolean> {
+        return (await this.contextBindings()).length > 0;
+    }
+
+    /** What this template's context statements bind, which is what it needs bound in the target file. */
+    private contextBindings(): Promise<ContextBinding[]> {
+        return this._contextBindings ??= this.deriveContextBindings();
+    }
+
+    private deriveContextBindings(): Promise<ContextBinding[]> {
+        return TemplateEngine.getContextBindings(
+            this.templateParts, this.parameters,
+            this.options.context || this.options.imports || [],
+            this.options.dependencies || {},
+            this.options.types
+        );
     }
 
     /**
@@ -345,6 +407,23 @@ export class Template {
             }
         }
 
+        const renames: Record<string, string> = {};
+        const modules: Record<string, string> = {};
+        // Supplying names is what asks for the context's modules to be bound in the file being
+        // edited; without them a context import only types the template.
+        if (options?.bindings !== undefined) {
+            for (const binding of await this.contextBindings()) {
+                const bound = options.bindings[binding.name];
+                if (bound === undefined) {
+                    throw new Error(`Template binds '${binding.module}' in its context, but no local name was ` +
+                        `given for '${binding.name}'. Either pass bindings from resolveBindings(visitor), or — if it ` +
+                        `already did — binding was refused, which an AMD block or a file requiring its modules can do.`);
+                }
+                renames[binding.name] = bound;
+                modules[binding.name] = binding.module!;
+            }
+        }
+
         // Use instance-level cache to get the template tree
         const ast = await this.getTemplateTree();
 
@@ -358,7 +437,10 @@ export class Template {
                 mode: JavaCoordinates.Mode.Replace
             },
             normalizedValues,
-            wrappersMap
+            wrappersMap,
+            options?.format ?? true,
+            renames,
+            modules
         );
     }
 }
@@ -377,13 +459,16 @@ export class Template {
  * - J.Container<T>: Elements will be expanded in place
  *
  * @param strings The string parts of the template
- * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container)
+ * @param parameters The parameters between the string parts (Capture, CaptureValue, TemplateParam, Tree, Tree[], J.RightPadded, J.RightPadded[], or J.Container).
+ *                   A parameter may appear more than once — `(${arr} ? f(${arr}) : -1)`. A node
+ *                   keeps its id only at its first occurrence, and only if it belongs to the
+ *                   subtree being replaced; anything else is spliced under fresh ids.
  * @returns A Template object that can be applied to generate AST nodes
  *
  * @example
  * // Simple template with literal
  * const tmpl = template`console.log("hello")`;
- * const result = await tmpl.apply(cursor, node);
+ * const result = await tmpl.apply(node, cursor);
  *
  * @example
  * // Template with capture - matches captured value from pattern
@@ -391,9 +476,9 @@ export class Template {
  * const pat = pattern`foo(${expr})`;
  * const tmpl = template`bar(${expr})`;
  *
- * const match = await pat.match(node);
+ * const match = await pat.match(node, cursor);
  * if (match) {
- *     const result = await tmpl.apply(cursor, node, match);
+ *     const result = await tmpl.apply(node, cursor, { values: match });
  * }
  *
  * @example

@@ -45,7 +45,12 @@ class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api", "guava", "jackson-databind", "jackson-core", "lombok"));
+          .parser(JavaParser.fromJavaVersion().classpath(
+            "junit-jupiter-api",
+            "guava",
+            "jackson-databind",
+            "jackson-core",
+            "lombok"));
     }
 
     @Language("java")
@@ -2106,6 +2111,110 @@ class AddDependencyTest implements RewriteTest {
 
                 dependencies {
                     implementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentsPrecedingTheFollowingDependency() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void doesNotDuplicateCommentsWhenInsertingBetweenDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api "commons-lang:commons-lang:2.6"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    api "commons-lang:commons-lang:2.6"
+
+                    implementation "com.google.guava:guava:29.0-jre"
+
+                    /*******************************
+                     * Test Dependencies
+                     *******************************/
+
+                    testImplementation "junit:junit:4.13.2"
                 }
                 """
             )

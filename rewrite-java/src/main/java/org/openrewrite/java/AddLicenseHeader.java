@@ -26,6 +26,7 @@ import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Markers;
 
 import java.util.Calendar;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
@@ -53,7 +54,7 @@ public class AddLicenseHeader extends Recipe {
             public J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    if (cu.getComments().isEmpty()) {
+                    if (!hasLeadingComment(cu)) {
                         PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
                         String formattedLicenseText = "\n * " + propertyPlaceholderHelper.replacePlaceholders(licenseText,
                                 k -> {
@@ -84,5 +85,39 @@ public class AddLicenseHeader extends Recipe {
                 return classDecl;
             }
         };
+    }
+
+    /**
+     * Java attaches everything preceding the first token to the compilation unit, but Groovy and Kotlin
+     * leave a file header on the first element instead, so all three locations have to be checked.
+     */
+    private static boolean hasLeadingComment(JavaSourceFile cu) {
+        if (!cu.getComments().isEmpty()) {
+            return true;
+        }
+        J first = firstElement(cu);
+        return first == null ? !cu.getEof().getComments().isEmpty() : !first.getComments().isEmpty();
+    }
+
+    private static @Nullable J firstElement(JavaSourceFile cu) {
+        J element = new JavaIsoVisitor<AtomicReference<J>>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, AtomicReference<J> first) {
+                if (first.get() != null || !(tree instanceof J)) {
+                    return (J) tree;
+                }
+                if (tree instanceof JavaSourceFile) {
+                    return super.visit(tree, first);
+                }
+                first.set((J) tree);
+                return (J) tree;
+            }
+        }.reduce(cu, new AtomicReference<>()).get();
+
+        while (element instanceof J.Block && element.getComments().isEmpty() &&
+               !((J.Block) element).getStatements().isEmpty()) {
+            element = ((J.Block) element).getStatements().get(0);
+        }
+        return element;
     }
 }

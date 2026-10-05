@@ -69,7 +69,7 @@ public class Autodetect extends NamedStyles implements PythonStyle {
         private int currentBlockIndent = 0;
 
         private int countSpaces(String s) {
-            int withoutSpaces = s.replaceAll(" ", "").length();
+            int withoutSpaces = s.replace(" ", "").length();
             return s.length() - withoutSpaces;
         }
 

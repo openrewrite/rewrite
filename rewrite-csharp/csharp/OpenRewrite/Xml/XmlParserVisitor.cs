@@ -53,7 +53,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
     public override Xml VisitDocument(XMLParser.DocumentContext ctx)
     {
         return Convert(ctx, (c, prefix) => new Document(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             _path,
             prefix,
             Markers.Empty,
@@ -70,7 +70,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
     public override Xml VisitProlog(XMLParser.PrologContext ctx)
     {
         return Convert(ctx, (c, prefix) => new Prolog(
-            Guid.NewGuid(),
+            Tree.RandomId(),
             prefix,
             Markers.Empty,
             (XmlDecl?)VisitXmldecl(ctx.xmldecl()),
@@ -84,7 +84,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
         if (ctx.COMMENT() != null)
         {
             return Convert(ctx.COMMENT(), (comment, prefix) => new Comment(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 comment.GetText().Substring("<!--".Length, comment.GetText().Length - "<!--".Length - "-->".Length)));
@@ -124,7 +124,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             {
                 var prefix = Prefix(ctx);
                 AdvanceCursor(ctx.reference().EntityRef().Symbol.StopIndex + 1);
-                return new CharData(Guid.NewGuid(),
+                return new CharData(Tree.RandomId(),
                     prefix,
                     Markers.Empty,
                     false,
@@ -135,7 +135,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             {
                 var prefix = Prefix(ctx);
                 AdvanceCursor(ctx.reference().CharRef().Symbol.StopIndex + 1);
-                return new CharData(Guid.NewGuid(),
+                return new CharData(Tree.RandomId(),
                     prefix,
                     Markers.Empty,
                     false,
@@ -146,7 +146,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
         else if (ctx.COMMENT() != null)
         {
             return Convert(ctx.COMMENT(), (comment, prefix) => new Comment(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 comment.GetText().Substring("<!--".Length, comment.GetText().Length - "<!--".Length - "-->".Length)));
@@ -193,7 +193,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
         var valueStr = value.ToString();
         valueStr = valueStr.Substring(0, valueStr.Length - suffix.Length);
 
-        return new CharData(Guid.NewGuid(),
+        return new CharData(Tree.RandomId(),
             newPrefix.ToString(),
             Markers.Empty,
             cdata,
@@ -211,7 +211,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var name = Convert(ctx.SPECIAL_OPEN_XML(), (n, p) => n.GetText()).Substring(2);
             var attributes = ctx.attribute().Select(a => (Attribute)VisitAttribute(a)).ToList();
             return new XmlDecl(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 name,
@@ -239,7 +239,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             }
 
             return new ProcessingInstruction(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 name,
@@ -259,7 +259,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var attributes = ctx.attribute().Select(a => (Attribute)VisitAttribute(a)).ToList();
 
             return new JspDirective(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 beforeType,
@@ -279,7 +279,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var content = scriptletText.Substring(2, scriptletText.Length - 4);
 
             return new JspScriptlet(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 content
@@ -296,7 +296,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var content = expressionText.Substring(3, expressionText.Length - 5);
 
             return new JspExpression(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 content
@@ -313,7 +313,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var content = declarationText.Substring(3, declarationText.Length - 5);
 
             return new JspDeclaration(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 content
@@ -330,7 +330,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
             var content = commentText.Substring(4, commentText.Length - 8);
 
             return new JspComment(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 content
@@ -368,7 +368,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
                 AdvanceCursor(_cursor + 2);
 
                 closeTag = new Tag.Closing(
-                    Guid.NewGuid(),
+                    Tree.RandomId(),
                     closeTagPrefix,
                     Markers.Empty,
                     Convert(ctx.Name(1), (n, p) => n.GetText()),
@@ -377,7 +377,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
                 AdvanceCursor(_cursor + 1);
             }
 
-            return new Tag(Guid.NewGuid(), prefix, Markers.Empty, name, attributes,
+            return new Tag(Tree.RandomId(), prefix, Markers.Empty, name, attributes,
                 content, closeTag, beforeTagDelimiterPrefix);
         })!;
     }
@@ -386,19 +386,19 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
     {
         return Convert(ctx, (c, prefix) =>
         {
-            var key = Convert(c.Name(), (t, p) => new Ident(Guid.NewGuid(), p, Markers.Empty, t.GetText()));
+            var key = Convert(c.Name(), (t, p) => new Ident(Tree.RandomId(), p, Markers.Empty, t.GetText()));
 
             var beforeEquals = Convert(c.EQUALS(), (e, p) => p);
 
             var val = Convert(c.STRING(), (v, p) => new Attribute.Value(
-                Guid.NewGuid(),
+                Tree.RandomId(),
                 p,
                 Markers.Empty,
                 v.GetText().StartsWith("'") ? Attribute.Value.Quote.Single : Attribute.Value.Quote.Double,
                 v.GetText().Substring(1, c.STRING().GetText().Length - 2)
             ));
 
-            return new Attribute(Guid.NewGuid(), prefix, Markers.Empty, key, beforeEquals, val);
+            return new Attribute(Tree.RandomId(), prefix, Markers.Empty, key, beforeEquals, val);
         })!;
     }
 
@@ -407,7 +407,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
         return Convert(ctx, (c, prefix) =>
         {
             Skip(c.DOCTYPE());
-            var name = Convert(c.Name(), (n, p) => new Ident(Guid.NewGuid(), p, Markers.Empty, n.GetText()));
+            var name = Convert(c.Name(), (n, p) => new Ident(Tree.RandomId(), p, Markers.Empty, n.GetText()));
             Ident? externalId = null;
             List<Ident>? internalSubset = null;
             if (!c.externalid().Start.Equals(c.DTD_CLOSE().Symbol))
@@ -415,10 +415,10 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
                 if (c.externalid().Name() != null)
                 {
                     externalId = Convert(c.externalid(),
-                        (n, p) => new Ident(Guid.NewGuid(), p, Markers.Empty, n.Name().GetText()));
+                        (n, p) => new Ident(Tree.RandomId(), p, Markers.Empty, n.Name().GetText()));
                 }
                 internalSubset = c.STRING()
-                    .Select(s => Convert(s, (attr, p) => new Ident(Guid.NewGuid(), p, Markers.Empty, attr.GetText())))
+                    .Select(s => Convert(s, (attr, p) => new Ident(Tree.RandomId(), p, Markers.Empty, attr.GetText())))
                     .ToList();
             }
 
@@ -436,7 +436,7 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
                     // Markup declarations are not fully implemented.
                     // n.GetText() includes element subsets.
                     var ident = Convert(element,
-                        (n, p) => new Ident(Guid.NewGuid(), p, Markers.Empty, n.GetText()));
+                        (n, p) => new Ident(Tree.RandomId(), p, Markers.Empty, n.GetText()));
 
                     var beforeElementTag = "";
                     if (i == children.Count - 1)
@@ -447,17 +447,17 @@ internal class XmlParserVisitor : XMLParserBaseVisitor<Xml>
 
                     elements.Add(
                         new Element(
-                            Guid.NewGuid(),
+                            Tree.RandomId(),
                             Prefix(element),
                             Markers.Empty,
                             new List<Ident> { ident },
                             beforeElementTag));
                 }
-                externalSubsets = new DocTypeDecl.ExternalSubsets(Guid.NewGuid(), subsetPrefix, Markers.Empty, elements);
+                externalSubsets = new DocTypeDecl.ExternalSubsets(Tree.RandomId(), subsetPrefix, Markers.Empty, elements);
             }
 
             var beforeTagDelimiterPrefix = Prefix(c.DTD_CLOSE());
-            return new DocTypeDecl(Guid.NewGuid(),
+            return new DocTypeDecl(Tree.RandomId(),
                 prefix,
                 Markers.Empty,
                 name,

@@ -17,7 +17,12 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -147,5 +152,79 @@ class LiteralTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void escapeSequencesInString() {
+        rewriteRun(
+          kotlin("val s = \"a\\nb\\tc\\u2605d\\\\e\\$f\"", spec -> spec.afterRecipe(cu -> {
+              J.Literal lit = initializerOf(cu);
+              assertThat(lit.getValue()).isEqualTo("a\nb\tc★d\\e$f");
+              assertThat(lit.getValueSource()).isEqualTo("\"a\\nb\\tc\\u2605d\\\\e\\$f\"");
+          }))
+        );
+    }
+
+    @Test
+    void rawStringHasNoEscapeSequences() {
+        rewriteRun(
+          kotlin("val s = \"\"\"a\\nb\"\"\"", spec -> spec.afterRecipe(cu ->
+            assertThat(initializerOf(cu).getValue()).isEqualTo("a\\nb")))
+        );
+    }
+
+    @Test
+    void surrogateEscapes() {
+        rewriteRun(
+          kotlin("val paired = \"\\uD83D\\uDE00\"", spec -> spec.afterRecipe(cu ->
+            assertThat(initializerOf(cu).getValue()).isEqualTo("\uD83D\uDE00"))),
+
+          kotlin("val unpaired = \"x\\uD800y\"", spec -> spec.afterRecipe(cu ->
+            assertThat(initializerOf(cu).getValue()).isEqualTo("x\\uD800y"))),
+
+          kotlin("val id = 1\nval fragment = \"\\uD800${id}\"", spec -> spec.afterRecipe(cu -> {
+              J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().get(1);
+              K.StringTemplate template = (K.StringTemplate) vd.getVariables().getFirst().getInitializer();
+              assertThat(((J.Literal) template.getStrings().getFirst()).getValue()).isEqualTo("\\uD800");
+          }))
+        );
+    }
+
+    @Test
+    void integerLiteralArithmeticInUnresolvedCall() {
+        AtomicInteger asserted = new AtomicInteger();
+        rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).variableDeclarations(false).build()),
+          kotlin(
+            //language=none
+            """
+              val a = (-13).scaled
+              val b = (10 * 8).scaled
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.Unary visitUnary(J.Unary unary, Integer p) {
+                        assertThat(unary.getType()).isEqualTo(JavaType.Primitive.Int);
+                        asserted.incrementAndGet();
+                        return super.visitUnary(unary, p);
+                    }
+
+                    @Override
+                    public J.Binary visitBinary(J.Binary binary, Integer p) {
+                        assertThat(binary.getType()).isEqualTo(JavaType.Primitive.Int);
+                        asserted.incrementAndGet();
+                        return super.visitBinary(binary, p);
+                    }
+                }.visit(cu, 0);
+                assertThat(asserted).hasValue(2);
+            })
+          )
+        );
+    }
+
+    private static J.Literal initializerOf(K.CompilationUnit cu) {
+        J.VariableDeclarations vd = (J.VariableDeclarations) cu.getStatements().getFirst();
+        return (J.Literal) vd.getVariables().getFirst().getInitializer();
     }
 }

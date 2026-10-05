@@ -22,29 +22,40 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import io.moderne.jsonrpc.JsonRpc;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import io.moderne.jsonrpc.handler.MessageHandler;
 import io.moderne.jsonrpc.handler.TraceMessageHandler;
 import lombok.Getter;
-import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.openrewrite.internal.StringUtils.readFully;
 
@@ -52,27 +63,53 @@ import static org.openrewrite.internal.StringUtils.readFully;
  * A client for spawning and communicating with a subprocess that implements Rewrite RPC.
  */
 public class RewriteRpcProcess extends Thread {
+
+    // Reflected: these Java 9+ APIs aren't visible to this Java 8 module.
+    private static final @Nullable Method PROCESS_DESCENDANTS;
+    private static final @Nullable Method PROCESS_HANDLE_DESTROY_FORCIBLY;
+
+    static {
+        Method descendants = null;
+        Method destroyForcibly = null;
+        try {
+            descendants = Process.class.getMethod("descendants");
+            destroyForcibly = Class.forName("java.lang.ProcessHandle").getMethod("destroyForcibly");
+        } catch (Exception ignored) {
+            // Java 8 has no ProcessHandle; only the direct child is destroyed.
+        }
+        PROCESS_DESCENDANTS = descendants;
+        PROCESS_HANDLE_DESTROY_FORCIBLY = destroyForcibly;
+    }
+
+    private static final long GRACEFUL_EXIT_MILLIS = 200;
+
+    private static volatile long memoryLimit;
+
+    private static final Map<String, AtomicInteger> ALIVE = new ConcurrentHashMap<>();
+
+    private final String language;
+
     private final String[] command;
 
-    @Setter
-    private boolean trace;
+    private final boolean trace;
 
-    @Setter
-    private @Nullable Path workingDirectory;
+    private final @Nullable Path workingDirectory;
 
+    private volatile Timer.@Nullable Sample lifetime;
+
+    // Package-private for tests; volatile for the JVM-hook shutdown() read.
     @Nullable
-    private Process process;
+    volatile Process process;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     @Getter
     private JsonRpc rpcClient;
 
-    private final Map<String, String> environment = new LinkedHashMap<>();
+    private final Map<String, String> environment;
 
-    private final Set<String> unsetEnvNames = new LinkedHashSet<>();
+    private final Set<String> unsetEnvNames;
 
-    @Setter
-    private @Nullable Path stderrRedirect;
+    private final @Nullable Path stderrRedirect;
 
     @Nullable
     private Thread shutdownHook;
@@ -81,12 +118,30 @@ public class RewriteRpcProcess extends Thread {
     private Thread stderrDrainThread;
 
     @Nullable
+    private Thread rssSamplerThread;
+
+    @Nullable
     private IOException startupFailure;
 
-    public RewriteRpcProcess(String... command) {
-        this.command = command;
+    private final AtomicBoolean shutDown = new AtomicBoolean();
+
+    private RewriteRpcProcess(Builder builder) {
+        this.language = builder.language;
+        this.command = builder.command;
+        this.trace = builder.trace;
+        this.workingDirectory = builder.workingDirectory;
+        this.stderrRedirect = builder.stderrRedirect;
+        this.environment = Collections.unmodifiableMap(new LinkedHashMap<>(builder.environment));
+        this.unsetEnvNames = Collections.unmodifiableSet(new LinkedHashSet<>(builder.unsetEnvNames));
         this.setName("RewriteRpcProcess");
         this.setDaemon(false);
+    }
+
+    /**
+     * @param language Identifies the peer in the process lifetime metrics, e.g. {@code go}.
+     */
+    public static Builder forLanguage(String language) {
+        return new Builder(language);
     }
 
     public Map<String, String> environment() {
@@ -94,25 +149,28 @@ public class RewriteRpcProcess extends Thread {
     }
 
     /**
-     * Strip these env vars from the spawned process's environment before
-     * applying {@link #environment()}. Use when the subprocess bundles its
-     * own runtime (e.g. a packaged Node) and inherited runtime-specific
-     * vars from the parent — {@code NODE_OPTIONS}, {@code NODE_PATH},
-     * {@code PYTHONHOME}, … — corrupt its startup.
+     * Caps what a peer may commit ({@code RLIMIT_DATA} on Linux, no effect elsewhere) so one that
+     * outgrows its budget dies alone rather than taking the host process with it. 0 is no cap.
      */
-    public void unsetEnv(Collection<String> names) {
-        this.unsetEnvNames.addAll(names);
+    public static void setMemoryLimit(long bytes) {
+        memoryLimit = bytes;
     }
 
-    public RewriteRpcProcess trace() {
-        this.trace = true;
-        return this;
+    /** Best-effort: a hard limit already below the cap can't be raised unprivileged, so the tighter one stands. */
+    List<String> launchCommand() {
+        if (memoryLimit <= 0 || !System.getProperty("os.name").startsWith("Linux")) {
+            return Arrays.asList(command);
+        }
+        List<String> limited = new ArrayList<>(Arrays.asList("/bin/sh", "-c",
+                "ulimit -d " + memoryLimit / 1024 + "; exec \"$@\"", "sh"));
+        limited.addAll(Arrays.asList(command));
+        return limited;
     }
 
     @Override
     public void run() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(command);
+            ProcessBuilder pb = new ProcessBuilder(launchCommand());
             // Strip inherited vars BEFORE putAll so the caller's explicit
             // environment (which can re-set any of these names) wins.
             unsetEnvNames.forEach(pb.environment()::remove);
@@ -123,8 +181,10 @@ public class RewriteRpcProcess extends Thread {
             // Don't use ProcessBuilder.redirectError() — on Windows it leaks the
             // parent-side file handle after process termination, preventing deletion
             // of the log file.  Instead we drain stderr in a daemon thread.
-            process = pb.start();
-            stderrDrainThread = drainStderr(process, stderrRedirect);
+            Process p = pb.start();
+            stderrDrainThread = drainStderr(p, stderrRedirect);
+            // Publish process last so its volatile write also releases stderrDrainThread.
+            process = p;
         } catch (IOException e) {
             // Record the failure so start() can surface it instead of busy-waiting forever
             // on `process == null`. Throwing here would just kill this thread silently.
@@ -159,7 +219,8 @@ public class RewriteRpcProcess extends Thread {
     }
 
     public @Nullable RuntimeException getLivenessCheck() {
-        if (process == null) {
+        // Don't report our own shutdown SIGKILL as a crash.
+        if (shutDown.get() || process == null) {
             return null;
         }
 
@@ -207,6 +268,8 @@ public class RewriteRpcProcess extends Thread {
                 throw new RuntimeException(e);
             }
         }
+        lifetime = Timer.start();
+        alive(language).incrementAndGet();
 
         // Hold a reference so shutdown() can deregister the hook; otherwise each
         // RPC process leaks its full RewriteRpc graph via ApplicationShutdownHooks.
@@ -216,7 +279,17 @@ public class RewriteRpcProcess extends Thread {
             } catch (Throwable ignored) {
             }
         }, "rpc-shutdown");
-        Runtime.getRuntime().addShutdownHook(shutdownHook);
+        try {
+            Runtime.getRuntime().addShutdownHook(shutdownHook);
+        } catch (IllegalStateException e) {
+            // JVM already shutting down; reap now so the peer can't linger.
+            shutdownHook = null;
+            shutdown();
+            throw new IllegalStateException(
+                    "JVM shutting down during RPC start; peer reaped: " + String.join(" ", command), e);
+        }
+
+        startRssSampler();
 
         SimpleModule module = new SimpleModule();
         module.addSerializer(Path.class, new PathSerializer());
@@ -227,10 +300,23 @@ public class RewriteRpcProcess extends Thread {
         if (trace) {
             handler = new TraceMessageHandler("client", handler);
         }
-        this.rpcClient = new JsonRpc(handler);
+        this.rpcClient = new JsonRpc(handler).tags(Tags.of("language", language));
     }
 
     public void shutdown() {
+        // Run once, even if an explicit caller and the JVM hook race.
+        if (!shutDown.compareAndSet(false, true)) {
+            return;
+        }
+        Process p = process;
+        boolean exitedOnItsOwn = p != null && !p.isAlive();
+        String reason = exitedOnItsOwn ? (terminatedAbnormally(p.exitValue()) ? "killed" : "exited") : "graceful";
+        // Snapshot descendants while connected; they reparent to init once the child is killed.
+        List<Object> descendants = captureDescendants(p);
+        if (rssSamplerThread != null) {
+            rssSamplerThread.interrupt();
+            rssSamplerThread = null;
+        }
         if (shutdownHook != null) {
             try {
                 Runtime.getRuntime().removeShutdownHook(shutdownHook);
@@ -239,30 +325,38 @@ public class RewriteRpcProcess extends Thread {
             }
             shutdownHook = null;
         }
-        if (process != null && process.isAlive()) {
-            process.destroy();
+        // EOF on stdin is every peer's exit signal, and taking it lets them flush metrics
+        // and logs and remove their temp dirs. SIGTERM would not do: of the four peers only
+        // the JS one installs a handler.
+        if (p != null) {
+            // Closing stdin needs the monitor that HeaderDelimitedMessageHandler holds across
+            // a send, so against a peer that stopped draining it blocks until the kill below
+            // releases the writer. Only the exit is waited on, which keeps that wait bounded.
+            severStdin(p);
             try {
-                boolean exited = process.waitFor(5, TimeUnit.SECONDS);
-                if (!exited) {
-                    process.destroyForcibly();
-                    process.waitFor(2, TimeUnit.SECONDS);
-                }
-                int exitCode = process.exitValue();
-                if (exitCode != 0 && exitCode != 1 && exitCode != 143) { // 143 = SIGTERM
-                    throw new RuntimeException("Rewrite RPC process crashed with exit code: " + exitCode);
+                if (!p.waitFor(GRACEFUL_EXIT_MILLIS, TimeUnit.MILLISECONDS)) {
+                    p.destroyForcibly();
+                    reason = "forced";
                 }
             } catch (InterruptedException e) {
+                p.destroyForcibly();
+                reason = "forced";
                 Thread.currentThread().interrupt();
             }
         }
-        // Wait for the drain thread to observe EOF and close its handle on
-        // stderrRedirect. Without this, the parent-side file handle outlives
-        // shutdown(); on Windows that breaks `@TempDir` test cleanup and any
-        // reopen-the-same-path flow, because the file can't be deleted or
-        // replaced while a handle is held without FILE_SHARE_DELETE. This is
-        // the same hazard the drain-thread approach exists to avoid (see
-        // run() above). Done outside the isAlive() guard so the join also
-        // runs when the subprocess already exited on its own.
+        // Force-kill the descendants captured above; empty on Java 8 or a single-process peer.
+        destroyDescendantsForcibly(descendants);
+        Timer.Sample started = lifetime;
+        if (started != null) {
+            alive(language).decrementAndGet();
+            started.stop(Timer.builder("rewrite.rpc.process")
+                    .description("How long an RPC peer process ran, from start until shutdown")
+                    .tag("language", language)
+                    .tag("outcome", exitedOnItsOwn ? "error" : "success")
+                    .tag("reason", reason)
+                    .register(Metrics.globalRegistry));
+        }
+        // Join the drain so Windows can delete/reopen the stderrRedirect file (see run()).
         if (stderrDrainThread != null) {
             try {
                 stderrDrainThread.join(TimeUnit.SECONDS.toMillis(2));
@@ -270,6 +364,185 @@ public class RewriteRpcProcess extends Thread {
                 Thread.currentThread().interrupt();
             }
             stderrDrainThread = null;
+        }
+    }
+
+    /**
+     * Unix reports a signal kill (the OOM killer, a memory cap) as 128 + the signal number and never
+     * a negative value. Windows has no signals; its crash statuses (e.g. 0xC0000005) have the high bit
+     * set, so read as negative.
+     */
+    private static boolean terminatedAbnormally(int exitValue) {
+        return exitValue < 0 || exitValue >= 128;
+    }
+
+    private static AtomicInteger alive(String language) {
+        return ALIVE.computeIfAbsent(language, lang -> Metrics.globalRegistry.gauge(
+                "rewrite.rpc.process.alive", Tags.of("language", lang), new AtomicInteger()));
+    }
+
+    /** Signals the peer to exit by closing its stdin, on a daemon thread that may never return. */
+    private static void severStdin(Process p) {
+        Thread closer = new Thread(() -> {
+            try {
+                p.getOutputStream().close();
+            } catch (IOException ignored) {
+                // The peer is going away regardless; the caller force-kills on timeout.
+            }
+        }, "rpc-stdin-close");
+        closer.setDaemon(true);
+        closer.start();
+    }
+
+    /** The peer's descendants as {@code ProcessHandle}s, empty on Java 8 or if unobtainable. */
+    private static List<Object> captureDescendants(@Nullable Process p) {
+        if (p == null || PROCESS_DESCENDANTS == null) {
+            return Collections.emptyList();
+        }
+        try {
+            List<Object> descendants = new ArrayList<>();
+            ((Stream<?>) PROCESS_DESCENDANTS.invoke(p)).forEach(descendants::add);
+            return descendants;
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /** Force-kill each captured handle, skipping any already gone. */
+    private static void destroyDescendantsForcibly(List<Object> descendants) {
+        if (PROCESS_HANDLE_DESTROY_FORCIBLY == null) {
+            return;
+        }
+        for (Object handle : descendants) {
+            try {
+                PROCESS_HANDLE_DESTROY_FORCIBLY.invoke(handle);
+            } catch (Exception ignored) {
+                // Best-effort; skip a handle we can't reach.
+            }
+        }
+    }
+
+    /**
+     * Opt-in RSS profiling ({@code REWRITE_RPC_RSS_MS}): sample the subprocess RSS — which catches
+     * native/off-heap growth the in-process counters miss — into {@code rpc-rss-<pid>.csv}.
+     */
+    private void startRssSampler() {
+        String intervalEnv = System.getenv("REWRITE_RPC_RSS_MS");
+        Path dir = workingDirectory;
+        Process p = process;
+        if (intervalEnv == null || dir == null || p == null) {
+            return;
+        }
+        long intervalMs;
+        try {
+            intervalMs = Long.parseLong(intervalEnv.trim());
+        } catch (NumberFormatException e) {
+            return;
+        }
+        if (intervalMs <= 0) {
+            return;
+        }
+        long pid;
+        try {
+            // Process.pid() is Java 9+, but this module compiles at Java 8 source level.
+            pid = (long) Process.class.getMethod("pid").invoke(p);
+        } catch (Exception e) {
+            return;
+        }
+        Path rssCsv = dir.resolve("rpc-rss-" + pid + ".csv");
+        Thread sampler = new Thread(() -> {
+            try (OutputStream out = Files.newOutputStream(rssCsv,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+                out.write("timestamp_ms,rss_kb\n".getBytes());
+                out.flush();
+                while (p.isAlive() && !Thread.currentThread().isInterrupted()) {
+                    long rssKb = readRssKb(pid);
+                    if (rssKb >= 0) {
+                        out.write((System.currentTimeMillis() + "," + rssKb + "\n").getBytes());
+                        out.flush();
+                    }
+                    Thread.sleep(intervalMs);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException ignored) {
+                // Best-effort profiling; never disturb the run.
+            }
+        }, "rpc-rss-sampler");
+        sampler.setDaemon(true);
+        sampler.start();
+        this.rssSamplerThread = sampler;
+    }
+
+    /** Resident set size of {@code pid} in KiB via {@code ps} (macOS + Linux), or -1 on failure. */
+    private static long readRssKb(long pid) {
+        try {
+            Process ps = new ProcessBuilder("ps", "-o", "rss=", "-p", Long.toString(pid))
+                    .redirectErrorStream(true).start();
+            String out = readFully(ps.getInputStream()).trim();
+            ps.waitFor(2, TimeUnit.SECONDS);
+            if (out.isEmpty()) {
+                return -1;
+            }
+            String[] tokens = out.split("\\s+");
+            return Long.parseLong(tokens[tokens.length - 1]);
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    public static class Builder {
+        private final String language;
+        private String[] command = new String[0];
+        private boolean trace;
+        private @Nullable Path workingDirectory;
+        private @Nullable Path stderrRedirect;
+        private final Map<String, String> environment = new LinkedHashMap<>();
+        private final Set<String> unsetEnvNames = new LinkedHashSet<>();
+
+        private Builder(String language) {
+            this.language = language;
+        }
+
+        public Builder command(String... command) {
+            this.command = command;
+            return this;
+        }
+
+        public Builder trace() {
+            this.trace = true;
+            return this;
+        }
+
+        public Builder workingDirectory(@Nullable Path workingDirectory) {
+            this.workingDirectory = workingDirectory;
+            return this;
+        }
+
+        public Builder stderrRedirect(@Nullable Path stderrRedirect) {
+            this.stderrRedirect = stderrRedirect;
+            return this;
+        }
+
+        public Builder environment(Map<String, String> environment) {
+            this.environment.putAll(environment);
+            return this;
+        }
+
+        /**
+         * Strip these env vars from the spawned process's environment before
+         * applying {@link #environment(Map)}. Use when the subprocess bundles its
+         * own runtime (e.g. a packaged Node) and inherited runtime-specific
+         * vars from the parent — {@code NODE_OPTIONS}, {@code NODE_PATH},
+         * {@code PYTHONHOME}, … — corrupt its startup.
+         */
+        public Builder unsetEnv(Collection<String> names) {
+            this.unsetEnvNames.addAll(names);
+            return this;
+        }
+
+        public RewriteRpcProcess build() {
+            return new RewriteRpcProcess(this);
         }
     }
 

@@ -69,7 +69,7 @@ public class JavaScriptParser implements Parser {
         if (!smallFiles.isEmpty()) {
             JavaScriptValidator<Integer> validator = new JavaScriptValidator<>();
             smallFileStream = JavaScriptRewriteRpc.getOrStart().parse(smallFiles, relativeTo, this,
-                    JS.CompilationUnit.class.getName(), ctx).map(source -> {
+                    JS.CompilationUnit.class.getName(), ctx, JavaScriptRewriteRpc.parseOptions(ctx)).map(source -> {
                 try {
                     validator.visit(source, 0);
                     return source;

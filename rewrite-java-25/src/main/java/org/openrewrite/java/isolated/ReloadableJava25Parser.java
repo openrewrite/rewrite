@@ -83,9 +83,11 @@ public class ReloadableJava25Parser implements JavaParser {
     private final ResettableLog compilerLog;
     private final Collection<NamedStyles> styles;
     private final List<Processor> annotationProcessors;
+    private final boolean typeAttribution;
 
     private ReloadableJava25Parser(
             boolean logCompilationWarningsAndErrors,
+            boolean typeAttribution,
             @Nullable Collection<Path> classpath,
             Collection<byte[]> classBytesClasspath,
             @Nullable Collection<Input> dependsOn,
@@ -96,6 +98,7 @@ public class ReloadableJava25Parser implements JavaParser {
         this.classpath = classpath;
         this.dependsOn = dependsOn;
         this.styles = styles;
+        this.typeAttribution = typeAttribution;
         this.typeCache = typeCache;
         this.typeFactory = typeFactory != null ? typeFactory : new DefaultJavaTypeFactory(typeCache);
 
@@ -247,6 +250,9 @@ public class ReloadableJava25Parser implements JavaParser {
                 handleParsingException(ctx, t);
             }
 
+            if (!typeAttribution) {
+                compiler.todo.clear();
+            }
             while (!compiler.todo.isEmpty()) {
                 try {
                     compiler.attribute(compiler.todo);
@@ -350,7 +356,7 @@ public class ReloadableJava25Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava25Parser, Builder> {
         @Override
         public ReloadableJava25Parser build() {
-            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
+            return new ReloadableJava25Parser(logCompilationWarningsAndErrors, typeAttribution, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache, javaTypeFactory);
         }
     }
 
@@ -377,7 +383,7 @@ public class ReloadableJava25Parser implements JavaParser {
 
         @Override
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
-            if (StandardLocation.CLASS_PATH.equals(location)) {
+            if (StandardLocation.CLASS_PATH == location) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
                 return classByteClasspath.isEmpty() ? listed :
                         Stream.concat(classByteClasspath.stream()

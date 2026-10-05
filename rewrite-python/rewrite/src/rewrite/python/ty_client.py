@@ -24,12 +24,39 @@ cross-file deduplication.
 from __future__ import annotations
 
 import json
+import logging
 import os
-import select
+import queue
+import re
+import shutil
 import subprocess
 import sys
+import tempfile
+import threading
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from .type_mapping import SessionTypeCache
+
+logger = logging.getLogger(__name__)
+
+# ty has only ever shipped Python 3 stubs.
+_TY_PYTHON_VERSION = re.compile(r'3\.\d+')
+
+
+def _ty_user_config_dir(python_version: str) -> str:
+    """A throwaway ``XDG_CONFIG_HOME`` holding a ty user config naming
+    ``python_version``. ty ranks a project's own ``ty.toml`` and
+    ``requires-python`` above it, so it only fills in versions ty cannot read
+    for itself, such as setuptools classifiers.
+    """
+    config_dir = tempfile.mkdtemp(prefix='ty-user-config-')
+    ty_dir = os.path.join(config_dir, 'ty')
+    os.mkdir(ty_dir)
+    with open(os.path.join(ty_dir, 'ty.toml'), 'w', encoding='utf-8') as f:
+        f.write('[environment]\npython-version = "%s"\n' % python_version)
+    return config_dir
 
 
 class TyTypesClient:
@@ -47,7 +74,8 @@ class TyTypesClient:
             result = client.get_types("/path/to/file.py")
     """
 
-    def __init__(self, virtual_env: Optional[str] = None):
+    def __init__(self, virtual_env: Optional[str] = None,
+                 python_version: Optional[str] = None):
         """Create a client and start the ``ty-types --serve`` subprocess.
 
         Args:
@@ -60,12 +88,20 @@ class TyTypesClient:
                 from the project's ``pyproject.toml`` so that supertypes reaching
                 into installed dependencies (e.g. ``class User(BaseModel)``)
                 resolve.
+            python_version: Optional Python version ("3.10") whose stdlib
+                surface ty resolves against, for projects declaring one
+                somewhere ty does not look. Non-3.x values are ignored.
         """
         self._process: Optional[subprocess.Popen] = None
         self._request_id: int = 0
         self._initialized = False
         self._project_root: Optional[str] = None
         self._virtual_env: Optional[str] = str(virtual_env) if virtual_env else None
+        self._python_version: Optional[str] = (
+            python_version if python_version and _TY_PYTHON_VERSION.fullmatch(python_version)
+            else None
+        )
+        self._ty_config_dir: Optional[str] = None
 
         # Cumulative type table for the lifetime of this ``--serve`` session.
         #
@@ -87,6 +123,9 @@ class TyTypesClient:
         # state leaks across unrelated parses.
         self.session_types: Dict[int, Dict[str, Any]] = {}
 
+        # The JavaTypes those descriptors resolve to, sharing their lifetime.
+        self.java_types = SessionTypeCache()
+
         self._start_process()
 
     def __enter__(self) -> TyTypesClient:
@@ -104,25 +143,64 @@ class TyTypesClient:
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
 
+        if self._python_version is not None and self._ty_config_dir is None:
+            self._ty_config_dir = _ty_user_config_dir(self._python_version)
+
         try:
             self._process = subprocess.Popen(
                 [str(binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                env=self._subprocess_env(virtual_env=self._virtual_env),
+                env=self._subprocess_env(virtual_env=self._virtual_env,
+                                         ty_config_dir=self._ty_config_dir),
             )
         except FileNotFoundError:
             self._process = None
+            # No instance escapes the constructor to be shut down later.
+            self._discard_ty_config()
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+
+        # Draining both pipes keeps ty from deadlocking on a full buffer; threads
+        # because a pipe read cannot be bounded on Windows.
+        self._responses: queue.Queue = queue.Queue()
+        self._consecutive_timeouts = 0
+        threading.Thread(target=self._drain_stdout, args=(self._process,),
+                         name="ty-types-stdout", daemon=True).start()
+        threading.Thread(target=self._drain_stderr, args=(self._process,),
+                         name="ty-types-stderr", daemon=True).start()
+
+    def _drain_stdout(self, process: subprocess.Popen) -> None:
+        """Read response lines into the queue until EOF; EOF enqueues None."""
+        responses = self._responses
+        stdout = process.stdout
+        while True:
+            line = stdout.readline()
+            if not line:
+                responses.put(None)
+                return
+            try:
+                responses.put(json.loads(line.decode('utf-8')))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                logger.debug("ty-types emitted a non-JSON line on stdout")
+
+    @staticmethod
+    def _drain_stderr(process: subprocess.Popen) -> None:
+        stderr = process.stderr
+        while True:
+            line = stderr.readline()
+            if not line:
+                return
+            logger.debug("ty-types stderr: %s", line.decode('utf-8', 'replace').rstrip())
 
     @staticmethod
     def _subprocess_env(base_env: Optional[Dict[str, str]] = None,
                         prefix: Optional[str] = None,
                         base_prefix: Optional[str] = None,
-                        virtual_env: Optional[str] = None) -> Dict[str, str]:
+                        virtual_env: Optional[str] = None,
+                        ty_config_dir: Optional[str] = None) -> Dict[str, str]:
         """Build the environment for the ty-types subprocess.
 
         ty-types resolves a project's third-party packages by discovering the
@@ -147,6 +225,10 @@ class TyTypesClient:
         are injectable to keep this unit-testable.
         """
         env = dict(os.environ if base_env is None else base_env)
+
+        # Where ty looks for its user config, per platform.
+        if ty_config_dir:
+            env['APPDATA' if os.name == 'nt' else 'XDG_CONFIG_HOME'] = ty_config_dir
 
         def _point_at(venv: str) -> None:
             env['VIRTUAL_ENV'] = venv
@@ -183,9 +265,13 @@ class TyTypesClient:
             return Path(ty_types)
         return None
 
+    # Kill the process after this many consecutive timeouts; further requests degrade to None.
+    _MAX_CONSECUTIVE_TIMEOUTS = 3
+
     def _send_request(self, method: str, params: Optional[Dict[str, Any]] = None,
                       timeout: float = 0) -> Optional[Any]:
-        """Send a JSON-RPC request and read the response.
+        """Send a JSON-RPC request and wait for its response from the reader
+        thread's queue.
 
         Args:
             method: The JSON-RPC method name.
@@ -209,29 +295,35 @@ class TyTypesClient:
         try:
             self._process.stdin.write(line.encode('utf-8'))
             self._process.stdin.flush()
+        except (BrokenPipeError, OSError):
+            return None
 
-            if self._process.stdout is None:
+        end = None if timeout <= 0 else time.monotonic() + timeout
+        while True:
+            try:
+                remaining = None if end is None else end - time.monotonic()
+                if remaining is not None and remaining <= 0:
+                    raise queue.Empty
+                response = self._responses.get(timeout=remaining)
+            except queue.Empty:
+                self._consecutive_timeouts += 1
+                if self._consecutive_timeouts >= self._MAX_CONSECUTIVE_TIMEOUTS:
+                    logger.debug("ty-types unresponsive after %d timeouts; shutting it down",
+                                 self._consecutive_timeouts)
+                    self._kill()
                 return None
 
-            if timeout > 0:
-                ready, _, _ = select.select([self._process.stdout], [], [], timeout)
-                if not ready:
-                    return None
-
-            response_line = self._process.stdout.readline().decode('utf-8')
-            if not response_line:
+            if response is None:
+                # EOF sentinel: the process exited.
                 return None
-            response = json.loads(response_line)
-
+            # A response to an abandoned earlier request; drop it and keep waiting.
             if response.get('id') != self._request_id:
-                return None
+                continue
 
+            self._consecutive_timeouts = 0
             if response.get('error') is not None:
                 return None
-
             return response.get('result')
-        except (BrokenPipeError, OSError, json.JSONDecodeError):
-            return None
 
     def initialize(self, project_root: str) -> bool:
         """Initialize the ty-types session with a project root.
@@ -247,9 +339,30 @@ class TyTypesClient:
             # A different project root means a brand-new ty session whose type
             # ids start over; drop the accumulated table so ids don't collide.
             self.session_types.clear()
+            self.java_types.clear()
             self._start_process()
 
-        result = self._send_request("initialize", {"projectRoot": project_root})
+        if self._try_initialize(project_root):
+            return True
+
+        # ty rejects a version outside the range it ships stubs for by failing
+        # initialization outright, which costs the batch every type rather than
+        # only the version-gated ones. The version is a fallback, so trade it
+        # away. A timeout is no verdict on it, and retrying would pay it twice.
+        if self._python_version is not None and self._consecutive_timeouts == 0:
+            logger.debug("ty-types rejected python-version %s; retrying without it",
+                         self._python_version)
+            self._python_version = None
+            self.shutdown()
+            self._start_process()
+            return self._try_initialize(project_root)
+        return False
+
+    def _try_initialize(self, project_root: str) -> bool:
+        # Bounded so a wedged ty degrades to untyped instead of hanging; large
+        # because ty indexes the whole project up front.
+        result = self._send_request("initialize", {"projectRoot": project_root},
+                                    timeout=600)
         if result and result.get("ok"):
             self._initialized = True
             self._project_root = project_root
@@ -257,7 +370,8 @@ class TyTypesClient:
         return False
 
     def get_types(self, file_path: str, timeout: float = 30,
-                  include_display: bool = False) -> Optional[Dict[str, Any]]:
+                  include_display: bool = False,
+                  include_bindings: bool = False) -> Optional[Dict[str, Any]]:
         """Get all node types for a Python file.
 
         Args:
@@ -266,12 +380,16 @@ class TyTypesClient:
                      Some files with recursive types can cause ty to hang.
             include_display: Whether to include display strings in type
                            descriptors (default False — uses structured data).
+            include_bindings: Whether each name and attribute reference carries the
+                           module and qualified name binding it. Costs roughly 10%
+                           inference time and 17% payload.
         """
         if not self._initialized:
             return None
         result = self._send_request(
             "getTypes",
-            {"file": file_path, "includeDisplay": include_display},
+            {"file": file_path, "includeDisplay": include_display,
+             "includeBindings": include_bindings},
             timeout=timeout,
         )
         if result:
@@ -292,16 +410,39 @@ class TyTypesClient:
 
     def shutdown(self) -> None:
         """Gracefully shut down the ty-types process."""
-        if self._process is None:
+        # Local: the "shutdown" request can trip the breaker, whose ``_kill`` detaches ``self._process``.
+        process = self._process
+        if process is None:
+            self._discard_ty_config()
             return
 
         try:
-            self._send_request("shutdown")
-            self._process.wait(timeout=5)
+            self._send_request("shutdown", timeout=5)
+            process.wait(timeout=5)
         except (subprocess.TimeoutExpired, OSError):
-            if self._process is not None:
-                self._process.kill()
+            process.kill()
         finally:
             self._process = None
             self._initialized = False
             self._project_root = None
+            self._discard_ty_config()
+
+    def _kill(self) -> None:
+        """Forcibly terminate an unresponsive ty-types process."""
+        process = self._process
+        self._process = None
+        self._initialized = False
+        self._project_root = None
+        self._discard_ty_config()
+        if process is not None:
+            try:
+                process.kill()
+            except OSError:
+                pass
+
+    def _discard_ty_config(self) -> None:
+        """Remove the throwaway user-config dir; ``_start_process`` rebuilds it
+        while a version is still in play."""
+        if self._ty_config_dir is not None:
+            shutil.rmtree(self._ty_config_dir, ignore_errors=True)
+            self._ty_config_dir = None

@@ -28,6 +28,8 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
         observed["source"] = source
         observed["path"] = path
+        # Read while the batch is still in flight; the file is removed once it ends.
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
         return {"id": "empty-file"}
 
     monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
@@ -44,7 +46,7 @@ def test_handle_parse_preserves_empty_text(tmp_path, monkeypatch):
     assert result == ["empty-file"]
     assert observed["source"] == ""
     assert observed["path"] == str(tmp_path / "pkg" / "__init__.py")
-    assert (tmp_path / "pkg" / "__init__.py").read_text(encoding="utf-8") == ""
+    assert observed["content_at_parse"] == ""
 
 
 def test_pip_install_recipe_package_shape(tmp_path, monkeypatch):
@@ -220,6 +222,36 @@ def test_handle_install_recipes_local_path_installs_with_deps(tmp_path, monkeypa
     assert str(local) in captured["cmd"]
 
 
+def test_handle_install_recipes_local_path_attributes_to_the_supplied_path(monkeypatch, tmp_path):
+    # A local install is attributed to the supplied path (the identity the host keys the bundle by),
+    # not the resolved distribution name — matching the facade's local install.
+    import rewrite.rpc.server as server
+    from rewrite import CategoryDescriptor, Recipe
+    from rewrite.discovery import RecipeAttribution
+    from rewrite.marketplace import RecipeMarketplace
+
+    class _Sample(Recipe):
+        @property
+        def name(self): return "org.local.Sample"
+        @property
+        def display_name(self): return "Sample"
+        @property
+        def description(self): return "s"
+
+    attribution = RecipeAttribution()
+    monkeypatch.setattr(server, "_marketplace", RecipeMarketplace())
+    monkeypatch.setattr(server, "_attribution", attribution)
+    monkeypatch.setattr(server, "_recipe_install_dir", None)          # no pip; just activate
+    monkeypatch.setattr(server, "_find_package_name", lambda p: "sample-dist")
+    monkeypatch.setattr(server, "_import_and_activate_package",
+                        lambda name, mkt, local_path=None: mkt.install(_Sample, [CategoryDescriptor(display_name="Local")]))
+
+    supplied = str(tmp_path / "my-recipe-src")
+    server.handle_install_recipes({"recipes": supplied})
+
+    assert attribution.package_for("org.local.Sample") == supplied   # the path, not "sample-dist"
+
+
 def test_recipe_descriptor_to_dict_emits_all_collection_keys():
     from rewrite.recipe import RecipeDescriptor
     from rewrite.rpc.server import _recipe_descriptor_to_dict
@@ -271,8 +303,46 @@ def test_get_marketplace_row_carries_package_name(monkeypatch):
     assert row["packageName"] == "my-recipes-package"
 
 
+def test_handle_install_recipes_local_path_attributes_to_the_path(tmp_path, monkeypatch):
+    """A local-path install attributes its recipes to the install path (the host's bundle identity),
+    not the distribution name — the host's marketplace filter keys on that path."""
+    import rewrite.rpc.server as server
+    from rewrite.discovery import RecipeAttribution
+    from rewrite import CategoryDescriptor, RecipeMarketplace, Recipe
+
+    class _MyRecipe(Recipe):
+        @property
+        def name(self): return "org.example.MyRecipe"
+        @property
+        def display_name(self): return "My Recipe"
+        @property
+        def description(self): return "A recipe."
+
+    marketplace = RecipeMarketplace()
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+    monkeypatch.setattr(server, "_attribution", RecipeAttribution())
+    monkeypatch.setattr(server, "_recipe_install_dir", None)
+    # The distribution name deliberately differs from the install path — attributing to it was the bug.
+    monkeypatch.setattr(server, "_find_package_name", lambda path: "some-distribution-name")
+    monkeypatch.setattr(server, "_import_and_activate_package",
+                        lambda pkg, mkt, local_path=None: mkt.install(_MyRecipe, [CategoryDescriptor(display_name="Test")]))
+
+    local = tmp_path / "my-recipe"
+    local.mkdir()
+
+    response = server.handle_install_recipes({"recipes": str(local)})
+
+    assert response["recipesInstalled"] == 1
+    # Attributed to the path, not the distribution name.
+    assert server._attribution.package_for("org.example.MyRecipe") == str(local)
+    # And GetMarketplace surfaces that path as the row's origin, so the host keeps the recipe.
+    rows = server._collect_marketplace_rows(marketplace)
+    row = next(r for r in rows if r["descriptor"]["name"] == "org.example.MyRecipe")
+    assert row["packageName"] == str(local)
+
+
 def test_get_marketplace_row_unattributed_has_none_package_name(monkeypatch):
-    """An unattributed recipe (e.g. a local-path install with no package identity)
+    """An unattributed recipe (e.g. a built-in the server recorded no origin for)
     leaves packageName None so the host falls back to the requested bundle."""
     import rewrite.rpc.server as server
     from rewrite.discovery import RecipeAttribution
@@ -405,3 +475,340 @@ def test_prepare_recipe_returns_whole_child_tree(monkeypatch):
 
     assert "recipeList" in response
     assert [c["descriptor"]["name"] for c in response["recipeList"]] == ["org.example.Leaf"]
+
+
+def test_prepare_recipe_same_type_children_preserve_distinct_options(monkeypatch):
+    """A composite whose recipe_list() yields multiple instances of the same recipe class with
+    different option values must keep each prepared child's own id and options, rather than
+    collapsing them."""
+    import rewrite.rpc.server as server
+    from rewrite.marketplace import RecipeMarketplace
+    from rewrite import Recipe, CategoryDescriptor
+    from rewrite.recipe import option
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class _SetsText(Recipe):
+        text: str = field(default=None, metadata=option(
+            display_name="Text", description="Text value."))
+
+        @property
+        def name(self): return "org.example.SetsText"
+        @property
+        def display_name(self): return "Sets text"
+        @property
+        def description(self): return "A recipe with a text option."
+
+    class _CompositeSameType(Recipe):
+        @property
+        def name(self): return "org.example.CompositeSameType"
+        @property
+        def display_name(self): return "Composite with same-type children"
+        @property
+        def description(self): return "A composite with distinct-option children of one type."
+
+        def recipe_list(self):
+            return [_SetsText(text="a"), _SetsText(text="b"), _SetsText(text="c")]
+
+    marketplace = RecipeMarketplace()
+    marketplace.install(_CompositeSameType, [CategoryDescriptor(display_name="Test")])
+    monkeypatch.setattr(server, "_marketplace", marketplace)
+
+    response = server.handle_prepare_recipe({"id": "org.example.CompositeSameType"})
+
+    children = response["recipeList"]
+    assert [c["descriptor"]["name"] for c in children] == ["org.example.SetsText"] * 3
+
+    ids = [c["id"] for c in children]
+    assert len(set(ids)) == 3
+
+    def text_of(child):
+        return next(o["value"] for o in child["descriptor"]["options"] if o["name"] == "text")
+    assert [text_of(c) for c in children] == ["a", "b", "c"]
+
+
+def test_hub_release_rewinds_send_refs_in_lockstep_with_the_child():
+    """A child drops its receive refs for a file when the broadcast Evict reaches it, so the facade
+    must return its send-ref numbering to exactly the pre-file value. If the facade kept advancing,
+    it would emit a GET_REF for a ref the child no longer holds; if it rewound while the child did
+    not, it would reuse a number still bound to the old object and serve a wrong tree silently."""
+    import rewrite.rpc.server as server
+    from rewrite.rpc.reference import ReferenceMap
+
+    bundle, first, second = "pkg", "file-1", "file-2"
+    refs = server._hub_send_refs[bundle] = ReferenceMap()
+
+    # Serving the first file advances this child's numbering and records where it started.
+    server._hub_send_checkpoint.setdefault((bundle, first), refs.snapshot())
+    refs.create(object())
+    refs.create(object())
+    server._hub_served[(bundle, first)] = object()
+    server._hub_tree[first] = object()
+
+    server._hub_release(first)
+
+    # Everything that file introduced is gone, and the counter is back where it began.
+    assert refs.snapshot() == 0
+    assert len(refs) == 0
+    assert (bundle, first) not in server._hub_served
+    assert (bundle, first) not in server._hub_send_checkpoint
+    assert first not in server._hub_tree
+
+    # So the next file reuses the same ref numbers rather than continuing past them.
+    server._hub_send_checkpoint.setdefault((bundle, second), refs.snapshot())
+    assert server._hub_send_checkpoint[(bundle, second)] == 0
+
+
+def test_project_root_roots_ty_independently_of_relative_to(tmp_path, monkeypatch):
+    """``projectRoot`` is where ty is rooted; ``relativeTo`` is the base source
+    paths are made relative to. A caller whose generated ``ty.toml`` sits outside
+    its source tree needs the two pointed at different directories."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **_):
+        observed["relative_to"] = relative_to
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    result = server.handle_parse({
+        "inputs": [{"path": str(sources / "a.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert result == ["parsed"]
+    assert observed["ty_root"] == str(config_root)
+    assert observed["relative_to"] == str(sources)
+
+
+def test_project_language_level_comes_from_the_source_tree(tmp_path, monkeypatch):
+    """``projectRoot`` may hold only a generated ``ty.toml``; the manifests declaring the
+    project's Python version sit with the sources. That version also selects the py2 parser."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "pyproject.toml").write_text(
+        '[project]\nname = "legacy"\nversion = "0.0.0"\nrequires-python = ">=2.7,<3"\n',
+        encoding="utf-8")
+    (sources / "app.py").write_text("print 'hello'\n", encoding="utf-8")
+    config_root = tmp_path / "cfg"
+    config_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            observed["ty_python_version"] = python_version
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_file(path, relative_to=None, ty_client=None, **kw):
+        observed["project_language_level"] = kw.get("project_language_level")
+        return {"id": "parsed"}
+
+    monkeypatch.setattr(server, "parse_python_file", fake_parse_python_file)
+
+    server.handle_parse({
+        "inputs": [{"path": str(sources / "app.py")}],
+        "relativeTo": str(sources),
+        "projectRoot": str(config_root),
+    })
+
+    assert observed["project_language_level"] == "2.7"
+
+
+def test_inline_source_is_written_where_ty_is_rooted(tmp_path, monkeypatch):
+    """The root ty is initialized at is ``projectRoot``, which the caller may point away
+    from the sources."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    ty_root = tmp_path / "cfg"
+    ty_root.mkdir()
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    def fake_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **_):
+        observed["path"] = path
+        observed["relative_to"] = relative_to
+        observed["content_at_parse"] = open(path, encoding="utf-8").read()
+        return {"id": "inline"}
+
+    monkeypatch.setattr(server, "parse_python_source", fake_parse_python_source)
+
+    server.handle_parse({
+        "inputs": [{"text": "x = 1\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(sources),
+        "projectRoot": str(ty_root),
+    })
+
+    assert observed["path"] == str(ty_root / "pkg" / "a.py")
+    assert observed["content_at_parse"] == "x = 1\n"
+    # The base passed alongside it keeps the reported source path the caller's own.
+    assert observed["relative_to"] == observed["ty_root"]
+
+    # The caller's directory is left as it was found; a later parse rooted here would
+    # otherwise pick these up as project sources.
+    assert not (ty_root / "pkg" / "a.py").exists()
+    assert not (ty_root / "pkg").exists()
+
+
+def test_consecutive_parses_each_use_their_own_project_root(tmp_path, monkeypatch):
+    """One peer serves many parse calls in sequence, each naming its own ``projectRoot``.
+    A ty client outliving a call would resolve later calls against the first one's config."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    sources = tmp_path / "src"
+    sources.mkdir()
+    (sources / "a.py").write_text("x = 1\n", encoding="utf-8")
+    roots = [tmp_path / "cfg-a", tmp_path / "cfg-b"]
+    for r in roots:
+        r.mkdir()
+
+    initialized = []
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            initialized.append(project_root)
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_file",
+                        lambda path, relative_to=None, ty_client=None, **kw: {"id": "parsed"})
+
+    for root in roots:
+        server.handle_parse({
+            "inputs": [{"path": str(sources / "a.py")}],
+            "relativeTo": str(sources),
+            "projectRoot": str(root),
+        })
+
+    assert initialized == [str(roots[0]), str(roots[1])], \
+        "each call roots ty at its own projectRoot; a client carried over unrooted " \
+        "would leave later calls resolving against the first call's config"
+
+
+def test_a_source_the_caller_already_had_survives_the_parse(tmp_path, monkeypatch):
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    existing = pkg / "a.py"
+    existing.write_text("original = 1\n", encoding="utf-8")
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+    monkeypatch.setattr(server, "parse_python_source",
+                        lambda source, path="<unknown>", relative_to=None, ty_client=None, **_: {"id": "inline"})
+
+    server.handle_parse({
+        "inputs": [{"text": "replaced = 2\n", "sourcePath": "pkg/a.py"}],
+        "relativeTo": str(tmp_path),
+    })
+
+    assert existing.exists(), "a file the server did not create must not be removed"
+    assert pkg.exists()
+
+
+def test_source_path_is_not_relativized_against_an_inferred_project_root(tmp_path, monkeypatch):
+    """Without a ``relativeTo`` the host's other parsers keep its input paths as given,
+    so an inferred project root may only root ty, not rebase the LST's source path."""
+    import rewrite.rpc.server as server
+    import rewrite.python.ty_client as ty_client_module
+    from pathlib import Path
+
+    # given
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n', encoding="utf-8")
+    source_path = tmp_path / "demo" / "http.py"
+
+    observed = {}
+
+    class FakeTyClient:
+        def __init__(self, virtual_env=None, python_version=None):
+            pass
+
+        def initialize(self, project_root):
+            observed["ty_root"] = project_root
+            return True
+
+        def shutdown(self):
+            pass
+
+    monkeypatch.setattr(ty_client_module, "TyTypesClient", FakeTyClient)
+
+    parse_python_source = server.parse_python_source
+
+    def untyped_parse_python_source(source, path="<unknown>", relative_to=None, ty_client=None, **kw):
+        return parse_python_source(source, path, relative_to, None, **kw)
+
+    monkeypatch.setattr(server, "parse_python_source", untyped_parse_python_source)
+
+    # when
+    ids = server.handle_parse({"inputs": [{"text": "x = 1\n", "sourcePath": str(source_path)}]})
+
+    # then
+    assert server.local_objects[ids[0]].source_path == Path(source_path)
+    assert observed["ty_root"] == str(tmp_path)

@@ -1,0 +1,20 @@
+version = 1
+revision = 3
+requires-python = ">=3.12"
+
+[[package]]
+name = "fixture-c"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "pickle-mixin" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pickle-mixin", specifier = "==1.0.2" }]
+
+[[package]]
+name = "pickle-mixin"
+version = "1.0.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/02/77/9d5eb2201bbc130e2a5cc41fc949e4ab0da74b619107eac1c511be3af7a7/pickle-mixin-1.0.2.tar.gz", hash = "sha256:d4983cd09939f6e402c69ba4f4200f2e6ccdfd39c020f6d1091290d78f17625c", size = 5113, upload-time = "2017-04-09T22:30:44.369Z" }

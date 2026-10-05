@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
@@ -57,6 +58,7 @@ public class Visit implements RpcRequest {
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<Visit> {
+        private final RewriteRpc rpc;
         private final Map<String, Object> localObjects;
         private final PreparedRecipeCache preparedRecipes;
         private final BiFunction<String, @Nullable String, ?> getObject;
@@ -64,19 +66,22 @@ public class Visit implements RpcRequest {
 
         @Override
         protected Object handle(Visit request) throws Exception {
-            Tree before = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
-            Object p = getVisitorP(request);
-            TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(request.getVisitor(),
-                    request.getVisitorOptions());
-            Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor(),
-                    request.getSourceFileType()));
-            if (after == null) {
-                localObjects.remove(before.getId().toString());
-            } else {
-                localObjects.put(after.getId().toString(), after);
-            }
+            // Make this connection discoverable via RewriteRpc.current() while the visitor runs.
+            return rpc.withCurrent(() -> {
+                Tree before = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
+                Object p = getVisitorP(request);
+                TreeVisitor<?, Object> visitor = preparedRecipes.instantiateVisitor(request.getVisitor(),
+                        request.getVisitorOptions());
+                Tree after = visitor.visit(before, p, getCursor.apply(request.getCursor(),
+                        request.getSourceFileType()));
+                if (after == null) {
+                    localObjects.remove(before.getId().toString());
+                } else {
+                    localObjects.put(after.getId().toString(), after);
+                }
 
-            return new VisitResponse(before != after);
+                return new VisitResponse(before != after);
+            });
         }
 
         private Object getVisitorP(Visit request) {

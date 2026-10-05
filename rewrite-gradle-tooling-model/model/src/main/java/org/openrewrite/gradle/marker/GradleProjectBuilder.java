@@ -38,6 +38,7 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -84,7 +85,77 @@ public final class GradleProjectBuilder {
                         randomId(),
                         new ArrayList<>(pluginRepositories),
                         GradleProjectBuilder.dependencyConfigurations(project.getBuildscript().getConfigurations())
-                ));
+                ),
+                springDependencyManagementPlugin(project));
+    }
+
+    // Reflective because OpenRewrite depends on neither plugin, and null when anything is unavailable so that
+    // recipes fall back to what the scripts say.
+    private static @Nullable SpringDependencyManagementPlugin springDependencyManagementPlugin(Project project) {
+        try {
+            Object extension = project.getExtensions().findByName("dependencyManagement");
+            if (extension == null) {
+                return null;
+            }
+            //noinspection unchecked
+            Map<String, String> importedProperties = (Map<String, String>) extension.getClass()
+                    .getMethod("getImportedProperties").invoke(extension);
+            //noinspection unchecked
+            Map<String, String> managedVersions = (Map<String, String>) extension.getClass()
+                    .getMethod("getManagedVersions").invoke(extension);
+            return new SpringDependencyManagementPlugin(
+                    importedBoms(project, extension),
+                    importedProperties == null ? emptyMap() : new LinkedHashMap<>(importedProperties),
+                    managedVersions == null ? emptyMap() : new LinkedHashMap<>(managedVersions));
+        } catch (Exception | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    private static List<GroupArtifactVersion> importedBoms(Project project, Object extension) {
+        List<GroupArtifactVersion> boms = new ArrayList<>();
+        // The Boot plugin publishes the coordinates it imports, so prefer that over the other plugin's internals
+        Object bootPlugin = project.getPlugins().findPlugin("org.springframework.boot");
+        if (bootPlugin != null) {
+            try {
+                Object coordinates = bootPlugin.getClass().getField("BOM_COORDINATES").get(null);
+                GroupArtifactVersion gav = parseCoordinates(String.valueOf(coordinates));
+                if (gav != null) {
+                    boms.add(gav);
+                }
+            } catch (Exception | LinkageError ignored) {
+                // Fall through to the dependency management plugin's own view of what it imported
+            }
+        }
+        try {
+            Field containerField = extension.getClass().getDeclaredField("dependencyManagementContainer");
+            containerField.setAccessible(true);
+            Object container = containerField.get(extension);
+            Object globalDependencyManagement = container.getClass().getMethod("getGlobalDependencyManagement").invoke(container);
+            Method getImportedBomReferences = globalDependencyManagement.getClass().getDeclaredMethod("getImportedBomReferences");
+            getImportedBomReferences.setAccessible(true);
+            Object references = getImportedBomReferences.invoke(globalDependencyManagement);
+            if (references instanceof Iterable) {
+                for (Object reference : (Iterable<?>) references) {
+                    Object coordinates = reference.getClass().getMethod("getCoordinates").invoke(reference);
+                    GroupArtifactVersion gav = coordinates == null ? null : new GroupArtifactVersion(
+                            (String) coordinates.getClass().getMethod("getGroupId").invoke(coordinates),
+                            (String) coordinates.getClass().getMethod("getArtifactId").invoke(coordinates),
+                            (String) coordinates.getClass().getMethod("getVersion").invoke(coordinates));
+                    if (gav != null && gav.getArtifactId() != null && !boms.contains(gav)) {
+                        boms.add(gav);
+                    }
+                }
+            }
+        } catch (Exception | LinkageError ignored) {
+            // Plugin internals differ across versions; what the Boot plugin reported, if anything, still stands
+        }
+        return boms;
+    }
+
+    private static @Nullable GroupArtifactVersion parseCoordinates(String coordinates) {
+        String[] gav = coordinates.split(":");
+        return gav.length == 3 ? new GroupArtifactVersion(gav[0], gav[1], gav[2]) : null;
     }
 
     static List<MavenRepository> mapRepositories(List<ArtifactRepository> repositories) {

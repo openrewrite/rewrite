@@ -16,8 +16,11 @@
 package org.openrewrite.scala.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.marker.Quoted;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.scala.Assertions.scala;
 
 class CompilationUnitTest implements RewriteTest {
@@ -96,6 +99,27 @@ class CompilationUnitTest implements RewriteTest {
             
             val message = "Hello"
             """
+          )
+        );
+    }
+
+    @Test
+    void packageWithBacktickedSegment() {
+        rewriteRun(
+          scala(
+            """
+            package com.example.`trait`
+
+            val x = 42
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                // The backticks are source syntax only: the identifier's simple name is
+                // bare and the quoting is carried by a Quoted marker.
+                J.FieldAccess pkg = (J.FieldAccess) cu.getPackageDeclaration().getExpression();
+                assertThat(pkg.getSimpleName()).isEqualTo("trait");
+                assertThat(pkg.getName().getMarkers().findFirst(Quoted.class)).isPresent();
+                assertThat(cu.getPackageDeclaration().getPackageName()).isEqualTo("com.example.trait");
+            })
           )
         );
     }
@@ -492,6 +516,79 @@ class CompilationUnitTest implements RewriteTest {
             """
             class Divider(using Executor)
             """
+          )
+        );
+    }
+
+    @Test
+    void packageThenAnnotatedClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @scala.annotation.meta.field
+            case class ConfigProperty(key: String, defaultValue: Object = null) extends scala.annotation.Annotation
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenAnnotatedObject() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @deprecated
+            object Logging
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenAnnotatedVal() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            @deprecated
+            val x = 1
+            """
+          )
+        );
+    }
+
+    @Test
+    void packageThenBlankLineThenAnnotatedClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+
+            @deprecated
+            class Logging
+            """
+          )
+        );
+    }
+
+    @Test
+    void docCommentOnAnnotatedClassBelongsToTheClass() {
+        rewriteRun(
+          scala(
+            """
+            package foo.bar
+            /** A trait. */
+            @deprecated
+            trait Logging
+            """,
+            spec -> spec.afterRecipe(cu -> {
+                J.ClassDeclaration logging = (J.ClassDeclaration) cu.getStatements().get(0);
+                assertThat(logging.getComments()).hasSize(1);
+                assertThat(logging.getPrefix().getWhitespace()).isEqualTo("\n");
+                assertThat(logging.getLeadingAnnotations().get(0).getPrefix().getWhitespace()).isEmpty();
+            })
           )
         );
     }

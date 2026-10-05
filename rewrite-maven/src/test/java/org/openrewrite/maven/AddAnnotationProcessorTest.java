@@ -23,6 +23,7 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.mavenProject;
+import static org.openrewrite.java.Assertions.project;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddAnnotationProcessorTest implements RewriteTest {
@@ -2699,6 +2700,414 @@ class AddAnnotationProcessorTest implements RewriteTest {
                                 </plugin>
                             </plugins>
                         </build>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+    }
+
+    @Nested
+    class NestedParents {
+
+        @Test
+        void addToNearestParentNotAggregatorRoot() {
+            // Three-level reactor: the aggregator root is also the parent of an
+            // intermediate parent POM, which in turn parents the module that
+            // compiles sources. Only the intermediate parent should be modified:
+            // it is the nearest parent of the compiling module, and it manages the
+            // processor's version, so no <version> is emitted.
+            rewriteRun(
+              pomXml(
+                // Aggregator and parent of `parent` - should NOT be modified
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>core</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <version>3.13.0</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                    <version>0.2.0</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                    <version>0.2.0</version>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("core",
+                pomXml(
+                  // Compiling module - should NOT be modified
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>core</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void addToRootWhenItDirectlyParentsACompilingModule() {
+            // The aggregator root parents both an intermediate parent and a compiling
+            // module of its own. The root is still the nearest parent of `module-a`,
+            // so both it and the intermediate parent are modified.
+            rewriteRun(
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                          <module>core</module>
+                      </modules>
+                  </project>
+                  """,
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>module-a</module>
+                          <module>core</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <configuration>
+                                          <annotationProcessorPaths>
+                                              <path>
+                                                  <groupId>org.projectlombok</groupId>
+                                                  <artifactId>lombok-mapstruct-binding</artifactId>
+                                                  <version>0.2.0</version>
+                                              </path>
+                                          </annotationProcessorPaths>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                    <version>0.2.0</version>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("module-a",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>module-a</artifactId>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("core",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>core</artifactId>
+                    </project>
+                    """
+                )
+              )
+            );
+        }
+
+        @Test
+        void addsToParentThatDeclaresTheDependencyWhenGatedByPrecondition() {
+            // Gated by `ModuleHasDependency`, as recipes enabling an annotation processor
+            // typically are. The aggregator root declares no dependencies, so it is never
+            // marked; if the recipe targets it rather than the intermediate parent that
+            // does declare the dependency, nothing is changed at all.
+            rewriteRun(
+              spec -> spec.recipeFromYaml(
+                """
+                  type: specs.openrewrite.org/v1beta/recipe
+                  name: org.openrewrite.maven.AddAnnotationProcessorForDeclaredDependency
+                  displayName: Add an annotation processor for a declared dependency
+                  description: Test.
+                  preconditions:
+                    - org.openrewrite.maven.search.ModuleHasDependency:
+                        groupIdPattern: org.projectlombok
+                        artifactIdPattern: lombok-mapstruct-binding
+                  recipeList:
+                    - org.openrewrite.maven.AddAnnotationProcessor:
+                        groupId: org.projectlombok
+                        artifactId: lombok-mapstruct-binding
+                        version: 0.2.0
+                  """,
+                "org.openrewrite.maven.AddAnnotationProcessorForDeclaredDependency"
+              ),
+              pomXml(
+                """
+                  <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>aggregator</artifactId>
+                      <version>1</version>
+                      <packaging>pom</packaging>
+                      <modules>
+                          <module>parent</module>
+                          <module>core</module>
+                      </modules>
+                      <build>
+                          <pluginManagement>
+                              <plugins>
+                                  <plugin>
+                                      <groupId>org.apache.maven.plugins</groupId>
+                                      <artifactId>maven-compiler-plugin</artifactId>
+                                      <version>3.13.0</version>
+                                  </plugin>
+                              </plugins>
+                          </pluginManagement>
+                      </build>
+                  </project>
+                  """,
+                spec -> project(spec, "aggregator")
+              ),
+              mavenProject("parent",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                    <version>0.2.0</version>
+                                    <scope>provided</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok-mapstruct-binding</artifactId>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                    """,
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>aggregator</artifactId>
+                            <version>1</version>
+                        </parent>
+                        <artifactId>parent</artifactId>
+                        <packaging>pom</packaging>
+                        <dependencyManagement>
+                            <dependencies>
+                                <dependency>
+                                    <groupId>org.projectlombok</groupId>
+                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                    <version>0.2.0</version>
+                                    <scope>provided</scope>
+                                </dependency>
+                            </dependencies>
+                        </dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok-mapstruct-binding</artifactId>
+                            </dependency>
+                        </dependencies>
+                        <build>
+                            <pluginManagement>
+                                <plugins>
+                                    <plugin>
+                                        <groupId>org.apache.maven.plugins</groupId>
+                                        <artifactId>maven-compiler-plugin</artifactId>
+                                        <configuration>
+                                            <annotationProcessorPaths>
+                                                <path>
+                                                    <groupId>org.projectlombok</groupId>
+                                                    <artifactId>lombok-mapstruct-binding</artifactId>
+                                                </path>
+                                            </annotationProcessorPaths>
+                                        </configuration>
+                                    </plugin>
+                                </plugins>
+                            </pluginManagement>
+                        </build>
+                    </project>
+                    """
+                )
+              ),
+              mavenProject("core",
+                pomXml(
+                  """
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                        <parent>
+                            <groupId>com.mycompany.app</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>1</version>
+                            <relativePath>../parent</relativePath>
+                        </parent>
+                        <artifactId>core</artifactId>
                     </project>
                     """
                 )

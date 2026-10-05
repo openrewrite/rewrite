@@ -20,37 +20,44 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.gradle.DependencyVersionSelector;
-import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.gradle.util.GradleWrapper;
+import org.openrewrite.groovy.GroovyTemplate;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.JavaTemplate;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.search.FindProperties;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
-import org.openrewrite.style.Style;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.singletonList;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddDevelocityGradlePlugin extends Recipe {
+public class AddDevelocityGradlePlugin extends ScanningRecipe<AddDevelocityGradlePlugin.WrapperVersions> {
     transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin version",
@@ -123,9 +130,80 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return validated;
     }
 
+    /**
+     * The Gradle version declared by each wrapper in the repository, keyed by the directory the wrapper belongs to
+     * (the repository root is {@link #ROOT}). Scripts resolve against the nearest enclosing wrapper, so an independent
+     * build nested in a subdirectory is never judged by the root wrapper's version.
+     */
+    public static class WrapperVersions {
+        static final Path ROOT = Paths.get("");
+
+        final Map<Path, String> versionsByDirectory = new HashMap<>();
+
+        void put(Path wrapperPropertiesPath, String version) {
+            // The path is known to end in the three segments of `gradle/wrapper/gradle-wrapper.properties`
+            int nameCount = wrapperPropertiesPath.getNameCount();
+            versionsByDirectory.put(nameCount > 3 ? wrapperPropertiesPath.subpath(0, nameCount - 3) : ROOT, version);
+        }
+
+        @Nullable String nearest(Path sourcePath) {
+            if (versionsByDirectory.isEmpty()) {
+                return null;
+            }
+            for (Path dir = sourcePath.getParent(); ; dir = dir.getParent()) {
+                String version = versionsByDirectory.get(dir == null ? ROOT : dir);
+                if (version != null) {
+                    return version;
+                }
+                if (dir == null) {
+                    return null;
+                }
+            }
+        }
+    }
+
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public WrapperVersions getInitialValue(ExecutionContext ctx) {
+        return new WrapperVersions();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(WrapperVersions acc) {
+        return new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return super.isAcceptable(sourceFile, ctx) &&
+                       PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH);
+            }
+
+            @Override
+            public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                for (Properties.Entry entry : FindProperties.find(file, "distributionUrl", false)) {
+                    String version = GradleWrapper.versionFromDistributionUrl(entry.getValue().getText());
+                    if (version != null) {
+                        acc.put(file.getSourcePath(), version);
+                        break;
+                    }
+                }
+                return file;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(WrapperVersions acc) {
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new JavaIsoVisitor<ExecutionContext>() {
+
+            /**
+             * Prefer the {@link BuildTool} marker the OpenRewrite Gradle plugin attaches, and otherwise fall back to
+             * the version the nearest wrapper declares, so the recipe works on LSTs produced by any other parser.
+             */
+            private @Nullable String gradleVersion(JavaSourceFile cu) {
+                return cu.getMarkers().findFirst(BuildTool.class)
+                        .filter(buildTool -> buildTool.getType() == BuildTool.Type.Gradle)
+                        .map(BuildTool::getVersion)
+                        .orElseGet(() -> acc.nearest(cu.getSourcePath()));
+            }
 
             @Override
             public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -141,12 +219,8 @@ public class AddDevelocityGradlePlugin extends Recipe {
             }
 
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
-                if (!maybeBuildTool.isPresent()) {
-                    return cu;
-                }
-                BuildTool buildTool = maybeBuildTool.get();
-                if (buildTool.getType() != BuildTool.Type.Gradle) {
+                String gradleVersion = gradleVersion(cu);
+                if (gradleVersion == null) {
                     return cu;
                 }
                 VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
@@ -158,7 +232,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     return cu;
                 }
 
-                boolean gradleSixOrLater = versionComparator.compare(null, buildTool.getVersion(), "6.0") >= 0;
+                boolean gradleSixOrLater = versionComparator.compare(null, gradleVersion, "6.0") >= 0;
                 if (gradleSixOrLater && cu.getSourcePath().endsWith("settings.gradle")) {
                     // Newer than 6.0 goes in settings
                     Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
@@ -208,12 +282,8 @@ public class AddDevelocityGradlePlugin extends Recipe {
             }
 
             public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
-                if (!maybeBuildTool.isPresent()) {
-                    return cu;
-                }
-                BuildTool buildTool = maybeBuildTool.get();
-                if (buildTool.getType() != BuildTool.Type.Gradle) {
+                String gradleVersion = gradleVersion(cu);
+                if (gradleVersion == null) {
                     return cu;
                 }
                 VersionComparator versionComparator = Semver.validate("(,6)", null).getValue();
@@ -225,7 +295,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                     return cu;
                 }
 
-                boolean gradleSixOrLater = versionComparator.compare(null, buildTool.getVersion(), "6.0") >= 0;
+                boolean gradleSixOrLater = versionComparator.compare(null, gradleVersion, "6.0") >= 0;
                 if (gradleSixOrLater && cu.getSourcePath().endsWith("settings.gradle.kts")) {
                     // Newer than 6.0 goes in settings
                     Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
@@ -289,12 +359,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                         .visitNonNull(cu, ctx, getCursor());
                 cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                         .visitNonNull(cu, ctx, getCursor());
-                J.MethodInvocation gradleEnterpriseInvocation = groovyEnterpriseDsl(
-                        newVersion,
-                        versionComparator,
-                        getIndent(cu),
-                        ctx);
-                return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
+                return (G.CompilationUnit) appendDevelocityDsl(cu, getCursor(), newVersion, versionComparator, false);
             }
 
             private K.CompilationUnit withPlugin(K.CompilationUnit cu, String pluginId, String newVersion, VersionComparator versionComparator, ExecutionContext ctx) {
@@ -302,12 +367,7 @@ public class AddDevelocityGradlePlugin extends Recipe {
                         .visitNonNull(cu, ctx, getCursor());
                 cu = (K.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                         .visitNonNull(cu, ctx, getCursor());
-                J.MethodInvocation gradleEnterpriseInvocation = kotlinEnterpriseDsl(
-                        newVersion,
-                        versionComparator,
-                        getIndent(cu),
-                        ctx);
-                return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
+                return (K.CompilationUnit) appendDevelocityDsl(cu, getCursor(), newVersion, versionComparator, true);
             }
         });
     }
@@ -335,152 +395,86 @@ public class AddDevelocityGradlePlugin extends Recipe {
         return found.get();
     }
 
-    private J.@Nullable MethodInvocation groovyEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
+    /**
+     * Every option value travels as a parameter rather than as text, so nothing a user supplies can be mistaken
+     * for the template's own placeholder syntax.
+     */
+    private JavaSourceFile appendDevelocityDsl(JavaSourceFile cu, Cursor scope, String newVersion,
+                                               VersionComparator versionComparator, boolean kotlinDsl) {
         if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
-            return null;
+            return cu;
         }
         boolean versionIsAtLeast3_2 = versionComparator.compare(null, newVersion, "3.2") >= 0;
         boolean versionIsAtLeast3_7 = versionComparator.compare(null, newVersion, "3.7") >= 0;
         boolean versionIsAtLeast3_17 = versionComparator.compare(null, newVersion, "3.17") >= 0;
-        StringBuilder ge;
-        if (versionIsAtLeast3_17) {
-            ge = new StringBuilder("\ndevelocity {\n");
-        } else {
-            ge = new StringBuilder("\ngradleEnterprise {\n");
-        }
+
+        List<Expression> values = new ArrayList<>();
+        StringBuilder ge = new StringBuilder(versionIsAtLeast3_17 ? "develocity {\n" : "gradleEnterprise {\n");
         if (server != null && !server.isEmpty()) {
-            ge.append(indent).append("server = '").append(server).append("'\n");
+            ge.append(kotlinDsl ? "    server.set(#{any()})\n" : "    server = #{any()}\n");
+            values.add(literal(server, kotlinDsl));
         }
         if (allowUntrustedServer != null && versionIsAtLeast3_2) {
-            ge.append(indent).append("allowUntrustedServer = ").append(allowUntrustedServer).append("\n");
+            ge.append(kotlinDsl ? "    allowUntrustedServer.set(#{any()})\n" : "    allowUntrustedServer = #{any()}\n");
+            values.add(literal(allowUntrustedServer));
         }
         if (captureTaskInputFiles != null || uploadInBackground != null || (allowUntrustedServer != null && !versionIsAtLeast3_2) || publishCriteria != null) {
-            ge.append(indent).append("buildScan {\n");
+            ge.append("    buildScan {\n");
             if (publishCriteria != null) {
                 if (publishCriteria == PublishCriteria.Always) {
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
-                    } else {
-                        ge.append(indent).append(indent).append("publishAlways()\n");
-                    }
+                    ge.append(versionIsAtLeast3_17 ? "        publishing.onlyIf { true }\n" : "        publishAlways()\n");
+                } else if (versionIsAtLeast3_17) {
+                    ge.append(kotlinDsl ?
+                            "        publishing.onlyIf { it.buildResult.failures.isNotEmpty() }\n" :
+                            "        publishing.onlyIf { !it.buildResult.failures.empty }\n");
                 } else {
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append("publishing.onlyIf { !it.buildResult.failures.empty }\n");
-                    } else {
-                        ge.append(indent).append(indent).append("publishOnFailure()\n");
-                    }
+                    ge.append("        publishOnFailure()\n");
                 }
             }
             if (allowUntrustedServer != null && !versionIsAtLeast3_2) {
-                ge.append(indent).append(indent).append("allowUntrustedServer = ").append(allowUntrustedServer).append("\n");
+                ge.append(kotlinDsl ? "        allowUntrustedServer.set(#{any()})\n" : "        allowUntrustedServer = #{any()}\n");
+                values.add(literal(allowUntrustedServer));
             }
             if (uploadInBackground != null) {
-                ge.append(indent).append(indent).append("uploadInBackground = ").append(uploadInBackground).append("\n");
+                ge.append(kotlinDsl ? "        uploadInBackground.set(#{any()})\n" : "        uploadInBackground = #{any()}\n");
+                values.add(literal(uploadInBackground));
             }
             if (captureTaskInputFiles != null) {
                 if (versionIsAtLeast3_7) {
-                    ge.append(indent).append(indent).append("capture {\n");
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append(indent).append("fileFingerprints = ").append(captureTaskInputFiles).append("\n");
-                    } else {
-                        ge.append(indent).append(indent).append(indent).append("taskInputFiles = ").append(captureTaskInputFiles).append("\n");
-                    }
-                    ge.append(indent).append(indent).append("}\n");
+                    ge.append("        capture {\n");
+                    String property = versionIsAtLeast3_17 ? "fileFingerprints" : "taskInputFiles";
+                    ge.append(kotlinDsl ? "            " + property + ".set(#{any()})\n" : "            " + property + " = #{any()}\n");
+                    values.add(literal(captureTaskInputFiles));
+                    ge.append("        }\n");
                 } else {
-                    ge.append(indent).append(indent).append("captureTaskInputFiles = ").append(captureTaskInputFiles).append("\n");
+                    ge.append(kotlinDsl ? "        captureTaskInputFiles.set(#{any()})\n" : "        captureTaskInputFiles = #{any()}\n");
+                    values.add(literal(captureTaskInputFiles));
                 }
             }
-            ge.append(indent).append("}\n");
+            ge.append("    }\n");
         }
-        ge.append("}\n");
-        G.CompilationUnit cu = GradleParser.builder().build()
-                .parseInputs(singletonList(
-                        Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                .map(requireParsed(G.CompilationUnit.class))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
+        ge.append("}");
 
-        return (J.MethodInvocation) cu.getStatements().get(0);
+        List<Statement> statements = kotlinDsl ?
+                ((J.Block) ((K.CompilationUnit) cu).getStatements().get(0)).getStatements() :
+                ((G.CompilationUnit) cu).getStatements();
+        if (statements.isEmpty()) {
+            return cu;
+        }
+        Statement last = statements.get(statements.size() - 1);
+        JavaTemplate template = kotlinDsl ?
+                KotlinTemplate.builder(ge.toString()).build() :
+                GroovyTemplate.builder(ge.toString()).build();
+        return template.apply(new Cursor(scope, cu), last.getCoordinates().after(), values.toArray());
     }
 
-    private J.@Nullable MethodInvocation kotlinEnterpriseDsl(String newVersion, VersionComparator versionComparator, String indent, ExecutionContext ctx) {
-        if (server == null && allowUntrustedServer == null && captureTaskInputFiles == null && uploadInBackground == null && publishCriteria == null) {
-            return null;
-        }
-        boolean versionIsAtLeast3_2 = versionComparator.compare(null, newVersion, "3.2") >= 0;
-        boolean versionIsAtLeast3_7 = versionComparator.compare(null, newVersion, "3.7") >= 0;
-        boolean versionIsAtLeast3_17 = versionComparator.compare(null, newVersion, "3.17") >= 0;
-        StringBuilder ge;
-        if (versionIsAtLeast3_17) {
-            ge = new StringBuilder("\ndevelocity {\n");
-        } else {
-            ge = new StringBuilder("\ngradleEnterprise {\n");
-        }
-        if (server != null && !server.isEmpty()) {
-            ge.append(indent).append("server.set(\"").append(server).append("\")\n");
-        }
-        if (allowUntrustedServer != null && versionIsAtLeast3_2) {
-            ge.append(indent).append("allowUntrustedServer.set(").append(allowUntrustedServer).append(")\n");
-        }
-        if (captureTaskInputFiles != null || uploadInBackground != null || (allowUntrustedServer != null && !versionIsAtLeast3_2) || publishCriteria != null) {
-            ge.append(indent).append("buildScan {\n");
-            if (publishCriteria != null) {
-                if (publishCriteria == PublishCriteria.Always) {
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append("publishing.onlyIf { true }\n");
-                    } else {
-                        ge.append(indent).append(indent).append("publishAlways()\n");
-                    }
-                } else {
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append("publishing.onlyIf { it.buildResult.failures.isNotEmpty() }\n");
-                    } else {
-                        ge.append(indent).append(indent).append("publishOnFailure()\n");
-                    }
-                }
-            }
-            if (allowUntrustedServer != null && !versionIsAtLeast3_2) {
-                ge.append(indent).append(indent).append("allowUntrustedServer.set(").append(allowUntrustedServer).append(")\n");
-            }
-            if (uploadInBackground != null) {
-                ge.append(indent).append(indent).append("uploadInBackground.set(").append(uploadInBackground).append(")\n");
-            }
-            if (captureTaskInputFiles != null) {
-                if (versionIsAtLeast3_7) {
-                    ge.append(indent).append(indent).append("capture {\n");
-                    if (versionIsAtLeast3_17) {
-                        ge.append(indent).append(indent).append(indent).append("fileFingerprints.set(").append(captureTaskInputFiles).append(")\n");
-                    } else {
-                        ge.append(indent).append(indent).append(indent).append("taskInputFiles.set(").append(captureTaskInputFiles).append(")\n");
-                    }
-                    ge.append(indent).append(indent).append("}\n");
-                } else {
-                    ge.append(indent).append(indent).append("captureTaskInputFiles.set(").append(captureTaskInputFiles).append(")\n");
-                }
-            }
-            ge.append(indent).append("}\n");
-        }
-        ge.append("}\n");
-        K.CompilationUnit cu = GradleParser.builder().build()
-                .parseInputs(singletonList(
-                        Parser.Input.fromString(Paths.get("settings.gradle.kts"), ge.toString())), null, ctx)
-                .map(requireParsed(K.CompilationUnit.class))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
-
-        return (J.MethodInvocation) ((J.Block) cu.getStatements().get(0)).getStatements().get(0);
+    // A value, not a construct: the quoting is the recipe's own, so there is nothing for a parser to tell us
+    private static J.Literal literal(String value, boolean kotlinDsl) {
+        String quote = kotlinDsl ? "\"" : "'";
+        return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, quote + value + quote, null, JavaType.Primitive.String);
     }
 
-    private static String getIndent(JavaSourceFile cu) {
-        TabsAndIndentsStyle style = Style.from(TabsAndIndentsStyle.class, cu, IntelliJ::tabsAndIndents);
-        if (style.getUseTabCharacter()) {
-            return "\t";
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < style.getIndentSize(); i++) {
-                sb.append(" ");
-            }
-            return sb.toString();
-        }
+    private static J.Literal literal(Boolean value) {
+        return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value, String.valueOf(value), null, JavaType.Primitive.Boolean);
     }
 }

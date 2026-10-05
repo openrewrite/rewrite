@@ -16,8 +16,11 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 @SuppressWarnings({"GroovyEmptyStatementBody", "GroovyInfiniteLoopStatement"})
@@ -41,6 +44,44 @@ class WhileLoopTest implements RewriteTest {
             """
               while(true) test()
               """
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              while (i++ < 10);
+              """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, Integer p) {
+                    assertThat(whileLoop.getBody()).isInstanceOf(J.Empty.class);
+                    return super.visitWhileLoop(whileLoop, p);
+                }
+            }.visit(cu, 0))
+          )
+        );
+    }
+
+    @Test
+    void emptyBodyDoWhileLoop() {
+        rewriteRun(
+          groovy(
+            """
+              int i = 0
+              do; while (i++ < 10)
+              """,
+            spec -> spec.afterRecipe(cu -> new GroovyIsoVisitor<Integer>() {
+                @Override
+                public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, Integer p) {
+                    assertThat(doWhileLoop.getBody()).isInstanceOf(J.Empty.class);
+                    return super.visitDoWhileLoop(doWhileLoop, p);
+                }
+            }.visit(cu, 0))
           )
         );
     }

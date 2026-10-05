@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.style;
 
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -121,6 +122,77 @@ class AutodetectTest implements RewriteTest {
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getFunctionDeclarationParameters().getAlignWhenMultiple()).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndent() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                        s1: String,
+                        s2: String
+                ) {
+                }
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Outer {
+                data class Item(
+                        val id: String
+                )
+            }
+            """
+        )).isTrue();
+
+        assertThat(parametersUseContinuationIndent(
+          """
+            fun main(
+                    args: Array<String>
+            ) {
+            }
+            """
+        )).isTrue();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtIndentSize() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+                fun foo(
+                    s1: String,
+                    s2: String
+                ) {
+                }
+            }
+            """
+        )).isFalse();
+    }
+
+    @Test
+    void parametersOnOwnLinesAtContinuationIndentWithTabs() {
+        assertThat(parametersUseContinuationIndent(
+          """
+            class Test {
+            	fun foo(
+            			s1: String,
+            			s2: String
+            	) {
+            	}
+            }
+            """
+        )).isTrue();
+    }
+
+    private static boolean parametersUseContinuationIndent(@Language("kotlin") String source) {
+        var detector = Autodetect.detector();
+        kp().parse(source).forEach(detector::sample);
+        var wrappingAndBraces = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(detector.build()));
+        return wrappingAndBraces.getFunctionDeclarationParameters().getUseContinuationIndent();
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
@@ -672,6 +744,70 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getTopLevelSymbolsToUseStarImport()).isEqualTo(5);
         assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(3);
+    }
+
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsFoldedMembersNotVariablesOfThatType() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            class Outer {
+                enum class Measure(val label: Int) {
+                    One(1), Two(2), Three(3), Four(4), Five(5), Six(6)
+                }
+            }
+            """,
+          """
+            package org.openrewrite.test
+
+            import org.openrewrite.test.Outer.Measure.*
+
+            class OuterTest {
+                fun used(): List<Any> {
+                    return listOf(One, Two, Three, Four, Five)
+                }
+
+                fun parameterized(measure: Outer.Measure): Int {
+                    return measure.label
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(5);
+    }
+
+    @Disabled("Detector.build() uses FindImportLayout.getImportLayoutStyle(), which never reaches the star import " +
+              "counting in ImportLayoutStatistics; enable once the two are connected, as for detectStarImport()")
+    @Test
+    void staticStarImportCountsStaticallyImportedMethods() {
+        var cus = kp().parse(
+          """
+            package org.openrewrite.test
+
+            import java.util.Objects.*
+
+            class StaticMethods {
+                fun check(a: Any?, b: Any?): Boolean {
+                    requireNonNull(a)
+                    return equals(a, b) && hash(a, b) != 0 && isNull(b)
+                }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(detector.build()));
+
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(4);
     }
 
     @Test

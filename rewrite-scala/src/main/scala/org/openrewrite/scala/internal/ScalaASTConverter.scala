@@ -198,8 +198,7 @@ class ScalaASTConverter {
   private def buildBracedPackage(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): S.PackageDeclaration = {
     val prefix = visitor.extractPrefix(pkgDef.span)
 
-    val packageName = extractPackageName(pkgDef)
-    val packageExpr: Expression = TypeTree.build(packageName)
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
     val namePkg = new J.Package(
       Tree.randomId(),
       Space.EMPTY,
@@ -252,9 +251,6 @@ class ScalaASTConverter {
     // Extract the prefix (whitespace before 'package' keyword)
     val prefix = visitor.extractPrefix(pkgDef.span)
 
-    // Extract the package name
-    val packageName = extractPackageName(pkgDef)
-
     // Find the end of the package declaration in the source
     // This includes "package" keyword + package name
     val packageEndPos = pkgDef.pid.span.end
@@ -282,7 +278,7 @@ class ScalaASTConverter {
     visitor.updateCursor(cursorAfter)
 
     // Create package expression
-    val packageExpr: Expression = TypeTree.build(packageName)
+    val packageExpr: Expression = TypeTree.build(packageNameFromSource(pkgDef, visitor), '`')
 
     val markerList = new util.ArrayList[org.openrewrite.marker.Marker]()
     if (hasIndentedColon) {
@@ -314,6 +310,27 @@ class ScalaASTConverter {
   }
 
   /**
+   * The package name as written in source (the `pid` span), so backtick-quoted
+   * segments like `` `trait` `` retain their quoting — the compiler's name strings
+   * strip it. `TypeTree.build` with the backtick escape turns each quoted segment
+   * into an identifier with a bare simple name and a [[org.openrewrite.java.marker.Quoted]]
+   * marker, which the printer renders back with backticks. Falls back to
+   * [[extractPackageName]] when the span is unusable.
+   */
+  private def packageNameFromSource(pkgDef: Trees.PackageDef[?], visitor: ScalaTreeVisitor): String = {
+    if (pkgDef.pid.span.exists) {
+      val srcText = visitor.getSourceText
+      val srcOffset = visitor.getOffsetAdjustment
+      val start = pkgDef.pid.span.start - srcOffset
+      val end = pkgDef.pid.span.end - srcOffset
+      if (start >= 0 && start < end && end <= srcText.length) {
+        return srcText.substring(start, end)
+      }
+    }
+    extractPackageName(pkgDef)
+  }
+
+  /**
    * Extracts the package name from a PackageDef.
    */
   private def extractPackageName(pkg: Trees.PackageDef[?]): String = {
@@ -336,17 +353,7 @@ class ScalaASTConverter {
    * This should return the source text after the last parsed element.
    */
   def getRemainingSource(parseResult: ScalaParseResult, source: String, lastCursorPosition: Int): String = {
-    // If tree is empty (parse error), don't return any remaining source
-    // The Unknown node will handle the entire source
-    if (parseResult.tree.isEmpty) {
-      return ""
-    }
-
-    // Return any remaining source after the last cursor position
-    if (lastCursorPosition < source.length) {
-      source.substring(lastCursorPosition)
-    } else {
-      ""
-    }
+    val start = Math.max(lastCursorPosition, 0)
+    if (start < source.length) source.substring(start) else ""
   }
 }

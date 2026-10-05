@@ -83,7 +83,7 @@ public class StringUtils {
         }
 
         // Document markers
-        if (value.equals("---") || value.equals("...")) {
+        if ("---".equals(value) || "...".equals(value)) {
             return true;
         }
 

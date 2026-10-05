@@ -203,4 +203,24 @@ class JavaTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shallowClassOwningClassInference() {
+        JavaType.ShallowClass nested = JavaType.ShallowClass.build("java.util.Map.Entry");
+        assertThat(nested.getOwningClass()).isNotNull();
+        assertThat(nested.getOwningClass().getFullyQualifiedName()).isEqualTo("java.util.Map");
+
+        // Lowercase class names (e.g. Python's builtins.list) are package-qualified, not nested
+        JavaType.ShallowClass lowercase = JavaType.ShallowClass.build("builtins.list");
+        assertThat(lowercase.getOwningClass()).isNull();
+        assertThat(lowercase.getPackageName()).isEqualTo("builtins");
+        assertThat(lowercase.getClassName()).isEqualTo("list");
+
+        assertThat(JavaType.ShallowClass.build("Foo").getOwningClass()).isNull();
+        assertThat(JavaType.ShallowClass.build("list").getOwningClass()).isNull();
+
+        // Default-package nested names get no owning class: ChangeType's plain-rename
+        // path depends on this (see ChangeTypeTest.doesNotModifyInnerClassesIfIgnoreDefinitionTrue)
+        assertThat(JavaType.ShallowClass.build("Test.InnerB").getOwningClass()).isNull();
+    }
 }

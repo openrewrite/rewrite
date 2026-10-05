@@ -17,6 +17,8 @@ package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.maven.table.DependenciesDeclared;
@@ -450,6 +452,63 @@ class FindDependencyTest implements RewriteTest {
               }
               dependencies {
                   /*~~>*/api("org.openrewrite:rewrite-core:latest.release")
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"2.7.18", "2.7.x"})
+    void findDependencyWhenVersionComesFromBuildscriptExtProperty(String versionSelector) {
+        rewriteRun(
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(new FindDependency("org.springframework.boot", "spring-boot-starter", null, versionSelector, null)),
+          buildGradle(
+            //language=gradle
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '2.7.18'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter:${springBootVersion}"
+              }
+              """,
+            """
+              buildscript {
+                  ext {
+                      springBootVersion = '2.7.18'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+              }
+
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  /*~~>*/implementation "org.springframework.boot:spring-boot-starter:${springBootVersion}"
               }
               """
           )

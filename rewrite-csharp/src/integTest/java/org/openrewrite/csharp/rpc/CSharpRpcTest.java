@@ -61,6 +61,29 @@ class CSharpRpcTest implements RewriteTest {
     }
 
     @Test
+    void parseXmlDocComments() {
+        // Structured /// documentation comments are parsed on the C# side, decomposed over RPC
+        // as a CsDocComment tree, and must print back byte-identically on the Java side.
+        rewriteRun(csharp(
+          """
+            namespace Test
+            {
+                /// <summary>
+                /// Adds <paramref name="a"/> to <c>b</c>.
+                /// </summary>
+                /// <param name="a">first</param>
+                /// <returns>the <see cref="int"/> sum</returns>
+                public class Calculator
+                {
+                    /// <summary>Adds two numbers.</summary>
+                    public int Add(int a, int b) => a + b;
+                }
+            }
+            """
+        ));
+    }
+
+    @Test
     void parseClassWithProperties() {
         rewriteRun(csharp(
           """
@@ -438,8 +461,8 @@ class CSharpRpcTest implements RewriteTest {
                 null, null, null);
         RecipeMarketplace marketplace = CSharpRewriteRpc.getOrStart().getMarketplace(bundle);
         assertThat(marketplace).isNotNull();
-        // Core C# recipes are registered via CoreCSharpRecipeActivator
-        assertThat(marketplace.getAllRecipes()).isNotEmpty();
+        // the tool ships no recipes of its own, so there are none until a bundle is installed
+        assertThat(marketplace.getAllRecipes()).isEmpty();
     }
 
     // ---- Type attribution tests ----
@@ -667,7 +690,8 @@ class CSharpRpcTest implements RewriteTest {
                 {
                     public System.Type GetIntType()
                     {
-                        return typeof(int);
+                        var list = typeof( System.Collections.Generic.List<int> );
+                        return typeof (int);
                     }
                 }
             }
@@ -685,7 +709,7 @@ class CSharpRpcTest implements RewriteTest {
                 {
                     public int GetIntSize()
                     {
-                        return sizeof(int);
+                        return sizeof(int) + sizeof ( long );
                     }
                 }
             }
@@ -907,6 +931,9 @@ class CSharpRpcTest implements RewriteTest {
                     public void Read()
                     {
                         using (var stream = new MemoryStream())
+                        {
+                        }
+                        using ( var other = new MemoryStream() /* trailing */ )
                         {
                         }
                     }
@@ -1678,12 +1705,11 @@ class CSharpRpcTest implements RewriteTest {
                 }
             }
             """,
-          spec -> spec.beforeRecipe(cu -> {
+          spec -> spec.beforeRecipe(cu ->
               // Reset clears both sides' caches, forcing the next print to
               // re-send the tree from Java to C# via the full receiver path.
               // This exercises ControlParentheses<J> deserialization.
-              CSharpRewriteRpc.resetCurrent();
-          })
+              CSharpRewriteRpc.resetCurrent())
         ));
     }
 

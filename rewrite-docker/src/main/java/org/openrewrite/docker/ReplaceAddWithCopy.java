@@ -22,7 +22,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.docker.tree.Docker;
-import org.openrewrite.internal.ListUtils;
 
 import java.util.Arrays;
 import java.util.HashSet;

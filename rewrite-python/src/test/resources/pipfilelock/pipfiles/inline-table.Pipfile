@@ -1,0 +1,18 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+requests = {version = ">=2.0", extras = ["socks"], markers = "python_version >= '3.8'"}
+gunicorn = {version = "==21.2.0", index = "pypi"}
+uvicorn = {extras = ["standard"], version = "*"}
+mylib = {path = ".", editable = true}
+weird = {version = "*", extras = []}
+
+[dev-packages]
+pytest = {version = ">=7.0", markers = "sys_platform == 'linux'"}
+
+[requires]
+python_version = "3.11"
+python_full_version = "3.11.9"

@@ -36,7 +36,7 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-yaml"))
 
-    api("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:latest.release")
     api("org.jetbrains:annotations:latest.release")
 
     antlrGeneration("org.antlr:antlr4:4.13.2") {

@@ -16,10 +16,10 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PipfileParserTest {
@@ -68,16 +68,19 @@ class PipfileParserTest {
         PipfileParser parser = new PipfileParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("Pipfile"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
         PythonResolutionResult marker = doc.getMarkers().findFirst(PythonResolutionResult.class).orElse(null);
         assertThat(marker).isNotNull();
         assertThat(marker.getPackageManager()).isEqualTo(PythonResolutionResult.PackageManager.Pipenv);
+
+        assertThat(marker.getSourceIndexes()).containsExactly(
+                new PythonResolutionResult.SourceIndex("pypi", "https://pypi.org/simple", true));
 
         assertThat(marker.getResolvedDependencies()).hasSize(3);
         assertThat(marker.getResolvedDependency("requests")).isNotNull();
@@ -102,8 +105,8 @@ class PipfileParserTest {
 
     @Test
     void parsesWithoutLockFile(@TempDir Path tempDir) throws Exception {
-        // Without a Pipfile.lock and without pipenv on PATH the marker should still
-        // be produced — just without resolved dependencies.
+        // Without a Pipfile.lock the marker is still produced, just without
+        // resolved dependencies; parsing never regenerates a missing lock.
         String pipfile = """
           [packages]
           requests = ">=2.28.0"
@@ -113,10 +116,10 @@ class PipfileParserTest {
         PipfileParser parser = new PipfileParser();
         Parser.Input input = Parser.Input.fromFile(tempDir.resolve("Pipfile"));
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 tempDir,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         Toml.Document doc = (Toml.Document) parsed.get(0);
@@ -124,6 +127,8 @@ class PipfileParserTest {
         assertThat(marker).isNotNull();
         assertThat(marker.getDependencies()).hasSize(1);
         assertThat(marker.getDependencies().get(0).getName()).isEqualTo("requests");
-        // resolvedDependencies may be empty when neither Pipfile.lock nor pipenv is available.
+        assertThat(marker.getResolvedDependencies()).isEmpty();
+        // No [[source]] blocks means no source indexes on the marker.
+        assertThat(marker.getSourceIndexes()).isNull();
     }
 }

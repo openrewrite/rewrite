@@ -25,11 +25,11 @@ import org.openrewrite.toml.TomlParser;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PythonDependencyParserTest {
@@ -289,10 +289,10 @@ class PythonDependencyParserTest {
           content
         );
         List<SourceFile> parsed = parser.parseInputs(
-          Collections.singletonList(input),
+          singletonList(input),
           null,
           new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         assertThat(parsed).hasSize(1);
         assertThat(parsed.get(0)).isInstanceOf(Toml.Document.class);

@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "i-upgrade"
+version = "0.1.0"
+description = "six upgrade pair"
+authors = ["Test <test@example.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+six = "1.16.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -230,8 +230,9 @@ public class YamlResourceLoader implements ResourceLoader {
         }
         try {
             return recipeLoader.apply(recipeName, null);
-        } catch (IllegalArgumentException | NoClassDefFoundError ignored) {
-            // handled by caller
+        } catch (IllegalArgumentException | RecipeNotFoundException | NoClassDefFoundError ignored) {
+            // A recipe this loader cannot supply is reported as absent so that the caller can
+            // consult the remaining resource loaders.
         }
         return null;
     }
@@ -375,12 +376,13 @@ public class YamlResourceLoader implements ResourceLoader {
                         recipeName,
                         null,
                         e.getMessage());
-            } catch (NoClassDefFoundError e) {
+            } catch (LinkageError e) {
                 addInvalidRecipeValidation(
                         addValidation,
                         recipeName,
                         null,
-                        "Recipe class " + recipeName + " cannot be found");
+                        "Recipe class " + recipeName + " could not be loaded: " + e,
+                        e);
             }
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
@@ -396,7 +398,8 @@ public class YamlResourceLoader implements ResourceLoader {
                                     addValidation,
                                     recipeName,
                                     recipeArgs,
-                                    "Recipe class " + recipeName + " cannot be found");
+                                    "Recipe class " + recipeName + " cannot be found",
+                                    e);
                         } else {
                             addInvalidRecipeValidation(
                                     addValidation,
@@ -410,12 +413,13 @@ public class YamlResourceLoader implements ResourceLoader {
                                 recipeName,
                                 recipeArgs,
                                 e.getMessage());
-                    } catch (NoClassDefFoundError e) {
+                    } catch (LinkageError e) {
                         addInvalidRecipeValidation(
                                 addValidation,
                                 recipeName,
                                 recipeArgs,
-                                "Recipe class " + nameAndConfig.getKey() + " cannot be found");
+                                "Recipe class " + nameAndConfig.getKey() + " could not be loaded: " + e,
+                                e);
                     }
                 } else {
                     addInvalidRecipeValidation(
@@ -442,7 +446,13 @@ public class YamlResourceLoader implements ResourceLoader {
 
     private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
                                             @Nullable Object recipeArgs, String message) {
-        addValidation.accept(Validated.invalid(recipeName, recipeArgs, message));
+        addInvalidRecipeValidation(addValidation, recipeName, recipeArgs, message, null);
+    }
+
+    private void addInvalidRecipeValidation(Consumer<Validated<Object>> addValidation, String recipeName,
+                                            @Nullable Object recipeArgs, String message,
+                                            @Nullable Throwable exception) {
+        addValidation.accept(Validated.invalid(recipeName, recipeArgs, message, exception));
     }
 
     public Collection<RecipeListing> listRecipeListings(RecipeBundle bundle) {

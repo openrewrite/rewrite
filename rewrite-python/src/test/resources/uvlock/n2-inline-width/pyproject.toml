@@ -1,0 +1,7 @@
+[project]
+name = "fixture-n2"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "charset-normalizer>=3.0,<4,!=3.1.0,!=3.2.0,!=3.3.0,!=3.3.1; python_full_version >= '3.10.2' and sys_platform != 'win32' and platform_machine != 'aarch64'",
+]

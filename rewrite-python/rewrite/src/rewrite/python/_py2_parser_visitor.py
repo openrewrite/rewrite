@@ -19,10 +19,12 @@ from uuid import UUID
 
 import parso
 from parso.python import tree as parso_tree
+from parso.python.tokenize import tokenize
+from parso.utils import parse_version_string, split_lines
 
 from rewrite import random_id, Markers
 from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, JavaType
-from rewrite.java.support_types import TextComment
+from rewrite.java.support_types import Statement, TextComment
 from rewrite.java import tree as j
 from rewrite.python import tree as py
 from rewrite.python.markers import (
@@ -62,7 +64,41 @@ class Py2ParserVisitor:
         else:
             self._bom_marked = False
 
+        # Peel a leading ``#!`` line off before parso sees it, so it becomes a
+        # first-class Shebang statement rather than folding into the first leaf's
+        # prefix as a comment (mirrors the Python 3 parser). The terminating
+        # newline is kept as the node's ``after`` padding; the remainder is parsed
+        # normally so any following blank lines stay with the next statement.
+        self._shebang_text: Optional[str] = None
+        self._shebang_after: str = ''
+        if source.startswith('#!'):
+            line_end = len(source)
+            for idx, ch in enumerate(source):
+                if ch in ('\n', '\r'):
+                    line_end = idx
+                    break
+            self._shebang_text = source[:line_end]
+            if line_end < len(source) and source[line_end] == '\r' and \
+                    line_end + 1 < len(source) and source[line_end + 1] == '\n':
+                self._shebang_after = '\r\n'
+            elif line_end < len(source):
+                self._shebang_after = source[line_end]
+            source = source[line_end + len(self._shebang_after):]
+
         self._source_without_bom = source
+
+        # parso reads `<>` as two operators, so it parses the same-width `!=` in its place.
+        self._legacy_not_equal = set()
+        if '<>' in source:
+            lines = split_lines(source, keepends=True)
+            previous = None
+            for token in tokenize(source, parse_version_string(self._version)):
+                if previous is not None and previous.string == '<' and token.string == '>' and not token.prefix:
+                    row, col = previous.start_pos
+                    lines[row - 1] = lines[row - 1][:col] + '!=' + lines[row - 1][col + 2:]
+                    self._legacy_not_equal.add(previous.start_pos)
+                previous = token
+            source = ''.join(lines)
 
         # Parse with parso
         try:
@@ -78,6 +114,12 @@ class Py2ParserVisitor:
         """
         # Convert parso tree to LST statements
         statements, end_ws = self._convert_module(self._tree)
+
+        # Prepend the peeled shebang as the first statement.
+        if self._shebang_text is not None:
+            shebang = py.Shebang(random_id(), Space.EMPTY, Markers.EMPTY, self._shebang_text)
+            after = Space([], self._shebang_after) if self._shebang_after else Space.EMPTY
+            statements.insert(0, JRightPadded(shebang, after, Markers.EMPTY))
 
         # Combine block end-whitespace (from trailing ``;`` lines) with
         # the file's terminal whitespace recovered from the endmarker.
@@ -114,7 +156,7 @@ class Py2ParserVisitor:
         trailing ``;`` line).
         """
         statements, end_ws = self._convert_stmt_block_children(module.children)
-        if not statements:
+        if not statements and self._shebang_text is None:
             statements.append(JRightPadded(
                 j.Empty(random_id(), Space.EMPTY, Markers.EMPTY),
                 Space.EMPTY,
@@ -2736,7 +2778,7 @@ class Py2ParserVisitor:
                 random_id(), Space.EMPTY, Markers.EMPTY,
                 name_ident,
                 JLeftPadded(self._parse_space(children[1].prefix), value, Markers.EMPTY),
-                None,
+                getattr(value, 'type', None),
             )
         # Generator-expression argument: ``test (sync_)comp_for ...``.
         if (len(children) >= 2 and
@@ -3008,6 +3050,9 @@ class Py2ParserVisitor:
 
     def _pad_statement(self, stmt: j.J) -> JRightPadded:
         """Wrap a statement in JRightPadded."""
+        # parso collapses an expression statement to its expression, a docstring to a literal
+        if not isinstance(stmt, Statement):
+            stmt = py.ExpressionStatement(random_id(), stmt)
         return JRightPadded(stmt, Space.EMPTY, Markers.EMPTY)
 
     def _trailing_whitespace(self) -> Space:
@@ -3075,12 +3120,8 @@ class Py2ParserVisitor:
             '>=':  (j.Binary, j.Binary.Type.GreaterThanOrEqual),
             '==':  (j.Binary, j.Binary.Type.Equal),
             '!=':  (j.Binary, j.Binary.Type.NotEqual),
-            # Py2 spelling of '!='. parso < 0.8 never emits '<>' as a
-            # token (it pre-rewrites it to '!='), so this entry is
-            # unreachable through the normal fold path; it is kept so
-            # that a future parso upgrade — or source pre-processing
-            # that injects a '<>' operator leaf directly — finds the
-            # marker/printer wiring already in place.
+            # Py2 spelling of '!='. parso has no such token, so the source it
+            # parses spells it '!=' and _fold_binary restores the spelling.
             '<>':  (j.Binary, j.Binary.Type.NotEqual),
             'and': (j.Binary, j.Binary.Type.And),
             'or':  (j.Binary, j.Binary.Type.Or),
@@ -3152,6 +3193,8 @@ class Py2ParserVisitor:
                 return None
 
             op_text = getattr(op_leaf, 'value', None)
+            if getattr(op_leaf, 'start_pos', None) in self._legacy_not_equal:
+                op_text = '<>'
             mapping = bin_map.get(op_text)
             if mapping is None:
                 return None

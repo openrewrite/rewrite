@@ -576,4 +576,17 @@ class HelmTemplateParsingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void hashDirectlyPrecedingTemplate() {
+        rewriteRun(
+          yaml(
+            """
+              #{{ template "chart.name" . }}
+              prompt: |
+                Answer the question: #{{ question }}
+              """
+          )
+        );
+    }
 }

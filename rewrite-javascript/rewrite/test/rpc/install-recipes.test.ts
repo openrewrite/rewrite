@@ -311,7 +311,7 @@ describe("InstallRecipes", () => {
 
     describe("recipe attribution", () => {
 
-        test("does not attribute recipes installed from a local path", async () => {
+        test("attributes recipes installed from a local path to that path", async () => {
             await withDir(async (dir) => {
                 const recipeModulePath = path.join(dir.path, "local-recipe.js");
                 fs.writeFileSync(recipeModulePath, `
@@ -337,9 +337,8 @@ describe("InstallRecipes", () => {
                 await handler({recipes: recipeModulePath} as any);
 
                 expect(marketplace.allRecipes().length).toBe(1);
-                // A local-path install has no package identity, so it stays unattributed and falls
-                // back to the requested bundle on the host.
-                expect(recipeOrigin.size).toBe(0);
+                // Attributed to the install path (the host's bundle identity), not left unattributed.
+                expect(recipeOrigin.get("local.recipe")).toBe(recipeModulePath);
             }, {unsafeCleanup: true});
         });
 

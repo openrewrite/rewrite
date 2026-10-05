@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
@@ -85,14 +86,17 @@ public class Assertions {
                 List<J.Unknown> allUnknown = new JavaIsoVisitor<List<J.Unknown>>() {
                     @Override
                     public J.Unknown visitUnknown(J.Unknown unknown, List<J.Unknown> list) {
-                        J.Unknown err = super.visitUnknown(unknown, list);
-                        list.add(err);
-                        return err;
+                        J.Unknown u = super.visitUnknown(unknown, list);
+                        list.add(u);
+                        return u;
                     }
                 }.reduce(source, new ArrayList<>());
                 if (!allUnknown.isEmpty()) {
-                    throw new IllegalStateException("LST contains erroneous nodes\n" + allUnknown.stream()
-                            .map(unknown -> unknown.getSource().getText())
+                    throw new IllegalStateException("LST contains unknown elements\n" + allUnknown.stream()
+                            .map(unknown -> unknown.getSource().getMarkers()
+                                    .findFirst(ParseExceptionResult.class)
+                                    .map(per -> per.getMessage() + "\n")
+                                    .orElse("") + unknown.getSource().getText())
                             .collect(joining("\n\n")));
                 }
             }

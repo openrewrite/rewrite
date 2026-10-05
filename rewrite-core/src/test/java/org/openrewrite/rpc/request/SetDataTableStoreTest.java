@@ -25,10 +25,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class SetDataTableStoreTest {
@@ -52,7 +53,7 @@ class SetDataTableStoreTest {
 
             @Override
             public java.util.Collection<DataTable<?>> getDataTables() {
-                return Collections.emptyList();
+                return emptyList();
             }
         };
         assertThat(SetDataTableStore.from(custom)).isNull();
@@ -63,7 +64,7 @@ class SetDataTableStoreTest {
         Map<String, String> prefix = new LinkedHashMap<>();
         prefix.put("repositoryOrigin", "github.com/acme/example");
 
-        CsvDataTableStore original = new CsvDataTableStore(tmp, prefix, Collections.emptyMap());
+        CsvDataTableStore original = new CsvDataTableStore(tmp, prefix, emptyMap());
 
         SetDataTableStore wire = SetDataTableStore.from(original);
         assertThat(wire).isInstanceOf(SetDataTableStore.Csv.class);

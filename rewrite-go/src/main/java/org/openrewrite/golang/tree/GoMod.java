@@ -23,14 +23,12 @@ import org.openrewrite.Cursor;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.golang.GoModPrinter;
 import org.openrewrite.golang.GoModVisitor;
-import org.openrewrite.golang.rpc.GoRewriteRpc;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +43,7 @@ import java.util.UUID;
  * <p>
  * {@code GoMod} is a {@link SourceFile} but, like {@link org.openrewrite.tree.ParseError},
  * not a {@code J} node — go.mod tokens are not Java expressions. It is serialized by
- * {@code GoModRpcCodec} and printed by the Go RPC server.
+ * {@code GoModRpcCodec} and printed by {@link GoModPrinter}.
  * <p>
  * Every byte is recoverable: all whitespace and comments live in {@link Space} prefixes
  * and in the {@link JRightPadded#getAfter() after} of each statement (the same-line
@@ -102,15 +100,7 @@ public class GoMod implements SourceFile, GoModTree {
 
     @Override
     public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-        return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-            @Override
-            public @Nullable Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                GoRewriteRpc rpc = GoRewriteRpc.getOrStart();
-                p.append(rpc.print(tree, cursor, Print.MarkerPrinter.from(p.getMarkerPrinter())));
-                stopAfterPreVisit();
-                return tree;
-            }
-        };
+        return new GoModPrinter<>();
     }
 
     /**

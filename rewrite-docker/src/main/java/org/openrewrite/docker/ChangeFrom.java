@@ -162,9 +162,9 @@ public class ChangeFrom extends Recipe {
             }
 
             // Check if any change is needed
-            String currentImageName = image.getImageName();
-            String currentTag = image.getTag();
-            String currentDigest = image.getDigest();
+            String currentImageName = image.getImageName().orElse(null);
+            String currentTag = image.getTag().orElse(null);
+            String currentDigest = image.getDigest().orElse(null);
             String currentPlatform = image.getPlatform();
 
             // Resolve $N backrefs against captures from the paired old-field glob

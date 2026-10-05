@@ -78,6 +78,76 @@ class UvLockParserTest {
     }
 
     @Test
+    void linksTransitiveDependenciesDeeply() {
+        String uvLock = """
+          version = 1
+          requires-python = ">=3.10"
+
+          [[package]]
+          name = "a"
+          version = "1.0.0"
+          source = { registry = "https://pypi.org/simple" }
+          dependencies = [
+              { name = "b", specifier = ">=1.0" },
+          ]
+
+          [[package]]
+          name = "b"
+          version = "1.0.0"
+          source = { registry = "https://pypi.org/simple" }
+          dependencies = [
+              { name = "c", specifier = ">=1.0" },
+          ]
+
+          [[package]]
+          name = "c"
+          version = "1.0.0"
+          source = { registry = "https://pypi.org/simple" }
+          """;
+
+        List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
+
+        assertThat(resolved).hasSize(3);
+        ResolvedDependency a = resolved.get(0);
+        ResolvedDependency b = resolved.get(1);
+        ResolvedDependency c = resolved.get(2);
+        assertThat(a.getDependencies().get(0)).isSameAs(b);
+        assertThat(b.getDependencies().get(0)).isSameAs(c);
+        assertThat(a.getDependencies().get(0).getDependencies().get(0)).isSameAs(c);
+    }
+
+    @Test
+    void linksCyclicDependencies() {
+        String uvLock = """
+          version = 1
+
+          [[package]]
+          name = "a"
+          version = "1.0.0"
+          source = { registry = "https://pypi.org/simple" }
+          dependencies = [
+              { name = "b", specifier = ">=1.0" },
+          ]
+
+          [[package]]
+          name = "b"
+          version = "1.0.0"
+          source = { registry = "https://pypi.org/simple" }
+          dependencies = [
+              { name = "a", specifier = ">=1.0" },
+          ]
+          """;
+
+        List<ResolvedDependency> resolved = UvLockParser.parse(uvLock);
+
+        assertThat(resolved).hasSize(2);
+        ResolvedDependency a = resolved.get(0);
+        ResolvedDependency b = resolved.get(1);
+        assertThat(a.getDependencies().get(0)).isSameAs(b);
+        assertThat(b.getDependencies().get(0)).isSameAs(a);
+    }
+
+    @Test
     void parseEditableSource() {
         String uvLock = """
           version = 1
@@ -158,38 +228,5 @@ class UvLockParserTest {
     void findLockFileReturnsNullWhenNotFound(@TempDir Path tempDir) {
         Path found = UvLockParser.findLockFile(tempDir, tempDir);
         assertThat(found).isNull();
-    }
-
-    @Test
-    void hasAlternativeLockFileDetectsPoetryLock(@TempDir Path tempDir) throws Exception {
-        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
-        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
-    }
-
-    @Test
-    void hasAlternativeLockFileDetectsPdmLock(@TempDir Path tempDir) throws Exception {
-        Files.write(tempDir.resolve("pdm.lock"), "".getBytes());
-        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, null)).isTrue();
-    }
-
-    @Test
-    void hasAlternativeLockFileReturnsFalseWhenNoneExist(@TempDir Path tempDir) {
-        assertThat(UvLockParser.hasAlternativeLockFile(tempDir, tempDir)).isFalse();
-    }
-
-    @Test
-    void hasAlternativeLockFileWalksUpToParent(@TempDir Path tempDir) throws Exception {
-        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
-        Path subDir = tempDir.resolve("subproject");
-        Files.createDirectories(subDir);
-        assertThat(UvLockParser.hasAlternativeLockFile(subDir, null)).isTrue();
-    }
-
-    @Test
-    void hasAlternativeLockFileRespectsBoundary(@TempDir Path tempDir) throws Exception {
-        Files.write(tempDir.resolve("poetry.lock"), "".getBytes());
-        Path boundary = tempDir.resolve("boundary");
-        Files.createDirectories(boundary);
-        assertThat(UvLockParser.hasAlternativeLockFile(boundary, boundary)).isFalse();
     }
 }

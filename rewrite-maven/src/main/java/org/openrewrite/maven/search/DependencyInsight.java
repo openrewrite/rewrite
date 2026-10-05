@@ -179,11 +179,12 @@ public class DependencyInsight extends Recipe {
                         continue;
                     }
                     for (ResolvedDependency dependency : entry.getValue()) {
-                        matches.collect(scope, dependency, dependencyMatcher,
-                                (matched, path) -> {
-                                    dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new LinkedHashMap<>())
-                                            .computeIfAbsent(matched.getGav(), __ -> new DependencyGraph()).append(scope.name().toLowerCase(), path);
-                                });
+                        matches.collect(scope, dependency, dependencyMatcher, null);
+                    }
+                    Map<ResolvedGroupArtifactVersion, DependencyGraph> graphs =
+                            DependencyGraph.build(scope.name().toLowerCase(), entry.getValue(), dependencyMatcher);
+                    if (!graphs.isEmpty()) {
+                        dependencyPathsByConfiguration.computeIfAbsent(scope.name().toLowerCase(), __ -> new LinkedHashMap<>()).putAll(graphs);
                     }
                 }
             }

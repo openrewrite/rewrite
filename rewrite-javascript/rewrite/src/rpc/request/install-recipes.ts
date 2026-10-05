@@ -150,16 +150,12 @@ export class InstallRecipes {
                         throw new Error(`${recipesName} does not export an 'activate' function`);
                     }
 
-                    // Attribute the recipes this install contributed to their package, so GetMarketplace
-                    // can tag each row with its origin and the host can bind it to the right bundle.
-                    // Local-path installs have no package identity, so they stay unattributed and fall
-                    // back to the requested bundle on the host.
-                    if (typeof request.recipes === "object") {
-                        const packageName = request.recipes.packageName;
-                        for (const recipe of marketplace.allRecipes()) {
-                            if (!beforeNames.has(recipe.name)) {
-                                recipeOrigin.set(recipe.name, packageName);
-                            }
+                    const origin = typeof request.recipes === "object"
+                        ? request.recipes.packageName
+                        : request.recipes;
+                    for (const recipe of marketplace.allRecipes()) {
+                        if (!beforeNames.has(recipe.name)) {
+                            recipeOrigin.set(recipe.name, origin);
                         }
                     }
 

@@ -1078,4 +1078,33 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotRemoveEarlyReturnFromClosure() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              subprojects { subproject ->
+                  if (subproject.name == 'bom') {
+                      return
+                  }
+
+                  apply plugin: 'java-library'
+              }
+
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
 }

@@ -128,9 +128,8 @@ class RecipeSchedulerTest implements RewriteTest {
                   if (cycle.incrementAndGet() == 2) {
                       assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
                   }
-                  assertDoesNotThrow(() -> {
-                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
-                  });
+                  assertDoesNotThrow(() ->
+                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText()));
                   return plainText.withText("bar");
               }
           })),
@@ -325,6 +324,23 @@ class RecipeSchedulerTest implements RewriteTest {
 
         assertThat(generatedPaths).containsExactly("generated.txt");
     }
+
+    @Test
+    void invalidGeneratedPathIsDroppedAndSurfaced() {
+        AtomicReference<Throwable> error = new AtomicReference<>();
+        var ctx = new InMemoryExecutionContext(error::set);
+        List<SourceFile> sources = List.of(PlainText.builder().text("existing").sourcePath(Path.of("existing.txt")).build());
+
+        RecipeRun run = new RecipeScheduler().scheduleRun(
+          new GeneratesInvalidPathRecipe(), new InMemoryLargeSourceSet(sources), ctx, 3, 1);
+
+        // the invalid file is dropped, so it never enters the changeset
+        assertThat(run.getChangeset().getAllResults()).isEmpty();
+        // but the drop is surfaced for visibility rather than silently swallowed
+        assertThat(error.get())
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("generated a source file with an invalid path");
+    }
 }
 
 @AllArgsConstructor
@@ -423,6 +439,32 @@ class GeneratingRecipe extends ScanningRecipe<AtomicInteger> {
     }
 }
 
+class GeneratesInvalidPathRecipe extends ScanningRecipe<AtomicInteger> {
+    @Getter
+    final String displayName = "Generates a file with an invalid path";
+
+    @Getter
+    final String description = "Generates a source file whose path points outside the source root.";
+
+    @Override
+    public AtomicInteger getInitialValue(ExecutionContext ctx) {
+        return new AtomicInteger(0);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicInteger acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(AtomicInteger acc, ExecutionContext ctx) {
+        return List.of(PlainText.builder()
+          .text("outside")
+          .sourcePath(Path.of("../outside.txt"))
+          .build());
+    }
+}
+
 @AllArgsConstructor
 class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator> {
 
@@ -460,9 +502,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 Path workingDirectory = validateExecutionContext(ctx);
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isEmptyDirectory();
-                assertDoesNotThrow(() -> {
-                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
-                });
+                assertDoesNotThrow(() ->
+                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE));
                 return tree;
             }
         };
@@ -473,9 +514,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         Path workingDirectory = validateExecutionContext(ctx);
         assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
         assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-        assertDoesNotThrow(() -> {
-            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-        });
+        assertDoesNotThrow(() ->
+            assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
         return List.of();
     }
 
@@ -489,9 +529,8 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
                 assertThat(workingDirectory).isDirectory();
                 assertThat(acc.workingDirectory()).isEqualTo(workingDirectory);
                 assertThat(workingDirectory).isDirectoryContaining(path -> "manifest.txt".equals(path.getFileName().toString()));
-                assertDoesNotThrow(() -> {
-                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
-                });
+                assertDoesNotThrow(() ->
+                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt"));
                 assert tree instanceof PlainText;
                 return ((PlainText) tree).withText("bar");
             }

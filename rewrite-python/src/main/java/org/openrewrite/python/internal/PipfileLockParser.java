@@ -31,9 +31,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Parses Pipfile.lock files (JSON format) to extract resolved dependency information.
@@ -59,13 +61,13 @@ public class PipfileLockParser {
     public static List<ResolvedDependency> findAndParse(Path pipfileDir, @Nullable Path boundary) {
         Path lockFile = findLockFile(pipfileDir, boundary);
         if (lockFile == null) {
-            return Collections.emptyList();
+            return emptyList();
         }
         try {
             String content = new String(Files.readAllBytes(lockFile), StandardCharsets.UTF_8);
             return parse(content);
         } catch (IOException e) {
-            return Collections.emptyList();
+            return emptyList();
         }
     }
 
@@ -92,18 +94,18 @@ public class PipfileLockParser {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(Paths.get("Pipfile.lock"), content);
         List<SourceFile> parsed = parser.parseInputs(
-                Collections.singletonList(input),
+                singletonList(input),
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)
-        ).collect(Collectors.toList());
+        ).collect(toList());
 
         if (parsed.isEmpty() || !(parsed.get(0) instanceof Json.Document)) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         Json.Document doc = (Json.Document) parsed.get(0);
         if (!(doc.getValue() instanceof Json.JsonObject)) {
-            return Collections.emptyList();
+            return emptyList();
         }
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
 

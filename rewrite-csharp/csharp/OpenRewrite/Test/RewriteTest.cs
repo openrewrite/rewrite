@@ -83,6 +83,31 @@ public abstract class RewriteTest
             csprojParsed = ParseCsprojFilesTogether(csprojSpecs);
         }
 
+        var sharedTrees = new Dictionary<SourceSpec, SyntaxTree>();
+        CSharpCompilation? sharedCompilation = null;
+        if (metadataReferences != null)
+        {
+            foreach (var spec in specs)
+            {
+                var isCsproj = spec.SourcePath != null && IsCsprojPath(spec.SourcePath);
+                var isCs = spec.SourcePath == null ||
+                           spec.SourcePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
+                if (isCs && !isCsproj)
+                {
+                    sharedTrees[spec] = CSharpSyntaxTree.ParseText(
+                        spec.Before, path: spec.SourcePath ?? "source.cs");
+                }
+            }
+
+            if (sharedTrees.Count > 0)
+            {
+                sharedCompilation = CSharpCompilation.Create("TestCompilation")
+                    .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+                    .AddReferences(metadataReferences)
+                    .AddSyntaxTrees(sharedTrees.Values);
+            }
+        }
+
         foreach (var spec in specs)
         {
             SourceFile source;
@@ -109,14 +134,9 @@ public abstract class RewriteTest
                 // Local C# parsing
                 var localSourcePath = spec.SourcePath ?? "source.cs";
                 SemanticModel? semanticModel = null;
-                if (metadataReferences != null)
+                if (sharedCompilation != null && sharedTrees.TryGetValue(spec, out var syntaxTree))
                 {
-                    var syntaxTree = CSharpSyntaxTree.ParseText(spec.Before, path: localSourcePath);
-                    var compilation = CSharpCompilation.Create("TestCompilation")
-                        .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
-                        .AddReferences(metadataReferences)
-                        .AddSyntaxTrees(syntaxTree);
-                    semanticModel = compilation.GetSemanticModel(syntaxTree);
+                    semanticModel = sharedCompilation.GetSemanticModel(syntaxTree);
                 }
 
                 source = parser.Parse(spec.Before, sourcePath: localSourcePath, semanticModel: semanticModel);
@@ -160,13 +180,19 @@ public abstract class RewriteTest
             var prevThrow = WhitespaceReconciler.ThrowOnMismatchDefault;
             WhitespaceReconciler.ThrowOnMismatchDefault = validations.FormattingReconciliation;
             List<Result> results;
+            var runCtx = new ExecutionContext();
             try
             {
-                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, new ExecutionContext());
+                results = RecipeScheduler.Run(recipeSpec.Recipe, sources, runCtx);
             }
             finally
             {
                 WhitespaceReconciler.ThrowOnMismatchDefault = prevThrow;
+            }
+
+            foreach (var afterRecipe in recipeSpec.AfterRecipe)
+            {
+                afterRecipe(runCtx);
             }
 
             foreach (var (spec, source) in parsed)
@@ -256,7 +282,18 @@ public abstract class RewriteTest
 
     private static readonly CsprojParser CsprojParserInstance = new();
 
-    private static bool IsCsprojPath(string path) => CsprojParserInstance.Accept(path);
+    private static bool IsCsprojPath(string path)
+    {
+        // packages.config / nuget.config ride along into the shared temp directory so the
+        // in-process restore sees them (legacy attestation, package sources) during ParseAll.
+        var fileName = Path.GetFileName(path);
+        if (fileName.Equals("packages.config", StringComparison.OrdinalIgnoreCase) ||
+            fileName.Equals("nuget.config", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+        return CsprojParserInstance.Accept(path);
+    }
 
     private static Dictionary<string, SourceFile> ParseCsprojFilesTogether(List<SourceSpec> specs)
     {
@@ -300,9 +337,36 @@ public class RecipeSpec
     public ReferenceAssemblies? ReferenceAssemblies { get; private set; } = Assemblies.Net90;
     public Validations Validations { get; private set; } = Validations.All;
 
+    private readonly List<Action<ExecutionContext>> _afterRecipe = [];
+
+    /// <summary>
+    /// Assertions run against the execution context after the recipe completes (e.g. to verify
+    /// data table rows written via the recipe's <see cref="OpenRewrite.Core.IDataTableStore"/>).
+    /// </summary>
+    public IReadOnlyList<Action<ExecutionContext>> AfterRecipe => _afterRecipe;
+
     public RecipeSpec SetRecipe(Recipe recipe)
     {
         Recipe = recipe;
+        return this;
+    }
+
+    /// <summary>
+    /// Assert the rows a recipe wrote to a data table. <paramref name="group"/> is the data
+    /// table's bucket key — its <c>Group</c> if set, otherwise its <c>InstanceName</c> (which
+    /// defaults to the display name). The test-default in-memory store is read back, so no RPC
+    /// data-table configuration is required.
+    /// </summary>
+    public RecipeSpec ExpectDataTable<TRow>(string name, string group, Action<IReadOnlyList<TRow>> assertion)
+        where TRow : notnull
+    {
+        _afterRecipe.Add(ctx =>
+        {
+            var store = ctx.GetMessage<OpenRewrite.Core.IDataTableStore>(
+                OpenRewrite.Core.DataTable<TRow>.DataTableStoreKey);
+            var rows = (store?.GetRows(name, group) ?? []).Cast<TRow>().ToList();
+            assertion(rows);
+        });
         return this;
     }
 
@@ -326,6 +390,14 @@ public static class Assemblies
 {
     public static ReferenceAssemblies Net90 => Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.Net.Net90;
     public static ReferenceAssemblies Net100 => Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.Net.Net100;
+
+    /// <summary>
+    /// .NET Framework 4.8 reference assemblies (via the
+    /// <c>Microsoft.NETFramework.ReferenceAssemblies.net48</c> package). Use for tests that
+    /// need to attest legacy framework types such as <c>System.Web.UI.Page</c>,
+    /// <c>System.ServiceModel.*</c>, or <c>System.Data.Entity.*</c>.
+    /// </summary>
+    public static ReferenceAssemblies Net48 => Microsoft.CodeAnalysis.Testing.ReferenceAssemblies.NetFramework.Net48.Default;
 
     public static ReferenceAssemblies AspNet90 =>
         Net90.AddPackage("Microsoft.AspNetCore.App.Ref");

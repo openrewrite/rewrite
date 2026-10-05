@@ -21,6 +21,7 @@ import lombok.experimental.NonFinal;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
@@ -123,14 +124,31 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
+        JavaTemplateJavaExtension extension = new JavaTemplateJavaExtension(templateParser, substitutions,
+                substitutedTemplate, coordinates, autoFormat);
+
         //noinspection ConstantConditions
-        J2 result = (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates, autoFormat)
+        J2 result = (J2) extension
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+
+        if (!extension.isSubstituted()) {
+            throw new IllegalStateException(unmatchedCoordinatesMessage(scope, coordinates));
+        }
 
         return result != scope.getValue() && result instanceof Expression ?
                 (J2) ParenthesizeVisitor.maybeParenthesize((Expression) result, scope) :
                 result;
+    }
+
+    private static String unmatchedCoordinatesMessage(Cursor scope, JavaCoordinates coordinates) {
+        Tree target = coordinates.getTree();
+        return "JavaTemplate coordinates were never matched, so the template was not applied: " +
+               target.getClass().getName() + " (id=" + target.getId() + ") at " +
+               coordinates.getSpaceLocation() + " in " + coordinates.getMode() + " mode.\n" +
+               "The `scope` cursor pointed at " + scope.getValue().getClass().getName() + ".\n" +
+               "Either the targeted element is not reachable from `scope`, or it is not dispatched to a visitor " +
+               "method and therefore can never be matched.";
     }
 
     protected Substitutions substitutions(Object[] parameters) {

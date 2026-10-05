@@ -47,7 +47,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }
@@ -253,6 +253,7 @@ public class JavaScriptSender extends JavaScriptVisitor<RpcSendQueue> {
 
     @Override
     public J visitPropertyAssignment(JS.PropertyAssignment propertyAssignment, RpcSendQueue q) {
+        q.getAndSendList(propertyAssignment, JS.PropertyAssignment::getModifiers, J.Modifier::getId, el -> visit(el, q));
         q.getAndSend(propertyAssignment, el -> el.getPadding().getName(), el -> visitRightPadded(el, q));
         q.getAndSend(propertyAssignment, JS.PropertyAssignment::getAssigmentToken);
         q.getAndSend(propertyAssignment, JS.PropertyAssignment::getInitializer, el -> visit(el, q));

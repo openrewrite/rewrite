@@ -1,0 +1,7 @@
+{
+  "name": "multi-alias-diff",
+  "version": "1.0.0",
+  "dependencies": {
+    "er8": "npm:emoji-regex@^8.0.0"
+  }
+}

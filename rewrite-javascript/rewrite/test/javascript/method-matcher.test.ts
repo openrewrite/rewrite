@@ -1,8 +1,9 @@
 import {MethodMatcher} from "../../src/javascript/method-matcher";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
-import {JavaScriptVisitor, typescript} from "../../src/javascript";
+import {JavaScriptVisitor, npm, packageJson, typescript} from "../../src/javascript";
 import {J} from "../../src/java";
 import {RecipeSpec} from "../../src/test";
+import {withDir} from "tmp-promise";
 
 describe('MethodMatcher', () => {
     function markMatchedMethods(pattern: string): Recipe {
@@ -283,6 +284,60 @@ describe('MethodMatcher', () => {
                 //@formatter:on
                 )
             );
+        });
+    });
+    describe('Pattern: fs-extra *(..)', () => {
+        test('should match a package method however the module is bound', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('fs-extra ensureDir(..)');
+
+            await withDir(async (repo) => {
+                await spec.rewriteRun(
+                    npm(
+                        repo.path,
+                        //language=typescript
+                        typescript(
+                            `
+                                import fse from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                import {ensureDir} from 'fs-extra';
+
+                                fse.ensureDir('a');
+                                ns.ensureDir('b');
+                                ensureDir('c');
+                                fse.pathExists('d');
+                            `,
+                            //@formatter:off
+                            `
+                                import fse from 'fs-extra';
+                                import * as ns from 'fs-extra';
+                                import {ensureDir} from 'fs-extra';
+
+                                /*~~>*/fse.ensureDir('a');
+                                /*~~>*/ns.ensureDir('b');
+                                /*~~>*/ensureDir('c');
+                                fse.pathExists('d');
+                            `
+                            //@formatter:on
+                        ),
+                        //language=json
+                        packageJson(
+                            `
+                              {
+                                "name": "test-project",
+                                "version": "1.0.0",
+                                "dependencies": {
+                                  "fs-extra": "^11"
+                                },
+                                "devDependencies": {
+                                  "@types/fs-extra": "^11"
+                                }
+                              }
+                            `
+                        )
+                    )
+                );
+            }, {unsafeCleanup: true});
         });
     });
 });

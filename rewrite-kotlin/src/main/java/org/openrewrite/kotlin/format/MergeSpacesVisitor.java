@@ -20,12 +20,11 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.ToBeRemoved;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.*;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -209,6 +208,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         f = f.withMarkers(visitMarkers(f.getMarkers(), newFunctionType.getMarkers()));
         f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), (index, a) -> visitAndCast(a, newFunctionType.getLeadingAnnotations().get(index))));
         f = f.withModifiers(ListUtils.map(f.getModifiers(), (index, e) -> visitAndCast(e, newFunctionType.getModifiers().get(index))));
+        f = f.withContextParameters(visitAndCast(f.getContextParameters(), newFunctionType.getContextParameters()));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), newFunctionType.getReceiver()));
         if (f.getPadding().getParameters() != null) {
             f = f.getPadding().withParameters(visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, newFunctionType.getPadding().getParameters()));
@@ -261,6 +261,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         K.MethodDeclaration m = methodDeclaration;
         m = m.withMarkers(visitMarkers(m.getMarkers(), newMethodDeclaration.getMarkers()));
         m = m.withMethodDeclaration(visitAndCast(m.getMethodDeclaration(), newMethodDeclaration.getMethodDeclaration()));
+        m = m.withContextParameters(visitAndCast(m.getContextParameters(), newMethodDeclaration.getContextParameters()));
         return m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), newMethodDeclaration.getTypeConstraints()));
     }
 
@@ -278,6 +279,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         return m.withAnnotations(visitContainer(m.getAnnotations(), newMultiAnnotationType.getAnnotations()));
     }
 
+    @Override
     @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, @Nullable Object ctx) {
         if (property == ctx || !(ctx instanceof K.Property)) {
@@ -297,6 +299,8 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
         pr = pr.getPadding().withVariableDeclarations(visitRightPadded(pr.getPadding().getVariableDeclarations(), newProperty.getPadding().getVariableDeclarations()));
         pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), newProperty.getPadding().getReceiver()));
+        pr = pr.withBackingField(visitAndCast(pr.getBackingField(), newProperty.getBackingField()));
+        pr = pr.withContextParameters(visitAndCast(pr.getContextParameters(), newProperty.getContextParameters()));
         return pr.withAccessors(visitContainer(pr.getAccessors(), newProperty.getAccessors()));
     }
 
@@ -395,6 +399,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
         } else {
             k = (K.This) temp;
         }
+        k = k.withLabel(visitAndCast(k.getLabel(), newAThis.getLabel()));
         return k.withType(visitType(k.getType(), newAThis.getType()));
     }
 
@@ -490,6 +495,19 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
+    public J visitContextParameters(K.ContextParameters contextParameters, @Nullable Object ctx) {
+        if (contextParameters == ctx || !(ctx instanceof K.ContextParameters)) {
+            return contextParameters;
+        }
+
+        K.ContextParameters newContextParameters = (K.ContextParameters) ctx;
+        K.ContextParameters c = contextParameters;
+        c = c.withPrefix(visitSpace(c.getPrefix(), KSpace.Location.CONTEXT_PARAMETERS_PREFIX, newContextParameters.getPrefix()));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), newContextParameters.getMarkers()));
+        return c.withParameters(visitContainer(c.getParameters(), KContainer.Location.CONTEXT_PARAMETERS, newContextParameters.getParameters()));
+    }
+
+    @Override
     public J visitWhenBranch(K.WhenBranch whenBranch, @Nullable Object ctx) {
         if (whenBranch == ctx || !(ctx instanceof K.WhenBranch)) {
             return whenBranch;
@@ -506,6 +524,7 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
             w = (K.WhenBranch) temp;
         }
         w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, newWhenBranch.getPadding().getExpressions()));
+        w = w.getPadding().withGuard(visitRightPadded(w.getPadding().getGuard(), newWhenBranch.getPadding().getGuard()));
         return w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, newWhenBranch.getPadding().getBody()));
     }
 
@@ -636,16 +655,23 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
     }
 
     @Override
-    public <M extends Marker> M visitMarker(Marker marker, @Nullable Object ctx) {
-        if (marker == ctx || !(ctx instanceof Marker)) {
-            return (M) marker;
+    public Markers visitMarkers(@Nullable Markers markers, @Nullable Object ctx) {
+        if (markers == null || markers == ctx || !(ctx instanceof Markers)) {
+            return markers == null ? Markers.EMPTY : markers;
         }
-
-        Marker newMarker = (Marker) ctx;
-        if (marker instanceof TypeReferencePrefix && newMarker instanceof TypeReferencePrefix) {
-            return super.visitMarker(newMarker, ((TypeReferencePrefix) newMarker).getPrefix());
+        Markers newMarkers = (Markers) ctx;
+        TrailingComma newTrailingComma = newMarkers.findFirst(TrailingComma.class).orElse(null);
+        if (newTrailingComma != null && !markers.findFirst(TrailingComma.class).isPresent()) {
+            // Wrapping may introduce a trailing comma, which is formatting rather than content
+            return markers.add(newTrailingComma);
         }
-        return super.visitMarker(marker, newMarker);
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> {
+            if (marker instanceof TrailingComma && newTrailingComma != null) {
+                TrailingComma t = (TrailingComma) marker;
+                return t.withSuffix(visitSpace(t.getSuffix(), Space.Location.LANGUAGE_EXTENSION, newTrailingComma.getSuffix()));
+            }
+            return marker;
+        }));
     }
 
     @Override
@@ -1733,10 +1759,11 @@ public class MergeSpacesVisitor extends KotlinVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));

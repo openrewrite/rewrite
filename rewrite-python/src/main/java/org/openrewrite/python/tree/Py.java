@@ -15,6 +15,12 @@
  */
 package org.openrewrite.python.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -23,14 +29,16 @@ import org.openrewrite.*;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.python.PythonPrinter;
 import org.openrewrite.python.PythonVisitor;
-import org.openrewrite.python.rpc.PythonRewriteRpc;
 import org.openrewrite.python.service.PythonAutoFormatService;
-import org.openrewrite.rpc.request.Print;
+import org.openrewrite.python.service.PythonImportService;
 
 import java.beans.Transient;
+import java.io.IOException;
 import java.lang.ref.SoftReference;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
@@ -46,11 +54,6 @@ public interface Py extends J {
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        final String visitorName = v.getClass().getCanonicalName();
-        // FIXME HACK TO AVOID RUNTIME VISITOR-ADAPTING IN NATIVE IMAGE
-        if (visitorName != null && visitorName.startsWith("io.moderne.serialization.")) {
-            return (R) this;
-        }
         return (R) acceptPython(v.adapt(PythonVisitor.class), p);
     }
 
@@ -94,6 +97,36 @@ public interface Py extends J {
             return v.visitAsync(this, p);
         }
 
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @Getter
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false)
+    @AllArgsConstructor
+    final class Shebang implements Py, Statement {
+        @With
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        String text;
+
+        @Override
+        public <P> J acceptPython(PythonVisitor<P> v, P p) {
+            return v.visitShebang(this, p);
+        }
+
+        @Transient
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -510,16 +543,7 @@ public interface Py extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    PythonRewriteRpc rpc = PythonRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new PythonPrinter<>();
         }
 
         @Override
@@ -555,6 +579,8 @@ public interface Py extends J {
         public <S, T extends S> T service(Class<S> service) {
             if (AutoFormatService.class.getName().equals(service.getName())) {
                 return (T) new PythonAutoFormatService();
+            } else if (ImportService.class.getName().equals(service.getName())) {
+                return (T) new PythonImportService();
             }
             return JavaSourceFile.super.service(service);
         }
@@ -1148,12 +1174,25 @@ public interface Py extends J {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false)
-        @RequiredArgsConstructor
         @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Value implements Py, Expression, TypedTree {
 
             public enum Conversion {
                 STR, REPR, ASCII
+            }
+
+            @JsonCreator
+            public Value(UUID id, Space prefix, Markers markers, JRightPadded<Expression> expression,
+                         @Nullable JRightPadded<Boolean> debug,
+                         @JsonDeserialize(using = ConversionDeserializer.class) @Nullable JRightPadded<Conversion> conversion,
+                         @Nullable Expression format) {
+                this.id = id;
+                this.prefix = prefix;
+                this.markers = markers;
+                this.expression = expression;
+                this.debug = debug;
+                this.conversion = conversion;
+                this.format = format;
             }
 
             @Nullable
@@ -1195,9 +1234,15 @@ public interface Py extends J {
             }
 
             @Nullable
-            @Getter
-            @With
-            Conversion conversion;
+            JRightPadded<Conversion> conversion;
+
+            public @Nullable Conversion getConversion() {
+                return conversion == null ? null : conversion.getElement();
+            }
+
+            public Value withConversion(@Nullable Conversion conversion) {
+                return getPadding().withConversion(JRightPadded.withElement(this.conversion, conversion));
+            }
 
             @Nullable
             @Getter
@@ -1259,6 +1304,25 @@ public interface Py extends J {
 
                 public Value withDebug(@Nullable JRightPadded<Boolean> debug) {
                     return t.debug == debug ? t : new Value(t.id, t.prefix, t.markers, t.expression, debug, t.conversion, t.format);
+                }
+
+                public @Nullable JRightPadded<Conversion> getConversion() {
+                    return t.conversion;
+                }
+
+                public Value withConversion(@Nullable JRightPadded<Conversion> conversion) {
+                    return t.conversion == conversion ? t : new Value(t.id, t.prefix, t.markers, t.expression, t.debug, conversion, t.format);
+                }
+            }
+
+            static class ConversionDeserializer extends JsonDeserializer<JRightPadded<Conversion>> {
+                @Override
+                public JRightPadded<Conversion> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+                    if (p.hasToken(JsonToken.VALUE_STRING)) {
+                        // an LST written before the conversion kept the space after it
+                        return JRightPadded.build(Conversion.valueOf(p.getText()));
+                    }
+                    return ctxt.readValue(p, ctxt.getTypeFactory().constructParametricType(JRightPadded.class, Conversion.class));
                 }
             }
         }
@@ -1562,6 +1626,17 @@ public interface Py extends J {
         @Getter
         J.Identifier name;
 
+        @Nullable
+        JContainer<J.TypeParameter> typeParameters;
+
+        public @Nullable List<J.TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
+        public TypeAlias withTypeParameters(@Nullable List<J.TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
         JLeftPadded<J> value;
 
         public J getValue() {
@@ -1612,12 +1687,20 @@ public interface Py extends J {
         public static class Padding {
             private final TypeAlias t;
 
+            public @Nullable JContainer<J.TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public TypeAlias withTypeParameters(@Nullable JContainer<J.TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, typeParameters, t.value, t.type);
+            }
+
             public JLeftPadded<J> getValue() {
                 return t.value;
             }
 
             public TypeAlias withValue(JLeftPadded<J> assignment) {
-                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, assignment, t.type);
+                return t.value == assignment ? t : new TypeAlias(t.id, t.prefix, t.markers, t.name, t.typeParameters, assignment, t.type);
             }
         }
     }

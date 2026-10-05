@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using OpenRewrite.CSharp;
+using OpenRewrite.Java;
 using OpenRewrite.Test;
 
 namespace OpenRewrite.Tests.Tree;
@@ -248,5 +252,71 @@ public class ArrayTests : RewriteTest
                 """
             )
         );
+    }
+
+    /// <summary>
+    /// An array type carries its resolved type like every other <c>TypeTree</c>, so a recipe can
+    /// reason about <c>typeof(int[])</c> or an array-typed declaration.
+    /// </summary>
+    [Fact]
+    public void ArrayTypeIsAttributed()
+    {
+        var arrayType = FirstArrayType(
+            """
+            class Foo {
+                int[] arr;
+            }
+            """);
+
+        var elementType = Assert.IsType<JavaType.Array>(arrayType.Type).ElemType;
+        Assert.Equal(JavaType.Primitive.PrimitiveKind.Int, Assert.IsType<JavaType.Primitive>(elementType).Kind);
+    }
+
+    /// <summary>
+    /// The outermost rank carries the whole type. The inner levels of a jagged type are left
+    /// unattributed: the syntax nests the ranks in the opposite order from the symbol, so there is
+    /// no per-level type to hand out.
+    /// </summary>
+    [Fact]
+    public void JaggedArrayTypeIsAttributedAtTheOutermostRank()
+    {
+        var arrayType = FirstArrayType(
+            """
+            class Foo {
+                int[][] arr;
+            }
+            """);
+
+        var elementType = Assert.IsType<JavaType.Array>(arrayType.Type).ElemType;
+        Assert.IsType<JavaType.Array>(elementType);
+    }
+
+    private static ArrayType FirstArrayType(string code)
+    {
+        var references = Assemblies.Net90
+            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+            .GetAwaiter().GetResult();
+        var syntaxTree = CSharpSyntaxTree.ParseText(code, path: "source.cs");
+        var compilation = CSharpCompilation.Create("TestCompilation")
+            .WithOptions(new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary))
+            .AddReferences(references)
+            .AddSyntaxTrees(syntaxTree);
+
+        var cu = new CSharpParser().Parse(code, semanticModel: compilation.GetSemanticModel(syntaxTree));
+
+        var collector = new ArrayTypeCollector();
+        collector.Visit(cu, 0);
+        return collector.Found[0];
+    }
+
+    private sealed class ArrayTypeCollector : CSharpVisitor<int>
+    {
+        internal List<ArrayType> Found { get; } = [];
+
+        public override J VisitArrayType(ArrayType arrayType, int ctx)
+        {
+            Found.Add(arrayType);
+            return base.VisitArrayType(arrayType, ctx);
+        }
     }
 }

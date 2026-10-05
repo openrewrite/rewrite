@@ -65,7 +65,32 @@ public class GetObject implements RpcRequest {
         private final AtomicReference<PrintStream> log;
         private final Supplier<Boolean> traceGetObject;
 
-        private final Map<String, BlockingQueue<List<RpcObjectData>>> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+        private final Map<String, Exchange> inProgressGetRpcObjects = new ConcurrentHashMap<>();
+
+        /**
+         * Kept after its last batch is handed over, since the receiver can still fail on that batch.
+         */
+        private volatile @Nullable Exchange last;
+
+        @RequiredArgsConstructor
+        private static class Exchange {
+            final String id;
+
+            /**
+             * The number of refs before this exchange. Refs are numbered in sequence, so
+             * every one above it was assigned by this exchange.
+             */
+            final int refCheckpoint;
+
+            final BlockingQueue<List<RpcObjectData>> batches = new ArrayBlockingQueue<>(1);
+
+            /**
+             * Written before {@code END_OF_OBJECT} is queued, and {@link #batches}
+             * orders that put against the take of the batch carrying it, so whoever
+             * takes the final batch sees this.
+             */
+            volatile @Nullable Throwable failure;
+        }
 
         @Override
         protected List<RpcObjectData> handle(GetObject request) throws Exception {
@@ -78,16 +103,13 @@ public class GetObject implements RpcRequest {
                 return deleted;
             }
 
-            BlockingQueue<List<RpcObjectData>> q = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
-                BlockingQueue<List<RpcObjectData>> batch = new ArrayBlockingQueue<>(1);
+            Exchange exchange = inProgressGetRpcObjects.computeIfAbsent(request.getId(), id -> {
+                Exchange e = new Exchange(id, localRefs.size());
+                last = e;
                 Object before = remoteObjects.get(id);
 
-                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), batch::put, localRefs, request.getSourceFileType(), traceGetObject.get());
+                RpcSendQueue sendQueue = new RpcSendQueue(batchSize.get(), e.batches::put, localRefs, request.getSourceFileType(), traceGetObject.get());
                 TREE_TRAVERSAL_POOL.submit(() -> {
-                    // Snapshot the current ref count so we can roll back on failure.
-                    // Ref IDs are assigned sequentially as localRefs.size() + 1,
-                    // so any ref > savedRefCount was added during this exchange.
-                    int savedRefCount = localRefs.size();
                     try {
                         sendQueue.send(after, before, null);
 
@@ -96,16 +118,8 @@ public class GetObject implements RpcRequest {
                         // of this tree.
                         remoteObjects.put(id, after);
                     } catch (Throwable t) {
-                        // Reset our tracking of the remote state so the next interaction
-                        // forces a full object sync (ADD) instead of a delta (CHANGE)
-                        // against the stale, partially-sent baseline.
-                        remoteObjects.remove(id);
-
-                        // Roll back localRefs to remove refs assigned during this failed
-                        // exchange. Without this, subsequent exchanges would send pure
-                        // references for objects the remote never received, causing
-                        // "Received a reference to an object that was not previously sent".
-                        localRefs.values().removeIf(ref -> ref > savedRefCount);
+                        e.failure = t;
+                        rollBack(e);
 
                         PrintStream logFile = log.get();
                         //noinspection ConstantValue
@@ -118,15 +132,57 @@ public class GetObject implements RpcRequest {
                     }
                     return 0;
                 });
-                return batch;
+                return e;
             });
 
-            List<RpcObjectData> batch = q.take();
+            List<RpcObjectData> batch = exchange.batches.take();
             if (batch.get(batch.size() - 1).getState() == END_OF_OBJECT) {
                 inProgressGetRpcObjects.remove(request.getId());
+                Throwable failure = exchange.failure;
+                if (failure != null) {
+                    // The JSON-RPC layer turns only an Exception into an error response, so
+                    // the wrapper is what keeps an Error from leaving the peer's request
+                    // unanswered until it times out.
+                    throw new IllegalStateException("Failed to send object " + request.getId() +
+                            (request.getSourceFileType() == null ? "" : " (type: " + request.getSourceFileType() + ")") +
+                            ": " + failure, failure);
+                }
             }
 
             return batch;
+        }
+
+        /**
+         * Undo the transfer of an object that its receiver failed to take.
+         *
+         * @see AbortGetObject
+         */
+        public void abort(String id) throws InterruptedException {
+            Exchange exchange = last;
+            if (exchange == null || !exchange.id.equals(id)) {
+                // Not the latest transfer, so which refs it assigned is no longer known.
+                remoteObjects.remove(id);
+                localRefs.clear();
+                return;
+            }
+            if (inProgressGetRpcObjects.remove(id) != null) {
+                // The traversal is waiting to hand over batches nobody will ask for.
+                List<RpcObjectData> batch;
+                do {
+                    batch = exchange.batches.take();
+                } while (batch.get(batch.size() - 1).getState() != END_OF_OBJECT);
+            }
+            rollBack(exchange);
+        }
+
+        /**
+         * Forget that the remote holds the object and the refs assigned while sending it, so that
+         * the next transfer sends both whole instead of a delta against a baseline, or a bare ref
+         * to an object, that the remote never received.
+         */
+        private void rollBack(Exchange exchange) {
+            remoteObjects.remove(exchange.id);
+            localRefs.values().removeIf(ref -> ref > exchange.refCheckpoint);
         }
     }
 }

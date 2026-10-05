@@ -1,0 +1,12 @@
+[project]
+name = "f-git"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["six @ git+https://github.com/benjaminp/six.git@1.17.0"]
+
+[tool.pdm]
+distribution = false
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"

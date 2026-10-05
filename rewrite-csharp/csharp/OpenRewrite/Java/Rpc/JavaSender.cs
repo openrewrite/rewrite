@@ -13,6 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+using Rewrite.Core.Rpc;
+using System.Text;
 using OpenRewrite.Core;
 using OpenRewrite.Core.Rpc;
 using OpenRewrite.CSharp;
@@ -107,7 +109,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
     {
         q.GetAndSend(j, (J t) => t.Id);
         q.GetAndSend(j, (J t) => t.Prefix, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(j, (J t) => t.Markers);
+        q.GetAndSend(j, (J t) => Reference.AsRef(t.Markers));
         return j;
     }
 
@@ -622,7 +624,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             q.GetAndSend(left, l => l.Element);
         }
         // C# JLeftPadded does not have Markers; send empty for protocol compatibility
-        q.GetAndSend(left, _ => Markers.Empty);
+        q.GetAndSend(left, _ => Reference.AsRef(Markers.Empty));
     }
 
     public virtual void VisitRightPadded<T>(JRightPadded<T> right, RpcSendQueue q)
@@ -641,7 +643,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             q.GetAndSend(right, r => r.Element);
         }
         q.GetAndSend(right, r => r.After, space => VisitSpace(GetValueNonNull<Space>(space), q));
-        q.GetAndSend(right, r => r.Markers);
+        q.GetAndSend(right, r => Reference.AsRef(r.Markers));
     }
 
     public virtual void VisitContainer<TJ>(JContainer<TJ> container, RpcSendQueue q) where TJ : J
@@ -654,7 +656,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                     $"Null element in JContainer<{typeof(TJ).Name}>, cursor path: {BuildCursorPath()}");
             return e.Element.Id;
         }, e => VisitRightPadded(e, q));
-        q.GetAndSend(container, c => c.Markers);
+        q.GetAndSend(container, c => Reference.AsRef(c.Markers));
     }
 
     private string BuildCursorPath()
@@ -679,8 +681,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                 q.GetAndSend(c, cm => cm.Multiline);
                 q.GetAndSend(c, cm => cm.Text);
                 q.GetAndSend(c, cm => cm.Suffix);
-                // C# Comment does not have Markers; send empty Markers for protocol compatibility
-                q.GetAndSend(c, _ => Markers.Empty);
+                q.GetAndSend(c, cm => Reference.AsRef(cm is TextComment text ? text.Markers : Markers.Empty));
             });
         q.GetAndSend(space, s => s.Whitespace);
     }
@@ -697,7 +698,8 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                 q.GetAndSendListAsRef(
                     annotation,
                     a => a.Values,
-                    v => v.Element != null ? TypeSignature(v.Element) : "null",
+                    v => (v.Element != null ? TypeSignature(v.Element).ToString() : "{undefined}") +
+                         "=" + ElementValueSignature(v),
                     v => VisitAnnotationElementValue(v, q));
                 break;
 
@@ -849,7 +851,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                     (mc.ThrowableTypes ?? []).Select(TypeSignature)),
                 JavaType.Intersection i => string.Join(" & ",
                     (i.Bounds ?? []).Select(TypeSignature)),
-                JavaType.Annotation a => "@" + (a.AnnotationType != null ? TypeSignature(a.AnnotationType) : "{undefined}"),
+                JavaType.Annotation a => AnnotationSignature(a),
                 JavaType.Unknown => "{undefined}",
                 _ => "{undefined}"
             };
@@ -859,6 +861,56 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
             _typeSignatureStack.Remove(type);
         }
     }
+
+    /// <summary>
+    /// Mirrors DefaultJavaTypeSignatureBuilder.annotationSignature. The element values are part of
+    /// the signature because a type may carry several annotations of the same annotation type,
+    /// distinguished only by them — <c>System.Windows.Controls.ComboBox</c> declares two
+    /// <c>[TemplatePart]</c>s. Keying on the annotation type alone would make the two collide in
+    /// the before/after index that GetAndSendListAsRef builds.
+    /// </summary>
+    private static string AnnotationSignature(JavaType.Annotation annotation)
+    {
+        var s = new StringBuilder("@");
+        s.Append(annotation.AnnotationType != null
+            ? TypeSignature(annotation.AnnotationType)
+            : "{undefined}");
+
+        var values = annotation.Values;
+        if (values is { Count: > 0 })
+        {
+            s.Append('(');
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i > 0) s.Append(',');
+                var value = values[i];
+                s.Append(value.Element != null ? TypeSignature(value.Element) : "{undefined}")
+                    .Append('=')
+                    .Append(ElementValueSignature(value));
+            }
+            s.Append(')');
+        }
+        return s.ToString();
+    }
+
+    /// <summary>
+    /// The Java builder appends <c>ElementValue.getValue()</c>, whose JavaType members render as
+    /// their own signature (JavaType.toString delegates to the signature builder).
+    /// </summary>
+    private static string ElementValueSignature(JavaType.Annotation.ElementValue value) => value switch
+    {
+        JavaType.Annotation.SingleElementValue single =>
+            single.ConstantValue != null
+                ? single.ConstantValue.ToString() ?? "null"
+                : single.ReferenceValue != null
+                    ? TypeSignature(single.ReferenceValue).ToString()!
+                    : "null",
+        JavaType.Annotation.ArrayElementValue array =>
+            "[" + string.Join(", ", array.ReferenceValues != null
+                ? array.ReferenceValues.Select(t => TypeSignature(t).ToString()!)
+                : (array.ConstantValues ?? []).Select(c => c?.ToString() ?? "null")) + "]",
+        _ => "null"
+    };
 
     private static string GetPrimitiveKeyword(JavaType.PrimitiveKind kind) => kind switch
     {

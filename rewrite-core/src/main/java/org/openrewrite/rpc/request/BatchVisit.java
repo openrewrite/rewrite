@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.internal.PreparedRecipeCache;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
@@ -33,22 +34,28 @@ import org.openrewrite.table.SourcesFileResults;
 import java.util.*;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyList;
+
 @Value
 public class BatchVisit implements RpcRequest {
     String sourceFileType;
     String treeId;
     String p;
+
     @Nullable List<String> cursor;
+
     List<BatchVisitItem> visitors;
 
     @Value
     public static class BatchVisitItem {
         String visitor;
+
         @Nullable Map<String, Object> visitorOptions;
     }
 
     @RequiredArgsConstructor
     public static class Handler extends JsonRpcMethod<BatchVisit> {
+        private final RewriteRpc rpc;
         private final Map<String, Object> localObjects;
         private final PreparedRecipeCache preparedRecipes;
         private final BiFunction<String, @Nullable String, ?> getObject;
@@ -56,6 +63,11 @@ public class BatchVisit implements RpcRequest {
 
         @Override
         protected Object handle(BatchVisit request) throws Exception {
+            // Make this connection discoverable via RewriteRpc.current() while the visitors run.
+            return rpc.withCurrent(() -> doHandle(request));
+        }
+
+        private Object doHandle(BatchVisit request) {
             Tree tree = (Tree) getObject.apply(request.getTreeId(), request.getSourceFileType());
             Object p = getVisitorP(request);
             Cursor cursor = getCursor.apply(request.getCursor(), request.getSourceFileType());
@@ -75,7 +87,7 @@ public class BatchVisit implements RpcRequest {
                 // Diff SearchResult IDs against the running set
                 List<String> searchResultIds;
                 if (deleted) {
-                    searchResultIds = Collections.emptyList();
+                    searchResultIds = emptyList();
                 } else {
                     Set<String> afterIds = collectSearchResultIds(after);
                     afterIds.removeAll(knownIds);

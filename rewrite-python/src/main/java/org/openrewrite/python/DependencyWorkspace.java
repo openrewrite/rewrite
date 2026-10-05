@@ -17,6 +17,7 @@ package org.openrewrite.python;
 
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.python.internal.InstalledEnvParser;
 import org.openrewrite.python.internal.PackageManagerExecutor;
 
 import java.io.IOException;
@@ -27,9 +28,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
+import java.util.Base64;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.synchronizedMap;
 
 /**
@@ -39,9 +44,16 @@ import static java.util.Collections.synchronizedMap;
  */
 @UtilityClass
 public class DependencyWorkspace {
+    /**
+     * Installed venvs are expensive to rebuild and are meant to outlive a single run, so they live
+     * beside the other {@code ~/.rewrite} caches. A {@code $TMPDIR} reaper evicts by access time,
+     * which uv's installed files inherit from their wheel rather than from the install, and would
+     * empty a workspace the same night it was created. Bounded by {@link #MAX_CACHE_SIZE}.
+     */
     private static final Path WORKSPACE_BASE = Paths.get(
-            System.getProperty("java.io.tmpdir"),
-            "openrewrite-python-workspaces"
+            System.getProperty("user.home"),
+            ".rewrite",
+            "python-workspaces"
     );
     /**
      * Bump this when the workspace layout changes (e.g. new files expected)
@@ -74,7 +86,7 @@ public class DependencyWorkspace {
      * @return Path to the workspace directory containing .venv
      */
     static Path getOrCreateWorkspace(String pyprojectContent) {
-        return getOrCreateWorkspace(pyprojectContent, Collections.emptyMap());
+        return getOrCreateWorkspace(pyprojectContent, emptyMap());
     }
 
     /**
@@ -103,8 +115,7 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
-        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
-        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // An invalid leftover at the target path (e.g. from an interrupted run) would
         // block the final Files.move into place; remove it before rebuilding.
         cleanupDirectory(workspaceDir);
 
@@ -169,7 +180,7 @@ public class DependencyWorkspace {
      */
     static @Nullable Path getOrCreateRequirementsWorkspace(String requirementsContent,
                                                             @Nullable Path originalFilePath) {
-        return getOrCreateRequirementsWorkspace(requirementsContent, originalFilePath, Collections.emptyMap());
+        return getOrCreateRequirementsWorkspace(requirementsContent, originalFilePath, emptyMap());
     }
 
     /**
@@ -206,8 +217,7 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
-        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
-        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // An invalid leftover at the target path (e.g. from an interrupted run) would
         // block the final Files.move into place; remove it before rebuilding.
         cleanupDirectory(workspaceDir);
 
@@ -282,7 +292,7 @@ public class DependencyWorkspace {
      */
     public static @Nullable Path getOrCreateSetuptoolsWorkspace(String manifestContent,
                                                                 @Nullable Path projectDir) {
-        return getOrCreateSetuptoolsWorkspace(manifestContent, projectDir, Collections.emptyMap());
+        return getOrCreateSetuptoolsWorkspace(manifestContent, projectDir, emptyMap());
     }
 
     /**
@@ -320,8 +330,7 @@ public class DependencyWorkspace {
             cache.put(hash, workspaceDir);
             return workspaceDir;
         }
-        // An invalid leftover at the target path (e.g. gutted by macOS periodic tmp
-        // cleanup, which deletes old files but keeps the directory skeleton) would
+        // An invalid leftover at the target path (e.g. from an interrupted run) would
         // block the final Files.move into place; remove it before rebuilding.
         cleanupDirectory(workspaceDir);
 
@@ -392,7 +401,7 @@ public class DependencyWorkspace {
 
     private static boolean isRequirementsWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
-                Files.isDirectory(workspaceDir.resolve(".venv")) &&
+                InstalledEnvParser.isIntact(workspaceDir.resolve(".venv")) &&
                 Files.exists(workspaceDir.resolve("freeze.txt")) &&
                 hasCurrentVersion(workspaceDir);
     }
@@ -437,7 +446,7 @@ public class DependencyWorkspace {
 
     private static boolean isWorkspaceValid(Path workspaceDir) {
         return Files.exists(workspaceDir) &&
-                Files.isDirectory(workspaceDir.resolve(".venv")) &&
+                InstalledEnvParser.isIntact(workspaceDir.resolve(".venv")) &&
                 Files.exists(workspaceDir.resolve("pyproject.toml")) &&
                 hasCurrentVersion(workspaceDir);
     }

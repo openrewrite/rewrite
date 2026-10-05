@@ -17,17 +17,17 @@ namespace Rewrite.Core.Rpc;
 
 public class Reference
 {
-    [ThreadStatic] private static Reference? _flyweight;
-
     private object? _value;
 
     public object? Value => _value;
 
+    /// <summary>
+    /// Each call returns a distinct instance: a diffing sender holds the before and after
+    /// references at the same time, so they must not share state.
+    /// </summary>
     public static Reference AsRef(object? t)
     {
-        _flyweight ??= new Reference();
-        _flyweight._value = t;
-        return _flyweight;
+        return new Reference { _value = t };
     }
 
     public static T? GetValue<T>(object? maybeRef)

@@ -15,6 +15,7 @@
  */
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Testing;
 using OpenRewrite.CSharp;
 using OpenRewrite.Java;
 using OpenRewrite.Test;
@@ -41,9 +42,11 @@ public class CSharpTypeMappingTests : RewriteTest
         """,
         path: "__GlobalUsings__.g.cs");
 
-    private static CompilationUnit ParseWithSemanticModel(string code)
+    private static CompilationUnit ParseWithSemanticModel(string code,
+        ReferenceAssemblies? referenceAssemblies = null)
     {
-        var refs = Assemblies.Net90.ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
+        var refs = (referenceAssemblies ?? Assemblies.Net90)
+            .ResolveAsync(LanguageNames.CSharp, CancellationToken.None)
             .GetAwaiter().GetResult();
         var syntaxTree = CSharpSyntaxTree.ParseText(code, path: "source.cs");
         var compilation = CSharpCompilation.Create("TestCompilation")
@@ -452,5 +455,374 @@ public class CSharpTypeMappingTests : RewriteTest
         Assert.NotNull(typeA);
         Assert.NotNull(typeB);
         Assert.Same(typeA, typeB);
+    }
+
+    [Fact]
+    public void SourceClass_DeclaredMembersAndMethodsArePopulated()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System.Collections.Generic;
+            class Holder
+            {
+                private int _count;
+                public string Name { get; set; } = "";
+                public event System.EventHandler? Changed;
+                public List<string> Items() => new();
+                public void Reset(int to) { _count = to; }
+            }
+            class Test
+            {
+                void M() { Holder holder = new Holder(); }
+            }
+            """);
+
+        var holderType = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "holder")!.TypeExpression?.Type);
+
+        Assert.NotNull(holderType.Members);
+        Assert.NotNull(holderType.Methods);
+
+        var count = Assert.Single(holderType.Members!, v => v.Name == "_count");
+        Assert.Equal(JavaType.Primitive.Of(JavaType.PrimitiveKind.Int), count.Type);
+        Assert.Same(holderType, count.Owner);
+
+        var name = Assert.Single(holderType.Members!, v => v.Name == "Name");
+        Assert.Equal("System.String", Assert.IsType<JavaType.Class>(name.Type).FullyQualifiedName);
+        Assert.Contains(holderType.Members!, v => v.Name == "Changed");
+
+        Assert.DoesNotContain(holderType.Members!, v => v.Name.StartsWith('<'));
+        Assert.DoesNotContain(holderType.Methods!, m => m.Name is "get_Name" or "set_Name"
+            or "add_Changed" or "remove_Changed");
+
+        var items = Assert.Single(holderType.Methods!, m => m.Name == "Items");
+        Assert.Equal("System.Collections.Generic.List",
+            Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Parameterized>(items.ReturnType).Type)
+                .FullyQualifiedName);
+
+        var reset = Assert.Single(holderType.Methods!, m => m.Name == "Reset");
+        Assert.Equal(["to"], reset.ParameterNames);
+        Assert.Same(holderType, reset.DeclaringType);
+
+        Assert.Contains(holderType.Methods!, m => m.Name == ".ctor");
+
+        Assert.DoesNotContain(holderType.Methods!, m => m.Name == "ToString");
+        var objectType = Assert.IsType<JavaType.Class>(holderType.Supertype);
+        Assert.Equal("System.Object", objectType.FullyQualifiedName);
+        Assert.Contains(objectType.Methods!, m => m.Name == "ToString");
+    }
+
+    [Fact]
+    public void MetadataClass_DeclaredMembersAndMethodsArePopulated()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System.Windows.Controls;
+            class Test
+            {
+                void M() { ItemsControl control = new ItemsControl(); }
+            }
+            """, Assemblies.Net90.AddPackage("Microsoft.WindowsDesktop.App.Ref", "9.0.16"));
+
+        var itemsControl = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "control")!.TypeExpression?.Type);
+        Assert.Equal("System.Windows.Controls.ItemsControl", itemsControl.FullyQualifiedName);
+
+        Assert.NotNull(itemsControl.Members);
+        Assert.NotNull(itemsControl.Methods);
+
+        var itemsSource = Assert.Single(itemsControl.Members!, v => v.Name == "ItemsSource");
+        Assert.Equal("System.Collections.IEnumerable",
+            Assert.IsType<JavaType.Class>(itemsSource.Type).FullyQualifiedName);
+
+        var itemsSourceProperty = Assert.Single(itemsControl.Members!,
+            v => v.Name == "ItemsSourceProperty");
+        Assert.Equal("System.Windows.DependencyProperty",
+            Assert.IsType<JavaType.Class>(itemsSourceProperty.Type).FullyQualifiedName);
+
+        Assert.Contains(itemsControl.Methods!, m => m.Name == "GetItemsOwner");
+
+        Assert.DoesNotContain(itemsControl.Members!, v => v.Name == "Visibility");
+        var uiElement = Walk(itemsControl, "System.Windows.UIElement");
+        Assert.Contains(uiElement.Members!, v => v.Name == "Visibility");
+    }
+
+    /// <summary>
+    /// Attributes written on a type in the analysed source are mapped onto
+    /// <see cref="JavaType.Class.Annotations"/>, with their named arguments resolved to the
+    /// attribute class' properties and their values carried as constants or type references.
+    /// </summary>
+    [Fact]
+    public void SourceClass_AnnotationsAreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+            sealed class MarkerAttribute : Attribute
+            {
+                public string? Name { get; set; }
+                public Type? Kind { get; set; }
+            }
+
+            [Marker(Name = "first", Kind = typeof(string))]
+            class Marked { }
+
+            class Test
+            {
+                void M() { Marked marked = new Marked(); }
+            }
+            """);
+
+        var marked = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "marked")!.TypeExpression?.Type);
+
+        Assert.NotNull(marked.Annotations);
+        var marker = Assert.Single(marked.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "MarkerAttribute" });
+
+        Assert.NotNull(marker.Values);
+        Assert.Equal(2, marker.Values!.Count);
+
+        var name = Assert.Single(marker.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Name" });
+        Assert.Equal("first", name.ConstantValue);
+        Assert.Null(name.ReferenceValue);
+        Assert.Equal("MarkerAttribute",
+            Assert.IsType<JavaType.Class>(Assert.IsType<JavaType.Variable>(name.Element).Owner)
+                .FullyQualifiedName);
+
+        var kind = Assert.Single(marker.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Kind" });
+        Assert.Null(kind.ConstantValue);
+        Assert.Equal("System.String",
+            Assert.IsType<JavaType.Class>(kind.ReferenceValue).FullyQualifiedName);
+    }
+
+    /// <summary>
+    /// A positional (constructor) attribute argument has no element name of its own. It is
+    /// resolved to the property of the attribute class that the constructor parameter feeds,
+    /// matched case-insensitively on name — the universal C# convention.
+    /// </summary>
+    [Fact]
+    public void PositionalAttributeArguments_ResolveToTheMatchingProperty()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            [Obsolete("use something else", true)]
+            class Old { }
+
+            class Test
+            {
+                void M() { Old old = new Old(); }
+            }
+            """);
+
+        var old = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "old")!.TypeExpression?.Type);
+
+        var obsolete = Assert.Single(old.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+
+        var values = obsolete.Values!.Cast<JavaType.Annotation.SingleElementValue>().ToList();
+        Assert.Equal(2, values.Count);
+
+        Assert.Equal("Message", Assert.IsType<JavaType.Variable>(values[0].Element).Name);
+        Assert.Equal("use something else", values[0].ConstantValue);
+
+        var ctor = Assert.IsType<JavaType.Method>(values[1].Element);
+        Assert.Equal(".ctor", ctor.Name);
+        Assert.Equal("System.ObsoleteAttribute",
+            Assert.IsAssignableFrom<JavaType.Class>(ctor.DeclaringType).FullyQualifiedName);
+        Assert.Equal(true, values[1].ConstantValue);
+    }
+
+    /// <summary>
+    /// Enum-valued arguments map to the enum member as a <see cref="JavaType.Variable"/>
+    /// reference (matching Java's <c>Attribute.Enum</c> -> <c>VarSymbol</c> mapping), and array
+    /// arguments map to an <see cref="JavaType.Annotation.ArrayElementValue"/>.
+    /// </summary>
+    [Fact]
+    public void EnumAndArrayAttributeArguments_AreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            enum Level { Low, High }
+
+            sealed class ShapeAttribute : Attribute
+            {
+                public Level Level { get; set; }
+                public string[] Names { get; set; } = [];
+            }
+
+            [Shape(Level = Level.High, Names = new[] { "a", "b" })]
+            class Shaped { }
+
+            class Test
+            {
+                void M() { Shaped shaped = new Shaped(); }
+            }
+            """);
+
+        var shaped = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "shaped")!.TypeExpression?.Type);
+        var shape = Assert.Single(shaped.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "ShapeAttribute" });
+
+        var level = Assert.Single(shape.Values!.OfType<JavaType.Annotation.SingleElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Level" });
+        var member = Assert.IsType<JavaType.Variable>(level.ReferenceValue);
+        Assert.Equal("High", member.Name);
+        Assert.Equal("Level", Assert.IsType<JavaType.Class>(member.Owner).FullyQualifiedName);
+
+        var names = Assert.Single(shape.Values!.OfType<JavaType.Annotation.ArrayElementValue>(),
+            v => v.Element is JavaType.Variable { Name: "Names" });
+        Assert.Equal(["a", "b"], names.ConstantValues);
+    }
+
+    /// <summary>
+    /// Attributes on methods and on fields/properties are mapped too.
+    /// </summary>
+    [Fact]
+    public void MethodAndVariableAnnotationsAreMapped()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+
+            class Holder
+            {
+                [Obsolete] public int Field;
+                [Obsolete] public void Method() { }
+            }
+
+            class Test
+            {
+                void M() { Holder holder = new Holder(); }
+            }
+            """);
+
+        var holder = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "holder")!.TypeExpression?.Type);
+
+        var field = Assert.Single(holder.Members!, v => v.Name == "Field");
+        Assert.Contains(field.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+
+        var method = Assert.Single(holder.Methods!, m => m.Name == "Method");
+        Assert.Contains(method.Annotations!.OfType<JavaType.Annotation>(),
+            a => a.AnnotationType is JavaType.Class { FullyQualifiedName: "System.ObsoleteAttribute" });
+    }
+
+    /// <summary>
+    /// The motivating case: <c>ComboBox</c> comes from a reference assembly and declares two
+    /// <c>[TemplatePart]</c> attributes. Both must survive, distinguished by their values — a
+    /// WPF recipe that only sees one of them silently loses <c>PART_Popup</c>.
+    /// </summary>
+    [Fact]
+    public void MetadataClass_RepeatedAnnotationsAreMappedWithTheirValues()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System.Windows.Controls;
+            class Test
+            {
+                void M() { ComboBox box = new ComboBox(); }
+            }
+            """, Assemblies.Net90.AddPackage("Microsoft.WindowsDesktop.App.Ref", "9.0.16"));
+
+        var comboBox = Assert.IsType<JavaType.Class>(
+            FindVariableDeclaration(cu, "box")!.TypeExpression?.Type);
+        Assert.Equal("System.Windows.Controls.ComboBox", comboBox.FullyQualifiedName);
+
+        Assert.NotNull(comboBox.Annotations);
+        var templateParts = comboBox.Annotations!.OfType<JavaType.Annotation>()
+            .Where(a => a.AnnotationType is JavaType.Class
+            {
+                FullyQualifiedName: "System.Windows.TemplatePartAttribute"
+            })
+            .ToList();
+        Assert.Equal(2, templateParts.Count);
+
+        var byName = templateParts.ToDictionary(
+            a => (string)a.Values!.OfType<JavaType.Annotation.SingleElementValue>()
+                .Single(v => v.Element is JavaType.Variable { Name: "Name" }).ConstantValue!,
+            a => Assert.IsType<JavaType.Class>(
+                a.Values!.OfType<JavaType.Annotation.SingleElementValue>()
+                    .Single(v => v.Element is JavaType.Variable { Name: "Type" }).ReferenceValue)
+                .FullyQualifiedName);
+
+        Assert.Equal("System.Windows.Controls.TextBox", byName["PART_EditableTextBox"]);
+        Assert.Equal("System.Windows.Controls.Primitives.Popup", byName["PART_Popup"]);
+    }
+
+    /// <summary>
+    /// An event reference carries <see cref="JavaType.Variable"/> attribution naming the type that
+    /// declares it, exactly as a field or property reference does. Without it a recipe renaming an
+    /// event has nothing to key an unqualified reference on — the enclosing type is the wrong
+    /// answer as soon as the reference is made from a derived type.
+    /// </summary>
+    [Fact]
+    public void EventReferencesCarryVariableAttribution()
+    {
+        var cu = ParseWithSemanticModel("""
+            using System;
+            class Base
+            {
+                public event EventHandler? Changed;
+            }
+            class Derived : Base
+            {
+                void M()
+                {
+                    Changed += this.OnChanged;
+                    this.Changed += this.OnChanged;
+                }
+
+                void OnChanged(object? sender, EventArgs e) { }
+            }
+            """);
+
+        var occurrences = new IdentifierFinder("Changed").Collect(cu);
+        Assert.Equal(3, occurrences.Count);
+
+        foreach (var occurrence in occurrences)
+        {
+            var attribution = Assert.IsType<JavaType.Variable>(occurrence.FieldType);
+            Assert.Equal("Changed", attribution.Name);
+            Assert.Equal("Base", Assert.IsType<JavaType.Class>(attribution.Owner).FullyQualifiedName);
+            Assert.Equal("System.EventHandler",
+                Assert.IsType<JavaType.Class>(attribution.Type).FullyQualifiedName);
+        }
+    }
+
+    private class IdentifierFinder(string name) : CSharpVisitor<int>
+    {
+        private readonly List<Identifier> _found = [];
+
+        public List<Identifier> Collect(CompilationUnit cu)
+        {
+            Cursor = new OpenRewrite.Core.Cursor(null, OpenRewrite.Core.Cursor.ROOT_VALUE);
+            Visit(cu, 0);
+            return _found;
+        }
+
+        public override J VisitIdentifier(Identifier identifier, int p)
+        {
+            if (identifier.SimpleName == name)
+            {
+                _found.Add(identifier);
+            }
+
+            return identifier;
+        }
+    }
+
+    private static JavaType.Class Walk(JavaType.Class from, string fullyQualifiedName)
+    {
+        for (JavaType.Class? c = from; c != null; c = c.Supertype as JavaType.Class)
+        {
+            if (c.FullyQualifiedName == fullyQualifiedName) return c;
+        }
+        throw new Xunit.Sdk.XunitException(
+            $"{fullyQualifiedName} not found in the supertype chain of {from.FullyQualifiedName}");
     }
 }

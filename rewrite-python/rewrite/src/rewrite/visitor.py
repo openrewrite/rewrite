@@ -34,6 +34,14 @@ class Cursor:
             object.__setattr__(self, 'messages', messages)
         messages[key] = value
 
+    @property
+    def root(self) -> Cursor:
+        """The top-most cursor in the parent chain."""
+        c = self
+        while c.parent is not None:
+            c = c.parent
+        return c
+
     def parent_tree_cursor(self) -> Cursor:
         c = self.parent
         while c is not None:

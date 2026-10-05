@@ -16,6 +16,8 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -696,7 +698,7 @@ class TabsAndIndentsTest implements RewriteTest {
               label2:
               for (int i = 0; i < 5; i++) doSomething(i);
               }
-              switch (a) {
+              switch (x) {
               case 0:
               doCase0();
               break;
@@ -749,7 +751,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   label2:
                                   for (int i = 0; i < 5; i++) doSomething(i);
                               }
-                              switch (a) {
+                              switch (x) {
                                   case 0:
                                       doCase0();
                                       break;
@@ -1609,8 +1611,7 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
-              @Retention
+              @SuppressWarnings
               (value = "1.0")
               public
               class
@@ -1641,9 +1642,8 @@ class TabsAndIndentsTest implements RewriteTest {
               import java.io.ByteArrayInputStream;
               import java.io.InputStream;
               import java.io.Serializable;
-              import java.lang.annotation.Retention;
               
-              @Retention
+              @SuppressWarnings
                       (value = "1.0")
               public
               class
@@ -2740,6 +2740,36 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void textBlockBlankLinesAreNotIndented() {
+        rewriteRun(
+          autoFormat(
+            spaces -> spaces,
+            wrap -> wrap
+          ),
+          java(
+            """
+              class Test {
+                  private final String foo = ""\"
+                    YES
+
+                    AND YES
+                    ""\";
+              }
+              """,
+            """
+              class Test {
+                  private final String foo = ""\"
+                          YES
+
+                          AND YES
+                          ""\";
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void textBlocksNotAlignedTabs() {
         rewriteRun(
           autoFormat(
@@ -2793,6 +2823,35 @@ class TabsAndIndentsTest implements RewriteTest {
                               : in
                       ).orElse(in);
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {0, -1})
+    void nonPositiveTabSize(int tabSize) {
+        rewriteRun(
+          // Autodetect derives the indent size from the tab size, so both are non-positive together, leaving no width to indent by
+          autoFormat(style -> style.withUseTabCharacter(true).withTabSize(tabSize).withIndentSize(tabSize)),
+          java(
+            """
+              class Test {
+              \tvoid m() {
+              \t\tif (true) {
+              int n = 0;
+              \t\t}
+              \t}
+              }
+              """,
+            """
+              class Test {
+              void m() {
+              if (true) {
+              int n = 0;
+              }
+              }
               }
               """
           )

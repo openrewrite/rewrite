@@ -26,11 +26,10 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.javascript.JavaScriptPrinter;
 import org.openrewrite.javascript.JavaScriptVisitor;
-import org.openrewrite.javascript.rpc.JavaScriptRewriteRpc;
 import org.openrewrite.javascript.service.JavaScriptAutoFormatService;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.rpc.request.Print;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -183,16 +182,7 @@ public interface JS extends J {
 
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-            return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
-                @Override
-                public Tree preVisit(Tree tree, PrintOutputCapture<P> p) {
-                    JavaScriptRewriteRpc rpc = JavaScriptRewriteRpc.getOrStart();
-                    Print.MarkerPrinter mappedMarkerPrinter = Print.MarkerPrinter.from(p.getMarkerPrinter());
-                    p.append(rpc.print(tree, cursor, mappedMarkerPrinter));
-                    stopAfterPreVisit();
-                    return tree;
-                }
-            };
+            return new JavaScriptPrinter<>();
         }
 
         @Transient
@@ -2390,6 +2380,9 @@ public interface JS extends J {
         @With
         Markers markers;
 
+        @With
+        List<J.Modifier> modifiers;
+
         JRightPadded<Expression> name;
 
         public Expression getName() {
@@ -2415,7 +2408,7 @@ public interface JS extends J {
         @SuppressWarnings("unchecked")
         @Override
         public PropertyAssignment withType(@Nullable JavaType type) {
-            return initializer == null || initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, name, assigmentToken, initializer.withType(type));
+            return initializer == null || initializer.getType() == type ? this : new PropertyAssignment(id, prefix, markers, modifiers, name, assigmentToken, initializer.withType(type));
         }
 
         @Override
@@ -2459,7 +2452,7 @@ public interface JS extends J {
             }
 
             public PropertyAssignment withName(JRightPadded<Expression> target) {
-                return t.name == target ? t : new PropertyAssignment(t.id, t.prefix, t.markers, target, t.assigmentToken, t.initializer);
+                return t.name == target ? t : new PropertyAssignment(t.id, t.prefix, t.markers, t.modifiers, target, t.assigmentToken, t.initializer);
             }
         }
     }

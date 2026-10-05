@@ -103,7 +103,6 @@ public class ChangeDependencyExtension extends Recipe {
                     String artifactId = null;
                     String extension = null;
 
-                    String extensionStringDelimiter = "'";
                     for (Expression e : depArgs) {
                         if (!(e instanceof G.MapEntry)) {
                             continue;
@@ -124,9 +123,6 @@ public class ChangeDependencyExtension extends Recipe {
                         } else if ("name".equals(keyValue)) {
                             artifactId = valueValue;
                         } else if ("ext".equals(keyValue) && !newExtension.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                extensionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
                             extensionEntry = arg;
                             extension = valueValue;
                         }
@@ -134,13 +130,11 @@ public class ChangeDependencyExtension extends Recipe {
                     if (groupId == null || artifactId == null || extension == null) {
                         return m;
                     }
-                    String delimiter = extensionStringDelimiter;
                     G.MapEntry finalExtension = extensionEntry;
                     m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                         if (arg == finalExtension) {
-                            return finalExtension.withValue(((J.Literal) finalExtension.getValue())
-                                    .withValue(newExtension)
-                                    .withValueSource(delimiter + newExtension + delimiter));
+                            return finalExtension.withValue(ChangeStringLiteral.withStringValue(
+                                    (J.Literal) finalExtension.getValue(), newExtension));
                         }
                         return arg;
                     }));
@@ -151,7 +145,6 @@ public class ChangeDependencyExtension extends Recipe {
                     String artifactId = null;
                     String extension = null;
 
-                    String extensionStringDelimiter = "'";
                     for (G.MapEntry arg : map.getElements()) {
                         if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
                             continue;
@@ -168,9 +161,6 @@ public class ChangeDependencyExtension extends Recipe {
                         } else if ("name".equals(keyValue)) {
                             artifactId = valueValue;
                         } else if ("ext".equals(keyValue) && !newExtension.equals(valueValue)) {
-                            if (value.getValueSource() != null) {
-                                extensionStringDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
                             extensionEntry = arg;
                             extension = valueValue;
                         }
@@ -178,15 +168,13 @@ public class ChangeDependencyExtension extends Recipe {
                     if (groupId == null || artifactId == null || extension == null) {
                         return m;
                     }
-                    String delimiter = extensionStringDelimiter;
                     G.MapEntry finalExtension = extensionEntry;
                     m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                         G.MapLiteral mapLiteral = (G.MapLiteral) arg;
                         return mapLiteral.withElements(ListUtils.map(mapLiteral.getElements(), e -> {
                             if (e == finalExtension) {
-                                return finalExtension.withValue(((J.Literal) finalExtension.getValue())
-                                        .withValue(newExtension)
-                                        .withValueSource(delimiter + newExtension + delimiter));
+                                return finalExtension.withValue(ChangeStringLiteral.withStringValue(
+                                        (J.Literal) finalExtension.getValue(), newExtension));
                             }
                             return e;
                         }));

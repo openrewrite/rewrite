@@ -18,9 +18,15 @@ package org.openrewrite;
 import com.google.errorprone.annotations.MustBeClosed;
 import org.jspecify.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
+
+import static java.util.Collections.synchronizedList;
+import static java.util.Collections.unmodifiableCollection;
 
 /**
  * Default {@link DataTableStore} that holds all rows in memory.
@@ -38,7 +44,7 @@ public class InMemoryDataTableStore implements DataTableStore {
      */
     private static class Bucket {
         final DataTable<?> dataTable;
-        final List<Object> rows = Collections.synchronizedList(new ArrayList<>());
+        final List<Object> rows = synchronizedList(new ArrayList<>());
 
         Bucket(DataTable<?> dataTable) {
             this.dataTable = dataTable;
@@ -86,6 +92,6 @@ public class InMemoryDataTableStore implements DataTableStore {
         for (Bucket bucket : buckets.values()) {
             result.add(bucket.dataTable);
         }
-        return Collections.unmodifiableCollection(result);
+        return unmodifiableCollection(result);
     }
 }

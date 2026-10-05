@@ -21,8 +21,9 @@ import org.objectweb.asm.signature.SignatureReader;
 import org.objectweb.asm.signature.SignatureVisitor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Structured representation of JVMS type signatures, parsed from ASM.
@@ -222,7 +223,7 @@ public abstract class TypeSignature {
         ClassSignatureResult getResult() {
             flushCurrentTypeParameter();
             return new ClassSignatureResult(typeParameters,
-                    superclass != null ? superclass : new ClassType("java/lang/Object", Collections.emptyList()),
+                    superclass != null ? superclass : new ClassType("java/lang/Object", emptyList()),
                     interfaces);
         }
     }

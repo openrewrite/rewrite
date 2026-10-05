@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -2697,6 +2698,41 @@ class ChangeTypeTest implements RewriteTest {
                   Other o;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void doesNotFailOnClassDeclarationWithNullType() {
+        // Non-Java (e.g. Python) sources may produce a J.ClassDeclaration whose type is null.
+        // When such a file also references the type being changed, the precondition passes and
+        // ChangeClassDefinition iterates every class declaration; it must skip the null-typed one
+        // rather than dereference its type. ignoreDefinition is left unset so ChangeClassDefinition runs.
+        rewriteRun(
+          spec -> spec
+            .recipe(new ChangeType("java.util.List", "java.util.Collection", null))
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              import java.util.List;
+
+              class Foo {
+                  List<String> l;
+              }
+              """,
+            """
+              import java.util.Collection;
+
+              class Foo {
+                  Collection<String> l;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {
+                @Override
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Object o) {
+                    return classDecl.withType(null);
+                }
+            }.visit(cu, 0))
           )
         );
     }

@@ -139,6 +139,9 @@ public class ChangePropertyKey extends Recipe {
 
             String propertyToTest = newPropertyKey;
             if (oldKeyMatcher.matchesGlob(prop)) {
+                if (!hasNonExcludedValues(entry)) {
+                    return e;
+                }
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
@@ -263,6 +266,42 @@ public class ChangePropertyKey extends Recipe {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
+                // The portion before the first line break belongs to the preceding sibling.
+                int lineBreak = newEntryPrefix.indexOf('\n');
+                if (lineBreak >= 0) {
+                    newEntryPrefix = newEntryPrefix.substring(lineBreak > 0 && newEntryPrefix.charAt(lineBreak - 1) == '\r' ? lineBreak - 1 : lineBreak);
+                }
+                // A shared scope can survive while intermediate ancestors of the moved property
+                // disappear. Preserve comments from exactly the entries that disappear.
+                List<Yaml.Mapping.Entry> path = new ArrayList<>();
+                if (!hasExcludedValues(entryToReplace) && pathToEntry(scope, path)) {
+                    boolean[] removed = new boolean[path.size()];
+                    removed[path.size() - 1] = true;
+                    for (int i = path.size() - 2; i >= 0; i--) {
+                        removed[i] = removed[i + 1] && ((Yaml.Mapping) path.get(i).getValue()).getEntries().size() == 1;
+                    }
+                    if (!removed[0] && newEntryPrefix.contains("#")) {
+                        int lastBreak = newEntryPrefix.lastIndexOf('\n');
+                        newEntryPrefix = lastBreak < 0 ? "" : newEntryPrefix.substring(lastBreak);
+                    }
+                    for (int i = 1; i < path.size(); i++) {
+                        if (!removed[i]) {
+                            continue;
+                        }
+                        String prefix = path.get(i).getPrefix();
+                        // An inline comment belongs to the parent; standalone comments belong to this entry.
+                        if (!removed[i - 1]) {
+                            int breakAt = prefix.indexOf('\n');
+                            prefix = breakAt < 0 ? "" : prefix.substring(breakAt);
+                        }
+                        if (prefix.contains("#")) {
+                            if (!newEntryPrefix.contains("\n")) {
+                                newEntryPrefix += "\n";
+                            }
+                            newEntryPrefix += prefix.trim() + "\n";
+                        }
+                    }
+                }
                 Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
                         newEntryPrefix,
                         Markers.EMPTY,
@@ -272,7 +311,7 @@ public class ChangePropertyKey extends Recipe {
                         removeExclusions(entryToReplace.getValue().copyPaste()));
 
                 if (hasExcludedValues(entryToReplace)) {
-                    m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
+                    m = maybeAutoFormat(m, m.withEntries(ListUtils.concat(m.getEntries(), newEntry)), p, getCursor().getParentOrThrow());
                 } else {
                     if (m.getEntries().contains(entryToReplace)) {
                         m = m.withEntries(ListUtils.map(m.getEntries(), e -> {
@@ -283,14 +322,115 @@ public class ChangePropertyKey extends Recipe {
                         }));
                     } else {
                         m = (Yaml.Mapping) new DeletePropertyVisitor<>(entryToReplace).visitNonNull(m, p);
-                        Yaml.Mapping newMapping = m.withEntries(singletonList(newEntry));
-                        Yaml.Mapping mergedMapping = (Yaml.Mapping) new MergeYamlVisitor<>(m, newMapping, true, null, false, null, null).visitMapping(m, p);
-                        m = maybeAutoFormat(m, mergedMapping, p, getCursor().getParentOrThrow());
+                        Yaml.Mapping incoming = nestUnderExistingPrefix(m, newEntry);
+                        if (incoming == null) {
+                            incoming = m.withEntries(singletonList(newEntry));
+                        }
+                        // Inline comments can live on a following sibling outside this mapping,
+                        // or on Document.End. Merge from the document so those boundaries are visited.
+                        Yaml.Mapping target = m;
+                        Cursor formattingParent = getCursor().getParentOrThrow();
+                        doAfterVisit(new MergeYamlVisitor<P>(m, incoming, true, null, false, null, null) {
+                            @Override
+                            public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+                                Yaml.Mapping merged = (Yaml.Mapping) super.visitMapping(mapping, p);
+                                if (!target.isScope(mapping)) {
+                                    return merged;
+                                }
+                                // Keep the existing formatting behavior, including document-root spacing.
+                                boolean atDocumentRoot = getCursor().getParentOrThrow().getValue() instanceof Yaml.Document;
+                                String firstPrefix = atDocumentRoot ? merged.getEntries().get(0).getPrefix() : null;
+                                merged = maybeAutoFormat(mapping, merged, p, formattingParent);
+                                if (atDocumentRoot && !merged.getEntries().isEmpty()) {
+                                    merged = merged.withEntries(ListUtils.mapFirst(merged.getEntries(), e -> e.withPrefix(firstPrefix)));
+                                }
+                                return merged;
+                            }
+                        });
                     }
                 }
             }
 
             return m;
+        }
+
+        private boolean pathToEntry(Yaml.Mapping.Entry entry, List<Yaml.Mapping.Entry> path) {
+            path.add(entry);
+            if (entry == entryToReplace) {
+                return true;
+            }
+            if (entry.getValue() instanceof Yaml.Mapping) {
+                for (Yaml.Mapping.Entry child : ((Yaml.Mapping) entry.getValue()).getEntries()) {
+                    if (pathToEntry(child, path)) {
+                        return true;
+                    }
+                }
+            }
+            path.remove(path.size() - 1);
+            return false;
+        }
+
+        private Yaml.@Nullable Mapping nestUnderExistingPrefix(Yaml.Mapping mapping, Yaml.Mapping.Entry newEntry) {
+            String[] segments = ((Yaml.Scalar) newEntry.getKey()).getValue().split("\\.");
+            if (segments.length < 2) {
+                return null;
+            }
+
+            List<String> nestKeys = new ArrayList<>();
+            Yaml.Mapping current = mapping;
+            int consumed = 0;
+            while (consumed < segments.length - 1) {
+                Yaml.Mapping.Entry match = null;
+                int matchLength = 0;
+                for (Yaml.Mapping.Entry e : current.getEntries()) {
+                    if (!(e.getValue() instanceof Yaml.Mapping)) {
+                        continue;
+                    }
+                    String[] keyParts = e.getKey().getValue().split("\\.");
+                    if (consumed + keyParts.length >= segments.length ||
+                        !matchesPrefix(segments, consumed, keyParts) ||
+                        keyParts.length <= matchLength) {
+                        continue;
+                    }
+                    match = e;
+                    matchLength = keyParts.length;
+                }
+                if (match == null) {
+                    break;
+                }
+                nestKeys.add(match.getKey().getValue());
+                current = (Yaml.Mapping) match.getValue();
+                consumed += matchLength;
+            }
+            if (nestKeys.isEmpty()) {
+                return null;
+            }
+
+            String remainder = String.join(".", Arrays.copyOfRange(segments, consumed, segments.length));
+            Yaml.Mapping.Entry leaf = newEntry.withKey(((Yaml.Scalar) newEntry.getKey()).withValue(remainder));
+            Yaml.Mapping nested = new Yaml.Mapping(randomId(), Markers.EMPTY, null, singletonList(leaf), null, null, null);
+            for (int i = nestKeys.size() - 1; i >= 0; i--) {
+                Yaml.Mapping.Entry wrapper = new Yaml.Mapping.Entry(randomId(), "", Markers.EMPTY,
+                        new Yaml.Scalar(randomId(), "", Markers.EMPTY, Yaml.Scalar.Style.PLAIN, null, null, nestKeys.get(i)),
+                        "", nested);
+                nested = new Yaml.Mapping(randomId(), Markers.EMPTY, null, singletonList(wrapper), null, null, null);
+            }
+            return nested;
+        }
+
+        private boolean matchesPrefix(String[] segments, int start, String[] keyParts) {
+            if (start < 0 || start + keyParts.length > segments.length) {
+                return false;
+            }
+            NameCaseConvention convention = !Boolean.FALSE.equals(relaxedBinding) ?
+                    NameCaseConvention.LOWER_CAMEL :
+                    NameCaseConvention.EXACT;
+            for (int i = 0; i < keyParts.length; i++) {
+                if (!convention.format(segments[start + i]).equals(convention.format(keyParts[i]))) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {capture, isExpressionStatement, JavaScriptParser, JS, pattern} from '../../../src/javascript';
+import {capture, isExpressionStatement, JavaScriptParser, JS, pattern, sourceFileCache} from '../../../src/javascript';
 import {J} from '../../../src/java';
 
 /**
@@ -21,11 +21,7 @@ import {J} from '../../../src/java';
  * These tests verify the matchWithExplanation() API and debug information collection.
  */
 describe('Pattern Debugging', () => {
-    let parser: JavaScriptParser;
-
-    beforeEach(() => {
-        parser = new JavaScriptParser();
-    });
+    const parser = new JavaScriptParser({sourceFileCache});
 
     async function parseExpression(code: string): Promise<J> {
         const gen = parser.parse({text: code, sourcePath: 'test.ts'});

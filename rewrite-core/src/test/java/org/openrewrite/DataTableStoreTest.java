@@ -29,19 +29,19 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import static java.util.Collections.emptyMap;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -77,7 +77,7 @@ class DataTableStoreTest {
 
         List<?> rows;
         try (Stream<?> stream = store.getRows(table.getName(), null)) {
-            rows = stream.collect(Collectors.toList());
+            rows = stream.collect(toList());
         }
         assertThat(rows).hasSize(2);
     }
@@ -114,7 +114,7 @@ class DataTableStoreTest {
         // Both contributed to the same group bucket
         List<?> rows;
         try (Stream<?> stream = store.getRows(TestTable.class.getName(), "shared")) {
-            rows = stream.collect(Collectors.toList());
+            rows = stream.collect(toList());
         }
         assertThat(rows).hasSize(2);
 
@@ -304,7 +304,7 @@ class DataTableStoreTest {
 
             List<?> rows;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).hasSize(2);
             assertThat(rows.get(0)).isEqualTo(new TestTable.Row("alice"));
@@ -321,7 +321,7 @@ class DataTableStoreTest {
 
             List<?> rows;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).hasSize(2);
             assertThat(rows.get(0)).isEqualTo(new MultiColTable.Row(1, "hello"));
@@ -337,7 +337,7 @@ class DataTableStoreTest {
 
             List<?> rows;
             try (Stream<?> stream = store.getRows("nonexistent.Table", null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).isEmpty();
         }
@@ -353,14 +353,14 @@ class DataTableStoreTest {
 
             List<?> groupedRows;
             try (Stream<?> stream = store.getRows(grouped.getName(), "group-a")) {
-                groupedRows = stream.collect(Collectors.toList());
+                groupedRows = stream.collect(toList());
             }
             assertThat(groupedRows).hasSize(1);
             assertThat(groupedRows.getFirst()).isEqualTo(new TestTable.Row("grouped-row"));
 
             List<?> ungroupedRows;
             try (Stream<?> stream = store.getRows(ungrouped.getName(), null)) {
-                ungroupedRows = stream.collect(Collectors.toList());
+                ungroupedRows = stream.collect(toList());
             }
             assertThat(ungroupedRows).hasSize(1);
             assertThat(ungroupedRows.getFirst()).isEqualTo(new TestTable.Row("ungrouped-row"));
@@ -393,7 +393,7 @@ class DataTableStoreTest {
 
             List<?> rows;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).hasSize(1);
             // Should only contain the data column, not prefix/suffix
@@ -413,7 +413,7 @@ class DataTableStoreTest {
         try (CsvDataTableStore store2 = new CsvDataTableStore(tempDir)) {
             List<?> rows;
             try (Stream<?> stream = store2.getRows(table.getName(), null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).hasSize(2);
             assertThat((String[]) rows.get(0)).containsExactly("alice");
@@ -431,7 +431,7 @@ class DataTableStoreTest {
 
             List<?> rows;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                rows = stream.collect(Collectors.toList());
+                rows = stream.collect(toList());
             }
             assertThat(rows).hasSize(3);
             assertThat(rows.get(0)).isEqualTo(new TestTable.Row("value with, comma"));
@@ -472,7 +472,7 @@ class DataTableStoreTest {
         };
 
         try (CsvDataTableStore store = new CsvDataTableStore(
-                tempDir, appendOutput, countingInput, ".csv", Collections.emptyMap(), Collections.emptyMap())) {
+                tempDir, appendOutput, countingInput, ".csv", emptyMap(), emptyMap())) {
             TestTable table = new TestTable(Recipe.noop());
             List<String> names = List.of("alice", "bob", "carol", "dave", "erin", "frank");
             for (String name : names) {
@@ -481,7 +481,7 @@ class DataTableStoreTest {
 
             List<TestTable.Row> all;
             try (Stream<TestTable.Row> rows = store.getRows(TestTable.class)) {
-                all = rows.collect(Collectors.toList());
+                all = rows.collect(toList());
             }
             assertThat(all).extracting(TestTable.Row::getName).containsExactlyElementsOf(names);
 
@@ -629,7 +629,7 @@ class DataTableStoreTest {
             // Mid-run read (closes the writer internally)
             List<?> firstRead;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                firstRead = stream.collect(Collectors.toList());
+                firstRead = stream.collect(toList());
             }
             assertThat(firstRead).hasSize(2);
             assertThat(firstRead.get(0)).isEqualTo(new TestTable.Row("alice"));
@@ -641,7 +641,7 @@ class DataTableStoreTest {
             // Second read should see all three rows
             List<?> secondRead;
             try (Stream<?> stream = store.getRows(table.getName(), null)) {
-                secondRead = stream.collect(Collectors.toList());
+                secondRead = stream.collect(toList());
             }
             assertThat(secondRead).hasSize(3);
             assertThat(secondRead.get(0)).isEqualTo(new TestTable.Row("alice"));
@@ -679,8 +679,8 @@ class DataTableStoreTest {
         prefix.put("repositoryOrigin", "github.com/acme/x");
         TestTable table = new TestTable(Recipe.noop());
 
-        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, prefix, Collections.emptyMap());
-             CsvDataTableStore b = new CsvDataTableStore(tempDir, prefix, Collections.emptyMap())) {
+        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, prefix, emptyMap());
+             CsvDataTableStore b = new CsvDataTableStore(tempDir, prefix, emptyMap())) {
             a.insertRow(table, ctx(), new TestTable.Row("alice"));
             b.insertRow(table, ctx(), new TestTable.Row("bob"));
             a.insertRow(table, ctx(), new TestTable.Row("carol"));
@@ -699,13 +699,13 @@ class DataTableStoreTest {
         TestTable table = new TestTable(Recipe.noop());
         Map<String, String> originPrefix = new LinkedHashMap<>();
         originPrefix.put("repositoryOrigin", "github.com/acme/x");
-        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, originPrefix, Collections.emptyMap())) {
+        try (CsvDataTableStore a = new CsvDataTableStore(tempDir, originPrefix, emptyMap())) {
             a.insertRow(table, ctx(), new TestTable.Row("alice"));
         }
 
         Map<String, String> branchPrefix = new LinkedHashMap<>();
         branchPrefix.put("repositoryBranch", "main");
-        try (CsvDataTableStore b = new CsvDataTableStore(tempDir, branchPrefix, Collections.emptyMap())) {
+        try (CsvDataTableStore b = new CsvDataTableStore(tempDir, branchPrefix, emptyMap())) {
             assertThatThrownBy(() -> b.insertRow(table, ctx(), new TestTable.Row("bob")))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("must agree on column order");

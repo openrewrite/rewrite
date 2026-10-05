@@ -48,6 +48,7 @@ internal static class CSharpPrecedences
         Unary => 13,
         CsUnary => 13,
         TypeCast => 13,
+        InstanceOf => 7,
         IsPattern ip => GetIsPatternPrecedence(ip),
         RangeExpression => 12,
         SwitchExpression => 11,
@@ -76,7 +77,7 @@ internal static class CSharpPrecedences
     {
         if (expr is Parentheses<Expression> p) return p;
         return new Parentheses<Expression>(
-            Guid.NewGuid(), expr.Prefix, Markers.Empty,
+            Tree.RandomId(), expr.Prefix, Markers.Empty,
             new JRightPadded<Expression>(J.SetPrefix(expr, Space.Empty), Space.Empty, Markers.Empty));
     }
 

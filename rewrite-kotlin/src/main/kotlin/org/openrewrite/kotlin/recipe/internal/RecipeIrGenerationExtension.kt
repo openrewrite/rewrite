@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.ir.declarations.IrConstructor
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrMemberWithContainerSource
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
+import org.jetbrains.kotlin.ir.declarations.IrPackageFragment
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
@@ -60,15 +61,21 @@ import org.jetbrains.kotlin.ir.expressions.IrFunctionExpression
 import org.jetbrains.kotlin.ir.expressions.IrGetValue
 import org.jetbrains.kotlin.ir.expressions.IrReturn
 import org.jetbrains.kotlin.ir.expressions.IrSpreadElement
+import org.jetbrains.kotlin.ir.expressions.IrStringConcatenation
 import org.jetbrains.kotlin.ir.expressions.IrVararg
 import org.jetbrains.kotlin.ir.expressions.IrVarargElement
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrConstructorSymbol
 import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.symbols.IrValueSymbol
+import org.jetbrains.kotlin.ir.types.IrSimpleType
 import org.jetbrains.kotlin.ir.types.IrType
+import org.jetbrains.kotlin.ir.types.IrTypeArgument
+import org.jetbrains.kotlin.ir.types.IrTypeProjection
 import org.jetbrains.kotlin.ir.types.classFqName
+import org.jetbrains.kotlin.ir.types.classOrNull
 import org.jetbrains.kotlin.ir.types.defaultType
+import org.jetbrains.kotlin.ir.types.isPrimitiveType
 import org.jetbrains.kotlin.ir.util.addChild
 import org.jetbrains.kotlin.ir.util.createThisReceiverParameter
 import org.jetbrains.kotlin.ir.util.deepCopyWithSymbols
@@ -81,6 +88,8 @@ import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.types.Variance
+import org.openrewrite.kotlin.internal.facadeFqn
 import java.io.File
 
 /**
@@ -151,17 +160,34 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
          */
         const val VARARGS_SENTINEL = "VARARGS"
 
-        /**
-         * Kotlin builtin → Java FQN, for typing the fixed prefix params of a
-         * varargs MethodMatcher spec. `JavaType.Method` carries Java types even
-         * for Kotlin sources, so `kotlin.String` must be spelled
-         * `java.lang.String` for the matcher to fire.
-         */
+        /** Kotlin builtin → Java FQN, for JavaTemplate placeholder types. */
         val KOTLIN_BUILTIN_TO_JAVA_FQN: Map<String, String> = mapOf(
             "kotlin.String" to "java.lang.String",
             "kotlin.CharSequence" to "java.lang.CharSequence",
             "kotlin.Any" to "java.lang.Object",
             "kotlin.Throwable" to "java.lang.Throwable",
+            "kotlin.Int" to "int",
+            "kotlin.Long" to "long",
+            "kotlin.Short" to "short",
+            "kotlin.Byte" to "byte",
+            "kotlin.Boolean" to "boolean",
+            "kotlin.Char" to "char",
+            "kotlin.Float" to "float",
+            "kotlin.Double" to "double",
+        )
+
+        /**
+         * Kotlin builtin → a MethodMatcher argument token that names it in both a
+         * Kotlin and a Java LST. `KotlinTypeMapping` only remaps builtins to their
+         * JVM FQN for Java-declared methods, so the same `String` parameter reads
+         * `kotlin.String` on a Kotlin-declared callee and `java.lang.String` on a
+         * Java-declared one; hence the package wildcards. `kotlin.Any` has no
+         * entry — it shares no simple name with `java.lang.Object`.
+         */
+        val KOTLIN_BUILTIN_TO_MATCHER_TOKEN: Map<String, String> = mapOf(
+            "kotlin.String" to "*..String",
+            "kotlin.CharSequence" to "*..CharSequence",
+            "kotlin.Throwable" to "*..Throwable",
             "kotlin.Int" to "int",
             "kotlin.Long" to "long",
             "kotlin.Short" to "short",
@@ -426,8 +452,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val displayNameIdx = params.indexOfFirst { it.name == Name.identifier("displayName") }
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         if (displayNameIdx < 0 || descriptionIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
 
         val tagsIdx = params.indexOfFirst { it.name == Name.identifier("tags") }
         val tagsArg = if (tagsIdx >= 0) substantiveArgOrNull(call.arguments[tagsIdx]) else null
@@ -451,8 +477,8 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         val descriptionIdx = params.indexOfFirst { it.name == Name.identifier("description") }
         val recipesIdx = params.indexOfFirst { it.name == Name.identifier("recipes") }
         if (displayNameIdx < 0 || descriptionIdx < 0 || recipesIdx < 0) return null
-        val displayName = (call.arguments[displayNameIdx] as? IrConst)?.value as? String ?: return null
-        val description = (call.arguments[descriptionIdx] as? IrConst)?.value as? String ?: return null
+        val displayName = evalConstString(call.arguments[displayNameIdx]) ?: return null
+        val description = evalConstString(call.arguments[descriptionIdx]) ?: return null
         val recipesVararg = call.arguments[recipesIdx] as? org.jetbrains.kotlin.ir.expressions.IrVararg ?: return null
         return CompositeRecipeMetadata(displayName, description, recipesVararg)
     }
@@ -474,6 +500,38 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
             }
         }
         return arg
+    }
+
+    /**
+     * Fold a `displayName` / `description` argument to a compile-time constant
+     * String. This runs BEFORE the IR const-evaluation lowering, so even a
+     * literal `"a" + "b"` is still an unlowered `IrCall`/`IrStringConcatenation`
+     * here — a plain `as? IrConst` would miss it and silently drop the recipe.
+     */
+    private fun evalConstString(expr: IrExpression?): String? {
+        return when (expr) {
+            null -> null
+            is IrConst -> expr.value?.toString()
+            is IrStringConcatenation -> buildString {
+                for (part in expr.arguments) append(evalConstString(part) ?: return null)
+            }
+            is IrCall -> when (expr.symbol.owner.kotlinFqName.asString()) {
+                "kotlin.String.plus" -> {
+                    val left = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val right = evalConstString(expr.arguments.getOrNull(1)) ?: return null
+                    left + right
+                }
+                "kotlin.text.trimIndent" -> evalConstString(expr.arguments.getOrNull(0))?.trimIndent()
+                "kotlin.text.trimMargin" -> {
+                    val receiver = evalConstString(expr.arguments.getOrNull(0)) ?: return null
+                    val marginArg = expr.arguments.getOrNull(1)
+                    if (marginArg == null) receiver.trimMargin()
+                    else receiver.trimMargin(evalConstString(marginArg) ?: return null)
+                }
+                else -> null
+            }
+            else -> null
+        }
     }
 
     // ------------------------------------------------------------------
@@ -1270,10 +1328,10 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
     }
 
     /**
-     * Emit a precise MethodMatcher arg pattern (e.g. `*,*` for two args, empty for
-     * zero) instead of the `..` wildcard. Tightening the arg count is what
-     * distinguishes overloaded methods on the same name: `Iterable<T>.any()` (no
-     * predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
+     * Emit a precise MethodMatcher arg pattern (e.g. `double,*` for two args,
+     * empty for zero) instead of the `..` wildcard. Tightening the arg count is
+     * what distinguishes overloaded methods on the same name: `Iterable<T>.any()`
+     * (no predicate) versus `Iterable<T>.any(predicate: (T) -> Boolean)`. A recipe
      * authored as `xs.filter(p).any()` would otherwise also match
      * `xs.filter(p1).any { p2 }` via `(..)` and silently drop the `p2` predicate.
      *
@@ -1309,24 +1367,43 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         }
         val jvmArgCount = params.size + extReceiverArg
         if (jvmArgCount == 0) return ""
-        return List(jvmArgCount) { "*" }.joinToString(",")
+        // A receiver is usually declared in the callee's own type parameters
+        // (`Iterable<T>`), so its slot stays `*`.
+        val tokens = mutableListOf<String>()
+        repeat(extReceiverArg) { tokens += "*" }
+        for (param in params) {
+            tokens += matcherParamType(param.type)
+        }
+        return tokens.joinToString(",")
     }
 
     /**
-     * Render a fixed prefix parameter's type as a MethodMatcher type token,
-     * mapping Kotlin builtins back to the Java FQN the matcher resolves against.
-     * Falls back to `*` when the type can't be named.
+     * Render a parameter's declared type as a MethodMatcher argument token, so
+     * that `Math.abs(x: Double)` doesn't also rewrite `Math.abs(anInt)`.
+     *
+     * A wrong token silently stops the recipe firing, so anything whose
+     * `JavaType` spelling isn't predictable falls back to `*`: type parameters,
+     * nullable primitives (`Int?` boxes to `java.lang.Integer`), value classes,
+     * nested classes (`Map$Entry` in a `JavaType`), and the rest of `kotlin.`,
+     * whose collections, arrays and function types all erase to a different name.
      */
     private fun matcherParamType(type: IrType): String {
         val fqn = type.classFqName?.asString() ?: return "*"
-        return KOTLIN_BUILTIN_TO_JAVA_FQN[fqn] ?: fqn
+        val token = KOTLIN_BUILTIN_TO_MATCHER_TOKEN[fqn]
+        if (token != null) {
+            return if ('.' !in token && !type.isPrimitiveType()) "*" else token
+        }
+        val cls = type.classOrNull?.owner ?: return "*"
+        if (cls.isValue || cls.parent !is IrPackageFragment || fqn.startsWith("kotlin.")) {
+            return "*"
+        }
+        return fqn
     }
 
     private fun computeJvmFacadeFqn(fn: IrSimpleFunction): String? {
         val containerSource = (fn as? IrMemberWithContainerSource)?.containerSource
         if (containerSource is JvmPackagePartSource) {
-            val jvmName = containerSource.facadeClassName ?: containerSource.className
-            return jvmName.fqNameForTopLevelClassMaybeWithDollars.asString()
+            return containerSource.facadeFqn
         }
         val file = fn.parent as? IrFile ?: return null
         val pkgFqn = file.packageFqName.asString()
@@ -1620,9 +1697,23 @@ internal class RecipeIrGenerationExtension : IrGenerationExtension {
         // templated call's method type. Only remap reference FQNs (those with a
         // dot); leave primitives (`int`) and non-builtins alone. KotlinTemplate
         // keeps the Kotlin spelling, which is what it resolves against.
-        if (!javaTemplate) return fqn
-        val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
-        return if (mapped != null && mapped.contains('.')) mapped else fqn
+        if (javaTemplate) {
+            val mapped = KOTLIN_BUILTIN_TO_JAVA_FQN[fqn]
+            return if (mapped != null && mapped.contains('.')) mapped else fqn
+        }
+        // KotlinTemplate path: spell out concrete type arguments so overloads that
+        // dispatch on a generic argument resolve (e.g. `Iterable<T>.sumOf` on the
+        // selector's return type). Anything but an invariant, concrete argument
+        // (star projection, use-site variance, type parameter) falls back to raw.
+        val args = (type as? IrSimpleType)?.arguments
+        if (args.isNullOrEmpty()) return fqn
+        val rendered = args.map { renderTypeArgument(it) ?: return fqn }
+        return "$fqn<${rendered.joinToString(", ")}>"
+    }
+
+    private fun renderTypeArgument(arg: IrTypeArgument): String? {
+        if (arg !is IrTypeProjection || arg.variance != Variance.INVARIANT) return null
+        return renderPlaceholderType(arg.type, javaTemplate = false)
     }
 
     private fun renderPlaceholder(typeFqn: String?): String =

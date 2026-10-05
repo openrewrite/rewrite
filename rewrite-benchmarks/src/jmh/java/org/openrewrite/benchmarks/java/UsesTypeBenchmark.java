@@ -34,7 +34,6 @@ import java.lang.reflect.Field;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * Compares {@link TypesInUse#hasType(String, boolean)} (the closure-cached path) against

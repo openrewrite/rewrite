@@ -1,0 +1,9 @@
+[project]
+name = "fixture-g2"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+zeta = ["six>=1.16"]
+alpha = ["iniconfig>=2.0"]

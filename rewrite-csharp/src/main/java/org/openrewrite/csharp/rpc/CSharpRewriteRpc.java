@@ -15,19 +15,33 @@
  */
 package org.openrewrite.csharp.rpc;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTableStore;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.csharp.CSharpParser;
+import org.openrewrite.csharp.CsprojParser;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.internal.rpc.JavaTypeReceiver;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marketplace.RecipeBundleResolver;
 import org.openrewrite.marketplace.RecipeMarketplace;
+import org.openrewrite.quark.Quark;
 import org.openrewrite.rpc.RewriteRpc;
 import org.openrewrite.rpc.RewriteRpcProcess;
 import org.openrewrite.rpc.RewriteRpcProcessManager;
+import org.openrewrite.rpc.RpcObjectData;
+import org.openrewrite.rpc.RpcReceiveQueue;
+import org.openrewrite.rpc.request.GetObjectResponse;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -45,6 +59,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -61,11 +76,22 @@ public class CSharpRewriteRpc extends RewriteRpc {
     private final Map<String, String> commandEnv;
     private final RewriteRpcProcess process;
 
+    @Getter(AccessLevel.NONE)
+    private final AtomicLong restoreTimeMs = new AtomicLong();
+
     CSharpRewriteRpc(RewriteRpcProcess process, RecipeMarketplace marketplace, List<RecipeBundleResolver> resolvers, String command, Map<String, String> commandEnv) {
         super(process.getRpcClient(), marketplace, resolvers);
         this.command = command;
         this.commandEnv = commandEnv;
         this.process = process;
+    }
+
+    /**
+     * Total milliseconds this engine has spent restoring NuGet dependencies across every
+     * {@link #parseSolution} call.
+     */
+    public long getRestoreTimeMs() {
+        return restoreTimeMs.get();
     }
 
     public static @Nullable CSharpRewriteRpc get() {
@@ -141,6 +167,10 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 if (response == null) {
                     parsingListener.intermediateMessage("Starting C# solution parsing: " + path);
                     response = send("ParseSolution", new ParseSolution(path, rootDir, options), ParseSolutionResponse.class);
+                    restoreTimeMs.addAndGet(response.getRestoreTimeMs());
+                    // Project files carry the resolved packages, so a consumer can read them before the sources.
+                    response.getItems().sort(Comparator.comparing((ParseSolutionResponse.Item item) ->
+                            !"org.openrewrite.xml.tree.Xml$Document".equals(item.getSourceFileType())));
                     parsingListener.intermediateMessage(String.format("Discovered %,d files to parse", response.getItems().size()));
                 }
 
@@ -151,11 +181,42 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 ParseSolutionResponse.Item item = response.getItems().get(index);
                 index++;
 
-                SourceFile sourceFile = getObject(item.getId(), item.getSourceFileType());
+                if (Quark.class.getName().equals(item.getSourceFileType())) {
+                    // Oversize file the C# side declined to parse; build the Quark locally
+                    // from its path (plus file attributes) — no content on the wire.
+                    Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
+                    action.accept(new Quark(Tree.randomId(), sourcePath, Markers.EMPTY, null,
+                            FileAttributes.fromPath(rootDir.resolve(sourcePath))));
+                    return true;
+                }
+
+                SourceFile sourceFile;
+                try {
+                    sourceFile = getObject(item.getId(), item.getSourceFileType());
+                } catch (Exception e) {
+                    if (item.getSourcePath() == null) {
+                        throw e;
+                    }
+                    sourceFile = parseError(item, e);
+                }
 
                 parsingListener.startedParsing(Parser.Input.fromFile(sourceFile.getSourcePath()));
                 action.accept(sourceFile);
                 return true;
+            }
+
+            private SourceFile parseError(ParseSolutionResponse.Item item, Exception e) {
+                Parser parser = "org.openrewrite.xml.tree.Xml$Document".equals(item.getSourceFileType()) ?
+                        CsprojParser.builder().build() :
+                        CSharpParser.builder().build();
+                Path sourcePath = Paths.get(Objects.requireNonNull(item.getSourcePath()));
+                try {
+                    return ParseError.build(parser, Parser.Input.fromFile(rootDir.resolve(sourcePath)), rootDir, ctx, e);
+                } catch (Exception unreadable) {
+                    return new ParseError(Tree.randomId(),
+                            new Markers(Tree.randomId(), Collections.singletonList(ParseExceptionResult.build(parser, e))),
+                            sourcePath, null, null, false, null, "", null);
+                }
             }
 
             @Override
@@ -175,6 +236,34 @@ public class CSharpRewriteRpc extends RewriteRpc {
                 return response == null ? ORDERED : ORDERED | SIZED | SUBSIZED;
             }
         }, false);
+    }
+
+    /**
+     * Enumerate the public API of {@code ownAssemblies} into {@code JavaType}, resolving
+     * symbols against {@code referenceAssemblies} (the reference closure — other packages'
+     * assemblies plus the BCL). Returns one {@link org.openrewrite.java.tree.JavaType.FullyQualified}
+     * per top-level public type the own assemblies define, with complete members and methods;
+     * types they reference but don't define come back shallow (FQN only), for the caller to resolve.
+     * <p>
+     * Streaming: the engine sends the FQNs the own assemblies define first ({@code onFqns}, so the
+     * caller knows which names this package defines up front), then each defined type ({@code onType}) as
+     * a ref-deduplicated object stream (the same wire format {@code getObject} uses) so a shared type
+     * is transferred once and the caller never holds the whole list. A fresh ref space per call keeps it
+     * self-contained.
+     */
+    public void dependencyTypes(Dependency dependency,
+                                Consumer<Set<String>> onFqns, Consumer<JavaType.FullyQualified> onType) {
+        RpcReceiveQueue q = new RpcReceiveQueue(new HashMap<>(),
+                () -> send("DependencyTypes", dependency, GetObjectResponse.class),
+                JavaType.Class.class.getName(), null);
+        Set<String> ownFqns = new LinkedHashSet<>();
+        q.<String>receiveList(null, null, ownFqns::add);
+        onFqns.accept(ownFqns);
+        q.receiveList(null, v -> (JavaType.FullyQualified) new JavaTypeReceiver().visit(v, q), onType);
+        RpcObjectData end = q.take();
+        if (end.getState() != RpcObjectData.State.END_OF_OBJECT) {
+            throw new IllegalStateException("Expected END_OF_OBJECT but got: " + end);
+        }
     }
 
     public static Builder builder() {
@@ -204,6 +293,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
         private Supplier<@Nullable Path> dotnetPathSupplier = () -> DEFAULT_DOTNET_PATH;
         private @Nullable Path csharpServerEntry;
         private @Nullable Path log;
+        private @Nullable Path metricsCsv;
         private Duration timeout = Duration.ofSeconds(60);
         private boolean traceRpcMessages;
         private @Nullable Path workingDirectory;
@@ -268,6 +358,11 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         public Builder log(@Nullable Path log) {
             this.log = log;
+            return this;
+        }
+
+        public Builder metricsCsv(@Nullable Path metricsCsv) {
+            this.metricsCsv = metricsCsv;
             return this;
         }
 
@@ -360,6 +455,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                             dotnetPath.toString(),
                             serverEntry.toAbsolutePath().normalize().toString(),
                             log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                            metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                             traceRpcMessages ? "--trace-rpc-messages" : null,
                             recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
                     );
@@ -382,14 +478,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
 
         private CSharpRewriteRpc startProcess(Stream<@Nullable String> cmd, Path dotnetPath) {
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // The tool is launched as a self-contained apphost (not via the `dotnet`
             // muxer), so it must locate the shared runtime itself. When DOTNET_ROOT is
@@ -399,15 +488,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
             // (e.g. Homebrew, where the binary is under bin/ but the runtime under
             // libexec/), and on arm64 machines using an x64 dotnet. Derive DOTNET_ROOT
             // from the resolved dotnet and set it if the caller hasn't.
-            if (!process.environment().containsKey("DOTNET_ROOT")) {
+            if (!env.containsKey("DOTNET_ROOT")) {
                 Path dotnetRoot = resolveDotnetRoot(dotnetPath);
                 if (dotnetRoot != null) {
-                    process.environment().put("DOTNET_ROOT", dotnetRoot.toString());
+                    env.put("DOTNET_ROOT", dotnetRoot.toString());
                 }
             }
 
             if (profileOutputPath != null) {
-                Map<String, String> env = process.environment();
                 env.put("DOTNET_EnableEventPipe", "1");
                 env.put("DOTNET_EventPipeOutputPath", profileOutputPath.toAbsolutePath().normalize().toString());
                 env.put("DOTNET_EventPipeOutputStreaming", "1");
@@ -418,6 +506,12 @@ public class CSharpRewriteRpc extends RewriteRpc {
                         "System.Runtime:0:4");
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("csharp")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {
@@ -485,6 +579,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
                     // ("Non-default ID required"). --no-build also implies --no-restore.
                     "--no-build",
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );
@@ -513,6 +608,7 @@ public class CSharpRewriteRpc extends RewriteRpc {
             return Stream.of(
                     toolExecutable.toAbsolutePath().normalize().toString(),
                     log == null ? null : "--log-file=" + log.toAbsolutePath().normalize(),
+                    metricsCsv == null ? null : "--metrics-csv=" + metricsCsv.toAbsolutePath().normalize(),
                     traceRpcMessages ? "--trace-rpc-messages" : null,
                     recipeInstallDir == null ? null : "--recipe-install-dir=" + recipeInstallDir.toAbsolutePath().normalize()
             );

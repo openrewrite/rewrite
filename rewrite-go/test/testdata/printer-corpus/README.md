@@ -45,3 +45,104 @@ P2 in the eng review: corpus runs are open-ended (a new bug can land
 without a corpus regression, and a corpus diff can take longer to triage
 than tests like `go test`). Keeping it manual gives fast iteration on
 real bug reports without making the CI pipeline noisy.
+
+## Sweeping real repositories
+
+The fixtures above are cases someone already reduced. To find new ones,
+`make sweep` runs the same pipeline over checked-out Go repositories —
+clone them somewhere outside this repository — and sorts every file into
+one of three classes:
+
+- **parse error** — the parser rejects it, panics, or prints back
+  something other than its input. A loud failure.
+- **unsound** — it round-trips, but source text is sitting in a `Space`,
+  where no recipe can see or rewrite it. Silent: a `rewriteRun` test on
+  such a file passes.
+- **sound** — round-trips and hides nothing.
+
+```sh
+mkdir -p /tmp/go-corpus && cd /tmp/go-corpus
+for r in golang/go kubernetes/kubernetes prometheus/prometheus \
+         hashicorp/terraform etcd-io/etcd golang/tools uber-go/zap gin-gonic/gin; do
+  git clone --depth 1 https://github.com/$r.git ${r//\//_}
+done
+cd - && make sweep CORPUS=/tmp/go-corpus SWEEP_OUT=/tmp/go-sweep
+```
+
+`$SWEEP_OUT/report.txt` holds the counts and the failures grouped by
+cause; `results.jsonl` holds a row per file, for querying. Buckets are
+keyed on normalized signatures — error text with source offsets
+stripped, hidden text with identifiers collapsed — because unnormalized
+keys shatter one cause into hundreds of apparent singletons and hide the
+large clusters worth fixing.
+
+The run journals each result as it lands, so it resumes where it left
+off. That matters because a runaway parser recursion is a stack
+overflow, which `recover` cannot catch: the process dies, and the file
+it was on is named by the leftover in-flight markers on the next run.
+
+Pick a bucket, then shrink one of its files to something small enough to
+become a test:
+
+```sh
+make reduce FILE=/tmp/go-corpus/golang_go/src/some/file.go
+```
+
+`make reduce` drops lines while the failure keeps its exact
+classification, so it converges on the construct at fault rather than on
+some other bug. Turn the result into an ordinary test in the topic file
+that covers that syntax — `rewriteRun` already asserts both byte-equal
+round-trip and a clean tree, so a minimal reproducer is a complete test.
+
+## Checking what the sweep never sees
+
+```sh
+GO_CORPUS=/tmp/go-corpus go test -tags parityaudit ./test/ -run TestFalseRejections -v
+```
+
+A file the sweep skips is one no build context selected, and a bug in
+constraint evaluation looks exactly like a file that was meant to be
+skipped — it just disappears from the denominator. This asks `go/build`
+whether it would have taken the file, and lists those it would.
+
+## Measuring type attribution
+
+```sh
+make types CORPUS=/tmp/go-corpus
+```
+
+None of the three classes above look at types, so a change that trades
+attribution for termination — a recover, a depth bound, a cache that
+collapses one type onto another — leaves every one of them unmoved.
+`make types` counts, per node field, how many type slots came back
+resolved, `Unknown`, or nil. Compare two builds by running it on each:
+a field that reads 0.00% across the corpus is one nothing populates.
+
+Attribution is a property of a package, not of a file: a reference to a
+sibling resolves only when the importer can reach it. `GO_TYPES_PACKAGE=1`
+parses whole directories through a `ProjectImporter`, which is what a
+project parse does and what the numbers should be read against — per-file
+figures understate a real run by roughly ten points.
+
+A nil slot is not automatically a gap. `Identifier.FieldType` follows
+rewrite-java's rule that a variable type exists only for a `VarSymbol`,
+so a method name, a type name and a package qualifier all carry nil by
+contract. The report also lists empty slots keyed by the field the node
+sits in, which is what separates those from the ones worth chasing.
+
+## Fuzzing the gaps between tokens
+
+```sh
+make fuzz CORPUS=/tmp/go-corpus
+```
+
+Real Go is overwhelmingly gofmt'd, which leaves exactly one canonical
+amount of space between any two tokens. `make fuzz` widens that gap —
+with a block comment, extra spaces, a tab, a newline — and checks the
+result still round-trips. It reaches the places a corpus of formatted
+code never does: whether an empty argument list keeps `( )`, whether a
+directive keeps two spaces before its arguments.
+
+Failures are grouped by the same normalized signature the sweep uses,
+and reported one line per distinct cause with a file and offset to
+reproduce from.

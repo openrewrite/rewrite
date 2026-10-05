@@ -15,6 +15,9 @@
  */
 using OpenRewrite.Core.Rpc;
 
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace OpenRewrite.Core;
 
 /// <summary>
@@ -26,13 +29,21 @@ public interface Marker
 }
 
 /// <summary>
-/// Fallback marker for Java marker types that have no C# equivalent.
-/// Similar to Java's RpcMarker, this captures the Id so the marker can
-/// be round-tripped without losing identity, while the actual data is ignored.
+/// Stands in for a Java marker that has no type here. Like Java's RpcMarker, it keeps the
+/// marker's fields along with its id, so that it is sent back as it came.
 /// </summary>
-public sealed class UnknownMarker(Guid id) : Marker
+public sealed class UnknownMarker(Guid id, string? javaType = null) : Marker
 {
     public Guid Id { get; } = id;
+
+    /// <summary>
+    /// The Java type the marker arrived as.
+    /// </summary>
+    [JsonIgnore]
+    public string? JavaType { get; } = javaType;
+
+    [JsonExtensionData]
+    public Dictionary<string, JsonElement> Data { get; } = new();
 }
 
 /// <summary>
@@ -54,12 +65,9 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
     public Markers RpcReceive(Markers before, RpcReceiveQueue q)
     {
         var id = q.ReceiveAndGet<Guid, string>(before.Id, Guid.Parse);
-        var markerList = q.ReceiveList(before.MarkerList, marker =>
-        {
-            if (marker is IRpcCodec codec)
-                return (Marker)codec.RpcReceive(marker, q);
-            return marker;
-        });
+        // No onChange: the queue dispatches markers implementing IRpcCodec itself, and
+        // codec-less markers arrive as inline values that an onChange callback would discard
+        var markerList = q.ReceiveList(before.MarkerList, null);
         return new Markers(id, markerList!);
     }
 
@@ -68,7 +76,7 @@ public sealed class Markers(Guid id, IList<Marker> markerList) : IRpcCodec<Marke
     public static Markers Build(IEnumerable<Marker> markers)
     {
         var list = markers.ToList();
-        return list.Count == 0 ? Empty : new Markers(Guid.NewGuid(), list);
+        return list.Count == 0 ? Empty : new Markers(Tree.RandomId(), list);
     }
 
     public T? FindFirst<T>() where T : Marker =>

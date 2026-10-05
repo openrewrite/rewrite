@@ -11,8 +11,10 @@ package org.openrewrite.kotlin.recipe;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
@@ -28,11 +30,14 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.search.UsesField;
 import org.openrewrite.java.search.UsesMethod;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinTemplate;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
@@ -50,7 +55,7 @@ import org.openrewrite.kotlin.tree.K;
  * are parallel paths selected by the LST-structural classifier in the IR
  * extension: the default is {@code methodInvocationRewriteJava} (a
  * {@link JavaVisitor} walks both Java AND Kotlin sources via
- * {@link org.openrewrite.kotlin.TreeVisitorAdapter}); the Kotlin variant kicks
+ * {@link org.openrewrite.internal.TreeVisitorAdapter}); the Kotlin variant kicks
  * in only when the before/after templates structurally reference a {@code K.*}
  * LST node — see {@code RecipeIrLanguageDescriptors.isKotlinSpecificTreeNode}.
  */
@@ -130,7 +135,9 @@ public final class GeneratedRecipeSupport {
                         result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return result.withPrefix(method.getPrefix());
+                    J inserted = result.withPrefix(method.getPrefix());
+                    doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                    return inserted;
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
@@ -197,7 +204,9 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return result.withPrefix(method.getPrefix());
+                J inserted = result.withPrefix(method.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLine, walker);
@@ -380,7 +389,9 @@ public final class GeneratedRecipeSupport {
                     result = preserveTrailingLambdaShape((J.MethodInvocation) result);
                     result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                 }
-                return result.withPrefix(unary.getPrefix());
+                J inserted = result.withPrefix(unary.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
@@ -455,10 +466,55 @@ public final class GeneratedRecipeSupport {
                 }
                 J result = KotlinTemplate.builder(afterTemplate).build()
                         .apply(getCursor(), fieldAccess.getCoordinates().replace(), substitutions);
-                return result.withPrefix(fieldAccess.getPrefix());
+                J inserted = result.withPrefix(fieldAccess.getPrefix());
+                doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                return inserted;
             }
         };
         return wrapWithPrecondition(matcherSpecsLines, walker);
+    }
+
+    /**
+     * Shortens and imports the qualified type references the after-template spells out. Substituted
+     * captures are the matched source's own code and keep their spelling.
+     */
+    private static TreeVisitor<?, ExecutionContext> shortenTemplateTypes(
+            JavaVisitor<ExecutionContext> visitor, J inserted, Object[] substitutions) {
+        Set<UUID> captured = new HashSet<>();
+        for (Object substitution : substitutions) {
+            if (substitution instanceof J) {
+                captured.add(((J) substitution).getId());
+            }
+        }
+        List<J.FieldAccess> qualified = new ArrayList<>();
+        new KotlinIsoVisitor<Integer>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, Integer p) {
+                return tree != null && captured.contains(tree.getId()) ? (J) tree : super.visit(tree, p);
+            }
+
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer p) {
+                if (fieldAccess.getType() instanceof JavaType.FullyQualified && fieldAccess.getName().getFieldType() == null) {
+                    qualified.add(fieldAccess);
+                    return fieldAccess;
+                }
+                return super.visitFieldAccess(fieldAccess, p);
+            }
+        }.visit(inserted, 0);
+        if (qualified.isEmpty()) {
+            return TreeVisitor.noop();
+        }
+        ImportService importService = visitor.service(ImportService.class);
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                for (J.FieldAccess fieldAccess : qualified) {
+                    tree = importService.shortenFullyQualifiedTypeReferencesIn(fieldAccess).visit(tree, ctx);
+                }
+                return tree;
+            }
+        };
     }
 
     private static @Nullable String fullyQualifiedNameOf(org.openrewrite.java.tree.@Nullable JavaType type) {
@@ -472,7 +528,7 @@ public final class GeneratedRecipeSupport {
      * Java-rooted parallel of {@link #methodInvocationRewrite}. Used when the
      * LST-structural classifier defaults a {@code rewrite { } to { }} clause
      * to a {@link JavaVisitor}: the visitor walks both Java and Kotlin sources
-     * via {@link org.openrewrite.kotlin.TreeVisitorAdapter}, but the template
+     * via {@link org.openrewrite.internal.TreeVisitorAdapter}, but the template
      * is parsed via {@link JavaTemplate}.
      *
      * <p>Matching, substitution-source semantics, and the multi-spec {@code \n}
@@ -516,7 +572,9 @@ public final class GeneratedRecipeSupport {
                         result = preserveSelectAfter((J.MethodInvocation) result, method);
                         result = restoreSubstitutedInteriors((J.MethodInvocation) result, substitutions);
                     }
-                    return result.withPrefix(method.getPrefix());
+                    J inserted = result.withPrefix(method.getPrefix());
+                    doAfterVisit(shortenTemplateTypes(this, inserted, substitutions));
+                    return inserted;
                 }
                 return super.visitMethodInvocation(method, ctx);
             }

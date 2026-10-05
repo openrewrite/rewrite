@@ -147,6 +147,28 @@ examples:
     language: kotlin
 ---
 type: specs.openrewrite.org/v1beta/example
+recipeName: org.openrewrite.java.search.FindFieldsOfType
+examples:
+- description: '`FindFieldsOfTypeTest#findsKotlinFieldWithoutThrowing`'
+  parameters:
+  - java.util.ArrayList
+  - 'false'
+  sources:
+  - before: |
+      import java.io.File
+
+      class Checksum {
+          val files: ArrayList<File> = arrayListOf()
+      }
+    after: |
+      import java.io.File
+
+      class Checksum {
+          /*~~>*/val files: ArrayList<File> = arrayListOf()
+      }
+    language: kotlin
+---
+type: specs.openrewrite.org/v1beta/example
 recipeName: org.openrewrite.java.search.FindMethods
 examples:
 - description: '`FindMethodsTest#jvmStaticMethod`'

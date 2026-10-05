@@ -29,11 +29,12 @@ import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+
+import static java.util.Collections.singletonList;
 
 /**
  * Shared utilities for Python dependency recipes operating on pyproject.toml files.
@@ -113,7 +114,7 @@ public class PyProjectHelper {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
         List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
+        parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
         if (!parsed.isEmpty() && parsed.get(0) instanceof Json.Document) {
             Json.Document newDoc = (Json.Document) parsed.get(0);
@@ -131,7 +132,7 @@ public class PyProjectHelper {
         TomlParser parser = new TomlParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
         List<SourceFile> parsed = new ArrayList<>();
-        parser.parseInputs(Collections.singletonList(input), null,
+        parser.parseInputs(singletonList(input), null,
                 new InMemoryExecutionContext(Throwable::printStackTrace)).forEach(parsed::add);
         if (!parsed.isEmpty() && parsed.get(0) instanceof Toml.Document) {
             Toml.Document newDoc = (Toml.Document) parsed.get(0);
@@ -196,7 +197,24 @@ public class PyProjectHelper {
                 if (resolved.isEmpty()) {
                     return depsFile;
                 }
-                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved);
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Uv);
+                break;
+            case Poetry:
+                resolved = PoetryLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Poetry);
+                break;
+            case Pdm:
+                resolved = PdmLockParser.parse(regeneratedLockContent);
+                if (resolved.isEmpty()) {
+                    return depsFile;
+                }
+                overlaid = PythonResolutionLinker.applyPyproject(existing, resolved,
+                        PythonResolutionResult.PackageManager.Pdm);
                 break;
             case Pipenv:
                 resolved = PipfileLockParser.parse(regeneratedLockContent);
@@ -261,13 +279,22 @@ public class PyProjectHelper {
             PythonDependencyFile trait,
             Function<PythonDependencyFile, PythonDependencyFile> editFn,
             @Nullable String capturedLockContent) {
+        return editAndRegenerate(trait, editFn, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static EditAndRegenerateResult editAndRegenerate(
+            PythonDependencyFile trait,
+            Function<PythonDependencyFile, PythonDependencyFile> editFn,
+            @Nullable String capturedLockContent,
+            ExecutionContext ctx) {
         PythonDependencyFile updated = editFn.apply(trait);
         if (updated.getTree() == trait.getTree()) {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile modified = refreshMarker((SourceFile) updated.getTree());
+        String originalDepsContent = ((SourceFile) trait.getTree()).printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(modified, capturedLockContent);
+                : regenerateLockContent(modified, originalDepsContent, capturedLockContent, ctx);
         if (regen != null && regen.isSuccess() && regen.getLockFileContent() != null) {
             modified = applyResolvedDependencies(modified, regen.getLockFileContent());
         }
@@ -301,6 +328,22 @@ public class PyProjectHelper {
      */
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile depsFile, @Nullable String capturedLockContent) {
+        return regenerateLockContent(depsFile, capturedLockContent, new InMemoryExecutionContext());
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String capturedLockContent, ExecutionContext ctx) {
+        return regenerateLockContent(depsFile, null, capturedLockContent, ctx);
+    }
+
+    /**
+     * @param originalDepsContent the pre-edit dependencies-file content, or {@code null}; lets the
+     *                            engine reconcile only the packages the edit changed (see
+     *                            {@link LockFileRegeneration#regenerate}).
+     */
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile depsFile, @Nullable String originalDepsContent,
+            @Nullable String capturedLockContent, ExecutionContext ctx) {
         PythonResolutionResult marker = depsFile.getMarkers()
                 .findFirst(PythonResolutionResult.class).orElse(null);
         if (marker == null) {
@@ -310,7 +353,7 @@ public class PyProjectHelper {
         if (regen == null) {
             return null;
         }
-        return regen.regenerate(depsFile.printAll(), capturedLockContent);
+        return regen.regenerate(depsFile.printAll(), originalDepsContent, capturedLockContent, ctx);
     }
 
     /**
@@ -422,7 +465,10 @@ public class PyProjectHelper {
             String packageName,
             @Nullable String scope,
             @Nullable String groupName) {
-        if (scope == null || "project.dependencies".equals(scope)) {
+        if (scope == null) {
+            // default: all scopes, matching the null-scope edit paths (Pipfile dev-packages, pyproject groups)
+            return marker.findDependencyInAnyScope(packageName);
+        } else if ("project.dependencies".equals(scope)) {
             return marker.findDependency(packageName);
         } else if ("build-system.requires".equals(scope)) {
             return findInList(marker.getBuildRequires(), packageName);

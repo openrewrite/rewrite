@@ -37,11 +37,11 @@ import (
 
 func TestCoerceLeftPaddedEnum_AmbiguousNameResolvesByParser(t *testing.T) {
 	// "Addition" is valid for BOTH operator enums; the supplied parser decides which.
-	asAssign := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseAssignmentOperator)
+	asAssign := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.EmptyMarkers, java.ParseAssignmentOperator)
 	if asAssign.Element != java.AddAssign {
 		t.Errorf("ParseAssignmentOperator: want AddAssign, got %v", asAssign.Element)
 	}
-	asBinary := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.Markers{}, java.ParseBinaryOperator)
+	asBinary := coerceLeftPaddedEnum(java.EmptySpace, "Addition", java.EmptyMarkers, java.ParseBinaryOperator)
 	if asBinary.Element != java.Add {
 		t.Errorf("ParseBinaryOperator: want Add, got %v", asBinary.Element)
 	}
@@ -49,7 +49,7 @@ func TestCoerceLeftPaddedEnum_AmbiguousNameResolvesByParser(t *testing.T) {
 
 func TestCoerceLeftPaddedEnum_PreTypedEnumPassThrough(t *testing.T) {
 	// NO_CHANGE hands back the already-typed enum; it must survive.
-	got := coerceLeftPaddedEnum(java.EmptySpace, java.OrAssign, java.Markers{}, java.ParseAssignmentOperator)
+	got := coerceLeftPaddedEnum(java.EmptySpace, java.OrAssign, java.EmptyMarkers, java.ParseAssignmentOperator)
 	if got.Element != java.OrAssign {
 		t.Errorf("pre-typed pass-through: want OrAssign, got %v", got.Element)
 	}
@@ -63,7 +63,7 @@ func TestAssignmentOperationRoundTrip_OperatorPreserved(t *testing.T) {
 	before := &java.AssignmentOperation{
 		ID:         id,
 		Variable:   makeIdent("x"),
-		Operator:   java.LeftPadded[java.AssignmentOperator]{Element: java.AddAssign, Markers: java.Markers{}},
+		Operator:   java.LeftPadded[java.AssignmentOperator]{Element: java.AddAssign, Markers: java.EmptyMarkers},
 		Assignment: makeIdent("y"),
 	}
 	seed := &java.AssignmentOperation{ID: id}
@@ -75,6 +75,36 @@ func TestAssignmentOperationRoundTrip_OperatorPreserved(t *testing.T) {
 	}
 }
 
+func TestBinaryOperatorChange_AppliedOnReceive(t *testing.T) {
+	// A recipe that flips `==` to `!=` mutates only the Binary operator element,
+	// producing a CHANGE (not a fresh ADD) diffed against the Equal baseline. The
+	// receiver must apply the new operator; if it re-uses the before value it drops
+	// the change and prints `==` unchanged (the EmptyBlock/Go corruption).
+	id := uuid.New()
+	before := &java.Binary{
+		ID:       id,
+		Left:     makeIdent("a"),
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Equal, Markers: java.EmptyMarkers},
+		Right:    makeIdent("b"),
+	}
+	after := &java.Binary{
+		ID:       id,
+		Left:     makeIdent("a"),
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.NotEqual, Markers: java.EmptyMarkers},
+		Right:    makeIdent("b"),
+	}
+	seed := &java.Binary{
+		ID:       id,
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Equal, Markers: java.EmptyMarkers},
+	}
+
+	got := roundTripNodeWithBefore(t, after, before, seed).(*java.Binary)
+
+	if got.Operator.Element != java.NotEqual {
+		t.Errorf("Operator: want NotEqual (!=) after CHANGE, got %v", got.Operator.Element)
+	}
+}
+
 func TestBinaryRoundTrip_OperatorPreserved(t *testing.T) {
 	// Sibling sanity check: a real BinaryOperator must still resolve to Binary,
 	// not be poached by the assignment parser.
@@ -82,7 +112,7 @@ func TestBinaryRoundTrip_OperatorPreserved(t *testing.T) {
 	before := &java.Binary{
 		ID:       id,
 		Left:     makeIdent("a"),
-		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Add, Markers: java.Markers{}},
+		Operator: java.LeftPadded[java.BinaryOperator]{Element: java.Add, Markers: java.EmptyMarkers},
 		Right:    makeIdent("b"),
 	}
 	seed := &java.Binary{ID: id}

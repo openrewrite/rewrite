@@ -1,0 +1,9 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+"flake8" = "*"
+"ruamel.yaml" = ">=0.17"
+requests = "==2.31.0"

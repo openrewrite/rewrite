@@ -1,6 +1,28 @@
 from rewrite.test import RecipeSpec, python
 
 
+def test_any_expression():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        @False or a
+        def f(): pass
+        @d := a
+        def g(): pass
+        @lambda f: a(f)
+        def h(): pass
+        @[..., a, ...][1]
+        def i(): pass
+        @a(a)(a)
+        def j(): pass
+        @a if b else c
+        class C: pass
+        @not a
+        class D: pass
+        """
+    ))
+
+
 def test_function_unqualified():
     # language=python
     RecipeSpec().rewrite_run(python(
@@ -106,6 +128,20 @@ def test_subscript_decorator():
             @[property][0]
             def f(self, x=[id]):
                 return x
+        """
+    ))
+
+
+def test_call_of_call_decorator():
+    # language=python
+    RecipeSpec().rewrite_run(python(
+        """\
+        def factory():
+            return lambda n: lambda f: f
+
+        @factory()(1)
+        def f():
+            pass
         """
     ))
 

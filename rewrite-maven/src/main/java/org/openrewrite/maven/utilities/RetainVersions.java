@@ -15,7 +15,10 @@
  */
 package org.openrewrite.maven.utilities;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.ChangeDependencyGroupIdAndArtifactId;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.search.FindDependency;
@@ -31,12 +34,40 @@ import java.util.function.Predicate;
 public class RetainVersions {
 
     /**
+     * Validates that every non-blank entry of a GAV list option consists of a group ID, an artifact ID,
+     * and optionally a version. Blank entries are tolerated, as they are ignored when the recipe runs.
+     */
+    public static Validated<Object> validate(String optionName, @Nullable List<String> gavs) {
+        Validated<Object> validated = Validated.none();
+        if (gavs != null) {
+            for (int i = 0; i < gavs.size(); i++) {
+                String gav = gavs.get(i);
+                if (StringUtils.isBlank(gav)) {
+                    continue;
+                }
+                validated = validated.and(Validated.test(
+                        String.format("%s[%d]", optionName, i),
+                        "did not look like a two-or-three-part GAV",
+                        gav,
+                        maybeGav -> {
+                            int gavParts = maybeGav.split(":").length;
+                            return gavParts == 2 || gavParts == 3;
+                        }));
+            }
+        }
+        return validated;
+    }
+
+    /**
      * Returns a list of recipes which can be applied to add explicit versions
      * for dependencies matching the GAVs in param `retainVersions`
      */
     public static List<Recipe> plan(MavenVisitor<?> visitor, List<String> retainVersions) {
         List<Recipe> recipes = new ArrayList<>();
         for (String gav : retainVersions) {
+            if (StringUtils.isBlank(gav)) {
+                continue;
+            }
             String[] split = gav.split(":");
             String requestedRetainedGroupId = split[0];
             String requestedRetainedArtifactId = split[1];

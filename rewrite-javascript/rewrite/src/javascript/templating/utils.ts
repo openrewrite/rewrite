@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {J, NameTree} from '../../java';
 import {JS} from '../index';
+import {JavaScriptVisitor} from '../visitor';
 import {Marker, Markers} from '../../markers';
 import {randomId} from '../../uuid';
 import {ConstraintFunction, VariadicOptions} from './types';
@@ -106,14 +107,98 @@ export function generateCacheKey(
     templateParts: string[] | TemplateStringsArray,
     itemsKey: string,
     contextStatements: string[],
-    dependencies: Record<string, string>
+    dependencies: Record<string, string>,
+    types?: string[]
 ): string {
     return [
         Array.from(templateParts).join('|'),
         itemsKey,
         contextStatements.join(';'),
-        JSON.stringify(dependencies)
+        JSON.stringify(dependencies),
+        JSON.stringify(types ?? null)
     ].join('::');
+}
+
+abstract class IdVisitor extends JavaScriptVisitor<any> {
+    // `JavaVisitor.visitTypeName` is a no-op stub, which leaves annotation names unreachable
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: any): Promise<N> {
+        return (await this.visit(nameTree, p)) as N;
+    }
+}
+
+class RandomizeIdVisitor extends IdVisitor {
+    readonly minted = new Set<string>();
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        const id = randomId();
+        this.minted.add(id);
+        return {...tree, id};
+    }
+}
+
+class CollectIdVisitor extends IdVisitor {
+    readonly ids = new Set<string>();
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        this.ids.add(tree.id);
+        return tree;
+    }
+}
+
+class RetainIdVisitor extends IdVisitor {
+    private readonly seen = new Set<string>();
+
+    constructor(private readonly retainable: ReadonlySet<string>) {
+        super();
+    }
+
+    protected override async postVisit(tree: J, p: any): Promise<J | undefined> {
+        if (this.retainable.has(tree.id) && !this.seen.has(tree.id)) {
+            this.seen.add(tree.id);
+            return tree;
+        }
+        const id = randomId();
+        this.seen.add(id);
+        return {...tree, id};
+    }
+}
+
+/**
+ * Structural copy of `tree` with a fresh `id` on every `Tree` node, and the ids that were minted;
+ * counterpart of Java's `RandomizeIdVisitor`.
+ */
+export async function randomizeIds<T extends J>(tree: T): Promise<{ tree: T, ids: ReadonlySet<string> }> {
+    const visitor = new RandomizeIdVisitor();
+    return {tree: (await visitor.visit(tree, null)) as T, ids: visitor.minted};
+}
+
+/** The `id` of every `Tree` node in `tree`. */
+export async function treeIds(tree: J): Promise<ReadonlySet<string>> {
+    const visitor = new CollectIdVisitor();
+    await visitor.visit(tree, null);
+    return visitor.ids;
+}
+
+/** Copy of `tree` in which an `id` survives only where it is `retainable` and unused so far. */
+export function retainIds<T extends J>(tree: T, retainable: ReadonlySet<string>): Promise<T> {
+    return new RetainIdVisitor(retainable).visit(tree, null) as Promise<T>;
+}
+
+/**
+ * Strips the indentation a template carries from the recipe source it was written in. Its first
+ * line starts at the opening backtick, so the common indent is the one shared by the lines below.
+ */
+export function dedentTemplate(code: string): string {
+    const lines = code.split("\n");
+    let indent = Infinity;
+    for (const line of lines.slice(1)) {
+        if (line.trim().length > 0) {
+            indent = Math.min(indent, line.length - line.trimStart().length);
+        }
+    }
+    return indent === Infinity || indent === 0 ?
+        code :
+        [lines[0], ...lines.slice(1).map(line => line.slice(indent))].join("\n");
 }
 
 /**

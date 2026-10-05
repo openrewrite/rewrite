@@ -99,6 +99,13 @@ public class CSharpPrecedencesTests
     }
 
     [Fact]
+    public void GetPrecedence_InstanceOf()
+    {
+        var expr = MakeInstanceOf(MakeId("a"));
+        Assert.Equal(7, CSharpPrecedences.GetPrecedence(expr));
+    }
+
+    [Fact]
     public void GetPrecedence_Assignment()
     {
         var expr = MakeAssignment(MakeId("a"), MakeId("b"));

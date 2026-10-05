@@ -19,7 +19,6 @@ package rpc
 import (
 	"strconv"
 
-	"github.com/google/uuid"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
@@ -64,7 +63,7 @@ func (s *JavaSender) PreVisit(t java.Tree, p any) java.Tree {
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetID().String() }, nil)
 	q.GetAndSend(t, func(v any) any { return v.(java.J).GetPrefix() },
 		func(v any) { sendSpace(v.(java.Space), q) })
-	q.GetAndSend(t, func(v any) any { return v.(java.J).GetMarkers() },
+	q.GetAndSend(t, func(v any) any { return AsRef(v.(java.J).GetMarkers()) },
 		func(v any) { SendMarkersCodec(v.(java.Markers), q) })
 	_ = j
 	return t
@@ -159,7 +158,7 @@ func (s *JavaSender) VisitBlock(b *java.Block, p any) java.J {
 	q := p.(*SendQueue)
 	// static (right-padded bool) - Java's JRightPadded<Boolean> with element=false
 	// Send manually since Go doesn't have RightPadded[bool]
-	sendRightPaddedBool(false, java.EmptySpace, java.Markers{}, q)
+	sendRightPaddedBool(false, java.EmptySpace, java.EmptyMarkers, q)
 	// statements
 	q.GetAndSendList(b,
 		func(v any) []any {
@@ -192,26 +191,12 @@ func (s *JavaSender) VisitIf(i *java.If, p any) java.J {
 	// ifCondition - the condition is already a ControlParentheses, matching J.If
 	q.GetAndSend(i, func(v any) any { return v.(*java.If).Condition },
 		func(v any) { s.Visit(v.(java.Tree), q) })
-	// thenPart (right-padded)
-	q.GetAndSend(i, func(v any) any {
-		return java.RightPadded[java.Statement]{
-			Element: v.(*java.If).Then,
-			After:   java.EmptySpace,
-		}
-	}, func(v any) { sendRightPadded(s, v, q) })
-	// elsePart - wrap in Else node for Java's J.If.Else model
-	q.GetAndSend(i, func(v any) any {
-		ep := v.(*java.If).ElsePart
-		if ep == nil {
-			return nil
-		}
-		return &java.Else{
-			ID:      uuid.New(),
-			Prefix:  ep.After,
-			Markers: java.Markers{ID: uuid.New()},
-			Body:    java.RightPadded[java.Statement]{Element: ep.Element.(java.Statement), After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// thenPart
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).ThenPart },
+		func(v any) { sendRightPadded(s, v, q) })
+	// elsePart
+	q.GetAndSend(i, func(v any) any { return v.(*java.If).ElsePart },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	return i
 }
 
@@ -346,9 +331,8 @@ func (s *JavaSender) VisitForLoop(f *java.ForLoop, p any) java.J {
 		ctrl := v.(*java.ForLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -393,9 +377,8 @@ func (s *JavaSender) VisitForEachLoop(f *java.ForEachLoop, p any) java.J {
 		ctrl := v.(*java.ForEachLoop).Control
 		return &ctrl
 	}, func(v any) { s.Visit(v.(java.Tree), q) })
-	q.GetAndSend(f, func(v any) any {
-		return java.RightPadded[java.Statement]{Element: v.(*java.ForEachLoop).Body, After: java.EmptySpace}
-	}, func(v any) { sendRightPadded(s, v, q) })
+	q.GetAndSend(f, func(v any) any { return v.(*java.ForEachLoop).Body },
+		func(v any) { sendRightPadded(s, v, q) })
 	return f
 }
 
@@ -411,22 +394,9 @@ func (s *JavaSender) VisitForEachControl(fc *java.ForEachControl, p any) java.J 
 
 func (s *JavaSender) VisitSwitch(sw *java.Switch, p any) java.J {
 	q := p.(*SendQueue)
-	// selector - wrap tag in ControlParentheses for Java's J.Switch model
-	q.GetAndSend(sw, func(v any) any {
-		tag := v.(*java.Switch).Tag
-		var inner java.Expression
-		if tag != nil {
-			inner = tag.Element
-		} else {
-			// Tagless switch: use Empty as the expression
-			inner = &java.Empty{ID: uuid.New()}
-		}
-		return &java.ControlParentheses{
-			ID:      uuid.New(),
-			Markers: java.Markers{ID: uuid.New()},
-			Tree:    java.RightPadded[java.Expression]{Element: inner, After: java.EmptySpace},
-		}
-	}, func(v any) { s.Visit(v.(java.Tree), q) })
+	// selector - already a ControlParentheses, matching J.Switch
+	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Selector },
+		func(v any) { s.Visit(v.(java.Tree), q) })
 	// cases (Block)
 	q.GetAndSend(sw, func(v any) any { return v.(*java.Switch).Body },
 		func(v any) { s.Visit(v.(java.Tree), q) })
@@ -441,12 +411,8 @@ func (s *JavaSender) VisitCase(c *java.Case, p any) java.J {
 	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Expressions },
 		func(v any) { sendContainer(s, v, q) })
 	// statements (container)
-	q.GetAndSend(c, func(v any) any {
-		body := v.(*java.Case).Body
-		result := make([]java.RightPadded[java.Statement], len(body))
-		copy(result, body)
-		return java.Container[java.Statement]{Elements: result}
-	}, func(v any) { sendContainer(s, v, q) })
+	q.GetAndSend(c, func(v any) any { return v.(*java.Case).Body },
+		func(v any) { sendContainer(s, v, q) })
 	// body (right-padded, nil for Go-style case)
 	q.GetAndSend(c, func(_ any) any { return nil }, nil)
 	// guard (nil for Go)
@@ -622,8 +588,9 @@ func (s *JavaSender) VisitArrayType(at *java.ArrayType, p any) java.J {
 	// dimension (left-padded)
 	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Dimension },
 		func(v any) { sendLeftPadded(s, v, q) })
-	// type
-	q.GetAndSend(at, func(v any) any { return v.(*java.ArrayType).Type }, nil)
+	// type (as ref)
+	q.GetAndSend(at, func(v any) any { return AsRef(v.(*java.ArrayType).Type) },
+		func(v any) { s.visitType(GetValueNonNull(v).(java.JavaType), q) })
 	return at
 }
 
@@ -656,7 +623,7 @@ func (s *JavaSender) VisitParameterizedType(pt *java.ParameterizedType, p any) j
 
 func (s *JavaSender) VisitArrayDimension(ad *java.ArrayDimension, p any) java.J {
 	q := p.(*SendQueue)
-	q.GetAndSend(ad, func(v any) any { return ad.Index },
+	q.GetAndSend(ad, func(v any) any { return v.(*java.ArrayDimension).Index },
 		func(v any) { sendRightPadded(s, v, q) })
 	return ad
 }
@@ -666,6 +633,29 @@ func (s *JavaSender) VisitParentheses(parens *java.Parentheses, p any) java.J {
 	q.GetAndSend(parens, func(v any) any { return v.(*java.Parentheses).Tree },
 		func(v any) { sendRightPadded(s, v, q) })
 	return parens
+}
+
+func (s *JavaSender) VisitParenthesizedTypeTree(ptt *java.ParenthesizedTypeTree, p any) java.J {
+	q := p.(*SendQueue)
+	// annotations (list)
+	q.GetAndSendList(ptt,
+		func(v any) []any {
+			annots := v.(*java.ParenthesizedTypeTree).Annotations
+			if annots == nil {
+				return nil
+			}
+			result := make([]any, len(annots))
+			for i, a := range annots {
+				result[i] = a
+			}
+			return result
+		},
+		func(v any) any { return extractID(v) },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	// parenthesizedType
+	q.GetAndSend(ptt, func(v any) any { return v.(*java.ParenthesizedTypeTree).Type },
+		func(v any) { s.Visit(v.(java.Tree), q) })
+	return ptt
 }
 
 func (s *JavaSender) VisitTypeCast(tc *java.TypeCast, p any) java.J {

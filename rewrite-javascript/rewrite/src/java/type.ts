@@ -21,6 +21,7 @@ export interface Type {
 
 export namespace Type {
     export const FUNCTION_TYPE_NAME = '𝑓';
+    export const OBJECT_TYPE_NAME = '{}';
 
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
@@ -254,6 +255,10 @@ export namespace Type {
 
     export function isFunctionType(type?: Type): type is Type.Class {
         return type?.kind === Type.Kind.Class && (type as Type.Class).fullyQualifiedName === FUNCTION_TYPE_NAME;
+    }
+
+    export function isObjectType(type?: Type): type is Type.Class {
+        return type?.kind === Type.Kind.Class && (type as Type.Class).fullyQualifiedName === OBJECT_TYPE_NAME;
     }
 
     export function isMethod(type?: Type): type is Type.Method {

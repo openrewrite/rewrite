@@ -3,7 +3,8 @@ from __future__ import annotations
 import traceback
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any
+from rewrite.utils import lst_dataclass
+from typing import List, ClassVar, cast, TYPE_CHECKING, Callable, TypeVar, Type, Optional, Dict, Any, Self
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -31,7 +32,7 @@ class Marker(ABC):
         if self._id is not None and type(self._id) is not int:  # ty: ignore[unresolved-attribute]  # _id on concrete subclasses
             object.__setattr__(self, '_id', id_to_int(self._id))  # ty: ignore[unresolved-attribute]
 
-    def replace(self, **kwargs) -> 'Marker':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this marker, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 
@@ -50,7 +51,7 @@ class Marker(ABC):
 M = TypeVar('M', bound=Marker)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class Markers:
     _id: UUID
 
@@ -103,15 +104,27 @@ class Markers:
     def __hash__(self) -> int:
         return hash(self._id)
 
+    _LAST_EMPTY: ClassVar[Optional[Markers]] = None
+
     @classmethod
     def build(cls, id: UUID, markers: List[Marker]) -> Markers:
-        return Markers(id, markers)
+        """Marker-free nodes share one instance, and so one id, on the sending
+        side; the last empty Markers stands in whenever that id comes round."""
+        if markers:
+            return Markers(id, markers)
+        key = id if type(id) is int else id_to_int(id)
+        cached = cls._LAST_EMPTY
+        if cached is not None and cached._id == key:
+            return cached
+        cached = Markers(key, markers)
+        cls._LAST_EMPTY = cached
+        return cached
 
 
 Markers.EMPTY = Markers(random_id(), [])
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class SearchResult(Marker):
     _id: UUID
 
@@ -122,8 +135,7 @@ class SearchResult(Marker):
         return self._description
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
-        desc = self._description or ""
-        return comment_wrapper(f"({desc})" if desc else "")
+        return comment_wrapper("" if self._description is None else f"({self._description})")
 
     @staticmethod
     def found(tree: Any, description: Optional[str] = None) -> Any:
@@ -170,7 +182,7 @@ class Markup(Marker, ABC):
         ...
 
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
-        if verbose and self.detail:
+        if verbose and self.detail is not None:
             return comment_wrapper(f"({self.detail})")
         return comment_wrapper(f"({self.message})")
 
@@ -195,7 +207,7 @@ class Markup(Marker, ABC):
         return MarkupDebug(random_id(), message, detail)
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
     _id: UUID
@@ -211,7 +223,7 @@ class MarkupWarn(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
     _id: UUID
@@ -227,7 +239,7 @@ class MarkupError(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
     _id: UUID
@@ -243,7 +255,7 @@ class MarkupInfo(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
     _id: UUID
@@ -259,7 +271,60 @@ class MarkupDebug(Markup):
         return self._detail
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@dataclass(frozen=True, slots=True)
+class RecipeThatMadeChanges:
+    """One frame of a :class:`RecipesThatMadeChanges` stack: how the recipe is named, how it was
+    configured, and what it is worth.
+    """
+
+    _name: str
+
+    _display_name: Optional[str] = None
+
+    _instance_name: Optional[str] = None
+
+    # Configured option values. Python never interprets them.
+    _options: Optional[Dict[str, Any]] = None
+
+    _estimated_effort_per_occurrence_millis: Optional[int] = None
+
+    @property
+    def name(self) -> str:
+        return self._name
+
+    @property
+    def display_name(self) -> Optional[str]:
+        return self._display_name
+
+    @property
+    def instance_name(self) -> Optional[str]:
+        return self._instance_name
+
+    @property
+    def options(self) -> Optional[Dict[str, Any]]:
+        return self._options
+
+    @property
+    def estimated_effort_per_occurrence_millis(self) -> Optional[int]:
+        return self._estimated_effort_per_occurrence_millis
+
+
+@lst_dataclass
+class RecipesThatMadeChanges(Marker):
+    """Records which recipe stacks changed a source file. Python holds the stacks without
+    interpreting them, so a marker served to this peer returns to the host intact.
+    """
+
+    _id: UUID
+
+    _recipes: Optional[List[List[RecipeThatMadeChanges]]]
+
+    @property
+    def recipes(self) -> Optional[List[List[RecipeThatMadeChanges]]]:
+        return self._recipes
+
+
+@lst_dataclass
 class UnknownJavaMarker(Marker):
     _id: UUID
 
@@ -270,7 +335,7 @@ class UnknownJavaMarker(Marker):
         return self._data
 
 
-@dataclass(frozen=True, eq=False, slots=True)
+@lst_dataclass
 class ParseExceptionResult(Marker):
     @classmethod
     def build(cls, parser: 'Parser', exception: Exception) -> ParseExceptionResult:

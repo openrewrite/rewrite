@@ -88,7 +88,8 @@ class MavenRecipeMarketplaceGeneratorTest {
                 artifactCache,
                 null,
                 new HttpUrlConnectionSender(),
-                Throwable::printStackTrace
+                Throwable::printStackTrace,
+                ctx
         );
 
         // Download rewrite-rewrite jar and its dependencies for testing
@@ -162,7 +163,8 @@ class MavenRecipeMarketplaceGeneratorTest {
                 artifactCache,
                 null,
                 new HttpUrlConnectionSender(),
-                Throwable::printStackTrace
+                Throwable::printStackTrace,
+                ctx
         );
 
         // Download rewrite-rewrite jar and extract it to a directory

@@ -16,9 +16,32 @@
 import {RpcCodec, RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "./rpc";
 
 export class ExecutionContext {
+    /** Mirrors `org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT`. */
+    static readonly REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
+
     readonly kind: string = "org.openrewrite.InMemoryExecutionContext"
 
     constructor(public readonly messages: { [key: string | symbol]: any } = {}) {
+    }
+
+    /**
+     * Option maps are loosely typed across peers, so a value that arrived as a string counts the same as
+     * its boolean form. The spellings accepted are Go's `strconv.ParseBool`, which peers parse with;
+     * anything else falls back to `defaultValue`.
+     */
+    getBoolean(key: string, defaultValue: boolean): boolean {
+        const value = this.messages[key];
+        if (typeof value === "boolean") {
+            return value;
+        }
+        switch (value) {
+            case "1": case "t": case "T": case "true": case "TRUE": case "True":
+                return true;
+            case "0": case "f": case "F": case "false": case "FALSE": case "False":
+                return false;
+            default:
+                return defaultValue;
+        }
     }
 }
 

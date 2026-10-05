@@ -33,6 +33,7 @@ import org.openrewrite.java.tree.Space;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
@@ -76,10 +77,17 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
      * @see JavaVisitor#service(Class)
      */
     public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
-        return getVisitor(subtree);
+        return getVisitor(subtree, fqn -> false);
     }
 
-    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope) {
+    /**
+     * Like {@link #modifyOnly(J)}, but leaves references to types matching {@code keepQualified} fully qualified.
+     */
+    public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree, Predicate<String> keepQualified) {
+        return getVisitor(subtree, keepQualified);
+    }
+
+    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope, Predicate<String> keepQualified) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
             final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
@@ -96,7 +104,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                         @Override
                         public J.Import visitImport(J.Import import_, Map<String, JavaType> types) {
                             if (!import_.isStatic() && isWellFormedType(import_.getQualid().getType())) {
-                                types.put(import_.getQualid().getSimpleName(), import_.getQualid().getType());
+                                J.Identifier alias = import_.getAlias();
+                                types.put(alias != null ? alias.getSimpleName() : import_.getQualid().getSimpleName(), import_.getQualid().getType());
                             }
                             return import_;
                         }
@@ -166,7 +175,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                 }
 
                 JavaType type = fieldAccess.getType();
-                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
+                if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null &&
+                    !keepQualified.test(((JavaType.Class) type).getFullyQualifiedName())) {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();

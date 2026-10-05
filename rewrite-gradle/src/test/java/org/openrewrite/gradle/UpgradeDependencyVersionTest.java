@@ -16,8 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
@@ -927,6 +927,218 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradesVersionManagedByPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByPlatformKotlinDsl() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml")
+              }
+              """,
+            """
+              plugins {
+                  `java`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:2.5.7"))
+                  implementation("org.yaml:snakeyaml:1.29")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradesVersionManagedByEnforcedPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation enforcedPlatform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void versionDeclaredAlongsidePlatformIsUpgradedInPlace() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.27'
+              }
+              """,
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:2.5.7')
+                  implementation 'org.yaml:snakeyaml:1.29'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotPinAVersionAConstraintGoverns() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.yaml", "snakeyaml", "1.29", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  constraints {
+                      implementation 'org.yaml:snakeyaml:1.28'
+                  }
+                  implementation 'org.yaml:snakeyaml'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void leavesVersionlessDependencyManagedByAnUpgradedPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.boot", "*", "2.7.18", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+                  id "org.springframework.boot" version "2.6.15"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.springframework.boot:spring-boot-dependencies:2.6.15")
+                  implementation "org.springframework.boot:spring-boot-starter-web"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "org.springframework.boot" version "2.6.15"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.springframework.boot:spring-boot-dependencies:2.7.18")
+                  implementation "org.springframework.boot:spring-boot-starter-web"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradesVariablesDefinedInExtraProperties() {
         rewriteRun(
           buildGradle(
@@ -1048,6 +1260,88 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               dependencies {
                   implementation "com.fasterxml.jackson.core:jackson-annotations:2.21"
                   implementation "com.fasterxml.jackson.core:jackson-core:${jacksonVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedVariableInMapNotation() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: jacksonVersion
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-annotations", version: "2.21"
+                  implementation group: "com.fasterxml.jackson.core", name: "jackson-core", version: jacksonVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotCorruptSharedVariableInKotlinNamedArguments() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.fasterxml.jackson.core", "jackson-annotations", "2.21", null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = jacksonVersion)
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              val jacksonVersion = "2.17.3"
+
+              dependencies {
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-annotations", version = "2.21")
+                  implementation(group = "com.fasterxml.jackson.core", name = "jackson-core", version = jacksonVersion)
               }
               """
           )
@@ -2262,7 +2556,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
+    @DisabledIfEnvironmentVariable(named = "REWRITE_GRADLE_MIRROR_URL", matches = ".+",
+            disabledReason = "An injected mirror adds a repository, defeating the empty-repositories scenario.")
     void cannotDownloadMetaDataWhenNoRepositoriesAreDefined() {
         rewriteRun(
           buildGradle(

@@ -74,6 +74,33 @@ func MaybeAddImport(v visitor.AfterVisitsProvider, packagePath string, alias *st
 	}).Editor())
 }
 
+// MaybeRemoveImport queues a RemoveImport visitor on v unless an
+// equivalent RemoveImport is already pending. It mirrors
+// JavaVisitor.maybeRemoveImport: the import survives while the file
+// still references the package, and running on the after-visit drain is
+// what lets that check see the recipe's own edits.
+func MaybeRemoveImport(v visitor.AfterVisitsProvider, packagePath string) {
+	if v == nil {
+		return
+	}
+	if pending, ok := v.(visitor.PendingAfterVisitsProvider); ok {
+		for _, after := range pending.PendingAfterVisits() {
+			if samePendingRemoveImport(after, packagePath) {
+				return
+			}
+		}
+	}
+	v.DoAfterVisit((&RemoveImport{PackagePath: packagePath}).Editor())
+}
+
+func samePendingRemoveImport(after visitor.AfterVisitor, packagePath string) bool {
+	v, ok := after.(*removeImportVisitor)
+	if !ok || v.cfg == nil {
+		return false
+	}
+	return v.cfg.PackagePath == packagePath && !v.cfg.Force
+}
+
 func samePendingAddImport(after visitor.AfterVisitor, packagePath string, alias *string, onlyIfReferenced bool) bool {
 	v, ok := after.(*addImportVisitor)
 	if !ok || v.cfg == nil {
@@ -115,11 +142,11 @@ func (s *ImportService) AddImportVisitor(packagePath string, alias *string, only
 }
 
 // RemoveImportVisitor returns a visitor that deletes any `import` whose
-// path matches packagePath. Aliased / blank / dot forms are all
-// removed. Empty import containers are nil-ed out so the printer
-// doesn't emit an empty `import ()` block.
-func (s *ImportService) RemoveImportVisitor(packagePath string) recipe.TreeVisitor {
-	return (&RemoveImport{PackagePath: packagePath}).Editor()
+// path matches packagePath. Empty import containers are nil-ed out so
+// the printer doesn't emit an empty `import ()` block. See RemoveImport
+// for what force does.
+func (s *ImportService) RemoveImportVisitor(packagePath string, force bool) recipe.TreeVisitor {
+	return (&RemoveImport{PackagePath: packagePath, Force: force}).Editor()
 }
 
 // RemoveUnusedImportsVisitor returns a visitor that drops imports

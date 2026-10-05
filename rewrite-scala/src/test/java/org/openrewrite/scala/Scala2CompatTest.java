@@ -1490,4 +1490,34 @@ class Scala2CompatTest implements RewriteTest {
             )
         );
     }
+
+    @Test
+    void enumAsIdentifier() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  def qualifyEnum(enum: Enum[_]): String =
+                    enum.getClass.getCanonicalName + "." + enum.name()
+
+                  def compareEnum(term: String, enum: Enum[_]): Boolean = term == qualifyEnum(enum)
+                }
+                """
+            )
+        );
+    }
+
+    @Test
+    void givenAsIdentifier() {
+        rewriteRun(
+            scala(
+                """
+                object Test {
+                  val given = 42
+                  def use(given: Int): Int = given + 1
+                }
+                """
+            )
+        );
+    }
 }

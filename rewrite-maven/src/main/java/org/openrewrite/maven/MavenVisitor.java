@@ -39,7 +39,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
     static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     static final XPathMatcher PROFILE_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencies/dependency");
     static final XPathMatcher PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("//plugins/plugin/dependencies/dependency");
-    static final XPathMatcher PROFILE_PLUGIN_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/build/plugins/plugin/dependencies/dependency");
     static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROFILE_MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies/dependency");
     static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
@@ -132,19 +131,6 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
             if (dependencies.containsKey(scope)) {
                 for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
                     if (matchesGlob(resolvedDependency.getGroupId(), groupId) && matchesGlob(resolvedDependency.getArtifactId(), artifactId)) {
-                        String scopeName = tag.getChildValue("scope").orElse(null);
-                        Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : null;
-                        if (tagScope == null) {
-                            tagScope = getResolutionResult().getPom().getManagedScope(
-                                    groupId,
-                                    artifactId,
-                                    tag.getChildValue("type").orElse(null),
-                                    tag.getChildValue("classifier").orElse(null)
-                            );
-                            if (tagScope == null) {
-                                tagScope = Scope.Compile;
-                            }
-                        }
                         Dependency req = resolvedDependency.getRequested();
                         ResolvedPom pom = getResolutionResult().getPom();
                         String reqGroup = pom.getValue(req.getGroupId());
@@ -153,7 +139,7 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
                         String tagArtifactId = pom.getValue(tag.getChildValue("artifactId").orElse(null));
                         if ((reqGroup == null || reqGroup.equals(tagGroupId)) &&
                                 reqArtifact.equals(tagArtifactId) &&
-                                scope == tagScope) {
+                                scope == effectiveScope(tag, resolvedDependency, pom)) {
                             return true;
                         }
                     }
@@ -163,10 +149,23 @@ public class MavenVisitor<P> extends XmlVisitor<P> {
         return false;
     }
 
+    private static Scope effectiveScope(Xml.Tag tag, ResolvedDependency resolvedDependency, ResolvedPom pom) {
+        String scopeName = tag.getChildValue("scope").orElse(null);
+        Scope tagScope = scopeName != null ? Scope.fromName(scopeName) : pom.getManagedScope(
+                resolvedDependency.getGroupId(),
+                resolvedDependency.getArtifactId(),
+                pom.getValue(tag.getChildValue("type").orElse(null)),
+                pom.getValue(tag.getChildValue("classifier").orElse(null))
+        );
+        return tagScope != null ? tagScope : Scope.Compile;
+    }
+
+    public boolean isPluginDependencyTag() {
+        return isTag("dependency") && PLUGIN_DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
     public boolean isPluginDependencyTag(String groupId, String artifactId) {
-        if (!isTag("dependency") ||
-                !PLUGIN_DEPENDENCY_MATCHER.matches(getCursor()) &&
-                        !PROFILE_PLUGIN_DEPENDENCY_MATCHER.matches(getCursor())) {
+        if (!isPluginDependencyTag()) {
             return false;
         }
         Xml.Tag tag = getCursor().getValue();

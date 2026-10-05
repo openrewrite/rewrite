@@ -34,10 +34,10 @@ dependencies {
     // For Levenshtein distance of mismatched recipes
     implementation("org.apache.commons:commons-text:latest.release")
 
-    implementation("io.micrometer:micrometer-core:1.9.+")
+    implementation("io.micrometer:micrometer-core:latest.release")
     implementation("org.yaml:snakeyaml:latest.release")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
     implementation("org.objenesis:objenesis:latest.release")
 
     testImplementation("org.assertj:assertj-core:latest.release")

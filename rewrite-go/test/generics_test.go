@@ -123,3 +123,80 @@ func TestParseTildeConstraint(t *testing.T) {
 			}
 		`))
 }
+
+// A parameter that re-instantiates its own receiver names an infinite
+// family of types, one fresh *types.Named per nesting.
+func TestParseSelfInstantiatingGeneric(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type R[P any] int
+
+			func (R[P]) m(R[R[P]]) {}
+		`))
+}
+
+func TestParseMutuallyRecursiveGenerics(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type A[P any] int
+
+			type B[P any] int
+
+			func (A[P]) m(B[B[P]]) {}
+
+			func (B[P]) m(A[A[P]]) {}
+		`))
+}
+
+func TestParseTrailingCommaInTypeArguments(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			func NewMap[K any, V any]() int { return 0 }
+
+			var m = NewMap[
+				string,
+				int,
+			]()
+		`))
+}
+
+func TestParseTrailingCommaInGenericTypeReference(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			type M[K any, V any] struct{}
+
+			var m M[
+				string,
+				int,
+			]
+		`))
+}
+
+func TestParseSelfInstantiatingGenericChain(t *testing.T) {
+	NewRecipeSpec().RewriteRun(t,
+		Golang(`
+			package main
+
+			import "unsafe"
+
+			type R[P any] int
+
+			func (R[P]) m1(R[R[P]]) {}
+
+			func (R[P]) m4([unsafe.Sizeof(new(R[R[P]]))]int) {}
+
+			type M[P any] int
+
+			func (R[P]) m5(M[M[P]]) {}
+
+			func (M[P]) m(R[R[P]]) {}
+		`))
+}

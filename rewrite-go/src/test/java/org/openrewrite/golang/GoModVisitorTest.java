@@ -45,7 +45,7 @@ class GoModVisitorTest {
 
         // when: a visitor counts values and bumps the go version
         AtomicInteger valuesSeen = new AtomicInteger();
-        GoModVisitor<Integer> v = new GoModVisitor<Integer>() {
+        GoModVisitor<Integer> v = new GoModVisitor<>() {
             @Override
             public GoModTree visitValue(GoMod.Value value, Integer p) {
                 valuesSeen.incrementAndGet();

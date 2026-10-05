@@ -82,11 +82,13 @@ public class Autodetect extends NamedStyles {
         }
 
         public Autodetect build() {
+            TabsAndIndentsStyle tabsAndIndents = indentStatistics.getTabsAndIndentsStyle();
             return new Autodetect(Tree.randomId(), Arrays.asList(
-                    indentStatistics.getTabsAndIndentsStyle(),
+                    tabsAndIndents,
                     findImportLayout.getImportLayoutStyle(),
                     spacesStatistics.getSpacesStyle(),
-                    wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
+                    wrappingAndBracesStatistics.getWrappingAndBracesStyle(
+                            indentStatistics.parametersUseContinuationIndent(tabsAndIndents)),
                     generalFormatStatistics.getFormatStyle(),
                     trailingCommaStatistics.getOtherStyle()
             ));
@@ -175,6 +177,9 @@ public class Autodetect extends NamedStyles {
         private long accumulateDepthCount = 0;
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
+        // Column of a first parameter that begins its own line, relative to its declaration's line -> occurrences
+        private final Map<Integer, Long> spaceParameterIndentFrequencies = new ConcurrentHashMap<>();
+        private final Map<Integer, Long> tabParameterIndentFrequencies = new ConcurrentHashMap<>();
 
         @Getter
         private int depth = 0;
@@ -256,6 +261,28 @@ public class Autodetect extends NamedStyles {
                     new TabsAndIndentsStyle.FunctionDeclarationParameters(
                             multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
+        }
+
+        public void recordParameterIndent(String declarationIndent, String parameterIndent) {
+            String both = declarationIndent + parameterIndent;
+            if (both.contains(" ") && both.contains("\t")) {
+                return;
+            }
+            int offset = parameterIndent.length() - declarationIndent.length();
+            if (offset > 0) {
+                (both.contains("\t") ? tabParameterIndentFrequencies : spaceParameterIndentFrequencies)
+                        .merge(offset, 1L, Long::sum);
+            }
+        }
+
+        public boolean parametersUseContinuationIndent(TabsAndIndentsStyle style) {
+            Map<Integer, Long> frequencies = style.getUseTabCharacter() ? tabParameterIndentFrequencies : spaceParameterIndentFrequencies;
+            int charWidth = style.getUseTabCharacter() ? style.getTabSize() : 1;
+            return frequencies.entrySet().stream()
+                    .max(Map.Entry.comparingByValue())
+                    .map(entry -> entry.getKey() * charWidth)
+                    .map(offset -> offset == style.getContinuationIndent())
+                    .orElse(false);
         }
     }
 
@@ -344,6 +371,18 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, IndentStatistics stats) {
+            Statement firstParameter = method.getParameters().isEmpty() ? null : method.getParameters().get(0);
+            String parameterIndent = firstParameter == null || firstParameter instanceof J.Empty ? null : lineIndent(firstParameter.getPrefix());
+            if (parameterIndent != null) {
+                // Nothing on the opening line to align to: the parameters indent from the line the declaration starts on,
+                // which for a primary constructor is the class declaration's
+                String declarationIndent = getCursor().getPathAsStream(J.class::isInstance)
+                        .map(j -> lineIndent(((J) j).getPrefix()))
+                        .filter(Objects::nonNull)
+                        .findFirst()
+                        .orElse("");
+                stats.recordParameterIndent(declarationIndent, parameterIndent);
+            }
             if (method.getParameters().size() > 1) {
                 int alignTo;
                 if (method.getParameters().get(0).getPrefix().getLastWhitespace().contains("\n")) {
@@ -480,6 +519,10 @@ public class Autodetect extends NamedStyles {
         @Override
         public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, JRightPadded.Location loc, IndentStatistics indentStatistics) {
             return super.visitRightPadded(right, loc, indentStatistics);
+        }
+
+        private static @Nullable String lineIndent(Space prefix) {
+            return prefix.getLastWhitespace().contains("\n") ? prefix.getIndent() : null;
         }
 
         private void countIndents(String space, boolean isContinuation, IndentStatistics stats) {
@@ -999,17 +1042,25 @@ public class Autodetect extends NamedStyles {
 
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (anImport.isStatic()) {
-                        int count = 0;
+                        String importedTypeName = anImport.getTypeName();
+                        Set<String> staticMembers = new HashSet<>();
                         for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                            JavaType.FullyQualified fq = TypeUtils.asFullyQualified(variable.getType());
-                            if (fq != null && anImport.getTypeName().equals(fq.getFullyQualifiedName())) {
-                                count++;
+                            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(variable.getOwner());
+                            if (variable.hasFlags(Flag.Static) &&
+                                owner != null && importedTypeName.equals(owner.getFullyQualifiedName())) {
+                                staticMembers.add(variable.getName());
+                            }
+                        }
+                        for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                            if (method.hasFlags(Flag.Static) &&
+                                importedTypeName.equals(method.getDeclaringType().getFullyQualifiedName())) {
+                                staticMembers.add(method.getName());
                             }
                         }
 
                         importLayoutStatistics.minimumFoldedStaticImports = Math.min(
                                 importLayoutStatistics.minimumFoldedStaticImports,
-                                count
+                                staticMembers.size()
                         );
                     } else {
                         Set<String> fqns = new HashSet<>();
@@ -1257,9 +1308,11 @@ public class Autodetect extends NamedStyles {
     private static class WrappingAndBracesStatistics {
         int elseOnNewLine = 0;
 
-        public WrappingAndBracesStyle getWrappingAndBracesStyle() {
+        public WrappingAndBracesStyle getWrappingAndBracesStyle(boolean parametersUseContinuationIndent) {
             WrappingAndBracesStyle wrappingAndBracesStyle = IntelliJ.wrappingAndBraces();
             return wrappingAndBracesStyle
+                    .withFunctionDeclarationParameters(wrappingAndBracesStyle.getFunctionDeclarationParameters()
+                            .withUseContinuationIndent(parametersUseContinuationIndent))
                     .withIfStatement(new WrappingAndBracesStyle.IfStatement(
                             elseOnNewLine > 0, true, false)
                     );

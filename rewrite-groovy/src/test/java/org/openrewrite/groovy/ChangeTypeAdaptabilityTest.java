@@ -89,6 +89,29 @@ class ChangeTypeAdaptabilityTest implements RewriteTest {
         );
     }
 
+    @Test
+    void changeImportKeepsAlias() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          groovy(
+            """
+              import java.util.ArrayList as MyList
+
+              class A {
+                  MyList type
+              }
+              """,
+            """
+              import java.util.LinkedList as MyList
+
+              class A {
+                  MyList type
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("GrPackage")
     @Test
     void changeType() {

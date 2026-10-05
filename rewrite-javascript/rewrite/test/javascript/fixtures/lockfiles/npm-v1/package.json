@@ -1,0 +1,7 @@
+{
+  "name": "json-server-trimmed",
+  "version": "0.14.0",
+  "dependencies": {
+    "chalk": "^2.4.1"
+  }
+}

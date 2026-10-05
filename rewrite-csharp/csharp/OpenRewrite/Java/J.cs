@@ -1201,13 +1201,13 @@ public sealed class TypeParameters(
     /// Create a TypeParameters wrapper from a JContainer (for RPC sending).
     /// </summary>
     public static TypeParameters FromContainer(JContainer<TypeParameter> container) =>
-        new(Guid.NewGuid(), container.Before, Markers.Empty, [], container.Elements);
+        new(Tree.RandomId(), container.Before, container.Markers, [], container.Elements);
 
     /// <summary>
     /// Convert back to a JContainer (for RPC receiving).
     /// </summary>
     public JContainer<TypeParameter> ToContainer() =>
-        new(Prefix, Params, Markers.Empty);
+        new(Prefix, Params, Markers);
 
     public bool Equals(TypeParameters? other) => other is not null && Id == other.Id;
     public override bool Equals(object? obj) => Equals(obj as TypeParameters);

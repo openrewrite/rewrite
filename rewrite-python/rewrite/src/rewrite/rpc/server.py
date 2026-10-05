@@ -22,6 +22,7 @@ Bidirectional RPC:
 
 import argparse
 import ast
+import csv
 import json
 import logging
 import os
@@ -29,14 +30,28 @@ import select
 import sys
 import tempfile
 import time
+import tokenize
 import traceback
 import threading
 
+from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Set
+from typing import Dict, Any, Iterator, Optional, List, Callable, Set
 from uuid import uuid4
 
-from rewrite.discovery import RecipeAttribution, RecipeName
+try:
+    import resource
+except ImportError:  # not available on Windows
+    resource = None
+
+from rewrite.discovery import RecipeAttribution, RecipeName, _normalize_package_name
+from rewrite.execution import ExecutionContext
+from rewrite.python._version_detect import (
+    detect_from_project, detect_from_source, requested_python_version, ty_python_version)
+from rewrite.python.printer import PythonPrinter
+from rewrite.result import Result
+from rewrite.rpc.reference import ReferenceMap
 
 # Deeply nested LST nodes (e.g., 256 implicitly concatenated strings) can
 # overflow the default recursion limit (1000) during RPC serialization.
@@ -59,14 +74,37 @@ local_objects: Dict[str, Any] = {}
 remote_objects: Dict[str, Any] = {}
 # Remote refs - maps reference IDs to objects for cyclic graph handling
 remote_refs: Dict[int, Any] = {}
+# Refs sent to Java, so a type sent for one source file is cited rather than resent
+# by the next (mirrors RewriteRpc.localRefs).
+local_refs = ReferenceMap()
+# The latest transfer sent, as [object id, ref high-water before it], for AbortGetObject to undo.
+_last_sent: List[Any] = []
+# Per-source-file ref high-water on each side, captured before a file is first visited
+# so handle_evict can roll back exactly the refs that file introduced. Keyed by tree id.
+_ref_checkpoints: Dict[str, int] = {}
+_local_ref_checkpoints: Dict[str, int] = {}
+
+
+def _checkpoint_refs(tree_id: str) -> None:
+    """Snapshot both directions' ref high-water before any of a file's data moves, so
+    handle_evict rolls back exactly what that file introduced (first sight of the file wins)."""
+    _ref_checkpoints.setdefault(tree_id, max(remote_refs.keys(), default=-1))
+    _local_ref_checkpoints.setdefault(tree_id, local_refs.snapshot())
+
+
+# Per-call metrics CSV (--metrics-csv), same schema as Go: cache-size ramp vs per-file-Evict sawtooth.
+_metrics_file = None
+_metrics_writer = None
+_metrics_lock = threading.Lock()
 
 # Request ID counter for outgoing requests
 _request_id_counter = 0
 _request_id_lock = threading.Lock()
 
-# Pending requests waiting for responses
-_pending_requests: Dict[int, Any] = {}
-_pending_lock = threading.Lock()
+# Ids of the calls currently on the stack, and responses that arrived for one of them
+# while another was waiting; anything no listed call claims is dropped rather than kept.
+_awaiting_ids: Set[Any] = set()
+_pending_responses: Dict[Any, dict] = {}
 
 # Flag for trace mode
 _trace_rpc = False
@@ -79,6 +117,14 @@ _python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
 # package pip installs it here before activating.
 _recipe_install_dir: Optional[Path] = None
 
+# Set via --child-bundle: the marketplace is scoped to exactly this distribution's recipes.
+_child_bundle: Optional[str] = None
+
+# The identity the host keys a local bundle by (its supplied path); None for a registry spec.
+_attribution_name: Optional[str] = None
+
+_facade = None
+
 
 def _next_request_id() -> int:
     """Generate a unique request ID for outgoing requests."""
@@ -86,6 +132,73 @@ def _next_request_id() -> int:
     with _request_id_lock:
         _request_id_counter += 1
         return _request_id_counter
+
+
+def _issue_request(method: str, params: dict) -> Any:
+    """Write a request and register its id, without waiting for the reply.
+
+    Separating the write from the wait lets a caller keep a request in flight
+    while it works; :func:`_await_response` collects it. A reply arriving for
+    another registered id is stashed by that function rather than discarded.
+    """
+    request_id = _next_request_id()
+
+    request = {
+        'jsonrpc': '2.0',
+        'id': request_id,
+        'method': method,
+        'params': params
+    }
+
+    if _trace_rpc:
+        logger.debug(f"Sending request to Java: {json.dumps(request)}")
+
+    # Send the request to Java via stdout
+    write_message(request)
+
+    _awaiting_ids.add(request_id)
+    return request_id
+
+
+def _await_response(request_id: Any, method: str, timeout_seconds: float = 30.0) -> Any:
+    """Wait for the reply to a request :func:`_issue_request` already wrote."""
+    try:
+        while True:
+            response = _pending_responses.pop(request_id, None)
+            if response is None:
+                try:
+                    response = read_message_with_timeout(timeout_seconds)
+                except TimeoutError as e:
+                    raise RuntimeError(f"No response received for {method} request ({e})")
+                if response is None:
+                    raise RuntimeError(f"Host closed the stream while awaiting a response to {method}")
+
+            # Java can call us while we are calling Java; serve it and keep waiting, as
+            # the JS peer's connection does for a request arriving mid-call.
+            if response.get('method') is not None:
+                _serve(response)
+                continue
+
+            response_id = response.get('id')
+            if response_id != request_id:
+                if response_id in _awaiting_ids:
+                    _pending_responses[response_id] = response
+                else:
+                    logger.warning(f"Discarding response for request {response_id}; "
+                                   f"no call is awaiting it")
+                continue
+
+            if _trace_rpc:
+                logger.debug(f"Received response from Java: {json.dumps(response)}")
+
+            if 'error' in response:
+                error = response['error']
+                raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
+
+            return response.get('result')
+    finally:
+        _awaiting_ids.discard(request_id)
+        _pending_responses.pop(request_id, None)
 
 
 def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> Any:
@@ -105,36 +218,7 @@ def send_request(method: str, params: dict, timeout_seconds: float = 30.0) -> An
     Raises:
         RuntimeError: If request times out or fails
     """
-    request_id = _next_request_id()
-
-    request = {
-        'jsonrpc': '2.0',
-        'id': request_id,
-        'method': method,
-        'params': params
-    }
-
-    if _trace_rpc:
-        logger.debug(f"Sending request to Java: {json.dumps(request)}")
-
-    # Send the request to Java via stdout
-    write_message(request)
-
-    # Read the response from Java with timeout
-    response = read_message_with_timeout(timeout_seconds)
-
-    if response is None:
-        raise RuntimeError(f"No response received for {method} request (timeout after {timeout_seconds}s)")
-
-    if _trace_rpc:
-        logger.debug(f"Received response from Java: {json.dumps(response)}")
-
-    # Check for errors
-    if 'error' in response:
-        error = response['error']
-        raise RuntimeError(f"RPC error from Java: {error.get('message', 'Unknown error')}")
-
-    return response.get('result')
+    return _await_response(_issue_request(method, params), method, timeout_seconds)
 
 
 def _require_tree(tree: Any, source_file_type: Optional[str]) -> Any:
@@ -179,6 +263,14 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
 
     # Track whether we've received the complete object
     received_end = False
+    # Id of a page asked for and not yet collected, so the peer serializes it while
+    # this side turns the previous one into a tree. Only the stdio transport can
+    # hold one: a client that replaces send_request writes and waits in one call,
+    # with no seam to issue against, so there the pages are fetched on demand.
+    pending_page = None
+    can_prefetch = getattr(send_request, '_java_rpc_original', None) is None
+    # True while a page is being waited for, when a failure is the peer's or the transport's.
+    awaiting_page = False
 
     def pull_batch() -> List[Dict[str, Any]]:
         """Pull the next batch of RpcObjectData from Java.
@@ -192,16 +284,21 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         expecting positions). Java's RewriteRpc.java explicitly consumes END_OF_OBJECT
         after receive() completes (line 474), and we do the same by tracking received_end.
         """
-        nonlocal received_end
+        nonlocal received_end, pending_page, awaiting_page
 
-        if received_end:
+        if pending_page is not None:
+            page_id, pending_page = pending_page, None
+            awaiting_page = True
+            batch = _await_response(page_id, 'GetObject')
+        elif received_end:
             return []
-
-        # Request the next batch from Java
-        batch = send_request('GetObject', {
-            'id': obj_id,
-            'sourceFileType': source_file_type
-        })
+        else:
+            awaiting_page = True
+            batch = send_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
+        awaiting_page = False
 
         if not batch:
             received_end = True
@@ -213,6 +310,13 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         if batch[-1].get('state') == 'END_OF_OBJECT':
             received_end = True
             batch = batch[:-1]  # Remove END_OF_OBJECT from the batch
+        elif can_prefetch:
+            # A batch ending in END_OF_OBJECT has no successor: the peer drops its
+            # transfer state on that marker, so asking again would restart it.
+            pending_page = _issue_request('GetObject', {
+                'id': obj_id,
+                'sourceFileType': source_file_type
+            })
 
         return batch
 
@@ -239,6 +343,27 @@ def get_object_from_java(obj_id: str, source_file_type: Optional[str] = None) ->
         # Reset our tracking of the remote state so the next interaction
         # forces a full object sync (ADD) instead of a delta (CHANGE).
         remote_objects.pop(obj_id, None)
+        if pending_page is not None:
+            # A page was requested ahead and is still owed a reply. Collecting it
+            # retires the request, so no id is left registered and at most one page
+            # is ever in flight.
+            try:
+                _await_response(pending_page, 'GetObject')
+            except Exception:
+                pass
+            pending_page = None
+        if awaiting_page:
+            # The peer failed to send it, and has dropped the refs it had assigned.
+            q.roll_back_refs()
+        else:
+            # The failure is this side's, so the peer still counts the object and the refs it
+            # sent with it as received. One without the method goes on citing those refs,
+            # which is why they are dropped here only once it has dropped them too.
+            try:
+                if send_request('AbortGetObject', {'id': obj_id}) is True:
+                    q.roll_back_refs()
+            except Exception:
+                pass
         raise
 
     if obj is not None:
@@ -255,20 +380,55 @@ def generate_id() -> str:
     return str(uuid4())
 
 
+def _source_path(path: str, relative_to: Optional[str]) -> Path:
+    """The path an LST carries: relative to the project root when it sits under it."""
+    source_path = Path(path)
+    if relative_to is not None:
+        try:
+            source_path = source_path.relative_to(relative_to)
+        except ValueError:
+            pass  # path is not under relative_to, keep absolute
+    return source_path
+
+
 def parse_python_file(path: str, relative_to: Optional[str] = None, ty_client=None,
                       language_level: Optional[str] = None,
-                      project_language_level: Optional[str] = None) -> dict:
+                      project_language_level: Optional[str] = None,
+                      check_print: bool = True) -> dict:
     """Parse a Python file and return its LST."""
-    with open(path, 'r', encoding='utf-8') as f:
-        source = f.read()
+    # Decoded from bytes rather than read as text, which keeps the file's own line endings.
+    with open(path, 'rb') as f:
+        raw = f.read()
+    # The encoding the interpreter reads the file in: a coding line names one, and UTF-8 is the default.
+    try:
+        declared, _ = tokenize.detect_encoding(BytesIO(raw).readline)
+    except SyntaxError:
+        # A coding line the interpreter rejects: read as before one was looked for.
+        declared = 'utf-8'
+    charset_name = None
+    if declared in ('utf-8', 'utf-8-sig'):
+        # A byte order mark is left in the text for the parser, which records it.
+        source = raw.decode('utf-8')
+    else:
+        source = raw.decode(declared)
+        try:
+            # Reported to the host only where the bytes depend on it, as a name it may not know.
+            if raw.decode('utf-8') != source:
+                charset_name = declared
+        except UnicodeDecodeError:
+            charset_name = declared
     return parse_python_source(source, path, relative_to, ty_client,
                                language_level=language_level,
-                               project_language_level=project_language_level)
+                               project_language_level=project_language_level,
+                               check_print=check_print,
+                               charset_name=charset_name)
 
 
 def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optional[str] = None, ty_client=None,
                         language_level: Optional[str] = None,
-                        project_language_level: Optional[str] = None) -> dict:
+                        project_language_level: Optional[str] = None,
+                        check_print: bool = True,
+                        charset_name: Optional[str] = None) -> dict:
     """Parse Python source code and return its LST.
 
     The parser used depends on the effective language version, resolved in
@@ -285,7 +445,6 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
     Values starting with "2" select the parso-based Py2ParserVisitor; anything
     else uses the ast-based Python 3 parser.
     """
-    from rewrite.python._version_detect import detect_from_source
 
     effective_version = (
         language_level
@@ -294,13 +453,7 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
         or _python_version
     )
 
-    # Compute the source_path that will be stored on the LST
-    source_path = Path(path)
-    if relative_to is not None:
-        try:
-            source_path = source_path.relative_to(relative_to)
-        except ValueError:
-            pass  # path is not under relative_to, keep absolute
+    source_path = _source_path(path, relative_to)
 
     try:
         from rewrite import Markers
@@ -330,6 +483,18 @@ def parse_python_source(source: str, path: str = "<unknown>", relative_to: Optio
             cu = ParserVisitor(source, path, ty_client).visit(tree)
 
         cu = cu.replace(source_path=source_path, markers=Markers.EMPTY)
+        if charset_name is not None:
+            # what the host writes the file back in
+            cu = cu.replace(charset_name=charset_name)
+
+        if check_print:
+            printed = PythonPrinter().print(cu)
+            if printed != source:
+                return _create_parse_error(
+                    str(source_path),
+                    f"{source_path} is not print idempotent. \n"
+                    f"{Result.diff(source, printed, source_path)}",
+                    source)
 
         # Store and return
         obj_id = str(cu.id)
@@ -387,6 +552,40 @@ def _create_parse_error(path: str, message: str, source: str = '') -> dict:
     return {'id': obj_id, 'sourceFileType': 'org.openrewrite.tree.ParseError', 'sourcePath': path}
 
 
+def _make_dirs(directory: str) -> List[str]:
+    """``os.makedirs``, reporting the directories it had to create, deepest first."""
+    created = []
+    d = directory
+    while d and not os.path.isdir(d):
+        created.append(d)
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    os.makedirs(directory, exist_ok=True)
+    return created
+
+
+# Files larger than this are recorded as Quarks rather than parsed into an AST.
+# Matches the 1 MB cap in the JVM JavaScriptParser and the other RPC engines.
+MAX_PARSEABLE_SIZE_BYTES = 1024 * 1024
+
+
+def _create_quark(path: str, relative_to: Optional[str]) -> dict:
+    """Represent a file that won't be parsed (currently: too large) as a Quark.
+
+    No object is registered in ``local_objects``: the Java side builds the Quark
+    from ``sourcePath`` locally, so no content crosses the wire.
+    """
+    from rewrite import random_id
+    source_path = _source_path(path, relative_to)
+    return {
+        'id': str(random_id()),
+        'sourceFileType': 'org.openrewrite.quark.Quark',
+        'sourcePath': str(source_path),
+    }
+
+
 def _infer_project_root(inputs: list) -> Optional[str]:
     """Infer the project root from input paths.
 
@@ -414,6 +613,23 @@ def _infer_project_root(inputs: list) -> Optional[str]:
     return None
 
 
+# The dependency environment of the most recent parse; DependencyTypes resolves
+# pip coordinates against it.
+_last_dependency_path: Optional[str] = None
+
+
+def _require_print_equals_input(options: dict) -> bool:
+    """Whether parse results must print back to their input, which they must
+    unless the client says otherwise. Option maps are loosely typed across
+    peers, so both the string and the bool form count."""
+    value = options.get(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.strip().lower() not in ('false', '0', 'no', 'off')
+    return True
+
+
 def handle_parse(params: dict) -> List[str]:
     """Handle a Parse RPC request."""
     import tempfile
@@ -421,105 +637,187 @@ def handle_parse(params: dict) -> List[str]:
 
     inputs = params.get('inputs', [])
     relative_to = params.get('relativeTo')
+    # Where ty is rooted, and so where it finds its `ty.toml`. Separate from
+    # `relative_to`: relativizing a source path against a config directory the
+    # sources are not under silently leaves that path absolute.
+    project_root = params.get('projectRoot')
     # Per-parse options forwarded from the client (e.g. {"languageLevel": "2.7"}).
     # Absent for older clients; absent or unknown keys are silently ignored.
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
+    # What materializing inline sources put on disk, removed once the batch is parsed so
+    # a caller's own directory is left as it was found.
+    created_files: List[str] = []
+    created_dirs: List[str] = []
     # Path to a virtual environment with the project's dependencies installed,
     # provisioned and forwarded by the caller (the CLI build step in production;
     # a test/template helper in-repo). Points ty-types at the deps so supertypes
     # reaching into third-party packages resolve (e.g. a first-party class
     # extending pydantic.BaseModel). The handler never provisions deps itself.
     dependency_path = params.get('dependencyPath')
+    if dependency_path:
+        global _last_dependency_path
+        _last_dependency_path = dependency_path
     results = []
 
-    # If no relativeTo provided, try to infer from absolute input paths
-    if not relative_to:
-        relative_to = _infer_project_root(inputs)
+    # Only roots ty: the host's other parsers keep its input paths as given when it
+    # sent no `relativeTo`, so relativizing against an inferred root would desync them.
+    if not project_root:
+        project_root = relative_to or _infer_project_root(inputs)
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
-    # parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
+    # parse_python_source. The manifests declaring it sit with the sources, which
+    # `project_root` need not contain — it may hold only a ty config.
     project_language_level = detect_from_project(relative_to) if relative_to else None
+    if project_language_level is None and project_root and project_root != relative_to:
+        project_language_level = detect_from_project(project_root)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     # Create a ty-types client for this parse batch
     ty_client = None
     tmpdir = None
+    ty_root = project_root
     try:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
-        if relative_to:
-            ty_client.initialize(relative_to)
-        else:
-            # For inline text inputs without a project root, create a temp directory
-            # so ty-types can still provide type attribution
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_version)
+        if not ty_root:
+            # A scratch root gives inline text inputs somewhere on disk that ty can see.
             tmpdir = tempfile.mkdtemp(prefix='rewrite-parse-')
-            ty_client.initialize(tmpdir)
+            ty_root = tmpdir
+        ty_client.initialize(ty_root)
     except (ImportError, RuntimeError):
         ty_client = None  # ty-types not available
 
     try:
-        for i, input_item in enumerate(inputs):
-            if isinstance(input_item, str):
-                result = parse_python_file(input_item, relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'path' in input_item:
-                result = parse_python_file(input_item['path'], relative_to, ty_client,
-                                           language_level=language_level,
-                                           project_language_level=project_language_level)
-            elif 'text' in input_item or 'source' in input_item:
-                source = input_item.get('text') if 'text' in input_item else input_item.get('source')
-                path = input_item.get('sourcePath') or input_item.get('relativePath', '<unknown>')
-                # For relative paths, write the source under the project root
-                # (tmpdir or relative_to) so ty-types can resolve imports from
-                # the project's .venv and dependencies.
-                base_dir = tmpdir or relative_to
-                if base_dir and not os.path.isabs(path):
-                    disk_path = os.path.join(base_dir, path)
-                    os.makedirs(os.path.dirname(disk_path), exist_ok=True)
-                    with open(disk_path, 'w', encoding='utf-8') as f:
-                        f.write(source)
-                    result = parse_python_source(source, disk_path, base_dir, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
+        for input_item in inputs:
+            # The client pairs this list to its input list by position, so every
+            # input owes the batch one result — a file too broken to read included.
+            path = '<unknown>'
+            source = ''
+            try:
+                if isinstance(input_item, str):
+                    path = input_item
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
+                elif input_item.get('text') is None and input_item.get('source') is None:
+                    # An input carrying no text names a file the peer reads itself.
+                    named = (input_item.get('path') or input_item.get('sourcePath') or
+                             input_item.get('relativePath'))
+                    if named is None:
+                        raise ValueError('input carries neither source text nor a path')
+                    path = named
+                    result = parse_python_file(path, relative_to, ty_client,
+                                               language_level=language_level,
+                                               project_language_level=project_language_level,
+                                               check_print=check_print)
                 else:
-                    result = parse_python_source(source, path, relative_to, ty_client,
-                                                 language_level=language_level,
-                                                 project_language_level=project_language_level)
-            else:
-                logger.warning(f"  [{i}] unknown input type: {type(input_item)}")
-                continue
+                    source = input_item.get('text')
+                    if source is None:
+                        source = input_item.get('source')
+                    path = (input_item.get('sourcePath') or input_item.get('path') or
+                            input_item.get('relativePath', '<unknown>'))
+                    # ty analyses files from disk and resolves only what lies under the
+                    # root it was initialized at, so materialize the source there. Passing
+                    # that same root as the relativization base keeps the LST's source path
+                    # equal to the caller's own.
+                    base_dir = ty_root
+                    if base_dir and not os.path.isabs(path):
+                        disk_path = os.path.join(base_dir, path)
+                        created_dirs.extend(_make_dirs(os.path.dirname(disk_path)))
+                        if not os.path.exists(disk_path):
+                            created_files.append(disk_path)
+                        # ty must read the same bytes the LST was built from.
+                        with open(disk_path, 'w', encoding='utf-8', newline='') as f:
+                            f.write(source)
+                        result = parse_python_source(source, disk_path, base_dir, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+                    else:
+                        result = parse_python_source(source, path, relative_to, ty_client,
+                                                     language_level=language_level,
+                                                     project_language_level=project_language_level,
+                                                     check_print=check_print)
+            except Exception as e:
+                logger.exception(f"Error parsing {path}: {e}")
+                result = _create_parse_error(str(_source_path(path, relative_to)), str(e), source)
             results.append(result['id'])
     finally:
         if ty_client is not None:
             ty_client.shutdown()
         if tmpdir is not None:
             shutil.rmtree(tmpdir, ignore_errors=True)
+        for created in created_files:
+            try:
+                os.remove(created)
+            except OSError:
+                pass
+        # rmdir only takes an empty directory, so one the caller had content in stays.
+        for created in created_dirs:
+            try:
+                os.rmdir(created)
+            except OSError:
+                pass
 
     return results
 
 
-def handle_parse_project(params: dict) -> List[dict]:
-    """Handle a ParseProject RPC request."""
+# These nest anywhere in a project.
+DEFAULT_PARSE_EXCLUSIONS = [
+    '__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne',
+    'node_modules', '.pytest_cache', '.mypy_cache',
+]
+
+# Build output, which only ever sits at the project root; deeper down these are
+# ordinary packages — ``src/build/`` is the PyPI ``build`` package's own layout.
+ROOT_PARSE_EXCLUSIONS = ['build', 'dist']
+
+
+def _walk_python_files(project_path: str, exclusions: List[str]) -> Iterator[str]:
+    """Yield every ``.py`` path under ``project_path`` outside an excluded directory."""
     import fnmatch
 
+    def excluded(name: str, patterns: List[str]) -> bool:
+        return any(fnmatch.fnmatch(name, pattern) for pattern in patterns)
+
+    for root, dirs, files in os.walk(project_path):
+        at_root = root == project_path
+        patterns = exclusions + ROOT_PARSE_EXCLUSIONS if at_root else exclusions
+        dirs[:] = [d for d in dirs if not excluded(d, patterns)]
+
+        for file in files:
+            if file.endswith('.py'):
+                yield os.path.join(root, file)
+
+
+def handle_parse_project(params: dict) -> List[dict]:
+    """Handle a ParseProject RPC request."""
     project_path = params.get('projectPath', '.')
-    exclusions = params.get('exclusions', ['__pycache__', '.venv', 'venv', '.git', '.tox', '*.egg-info', '.moderne'])
+    exclusions = DEFAULT_PARSE_EXCLUSIONS + [
+        excl for excl in (params.get('exclusions') or []) if excl not in DEFAULT_PARSE_EXCLUSIONS
+    ]
     relative_to = params.get('relativeTo') or project_path
     # Per-request explicit override (mirror of the Parse RPC options carrier).
     options = params.get('options') or {}
     language_level = options.get('languageLevel')
+    check_print = _require_print_equals_input(options)
     # Caller-provisioned dependency environment for ty-types (see handle_parse).
     dependency_path = params.get('dependencyPath')
+    if dependency_path:
+        global _last_dependency_path
+        _last_dependency_path = dependency_path
 
     # Resolve project-level language version once for the whole walk; each
     # file may still override it via in-source signals inside parse_python_source.
-    from rewrite.python._version_detect import detect_from_project
     project_language_level = detect_from_project(project_path)
+    ty_version = ty_python_version(language_level, project_language_level)
 
     results = []
 
@@ -528,30 +826,342 @@ def handle_parse_project(params: dict) -> List[dict]:
         from rewrite.python.ty_client import TyTypesClient
         # Point ty-types at the caller-provisioned dependency environment (if any)
         # so supertypes reaching into third-party packages resolve.
-        ty_client = TyTypesClient(virtual_env=dependency_path)
+        ty_client = TyTypesClient(virtual_env=dependency_path,
+                                  python_version=ty_version)
         ty_client.initialize(project_path)
     except (ImportError, RuntimeError):
         pass
 
     try:
-        for root, dirs, files in os.walk(project_path):
-            dirs[:] = [d for d in dirs if not any(fnmatch.fnmatch(d, excl) for excl in exclusions)]
-
-            for file in files:
-                if file.endswith('.py'):
-                    path = os.path.join(root, file)
-                    try:
-                        result = parse_python_file(path, relative_to, ty_client,
-                                                   language_level=language_level,
-                                                   project_language_level=project_language_level)
-                        results.append(result)
-                    except Exception as e:
-                        logger.error(f"Error parsing {path}: {e}")
+        for path in _walk_python_files(project_path, exclusions):
+            try:
+                oversize = os.path.getsize(path) > MAX_PARSEABLE_SIZE_BYTES
+            except OSError:
+                oversize = False  # let the normal path surface the read error
+            if oversize:
+                results.append(_create_quark(path, relative_to))
+                continue
+            try:
+                result = parse_python_file(path, relative_to, ty_client,
+                                           language_level=language_level,
+                                           project_language_level=project_language_level,
+                                           check_print=check_print)
+                results.append(result)
+            except Exception as e:
+                logger.exception(f"Error parsing {path}: {e}")
+                # Every file the walk finds is accounted for in the response.
+                results.append(_create_parse_error(str(_source_path(path, relative_to)), str(e)))
     finally:
         if ty_client is not None:
             ty_client.shutdown()
 
     return results
+
+
+def _richness(cls) -> int:
+    """A classLiteral's completeness, used to keep the fullest of several
+    same-FQN descriptors ty may emit for one class. Supertypes, interfaces, and
+    type parameters count too, so a supertype-rich descriptor isn't dropped for
+    a method-rich one.
+    """
+    n = (len(getattr(cls, '_methods', None) or [])
+         + len(getattr(cls, '_members', None) or [])
+         + len(getattr(cls, '_interfaces', None) or [])
+         + len(getattr(cls, '_type_parameters', None) or []))
+    if getattr(cls, '_supertype', None) is not None:
+        n += 1
+    return n
+
+
+def _artifact_files(path: Path) -> List[str]:
+    """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
+    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
+    files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
+    return [str(f) for f in files]
+
+
+def _site_packages(virtual_env):
+    """The venv's site-packages dir (Unix ``lib/pythonX.Y/site-packages`` or Windows ``Lib``)."""
+    if not virtual_env:
+        return None
+    venv = Path(virtual_env)
+    lib = venv / "lib"
+    if lib.is_dir():
+        for p in sorted(lib.glob("python*")):
+            sp = p / "site-packages"
+            if sp.is_dir():
+                return str(sp)
+    win = venv / "Lib" / "site-packages"
+    return str(win) if win.is_dir() else None
+
+
+def _module_name(fp: str, root: str) -> str:
+    """The dotted module of ``fp`` relative to ``root`` (site-packages): e.g.
+    ``google/cloud/storage/client.py`` -> ``google.cloud.storage.client`` (``__init__`` dropped)."""
+    try:
+        rel = Path(fp).resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return Path(fp).stem
+    parts = list(rel.with_suffix('').parts)
+    if parts and parts[-1] == '__init__':
+        parts = parts[:-1]
+    return '.'.join(parts)
+
+
+def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any],
+                        processed_ids: Set[int]) -> None:
+    """Collect the complete JavaType.Class for every class one package defines,
+    plus a synthetic per-module class carrying its module-level functions and
+    constants (see ``PythonTypeMapping.module_type``).
+
+    ty has no module enumeration, so walk the package's own .py/.pyi, run the
+    per-file type extraction, and keep the classLiteral descriptors whose module
+    is the package's own — mapping each via the classLiteral branch of
+    PythonTypeMapping, which builds a full class (supertypes, methods, members).
+
+    ``processed_ids`` holds ty's session-stable type ids already enumerated. ty
+    deduplicates descriptors across a session and back-fills them into later
+    files' registries, so without this a class defined early is re-mapped once
+    per subsequent file — O(files x classes) work ``by_fqn`` only ever discarded.
+    Reset it per ty session (ids restart) but share it across the session's files.
+    """
+    from rewrite.python.type_mapping import PythonTypeMapping
+    from rewrite.java import JavaType
+
+    path = Path(artifact)
+    if path.is_dir():
+        files = _artifact_files(path)
+    elif path.suffix in ('.py', '.pyi'):
+        files = [str(path)]
+    else:
+        return
+
+    for fp in files:
+        own_module = _module_name(fp, root)
+        try:
+            with open(fp, 'r', encoding='utf-8') as fh:
+                source = fh.read()
+        except OSError:
+            continue
+        try:
+            mapping = PythonTypeMapping(source, file_path=fp, ty_client=client)
+        except Exception:
+            logger.warning("ExportedTypes: type mapping failed for %s", fp, exc_info=True)
+            continue
+        # A non-empty file with no node index means ty returned nothing for it
+        # (its 30s timeout, or an error) — surface it per-file rather than only
+        # in the final aggregate count.
+        if source.strip() and not mapping._node_index:
+            logger.warning("ExportedTypes: ty returned no types for %s", fp)
+            continue
+        for tid, descriptor in mapping._type_registry.items():
+            if tid in processed_ids:
+                continue
+            if descriptor.get('kind') != 'classLiteral':
+                continue
+            module_name = descriptor.get('moduleName') or ''
+            # Keep only classes defined in this file's own module — precise per-file scoping so ty's
+            # cross-file back-fill (which surfaces referenced types too) can't leak a sibling class,
+            # and a dist sharing a namespace-package dir contributes only its own types.
+            if module_name != own_module:
+                continue
+            processed_ids.add(tid)
+            try:
+                java_type = mapping._descriptor_to_java_type(descriptor)
+            except Exception:
+                continue
+            if not isinstance(java_type, JavaType.Class):
+                continue
+            fqn = java_type.fully_qualified_name
+            if not fqn:
+                continue
+            existing = by_fqn.get(fqn)
+            if existing is None or _richness(java_type) > _richness(existing):
+                by_fqn[fqn] = java_type
+        # One module type per module FQN: the first file defines it, which the
+        # stub-first file ordering makes the .pyi when one exists.
+        if own_module not in by_fqn:
+            module_type = mapping.module_type(own_module)
+            if module_type is not None:
+                by_fqn[own_module] = module_type
+
+
+# DependencyTypes pages its (potentially hundreds-of-MB) response: the full list is
+# built once and handed back in _DEPENDENCY_TYPES_BATCH_SIZE slices across the client's
+# repeated identical requests. 1000 matches the Java/JS RewriteRpc default.
+_DEPENDENCY_TYPES_BATCH_SIZE = 1000
+_dependency_types_pending: Dict[tuple, List[dict]] = {}
+
+
+def _typeshed_stdlib_dir() -> Path:
+    """The typeshed ``stdlib`` dir named by REWRITE_PYTHON_TYPESHED, which may point
+    at the checkout root or at stdlib itself (verified by its ``VERSIONS`` file)."""
+    env = os.environ.get('REWRITE_PYTHON_TYPESHED')
+    if not env:
+        raise ValueError("REWRITE_PYTHON_TYPESHED is not set; cannot resolve standard-library modules")
+    # ty canonicalizes paths internally; a symlinked root would break own-module attribution.
+    root = Path(env).resolve()
+    if (root / 'stdlib' / 'VERSIONS').is_file():
+        return root / 'stdlib'
+    if root.name == 'stdlib' and (root / 'VERSIONS').is_file():
+        return root
+    raise ValueError(f"no typeshed stdlib/VERSIONS under {env}")
+
+
+def _write_stdlib_ty_config(stdlib: Path, python_version: Optional[str]) -> str:
+    """Throwaway ty.toml dir pointing ty's typeshed at the checkout so it resolves as the
+    stdlib and names modules os, not stdlib.os — matching the parser's stdlib attribution."""
+    version = requested_python_version(python_version) \
+              or '%d.%d' % (sys.version_info.major, sys.version_info.minor)
+    ty_config_dir = tempfile.mkdtemp(prefix='ty-stdlib-')
+    with open(os.path.join(ty_config_dir, 'ty.toml'), 'w') as f:
+        f.write('[environment]\ntypeshed = "%s"\npython-version = "%s"\n'
+                % (str(stdlib.parent), version))
+    return ty_config_dir
+
+
+def _dist_info_dir(site_packages: Path, name: str, version: str) -> Path:
+    """The coordinate's dist-info dir: the exact ``<name>-<version>.dist-info``, else
+    any whose dist name part normalizes to the requested name."""
+    exact = site_packages / f"{name}-{version}.dist-info"
+    if exact.is_dir():
+        return exact
+    target = _normalize_package_name(name)
+    for cand in site_packages.glob('*.dist-info'):
+        dist_name = cand.name[:-len('.dist-info')].rpartition('-')[0]
+        if dist_name and _normalize_package_name(dist_name) == target:
+            return cand
+    raise ValueError(f"{name}=={version} is not installed in the dependency environment")
+
+
+def _resolve_dist_artifacts(name: str, version: str, site_packages: Path) -> List[str]:
+    """The dist's own .py/.pyi files from its RECORD (entries outside site-packages
+    dropped); a RECORD-less dist falls back to its import package dir(s)."""
+    dist_info = _dist_info_dir(site_packages, name, version)
+    sp = site_packages.resolve()
+    record = dist_info / 'RECORD'
+    if record.is_file():
+        try:
+            with open(record, newline='', encoding='utf-8') as fh:
+                own = []
+                for row in csv.reader(fh):
+                    if not row or not row[0].endswith(('.py', '.pyi')):
+                        continue
+                    p = (site_packages / row[0]).resolve()
+                    if p.is_file() and p.is_relative_to(sp):
+                        own.append(p)
+                # Stubs ahead of runtime siblings, matching _artifact_files ordering.
+                own.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
+                return [str(f) for f in own]
+        except OSError:
+            pass
+    try:
+        tops = [t.strip() for t in (dist_info / 'top_level.txt').read_text(encoding='utf-8').splitlines()
+                if t.strip()]
+    except OSError:
+        tops = []
+    own = []
+    for top in tops or [_normalize_package_name(name)]:
+        if (site_packages / top).is_dir():
+            own.append(str(site_packages / top))
+        elif (site_packages / f"{top}.py").is_file():
+            own.append(str(site_packages / f"{top}.py"))
+    return own
+
+
+def _build_exported_types_data(own_artifacts: List[str], root: str, virtual_env: Optional[str],
+                               stdlib: Optional[Path],
+                               python_version: Optional[str] = None) -> List[dict]:
+    """Enumerate the public types ``own_artifacts`` define into the full ref-deduplicated
+    RpcObjectData list terminated by END_OF_OBJECT (see ``handle_dependency_types``).
+    ``root`` anchors module names: the typeshed stdlib dir, or the venv's site-packages
+    so dotted paths resolve fully (e.g. google.cloud.storage for a namespace package)."""
+    import shutil
+    from rewrite.python.ty_client import TyTypesClient
+    from rewrite.rpc.send_queue import RpcSendQueue, RpcObjectState
+    from rewrite.rpc.python_sender import PythonRpcSender
+
+    ty_config_dir = None
+    if stdlib is not None:
+        ty_config_dir = _write_stdlib_ty_config(stdlib, python_version)
+        ty_project_root = ty_config_dir
+    else:
+        ty_project_root = root
+
+    by_fqn: Dict[str, Any] = {}
+    if root and os.path.isdir(root):
+        client = None
+        try:
+            try:
+                client = TyTypesClient(virtual_env=virtual_env)
+                client.initialize(ty_project_root)
+            except (ImportError, RuntimeError):
+                client = None
+            if client is not None and client.is_available:
+                processed_ids: Set[int] = set()  # ty type ids are per-session
+                for artifact in own_artifacts:
+                    _enumerate_artifact(artifact, root, client, by_fqn, processed_ids)
+        finally:
+            if client is not None:
+                client.shutdown()
+            if ty_config_dir is not None:
+                shutil.rmtree(ty_config_dir, ignore_errors=True)
+
+    types = list(by_fqn.values())
+    logger.info(f"ExportedTypes: {len(own_artifacts)} own artifacts -> {len(types)} types")
+
+    q = RpcSendQueue('org.openrewrite.java.tree.JavaType$Class')
+    sender = PythonRpcSender()
+    # FQN strings first, so the caller can tell the types this package defines from references up front.
+    q.send_list(list(by_fqn.keys()), None, lambda s: s, None, as_ref=False)
+    q.send_list(types, None, sender._type_signature,
+                lambda t: sender._visit_type(t, q), as_ref=True)
+    q.put({'state': RpcObjectState.END_OF_OBJECT})
+    return q.q
+
+
+def handle_dependency_types(params: dict) -> List[dict]:
+    """Handle a DependencyTypes request: enumerate the public types of one dependency, named by
+    its pip coordinate (a null version names a standard-library module), streamed back terminated
+    by END_OF_OBJECT. Built once, returned in ``_DEPENDENCY_TYPES_BATCH_SIZE`` slices across the
+    client's repeated pulls. An optional ``pythonVersion`` ("3.12") picks the stdlib stub surface.
+    """
+    name = params.get('name')
+    version = params.get('version')
+    # Stdlib stubs are version-conditioned; a malformed value falls back to the interpreter minor.
+    python_version = requested_python_version(params.get('pythonVersion'))
+    if not name:
+        raise ValueError("DependencyTypes requires a dependency name")
+
+    key = (name, version, python_version)
+    data = _dependency_types_pending.get(key)
+    if data is None:
+        if version is None:
+            stdlib = _typeshed_stdlib_dir()
+            artifact = stdlib / name
+            if not artifact.is_dir():
+                artifact = stdlib / f"{name}.pyi"
+                if not artifact.is_file():
+                    raise ValueError(f"standard-library module {name!r} not found in typeshed at {stdlib}")
+            data = _build_exported_types_data([str(artifact)], str(stdlib), None, stdlib,
+                                              python_version=python_version)
+        else:
+            dependency_path = _last_dependency_path or os.environ.get('VIRTUAL_ENV')
+            if not dependency_path:
+                raise ValueError("no dependency environment: parse with dependencyPath or set VIRTUAL_ENV")
+            site_packages = _site_packages(dependency_path)
+            if site_packages is None:
+                raise ValueError(f"no site-packages under {dependency_path}")
+            own_artifacts = _resolve_dist_artifacts(name, version, Path(site_packages))
+            data = _build_exported_types_data(own_artifacts, site_packages, dependency_path, None)
+        _dependency_types_pending[key] = data
+
+    batch = data[:_DEPENDENCY_TYPES_BATCH_SIZE]
+    del data[:_DEPENDENCY_TYPES_BATCH_SIZE]
+    if not data:
+        del _dependency_types_pending[key]
+    return batch
 
 
 def handle_get_object(params: dict) -> List[dict]:
@@ -583,8 +1193,16 @@ def handle_get_object(params: dict) -> List[dict]:
         # Get the "before" state - what we previously sent to Java
         before = remote_objects.get(obj_id)
 
-        q = RpcSendQueue(source_file_type)
-        result = q.generate(obj, before)
+        saved_refs = local_refs.snapshot()
+        _last_sent[:] = [obj_id, saved_refs]
+        q = RpcSendQueue(source_file_type, local_refs)
+        try:
+            result = q.generate(obj, before)
+        except BaseException:
+            # Java receives nothing of this exchange, so refs assigned during it name
+            # objects it never got; citing them later would fail on its side.
+            local_refs.rollback_to(saved_refs)
+            raise
 
         # Update remote_objects to track that Java now has this version
         remote_objects[obj_id] = obj
@@ -595,6 +1213,23 @@ def handle_get_object(params: dict) -> List[dict]:
         source_path = getattr(obj, 'source_path', None)
         logger.exception(f"Error serializing object {obj_id} (type={type(obj).__name__}, path={source_path}): {e}")
         return [{'state': 'END_OF_OBJECT'}]
+
+
+def handle_abort_get_object(params: dict) -> bool:
+    """Handle an AbortGetObject RPC request: undo the transfer of an object that its receiver
+    failed to take. Forgetting that the peer holds it, and the refs assigned while sending it,
+    has both next go out whole instead of as a delta or a bare ref the peer cannot resolve.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    remote_objects.pop(obj_id, None)
+    if _last_sent and _last_sent[0] == obj_id:
+        local_refs.rollback_to(_last_sent[1])
+    else:
+        # Not the latest transfer, so which refs it assigned is no longer known.
+        local_refs.clear()
+    return True
 
 
 def _serialize_object_fallback(obj: Any) -> List[dict]:
@@ -641,16 +1276,25 @@ def handle_print(params: dict) -> str:
         logger.warning(f"Object {obj_id} not found")
         return ""
 
-    # If it's a CompilationUnit, use the printer
-    try:
-        from rewrite.python.printer import PythonPrinter
-        printer = PythonPrinter()
-        return printer.print(obj)
-    except ImportError as e:
-        logger.error(f"Failed to import PythonPrinter: {e}")
-        pass
-    except Exception as e:
-        logger.exception(f"Error printing object: {e}")
+    from rewrite.java import J
+    if isinstance(obj, J):
+        # Honor the requested marker printer: FENCED emits the {{uuid}} fences the diff
+        # reader expects; SANITIZED strips markers; DEFAULT/unknown use default rendering.
+        name = params.get('markerPrinter')
+        from rewrite.python.printer import PythonPrinter, PrintOutputCapture
+        from rewrite.tree import PrintOutputCapture as CorePrintOutputCapture
+        marker_printer = {
+            'FENCED': CorePrintOutputCapture.MarkerPrinter.FENCED,
+            'SANITIZED': CorePrintOutputCapture.MarkerPrinter.SANITIZED,
+            'SEARCH_MARKERS_ONLY': CorePrintOutputCapture.MarkerPrinter.SEARCH_MARKERS_ONLY,
+        }.get(name)
+        # A FENCED typo would otherwise silently fall back to /*~~>*/ and corrupt the diff.
+        if marker_printer is None and name not in (None, 'DEFAULT'):
+            logger.warning(f"Unknown markerPrinter '{name}'; using default rendering")
+        # The ancestors of a subtree decide some of its syntax, such as `=` over `:=`.
+        cursor_ids = params.get('cursor')
+        cursor = _build_cursor(cursor_ids, source_file_type) if cursor_ids else None
+        return PythonPrinter().print(obj, PrintOutputCapture(marker_printer), cursor)
 
     # Fallback: return stored source if available
     if hasattr(obj, 'source'):
@@ -671,10 +1315,47 @@ def handle_reset(params: dict) -> bool:
     _prepared_editor_overrides.clear()
     _prepared_edit_preconditions.clear()
     _execution_contexts.clear()
+    _local_object_ids.clear()
     _recipe_accumulators.clear()
     _recipe_phases.clear()
+    _ref_checkpoints.clear()
+    _local_ref_checkpoints.clear()
+    local_refs.clear()
+    _last_sent.clear()
+    _hub_tree.clear()
+    _hub_served.clear()
+    _hub_send_refs.clear()
+    _hub_recv_refs.clear()
+    _hub_send_checkpoint.clear()
+    _hub_recv_checkpoint.clear()
+    _hub_last_served.clear()
+    # A half-drained page would resume mid-list for a host that expects to start over.
+    _dependency_types_pending.clear()
 
     logger.info("Reset: cleared all cached state")
+    return True
+
+
+def handle_evict(params: dict) -> bool:
+    """Handle an Evict RPC notification - drop one source file's tree and roll back the
+    refs it introduced, bounding memory to roughly one source file at a time. Recipe,
+    accumulator, and execution-context state (keyed separately) is left intact.
+
+    Both directions roll back together, matching RewriteRpc.evict: Java drops this file's
+    refs from both of its maps, so any kept here would name ids it no longer holds.
+    """
+    obj_id = params.get('id')
+    if obj_id is None:
+        return True
+    local_objects.pop(obj_id, None)
+    remote_objects.pop(obj_id, None)
+    checkpoint = _ref_checkpoints.pop(obj_id, None)
+    if checkpoint is not None:
+        for ref_id in [k for k in remote_refs if k > checkpoint]:
+            del remote_refs[ref_id]
+    local_checkpoint = _local_ref_checkpoints.pop(obj_id, None)
+    if local_checkpoint is not None:
+        local_refs.rollback_to(local_checkpoint)
     return True
 
 
@@ -700,24 +1381,22 @@ def _get_marketplace():
     """
     global _marketplace
     if _marketplace is None:
-        from rewrite.discovery import discover_recipes, recipe_name_set
         from rewrite.marketplace import RecipeMarketplace
-        from rewrite import activate
-
         _marketplace = RecipeMarketplace()
 
-        # Discover from installed packages, tracking which distribution
-        # contributed each recipe.
-        discover_recipes(marketplace=_marketplace, attribution=_attribution)
+        if _child_bundle:
+            from rewrite.discovery import discover_root_recipes
+            discover_root_recipes(_child_bundle, marketplace=_marketplace, attribution=_attribution,
+                                  attribution_name=_attribution_name)
+        else:
+            from rewrite.discovery import discover_recipes, recipe_name_set
+            from rewrite import activate
 
-        # Also activate local recipes (in case the openrewrite distribution
-        # isn't pip-installed, e.g., when running from source). When it is
-        # installed, discovery already covered these and install() will dedupe
-        # by name; attribute the source-mode additions to "openrewrite" so
-        # they're returned by GetMarketplace/InstallRecipes for that package.
-        before = recipe_name_set(_marketplace)
-        activate(_marketplace)
-        _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
+            discover_recipes(marketplace=_marketplace, attribution=_attribution)
+
+            before = recipe_name_set(_marketplace)
+            activate(_marketplace)
+            _attribution.record("openrewrite", recipe_name_set(_marketplace) - before)
 
     return _marketplace
 
@@ -838,14 +1517,14 @@ def handle_install_recipes(params: dict) -> dict:
         else:
             logger.info(f"Activating recipes from local path: {recipes}")
 
-        # Find and import the package
-        # For local paths, we look for the package name from setup.py/pyproject.toml
+        # Attribution is the supplied path, not the distribution name — the identity the host
+        # keys a local bundle by.
         package_name = _find_package_name(local_path)
         if package_name:
             before = recipe_name_set(marketplace)
             _import_and_activate_package(package_name, marketplace, local_path)
             added = recipe_name_set(marketplace) - before
-            _attribution.record(package_name, added)
+            _attribution.record(recipes, added)
             recipes_added = len(added)
 
     elif isinstance(recipes, dict):
@@ -920,44 +1599,8 @@ def _add_source_to_path(local_path: Path) -> None:
 
 def _find_package_name(local_path: Path) -> Optional[str]:
     """Find the package name from a local path."""
-    import sys
-    if sys.version_info >= (3, 11):
-        import tomllib
-    else:
-        try:
-            import tomli as tomllib  # type: ignore[import-not-found]
-        except ModuleNotFoundError:
-            return None
-
-    # Try pyproject.toml first
-    pyproject_path = local_path / 'pyproject.toml'
-    if pyproject_path.exists():
-        try:
-            with open(pyproject_path, 'rb') as f:
-                data = tomllib.load(f)
-                # Try [project] section first (PEP 621)
-                if 'project' in data and 'name' in data['project']:
-                    return data['project']['name']
-                # Try [tool.poetry] section
-                if 'tool' in data and 'poetry' in data['tool'] and 'name' in data['tool']['poetry']:
-                    return data['tool']['poetry']['name']
-        except Exception as e:
-            logger.warning(f"Failed to parse pyproject.toml: {e}")
-
-    # Try setup.py
-    setup_py = local_path / 'setup.py'
-    if setup_py.exists():
-        # Simple heuristic: look for name= in setup.py
-        try:
-            content = setup_py.read_text()
-            import re
-            match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
-            if match:
-                return match.group(1)
-        except Exception as e:
-            logger.warning(f"Failed to parse setup.py: {e}")
-
-    return None
+    from rewrite.discovery import distribution_name_from_source
+    return distribution_name_from_source(local_path)
 
 
 def _import_and_activate_package(package_name: str, marketplace, local_path: Optional[Path] = None):
@@ -1196,6 +1839,32 @@ _prepared_editor_overrides: Dict[str, Any] = {}
 _prepared_edit_preconditions: Dict[str, List[Dict[str, Any]]] = {}
 # Execution contexts storage - maps context IDs to ExecutionContext instances
 _execution_contexts: Dict[str, Any] = {}
+# Identity-keyed registry backing local_object(). Holds a strong reference to
+# each registered object so its id() — and therefore its minted RPC id — can
+# never be reused for a different object while a peer still diffs against it.
+_local_object_ids: Dict[int, Any] = {}
+
+
+def local_object(obj: Any) -> str:
+    """The stable id under which a peer can fetch ``obj`` via GetObject,
+    minted on first use — the counterpart of ``RewriteRpc.localObject`` in the
+    Java and JavaScript runtimes.
+
+    An ExecutionContext is also entered into ``_execution_contexts`` so that
+    an inbound Visit carrying the id resolves to this very context (see
+    ``_context_for``) instead of fabricating a fresh one.
+    """
+    from rewrite.execution import ExecutionContext
+
+    entry = _local_object_ids.get(id(obj))
+    if entry is not None and entry[0] is obj:
+        return entry[1]
+    obj_id = str(uuid4())
+    _local_object_ids[id(obj)] = (obj, obj_id)
+    local_objects[obj_id] = obj
+    if isinstance(obj, ExecutionContext):
+        _execution_contexts[obj_id] = obj
+    return obj_id
 # Accumulator storage for ScanningRecipes - maps recipe IDs to accumulators
 _recipe_accumulators: Dict[str, Any] = {}
 # Phase tracking for recipes - maps recipe IDs to 'scan' or 'edit'
@@ -1206,15 +1875,37 @@ _configured_data_table_store: Optional[Any] = None
 # Registry mapping fully-qualified visitor names to visitor classes.
 # Used to instantiate visitors by name when dispatched via RPC (e.g., auto-format).
 # Lazily initialized to avoid circular imports.
-_VISITOR_REGISTRY: Optional[Dict[str, type]] = None
+_VISITOR_REGISTRY: Optional[Dict[str, Any]] = None
 
 
-def _get_visitor_registry() -> Dict[str, type]:
+def _get_visitor_registry() -> Dict[str, Any]:
+    """Built-in visitors Java can dispatch by name, each a factory taking the request's
+    ``visitorOptions`` dict so an argument-taking visitor (``AddImport``) is built from the wire."""
     global _VISITOR_REGISTRY
     if _VISITOR_REGISTRY is None:
+        from rewrite.python.add_import import AddImport, AddImportOptions
+        from rewrite.python.remove_import import RemoveImport, RemoveImportOptions
         from rewrite.python.format.auto_format import AutoFormatVisitor
+
+        def _add_import(options: Dict[str, Any]):
+            return AddImport(AddImportOptions(
+                module=options['module'],
+                name=options.get('name'),
+                alias=options.get('alias'),
+                only_if_referenced=bool(options.get('only_if_referenced', True)),
+            ))
+
+        def _remove_import(options: Dict[str, Any]):
+            return RemoveImport(RemoveImportOptions(
+                module=options['module'],
+                name=options.get('name'),
+                only_if_unused=bool(options.get('only_if_unused', True)),
+            ))
+
         _VISITOR_REGISTRY = {
-            'org.openrewrite.python.format.AutoFormatVisitor': AutoFormatVisitor,
+            'org.openrewrite.python.AddImport': _add_import,
+            'org.openrewrite.python.RemoveImport': _remove_import,
+            'org.openrewrite.python.format.AutoFormatVisitor': lambda options: AutoFormatVisitor(),
         }
     return _VISITOR_REGISTRY
 
@@ -1544,6 +2235,32 @@ def _install_data_table_store(ctx) -> None:
         ctx.put_message(DATA_TABLE_STORE, _configured_data_table_store)
 
 
+def _context_for(p_id: Optional[str]):
+    """The execution context the host identified by ``p``, created and remembered on first use."""
+    if p_id and p_id in _execution_contexts:
+        ctx = _execution_contexts[p_id]
+    else:
+        from rewrite import InMemoryExecutionContext
+        ctx = InMemoryExecutionContext()
+        if p_id:
+            _execution_contexts[p_id] = ctx
+            local_objects[p_id] = ctx
+    _install_data_table_store(ctx)
+    return ctx
+
+
+def _build_cursor(cursor_ids: Optional[List[str]], source_file_type: Optional[str]):
+    """Rebuild the host's cursor chain, consuming the innermost-to-outermost IDs in reverse to build
+    it from the root inward (matching the JS implementation)."""
+    from rewrite.visitor import Cursor
+    cursor = Cursor(None, Cursor.ROOT_VALUE)
+    for cursor_id in reversed(cursor_ids or []):
+        cursor_obj = get_object_from_java(cursor_id, source_file_type)
+        if cursor_obj is not None:
+            cursor = Cursor(cursor, cursor_obj)
+    return cursor
+
+
 def handle_visit(params: dict) -> dict:
     """Handle a Visit RPC request.
 
@@ -1556,6 +2273,7 @@ def handle_visit(params: dict) -> dict:
         dict with 'modified' boolean
     """
     visitor_name = params.get('visitor')
+    visitor_options = params.get('visitorOptions')
     source_file_type = params.get('sourceFileType')
     tree_id = params.get('treeId')
     p_id = params.get('p')
@@ -1568,17 +2286,9 @@ def handle_visit(params: dict) -> dict:
 
     logger.debug(f"Visit: visitor={visitor_name}, treeId={tree_id}, p={p_id}")
 
-    # Get or create execution context
-    if p_id and p_id in _execution_contexts:
-        ctx = _execution_contexts[p_id]
-    else:
-        from rewrite import InMemoryExecutionContext
-        ctx = InMemoryExecutionContext()
-        if p_id:
-            _execution_contexts[p_id] = ctx
-            local_objects[p_id] = ctx
+    ctx = _context_for(p_id)
 
-    _install_data_table_store(ctx)
+    _checkpoint_refs(tree_id)
 
     # Always fetch the tree from Java to ensure we have the latest version.
     # Java may have modified the tree (e.g., via a Java-side recipe) since our last sync.
@@ -1590,18 +2300,9 @@ def handle_visit(params: dict) -> dict:
     tree = _require_tree(tree, source_file_type)
 
     # Instantiate the visitor
-    visitor = _instantiate_visitor(visitor_name, ctx)
+    visitor = _instantiate_visitor(visitor_name, ctx, visitor_options)
 
-    # Reconstruct cursor from cursor IDs (if provided).
-    # Cursor IDs are ordered innermost-to-outermost, so we iterate in reverse
-    # to build the cursor chain from root inward (matching JS implementation).
-    from rewrite.visitor import Cursor
-    cursor = Cursor(None, Cursor.ROOT_VALUE)
-    if cursor_ids:
-        for cursor_id in reversed(cursor_ids):
-            cursor_obj = get_object_from_java(cursor_id, source_file_type)
-            if cursor_obj is not None:
-                cursor = Cursor(cursor, cursor_obj)
+    cursor = _build_cursor(cursor_ids, source_file_type)
 
     before = tree
     after = visitor.visit(tree, ctx, cursor)
@@ -1642,17 +2343,9 @@ def handle_batch_visit(params: dict) -> dict:
 
     logger.debug(f"BatchVisit: treeId={tree_id}, visitors={len(visitors)}")
 
-    # Get or create execution context
-    if p_id and p_id in _execution_contexts:
-        ctx = _execution_contexts[p_id]
-    else:
-        from rewrite import InMemoryExecutionContext
-        ctx = InMemoryExecutionContext()
-        if p_id:
-            _execution_contexts[p_id] = ctx
-            local_objects[p_id] = ctx
+    ctx = _context_for(p_id)
 
-    _install_data_table_store(ctx)
+    _checkpoint_refs(tree_id)
 
     # Fetch tree once from Java
     tree = get_object_from_java(tree_id, source_file_type)
@@ -1672,7 +2365,7 @@ def handle_batch_visit(params: dict) -> dict:
         visitor_name = item.get('visitor', '')
 
         # Instantiate and run visitor
-        visitor = _instantiate_visitor(visitor_name, ctx)
+        visitor = _instantiate_visitor(visitor_name, ctx, item.get('visitorOptions'))
         before = tree
         after = visitor.visit(tree, ctx, cursor)
 
@@ -1720,28 +2413,23 @@ def _collect_search_result_ids(tree) -> set:
     if tree is None:
         return ids
 
-    def _walk(node):
-        if hasattr(node, 'markers') and node.markers is not None:
-            for m in node.markers.markers:
-                if isinstance(m, SearchResult):
-                    ids.add(str(m.id))
-
-    # Use the visitor framework to walk all nodes
-    from rewrite.visitor import TreeVisitor
-    class _Collector(TreeVisitor):
-        def pre_visit(self, tree, p):
-            _walk(tree)
-            return tree
-    _Collector().visit(tree, None)
+    from rewrite.python.visitor import PythonVisitor
+    class _Collector(PythonVisitor):
+        def visit_marker(self, marker, p):
+            if isinstance(marker, SearchResult):
+                p.add(str(marker.id))
+            return marker
+    _Collector().visit(tree, ids)
     return ids
 
 
-def _instantiate_visitor(visitor_name: str, ctx):
+def _instantiate_visitor(visitor_name: str, ctx, visitor_options: Optional[Dict[str, Any]] = None):
     """Instantiate a visitor from its name.
 
     Visitor names can be:
     - 'edit:<recipe_id>' - get the editor from a prepared recipe
     - 'scan:<recipe_id>' - get the scanner from a prepared scanning recipe
+    - a fully-qualified built-in visitor name, constructed from ``visitor_options``
 
     For ScanningRecipes, the accumulator is persisted across calls so that
     data collected during the scan phase is available during the edit and
@@ -1798,10 +2486,10 @@ def _instantiate_visitor(visitor_name: str, ctx):
 
     else:
         # Look up visitor by fully-qualified name from registry
-        visitor_cls = _get_visitor_registry().get(visitor_name)
-        if visitor_cls is None:
+        factory = _get_visitor_registry().get(visitor_name)
+        if factory is None:
             raise ValueError(f"Unknown visitor name format: {visitor_name}")
-        return visitor_cls()
+        return factory(visitor_options or {})
 
 
 def handle_generate(params: dict) -> dict:
@@ -1869,15 +2557,298 @@ def handle_generate(params: dict) -> dict:
     return {'ids': [], 'sourceFileTypes': []}
 
 
+# The facade owns the working source file and keeps one RPC ref table per connection: its own
+# facade<->Java table (remote_objects/remote_refs) plus one per child. Each bundle runs as a
+# "sub-BatchVisit": the child is served the current tree over that child's table, runs its visitors,
+# and its edit is pulled back as a diff and applied before the next bundle starts.
+#
+# Deserializing and re-generating per child keeps every hop a diff between a matched send/receive
+# pair, so one child's ref numbering never has to mean anything to another child. Relaying a
+# child's stream directly to a sibling is unsafe.
+_hub_tree: Dict[str, Any] = {}              # obj_id -> the facade's authoritative tree
+_hub_send_refs: Dict[str, ReferenceMap] = {}  # bundle -> send ref map      (facade -> child)
+_hub_recv_refs: Dict[str, Dict[int, Any]] = {}  # bundle -> receive ref map (child -> facade)
+_hub_served: Dict[tuple, Any] = {}          # (bundle, obj_id) -> what that child was last served
+_hub_send_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> send ref counter before this file
+_hub_recv_checkpoint: Dict[tuple, int] = {}  # (bundle, obj_id) -> highest received ref before this file
+_hub_last_served: Dict[str, tuple] = {}     # bundle -> (obj_id, send ref counter before it), its latest transfer
+
+def _hub_acquire(obj_id: str, source_file_type: Optional[str]):
+    """The facade's copy of the in-flight tree, fetched from Java (over the facade<->Java table) the
+    first time it is needed and owned by the facade from then on."""
+    if obj_id is None:
+        return None
+    # The facade routes Visit and BatchVisit past handle_visit, so this is the only place
+    # it sees a file early enough to checkpoint the facade<->Java tables.
+    _checkpoint_refs(obj_id)
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        tree = get_object_from_java(obj_id, source_file_type)
+        if tree is not None:
+            _hub_tree[obj_id] = tree
+            local_objects[obj_id] = tree
+    return tree
+
+
+def _hub_serve_child(bundle: str, obj_id: str, source_file_type: Optional[str]) -> Any:
+    """Serve a child its view of the facade's tree over that child's ref table: a diff against
+    whatever that child was last served, or a full object the first time."""
+    from rewrite.rpc.send_queue import RpcSendQueue
+
+    # Serve only from what the facade already holds. Fetching from Java here would deadlock: we are
+    # inside a child's callback, the child is blocked on us, and Java is blocked on the request that
+    # got us here. handle_request acquires the tree at the top level before dispatching instead.
+    tree = _hub_tree.get(obj_id)
+    if tree is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+
+    refs = _hub_send_refs.setdefault(bundle, ReferenceMap())
+    # Remember where this child's ref numbering stood before this file, so Evict can roll it back
+    # in lockstep with the child's own rollback (see _hub_release).
+    _hub_send_checkpoint.setdefault((bundle, obj_id), refs.snapshot())
+    _hub_last_served[bundle] = (obj_id, refs.snapshot())
+    data = RpcSendQueue(source_file_type, refs).generate(tree, _hub_served.get((bundle, obj_id)))
+    _hub_served[(bundle, obj_id)] = tree
+    return data
+
+
+def _hub_abort_child(bundle: str, obj_id: Optional[str]) -> bool:
+    """A child failed to take what it was served: forget that it holds the tree, and the refs
+    assigned while serving it, so that it is next served both whole."""
+    if obj_id is None:
+        return True
+    _hub_served.pop((bundle, obj_id), None)
+    refs = _hub_send_refs.get(bundle)
+    if refs is not None:
+        last = _hub_last_served.get(bundle)
+        if last is not None and last[0] == obj_id:
+            refs.rollback_to(last[1])
+        else:
+            # Not the latest transfer, so which refs it assigned is no longer known.
+            refs.clear()
+    return True
+
+
+def _hub_pull_child_edit(children, bundle: str, obj_id: str, source_file_type: Optional[str],
+                         may_delete: bool = False) -> None:
+    """Pull a child's edit back as a diff against what it was served and apply it to the facade's
+    tree, so the next bundle starts from this bundle's result."""
+    from rewrite.rpc.receive_queue import RpcReceiveQueue
+
+    served = _hub_served.get((bundle, obj_id))
+    # The child's send map spans its connection, so a bundle pulled twice — a BatchVisit whose
+    # owners alternate, or a later file — cites on the second pull a ref it ADDed on the first.
+    refs = _hub_recv_refs.setdefault(bundle, {})
+    _hub_recv_checkpoint.setdefault((bundle, obj_id), max(refs, default=-1))
+    remaining = [children.request(bundle, 'GetObject',
+                                  {'id': obj_id, 'sourceFileType': source_file_type})]
+
+    def pull():
+        if not remaining:
+            return []
+        return [d for d in remaining.pop(0) if d.get('state') != 'END_OF_OBJECT']
+
+    q = RpcReceiveQueue(refs, source_file_type, pull)
+    try:
+        edited = q.receive(served, None)
+    except Exception:
+        # The child counts its edit and the refs sent with it as received. Its baseline and
+        # those refs are dropped here only once it has dropped them, as a child without the
+        # method goes on answering against both.
+        try:
+            if children.request(bundle, 'AbortGetObject', {'id': obj_id}) is True:
+                q.roll_back_refs()
+                _hub_served.pop((bundle, obj_id), None)
+        except Exception:
+            pass
+        raise
+    if edited is None:
+        if not may_delete:
+            raise RuntimeError(f"{bundle} reported {obj_id} as modified but no longer holds it")
+        _hub_forget(obj_id)
+    else:
+        _hub_tree[obj_id] = edited
+        _hub_served[(bundle, obj_id)] = edited
+        local_objects[obj_id] = edited
+        if str(getattr(edited, 'id', obj_id)) != obj_id:
+            local_objects[str(edited.id)] = edited
+
+
+def _hub_drop_bundle(bundle: str) -> None:
+    """Forget everything the hub holds on one bundle's behalf, for when its child is replaced."""
+    _hub_send_refs.pop(bundle, None)
+    _hub_recv_refs.pop(bundle, None)
+    _hub_last_served.pop(bundle, None)
+    for table in (_hub_served, _hub_send_checkpoint, _hub_recv_checkpoint):
+        for key in [k for k in table if k[0] == bundle]:
+            del table[key]
+
+
+def _hub_forget(obj_id: str) -> None:
+    """Let go of a file while leaving every child's ref numbering where it stands. This is the half
+    of _hub_release that is safe without an Evict: a child that has not been told to roll back still
+    holds this file's refs, and dropping ours would strand the ones it goes on to cite."""
+    _hub_tree.pop(obj_id, None)
+    local_objects.pop(obj_id, None)
+    for key in [k for k in _hub_served if k[1] == obj_id]:
+        del _hub_served[key]
+
+
+def _hub_release(obj_id: str) -> None:
+    """The rollback must be symmetric with the child's own Evict, in both directions: the child drops
+    this file's refs from both of its maps, so a ref kept here would name an id the child no longer
+    holds ("Received reference to unknown object").
+    """
+    _hub_forget(obj_id)
+    for key in [k for k in _hub_send_checkpoint if k[1] == obj_id]:
+        checkpoint = _hub_send_checkpoint.pop(key)
+        refs = _hub_send_refs.get(key[0])
+        if refs is not None:
+            refs.rollback_to(checkpoint)
+    for key in [k for k in _hub_recv_checkpoint if k[1] == obj_id]:
+        checkpoint = _hub_recv_checkpoint.pop(key)
+        refs = _hub_recv_refs.get(key[0])
+        if refs is not None:
+            for ref_id in [r for r in refs if r > checkpoint]:
+                del refs[ref_id]
+
+
+def _hub_is_builtin_visitor(visitor_name: Optional[str]) -> bool:
+    """True for a visitor the server implements itself rather than one a recipe bundle owns."""
+    return bool(visitor_name) and visitor_name in _get_visitor_registry()
+
+
+def _hub_local_visit(visitor_items: List[dict], params: dict) -> List[dict]:
+    """Run the built-in service visitors (no recipe bundle owns them) against the facade's own tree
+    in order, threading each result into the next as a child would sequence a BatchVisit."""
+    tree_id = params.get('treeId')
+    source_file_type = params.get('sourceFileType')
+    tree = _hub_acquire(tree_id, source_file_type)
+    if tree is None:
+        raise ValueError(f"Tree not found: {tree_id}")
+    tree = _require_tree(tree, source_file_type)
+
+    ctx = _context_for(params.get('p'))
+    cursor = _build_cursor(params.get('cursor'), source_file_type)
+
+    results = []
+    for item in visitor_items:
+        before = tree
+        visitor = _instantiate_visitor(item['visitor'], ctx, item.get('visitorOptions'))
+        after = visitor.visit(before, ctx, cursor)
+        results.append({
+            'modified': after is not before,
+            'deleted': after is None,
+            'hasNewMessages': False,
+            'searchResultIds': [],
+        })
+        if after is None:
+            _hub_forget(tree_id)
+            tree = None
+            break
+        tree = after
+
+    # Advance the facade's tree only. _hub_served must keep pointing at what each child was last
+    # served, because that is the "before" the next _hub_serve_child diffs against — leaving it
+    # behind is exactly what makes this edit travel down to the children. Updating it here would
+    # make the facade claim the children already have this tree and silently drop the edit.
+    if tree is not None and tree is not _hub_tree.get(tree_id):
+        _hub_tree[tree_id] = tree
+        local_objects[tree_id] = tree
+        if str(tree.id) != tree_id:
+            local_objects[str(tree.id)] = tree
+    return results
+
+
+def _serve_child_object(method: str, params: dict, bundle: Optional[str] = None) -> Any:
+    """A child's upstream callback: GetObject is answered from the facade's tree, the rest relays
+    to Java."""
+    if method == 'AbortGetObject' and bundle is not None:
+        # It is the facade that served this child, so relaying would have Java undo a transfer of its own.
+        return _hub_abort_child(bundle, params.get('id'))
+    if method != 'GetObject':
+        return send_request(method, params)
+
+    obj_id = params.get('id')
+    if obj_id is None:
+        return [{'state': 'DELETE'}, {'state': 'END_OF_OBJECT'}]
+    if bundle is None:
+        return send_request('GetObject', params)
+    return _hub_serve_child(bundle, obj_id, params.get('sourceFileType'))
+
+
+def _facade_mode() -> bool:
+    return _recipe_install_dir is not None and _child_bundle is None
+
+
+def _get_facade():
+    global _facade
+    if _facade is None:
+        from rewrite.rpc import venv_manager
+        from rewrite.rpc.bundle_children import BundleChildren
+        from rewrite.rpc.facade import Facade
+        removed = venv_manager.purge_non_venv_entries(_recipe_install_dir)
+        if removed:
+            logger.info("Cleared %d pre-venv recipe artifact(s) from %s: %s",
+                        len(removed), _recipe_install_dir, ", ".join(removed))
+        _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
+                                        upstream=_serve_child_object,
+                                        on_child_replaced=_hub_drop_bundle),
+                         hub_pull=_hub_pull_child_edit,
+                         hub_drop=_hub_forget,
+                         local_visit=_hub_local_visit,
+                         is_local_visitor=_hub_is_builtin_visitor)
+    return _facade
+
+
 def handle_request(method: str, params: dict) -> Any:
     """Handle an RPC request."""
+    if _facade_mode():
+        facade = _get_facade()
+
+        if method == 'Evict':
+            facade.evict(params)
+            _hub_release(params.get('id'))
+            return handle_evict(params)
+        if method == 'Reset':
+            facade.reset(params)
+            return handle_reset(params)
+        facade_handlers = {
+            'InstallRecipes': facade.install_recipes,
+            'GetMarketplace': facade.get_marketplace,
+            'PrepareRecipe': facade.prepare_recipe,
+            'SetDataTableStore': facade.set_data_table_store,
+            'Visit': facade.visit,
+            'BatchVisit': facade.batch_visit,
+            'Generate': facade.generate,
+        }
+        facade_handler = facade_handlers.get(method)
+        if facade_handler:
+            # Acquire at the top level, before any child runs — acquiring inside a child's
+            # GetObject callback would deadlock (the child waits on us, Java on this request).
+            if method in ('Visit', 'BatchVisit'):
+                _hub_acquire(params.get('treeId'), params.get('sourceFileType'))
+            return facade_handler(params)
+        if method in ('Print', 'GetObject'):
+            obj_id = params.get('treeId') or params.get('id')
+            source_file_type = params.get('sourceFileType')
+            # Java fetches non-tree objects by id as well (the execution context, cursors).
+            # `GetObject.sourceFileType` is nullable and only set for trees, so it is what tells
+            # the two apart. Acquiring a non-tree would hand its property messages to a receiver
+            # that has no codec for them, desynchronizing the queue for every later object.
+            if obj_id is not None and source_file_type and obj_id not in _hub_tree:
+                _hub_acquire(obj_id, source_file_type)
+
     handlers = {
         'Parse': handle_parse,
         'ParseProject': handle_parse_project,
+        'DependencyTypes': handle_dependency_types,
         'GetObject': handle_get_object,
+        'AbortGetObject': handle_abort_get_object,
         'GetLanguages': handle_get_languages,
         'Print': handle_print,
         'Reset': handle_reset,
+        'Evict': handle_evict,
         'InstallRecipes': handle_install_recipes,
         'GetMarketplace': handle_get_marketplace,
         'PrepareRecipe': handle_prepare_recipe,
@@ -1894,6 +2865,10 @@ def handle_request(method: str, params: dict) -> Any:
         raise ValueError(f"Unknown method: {method}")
 
 
+class _ProtocolError(Exception):
+    """The stream can no longer be framed, so no later message can be trusted."""
+
+
 class _StdinBuffer:
     """Buffered reader for raw stdin file descriptor.
 
@@ -1901,11 +2876,19 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    _CHUNK_SIZE = 8192
+    # A response body is read whole, and a page of tree data runs to hundreds of
+    # kilobytes, so each read should take as much as the pipe will give. A pipe
+    # returns at most its own capacity per read, and os.read allocates what it is
+    # asked for before shrinking to what arrived, so an over-large request costs
+    # only the unused difference.
+    _CHUNK_SIZE = 65536
 
     def __init__(self):
         self._fd: Optional[int] = None
         self._buf = bytearray()
+        self.at_eof = False
+        self._pending_read: Optional[threading.Thread] = None
+        self._pending_chunk: list = []
 
     def _get_fd(self) -> int:
         fd = self._fd
@@ -1947,22 +2930,28 @@ class _StdinBuffer:
             if remaining <= 0:
                 return False
             if os.name == 'nt':
-                # Windows: select() doesn't support pipes, use a thread
-                result: list = []
+                # Windows: select() doesn't support pipes, so a thread does the read. It
+                # takes from the pipe whether or not this call is still waiting for it, so
+                # the thread and its chunk belong to the buffer -- a later _fill collects
+                # what an in-flight read returned, keeping those bytes in the stream.
+                if self._pending_read is None:
+                    self._pending_chunk = []
+                    pending = self._pending_chunk
 
-                def _read():
-                    try:
-                        data = os.read(self._get_fd(), self._CHUNK_SIZE)
-                        result.append(data)
-                    except OSError:
-                        result.append(b'')
+                    def _read():
+                        try:
+                            pending.append(os.read(self._get_fd(), self._CHUNK_SIZE))
+                        except OSError:
+                            pending.append(b'')
 
-                t = threading.Thread(target=_read, daemon=True)
-                t.start()
-                t.join(timeout=remaining)
-                if not result:
+                    self._pending_read = threading.Thread(target=_read, daemon=True)
+                    self._pending_read.start()
+
+                self._pending_read.join(timeout=remaining)
+                if self._pending_read.is_alive():
                     return False
-                chunk = result[0]
+                self._pending_read = None
+                chunk = self._pending_chunk[0] if self._pending_chunk else b''
             else:
                 readable, _, _ = select.select([self._get_fd()], [], [], remaining)
                 if not readable:
@@ -1971,6 +2960,7 @@ class _StdinBuffer:
         else:
             chunk = os.read(self._get_fd(), self._CHUNK_SIZE)
         if not chunk:
+            self.at_eof = True
             return False
         self._buf += chunk
         return True
@@ -1979,75 +2969,70 @@ class _StdinBuffer:
 _stdin_buffer = _StdinBuffer()
 
 
-def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
-    """Read a JSON-RPC message from stdin with timeout.
+def _read_body(header_line: bytes) -> Optional[dict]:
+    """Read the remainder of a message whose header line has been consumed.
 
-    Args:
-        timeout_seconds: Maximum time to wait for complete message
+    No deadline applies past the header. A message the reader walks away from
+    half-read leaves its body to be parsed as the next message's header, which
+    desynchronizes every read that follows.
 
     Returns:
-        Parsed JSON message, or None on timeout/error
+        Parsed JSON message
+
+    Raises:
+        _ProtocolError: If the frame cannot be parsed or ends early
     """
-    deadline = time.time() + timeout_seconds
+    header_str = header_line.decode('utf-8', 'replace').strip()
+    if not header_str.startswith('Content-Length:'):
+        raise _ProtocolError(f"invalid header: {header_str}")
 
     try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line(deadline)
-        if not header_line:
-            logger.warning(f"Timeout waiting for RPC response header after {timeout_seconds}s")
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
         content_length = int(header_str.split(':')[1].strip())
+    except ValueError:
+        raise _ProtocolError(f"invalid content length: {header_str}")
 
-        # Read empty line (separator)
-        separator = _stdin_buffer.read_line(deadline)
-        if separator is None:
-            logger.warning(f"Timeout waiting for header separator")
-            return None
+    # The separator line. A stream ending mid-frame has truncated a message rather
+    # than closed between two, so it is a fault and not the host hanging up.
+    if _stdin_buffer.read_line() is None:
+        raise _ProtocolError("stream ended before the message body")
 
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length, deadline)
-        if content_bytes is None:
-            logger.warning(f"Timeout waiting for message content")
-            return None
+    content_bytes = _stdin_buffer.read_bytes(content_length)
+    if content_bytes is None:
+        raise _ProtocolError(f"stream ended inside a {content_length} byte message body")
 
+    try:
         return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message with timeout: {e}")
-        return None
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise _ProtocolError(f"invalid message body: {e}")
+
+
+def read_message_with_timeout(timeout_seconds: float) -> Optional[dict]:
+    """Read a JSON-RPC message from stdin, bounding the wait for it to *start*.
+
+    Args:
+        timeout_seconds: Maximum time to wait for a message to begin arriving
+
+    Returns:
+        Parsed JSON message, or None if the host closed the stream
+
+    Raises:
+        TimeoutError: If no message begins arriving within the deadline
+        _ProtocolError: If the frame cannot be parsed or ends early
+    """
+    header_line = _stdin_buffer.read_line(time.time() + timeout_seconds)
+    if header_line is None:
+        if _stdin_buffer.at_eof:
+            return None
+        raise TimeoutError(f"no RPC message arrived within {timeout_seconds}s")
+    return _read_body(header_line)
 
 
 def read_message() -> Optional[dict]:
-    """Read a JSON-RPC message from stdin (blocking, no timeout)."""
-    try:
-        # Read Content-Length header
-        header_line = _stdin_buffer.read_line()
-        if not header_line:
-            return None
-
-        header_str = header_line.decode('utf-8').strip()
-        if not header_str.startswith('Content-Length:'):
-            logger.error(f"Invalid header: {header_str}")
-            return None
-
-        content_length = int(header_str.split(':')[1].strip())
-
-        # Read empty line (separator)
-        _stdin_buffer.read_line()
-
-        # Read content
-        content_bytes = _stdin_buffer.read_bytes(content_length)
-        if not content_bytes:
-            return None
-        return json.loads(content_bytes.decode('utf-8'))
-    except Exception as e:
-        logger.error(f"Error reading message: {e}")
+    """Read a JSON-RPC message from stdin (blocking, no timeout). None on EOF."""
+    header_line = _stdin_buffer.read_line()
+    if not header_line:
         return None
+    return _read_body(header_line)
 
 
 def write_message(response: dict):
@@ -2060,6 +3045,72 @@ def write_message(response: dict):
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
     os.write(sys.stdout.fileno(), header + content_bytes)
+
+
+def _error_response(request_id: Any, e: Exception) -> dict:
+    """Must be called while handling ``e``, so the traceback reaches the host."""
+    return {
+        'jsonrpc': '2.0',
+        'id': request_id,
+        'error': {
+            'code': -32603,
+            'message': str(e),
+            'data': traceback.format_exc()
+        }
+    }
+
+
+def _write_response(response: dict) -> None:
+    """Send a response, substituting an error when the result cannot be encoded.
+
+    Encoding sits outside the guard around the handler, and a value JSON cannot
+    represent is that one request's failure rather than the server's.
+    """
+    try:
+        if _trace_rpc:
+            logger.debug(f"Sending: {json.dumps(response)}")
+        write_message(response)
+    except (TypeError, ValueError) as e:
+        request_id = response.get('id')
+        logger.exception(f"Error encoding response for request {request_id}: {e}")
+        write_message(_error_response(request_id, e))
+
+
+def _serve(message: dict) -> None:
+    """Handle one inbound request and reply to it."""
+    request_id = message.get('id')
+    method = message.get('method')
+    params = message.get('params', {})
+
+    if method is None:
+        logger.error("Missing 'method' in request")
+        return
+
+    if _trace_rpc:
+        logger.debug(f"Received: {json.dumps(message)}")
+
+    metric_start = time.monotonic()
+    metric_error = ''
+    try:
+        response = {
+            'jsonrpc': '2.0',
+            'id': request_id,
+            'result': handle_request(method, params)
+        }
+    except _ProtocolError:
+        # A nested call can raise this. Answering it as a request-level error would
+        # leave main() reading on, so let it through and end the process.
+        raise
+    except Exception as e:
+        logger.exception(f"Error handling request: {e}")
+        metric_error = str(e)
+        response = _error_response(request_id, e)
+    _record_metric(method, (time.monotonic() - metric_start) * 1000.0, metric_error)
+
+    # Notifications (no id, e.g. Evict) get no reply — a null-id response would
+    # fail every in-flight request on the Java reader.
+    if request_id is not None:
+        _write_response(response)
 
 
 def _init_pyroscope() -> None:
@@ -2089,6 +3140,79 @@ def _init_pyroscope() -> None:
     )
 
 
+_METRICS_HEADER = ['timestamp', 'method', 'duration_ms', 'error', 'memory_used_bytes',
+                   'memory_max_bytes', 'local_objects', 'remote_objects', 'refs']
+
+
+def _init_metrics_csv(path: str) -> None:
+    """Open the per-call metrics CSV and write its header. Best-effort: a failure here
+    disables metrics but never blocks the server."""
+    global _metrics_file, _metrics_writer
+    try:
+        _metrics_file = open(path, 'w', newline='')
+        _metrics_writer = csv.writer(_metrics_file)
+        _metrics_writer.writerow(_METRICS_HEADER)
+        _metrics_file.flush()
+    except OSError as e:
+        logger.warning(f"metrics-csv: cannot open {path!r}: {e} - metrics disabled")
+        _metrics_file = _metrics_writer = None
+
+
+def _rss_bytes():
+    """Best-effort (current, peak) RSS in bytes; blank without /proc or the resource module (Windows).
+    The RewriteRpcProcess RSS sampler is the source of truth; these columns just annotate each row."""
+    current = ''
+    peak = ''
+    try:
+        with open('/proc/self/statm') as f:
+            current = int(f.read().split()[1]) * os.sysconf('SC_PAGE_SIZE')
+    except (OSError, ValueError, IndexError):
+        pass
+    if resource is not None:
+        maxrss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+        # macOS reports ru_maxrss in bytes; Linux and most others in kilobytes.
+        peak = maxrss if sys.platform == 'darwin' else maxrss * 1024
+        if current == '':
+            current = peak
+    return current, peak
+
+
+def _record_metric(method: str, duration_ms: float, error: str) -> None:
+    """Append one row of timing + cache residency. refs counts both connection-scoped ref
+    tables, the ones handle_evict rolls back: what Java sent us and what we sent Java."""
+    if _metrics_writer is None:
+        return
+    used, peak = _rss_bytes()
+    with _metrics_lock:
+        if _metrics_writer is None:
+            return
+        try:
+            _metrics_writer.writerow([
+                datetime.now(timezone.utc).isoformat(), method, f"{duration_ms:.0f}", error,
+                used, peak, len(local_objects), len(remote_objects),
+                len(remote_refs) + len(local_refs)])
+            _metrics_file.flush()
+        except OSError as e:
+            logger.warning(f"metrics-csv: write failed: {e}")
+
+
+def _close_metrics() -> None:
+    global _metrics_file, _metrics_writer
+    with _metrics_lock:
+        if _metrics_file is not None:
+            try:
+                _metrics_file.flush()
+                _metrics_file.close()
+            except OSError:
+                pass
+        _metrics_file = _metrics_writer = None
+
+
+# Exit status for a fault, distinguishing it from the 0 of a host-closed stream.
+# Matches the JS server's `process.on('uncaughtException') -> process.exit(8)`.
+FATAL_EXIT_CODE = 8
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -2098,13 +3222,29 @@ def main():
     parser.add_argument('--metrics-csv', help='Metrics CSV output path')
     parser.add_argument('--trace-rpc-messages', action='store_true', help='Enable RPC message tracing')
     parser.add_argument('--recipe-install-dir', help='Directory where recipe pip packages are installed')
+    parser.add_argument('--child-bundle',
+                        help='Run as a single-bundle child scoped to this distribution name')
+    parser.add_argument('--attribution-name',
+                        help='Label this child\'s recipes with this identity (a local install\'s '
+                             'supplied path) instead of the distribution name')
     args = parser.parse_args()
 
     _init_pyroscope()
 
+    if args.metrics_csv:
+        _init_metrics_csv(args.metrics_csv)
+
     if args.recipe_install_dir:
         global _recipe_install_dir
         _recipe_install_dir = Path(args.recipe_install_dir)
+
+    if args.child_bundle:
+        global _child_bundle
+        _child_bundle = args.child_bundle
+
+    if args.attribution_name:
+        global _attribution_name
+        _attribution_name = args.attribution_name
 
     if args.log_file:
         file_handler = logging.FileHandler(args.log_file)
@@ -2117,56 +3257,27 @@ def main():
 
     logger.info("Python RPC server starting...")
 
-    while True:
-        try:
+    exit_code = 0
+    try:
+        while True:
             message = read_message()
             if message is None:
                 break
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Received: {json.dumps(message)}")
-
-            request_id = message.get('id')
-            method = message.get('method')
-            params = message.get('params', {})
-
-            if method is None:
-                logger.error("Missing 'method' in request")
-                continue
-
-            try:
-                result = handle_request(method, params)
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'result': result
-                }
-            except Exception as e:
-                logger.exception(f"Error handling request: {e}")
-                # Include full stack trace in error response for debugging
-                tb_str = traceback.format_exc()
-                response = {
-                    'jsonrpc': '2.0',
-                    'id': request_id,
-                    'error': {
-                        'code': -32603,
-                        'message': str(e),
-                        'data': tb_str
-                    }
-                }
-
-            if args.trace_rpc_messages:
-                logger.debug(f"Sending: {json.dumps(response)}")
-
-            write_message(response)
-
-        except Exception as e:
-            logger.exception(f"Fatal error: {e}")
-            break
+            _serve(message)
+    except _ProtocolError as e:
+        logger.error(f"Protocol error, cannot continue: {e}")
+        exit_code = FATAL_EXIT_CODE
+    except Exception as e:
+        logger.exception(f"Fatal error: {e}")
+        exit_code = FATAL_EXIT_CODE
 
     # No ty-types cleanup needed here — clients are scoped per parse batch
 
+    _close_metrics()
     logger.info("Python RPC server shutting down...")
+
+    if exit_code:
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':

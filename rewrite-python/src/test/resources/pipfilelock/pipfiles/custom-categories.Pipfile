@@ -1,0 +1,26 @@
+[[source]]
+name = "pypi"
+url = "https://pypi.org/simple"
+verify_ssl = true
+
+[packages]
+requests = "*"
+
+[docs]
+sphinx = ">=7.0"
+mkdocs = "*"
+
+[typing]
+mypy = {version = ">=1.0", markers = "python_version >= '3.9'"}
+
+[build-meta]
+priority = 42
+
+[scripts]
+test = "pytest"
+
+[pipenv]
+allow_prereleases = true
+
+[pipfile]
+spec = 6

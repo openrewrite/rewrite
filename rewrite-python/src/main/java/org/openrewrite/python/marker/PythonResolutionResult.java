@@ -15,11 +15,17 @@
  */
 package org.openrewrite.python.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.ToString;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.FieldDefaults;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.rpc.RpcCodec;
@@ -27,11 +33,13 @@ import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
+import static org.openrewrite.rpc.Reference.asRef;
 import static org.openrewrite.rpc.RpcReceiveQueue.toEnum;
 
 /**
@@ -240,7 +248,7 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
     @Override
     public PythonResolutionResult rpcReceive(PythonResolutionResult before, RpcReceiveQueue q) {
-        return before
+        PythonResolutionResult received = before
                 .withId(q.receiveAndGet(before.id, UUID::fromString))
                 .withName(q.receive(before.name))
                 .withVersion(q.receive(before.version))
@@ -264,6 +272,38 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
                 .withPackageManager(q.receiveAndGet(before.packageManager, toEnum(PackageManager.class)))
                 .withSourceIndexes(q.receiveList(before.sourceIndexes,
                         si -> si.rpcReceive(si, q)));
+        return received
+                .withOptionalDependencies(received.declared(received.optionalDependencies))
+                .withDependencyGroups(received.declared(received.dependencyGroups));
+    }
+
+    /**
+     * The dependency maps travel as plain JSON, so off the wire each {@link Dependency} is a map
+     * and its resolution a copy, rather than the entry of {@link #resolvedDependencies} it names.
+     */
+    private Map<String, List<Dependency>> declared(Map<String, List<Dependency>> received) {
+        Map<String, List<Dependency>> declared = new LinkedHashMap<>();
+        boolean rebuilt = false;
+        for (Map.Entry<String, ? extends List<?>> group : received.entrySet()) {
+            List<Dependency> dependencies = new ArrayList<>(group.getValue().size());
+            for (Object dependency : group.getValue()) {
+                if (dependency instanceof Dependency) {
+                    dependencies.add((Dependency) dependency);
+                } else {
+                    dependencies.add(fromJson((Map<?, ?>) dependency));
+                    rebuilt = true;
+                }
+            }
+            declared.put(group.getKey(), dependencies);
+        }
+        return rebuilt ? declared : received;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Dependency fromJson(Map<?, ?> json) {
+        String name = (String) json.get("name");
+        return new Dependency(name, (String) json.get("versionConstraint"), (List<String>) json.get("extras"),
+                (String) json.get("marker"), json.get("resolved") == null ? null : getResolvedDependency(name));
     }
 
     /**
@@ -272,11 +312,16 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
      * {@code optionalDependencies}, {@code dependencyGroups}).
      * <p>
      * When a lock file is available, the {@code resolved} field links to the
-     * corresponding {@link ResolvedDependency} entry.
+     * corresponding {@link ResolvedDependency} entry. See {@link ResolvedDependency} for why both
+     * types are mutable.
      */
-    @Value
+    @Getter
+    @EqualsAndHashCode
+    @ToString
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
-    public static class Dependency implements RpcCodec<Dependency> {
+    public static final class Dependency implements RpcCodec<Dependency> {
         String name;
         @Nullable String versionConstraint;
         @Nullable List<String> extras;
@@ -285,37 +330,50 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         @ToString.Exclude
         @Nullable ResolvedDependency resolved;
 
+        @JsonCreator
+        private Dependency() {
+        }
+
         @Override
         public void rpcSend(Dependency after, RpcSendQueue q) {
             q.getAndSend(after, Dependency::getName);
             q.getAndSend(after, Dependency::getVersionConstraint);
             q.getAndSend(after, Dependency::getExtras);
             q.getAndSend(after, Dependency::getMarker);
-            q.getAndSend(after, Dependency::getResolved);
+            q.getAndSend(after, d -> asRef(d.getResolved()));
         }
 
         @Override
         public Dependency rpcReceive(Dependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersionConstraint(q.receive(before.versionConstraint))
-                    .withExtras(q.receive(before.extras))
-                    .withMarker(q.receive(before.marker))
-                    .withResolved(q.receive(before.resolved));
+            before.name = q.receive(before.name);
+            before.versionConstraint = q.receive(before.versionConstraint);
+            before.extras = q.receive(before.extras);
+            before.marker = q.receive(before.marker);
+            before.resolved = q.receive(before.resolved);
+            return before;
         }
     }
 
     /**
-     * A resolved (locked) dependency from uv.lock.
+     * A resolved (locked) dependency from a lock file.
      * <p>
      * Python resolution is flat: each package name appears exactly once with one version.
-     * The {@code dependencies} list links directly to other {@code ResolvedDependency}
-     * instances (self-referential, like Maven's model), enabling graph traversal.
+     * The {@code dependencies} list references other {@code ResolvedDependency} instances of
+     * the same graph, so the graph is navigable to arbitrary depth and may contain cycles.
+     * Producers uphold this by filling each instance's list in place after construction
+     * rather than replacing instances with copies.
      */
-    @Value
+    // Mutable behind a no-arg creator so a cycle can close while an instance is still being
+    // populated: Jackson binds the @ref id, and rpcReceive fills the instance the receive
+    // queue registered for that ref, before either reads nested values.
+    @Getter
+    @EqualsAndHashCode
+    @ToString
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @AllArgsConstructor
     @With
     @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-    public static class ResolvedDependency implements RpcCodec<ResolvedDependency> {
+    public static final class ResolvedDependency implements RpcCodec<ResolvedDependency> {
         @ToString.Include
         String name;
 
@@ -325,11 +383,17 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
         @Nullable String source;
 
         /**
-         * Direct dependencies of this resolved package. Each entry is a reference
-         * to another {@code ResolvedDependency} in the flat resolution list.
-         * Null when the package has no dependencies in the lock file.
+         * Direct dependencies of this resolved package. Null when the package has no
+         * dependencies in the lock file. Excluded from equality and toString so they terminate on
+         * a cyclic graph; name and version already identify a resolution uniquely.
          */
+        @EqualsAndHashCode.Exclude
+        @ToString.Exclude
         @Nullable List<ResolvedDependency> dependencies;
+
+        @JsonCreator
+        private ResolvedDependency() {
+        }
 
         @Override
         public void rpcSend(ResolvedDependency after, RpcSendQueue q) {
@@ -343,12 +407,11 @@ public class PythonResolutionResult implements Marker, RpcCodec<PythonResolution
 
         @Override
         public ResolvedDependency rpcReceive(ResolvedDependency before, RpcReceiveQueue q) {
-            return before
-                    .withName(q.receive(before.name))
-                    .withVersion(q.receive(before.version))
-                    .withSource(q.receive(before.source))
-                    .withDependencies(q.receiveList(before.dependencies,
-                            dep -> dep.rpcReceive(dep, q)));
+            before.name = q.receive(before.name);
+            before.version = q.receive(before.version);
+            before.source = q.receive(before.source);
+            before.dependencies = q.receiveList(before.dependencies, dep -> dep.rpcReceive(dep, q));
+            return before;
         }
     }
 

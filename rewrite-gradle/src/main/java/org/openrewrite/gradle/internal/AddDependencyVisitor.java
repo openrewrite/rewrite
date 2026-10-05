@@ -57,7 +57,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.ENFORCED_PLATFORM;
 import static org.openrewrite.gradle.AddDependencyVisitor.DependencyModifier.PLATFORM;
-import static org.openrewrite.gradle.internal.GradleParseUtils.requireParsed;
+import static org.openrewrite.gradle.GradleParser.requireParsed;
 
 @RequiredArgsConstructor
 public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -167,18 +167,18 @@ public class AddDependencyVisitor extends JavaIsoVisitor<ExecutionContext> {
                                 J.MethodInvocation beforeDependency = (J.MethodInvocation) (dependencyComparator.getBeforeDependency() instanceof J.Return ?
                                         requireNonNull(((J.Return) dependencyComparator.getBeforeDependency()).getExpression()) :
                                         dependencyComparator.getBeforeDependency());
+                                Space currentPrefix = currentStatement.getPrefix();
                                 if (i == 0) {
                                     if (!addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        statements.set(i, currentStatement.withPrefix(Space.format("\n\n" + currentStatement.getPrefix().getIndent())));
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace("\n\n" + currentPrefix.getIndent())));
                                     }
                                 } else {
                                     Space originalPrefix = addDependencyInvocation.getPrefix();
-                                    addDependencyInvocation = addDependencyInvocation.withPrefix(currentStatement.getPrefix());
+                                    addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format(currentPrefix.getWhitespace()));
 
-                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName())) {
-                                        if (!currentStatement.getPrefix().equals(originalPrefix)) {
-                                            statements.set(i, currentStatement.withPrefix(originalPrefix));
-                                        }
+                                    if (addDependencyInvocation.getSimpleName().equals(beforeDependency.getSimpleName()) &&
+                                            !currentPrefix.getWhitespace().equals(originalPrefix.getWhitespace())) {
+                                        statements.set(i, currentStatement.withPrefix(currentPrefix.withWhitespace(originalPrefix.getWhitespace())));
                                     }
                                 }
                             }

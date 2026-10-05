@@ -23,14 +23,18 @@ import (
 )
 
 type CompilationUnit struct {
-	ID          uuid.UUID
-	Prefix      java.Space
-	Markers     java.Markers
-	SourcePath  string
-	PackageDecl *java.RightPadded[*java.Identifier] // `package main`
-	Imports     *java.Container[*java.Import]       // nil if no imports
-	Statements  []java.RightPadded[java.Statement]  // top-level declarations
-	EOF         java.Space
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	SourcePath string
+	// CharsetBomMarked reports a leading UTF-8 BOM. Go's scanner ignores
+	// one, so it is part of how the file is encoded rather than anything
+	// the tree models.
+	CharsetBomMarked bool
+	PackageDecl      *java.RightPadded[*java.Identifier] // `package main`
+	Imports          *java.Container[*java.Import]       // nil if no imports
+	Statements       []java.RightPadded[java.Statement]  // top-level declarations
+	EOF              java.Space
 }
 
 func (*CompilationUnit) IsTree()       {}
@@ -40,36 +44,54 @@ func (*CompilationUnit) IsSourceFile() {}
 func (n *CompilationUnit) GetSourcePath() string { return n.SourcePath }
 
 func (n *CompilationUnit) WithPrefix(prefix java.Space) *CompilationUnit {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *CompilationUnit) WithMarkers(markers java.Markers) *CompilationUnit {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *CompilationUnit) WithStatements(statements []java.RightPadded[java.Statement]) *CompilationUnit {
+	if java.SameSlice(n.Statements, statements) {
+		return n
+	}
 	c := *n
 	c.Statements = statements
 	return &c
 }
 
 func (n *CompilationUnit) WithPackageDecl(pkg *java.RightPadded[*java.Identifier]) *CompilationUnit {
+	if n.PackageDecl == pkg {
+		return n
+	}
 	c := *n
 	c.PackageDecl = pkg
 	return &c
 }
 
 func (n *CompilationUnit) WithImports(imports *java.Container[*java.Import]) *CompilationUnit {
+	if n.Imports == imports {
+		return n
+	}
 	c := *n
 	c.Imports = imports
 	return &c
 }
 
 func (n *CompilationUnit) WithEOF(eof java.Space) *CompilationUnit {
+	if java.SpaceEqual(n.EOF, eof) {
+		return n
+	}
 	c := *n
 	c.EOF = eof
 	return &c
@@ -87,12 +109,18 @@ func (*GoStmt) IsJ()         {}
 func (*GoStmt) IsStatement() {}
 
 func (n *GoStmt) WithPrefix(prefix java.Space) *GoStmt {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *GoStmt) WithMarkers(markers java.Markers) *GoStmt {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -110,12 +138,18 @@ func (*Defer) IsJ()         {}
 func (*Defer) IsStatement() {}
 
 func (n *Defer) WithPrefix(prefix java.Space) *Defer {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Defer) WithMarkers(markers java.Markers) *Defer {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -134,12 +168,18 @@ func (*Send) IsJ()         {}
 func (*Send) IsStatement() {}
 
 func (n *Send) WithPrefix(prefix java.Space) *Send {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Send) WithMarkers(markers java.Markers) *Send {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -157,12 +197,18 @@ func (*Goto) IsJ()         {}
 func (*Goto) IsStatement() {}
 
 func (n *Goto) WithPrefix(prefix java.Space) *Goto {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Goto) WithMarkers(markers java.Markers) *Goto {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -179,12 +225,18 @@ func (*Fallthrough) IsJ()         {}
 func (*Fallthrough) IsStatement() {}
 
 func (n *Fallthrough) WithPrefix(prefix java.Space) *Fallthrough {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Fallthrough) WithMarkers(markers java.Markers) *Fallthrough {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -195,7 +247,8 @@ type Composite struct {
 	Prefix   java.Space
 	Markers  java.Markers
 	TypeExpr java.Expression                 // nil for untyped composite literals
-	Elements java.Container[java.Expression] // Before = space before `{`, elements, last After = space before `}`
+	Elements java.Container[java.Expression] // Before = space between TypeExpr and `{`, empty when untyped; last After = space before `}`
+	Type     java.JavaType
 }
 
 func (*Composite) IsTree()       {}
@@ -203,12 +256,18 @@ func (*Composite) IsJ()          {}
 func (*Composite) IsExpression() {}
 
 func (n *Composite) WithPrefix(prefix java.Space) *Composite {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Composite) WithMarkers(markers java.Markers) *Composite {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -227,12 +286,18 @@ func (*KeyValue) IsJ()          {}
 func (*KeyValue) IsExpression() {}
 
 func (n *KeyValue) WithPrefix(prefix java.Space) *KeyValue {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *KeyValue) WithMarkers(markers java.Markers) *KeyValue {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -255,12 +320,18 @@ func (*Slice) IsJ()          {}
 func (*Slice) IsExpression() {}
 
 func (n *Slice) WithPrefix(prefix java.Space) *Slice {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Slice) WithMarkers(markers java.Markers) *Slice {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -276,6 +347,7 @@ type ArrayType struct {
 	Markers     java.Markers
 	Length      java.RightPadded[java.Expression] // Element = `N` (Prefix = space after `[`), After = space before `]`
 	ElementType java.Expression                   // element type `T` (Prefix = space after `]`)
+	Type        java.JavaType
 }
 
 func (*ArrayType) IsTree()       {}
@@ -283,12 +355,18 @@ func (*ArrayType) IsJ()          {}
 func (*ArrayType) IsExpression() {}
 
 func (n *ArrayType) WithPrefix(prefix java.Space) *ArrayType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *ArrayType) WithMarkers(markers java.Markers) *ArrayType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -301,6 +379,7 @@ type MapType struct {
 	OpenBracket java.Space                        // space before `[`
 	Key         java.RightPadded[java.Expression] // After = space before `]`
 	Value       java.Expression
+	Type        java.JavaType
 }
 
 func (*MapType) IsTree()       {}
@@ -308,12 +387,18 @@ func (*MapType) IsJ()          {}
 func (*MapType) IsExpression() {}
 
 func (n *MapType) WithPrefix(prefix java.Space) *MapType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *MapType) WithMarkers(markers java.Markers) *MapType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -332,6 +417,7 @@ type PointerType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Elem    java.Expression
+	Type    java.JavaType
 }
 
 func (*PointerType) IsTree()       {}
@@ -339,12 +425,18 @@ func (*PointerType) IsJ()          {}
 func (*PointerType) IsExpression() {}
 
 func (n *PointerType) WithPrefix(prefix java.Space) *PointerType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *PointerType) WithMarkers(markers java.Markers) *PointerType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -356,6 +448,7 @@ type Channel struct {
 	Markers java.Markers
 	Dir     ChanDir
 	Value   java.Expression
+	Type    java.JavaType
 }
 
 func (*Channel) IsTree()       {}
@@ -363,12 +456,18 @@ func (*Channel) IsJ()          {}
 func (*Channel) IsExpression() {}
 
 func (n *Channel) WithPrefix(prefix java.Space) *Channel {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Channel) WithMarkers(markers java.Markers) *Channel {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -380,6 +479,7 @@ type FuncType struct {
 	Markers    java.Markers
 	Parameters java.Container[java.Statement]
 	ReturnType java.Expression // nil if no return type
+	Type       java.JavaType
 }
 
 func (*FuncType) IsTree()       {}
@@ -387,12 +487,18 @@ func (*FuncType) IsJ()          {}
 func (*FuncType) IsExpression() {}
 
 func (n *FuncType) WithPrefix(prefix java.Space) *FuncType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *FuncType) WithMarkers(markers java.Markers) *FuncType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -403,6 +509,7 @@ type StructType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains VariableDeclarations for fields
+	Type    java.JavaType
 }
 
 func (*StructType) IsTree()       {}
@@ -410,12 +517,18 @@ func (*StructType) IsJ()          {}
 func (*StructType) IsExpression() {}
 
 func (n *StructType) WithPrefix(prefix java.Space) *StructType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *StructType) WithMarkers(markers java.Markers) *StructType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -426,6 +539,7 @@ type InterfaceType struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Body    *java.Block // contains MethodDeclaration (no body) or type refs for embedded interfaces
+	Type    java.JavaType
 }
 
 func (*InterfaceType) IsTree()       {}
@@ -433,12 +547,18 @@ func (*InterfaceType) IsJ()          {}
 func (*InterfaceType) IsExpression() {}
 
 func (n *InterfaceType) WithPrefix(prefix java.Space) *InterfaceType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *InterfaceType) WithMarkers(markers java.Markers) *InterfaceType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -451,6 +571,7 @@ type TypeList struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   java.Container[java.Statement] // Before = space before `(`, last After = space before `)`
+	Type    java.JavaType
 }
 
 func (*TypeList) IsTree()       {}
@@ -458,12 +579,18 @@ func (*TypeList) IsJ()          {}
 func (*TypeList) IsExpression() {}
 
 func (n *TypeList) WithPrefix(prefix java.Space) *TypeList {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *TypeList) WithMarkers(markers java.Markers) *TypeList {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -481,6 +608,7 @@ type Union struct {
 	Prefix  java.Space
 	Markers java.Markers
 	Types   []java.RightPadded[java.Expression]
+	Type    java.JavaType
 }
 
 func (*Union) IsTree()       {}
@@ -488,12 +616,18 @@ func (*Union) IsJ()          {}
 func (*Union) IsExpression() {}
 
 func (n *Union) WithPrefix(prefix java.Space) *Union {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Union) WithMarkers(markers java.Markers) *Union {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -517,12 +651,18 @@ func (*UnderlyingType) IsJ()          {}
 func (*UnderlyingType) IsExpression() {}
 
 func (n *UnderlyingType) WithPrefix(prefix java.Space) *UnderlyingType {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *UnderlyingType) WithMarkers(markers java.Markers) *UnderlyingType {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -547,24 +687,36 @@ func (*TypeDecl) IsJ()         {}
 func (*TypeDecl) IsStatement() {}
 
 func (n *TypeDecl) WithPrefix(prefix java.Space) *TypeDecl {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *TypeDecl) WithMarkers(markers java.Markers) *TypeDecl {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *TypeDecl) WithLeadingAnnotations(anns []*java.Annotation) *TypeDecl {
+	if java.SameSlice(n.LeadingAnnotations, anns) {
+		return n
+	}
 	c := *n
 	c.LeadingAnnotations = anns
 	return &c
 }
 
 func (n *TypeDecl) WithTypeParameters(tps *java.TypeParameters) *TypeDecl {
+	if n.TypeParameters == tps {
+		return n
+	}
 	c := *n
 	c.TypeParameters = tps
 	return &c
@@ -599,18 +751,27 @@ func (*DeclarationBlock) IsJ()         {}
 func (*DeclarationBlock) IsStatement() {}
 
 func (n *DeclarationBlock) WithPrefix(prefix java.Space) *DeclarationBlock {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *DeclarationBlock) WithMarkers(markers java.Markers) *DeclarationBlock {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
 func (n *DeclarationBlock) WithLeadingAnnotations(anns []*java.Annotation) *DeclarationBlock {
+	if java.SameSlice(n.LeadingAnnotations, anns) {
+		return n
+	}
 	c := *n
 	c.LeadingAnnotations = anns
 	return &c
@@ -669,12 +830,18 @@ func (*MultiAssignment) IsJ()         {}
 func (*MultiAssignment) IsStatement() {}
 
 func (n *MultiAssignment) WithPrefix(prefix java.Space) *MultiAssignment {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *MultiAssignment) WithMarkers(markers java.Markers) *MultiAssignment {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -696,12 +863,18 @@ func (*Return) IsJ()         {}
 func (*Return) IsStatement() {}
 
 func (n *Return) WithPrefix(prefix java.Space) *Return {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Return) WithMarkers(markers java.Markers) *Return {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -727,12 +900,18 @@ func (*MethodDeclaration) IsJ()         {}
 func (*MethodDeclaration) IsStatement() {}
 
 func (n *MethodDeclaration) WithPrefix(prefix java.Space) *MethodDeclaration {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *MethodDeclaration) WithMarkers(markers java.Markers) *MethodDeclaration {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -759,12 +938,18 @@ func (*StatementWithInit) IsJ()         {}
 func (*StatementWithInit) IsStatement() {}
 
 func (n *StatementWithInit) WithPrefix(prefix java.Space) *StatementWithInit {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *StatementWithInit) WithMarkers(markers java.Markers) *StatementWithInit {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -785,12 +970,51 @@ func (*CommClause) IsJ()         {}
 func (*CommClause) IsStatement() {}
 
 func (n *CommClause) WithPrefix(prefix java.Space) *CommClause {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// Select is Go's `select { ... }` statement. It looks like a `switch` but is a
+// distinct construct with no Java equivalent, so it is not mapped to java.Switch:
+// its clauses are golang.CommClause, which are not java.Case, and a JavaVisitor
+// walking java.Switch.getCases() must never encounter them.
+type Select struct {
+	ID      uuid.UUID
+	Prefix  java.Space
+	Markers java.Markers
+	Body    *java.Block // contains CommClause clauses
+}
+
+func (*Select) IsTree()      {}
+func (*Select) IsJ()         {}
+func (*Select) IsStatement() {}
+
+func (n *Select) WithPrefix(prefix java.Space) *Select {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *Select) WithMarkers(markers java.Markers) *Select {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -798,6 +1022,71 @@ func (n *CommClause) WithMarkers(markers java.Markers) *CommClause {
 
 // Used for Go function literals which are parsed as MethodDeclaration (a Statement)
 // but can appear in return statements, assignments, and call arguments.
+// ExpressionStatement wraps an Expression standing in statement
+// position — `(h())`, which J.Parentheses alone cannot represent.
+type ExpressionStatement struct {
+	ID         uuid.UUID
+	Prefix     java.Space
+	Markers    java.Markers
+	Expression java.Expression
+}
+
+func (*ExpressionStatement) IsTree()      {}
+func (*ExpressionStatement) IsJ()         {}
+func (*ExpressionStatement) IsStatement() {}
+
+func (n *ExpressionStatement) WithPrefix(prefix java.Space) *ExpressionStatement {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *ExpressionStatement) WithMarkers(markers java.Markers) *ExpressionStatement {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
+// TypeAssertion is Go's postfix `x.(T)`, which reads an interface's dynamic
+// type where J.TypeCast converts. The left expression is right-padded, so its
+// padding holds what stands before the dot — a space, or a comment.
+type TypeAssertion struct {
+	ID           uuid.UUID
+	Prefix       java.Space
+	Markers      java.Markers
+	Left         java.RightPadded[java.Expression] // After = space before `.`
+	AssertedType *java.ControlParentheses          // `(T)`
+	Type         java.JavaType                     // the result type
+}
+
+func (*TypeAssertion) IsTree()       {}
+func (*TypeAssertion) IsJ()          {}
+func (*TypeAssertion) IsExpression() {}
+
+func (n *TypeAssertion) WithPrefix(prefix java.Space) *TypeAssertion {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
+	c := *n
+	c.Prefix = prefix
+	return &c
+}
+
+func (n *TypeAssertion) WithMarkers(markers java.Markers) *TypeAssertion {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
+	c := *n
+	c.Markers = markers
+	return &c
+}
+
 type StatementExpression struct {
 	ID        uuid.UUID
 	Prefix    java.Space
@@ -810,12 +1099,18 @@ func (*StatementExpression) IsJ()          {}
 func (*StatementExpression) IsExpression() {}
 
 func (n *StatementExpression) WithPrefix(prefix java.Space) *StatementExpression {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *StatementExpression) WithMarkers(markers java.Markers) *StatementExpression {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -829,6 +1124,7 @@ type IndexList struct {
 	Markers java.Markers
 	Target  java.Expression
 	Indices java.Container[java.Expression] // Before = space before `[`, Elements = type args, last After = space before `]`
+	Type    java.JavaType
 }
 
 func (*IndexList) IsTree()       {}
@@ -836,12 +1132,18 @@ func (*IndexList) IsJ()          {}
 func (*IndexList) IsExpression() {}
 
 func (n *IndexList) WithPrefix(prefix java.Space) *IndexList {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *IndexList) WithMarkers(markers java.Markers) *IndexList {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -892,6 +1194,7 @@ type Unary struct {
 	Markers    java.Markers
 	Operator   java.LeftPadded[UnaryOperator] // Before = space before the operator token
 	Expression java.Expression
+	Type       java.JavaType
 }
 
 func (*Unary) IsTree()       {}
@@ -900,12 +1203,18 @@ func (*Unary) IsExpression() {}
 func (*Unary) IsStatement()  {}
 
 func (n *Unary) WithPrefix(prefix java.Space) *Unary {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Unary) WithMarkers(markers java.Markers) *Unary {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -951,12 +1260,18 @@ func (*Binary) IsJ()          {}
 func (*Binary) IsExpression() {}
 
 func (n *Binary) WithPrefix(prefix java.Space) *Binary {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Binary) WithMarkers(markers java.Markers) *Binary {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
@@ -995,6 +1310,7 @@ type AssignmentOperation struct {
 	Variable   java.Expression
 	Operator   java.LeftPadded[AssignmentOperator] // Before = space before the operator token
 	Assignment java.Expression
+	Type       java.JavaType
 }
 
 func (*AssignmentOperation) IsTree()       {}
@@ -1003,20 +1319,28 @@ func (*AssignmentOperation) IsExpression() {}
 func (*AssignmentOperation) IsStatement()  {}
 
 func (n *AssignmentOperation) WithPrefix(prefix java.Space) *AssignmentOperation {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *AssignmentOperation) WithMarkers(markers java.Markers) *AssignmentOperation {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
 
-// Variadic represents Go's `...` ellipsis: the `...T` parameter type
+// Variadic represents Go's `...` ellipsis where it stands for something other
+// than a parameter type: an array's elided length in `[...]T{...}`
 // (Postfix=false) and the `args...` call spread (Postfix=true). Dots is the
-// whitespace immediately before the `...` token in the postfix form.
+// whitespace immediately before the `...` token in the postfix form. A
+// parameter's `...T` is a VariableDeclarations whose Varargs slot holds the `...`.
 type Variadic struct {
 	ID      uuid.UUID
 	Prefix  java.Space
@@ -1024,6 +1348,7 @@ type Variadic struct {
 	Element java.Expression
 	Dots    java.Space
 	Postfix bool
+	Type    java.JavaType
 }
 
 func (*Variadic) IsTree()       {}
@@ -1031,23 +1356,22 @@ func (*Variadic) IsJ()          {}
 func (*Variadic) IsExpression() {}
 
 func (n *Variadic) WithPrefix(prefix java.Space) *Variadic {
+	if java.SpaceEqual(n.Prefix, prefix) {
+		return n
+	}
 	c := *n
 	c.Prefix = prefix
 	return &c
 }
 
 func (n *Variadic) WithMarkers(markers java.Markers) *Variadic {
+	if java.MarkersEqual(n.Markers, markers) {
+		return n
+	}
 	c := *n
 	c.Markers = markers
 	return &c
 }
-
-// SelectStmt is a marker on Switch indicating it's a `select` statement instead of `switch`.
-type SelectStmt struct {
-	Ident uuid.UUID
-}
-
-func (s SelectStmt) ID() uuid.UUID { return s.Ident }
 
 // TypeSwitchGuard is a marker on Switch indicating it's a type switch with
 // a type assertion guard like `switch x.(type)` or `switch v := x.(type)`.
@@ -1080,6 +1404,21 @@ type StructTag struct {
 }
 
 func (s StructTag) ID() uuid.UUID { return s.Ident }
+
+// StructTagQuote records which string literal delimiter a struct tag was
+// written with. The tag itself is modelled as LeadingAnnotations, which
+// carry its keys and values but not the quoting; absent this marker the
+// printer writes a raw string.
+type StructTagQuote struct {
+	Ident uuid.UUID
+	Quote string // "`" or `"`
+	// Value is what an interpreted string spells and ValueSource the literal
+	// as written, printed for as long as the annotations still spell Value.
+	Value       string
+	ValueSource string
+}
+
+func (s StructTagQuote) ID() uuid.UUID { return s.Ident }
 
 // ConstDecl is a marker on VariableDeclarations indicating `const` instead of `var`.
 type ConstDecl struct {

@@ -33,7 +33,10 @@ import org.openrewrite.test.TypeValidation;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -929,9 +932,10 @@ class KotlinTypeMappingTest {
                         var found = new AtomicBoolean(false);
                         new KotlinIsoVisitor<AtomicBoolean>() {
                             @Override
-                            public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, AtomicBoolean found) {
+                            public K.DestructuringPattern visitDestructuringPattern(K.DestructuringPattern pattern, AtomicBoolean found) {
                                 found.set(true);
-                                return super.visitDestructuringDeclaration(destructuringDeclaration, found);
+                                assertThat(pattern.getType().toString()).isEqualTo("kotlin.Triple<int, int, int>");
+                                return super.visitDestructuringPattern(pattern, found);
                             }
 
                             @Override
@@ -945,9 +949,14 @@ class KotlinTypeMappingTest {
 
                             @Override
                             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicBoolean found) {
+                                if (variable.getDeclarator() instanceof K.DestructuringPattern) {
+                                    // The declaration names no variable of its own; it is typed by the synthetic
+                                    // receiver the component calls are made on.
+                                    assertThat(variable.getVariableType().toString())
+                                            .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=<destruct>,type=kotlin.Triple<int, int, int>}");
+                                    return super.visitVariable(variable, found);
+                                }
                                 switch (variable.getSimpleName()) {
-                                    case "<destruct>" -> assertThat(variable.getName().getType().toString())
-                                            .isEqualTo("kotlin.Triple<int, int, int>");
                                     case "a" -> {
                                         assertThat(variable.getVariableType().toString())
                                                 .isEqualTo("openRewriteFile0Kt{name=foo,return=void,parameters=[]}{name=a,type=int}");
@@ -1073,7 +1082,7 @@ class KotlinTypeMappingTest {
               kotlin(
                 //language=none
                 "class A : RemoteStub",
-                    spec -> spec.afterRecipe(cu -> {
+                    spec -> spec.afterRecipe(cu ->
                         new KotlinIsoVisitor<Integer>() {
                             @Override
                             public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
@@ -1082,8 +1091,7 @@ class KotlinTypeMappingTest {
                                 }
                                 return super.visitIdentifier(identifier, integer);
                             }
-                        }.visit(cu, 0);
-                })
+                        }.visit(cu, 0))
               )
             );
         }
@@ -1862,6 +1870,202 @@ class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedOuter() {
+            rewriteRun(
+              kotlin(
+                """
+                  import java.util.Locale
+
+                  val category = Locale.Category.DISPLAY
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            // `Locale.Category` must keep its own nested type rather than collapsing to the imported outer
+                            // `Locale`, otherwise ShortenFullyQualifiedTypeReferences would rewrite it to an unresolved `Category`.
+                            if ("Category".equals(fieldAccess.getSimpleName())) {
+                                JavaType.Class type = (JavaType.Class) fieldAccess.getType();
+                                assertThat(type.getFullyQualifiedName()).isEqualTo("java.util.Locale$Category");
+                                assertThat(type.getOwningClass()).isNotNull();
+                                assertThat(type.getOwningClass().getFullyQualifiedName()).isEqualTo("java.util.Locale");
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(type);
+
+                                J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                                assertThat(((JavaType.FullyQualified) target.getType()).getFullyQualifiedName()).isEqualTo("java.util.Locale");
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(1);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedOuterMultiLevel() {
+            // Same shape as `nestedFieldAccessType`, but the outer type is imported, so the reference is
+            // package-relative (`A.B.A.C`) rather than root-package or fully qualified. Every nested level must
+            // keep its own class id instead of collapsing to the imported outer `foo.bar.A`.
+            rewriteRun(
+              kotlin(
+                """
+                  package    foo.bar
+                  class A {
+                      class B {
+                          class A {
+                              class C
+                          }
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  import foo.bar.A
+
+                  val x = A.B.A.C()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "A.B.A.C":
+                                    expected = "foo.bar.A$B$A$C";
+                                    break;
+                                case "A.B.A":
+                                    expected = "foo.bar.A$B$A";
+                                    break;
+                                case "A.B":
+                                    expected = "foo.bar.A$B";
+                                    // The outermost `A` is the imported top-level type, not a nested one.
+                                    J.Identifier target = (J.Identifier) fieldAccess.getTarget();
+                                    assertThat(((JavaType.FullyQualified) target.getType()).getFullyQualifiedName()).isEqualTo("foo.bar.A");
+                                    break;
+                            }
+                            if (expected != null) {
+                                assertThat(fieldAccess.getType()).isNotNull();
+                                assertThat(fieldAccess.getType().toString()).isEqualTo(expected);
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(fieldAccess.getType());
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(3);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedTypesWithSameSimpleNameFromDifferentOuters() {
+            // `Status` is nested in both `Alpha` and `Beta`. The package-relative match must select
+            // each reference's own outer, not confuse the two because the leaf name is identical.
+            rewriteRun(
+              kotlin(
+                """
+                  package p
+
+                  class Alpha { enum class Status { A } }
+                  class Beta { enum class Status { B } }
+
+                  val a = Alpha.Status.A
+                  val b = Beta.Status.B
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "Alpha.Status":
+                                    expected = "p.Alpha$Status";
+                                    break;
+                                case "Beta.Status":
+                                    expected = "p.Beta$Status";
+                                    break;
+                            }
+                            if (expected != null) {
+                                JavaType.Class type = (JavaType.Class) fieldAccess.getType();
+                                assertThat(type.getFullyQualifiedName()).isEqualTo(expected);
+                                assertThat(type.getOwningClass().getFullyQualifiedName()).isEqualTo(expected.replace("$Status", ""));
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8237")
+        @Test
+        void nestedFieldAccessViaImportedNestedClass() {
+            // The imported type is itself nested (`foo.bar.A.B`), so `B.A.C` is only a trailing run of
+            // the nested names. Each level must still keep its own class id rather than collapsing to
+            // the outer `foo.bar.A`.
+            rewriteRun(
+              kotlin(
+                """
+                  package    foo.bar
+                  class A {
+                      class B {
+                          class A {
+                              class C
+                          }
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  import foo.bar.A.B
+
+                  val y = B.A.C()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    var count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            String expected = null;
+                            switch (fieldAccess.toString()) {
+                                case "B.A.C":
+                                    expected = "foo.bar.A$B$A$C";
+                                    break;
+                                case "B.A":
+                                    expected = "foo.bar.A$B$A";
+                                    break;
+                            }
+                            if (expected != null) {
+                                assertThat(fieldAccess.getType()).isNotNull();
+                                assertThat(fieldAccess.getType().toString()).isEqualTo(expected);
+                                assertThat(fieldAccess.getName().getType()).isEqualTo(fieldAccess.getType());
+                                count.getAndIncrement();
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
+
         @Test
         void packageFieldAccess() {
             rewriteRun(
@@ -1951,6 +2155,335 @@ class KotlinTypeMappingTest {
                 })
               )
             );
+        }
+
+        @Test
+        void qualifierOfCallableReferenceToInheritedMember() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a: Any = NoCompanion<Int>::bar
+                  val b: Any = WithCompanion<Int>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "NoCompanion", "NoCompanion",
+                  "WithCompanion", "WithCompanion"
+                ), "Base"))
+              ),
+              kotlin(
+                """
+                  open class Base {
+                      fun bar() = 1
+                  }
+                  class NoCompanion<T> : Base()
+                  class WithCompanion<T> : Base() {
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualifierOfParameterizedNestedCallableReference() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = Outer.Nested<Int>::bar
+                  val b = Outer.Nested<List<Int>>::bar
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "Nested", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  class Outer {
+                      class Nested<T> {
+                          fun bar() = 1
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void qualifierOfStaticStyleCall() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = NoCompanion.valueOf("A")
+                  val b = WithCompanion.create()
+                  val c = Outer.Nested.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    assertQualifierTypes(cu, Map.of(
+                      "WithCompanion", "WithCompanion",
+                      "Nested", "Outer$Nested"
+                    ), "java.lang.Object");
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, AtomicBoolean found) {
+                            if ("NoCompanion".equals(identifier.getSimpleName())) {
+                                JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                                assertThat(type.getFullyQualifiedName()).isEqualTo("NoCompanion");
+                                assertThat(type.getKind()).isEqualTo(JavaType.FullyQualified.Kind.Enum);
+                                assertThat(type.getMembers()).extracting(JavaType.Variable::getName).containsExactly("A");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              ),
+              kotlin(
+                """
+                  enum class NoCompanion {
+                      A
+                  }
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void typeAliasQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = A.create()
+                  val b = O.bar()
+                  val c = N.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> assertQualifierTypes(cu, Map.of(
+                  "A", "WithCompanion",
+                  "O", "Obj",
+                  "N", "Outer$Nested"
+                ), "java.lang.Object"))
+              ),
+              kotlin(
+                """
+                  typealias A = WithCompanion
+                  typealias O = Obj
+                  typealias N = Outer.Nested
+
+                  class WithCompanion {
+                      fun bar() = 1
+                      companion object {
+                          fun create() = 2
+                      }
+                  }
+                  object Obj {
+                      fun bar() = 1
+                  }
+                  class Outer {
+                      class Nested {
+                          fun bar() = 1
+                          companion object {
+                              fun create() = 2
+                          }
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void typeAliasToJavaClassQualifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  typealias E = IllegalStateException
+                  val a = E::class
+                  val b = Exception::class
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Map<String, String> expected = Map.of(
+                      "E", "java.lang.IllegalStateException",
+                      "Exception", "java.lang.Exception"
+                    );
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<String> seen) {
+                            if (memberRef.getContaining() instanceof J.Identifier id) {
+                                assertThat(TypeUtils.asFullyQualified(id.getType()).getFullyQualifiedName())
+                                  .isEqualTo(expected.get(id.getSimpleName()));
+                                seen.add(id.getSimpleName());
+                            }
+                            return super.visitMemberReference(memberRef, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrderElementsOf(expected.keySet());
+                })
+              )
+            );
+        }
+
+        @Test
+        void typeAliasQualifierPreservesFixedTypeArguments() {
+            rewriteRun(
+              kotlin(
+                """
+                  class Box<T>(val value: T)
+                  typealias StringBox = Box<String>
+
+                  val value = StringBox::value
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, AtomicBoolean found) {
+                            JavaType.Parameterized type = TypeUtils.asParameterized(memberRef.getContaining().getType());
+                            assertThat(type).isNotNull();
+                            assertThat(type.getFullyQualifiedName()).isEqualTo("Box");
+                            assertThat(type.getTypeParameters())
+                              .extracting(JavaType::toString)
+                              .containsExactly("kotlin.String");
+                            found.set(true);
+                            return super.visitMemberReference(memberRef, found);
+                        }
+                    }.reduce(cu, new AtomicBoolean());
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
+        void packageSegmentOfQualifiedTypeAliasHasNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val value = p.A.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            if ("p".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType()).isNull();
+                                seen.add("p");
+                            } else if ("A".equals(identifier.getSimpleName())) {
+                                assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName())
+                                  .isEqualTo("p.Foo");
+                                seen.add("A");
+                            }
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "A");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  typealias A = Foo
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        void packageSegmentsOfQualifiedClassHaveNoType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val a = p.Foo.create()
+                  val b = p.q.Bar.create()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                            switch (identifier.getSimpleName()) {
+                                case "p", "q" -> assertThat(identifier.getType()).isNull();
+                                case "Foo" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.Foo");
+                                case "Bar" -> assertThat(TypeUtils.asFullyQualified(identifier.getType()).getFullyQualifiedName()).isEqualTo("p.q.Bar");
+                                default -> {
+                                    return super.visitIdentifier(identifier, seen);
+                                }
+                            }
+                            seen.add(identifier.getSimpleName());
+                            return super.visitIdentifier(identifier, seen);
+                        }
+                    }.reduce(cu, new HashSet<>());
+                    assertThat(seen).containsExactlyInAnyOrder("p", "q", "Foo", "Bar");
+                })
+              ),
+              kotlin(
+                """
+                  package p
+
+                  class Foo {
+                      companion object {
+                          fun create() = Foo()
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                """
+                  package p.q
+
+                  class Bar {
+                      companion object {
+                          fun create() = Bar()
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
+        private static void assertQualifierTypes(K.CompilationUnit cu, Map<String, String> expectedFqnBySimpleName, String supertype) {
+            Set<String> seen = new KotlinIsoVisitor<Set<String>>() {
+                @Override
+                public J.Identifier visitIdentifier(J.Identifier identifier, Set<String> seen) {
+                    String expectedFqn = expectedFqnBySimpleName.get(identifier.getSimpleName());
+                    if (expectedFqn != null) {
+                        JavaType.FullyQualified type = TypeUtils.asFullyQualified(identifier.getType());
+                        if (type instanceof JavaType.Parameterized parameterized) {
+                            type = parameterized.getType();
+                        }
+                        assertThat(type).as(identifier.getSimpleName()).isNotNull();
+                        assertThat(type.getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(expectedFqn);
+                        assertThat(type.getKind()).as(identifier.getSimpleName()).isEqualTo(JavaType.FullyQualified.Kind.Class);
+                        assertThat(type.getSupertype().getFullyQualifiedName()).as(identifier.getSimpleName()).isEqualTo(supertype);
+                        assertThat(type.getMethods()).as(identifier.getSimpleName())
+                          .extracting(JavaType.Method::getName)
+                          .doesNotContain("create", "toString");
+                        seen.add(identifier.getSimpleName());
+                    }
+                    return super.visitIdentifier(identifier, seen);
+                }
+            }.reduce(cu, new HashSet<>());
+            assertThat(seen).containsExactlyInAnyOrderElementsOf(expectedFqnBySimpleName.keySet());
         }
     }
 }

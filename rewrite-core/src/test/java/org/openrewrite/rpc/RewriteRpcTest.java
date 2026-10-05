@@ -17,18 +17,25 @@ package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.moderne.jsonrpc.JsonRpc;
+import io.moderne.jsonrpc.JsonRpcMethod;
 import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import io.moderne.jsonrpc.handler.HeaderDelimitedMessageHandler;
 import lombok.SneakyThrows;
+import lombok.Value;
+import lombok.With;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
@@ -38,6 +45,7 @@ import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.rpc.request.Print;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -48,10 +56,16 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
+import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.marketplace.RecipeBundle.runtimeClasspath;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -63,6 +77,7 @@ class RewriteRpcTest implements RewriteTest {
 
     RecipeMarketplace marketplace;
     RewriteRpc client;
+    JsonRpc serverJsonRpc;
     RewriteRpc server;
 
     @BeforeEach
@@ -80,7 +95,8 @@ class RewriteRpcTest implements RewriteTest {
         client = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(clientFormatter, clientIn, clientOut)), marketplace)
           .batchSize(1);
 
-        server = new RewriteRpc(new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut)), marketplace, List.of(new TestRecipeBundleResolver()))
+        serverJsonRpc = new JsonRpc(new HeaderDelimitedMessageHandler(serverFormatter, serverIn, serverOut));
+        server = new RewriteRpc(serverJsonRpc, marketplace, List.of(new TestRecipeBundleResolver()))
           .batchSize(1);
     }
 
@@ -165,6 +181,8 @@ class RewriteRpcTest implements RewriteTest {
         PlainText synced = client.getObject(id, sourceFileType);
         assertThat(synced.getText()).isEqualTo("Hello");
         assertThat(server.remoteObjects).containsKey(id);
+        // The refs this exchange assigned (its Markers) stay; only the failed exchange's roll back.
+        int refsAfterSync = server.localRefs.size();
 
         // Step 2: replace with a PlainText that has null sourcePath, causing
         // NPE in PlainTextRpcCodec.rpcSend() at d.getSourcePath().toString()
@@ -178,7 +196,7 @@ class RewriteRpcTest implements RewriteTest {
         try {
             client.getObject(id, sourceFileType);
         } catch (Exception expected) {
-            // Expected — sender failed and emitted premature END_OF_OBJECT
+            // The cause it carries is pinned by sendFailureSurfacesItsCauseToTheReceiver
         }
 
         // Step 4: verify the sender cleaned up its stale remoteObjects entry
@@ -189,13 +207,145 @@ class RewriteRpcTest implements RewriteTest {
         int refsAfterFailure = server.localRefs.size();
         assertThat(refsAfterFailure)
           .describedAs("Sender should roll back localRefs assigned during failed exchange")
-          .isEqualTo(0);
+          .isEqualTo(refsAfterSync);
 
         // Step 5: put back a valid tree and retry — should succeed via full ADD
         PlainText fixed = original.withText("Fixed");
         server.localObjects.put(id, fixed);
         PlainText result = client.getObject(id, sourceFileType);
         assertThat(result.getText()).isEqualTo("Fixed");
+    }
+
+    @Test
+    void sendFailureSurfacesItsCauseToTheReceiver() {
+        // No sourcePath → the sender NPEs mid-traversal
+        PlainText badTree = PlainText.builder()
+          .text("Bad")
+          .build();
+        String id = badTree.getId().toString();
+        server.localObjects.put(id, badTree);
+
+        assertThatThrownBy(() -> client.getObject(id, PlainText.class.getName()))
+          .hasStackTraceContaining("Failed to send object " + id)
+          // the sender's own frames, carried across the wire in the error's data
+          .hasStackTraceContaining("PlainTextRpcCodec.rpcSend");
+    }
+
+    /**
+     * A receiver that fails partway leaves the sender holding refs it never recorded and a baseline it
+     * never built. With a batch of one the sender is still streaming when that happens; with a large
+     * one it has already finished.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 1000})
+    void receiveFailureIsRolledBackOnBothPeers(int batchSize) {
+        server.batchSize(batchSize);
+        SearchResult shared = new SearchResult(Tree.randomId(), "shared");
+        PlainText unreceivable = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .markers(Markers.build(List.of(new Unreceivable(Tree.randomId()), shared)))
+          .build();
+        String id = unreceivable.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        server.localObjects.put(id, unreceivable);
+        assertThatThrownBy(() -> client.getObject(id, sourceFileType))
+          .hasMessageContaining("unreceivable");
+
+        assertThat(server.remoteObjects).doesNotContainKey(id);
+        assertThat(server.localRefs).isEmpty();
+        assertThat(client.remoteRefs).isEmpty();
+
+        // The sender had given this marker a ref that the receiver never got to.
+        server.localObjects.put(id, unreceivable.withMarkers(Markers.build(List.of(shared))));
+        PlainText received = client.getObject(id, sourceFileType);
+        assertThat(received.getText()).isEqualTo("Hello");
+        assertThat(received.getMarkers().getMarkers()).containsExactly(shared);
+    }
+
+    @Test
+    void receiveFailureSurfacesWhenThePeerCannotRollBack() {
+        serverJsonRpc.rpc("AbortGetObject", new JsonRpcMethod<Map<String, Object>>() {
+            @Override
+            protected Object handle(Map<String, Object> request) {
+                throw new UnsupportedOperationException("AbortGetObject");
+            }
+        });
+        PlainText unreceivable = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .markers(Markers.build(List.of(new Unreceivable(Tree.randomId()))))
+          .build();
+        String id = unreceivable.getId().toString();
+
+        server.localObjects.put(id, unreceivable);
+        assertThatThrownBy(() -> client.getObject(id, PlainText.class.getName()))
+          .hasMessageContaining("unreceivable");
+    }
+
+    /**
+     * A NO_CHANGE answer for an object this side never received means the peers have drifted apart,
+     * not that the object was deleted: getObject() must fail rather than hand back null.
+     */
+    @Test
+    void getObjectRejectsNoChangeWithoutABaseline() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+
+        // The client loses its copy (a failed receive drops it) while the server still believes it was delivered.
+        client.remoteObjects.remove(id);
+
+        assertThatThrownBy(() -> client.getObject(id, sourceFileType))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("no change to " + id);
+    }
+
+    /**
+     * {@link RewriteRpc#evict} drops the tree from both peers and rolls the client's ref maps
+     * back to the pre-file checkpoint.
+     */
+    @SneakyThrows
+    @Test
+    void evictDropsTreeFromBothPeers() {
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        String sourceFileType = PlainText.class.getName();
+
+        // High-water before the client fetches anything, so evict rolls back exactly this exchange.
+        int[] checkpoint = client.refCheckpoint();
+
+        // Server holds the tree; client fetches it → both peers cache it.
+        server.localObjects.put(id, original);
+        client.getObject(id, sourceFileType);
+        assertThat(client.localObjects).containsKey(id);
+        assertThat(client.remoteObjects).containsKey(id);
+        assertThat(server.localObjects).containsKey(id);
+        assertThat(server.remoteObjects).containsKey(id);
+
+        client.evict(id, checkpoint[0], checkpoint[1]);
+
+        // Client cleared synchronously, including refs rolled back to the checkpoint.
+        assertThat(client.localObjects).doesNotContainKey(id);
+        assertThat(client.remoteObjects).doesNotContainKey(id);
+        assertThat(client.remoteRefs.keySet()).allMatch(ref -> ref <= checkpoint[1]);
+
+        // The Evict notification is fire-and-forget; wait for the server to apply it.
+        long deadline = System.currentTimeMillis() + 5_000;
+        while (server.localObjects.containsKey(id) && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10);
+        }
+        assertThat(server.localObjects).doesNotContainKey(id);
+        assertThat(server.remoteObjects).doesNotContainKey(id);
     }
 
     @DocumentExample
@@ -218,8 +368,25 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
-    @Disabled("Print requires bidirectional RPC (GetObject callback) which deadlocks in the in-process test setup. " +
-              "Works correctly when calling to a real subprocess (e.g., Java to Python/JS).")
+    @Test
+    void nestedVisitBackToRequestOriginator() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              @SneakyThrows
+              public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                  Tree t = client.visit((SourceFile) tree, DispatchBackToOriginator.class.getName(), 0);
+                  stopAfterPreVisit();
+                  return requireNonNull(t);
+              }
+          })),
+          text(
+            "Hello Jon!",
+            "Hello World!"
+          )
+        );
+    }
+
     @Test
     void print() {
         rewriteRun(
@@ -229,6 +396,55 @@ class RewriteRpcTest implements RewriteTest {
               assertThat(client.print(text)).isEqualTo("Hello Jon!"))
           )
         );
+    }
+
+    @Test
+    void printSubtreeUnderItsCursor() {
+        PlainText text = helloJon();
+        Cursor parent = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), text);
+
+        assertThat(client.print(text.getSnippets().get(0), parent)).isEqualTo("[PlainText]Jon");
+    }
+
+    @Test
+    void printRequestWithoutCursor() {
+        PlainText.Snippet snippet = helloJon().getSnippets().get(0);
+        String id = snippet.getId().toString();
+        client.localObjects.put(id, snippet);
+
+        // What a peer that knows nothing of the cursor sends.
+        Print request = new Print(id, Path.of("hello.txt"), PlainText.class.getName(), null, null);
+        assertThat(client.send("Print", request, String.class)).isEqualTo("[]Jon");
+    }
+
+    @Test
+    void printSendsCursorOnlyForSubtree() {
+        List<Map<String, Object>> requests = new CopyOnWriteArrayList<>();
+        serverJsonRpc.rpc("Print", new JsonRpcMethod<Map<String, Object>>() {
+            @Override
+            protected Object handle(Map<String, Object> request) {
+                requests.add(request);
+                return "";
+            }
+        });
+        PlainText text = helloJon();
+        Cursor parent = new Cursor(new Cursor(null, Cursor.ROOT_VALUE), text);
+
+        client.print(text.getSnippets().get(0), parent);
+        client.print(text);
+
+        // The ids a Visit with the same cursor carries.
+        assertThat(requests.get(0)).containsEntry("cursor", client.getCursorIds(parent));
+        assertThat(requests.get(1)).doesNotContainKey("cursor");
+    }
+
+    private static PlainText helloJon() {
+        Markers enclosing = Markers.build(List.of(new Enclosing(Tree.randomId())));
+        return PlainText.builder()
+          .sourcePath(Path.of("hello.txt"))
+          .text("Hello ")
+          .snippets(List.of(new PlainText.Snippet(Tree.randomId(), enclosing, "Jon")))
+          .build();
     }
 
     @Test
@@ -247,8 +463,8 @@ class RewriteRpcTest implements RewriteTest {
     @Test
     void dataTableStoreConfigurationCrossesRpc(@TempDir Path tmp) {
         client.dataTableStore(new CsvDataTableStore(tmp,
-          java.util.Collections.singletonMap("repositoryOrigin", "github.com/acme/example"),
-          java.util.Collections.emptyMap()));
+          singletonMap("repositoryOrigin", "github.com/acme/example"),
+          emptyMap()));
 
         // A trivial remote visit triggers the lazy SetDataTableStore handshake.
         rewriteRun(
@@ -319,6 +535,75 @@ class RewriteRpcTest implements RewriteTest {
           text(
             "hi",
             "hello"
+          )
+        );
+    }
+
+    /**
+     * A composite whose recipe list yields multiple instances of the same recipe class with
+     * different option values must keep each prepared child a distinct instance with its own
+     * options, rather than collapsing them.
+     */
+    @Test
+    void compositeWithSameTypeChildrenPreservesDistinctOptions() {
+        Recipe composite = client.prepareRecipe(
+          "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of());
+
+        List<Recipe> children = composite.getRecipeList();
+        assertThat(children).hasSize(3);
+
+        assertThat(children.stream().map(System::identityHashCode).distinct().count())
+          .describedAs("Each prepared child must be its own instance, not a shared/collapsed one")
+          .isEqualTo(3);
+
+        List<String> toTexts = children.stream()
+          .map(child -> child.getDescriptor().getOptions().stream()
+            .filter(o -> "toText".equals(o.getName()))
+            .map(OptionDescriptor::getValue)
+            .map(String::valueOf)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Child is missing its toText option")))
+          .toList();
+        assertThat(toTexts)
+          .describedAs("Each same-type child must retain its own distinct option value")
+          .containsExactly("a", "b", "c");
+    }
+
+    /**
+     * Each same-type child must actually run with its own option, so all of "a", "b", "c"
+     * appear among the recipes that made changes (a collapse would leave the later
+     * applications as no-ops and attribute only one).
+     */
+    @Test
+    void compositeWithSameTypeChildrenAppliesEachDistinctOption() {
+        rewriteRun(
+          spec -> spec
+            .recipe(client.prepareRecipe(
+              "org.openrewrite.rpc.RewriteRpcTest$RecipeWithSameTypeChildren", Map.of()))
+            .validateRecipeSerialization(false)
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          text(
+            "hello",
+            "c",
+            spec -> spec.afterRecipe(result -> {
+                RecipesThatMadeChanges marker = result.getMarkers()
+                  .findFirst(RecipesThatMadeChanges.class)
+                  .orElseThrow(() -> new AssertionError("Expected RecipesThatMadeChanges marker"));
+
+                List<String> executedToTexts = marker.getRecipes().stream()
+                  .map(stack -> stack.get(stack.size() - 1))
+                  .filter(leaf -> "org.openrewrite.text.ChangeText".equals(leaf.getName()))
+                  .map(leaf -> leaf.getDescriptor().getOptions().stream()
+                    .filter(o -> "toText".equals(o.getName()))
+                    .map(OptionDescriptor::getValue)
+                    .map(String::valueOf)
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("Executed ChangeText is missing its toText option")))
+                  .toList();
+                assertThat(executedToTexts)
+                  .describedAs("All three same-type children must execute, each with its own distinct option")
+                  .containsExactlyInAnyOrder("a", "b", "c");
+            })
           )
         );
     }
@@ -520,10 +805,50 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(clientC2.getParentOrThrow(2).<String>getValue()).isEqualTo(Cursor.ROOT_VALUE);
     }
 
+    /**
+     * Prints the trees enclosing the one it marks, which is the cursor the printer was given.
+     */
+    @Value
+    @With
+    static class Enclosing implements Marker {
+        UUID id;
+
+        @Override
+        public String print(Cursor cursor, UnaryOperator<String> commentWrapper, boolean verbose) {
+            return cursor.getParentOrThrow(2).getPathAsStream(Tree.class::isInstance)
+              .map(tree -> tree.getClass().getSimpleName())
+              .collect(joining(",", "[", "]"));
+        }
+    }
+
+    @Value
+    @With
+    static class Unreceivable implements Marker, RpcCodec<Unreceivable> {
+        UUID id;
+
+        @Override
+        public void rpcSend(Unreceivable after, RpcSendQueue q) {
+            q.getAndSend(after, Marker::getId);
+        }
+
+        @Override
+        public Unreceivable rpcReceive(Unreceivable before, RpcReceiveQueue q) {
+            throw new IllegalStateException("unreceivable");
+        }
+    }
+
     static class ChangeText extends PlainTextVisitor<Integer> {
         @Override
         public PlainText visitText(PlainText text, Integer p) {
             return text.withText("Hello World!");
+        }
+    }
+
+    static class DispatchBackToOriginator extends PlainTextVisitor<Integer> {
+        @Override
+        public PlainText visitText(PlainText text, Integer p) {
+            RewriteRpc serving = requireNonNull(RewriteRpc.current(), "expected the serving RewriteRpc to be discoverable");
+            return (PlainText) requireNonNull(serving.visit(text, ChangeText.class.getName(), p));
         }
     }
 
@@ -565,6 +890,26 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public void buildRecipeList(RecipeList recipes) {
             recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    static class RecipeWithSameTypeChildren extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A recipe with same-type children carrying distinct options";
+        }
+
+        @Override
+        public String getDescription() {
+            return "To verify each RPC-prepared child of the same recipe type keeps its own options.";
+        }
+
+        @Override
+        public void buildRecipeList(RecipeList recipes) {
+            recipes.recipe(new org.openrewrite.text.ChangeText("a"));
+            recipes.recipe(new org.openrewrite.text.ChangeText("b"));
+            recipes.recipe(new org.openrewrite.text.ChangeText("c"));
         }
     }
 

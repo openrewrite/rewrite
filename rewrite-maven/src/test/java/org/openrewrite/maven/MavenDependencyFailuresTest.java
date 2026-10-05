@@ -73,9 +73,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 <version>1</version>
               </project>
               """,
-            spec -> spec.after(xml -> {
-                return assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual();
-            }
+            spec -> spec.after(xml -> assertThat(xml).contains("org.jenkins-ci.plugins:credentials failed. Unable to download metadata. Tried repositories:").actual()
           ))
         );
     }
@@ -191,7 +189,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """,
-            spec -> spec.beforeRecipe(maven -> {
+            spec -> spec.beforeRecipe(maven ->
                 // make the local pom bad before running the recipe
                 Files.writeString(localPom,
                   //language=xml
@@ -214,8 +212,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
                        </dependencies>
                      </project>
                     """
-                );
-            })
+                ))
           )
         );
     }

@@ -42,6 +42,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
 import javax.net.ssl.SSLSocketFactory;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -50,6 +51,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
@@ -149,6 +151,21 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .containsExactly("settings-provided", "local-provided");
             }))
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+    @Test
+    void repositoriesDeclaredUnderDifferentIdsForTheSameUriAreAskedOnce() {
+        var ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
+        var repositories = List.of(
+          MavenRepository.builder().id("first").uri("https://repo.example.com/maven").knownToExist(true).build(),
+          MavenRepository.builder().id("second").uri("https://REPO.example.com/maven/").knownToExist(true).build(),
+          MavenRepository.builder().id("third").uri("https://repo.example.com/other/").knownToExist(true).build()
+        );
+
+        assertThat(new MavenPomDownloader(ctx).distinctNormalizedRepositories(repositories, null, null))
+          .extracting(MavenRepository::getId)
+          .containsExactly("first", "third");
     }
 
     @Nested
@@ -799,6 +816,35 @@ class MavenPomDownloaderTest implements RewriteTest {
               new MavenPomDownloader(emptyMap(), ctx).downloadMetadata(new GroupArtifact("does.definitely.not", "exist"), null, List.of(repository)));
         }
 
+        @Test
+        void proxiedUpstreamsReportedWithRepositoryResponse() throws Exception {
+            try (var server = new MockWebServer()) {
+                server.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest request) {
+                        return new MockResponse().setResponseCode(404)
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://repo.example.com/maven\"; received-status=404")
+                          .addHeader("Proxy-Status", "gateway; next-hop=\"https://mirror.example.com/maven\"; error=connection_timeout");
+                    }
+                });
+                server.start();
+
+                var repository = MavenRepository.builder()
+                  .id("gateway")
+                  .uri("http://%s:%d/maven/".formatted(server.getHostName(), server.getPort()))
+                  .knownToExist(true)
+                  .build();
+                assertThatThrownBy(() -> new MavenPomDownloader(emptyMap(), ctx)
+                  .download(new GroupArtifactVersion("org.example", "missing", "1.0.0"), null, null, List.of(repository)))
+                  .isInstanceOfSatisfying(MavenDownloadingException.class, e ->
+                    assertThat(e.getMessage()).contains(
+                      "Tried repositories:\n" +
+                      repository.getUri() + ": HTTP 404, proxying:\n" +
+                      "  https://repo.example.com/maven: HTTP 404\n" +
+                      "  https://mirror.example.com/maven: connection_timeout"));
+            }
+        }
+
         @Issue("https://github.com/openrewrite/rewrite/issues/6739")
         @Test
         void deriveMetaDataFromHtmlWithTitleAttributes() throws Exception {
@@ -1335,6 +1381,94 @@ class MavenPomDownloaderTest implements RewriteTest {
             });
         }
 
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void throttledEndpointIsNotAskedAgainUntilItsCooldownElapses() {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            List<String> skipped = new ArrayList<>();
+            ctx.setResolutionListener(new ResolutionEventListener() {
+                @Override
+                public void repositoryAccessFailedPreviously(String uri) {
+                    skipped.add(uri);
+                }
+            });
+            var downloader = new MavenPomDownloader(ctx);
+            mockServer(429, mockRepo -> {
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven/".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .knownToExist(true)
+                  .build());
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "first"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                // The maven-metadata.xml request only: a host that just answered 429 is not asked for a directory listing too
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(1);
+                assertThat(skipped).containsExactly(repositories.get(0).getUri());
+
+                ctx.getThrottledEndpoints().replaceAll((endpoint, until) -> Instant.EPOCH);
+                assertThatThrownBy(() -> downloader.downloadMetadata(new GroupArtifact("org.example", "second"), null, repositories))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(mockRepo.getRequestCount()).isEqualTo(2);
+            });
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite/issues/8682")
+        @Test
+        void mirrorKeepsThePolicyOfEachRepositoryItMirrors() throws Exception {
+            var ctx = MavenExecutionContextView.view(this.ctx);
+            try (MockWebServer mirror = getMockServer()) {
+                List<String> metadataRequests = synchronizedList(new ArrayList<>());
+                mirror.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getPath() != null && recordedRequest.getPath().endsWith("maven-metadata.xml")) {
+                            metadataRequests.add(recordedRequest.getPath());
+                            return new MockResponse().setResponseCode(200).setBody(
+                              //language=xml
+                              """
+                                <metadata>
+                                  <groupId>org.example</groupId>
+                                  <artifactId>lib</artifactId>
+                                  <versioning>
+                                    <versions>
+                                      <version>1.0-SNAPSHOT</version>
+                                    </versions>
+                                  </versioning>
+                                </metadata>
+                                """);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mirror.start();
+                ctx.setMirrors(List.of(new MavenRepositoryMirror("mirror",
+                  "https://%s:%d/maven/".formatted(mirror.getHostName(), mirror.getPort()), "*", null, null, null)));
+                var downloader = new MavenPomDownloader(ctx);
+                var gav = new GroupArtifactVersion("org.example", "lib", "1.0-SNAPSHOT");
+
+                // Central does not serve snapshots, and mirroring it does not change that
+                assertThatThrownBy(() -> downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL)))
+                  .isInstanceOf(MavenDownloadingException.class);
+                assertThat(metadataRequests).isEmpty();
+
+                // A mirrored repository that does accept snapshots brings the mirror into the lookup
+                var snapshots = MavenRepository.builder()
+                  .id("snapshots")
+                  .uri("https://snapshots.example.com/maven")
+                  .releases(false)
+                  .snapshots(true)
+                  .build();
+                MavenMetadata metadata = downloader.downloadMetadata(gav, null, List.of(MAVEN_CENTRAL, snapshots));
+                assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0-SNAPSHOT");
+                assertThat(metadataRequests).hasSize(1);
+            }
+        }
+
         @Test
         void invalidArtifact() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
@@ -1433,6 +1567,120 @@ class MavenPomDownloaderTest implements RewriteTest {
         }
 
         @Test
+        void doesNotSendCredentialsWhenRepositoryServesAnonymously() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> authorizationHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        authorizationHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Mirror Apache Maven: a repository that serves anonymously must never be sent credentials
+                assertThat(authorizationHeaders).containsOnlyNulls();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void normalizesRepositoryThatDropsAnonymousRequests() {
+            try (MockWebServer mockRepo = getMockServer()) {
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            // Close without a status line, as an authenticating gateway may do, so the probe
+                            // sees a connection failure rather than a 401 it could recognize as "server exists"
+                            return new MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST);
+                        }
+                        return new MockResponse().setResponseCode(200).setBody("");
+                    }
+                });
+                mockRepo.start();
+                MavenRepository repository = MavenRepository.builder()
+                  .id("id")
+                  .uri("https://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build();
+
+                MavenRepository normalized = new MavenPomDownloader(emptyMap(), ctx)
+                  .normalizeRepository(repository, MavenExecutionContextView.view(ctx), null);
+
+                assertThat(normalized).isNotNull();
+                assertThat(MavenExecutionContextView.view(ctx).getUnreachableEndpoints()).isEmpty();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void authenticatesPreemptivelyAfterCredentialsRequired() {
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestAuthHeaders = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestAuthHeaders.add(recordedRequest.getHeaders().get("Authorization"));
+                        }
+                        if (recordedRequest.getHeaders().get("Authorization") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .username("user")
+                  .password("pass")
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "fred", "1.0.0"), null, null, repositories));
+                assertDoesNotThrow(() -> downloader.download(new GroupArtifactVersion("fred", "other", "1.0.0"), null, null, repositories));
+
+                // Only the first body GET probes anonymously; once the host is known to require credentials, later
+                // GETs authenticate preemptively instead of paying another anonymous 401 round-trip.
+                assertThat(getRequestAuthHeaders.stream().filter(Objects::isNull).count()).isEqualTo(1);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
         void usesAuthenticationIfRepositoryHasCredentials() {
             var downloader = new MavenPomDownloader(emptyMap(), ctx);
             var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
@@ -1469,6 +1717,70 @@ class MavenPomDownloaderTest implements RewriteTest {
                   .build());
 
                 assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        @Test
+        void usesHttpHeaderAuthenticationWhenServerHasNoUsernameOrPassword() {
+            MavenSettings settings = MavenSettings.parse(new Parser.Input(
+              Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+              //language=xml
+              """
+                <settings>
+                    <servers>
+                        <server>
+                            <id>id</id>
+                            <configuration>
+                                <httpHeaders>
+                                    <property>
+                                        <name>X-Auth-Token</name>
+                                        <value>token</value>
+                                    </property>
+                                </httpHeaders>
+                            </configuration>
+                        </server>
+                    </servers>
+                </settings>
+                """.getBytes())), ctx);
+            MavenExecutionContextView.view(ctx).setMavenSettings(settings);
+
+            var downloader = new MavenPomDownloader(emptyMap(), ctx);
+            var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+            try (MockWebServer mockRepo = getMockServer()) {
+                List<@Nullable String> getRequestTokens = synchronizedList(new ArrayList<>());
+                mockRepo.setDispatcher(new Dispatcher() {
+                    @Override
+                    public MockResponse dispatch(RecordedRequest recordedRequest) {
+                        if ("GET".equalsIgnoreCase(recordedRequest.getMethod())) {
+                            getRequestTokens.add(recordedRequest.getHeaders().get("X-Auth-Token"));
+                        }
+                        if (recordedRequest.getHeaders().get("X-Auth-Token") == null) {
+                            return new MockResponse().setResponseCode(401).setBody("");
+                        }
+                        return new MockResponse().setResponseCode(200).setBody(
+                          //language=xml
+                          """
+                            <project>
+                                <groupId>fred</groupId>
+                                <artifactId>fred</artifactId>
+                                <version>1.0.0</version>
+                            </project>
+                            """);
+                    }
+                });
+                mockRepo.start();
+                // No <username>/<password>: the token header is the only credential this server has.
+                var repositories = List.of(MavenRepository.builder()
+                  .id("id")
+                  .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+                  .build());
+
+                assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+
+                // Anonymous first, then a retry carrying the header — as with username/password credentials.
+                assertThat(getRequestTokens).containsExactly(null, "token");
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

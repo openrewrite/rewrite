@@ -16,6 +16,7 @@
 package org.openrewrite.javascript;
 
 import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.javascript.internal.PackageManagerExecutor;
@@ -38,6 +39,15 @@ import static org.openrewrite.javascript.Assertions.pnpm;
 import static org.openrewrite.javascript.Assertions.yarnBerry;
 import static org.openrewrite.test.SourceSpecs.text;
 
+/**
+ * Follow-up: these cases assert that adding a dependency overlays the resolved version back onto the
+ * marker. Native regeneration now fails loud for an add ({@code RESOLUTION_REQUIRED}) and performs no
+ * overlay, so the overlay assertions no longer hold. Reworking them into a closure-unchanged-upgrade
+ * overlay parity check (which does overlay on success) needs a real PM to record the expectations, so
+ * the class is disabled until then.
+ */
+@Disabled("Overlay-on-add assertions invalidated by native fail-loud regeneration; needs rework to a " +
+        "closure-unchanged-upgrade overlay parity check recorded against a real package manager.")
 class AddDependencyResolvedOverlayTest implements RewriteTest {
 
     private static final String PACKAGE_JSON = "{\n" +

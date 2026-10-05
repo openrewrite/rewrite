@@ -42,11 +42,22 @@ class MSBuildProjectTest {
         MSBuildProject.PackageReference ref = new MSBuildProject.PackageReference(
           "Newtonsoft.Json", "$(NJVersion)", "13.0.3");
 
+        Map<String, String> dependencyRanges = new LinkedHashMap<>();
+        dependencyRanges.put("Newtonsoft.Json", "[13.0.1, )");
+        MSBuildProject.ResolvedPackage app = MSBuildProject.ResolvedPackage.builder()
+          .name("My.App.Core")
+          .resolvedVersion("1.0.0")
+          .depth(0)
+          .dependencyRanges(dependencyRanges)
+          .build();
+
         MSBuildProject.ResolvedPackage resolved = MSBuildProject.ResolvedPackage.builder()
           .name("Newtonsoft.Json")
           .resolvedVersion("13.0.3")
           .depth(0)
           .build();
+        assertThat(resolved.getDependencyRanges()).isEmpty();
+        assertThat(app.getDependencyRanges()).containsEntry("Newtonsoft.Json", "[13.0.1, )");
 
         MSBuildProject.ProjectReference projRef = new MSBuildProject.ProjectReference("../Lib/Lib.csproj");
 

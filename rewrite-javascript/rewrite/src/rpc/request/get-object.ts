@@ -18,6 +18,11 @@ import {RpcObjectData, RpcObjectState, RpcSendQueue} from "../queue";
 import {ReferenceMap} from "../../reference";
 import {extractSourcePath, withMetrics} from "./metrics";
 
+export class AbortGetObject {
+    constructor(readonly id: string) {
+    }
+}
+
 export class GetObject {
     constructor(private readonly id: string,
                 private readonly sourceFileType?: string) {
@@ -32,7 +37,25 @@ export class GetObject {
         trace: () => boolean,
         metricsCsv?: string,
     ): void {
-        const pendingData = new Map<string, RpcObjectData[]>();
+        const pendingData = new Map<string, { data: (RpcObjectData | undefined)[], offset: number }>();
+        let latestTransfer: { id: string, refCount: number } | undefined;
+
+        // The receiver could not read a transfer to its end and has dropped what it took from it.
+        connection.onRequest(
+            new rpc.RequestType<AbortGetObject, boolean, Error>("AbortGetObject"),
+            request => {
+                pendingData.delete(request.id);
+                remoteObjects.delete(request.id);
+                if (latestTransfer?.id === request.id) {
+                    localRefs.rollbackTo(latestTransfer.refCount);
+                } else {
+                    // which refs that transfer assigned is no longer known; everything goes out whole again
+                    localRefs.clear();
+                }
+                latestTransfer = undefined;
+                return true;
+            }
+        );
 
         connection.onRequest(
             new rpc.RequestType<GetObject, any, Error>("GetObject"),
@@ -58,8 +81,8 @@ export class GetObject {
                     const obj = localObjects.get(objId);
                     context.target = extractSourcePath(obj);
 
-                    let allData = pendingData.get(objId);
-                    if (!allData) {
+                    let pending = pendingData.get(objId);
+                    if (!pending) {
                         const after = obj;
                         const before = remoteObjects.get(objId);
 
@@ -68,10 +91,14 @@ export class GetObject {
                         // was added during this exchange.
                         const savedRefCount = localRefs.snapshot();
                         try {
-                            allData = await new RpcSendQueue(localRefs, request.sourceFileType, trace())
-                                .generate(after, before);
-                            pendingData.set(objId, allData);
+                            pending = {
+                                data: await new RpcSendQueue(localRefs, request.sourceFileType, trace())
+                                    .generate(after, before),
+                                offset: 0
+                            };
+                            pendingData.set(objId, pending);
                             remoteObjects.set(objId, after);
+                            latestTransfer = {id: objId, refCount: savedRefCount};
                         } catch (e) {
                             remoteObjects.delete(objId);
                             localRefs.rollbackTo(savedRefCount);
@@ -79,10 +106,17 @@ export class GetObject {
                         }
                     }
 
-                    const batch = allData.splice(0, batchSize);
+                    // Advancing an offset keeps paging linear; removing the head copies the
+                    // remaining elements on every page. The whole object is materialized as
+                    // messages up front, so a sent page stays reachable through its slots
+                    // until they are cleared.
+                    const end = Math.min(pending.offset + batchSize, pending.data.length);
+                    const batch = pending.data.slice(pending.offset, end);
+                    pending.data.fill(undefined, pending.offset, end);
+                    pending.offset = end;
 
                     // If we've sent all data, remove from pending
-                    if (allData.length === 0) {
+                    if (pending.offset >= pending.data.length) {
                         pendingData.delete(objId);
                     }
 

@@ -13,8 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {createTwoFilesPatch} from "diff";
 import {ExecutionContext} from "./execution";
 import {SourceFile} from "./tree";
+import {TreePrinters} from "./print";
 import fs, {readFileSync} from "node:fs";
 import {isAbsolute, relative} from "path";
 import {ParseError, ParseErrorKind} from "./parse-error";
@@ -79,6 +81,27 @@ export abstract class Parser {
         return isAbsolute(path) && this.relativeTo ? relative(this.relativeTo, path) : path;
     }
 
+    /**
+     * A parse result that does not print back to its input has silently lost source, so it is reported as
+     * a `ParseError` carrying the tree that lost it. Mirrors `org.openrewrite.Parser`, down to the message.
+     * A parser whose LST cannot hold some byte of its input passes the form it can hold as `source`.
+     */
+    protected async requirePrintEqualsInput(sourceFile: SourceFile, input: ParserInput,
+                                            source: string = parserInputRead(input)): Promise<SourceFile> {
+        if (!this.ctx.getBoolean(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true)) {
+            return sourceFile;
+        }
+        const printed = await TreePrinters.print(sourceFile);
+        if (printed === source) {
+            return sourceFile;
+        }
+        const path = this.relativePath(input);
+        const diff = createTwoFilesPatch(path, path, source, printed, "", "", {context: 3});
+        const error = this.error(input, new Error(`${sourceFile.sourcePath} is not print idempotent. \n${diff}`));
+        const withErroneous: ParseError = {...error, erroneous: sourceFile};
+        return withErroneous;
+    }
+
     protected error(input: ParserInput, e: Error): ParseError {
         return {
             kind: ParseErrorKind,
@@ -88,7 +111,7 @@ export abstract class Parser {
                 id: randomId(),
                 parserType: this.constructor.name,
                 exceptionType: e.name,
-                message: e.message + ':\n' + e.stack,
+                message: e.stack ?? e.message,
             } satisfies ParseExceptionResult as ParseExceptionResult),
             text: parserInputRead(input),
             sourcePath: this.relativePath(input),

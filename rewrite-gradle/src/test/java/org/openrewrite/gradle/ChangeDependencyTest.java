@@ -28,6 +28,7 @@ import org.openrewrite.text.PlainTextParser;
 
 import java.nio.file.Path;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
@@ -903,10 +904,247 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void noDuplicateJacksonDatabindDependenciesInGradle() {
+    void dedupeDoesNotDowngradeSurvivorAtHigherVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.11.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupeUpgradesSurvivorViaSharedVariable() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.14.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.11"
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:${commonsVersion}"
+                  implementation "commons-lang:commons-lang:2.6"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              repositories {
+                  mavenCentral()
+              }
+              def commonsVersion = "3.14.0"
+              dependencies {
+                  implementation "org.apache.commons:commons-lang3:${commonsVersion}"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupesAndUpgradesSurvivorWhenExistingNewGAAtLowerVersion() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                "3.14.x",
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.14.0")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dedupesAndDoesNotAddVersionToBomManagedSurvivor() {
+        // Survivor is BOM-managed (no declared version); upgrade path should leave it alone.
         rewriteRun(
           spec -> spec.beforeRecipe(withToolingApi())
             .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson",
+                "jackson-bom",
+                "tools.jackson",
+                "jackson-bom",
+                "3.0.x",
+                null,
+                null,
+                null
+              ),
+              new ChangeDependency(
+                "com.fasterxml.jackson.datatype",
+                "jackson-datatype-jsr310",
+                "tools.jackson.core",
+                "jackson-databind",
+                "3.0.x",
+                null,
+                null,
+                null
+              )
+            ),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation platform("com.fasterxml.jackson:jackson-bom:2.19.0")
+                  implementation("tools.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+              }
+              """,
+            spec -> spec.after(buildGradle ->
+              assertThat(buildGradle)
+                .containsOnlyOnce("tools.jackson.core:jackson-databind")
+                .doesNotContain(":jackson-databind:")  // no version was added to survivor
+                .doesNotContain("jackson-datatype-jsr310")
+                .actual())
+          )
+        );
+    }
+
+    @Test
+    void dedupeWithoutNewVersionDoesNotAlterSurvivor() {
+        // newVersion is null; dedupe should still fire but survivor's version stays untouched.
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new ChangeDependency(
+                "commons-lang",
+                "commons-lang",
+                "org.apache.commons",
+                "commons-lang3",
+                null,
+                null,
+                null,
+                null
+            )),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+                  implementation("commons-lang:commons-lang:2.6")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicateJacksonDatabindDependenciesInGradleWithBomManagedVersions() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson",
+                "jackson-bom",
+                "tools.jackson",
+                "jackson-bom",
+                "3.0.4",
+                null,
+                null,
+                null
+              ),
               new ChangeDependency(
                 "com.fasterxml.jackson.core",
                 "jackson-databind",
@@ -938,15 +1176,78 @@ class ChangeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
               dependencies {
+                  implementation platform("com.fasterxml.jackson:jackson-bom:2.19.0")
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+              }
+              """,
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation platform("tools.jackson:jackson-bom:3.0.4")
+                  implementation("tools.jackson.core:jackson-databind")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noDuplicateJacksonDatabindDependenciesInGradle() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipes(
+              new ChangeDependency(
+                "com.fasterxml.jackson.core",
+                "jackson-databind",
+                "tools.jackson.core",
+                null,
+                "3.0.4",
+                null,
+                null,
+                null
+              ),
+              new ChangeDependency(
+                "com.fasterxml.jackson.datatype",
+                "jackson-datatype-jsr310",
+                "tools.jackson.core",
+                "jackson-databind",
+                "3.0.4",
+                null,
+                null,
+                null
+              )
+            ),
+          buildGradle(
+            //language=gradle
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
                   implementation("com.fasterxml.jackson.core:jackson-databind:2.19.0")
                   implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.0")
               }
               """,
-            spec -> spec.after(buildGradle ->
-              assertThat(buildGradle)
-                .containsOnlyOnce("tools.jackson.core:jackson-databind:3")
-                .doesNotContain("datatype")
-                .actual())
+            """
+              plugins {
+                  id("java-library")
+              }
+              repositories {
+                  mavenCentral()
+              }
+              dependencies {
+                  implementation("tools.jackson.core:jackson-databind:3.0.4")
+              }
+              """
           )
         );
     }
@@ -1073,6 +1374,94 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void sharedMapNotationVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  testImplementation([group: 'commons-lang', name: 'commons-lang', version: sharedVersion])
+                  compileOnly transitive: false, group: 'commons-lang', name: 'commons-lang', version: sharedVersion
+                  runtimeOnly group: 'commons-lang', version: sharedVersion, name: 'commons-lang'
+                  testRuntimeOnly group: "commons-lang", name: "commons-lang", version: sharedVersion
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              def sharedVersion = '2.6'
+              dependencies {
+                  implementation group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  testImplementation([group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'])
+                  compileOnly transitive: false, group: 'org.apache.commons', name: 'commons-lang3', version: '3.11'
+                  runtimeOnly group: 'org.apache.commons', version: '3.11', name: 'commons-lang3'
+                  testRuntimeOnly group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+                  implementation group: 'com.google.guava', name: 'guava', version: sharedVersion
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void sharedKotlinDslNamedArgumentsVersionVariableCollapsesToLiteral() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null, true)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "commons-lang", name = "commons-lang", version = sharedVersion)
+                  testImplementation(group = "commons-lang", version = sharedVersion, name = "commons-lang")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  val sharedVersion = "2.6"
+                  implementation(group = "org.apache.commons", name = "commons-lang3", version = "3.11")
+                  testImplementation(group = "org.apache.commons", version = "3.11", name = "commons-lang3")
+                  implementation(group = "com.google.guava", name = "guava", version = sharedVersion)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void isAcceptable() {
         var recipe = new ChangeDependency(
                 "org.old", "artifact", "org.new", "artifact", null, null, null
@@ -1098,7 +1487,7 @@ class ChangeDependencyTest implements RewriteTest {
                 .findFirst().orElseThrow()
                 .withSourcePath(Path.of("build.gradle"))
                 .withMarkers(new org.openrewrite.marker.Markers(org.openrewrite.Tree.randomId(),
-                        java.util.Collections.singletonList(GradleProject.builder()
+                        singletonList(GradleProject.builder()
                                 .group("com.example")
                                 .name("test")
                                 .version("1.0")

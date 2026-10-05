@@ -22,8 +22,8 @@ import {
     pattern,
     rewrite,
     template,
-    typescript
-} from "../../../src/javascript";
+    typescript,
+    sourceFileCache} from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
 import { castDraft, create as produce } from "mutative";
 
@@ -165,7 +165,7 @@ describe('match extraction', () => {
 
         // Create dummy code to trigger pattern parsing (which requires workspace creation)
         const testCode = 'const result = 1 + 2;';
-        const parser = new JavaScriptParser();
+        const parser = new JavaScriptParser({sourceFileCache});
         const parseGen = parser.parse({ text: testCode, sourcePath: 'test.ts' });
         const cu = (await parseGen.next()).value;
 

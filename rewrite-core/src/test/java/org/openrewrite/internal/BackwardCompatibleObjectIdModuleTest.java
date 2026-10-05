@@ -34,12 +34,12 @@ import org.openrewrite.marker.Marker;
 
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class BackwardCompatibleObjectIdModuleTest {
@@ -93,7 +93,7 @@ class BackwardCompatibleObjectIdModuleTest {
 
     @Test
     void readsNewFormatObjectWithIdPropertyAndResolvesBackReference() throws IOException {
-        Node shared = new Node("shared", Collections.emptyList());
+        Node shared = new Node("shared", emptyList());
         String json = mapper.writeValueAsString(new Wrapper(shared, shared));
 
         Wrapper parsed = mapper.readValue(json, Wrapper.class);
@@ -128,7 +128,7 @@ class BackwardCompatibleObjectIdModuleTest {
         // instead of throwing "No Object Id found for an instance of ...".
         Node parsed = mapper.readValue("{\"payload\":\"x\",\"children\":[]}", Node.class);
 
-        assertThat(parsed).isEqualTo(new Node("x", Collections.emptyList()));
+        assertThat(parsed).isEqualTo(new Node("x", emptyList()));
     }
 
     @Test
@@ -160,7 +160,7 @@ class BackwardCompatibleObjectIdModuleTest {
     }
 
     private static void assertIdPropertyFirst(ObjectMapper m) throws IOException {
-        byte[] bytes = m.writeValueAsBytes(new Node("payload", Collections.emptyList()));
+        byte[] bytes = m.writeValueAsBytes(new Node("payload", emptyList()));
         try (JsonParser p = m.getFactory().createParser(bytes)) {
             assertThat(p.nextToken()).isEqualTo(JsonToken.START_OBJECT);
             assertThat(p.nextToken()).isEqualTo(JsonToken.FIELD_NAME);
@@ -185,7 +185,7 @@ class BackwardCompatibleObjectIdModuleTest {
     private static Node largeRefFirstGraph(int childCount) {
         List<Node> children = new ArrayList<>(childCount);
         for (int i = 0; i < childCount; i++) {
-            children.add(new Node("child-" + i, Collections.emptyList()));
+            children.add(new Node("child-" + i, emptyList()));
         }
         return new Node("root", children);
     }
@@ -199,7 +199,7 @@ class BackwardCompatibleObjectIdModuleTest {
         Node(@JsonProperty("payload") String payload,
              @JsonProperty("children") @Nullable List<Node> children) {
             this.payload = payload;
-            this.children = children == null ? Collections.emptyList() : children;
+            this.children = children == null ? emptyList() : children;
             Probe.recordBuild();
         }
 

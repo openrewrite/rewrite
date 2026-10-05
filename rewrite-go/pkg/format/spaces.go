@@ -19,13 +19,13 @@ package format
 import (
 	"strings"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/printer"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/visitor"
 )
 
 // SpacesVisitor enforces gofmt's intra-line spacing rules:
 //
-//   - One space around binary operators (`a + b`, not `a+b`).
 //   - No space around unary operators (`!x`, `-y`).
 //   - One space after commas in argument/parameter lists
 //     (RightPadded.After fields don't get touched here — they precede
@@ -56,44 +56,66 @@ func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 	return out
 }
 
-func (v *SpacesVisitor) VisitBinary(bin *java.Binary, p any) java.J {
-	bin = v.GoVisitor.VisitBinary(bin, p).(*java.Binary)
-	bin.Operator.Before = ensureSingleSpace(bin.Operator.Before)
-	bin = bin.WithRight(ensureLeadingSingleSpace(bin.Right))
-	return bin
-}
-
 func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {
 	a = v.GoVisitor.VisitAssignment(a, p).(*java.Assignment)
-	a.Value.Before = ensureSingleSpace(a.Value.Before)
-	a.Value.Element = ensureLeadingSingleSpace(a.Value.Element)
-	return a
+	before := ensureSingleSpace(a.Value.Before)
+	value := ensureLeadingSingleSpace(a.Value.Element)
+	if java.SpaceEqual(before, a.Value.Before) && value == a.Value.Element {
+		return a
+	}
+	c := *a
+	c.Value.Before = before
+	c.Value.Element = value
+	return &c
 }
 
 func (v *SpacesVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
 	ao = v.GoVisitor.VisitAssignmentOperation(ao, p).(*java.AssignmentOperation)
-	ao.Operator.Before = ensureSingleSpace(ao.Operator.Before)
-	ao.Assignment = ensureLeadingSingleSpace(ao.Assignment)
-	return ao
+	before := ensureSingleSpace(ao.Operator.Before)
+	assignment := ensureLeadingSingleSpace(ao.Assignment)
+	if java.SpaceEqual(before, ao.Operator.Before) && assignment == ao.Assignment {
+		return ao
+	}
+	c := *ao
+	c.Operator.Before = before
+	c.Assignment = assignment
+	return &c
 }
 
+// VisitUnary writes the operand straight after the operator, except where the
+// two would then lex as one token.
 func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
 	u = v.GoVisitor.VisitUnary(u, p).(*java.Unary)
-	u.Operand = clearExpressionLeadingSpace(u.Operand)
+	tightened := clearExpressionLeadingSpace(u.Operand)
+	op, ahead := prefixOperator(u.Operator.Element)
+	if !ahead || !fusesWith(op, printer.Print(tightened)) {
+		u = u.WithOperand(tightened)
+	}
 	return u
+}
+
+// prefixOperator returns the operator text for the forms that write it ahead of
+// the operand. The postfix forms report false: their operator lands on the far
+// side of the operand and never meets its leading space.
+func prefixOperator(op java.UnaryOperator) (string, bool) {
+	switch op {
+	case java.PostIncrement, java.PostDecrement:
+		return "", false
+	}
+	return printer.UnaryOperatorString(op), true
 }
 
 // ensureSingleSpace returns the space unchanged if it contains a
 // newline (deliberate multi-line layout), otherwise normalizes any
 // 0-or-many-spaces to exactly one space.
 func ensureSingleSpace(s java.Space) java.Space {
-	if strings.Contains(s.Whitespace, "\n") {
+	if strings.Contains(s.Whitespace(), "\n") {
 		return s
 	}
-	if s.Whitespace == " " {
+	if s.Whitespace() == " " {
 		return s
 	}
-	s.Whitespace = " "
+	s = java.MakeSpace(s.Comments(), " ")
 	return s
 }
 
@@ -116,12 +138,12 @@ func clearExpressionLeadingSpace(e java.Expression) java.Expression {
 		return e
 	}
 	prefix := getPrefix(e)
-	if strings.Contains(prefix.Whitespace, "\n") {
+	if strings.Contains(prefix.Whitespace(), "\n") {
 		return e
 	}
-	if prefix.Whitespace == "" {
+	if prefix.Whitespace() == "" {
 		return e
 	}
-	prefix.Whitespace = ""
+	prefix = java.MakeSpace(prefix.Comments(), "")
 	return withPrefix(e, prefix)
 }

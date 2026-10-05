@@ -43,6 +43,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+import static java.util.Collections.*;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
@@ -107,7 +108,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
      */
     public CsvDataTableStore(Path outputDir) {
         this(outputDir, CsvDataTableStore::defaultOutputStream, CsvDataTableStore::defaultInputStream,
-                ".csv", Collections.emptyMap(), Collections.emptyMap());
+                ".csv", emptyMap(), emptyMap());
     }
 
     /**
@@ -369,7 +370,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
 
     @Override
     public Collection<DataTable<?>> getDataTables() {
-        return Collections.unmodifiableCollection(knownTables.values());
+        return unmodifiableCollection(knownTables.values());
     }
 
     @Override
@@ -642,7 +643,7 @@ public class CsvDataTableStore implements DataTableStore, AutoCloseable {
         }
         // displayName is set to name (FQN) since the CSV comments don't include it.
         // The full descriptor with proper displayName comes from recipes.csv in downstream resolvers.
-        return new DataTableDescriptor(name, name, instanceName, "", group, Collections.emptyList());
+        return new DataTableDescriptor(name, name, instanceName, "", group, emptyList());
     }
 
     private static String sha256Prefix(String input) {

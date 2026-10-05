@@ -20,7 +20,7 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     api("com.fasterxml.jackson.core:jackson-annotations")
 
-    implementation("io.moderne:jsonrpc:latest.integration")
+    implementation("io.moderne:jsonrpc:latest.release")
 
     compileOnly(project(":rewrite-test"))
 
@@ -247,10 +247,12 @@ val goTest = tasks.register<Exec>("goTest") {
     description = "Run Go tests"
 
     workingDir = projectDir
+    // -PverboseTests restores the per-test `standard-verbose` output
+    val gotestFormat = if (project.hasProperty("verboseTests")) "standard-verbose" else "pkgname"
     commandLine("go", "run", "gotest.tools/gotestsum@latest",
         "--junitfile", junitXmlFile.relativeTo(projectDir).path,
-        "--format", "standard-verbose",
-        "--", "-count=1", "./test/...")
+        "--format", gotestFormat,
+        "--", "-count=1", "./...")
 
     dependsOn(generateTestClasspath)
 

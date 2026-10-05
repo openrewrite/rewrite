@@ -29,6 +29,209 @@ import java.util.List;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class ChangePropertyKeyTest implements RewriteTest {
+
+    @Test
+    void preserveParentAndTrailingCommentsBeforeSeveralRootSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old: # enable the profile
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+
+              z: x # unrelated
+              last: y
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  # enable the profile
+                  export.endpoint: url
+
+              z: x # unrelated
+              last: y
+              """
+          )
+        );
+    }
+
+    @Test
+    void preserveCommentOnRemovedIntermediateParentWhenScopeRemains() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.metrics.export.prometheus", "a.prometheus.metrics.export", null, null, null)),
+          yaml(
+            """
+              a:
+                metrics:
+                  export:
+                    # default backend
+                    prometheus:
+                      enabled: true
+                  tags:
+                    application: test
+              z: x
+              """,
+            """
+              a:
+                metrics:
+                  tags:
+                    application: test
+                # default backend
+                prometheus.metrics.export:
+                  enabled: true
+              z: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void separateMovedAncestorCommentsFromPreviousScalar() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "b.endpoint", null, null, null)),
+          yaml(
+            """
+              a: # parent comment
+                old: # child comment
+                  endpoint: url
+              z: x
+              """,
+            """
+              z: x
+              # parent comment
+              # child comment
+              b.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepParentCommentWhenExclusionsRetainTheParent() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.settings", "a.new.settings", null, List.of("keep"), null)),
+          yaml(
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                    move: 2
+                other: true
+              """,
+            """
+              a:
+                old: # original group
+                  settings:
+                    keep: 1
+                other: true
+                new.settings:
+                  move: 2
+              """
+          )
+        );
+    }
+
+    @Test
+    void retainCommentOnRemovedParentAsStandaloneComment() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.new.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old: # requires the tracing profile
+                  endpoint: url
+                other: true
+              """,
+            """
+              a:
+                other: true
+                # requires the tracing profile
+                new.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingCommentAtDocumentEnd() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old:
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export.endpoint: url
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepTrailingSiblingCommentWhenMovingIntoItsMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.endpoint", "a.tracing.export.endpoint", null, null, null)),
+          yaml(
+            """
+              a:
+                old:
+                  endpoint: url
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+              z: x
+              """,
+            """
+              a:
+                tracing:
+                  sampling:
+                    probability: 1 # sample all
+                  export.endpoint: url
+              z: x
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotCopyPreviousSiblingCommentWhenSourceMappingRemains() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.old.enabled", "a.new.enabled", null, null, null)),
+          yaml(
+            """
+              a:
+                previous: false # keep
+                old:
+                  enabled: true
+                  retained: x
+              """,
+            """
+              a:
+                previous: false # keep
+                old:
+                  retained: x
+                new.enabled: true
+              """
+          )
+        );
+    }
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangePropertyKey(
@@ -523,7 +726,30 @@ class ChangePropertyKeyTest implements RewriteTest {
             """
               spring:
                 elasticsearch:
-                    restclient.sniffer.interval: 1
+                  restclient.sniffer.interval: 1
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/353")
+    @Test
+    void relocatedPropertyKeepsIndentationOfSiblings() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c2.d", true, null, null)),
+          yaml(
+            """
+              a:
+                b:
+                  c:
+                    d: 1
+                  e: 2
+              """,
+            """
+              a:
+                b:
+                  e: 2
+                  c2.d: 1
               """
           )
         );
@@ -847,6 +1073,172 @@ class ChangePropertyKeyTest implements RewriteTest {
                       config[0]:
                         prop1: 3
                         prop2: 4
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesPropertyIntoExistingMappingAtDifferentRoot() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesPropertyToNewRootWhenNoExistingPrefix() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management.prometheus.metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    @Test
+    void relocatesSoleSequencePropertyIntoExistingMapping() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: [0.99, 0.9]
+              management:
+                prometheus:
+                  test: true
+              """,
+            """
+              management:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: [0.99, 0.9]
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    void prefersLongestExistingPrefixWhenRelocatingProperty() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "management.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              management:
+                other: true
+              management.prometheus:
+                test: true
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+              """,
+            """
+              management:
+                other: true
+              management.prometheus:
+                test: true
+                metrics.export.enabled: true
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-spring/issues/1047")
+    void relocatesUnderExistingPrefixWithRelaxedBinding() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey(
+            "project.metrics.prometheus.enabled",
+            "managementServer.prometheus.metrics.export.enabled",
+            true,
+            null,
+            null
+          )),
+          yaml(
+            """
+              project:
+                metrics:
+                  prometheus:
+                    enabled: true
+                    percentiles: [0.99, 0.9]
+              management-server:
+                prometheus:
+                  test: true
+              """,
+            """
+              project:
+                metrics:
+                  prometheus:
+                    percentiles: [0.99, 0.9]
+              management-server:
+                prometheus:
+                  test: true
+                  metrics.export.enabled: true
               """
           )
         );

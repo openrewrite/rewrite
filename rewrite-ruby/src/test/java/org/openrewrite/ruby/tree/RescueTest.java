@@ -1,0 +1,376 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.ruby.tree;
+
+import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.ruby.RubyIsoVisitor;
+import org.openrewrite.ruby.RubyParser;
+import org.openrewrite.test.RewriteTest;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.ruby.Assertions.ruby;
+
+public class RescueTest implements RewriteTest {
+
+    @Test
+    void rescueExceptionUnnamed() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception
+                puts "Try again with a value >= 1"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void iterationRescue() {
+        rewriteRun(
+          ruby(
+            """
+              5.times do |i|
+                puts i
+              rescue Exception
+                puts "Try again with a value >= 1"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void rescueExceptionUnnamedMultipleStatements() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception
+                puts "Try again with a value >= 1"
+                puts "Or try something else"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void rescueExceptionNamed() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception => ex
+                puts "Try again with a value >= 1"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void retry() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception
+                retry
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleRescuesWithTypesAndNames() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue ArgumentError => ex
+                puts "Try again with a value >= 1"
+              rescue TypeError => ex
+                puts "Try again with an integer"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleTypesInOneRescue() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue ArgumentError, TypeError => ex
+                puts "Try again"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void ensure() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception
+                puts "Try again with a value >= 1"
+              ensure
+                puts "Ensured"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void elseClause() {
+        rewriteRun(
+          ruby(
+            """
+              begin
+                x = factorial(1)
+              rescue Exception
+                puts "Try again with a value >= 1"
+              else
+                puts "Else"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    /**
+     * The `begin` is written out even though the enclosing `def` would also supply an `end`.
+     */
+    @Test
+    void explicitBeginInsideMethod() {
+        rewriteRun(
+          ruby(
+            """
+              def deliver_mail(mail)
+                begin
+                  mail.deliver
+                rescue Exception => e
+                  puts e
+                end
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void rescueOnMethodDef() {
+        rewriteRun(
+          ruby(
+            """
+              def sum(a, b)
+                  a + b
+              rescue Exception
+                  puts "Not reachable"
+              end
+              
+              content
+              """
+          )
+        );
+    }
+
+    @Test
+    void rescueOnClassMethod() {
+        rewriteRun(
+          ruby(
+            """
+              def self.get_proxied_source(raw_source)
+                return raw_source
+              rescue Excon::Error::Socket, Excon::Error::Timeout => e
+                raw_source
+                1
+              end
+
+              content
+              """
+          )
+        );
+    }
+
+    /**
+     * The `begin` opening the body belongs to the inner rescue; the method's own rescue has no
+     * `begin` of its own even though one is the first thing in its body.
+     */
+    @Test
+    void explicitBeginFirstInMethodWithRescue() {
+        rewriteRun(
+          ruby(
+            """
+              def signature
+                begin
+                  require "gpgme"
+                rescue LoadError
+                  raise LoadError, "add gpgme"
+                end
+
+                sign
+              rescue Errno::ENOTEMPTY
+                retry
+              ensure
+                cleanup
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitBeginFirstInBlockWithRescue() {
+        rewriteRun(
+          ruby(
+            """
+              ips.each do |ip|
+                begin
+                  connect(ip)
+                rescue
+                  nil
+                end
+
+                next
+              rescue StandardError
+                retry
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifier() {
+        rewriteRun(
+          ruby(
+            """
+              x = Integer(s) rescue nil
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierWithHashFallback() {
+        rewriteRun(
+          ruby(
+            """
+              config = YAML.load_file(path) rescue {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierInMethodBody() {
+        rewriteRun(
+          ruby(
+            """
+              def load(path)
+                YAML.load_file(path) rescue {}
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierOnStatement() {
+        rewriteRun(
+          ruby(
+            """
+              do_something rescue nil
+              """
+          )
+        );
+    }
+
+    @Test
+    void modifierChainedWithAssignmentOperator() {
+        rewriteRun(
+          ruby(
+            """
+              @count ||= Integer(input) rescue 0
+              """
+          )
+        );
+    }
+
+    /**
+     * Ruby binds at most one name per rescue clause, so a tree carrying two has to fail before
+     * anything is printed rather than emit a second `=>` clause.
+     */
+    @Test
+    void atMostOneVariableName() {
+        Rb.CompilationUnit twoNames = (Rb.CompilationUnit) new RubyIsoVisitor<Integer>() {
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Integer p) {
+                if (multiVariable.getVariables().size() != 1) {
+                    return multiVariable;
+                }
+                J.VariableDeclarations.NamedVariable second = multiVariable.getVariables().get(0);
+                second = second.withId(Tree.randomId()).withName(second.getName().withSimpleName("e2"));
+                return multiVariable.withVariables(ListUtils.concat(multiVariable.getVariables(), second));
+            }
+        }.visitNonNull(RubyParser.builder().build()
+                .parse("begin\n  x\nrescue Foo => e\n  y\nend\n")
+                .findFirst().orElseThrow(), 0);
+
+        assertThatThrownBy(twoNames::printAll)
+                .rootCause()
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("at most one variable name in rescue");
+    }
+}

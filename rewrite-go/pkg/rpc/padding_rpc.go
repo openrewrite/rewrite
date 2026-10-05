@@ -19,6 +19,7 @@ package rpc
 import (
 	"fmt"
 
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
 
@@ -148,6 +149,19 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 	return leftPaddedFromElement(beforeSpace, elem, markers)
 }
 
+// receiveLeftPaddedSpaceVal receives a Space-valued JLeftPadded, type-directed rather
+// than inferred: a Space is a *spaceData and an empty one erases to a nil interface, so
+// leftPaddedFromElement would mis-build it as LeftPadded[J]. Every LeftPadded[java.Space]
+// slot (array dimension, `:=`/`=` operator, type-assertion) must receive through here.
+func receiveLeftPaddedSpaceVal(r Receiver, q *ReceiveQueue, before any) any {
+	beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, before)
+	var sp java.Space
+	if elem != nil {
+		sp = elem.(java.Space)
+	}
+	return java.LeftPadded[java.Space]{Before: beforeSpace, Element: sp, Markers: markers}
+}
+
 // receiveLeftPaddedEnum receives an enum-valued JLeftPadded field, returning the typed
 // LeftPadded[T] directly — it wraps the q.Receive call, the deserialization closure, and
 // the result assertion so call sites are a single typed assignment.
@@ -165,13 +179,30 @@ func receiveLeftPadded(r Receiver, q *ReceiveQueue, before any) any {
 // receiveContainerTyped.
 func receiveLeftPaddedEnum[T any](r Receiver, q *ReceiveQueue, before java.LeftPadded[T], parse func(string) T) java.LeftPadded[T] {
 	result := q.Receive(before, func(v any) any {
-		beforeSpace, elem, markers := receiveLeftPaddedParts(r, q, v)
+		beforeSpace, elem, markers := receiveLeftPaddedEnumParts(q, v)
 		return coerceLeftPaddedEnum(beforeSpace, elem, markers, parse)
 	})
 	if result == nil {
 		return before
 	}
 	return result.(java.LeftPadded[T])
+}
+
+// receiveLeftPaddedEnumParts deserializes the three wire fields of an enum-valued
+// JLeftPadded. Unlike receiveLeftPaddedParts it receives the element with a nil
+// closure: enum elements are codec-less scalars, so a CHANGE inlines the new value
+// on the wire (e.g. "NotEqual"), which Receive returns directly for coerceLeftPaddedEnum
+// to parse. A recursion closure would instead make Receive hand back the pre-change
+// `before` element, silently dropping operator mutations.
+func receiveLeftPaddedEnumParts(q *ReceiveQueue, before any) (java.Space, any, java.Markers) {
+	beforeSpace := q.Receive(leftPaddedBefore(before), func(v any) any {
+		return receiveSpace(v.(java.Space), q)
+	})
+	elem := q.Receive(leftPaddedElement(before), nil)
+	markers := q.Receive(leftPaddedMarkers(before), func(v any) any {
+		return receiveMarkersCodec(q, v.(java.Markers))
+	})
+	return beforeSpace.(java.Space), elem, markers.(java.Markers)
 }
 
 // coerceLeftPaddedEnum builds a LeftPadded[T] for an enum slot. The element is either
@@ -242,7 +273,7 @@ func rightPaddedMarkers(rp any) any {
 	case java.RightPadded[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -327,6 +358,17 @@ func coerceToStatementRP(rp any) java.RightPadded[java.Statement] {
 	panic(fmt.Sprintf("coerceToStatementRP: element does not implement java.Statement (rp=%T elem=%T nil=%v)", rp, elem, elem == nil))
 }
 
+// coerceAnnotation narrows a received leadingAnnotations element to *java.Annotation,
+// mapping a nil element to nil so receiveTypedListNonNil can drop it.
+func coerceAnnotation(v any) *java.Annotation {
+	if v == nil {
+		return nil
+	}
+	return v.(*java.Annotation)
+}
+
+func annotationIsNil(a *java.Annotation) bool { return a == nil }
+
 // coerceLeftPaddedIdent converts a LeftPadded of any variant to LeftPadded[*Identifier].
 // Java may send the value generic-parameterized on Expression even though the element
 // is an *Identifier; this helper bridges that asymmetry.
@@ -357,6 +399,12 @@ func leftPaddedBefore(lp any) any {
 		return v.Before
 	case java.LeftPadded[java.UnaryOperator]:
 		return v.Before
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Before
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Before
+	case java.LeftPadded[golang.UnaryOperator]:
+		return v.Before
 	case java.LeftPadded[java.Space]:
 		return v.Before
 	case java.LeftPadded[string]:
@@ -381,6 +429,12 @@ func leftPaddedElement(lp any) any {
 	case java.LeftPadded[java.AssignmentOperator]:
 		return v.Element
 	case java.LeftPadded[java.UnaryOperator]:
+		return v.Element
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Element
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Element
+	case java.LeftPadded[golang.UnaryOperator]:
 		return v.Element
 	case java.LeftPadded[java.Space]:
 		return v.Element
@@ -407,6 +461,12 @@ func leftPaddedMarkers(lp any) any {
 		return v.Markers
 	case java.LeftPadded[java.UnaryOperator]:
 		return v.Markers
+	case java.LeftPadded[golang.BinaryOperator]:
+		return v.Markers
+	case java.LeftPadded[golang.AssignmentOperator]:
+		return v.Markers
+	case java.LeftPadded[golang.UnaryOperator]:
+		return v.Markers
 	case java.LeftPadded[java.Space]:
 		return v.Markers
 	case java.LeftPadded[string]:
@@ -414,7 +474,7 @@ func leftPaddedMarkers(lp any) any {
 	case java.LeftPadded[bool]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 
@@ -520,7 +580,7 @@ func containerMarkers(c any) any {
 	case java.Container[*java.Import]:
 		return v.Markers
 	default:
-		return java.Markers{}
+		return java.EmptyMarkers
 	}
 }
 

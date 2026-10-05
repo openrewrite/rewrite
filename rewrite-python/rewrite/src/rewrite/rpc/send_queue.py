@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar
 from uuid import UUID
 
+from rewrite.rpc.reference import ReferenceMap
+
 
 class RpcObjectState(str, Enum):
     NO_CHANGE = "NO_CHANGE"
@@ -24,16 +26,21 @@ class RpcObjectState(str, Enum):
 
 ADDED_LIST_ITEM = -1
 
+# Jackson reads a JSON number of at most 1000 characters
+# (StreamReadConstraints.getMaxNumberLength), which 3300 bits stays under.
+_MAX_WIRE_INT_BITS = 3300
+
 T = TypeVar('T')
 
 
 class RpcSendQueue:
     """Queue for generating RpcObjectData array from Python LST using visitor pattern."""
 
-    def __init__(self, source_file_type: Optional[str] = None):
+    def __init__(self, source_file_type: Optional[str] = None,
+                 refs: Optional[ReferenceMap] = None):
         self.q: List[Dict[str, Any]] = []
-        self.refs: Dict[int, tuple] = {}  # id(obj) -> (obj, ref_number) — verified with `is`
-        self.next_ref: int = 0
+        # A caller-supplied map spans the peer connection; the default spans this queue.
+        self.refs: ReferenceMap = refs if refs is not None else ReferenceMap()
         self.source_file_type = source_file_type
         self._before: Any = None
 
@@ -107,6 +114,10 @@ class RpcSendQueue:
         value_type = self._get_value_type(after)
         codec = self._get_rpc_codec(after)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
+        if self._has_no_wire_form(value_type, value, on_change, codec):
+            # a CHANGE that carries nothing leaves the peer holding the value it had
+            self.put({'state': RpcObjectState.DELETE})
+            return
         self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
         self._do_change(after, before, on_change, codec)
 
@@ -125,19 +136,11 @@ class RpcSendQueue:
             self.put({'state': RpcObjectState.DELETE})
             return
 
-        # Changed value — update ref tracking so `after` is recognized if seen again
-        before_id = id(before)
-        entry = self.refs.get(before_id)
-        if entry is not None and entry[0] is before:
-            ref_num = entry[1]
-            del self.refs[before_id]
-            self.refs[id(after)] = (after, ref_num)
-
-        value_type = self._get_value_type(after)
-        codec = self._get_rpc_codec(after)
-        value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
-        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
-        self._do_change(after, before, on_change, codec)
+        # A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
+        # instance may be aliased by any number of other slots and source files. A CHANGE would
+        # be applied to that shared instance in place, corrupting every alias, so the new value
+        # is re-added instead; the refs map collapses repeats of it into ref-only ADDs.
+        self._add_as_ref(after, on_change)
 
     def send_list(self, after: Optional[List], before: Optional[List],
                   id_getter: Callable[[Any], Any],
@@ -160,40 +163,47 @@ class RpcSendQueue:
 
         def list_change():
             assert after is not None
-            # Build before index map
-            before_idx = {}
-            if before is not None:
-                for i, item in enumerate(before):
-                    before_idx[id_getter(item)] = i
+            if not before:
+                # Every element is an addition, so the positions are a constant that needs
+                # neither an index map nor a key computed per element.
+                self.put({'state': RpcObjectState.CHANGE, 'value': [ADDED_LIST_ITEM] * len(after)})
+                for item in after:
+                    add_fn(item, (lambda i=item: on_change(i)) if on_change else None)
+                return
 
-            # Send positions array
-            positions = []
-            for item in after:
-                item_id = id_getter(item)
-                if item_id in before_idx:
-                    positions.append(before_idx[item_id])
-                else:
-                    positions.append(ADDED_LIST_ITEM)
+            before_idx = {}
+            for i, item in enumerate(before):
+                before_idx[id_getter(item)] = i
+
+            positions = [before_idx.get(id_getter(item), ADDED_LIST_ITEM) for item in after]
             self.put({'state': RpcObjectState.CHANGE, 'value': positions})
 
             # Send each item
-            for item in after:
-                item_id = id_getter(item)
-                before_pos = before_idx.get(item_id)
+            for item, before_pos in zip(after, positions):
                 # Wrap on_change to capture current item
                 wrapped = (lambda i=item: on_change(i)) if on_change else None
 
-                if before_pos is None:
+                if before_pos == ADDED_LIST_ITEM:
                     add_fn(item, wrapped)
                 else:
-                    a_before = before[before_pos] if before else None
+                    a_before = before[before_pos]
                     if a_before is item:
                         self.put({'state': RpcObjectState.NO_CHANGE})
-                    elif a_before is None or type(item) != type(a_before):
+                    elif as_ref or a_before is None or type(item) != type(a_before):
+                        # Type changed, or a ref-deduplicated item, which is always re-added
+                        # rather than CHANGEd (see _send_as_ref)
                         add_fn(item, wrapped)
                     else:
-                        self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item)})
-                        self._do_change(item, a_before, wrapped)
+                        codec = self._get_rpc_codec(item)
+                        # Without an on_change callback or codec, no property messages follow, so the
+                        # value must travel inline (as in send()) or the receiver keeps the stale element
+                        value = None if wrapped is not None or codec is not None else self._get_primitive_value(item)
+                        value_type = self._get_value_type(item)
+                        if self._has_no_wire_form(value_type, value, wrapped, codec):
+                            self.put({'state': RpcObjectState.DELETE})
+                            continue
+                        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
+                        self._do_change(item, a_before, wrapped, codec)
 
         if before is None:
             # ADD for new list
@@ -213,6 +223,12 @@ class RpcSendQueue:
         value_type = self._get_value_type(obj)
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
+        if value is None and on_change is None and codec is None:
+            self._require_wire_form(obj)
+        if self._has_no_wire_form(value_type, value, on_change, codec):
+            # an ADD that carries nothing is a broken message to the peer, where DELETE is null
+            self.put({'state': RpcObjectState.DELETE})
+            return
         self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
         self._do_change(obj, None, on_change, codec)
 
@@ -222,22 +238,34 @@ class RpcSendQueue:
             self.put({'state': RpcObjectState.DELETE})
             return
 
-        obj_id = id(obj)
-        entry = self.refs.get(obj_id)
-        if entry is not None and entry[0] is obj:
+        ref = self.refs.get(obj)
+        if ref is not None:
             # Already sent — emit ref number only, no onChange
-            self.put({'state': RpcObjectState.ADD, 'ref': entry[1]})
+            self.put({'state': RpcObjectState.ADD, 'ref': ref})
             return
 
         # First time — assign ref number and serialize fully
-        self.next_ref += 1
-        self.refs[obj_id] = (obj, self.next_ref)
+        ref = self.refs.create(obj)
 
         value_type = self._get_value_type(obj)
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
-        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': self.next_ref})
+        if value is None and on_change is None and codec is None:
+            self._require_wire_form(obj)
+        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': ref})
         self._do_change(obj, None, on_change, codec)
+
+    @staticmethod
+    def _has_no_wire_form(value_type: Optional[str], value: Any, on_change: Any, codec: Any) -> bool:
+        """True of a value nothing carries, a complex number for one: null is all the peer can be told."""
+        return value is None and value_type is None and on_change is None and codec is None
+
+    @staticmethod
+    def _require_wire_form(obj: Any) -> None:
+        from rewrite.markers import Marker
+        # with nothing to send for it, a marker reaches the peer as null and is lost for good
+        if isinstance(obj, Marker):
+            raise TypeError(f"No RPC codec is registered for the marker {type(obj).__qualname__}")
 
     def _do_change(self, after: Any, before: Any,
                    on_change: Optional[Callable[[], None]] = None,
@@ -277,7 +305,12 @@ class RpcSendQueue:
         # Primitives and built-ins don't need type info
         if obj_type in (str, int, float, bool, type(None)):
             return None
-        if isinstance(obj, (list, dict)):
+        if isinstance(obj, dict):
+            # An opaque value the remote side has a codec for but Python does not is received as
+            # {'kind': <valueType>, **fields} (see RpcReceiveQueue._do_change). Re-emit its original
+            # valueType so it round-trips unchanged; an ordinary dict (no 'kind') stays untyped.
+            return obj.get('kind')
+        if isinstance(obj, list):
             return None
         if isinstance(obj, UUID):
             return None
@@ -318,15 +351,23 @@ class RpcSendQueue:
         import math
         if obj is None:
             return None
+        if isinstance(obj, dict) and 'kind' in obj:
+            # Opaque value (see _get_value_type): its wire payload is every field except the
+            # synthetic 'kind' tag the receiver added. Emit that back as the value.
+            return {k: v for k, v in obj.items() if k != 'kind'}
+        if isinstance(obj, dict):
+            # A plain mapping is JSON-native and travels as itself, as it does on every other
+            # peer. Sequences take the send_list protocol instead.
+            return obj
+        if isinstance(obj, list):
+            # Sent as one value rather than through send_list, a list of scalars is JSON-native too.
+            return obj if all(type(item) in (str, int, float, bool) for item in obj) else None
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):
-            # Integers exceeding Java's long range cannot be serialized as
-            # JSON numbers (Jackson's StreamReadConstraints rejects them).
-            # Convert to string — the original source is preserved in valueSource.
-            if obj > 9223372036854775807 or obj < -9223372036854775808:
-                return str(obj)
-            return obj
+            # An integer travels as a number whatever its width, so that a receiver boxes it
+            # as one; a string here is indistinguishable from a string literal's value.
+            return obj if obj.bit_length() <= _MAX_WIRE_INT_BITS else None
         if isinstance(obj, str):
             return obj
         if isinstance(obj, float):
@@ -335,11 +376,17 @@ class RpcSendQueue:
             if math.isinf(obj) or math.isnan(obj):
                 return None
             return obj
+        if isinstance(obj, complex):
+            # No JSON number carries a complex, and a string is ruled out for the same
+            # reason as a wide int, so valueSource carries the literal alone.
+            return None
         if isinstance(obj, UUID):
             return str(obj)
         if isinstance(obj, Path):
             return str(obj)
         if isinstance(obj, Enum):
             return obj.name
-        # Complex objects are serialized via visitor, not as values
-        return None
+        # Complex objects are serialized via visitor, not as values, but for the few sent whole
+        from rewrite.rpc.receive_queue import get_value_writer
+        writer = get_value_writer(obj)
+        return writer(obj) if writer is not None else None

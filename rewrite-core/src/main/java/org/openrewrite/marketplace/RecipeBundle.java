@@ -15,42 +15,32 @@
  */
 package org.openrewrite.marketplace;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
-@Data
-@AllArgsConstructor
+@Value
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class RecipeBundle implements RpcRequest {
-    String packageEcosystem;
-    String packageName;
-    @Nullable String requestedVersion;
-    @Nullable String version;
+    @EqualsAndHashCode.Include @Nullable String packageEcosystem;
+    @EqualsAndHashCode.Include @Nullable String packageName;
+
+    /**
+     * May be a dynamic constraint like LATEST or 0.2.0-SNAPSHOT, resolved in a way that is
+     * {@link RecipeBundleResolver} specific. Null when no constraint was requested.
+     */
+    @With @Nullable String requestedVersion;
+
+    @With @Nullable String version;
     @Nullable String team;
 
     /**
-     * A requested version could be a dynamic constraint like LATEST or 0.2.0-SNAPSHOT. The way
-     * in which a dynamic constraint is resolved is {@link RecipeBundleResolver} specific, but
-     * the possibility of dynamic version constraints is a concept that several resolvers share.
-     * <br>
-     * To prevent subtle bugs where, for example, version is set but requested version is not and
-     * a resolver is attempting to read the version on this bundle, we fall back on the version
-     * if a bundle has been constructed with a version but no requested version.
-     *
-     * @return The requested version, or {@link #getVersion()} if no requested version has been set.
+     * The version to resolve with: an already-resolved version wins over the requested
+     * constraint, which is what makes a repeat install of the same bundle repeatable.
      */
-    public @Nullable String getRequestedVersion() {
-        return requestedVersion == null ? version : requestedVersion;
-    }
-
-    /**
-     * This may seem a bit backwards here, but the intent is for resolution to be repeatable.
-     * Only when version is null do we resolve the requested version. That resolved version
-     * will then be set on version so that subsequent installations of the same bundle result
-     * in a repeatable outcome.
-     */
-    public @Nullable String getVersion() {
+    public @Nullable String getEffectiveVersion() {
         return version == null ? requestedVersion : version;
     }
 

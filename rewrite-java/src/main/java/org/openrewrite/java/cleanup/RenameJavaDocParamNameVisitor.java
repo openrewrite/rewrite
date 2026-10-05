@@ -43,7 +43,7 @@ public class RenameJavaDocParamNameVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-        if (methodMatcher.matches(md.getMethodType()) && md.getComments().stream().anyMatch(it -> it instanceof Javadoc.DocComment)) {
+        if (methodMatcher.matches(md.getMethodType()) && md.getComments().stream().anyMatch(Javadoc.DocComment.class::isInstance)) {
             md = md.withComments(ListUtils.map(md.getComments(), it -> {
                 if (it instanceof Javadoc.DocComment) {
                     Javadoc.DocComment docComment = (Javadoc.DocComment) it;

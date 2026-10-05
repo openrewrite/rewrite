@@ -54,6 +54,30 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3648")
+    @Test
+    void continuationIndentIsRelativeToTagDepth() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
+            TabsAndIndentsStyle.DEFAULT.withIndentSize(2).withContinuationIndentSize(5)
+          ))),
+          xml(
+            """
+              <root>
+              <child first="1"
+               second="2"/>
+              </root>
+              """,
+            """
+              <root>
+                <child first="1"
+                     second="2"/>
+              </root>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/4234")
     @Test
     void continuationIndentsWithinDOCTYPE() {

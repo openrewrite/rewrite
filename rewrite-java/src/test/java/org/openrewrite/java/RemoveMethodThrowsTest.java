@@ -205,6 +205,46 @@ class RemoveMethodThrowsTest implements RewriteTest {
     }
 
     @Test
+    void removeSingleExceptionAnonymousClassOverride() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveMethodThrows("Itf foo(..)", true, "java.io.IOException")),
+          //language=java
+          java(
+            """
+              import java.io.IOException;
+
+              interface Itf {
+                  void foo();
+              }
+
+              class Holder {
+                  Itf itf = new Itf() {
+                      @Override
+                      public void foo() throws IOException {
+                          // no-op
+                      }
+                  };
+              }
+              """,
+            """
+              interface Itf {
+                  void foo();
+              }
+
+              class Holder {
+                  Itf itf = new Itf() {
+                      @Override
+                      public void foo() {
+                          // no-op
+                      }
+                  };
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void removeExceptionWithMultipleExceptions() {
         rewriteRun(
           //language=java

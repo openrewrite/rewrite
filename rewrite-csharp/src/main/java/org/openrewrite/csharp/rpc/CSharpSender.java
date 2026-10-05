@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.csharp.CSharpVisitor;
 import org.openrewrite.csharp.tree.Cs;
 import org.openrewrite.csharp.tree.CsDocComment;
-import org.openrewrite.csharp.tree.CsDocCommentRawComment;
 import org.openrewrite.csharp.tree.Linq;
 import org.openrewrite.java.internal.rpc.JavaSender;
 import org.openrewrite.java.tree.*;
@@ -49,7 +48,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J preVisit(J j, RpcSendQueue q) {
         q.getAndSend(j, Tree::getId);
         q.getAndSend(j, J::getPrefix, space -> visitSpace(space, q));
-        q.getAndSend(j, Tree::getMarkers);
+        q.getAndSend(j, mk -> asRef(mk.getMarkers()));
 
         return j;
     }
@@ -342,7 +341,9 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     @Override
     public J visitInterpolation(Cs.Interpolation interpolation, RpcSendQueue q) {
         q.getAndSend(interpolation, i -> i.getPadding().getExpression(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getAlignmentBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getAlignment(), el -> visitRightPadded(el, q));
+        q.getAndSend(interpolation, Cs.Interpolation::getFormatBefore, space -> visitSpace(space, q));
         q.getAndSend(interpolation, i -> i.getPadding().getFormat(), el -> visitRightPadded(el, q));
         return interpolation;
     }
@@ -363,6 +364,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
     public J visitUsingDirective(Cs.UsingDirective usingDirective, RpcSendQueue q) {
         q.getAndSend(usingDirective, u -> u.getPadding().getGlobal(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getStatic(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingDirective, u -> u.getPadding().getUnsafe(), el -> visitLeftPadded(el, q));
         q.getAndSend(usingDirective, u -> u.getPadding().getAlias(), el -> visitRightPadded(el, q));
         q.getAndSend(usingDirective, Cs.UsingDirective::getNamespaceOrType, el -> visit(el, q));
         return usingDirective;
@@ -392,7 +394,7 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitUsingStatement(Cs.UsingStatement usingStatement, RpcSendQueue q) {
-        q.getAndSend(usingStatement, u -> u.getPadding().getExpression(), el -> visitLeftPadded(el, q));
+        q.getAndSend(usingStatement, Cs.UsingStatement::getExpression, el -> visit(el, q));
         q.getAndSend(usingStatement, Cs.UsingStatement::getStatement, el -> visit(el, q));
         return usingStatement;
     }
@@ -514,9 +516,16 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
 
     @Override
     public J visitSizeOf(Cs.SizeOf sizeOf, RpcSendQueue q) {
-        q.getAndSend(sizeOf, Cs.SizeOf::getExpression, el -> visit(el, q));
+        q.getAndSend(sizeOf, Cs.SizeOf::getClazz, el -> visit(el, q));
         q.getAndSend(sizeOf, s -> asRef(s.getType()), type -> visitType(getValueNonNull(type), q));
         return sizeOf;
+    }
+
+    @Override
+    public J visitTypeOf(Cs.TypeOf typeOf, RpcSendQueue q) {
+        q.getAndSend(typeOf, Cs.TypeOf::getClazz, el -> visit(el, q));
+        q.getAndSend(typeOf, t -> asRef(t.getType()), type -> visitType(getValueNonNull(type), q));
+        return typeOf;
     }
 
     @Override
@@ -879,8 +888,6 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                     c -> {
                         if (c instanceof TextComment) {
                             return ((TextComment) c).getText() + c.getSuffix();
-                        } else if (c instanceof CsDocCommentRawComment) {
-                            return ((CsDocCommentRawComment) c).getText() + c.getSuffix();
                         } else if (c instanceof CsDocComment.DocComment) {
                             // A structured doc comment is a proper tree, so it is keyed by its id
                             // (like Javadoc.DocComment on the Java side) and decomposed over RPC.
@@ -891,20 +898,14 @@ public class CSharpSender extends CSharpVisitor<RpcSendQueue> {
                     c -> {
                         if (c instanceof CsDocComment.DocComment) {
                             new CsDocCommentSender(delegate).visit((CsDocComment.DocComment) c, q);
-                        } else {
-                            if (c instanceof TextComment) {
-                                TextComment tc = (TextComment) c;
-                                q.getAndSend(tc, TextComment::isMultiline);
-                                q.getAndSend(tc, TextComment::getText);
-                            } else if (c instanceof CsDocCommentRawComment) {
-                                CsDocCommentRawComment dc = (CsDocCommentRawComment) c;
-                                q.getAndSend(dc, CsDocCommentRawComment::isMultiline);
-                                q.getAndSend(dc, CsDocCommentRawComment::getText);
-                            } else {
-                                throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
-                            }
+                        } else if (c instanceof TextComment) {
+                            TextComment tc = (TextComment) c;
+                            q.getAndSend(tc, TextComment::isMultiline);
+                            q.getAndSend(tc, TextComment::getText);
                             q.getAndSend(c, Comment::getSuffix);
-                            q.getAndSend(c, Comment::getMarkers);
+                            q.getAndSend(c, mk -> asRef(mk.getMarkers()));
+                        } else {
+                            throw new IllegalArgumentException("Unexpected comment type " + c.getClass().getName());
                         }
                     });
             q.getAndSend(space, Space::getWhitespace);

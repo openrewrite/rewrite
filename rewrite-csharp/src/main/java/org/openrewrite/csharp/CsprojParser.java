@@ -26,10 +26,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -108,7 +108,7 @@ public class CsprojParser implements Parser {
         }
 
         if (tfmNames.isEmpty()) {
-            return Collections.emptyList();
+            return emptyList();
         }
 
         // Extract package references from ItemGroup

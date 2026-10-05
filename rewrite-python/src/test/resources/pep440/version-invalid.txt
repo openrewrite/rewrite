@@ -1,0 +1,24 @@
+# Extracted from https://raw.githubusercontent.com/pypa/packaging/main/tests/test_version.py (test_invalid_versions)
+# Retrieved: 2026-07-16
+# Strings that must not parse as PEP 440 versions.
+# Fields are tab-separated; \t, \n, \r, \\ are escaped.
+french toast
+1.0+a+
+1.0++
+1.0+_foobar
+1.0+foo&asd
+1.0+1+1
+1. 0
+1 .0
+1. 0a1
+1 .0a1
+1.0 a1
+1.0a 1
+٠١٢.٣٤٥.٦٧٨٩
+.
+..
+1..0
+1.0.
+.1.0
+1..2.3
+1.0+İ

@@ -260,6 +260,54 @@ class UsePropertyAssignmentSyntaxTest implements RewriteTest {
     }
 
     @Test
+    void versionCatalogBuilderCallsUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          settingsGradle(
+            """
+              dependencyResolutionManagement {
+                  versionCatalogs {
+                      libs {
+                          version("junit", "6.1.2")
+                          library("bom", "org.junit", "junit-bom").versionRef("junit")
+                          library("assertj", "org.assertj", "assertj-core").version("3.27.7")
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void chainedMethodCallUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("version")),
+          buildGradle(
+            """
+              someBuilder().version('1.0')
+              """
+          )
+        );
+    }
+
+    @Test
+    void regularMethodWithSameNameUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UsePropertyAssignmentSyntax("group")),
+          buildGradle(
+            """
+              def m = java.util.regex.Pattern.compile("(\\\\d+)\\\\..*").matcher("1.2")
+              def major = ""
+              if (m.find()) {
+                  major = m.group(1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noArgMethodCallUnchanged() {
         rewriteRun(
           buildGradle(

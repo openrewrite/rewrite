@@ -22,6 +22,10 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/stretchr/testify/require"
+
+	"github.com/stretchr/testify/assert"
+
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/golang"
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
 )
@@ -34,7 +38,7 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	var messages []RpcObjectData
 	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
 		messages = append(messages, batch...)
-	}, make(map[uintptr]int))
+	}, NewReferenceMap())
 	SendMarkersCodec(before, sendQ)
 	sendQ.Flush()
 
@@ -49,28 +53,70 @@ func roundTripMarkers(t *testing.T, before java.Markers) java.Markers {
 	})
 	// receiveMarkersCodec expects the receive queue positioned at the
 	// Markers ID slot, matching what SendMarkersCodec emits.
-	return receiveMarkersCodec(recvQ, java.Markers{})
+	return receiveMarkersCodec(recvQ, java.EmptyMarkers)
 }
 
 func TestGoProjectMarkerRoundTrip(t *testing.T) {
 	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
-	gp := golang.GoProject{Ident: id, ProjectName: "example/foo"}
-	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{gp}}
+	gp := golang.GoProject{Ident: id, ProjectName: "example/foo", ModulePath: "example.com/foo"}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{gp})
 
 	after := roundTripMarkers(t, before)
-	if len(after.Entries) != 1 {
-		t.Fatalf("entries: want 1, got %d", len(after.Entries))
-	}
-	got, ok := after.Entries[0].(golang.GoProject)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoProject", after.Entries[0])
-	}
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.GoProject)
+	require.Truef(t, ok, "entry is %T, want golang.GoProject", after.Entries()[0])
 	if got.Ident != id {
 		t.Errorf("Ident: want %s, got %s", id, got.Ident)
 	}
-	if got.ProjectName != "example/foo" {
-		t.Errorf("ProjectName: want %q, got %q", "example/foo", got.ProjectName)
-	}
+	assert.Equalf(t, "example/foo", got.ProjectName, "ProjectName: want %q", "example/foo")
+	assert.Equalf(t, "example.com/foo", got.ModulePath, "ModulePath: want %q", "example.com/foo")
+}
+
+func TestPartialTypeAttributionMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaaa")
+	reason := `could not resolve import "strings": cannot decode "strings", export data version 4 is greater than maximum supported version 2`
+	before := java.MakeMarkers(uuid.New(), []java.Marker{
+		golang.PartialTypeAttribution{Ident: id, Reason: reason}})
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.PartialTypeAttribution)
+	require.Truef(t, ok, "entry is %T, want golang.PartialTypeAttribution", after.Entries()[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, reason, got.Reason)
+}
+
+func TestBuildConstraintMarkerRoundTrip(t *testing.T) {
+	// given
+	id := uuid.MustParse("12121212-3434-5656-7878-9a9a9a9a9a9a")
+	bc := golang.BuildConstraint{Ident: id, Constraint: "//go:build linux && amd64", GOOS: "linux", GOARCH: "amd64"}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{bc})
+
+	// when
+	after := roundTripMarkers(t, before)
+
+	// then
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.BuildConstraint)
+	require.Truef(t, ok, "entry is %T, want golang.BuildConstraint", after.Entries()[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, "//go:build linux && amd64", got.Constraint)
+	assert.Equal(t, "linux", got.GOOS)
+	assert.Equal(t, "amd64", got.GOARCH)
+}
+
+func TestMarkupWarnMarkerRoundTrip(t *testing.T) {
+	// given
+	message := "Go module resolution was incomplete, so unused-require removal was skipped."
+	detail := "unresolved imports: github.com/cof-primary/go-shared-libraries/gotel"
+	before := java.MarkupWarnDetail(java.MakeMarkers(uuid.New(), nil), message, detail)
+
+	// when
+	after := roundTripMarkers(t, before)
+
+	// then
+	require.Len(t, after.Entries(), 1, "entries")
+	assert.Equal(t, before.Entries()[0], after.Entries()[0])
 }
 
 func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
@@ -97,22 +143,33 @@ func TestGoResolutionResultMarkerRoundTrip(t *testing.T) {
 			{VersionRange: "[v1.0.0, v1.0.5]"},
 		},
 		ResolvedDependencies: []golang.GoResolvedDependency{
-			{ModulePath: "github.com/google/uuid", Version: "v1.6.0", ModuleHash: "h1:abc=", GoModHash: "h1:def="},
+			{
+				ModulePath: "github.com/google/uuid", Version: "v1.6.0",
+				ModuleHash: "h1:abc=", GoModHash: "h1:def=",
+				Main: true, ModuleGoVersion: "1.22",
+				Deps: []golang.GoModuleRef{
+					{ModulePath: "golang.org/x/mod", Version: "v0.35.0"},
+				},
+			},
+			{
+				ModulePath: "golang.org/x/mod", Version: "v0.35.0",
+				ModuleHash: "h1:ghi=", GoModHash: "h1:jkl=",
+				Indirect: true, ReplacePath: "github.com/forked/mod", ReplaceVersion: "v0.35.1",
+			},
 		},
+		PackageModules: []golang.GoPackageModule{
+			{ImportPath: "fmt", Standard: true},
+			{ImportPath: "github.com/google/uuid", ModulePath: "github.com/google/uuid", Version: "v1.6.0"},
+		},
+		ResolutionStatus: golang.GoResolutionResolved,
 	}
-	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{mrr})
 
 	after := roundTripMarkers(t, before)
-	if len(after.Entries) != 1 {
-		t.Fatalf("entries: want 1, got %d", len(after.Entries))
-	}
-	got, ok := after.Entries[0].(golang.GoResolutionResult)
-	if !ok {
-		t.Fatalf("entry is %T, want golang.GoResolutionResult", after.Entries[0])
-	}
-	if !reflect.DeepEqual(mrr, got) {
-		t.Errorf("round-trip mismatch\nbefore: %+v\nafter:  %+v", mrr, got)
-	}
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.GoResolutionResult)
+	require.Truef(t, ok, "entry is %T, want golang.GoResolutionResult", after.Entries()[0])
+	assert.Truef(t, reflect.DeepEqual(mrr, got), "round-trip mismatch\nbefore: %+v\nafter", mrr)
 }
 
 func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
@@ -129,11 +186,174 @@ func TestGoResolutionResultEmptyListsRoundTrip(t *testing.T) {
 		Excludes:   []golang.GoExclude{},
 		Retracts:   []golang.GoRetract{},
 	}
-	before := java.Markers{ID: uuid.New(), Entries: []java.Marker{mrr}}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{mrr})
 
 	after := roundTripMarkers(t, before)
-	got := after.Entries[0].(golang.GoResolutionResult)
-	if got.ModulePath != "example.com/empty" {
-		t.Errorf("ModulePath: want %q, got %q", "example.com/empty", got.ModulePath)
+	got := after.Entries()[0].(golang.GoResolutionResult)
+	assert.Equalf(t, "example.com/empty", got.ModulePath, "ModulePath: want %q", "example.com/empty")
+}
+
+// TestGoResolutionResultUnresolvedDiagnosticsRoundTrip pins that the diagnostic
+// fields a recipe needs to explain a skipped tidy — the unresolved import paths
+// (INCOMPLETE) and the toolchain failure reason (GO_SUM_ONLY) — survive the RPC
+// round-trip so recipes-go can read them instead of scraping a warning string.
+func TestGoResolutionResultUnresolvedDiagnosticsRoundTrip(t *testing.T) {
+	id := uuid.MustParse("88888888-0000-0000-0000-000000000000")
+	mrr := golang.GoResolutionResult{
+		Ident:            id,
+		ModulePath:       "example.com/foo",
+		Path:             "go.mod",
+		Requires:         []golang.GoRequire{},
+		Replaces:         []golang.GoReplace{},
+		Excludes:         []golang.GoExclude{},
+		Retracts:         []golang.GoRetract{},
+		ResolutionStatus: golang.GoResolutionIncomplete,
+		UnresolvedImports: []string{
+			"github.com/tidwall/redcon",
+			"github.com/valyala/fasthttp",
+		},
+		ResolutionError: "go list -m: 2 module(s) unresolved (build list unreliable): github.com/tidwall/redcon, gonum.org/v1/plot",
+	}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{mrr})
+
+	after := roundTripMarkers(t, before)
+	got := after.Entries()[0].(golang.GoResolutionResult)
+	assert.Equal(t, mrr.UnresolvedImports, got.UnresolvedImports, "unresolved imports must survive round-trip")
+	assert.Equal(t, mrr.ResolutionError, got.ResolutionError, "resolution error must survive round-trip")
+}
+
+// TestGoResolutionResultUnsetStatusRoundTrip pins the old-LST case: a marker whose
+// ResolutionStatus is unset (as when deserialized from an LST serialized before the
+// field existed) must round-trip as empty and travel as null on the wire, so the
+// Java receive side never feeds an empty string to Enum.valueOf.
+func TestGoResolutionResultUnsetStatusRoundTrip(t *testing.T) {
+	id := uuid.MustParse("77777777-0000-0000-0000-000000000000")
+	mrr := golang.GoResolutionResult{
+		Ident:      id,
+		ModulePath: "example.com/old-lst",
+		Path:       "go.mod",
+		Requires:   []golang.GoRequire{},
+		Replaces:   []golang.GoReplace{},
+		Excludes:   []golang.GoExclude{},
+		Retracts:   []golang.GoRetract{},
+		// ResolutionStatus intentionally left unset ("").
+	}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{mrr})
+
+	after := roundTripMarkers(t, before)
+	got := after.Entries()[0].(golang.GoResolutionResult)
+	assert.Equalf(t, golang.GoResolutionStatus(""), got.ResolutionStatus,
+		"unset status must stay empty, got %q", got.ResolutionStatus)
+}
+
+// diffRoundTripMarkers serializes `after` as a delta against `before` and
+// applies the delta on the receiver, mirroring how a modified tree's markers
+// travel back to the peer.
+func diffRoundTripMarkers(t *testing.T, before, after java.Markers) java.Markers {
+	t.Helper()
+	var messages []RpcObjectData
+	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+		messages = append(messages, batch...)
+	}, NewReferenceMap())
+	sendQ.Send(after, before, func(_ any) { SendMarkersCodec(after, sendQ) })
+	sendQ.Flush()
+
+	delivered := false
+	recvQ := NewReceiveQueue(make(map[int]any), func() []RpcObjectData {
+		if delivered {
+			return nil
+		}
+		delivered = true
+		return messages
+	})
+	result := recvQ.Receive(before, func(v any) any { return receiveMarkersCodec(recvQ, v.(java.Markers)) })
+	return result.(java.Markers)
+}
+
+func TestChangedCodecLessMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	mk := func(version string) java.GenericMarker {
+		return java.GenericMarker{
+			Ident:    id,
+			JavaType: "org.openrewrite.marker.BuildTool",
+			Data:     map[string]any{"id": id.String(), "type": "Gradle", "version": version},
+		}
+	}
+	markersID := uuid.New()
+	before := java.MakeMarkers(markersID, []java.Marker{mk("7.0")})
+	after := java.MakeMarkers(markersID, []java.Marker{mk("8.0")})
+
+	got := diffRoundTripMarkers(t, before, after)
+	require.Len(t, got.Entries(), 1, "entries")
+	gm, ok := got.Entries()[0].(java.GenericMarker)
+	require.Truef(t, ok, "entry is %T, want java.GenericMarker", got.Entries()[0])
+	if gm.Data["version"] != "8.0" {
+		t.Errorf("version: want %q, got %v", "8.0", gm.Data["version"])
+	}
+}
+
+func TestTrailingCommaMarkerRoundTripKeepsComments(t *testing.T) {
+	id := uuid.MustParse("cccccccc-dddd-eeee-ffff-000000000000")
+	tc := golang.TrailingComma{
+		Ident:  id,
+		Before: java.MakeSpace(nil, " "),
+		After: java.MakeSpace(
+			[]java.Comment{{Text: " third", Suffix: "\n\t\t"}},
+			" ",
+		),
+	}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{tc})
+
+	after := roundTripMarkers(t, before)
+	got, ok := after.Entries()[0].(golang.TrailingComma)
+	if !ok {
+		t.Fatalf("entry is %T, want golang.TrailingComma", after.Entries()[0])
+	}
+	if got.Before.Whitespace() != tc.Before.Whitespace() {
+		t.Errorf("Before.Whitespace: want %q, got %q", tc.Before.Whitespace(), got.Before.Whitespace())
+	}
+	if got.After.Whitespace() != tc.After.Whitespace() {
+		t.Errorf("After.Whitespace: want %q, got %q", tc.After.Whitespace(), got.After.Whitespace())
+	}
+	if len(got.After.Comments()) != 1 {
+		t.Fatalf("After.Comments: want 1, got %d", len(got.After.Comments()))
+	}
+	if got.After.Comments()[0].Text != " third" || got.After.Comments()[0].Suffix != "\n\t\t" {
+		t.Errorf("After.Comments[0]: want %#v, got %#v", tc.After.Comments()[0], got.After.Comments()[0])
+	}
+}
+
+func TestChanDirMarkerRoundTrip(t *testing.T) {
+	id := uuid.MustParse("dddddddd-eeee-ffff-0000-111111111111")
+	dir := golang.ChanDirMarker{
+		Ident:  id,
+		Before: java.MakeSpace([]java.Comment{{Multiline: true, Text: " x ", Suffix: " "}}, " "),
+	}
+	before := java.MakeMarkers(uuid.New(), []java.Marker{dir})
+
+	after := roundTripMarkers(t, before)
+	require.Len(t, after.Entries(), 1, "entries")
+	got, ok := after.Entries()[0].(golang.ChanDirMarker)
+	require.Truef(t, ok, "entry is %T, want golang.ChanDirMarker", after.Entries()[0])
+	assert.Equal(t, id, got.Ident)
+	assert.Equal(t, " ", got.Before.Whitespace())
+	require.Len(t, got.Before.Comments(), 1, "Before.Comments")
+	assert.Equal(t, " x ", got.Before.Comments()[0].Text)
+	assert.Equal(t, " ", got.Before.Comments()[0].Suffix)
+}
+
+// Java tells a SearchResult with no description from one whose description is
+// empty, and prints `()` for the latter.
+func TestSearchResultWithoutDescriptionSendsNoDescription(t *testing.T) {
+	var messages []RpcObjectData
+	sendQ := NewSendQueue(1000, func(batch []RpcObjectData) {
+		messages = append(messages, batch...)
+	}, NewReferenceMap())
+
+	SendMarkersCodec(java.MakeMarkers(uuid.New(), []java.Marker{java.NewSearchResult("")}), sendQ)
+	sendQ.Flush()
+
+	for _, message := range messages {
+		assert.NotEqual(t, "", message.Value)
 	}
 }

@@ -81,7 +81,7 @@ class AutodetectTest implements RewriteTest {
               TAB"age": 30,
               TAB"car": null
               }
-              """.replaceAll("TAB", "\t")
+              """.replace("TAB", "\t")
           )
         );
     }

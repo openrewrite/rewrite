@@ -210,10 +210,34 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
     }
 
     @Override
+    public J visitTupleExpression(G.TupleExpression tuple, @Nullable Object ctx) {
+        if (tuple == ctx || !(ctx instanceof G.TupleExpression)) {
+            return tuple;
+        }
+        G.TupleExpression newTuple = (G.TupleExpression) ctx;
+        G.TupleExpression t = tuple;
+        t = t.withPrefix(visitSpace(t.getPrefix(), GSpace.Location.TUPLE_PREFIX, newTuple.getPrefix()));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), newTuple.getMarkers()));
+        Expression temp = (Expression) visitExpression(t, newTuple);
+        if (!(temp instanceof G.TupleExpression)) {
+            return temp;
+        } else {
+            t = (G.TupleExpression) temp;
+        }
+        t = t.getPadding().withVariables(visitContainer(t.getPadding().getVariables(), GContainer.Location.TUPLE_ELEMENTS, newTuple.getPadding().getVariables()));
+        return t.withType(visitType(t.getType(), newTuple.getType()));
+    }
+
+    @Override
     public @Nullable J visit(@Nullable Tree tree, Object o) {
         if (o instanceof J.Block && !(tree instanceof J.Block)) {
             //Wrapping can introduce blocks
             return super.visit((J.Block) o, o);
+        }
+        if (o instanceof G.ExpressionStatement && !(tree instanceof G.ExpressionStatement)) {
+            // G.ExpressionStatement#acceptGroovy unwraps the visited tree to its inner expression but forwards
+            // the wrapper as context, so unwrap the context too to keep both trees aligned
+            o = ((G.ExpressionStatement) o).getExpression();
         }
         return super.visit(tree, o);
     }
@@ -1277,10 +1301,11 @@ public class MergeSpacesVisitor extends GroovyVisitor<Object> {
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, @Nullable Object ctx) {
-        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
-        if (parens == newParens) {
+        if (parens == ctx || !(ctx instanceof J.Parentheses)) {
             return parens;
         }
+        //noinspection unchecked
+        J.Parentheses<T> newParens = (J.Parentheses<T>) ctx;
         J.Parentheses<T> pa = parens;
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), Space.Location.PARENTHESES_PREFIX, newParens.getPrefix()));
         pa = pa.withMarkers(visitMarkers(pa.getMarkers(), newParens.getMarkers()));

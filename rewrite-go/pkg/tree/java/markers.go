@@ -23,10 +23,49 @@ type Marker interface {
 	ID() uuid.UUID
 }
 
-type Markers struct {
-	ID      uuid.UUID
-	Entries []Marker
+// Markers is a pointer to shared, immutable backing. Build via MakeMarkers; a nil
+// pointer reads as empty through every method, but MakeMarkers returns the shared
+// non-nil EmptyMarkers so an empty Markers keeps its type across `any`. Every empty
+// Markers reports one process-wide id (emptyMarkersID) since the id carries no
+// identity meaning and empty markers must be shareable to save memory.
+type Markers = *markersData
+
+type markersData struct {
+	id      uuid.UUID
+	entries []Marker
 }
+
+// emptyMarkersID is the shared id reported by every empty Markers. It is stable
+// per process and non-nil; nothing keys node identity on it (RPC ref-dedup keys
+// on the individual marker entries, not this container id).
+var emptyMarkersID = uuid.New()
+
+// MakeMarkers builds a Markers, sharing one backing for the empty case so that
+// the common empty markers on most nodes cost nothing beyond a nil pointer.
+func MakeMarkers(id uuid.UUID, entries []Marker) Markers {
+	if len(entries) == 0 {
+		return EmptyMarkers
+	}
+	return &markersData{id: id, entries: entries}
+}
+
+// GetID returns the container id. Empty markers report the shared emptyMarkersID.
+func (m *markersData) GetID() uuid.UUID {
+	if m == nil {
+		return emptyMarkersID
+	}
+	return m.id
+}
+
+// Entries returns the marker entries.
+func (m *markersData) Entries() []Marker {
+	if m == nil {
+		return nil
+	}
+	return m.entries
+}
+
+var EmptyMarkers Markers = &markersData{id: emptyMarkersID}
 
 // GenericMarker is a marker type for Java-side markers that the Go side
 // doesn't have a native type for (e.g., RecipesThatMadeChanges, SearchResult).
@@ -39,15 +78,29 @@ type GenericMarker struct {
 
 func (m GenericMarker) ID() uuid.UUID { return m.Ident }
 
-type SearchResultMarker struct {
-	Ident       uuid.UUID
-	Description string
+// RecipeThatMadeChanges is one frame of a RecipesThatMadeChanges stack: how the recipe is
+// named, how it was configured, and what it is worth.
+type RecipeThatMadeChanges struct {
+	Name         string
+	DisplayName  *string
+	InstanceName *string
+	// Options are configured option values. Go never interprets them, so they stay in
+	// whatever shape the wire delivered.
+	Options                            any
+	EstimatedEffortPerOccurrenceMillis *int64
 }
 
-func (m SearchResultMarker) ID() uuid.UUID { return m.Ident }
+// RecipesThatMadeChanges records which recipe stacks changed a source file. Go holds the
+// stacks without interpreting them, so a marker served to this peer returns to the host intact.
+type RecipesThatMadeChanges struct {
+	Ident   uuid.UUID
+	Recipes [][]RecipeThatMadeChanges
+}
+
+func (m RecipesThatMadeChanges) ID() uuid.UUID { return m.Ident }
 
 func FindMarker[T any](markers Markers) *T {
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if t, ok := m.(T); ok {
 			return &t
 		}
@@ -56,7 +109,7 @@ func FindMarker[T any](markers Markers) *T {
 }
 
 func HasMarker[T any](markers Markers) bool {
-	for _, m := range markers.Entries {
+	for _, m := range markers.Entries() {
 		if _, ok := m.(T); ok {
 			return true
 		}
@@ -65,10 +118,15 @@ func HasMarker[T any](markers Markers) bool {
 }
 
 func AddMarker(markers Markers, marker Marker) Markers {
-	entries := make([]Marker, len(markers.Entries)+1)
-	copy(entries, markers.Entries)
-	entries[len(markers.Entries)] = marker
-	return Markers{ID: markers.ID, Entries: entries}
+	existing := markers.Entries()
+	entries := make([]Marker, len(existing)+1)
+	copy(entries, existing)
+	entries[len(existing)] = marker
+	id := markers.GetID()
+	if markers == nil {
+		id = uuid.New()
+	}
+	return &markersData{id: id, entries: entries}
 }
 
 // SearchResult is a marker indicating that a search recipe found a match.
@@ -100,38 +158,6 @@ type Markup struct {
 }
 
 func (m Markup) ID() uuid.UUID { return m.Ident }
-
-// GoProject identifies the Go project (logical grouping of go.mod + .go
-// files) a source belongs to. Mirrors org.openrewrite.golang.marker.GoProject
-// on the Java side.
-type GoProject struct {
-	Ident       uuid.UUID
-	ProjectName string
-}
-
-func (m GoProject) ID() uuid.UUID { return m.Ident }
-
-// Semicolon marks a RightPadded element that is followed by an explicit
-// `;` separator in the source — i.e. multiple statements on one line:
-// `_ = 1; _ = 2`. Go inserts implicit semicolons at end-of-line so most
-// files don't need this marker; it's only emitted when the source
-// literally has a `;` between statements that the printer must
-// reproduce.
-//
-// Mirrors org.openrewrite.java.marker.Semicolon on the Java side.
-type Semicolon struct {
-	Ident uuid.UUID
-}
-
-func (m Semicolon) ID() uuid.UUID { return m.Ident }
-
-func NewSemicolon() Semicolon {
-	return Semicolon{Ident: uuid.New()}
-}
-
-func NewGoProject(projectName string) GoProject {
-	return GoProject{Ident: uuid.New(), ProjectName: projectName}
-}
 
 func NewSearchResult(description string) SearchResult {
 	return SearchResult{Ident: uuid.New(), Description: description}
