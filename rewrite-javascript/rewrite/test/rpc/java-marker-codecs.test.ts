@@ -86,6 +86,7 @@ const samples: { [kind: string]: () => Marker } = {
     }),
     [StyleKind.Autodetect]: () => autodetect(randomId(), []),
     [StyleKind.PrettierStyle]: () => prettierStyle(randomId(), {semi: false}, "3.0.0"),
+    [`${StyleKind.PrettierStyle} without a version`]: () => prettierStyle(randomId(), {semi: false}),
     [Yaml.Markers.OmitColon]: () => omitColon(),
 };
 

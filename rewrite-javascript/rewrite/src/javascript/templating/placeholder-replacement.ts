@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor, isTree, Markers} from '../..';
-import {J} from '../../java';
+import {Expression, J} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
@@ -22,6 +22,7 @@ import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
 import {enclosingTree, maybeParenthesize} from './precedence';
 import {Parameter} from './types';
+import {isExpression} from '../parser-utils';
 
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
@@ -68,6 +69,71 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         return bindingElement;
+    }
+
+    /** A statement substituted into an expression statement's placeholder is the statement itself. */
+    override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: any): Promise<J | undefined> {
+        const visited = await super.visitExpressionStatement(expressionStatement, p);
+        if (visited?.kind !== JS.Kind.ExpressionStatement) {
+            return visited;
+        }
+        const statement = visited as JS.ExpressionStatement;
+        const expression: J = statement.expression;
+        if (isExpression(expression)) {
+            return statement;
+        }
+        return {...expression, prefix: this.concatPrefix(statement.prefix, expression.prefix)};
+    }
+
+    /**
+     * A declaration substituted for the name of a declaration is the declaration itself: `(${p})` and
+     * `(...${p})` with `p` bound to the parameter `props: Props` give `(props: Props)` and `(...props: Props)`.
+     */
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, p: any): Promise<J | undefined> {
+        const visited = await super.visitVariableDeclarations(variableDeclarations, p);
+        if (visited?.kind !== J.Kind.VariableDeclarations) {
+            return visited;
+        }
+        const outer = visited as J.VariableDeclarations;
+        if (outer.variables.length !== 1) {
+            return outer;
+        }
+        const variable = outer.variables[0].element;
+        const spread = variable.name.kind === JS.Kind.Spread ? variable.name as JS.Spread : undefined;
+        const declared: J = spread ? spread.expression : variable.name;
+        if (declared.kind !== J.Kind.VariableDeclarations) {
+            return outer;
+        }
+        const inner = declared as J.VariableDeclarations;
+        const prefix = this.concatPrefix(this.concatPrefix(outer.prefix, variable.prefix), inner.prefix);
+        if (!spread) {
+            return {...inner, prefix};
+        } else if (inner.variables.length !== 1) {
+            return outer;
+        }
+        const innerVariable = inner.variables[0];
+        const spreadDeclaration: J.VariableDeclarations = {
+            ...inner,
+            prefix,
+            variables: [{
+                ...innerVariable,
+                element: {...innerVariable.element, name: {...spread, expression: innerVariable.element.name as Expression} as JS.Spread}
+            }]
+        };
+        return spreadDeclaration;
+    }
+
+    private concatPrefix(outer: J.Space, inner: J.Space): J.Space {
+        if (outer.whitespace === '' && outer.comments.length === 0) {
+            return inner;
+        } else if (outer.comments.length === 0) {
+            return {...inner, whitespace: outer.whitespace + inner.whitespace};
+        }
+        const last = outer.comments[outer.comments.length - 1];
+        return {
+            ...outer,
+            comments: [...outer.comments.slice(0, -1), {...last, suffix: last.suffix + inner.whitespace}, ...inner.comments]
+        };
     }
 
     /**

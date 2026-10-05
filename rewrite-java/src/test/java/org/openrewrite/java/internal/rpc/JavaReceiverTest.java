@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.rpc.Reference;
 import org.openrewrite.rpc.RpcObjectData;
@@ -219,6 +220,30 @@ class JavaReceiverTest {
         assertThat(((JavaType.FullyQualified) received.getArguments().get(1).getType()).getFullyQualifiedName())
                 .as("The unchanged slot aliases the receiver's cached instance, which must not be mutated")
                 .isEqualTo("java.util.List");
+    }
+
+    @Test
+    void changedBooleanOfLeftPaddedIsReceived() {
+        // given
+        J.Import original = new J.Import(
+                Tree.randomId(), Space.EMPTY, Markers.EMPTY,
+                JLeftPadded.build(true).withBefore(Space.SINGLE_SPACE),
+                TypeTree.build("java.util.Collections.emptyList"),
+                null
+        );
+        sq.send(original, null, null);
+        sq.flush();
+        J.Import receivedBefore = rq.receive(null);
+
+        // when
+        J.Import after = original.withStatic(false);
+        sq.send(after, original, null);
+        sq.flush();
+        J.Import received = rq.receive(receivedBefore);
+
+        // then
+        assertThat(receivedBefore.isStatic()).isTrue();
+        assertThat(received.isStatic()).isFalse();
     }
 
     @Test
