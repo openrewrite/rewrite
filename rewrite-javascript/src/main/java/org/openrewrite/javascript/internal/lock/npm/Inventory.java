@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.UNDEFINED;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
@@ -37,9 +38,6 @@ public final class Inventory {
 
     static final List<String> KEYS = Collections.unmodifiableList(
             Arrays.asList("name", "license", "funding", "realpath", "packageName"));
-
-    // the index key for JavaScript's undefined, which arborist files apart from null
-    private static final Object UNDEFINED = new Object();
 
     private final Map<String, Node> byLocation = new LinkedHashMap<>();
     private final Map<String, Map<@Nullable Object, Set<Node>>> index = new LinkedHashMap<>();
@@ -104,13 +102,13 @@ public final class Inventory {
             } else if ("packageName".equals(key) && truthy(node.getPackageName())) {
                 val = node.getPackageName();
             } else {
-                val = member(pkg, key);
+                val = Js.get(pkg, key);
             }
             if (val instanceof Map || val instanceof List) {
                 if ("license".equals(key)) {
-                    val = member(val, "type");
+                    val = Js.get(val, "type");
                 } else if ("funding".equals(key)) {
-                    val = member(val, "url");
+                    val = Js.get(val, "url");
                 }
             }
             entry.getValue().computeIfAbsent(val, k -> new LinkedHashSet<>()).add(node);
@@ -128,7 +126,7 @@ public final class Inventory {
             Object nodeVal = "name".equals(key) ? node.getName() :
                     "realpath".equals(key) ? node.getRealpath() :
                             "packageName".equals(key) ? node.getPackageName() : UNDEFINED;
-            Object val = nodeVal != UNDEFINED ? nodeVal : member(node.getPackage(), key);
+            Object val = nodeVal != UNDEFINED ? nodeVal : Js.get(node.getPackage(), key);
             Set<Node> set = map.get(val);
             if (set != null) {
                 set.remove(node);
@@ -182,9 +180,5 @@ public final class Inventory {
 
     private static @Nullable Object first(List<?> list) {
         return list.isEmpty() ? UNDEFINED : list.get(0);
-    }
-
-    private static @Nullable Object member(Object object, String key) {
-        return object instanceof Map && ((Map<?, ?>) object).containsKey(key) ? ((Map<?, ?>) object).get(key) : UNDEFINED;
     }
 }

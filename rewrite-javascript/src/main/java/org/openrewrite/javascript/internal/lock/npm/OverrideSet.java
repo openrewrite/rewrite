@@ -21,13 +21,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 import static org.openrewrite.semver.NodeSemver.Options.DEFAULT;
 
 /**
@@ -47,32 +47,33 @@ public final class OverrideSet {
     private @Nullable String key;
     private @Nullable String keySpec;
 
+    /**
+     * A spec, or whatever else the package gave as the rule's {@code "."}: npm fails on reading an
+     * edge's spec through a rule whose value is not a string.
+     */
     @Setter
-    private @Nullable String value;
+    private @Nullable Object value;
 
     /**
      * @param overrides a package's {@code overrides}: a spec string or a map of keys to nested overrides.
+     * @throws IllegalArgumentException for an override that is {@code null}, as arborist throws.
      */
-    public OverrideSet(Object overrides) {
+    public OverrideSet(@Nullable Object overrides) {
         this(overrides, null, null);
     }
 
     @SuppressWarnings("unchecked")
-    OverrideSet(Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
+    OverrideSet(@Nullable Object overrides, @Nullable String key, @Nullable OverrideSet parent) {
         this.parent = parent;
 
-        Map<String, Object> rules;
         if (overrides instanceof String) {
-            rules = new LinkedHashMap<>();
-            rules.put(".", overrides);
-        } else if (overrides instanceof Map) {
-            rules = (Map<String, Object>) overrides;
-        } else {
-            rules = Collections.emptyMap();
+            Map<String, Object> rule = new LinkedHashMap<>();
+            rule.put(".", overrides);
+            overrides = rule;
         }
 
-        if ("".equals(rules.get("."))) {
-            rules.put(".", "*");
+        if ("".equals(Js.get(overrides, "."))) {
+            ((Map<String, Object>) overrides).put(".", "*");
         }
 
         if (parent != null) {
@@ -83,11 +84,11 @@ public final class OverrideSet {
             this.name = spec.getName();
             this.key = key;
             this.keySpec = spec.withoutName().toString();
-            Object dot = rules.get(".");
-            this.value = dot instanceof String && !((String) dot).isEmpty() ? (String) dot : this.keySpec;
+            Object dot = Js.get(overrides, ".");
+            this.value = truthy(dot) ? dot : this.keySpec;
         }
 
-        for (Map.Entry<String, Object> entry : rules.entrySet()) {
+        for (Map.Entry<String, Object> entry : Js.entries(overrides)) {
             if (".".equals(entry.getKey())) {
                 continue;
             }
@@ -104,7 +105,7 @@ public final class OverrideSet {
             if (!other.children.containsKey(key)) {
                 return false;
             }
-            if (!Objects.equals(children.get(key).value, other.children.get(key).value)) {
+            if (!Js.strictEquals(children.get(key).value, other.children.get(key).value)) {
                 return false;
             }
             if (!children.get(key).childrenAreEqual(other.children.get(key))) {
@@ -121,7 +122,7 @@ public final class OverrideSet {
         if (other == null) {
             return false;
         }
-        if (!Objects.equals(key, other.key) || !Objects.equals(value, other.value)) {
+        if (!Objects.equals(key, other.key) || !Js.strictEquals(value, other.value)) {
             return false;
         }
         if (!childrenAreEqual(other)) {
@@ -195,7 +196,8 @@ public final class OverrideSet {
             if (!Objects.equals(rule.name, nodeName)) {
                 continue;
             }
-            if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) || NodeSemver.satisfies(version, rule.value, DEFAULT)) {
+            if (NodeSemver.satisfies(version, rule.keySpec, DEFAULT) ||
+                rule.value instanceof String && NodeSemver.satisfies(version, (String) rule.value, DEFAULT)) {
                 return rule;
             }
         }
@@ -227,7 +229,8 @@ public final class OverrideSet {
         return ruleset;
     }
 
-    public static @Nullable OverrideSet findSpecificOverrideSet(@Nullable OverrideSet first, @Nullable OverrideSet second) {
+    public static @Nullable OverrideSet findSpecificOverrideSet(@Nullable OverrideSet first,
+                                                                @Nullable OverrideSet second) {
         if (contains(second, first)) {
             return second;
         }
@@ -283,15 +286,13 @@ public final class OverrideSet {
                 continue;
             }
 
-            String firstValue = firstRule.value;
-            String secondValue = secondRule.value;
-            if (firstValue.startsWith("$") || secondValue.startsWith("$")) {
+            if (isReference(firstRule.value, "firstValue") || isReference(secondRule.value, "secondValue")) {
                 continue;
             }
 
             try {
-                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstValue);
-                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondValue);
+                Spec firstSpec = Spec.npa(firstRule.name + "@" + firstRule.value);
+                Spec secondSpec = Spec.npa(secondRule.name + "@" + secondRule.value);
                 if ((firstSpec.getType() == Spec.Type.RANGE || firstSpec.getType() == Spec.Type.VERSION) &&
                     (secondSpec.getType() == Spec.Type.RANGE || secondSpec.getType() == Spec.Type.VERSION)) {
                     if (!NodeSemver.intersects(firstSpec.getFetchSpec(), secondSpec.getFetchSpec(), DEFAULT)) {
@@ -303,5 +304,12 @@ public final class OverrideSet {
             }
         }
         return false;
+    }
+
+    private static boolean isReference(@Nullable Object value, String variable) {
+        if (!(value instanceof String)) {
+            throw new IllegalArgumentException(variable + ".startsWith is not a function");
+        }
+        return ((String) value).startsWith("$");
     }
 }

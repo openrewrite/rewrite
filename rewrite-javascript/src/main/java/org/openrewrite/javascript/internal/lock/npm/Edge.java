@@ -32,7 +32,8 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 public final class Edge {
 
     public enum Type {
-        PROD("prod"), DEV("dev"), OPTIONAL("optional"), PEER("peer"), PEER_OPTIONAL("peerOptional"), WORKSPACE("workspace");
+        PROD("prod"), DEV("dev"), OPTIONAL("optional"), PEER("peer"), PEER_OPTIONAL("peerOptional"),
+        WORKSPACE("workspace");
 
         private final String value;
 
@@ -204,13 +205,18 @@ public final class Edge {
     }
 
     /**
-     * @throws IllegalStateException when a {@code $name} override references a dependency neither the
-     *                               root nor this edge's package declares, as arborist throws.
+     * @throws IllegalStateException    when a {@code $name} override references a dependency neither the
+     *                                  root nor this edge's package declares, as arborist throws.
+     * @throws IllegalArgumentException when the override, or what its reference names, is not a string:
+     *                                  arborist's TypeError, there or in whatever reads the spec next.
      */
     public String getSpec() {
-        if (overrides != null && overrides.getValue() != null && !overrides.getValue().isEmpty() &&
-            !"*".equals(overrides.getValue()) && name.equals(overrides.getName())) {
-            String value = overrides.getValue();
+        if (overrides != null && truthy(overrides.getValue()) && !"*".equals(overrides.getValue()) &&
+            name.equals(overrides.getName())) {
+            if (!(overrides.getValue() instanceof String)) {
+                throw new IllegalArgumentException("this.overrides.value.startsWith is not a function");
+            }
+            String value = (String) overrides.getValue();
             if (value.startsWith("$")) {
                 String ref = value.substring(1);
                 Map<String, Object> pkg = from == null ? null : from.getSourceReference() != null ?
@@ -234,13 +240,15 @@ public final class Edge {
         if (pkg == null) {
             return null;
         }
-        for (String depType : new String[]{"devDependencies", "optionalDependencies", "dependencies", "peerDependencies"}) {
+        String[] depTypes = {"devDependencies", "optionalDependencies", "dependencies", "peerDependencies"};
+        for (String depType : depTypes) {
             Object deps = pkg.get(depType);
-            if (deps instanceof Map) {
-                Object spec = ((Map<?, ?>) deps).get(ref);
-                if (truthy(spec)) {
-                    return String.valueOf(spec);
+            Object spec = deps == null ? null : Js.get(deps, ref);
+            if (truthy(spec)) {
+                if (!(spec instanceof String)) {
+                    throw new IllegalArgumentException("Override reference $" + ref + " does not name a spec");
                 }
+                return (String) spec;
             }
         }
         return null;
@@ -366,7 +374,7 @@ public final class Edge {
         if (peerConflicted) {
             json.put("peerConflicted", true);
         }
-        if (overrides != null && overrides.getValue() != null && !overrides.getValue().isEmpty()) {
+        if (overrides != null && truthy(overrides.getValue())) {
             json.put("overridden", overrides.getValue());
         }
         return json;

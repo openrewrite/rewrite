@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,33 +51,31 @@ final class PackageJson {
             data.put("bundleDependencies", new ArrayList<>());
         } else if (Boolean.TRUE.equals(bd)) {
             Object deps = data.get("dependencies");
-            data.put("bundleDependencies", deps instanceof Map ?
-                    new ArrayList<>(((Map<String, Object>) deps).keySet()) : new ArrayList<>());
+            data.put("bundleDependencies", Js.keys(truthy(deps) ? deps : Collections.emptyMap()));
         } else if (bd instanceof Map) {
-            data.put("bundleDependencies", new ArrayList<>(((Map<String, Object>) bd).keySet()));
+            data.put("bundleDependencies", Js.keys(bd));
         } else if (!(bd instanceof List) && data.containsKey("bundleDependencies")) {
             data.remove("bundleDependencies");
         }
 
         Object dependencies = data.get("dependencies");
         Object optionalDependencies = data.get("optionalDependencies");
-        if (truthy(dependencies) && optionalDependencies instanceof Map && dependencies instanceof Map) {
-            Map<String, Object> prod = (Map<String, Object>) dependencies;
-            for (String optional : ((Map<String, Object>) optionalDependencies).keySet()) {
-                prod.remove(optional);
+        if (truthy(dependencies) && (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
+            if (dependencies instanceof Map) {
+                for (String optional : Js.keys(optionalDependencies)) {
+                    ((Map<String, Object>) dependencies).remove(optional);
+                }
             }
-            if (prod.isEmpty()) {
+            if (Js.keys(dependencies).isEmpty()) {
                 data.remove("dependencies");
             }
         }
 
-        if (data.containsKey("scripts") && data.get("scripts") != null) {
-            Object scripts = data.get("scripts");
-            if (scripts instanceof Map) {
-                ((Map<String, Object>) scripts).values().removeIf(script -> !(script instanceof String));
-            } else {
-                data.remove("scripts");
-            }
+        Object scripts = data.get("scripts");
+        if (scripts instanceof Map) {
+            ((Map<String, Object>) scripts).values().removeIf(script -> !(script instanceof String));
+        } else if (scripts != null && !(scripts instanceof List)) {
+            data.remove("scripts");
         }
 
         Object funding = data.get("funding");

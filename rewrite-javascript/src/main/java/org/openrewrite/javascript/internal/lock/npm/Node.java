@@ -316,7 +316,7 @@ public class Node {
             this.overrides = options.getOverrides();
         } else if (options.isLoadOverrides()) {
             Object overrides = pkg.get("overrides");
-            if (overrides instanceof Map && !((Map<?, ?>) overrides).isEmpty()) {
+            if (truthy(overrides) && !Js.keys(overrides).isEmpty()) {
                 this.overrides = new OverrideSet(overrides);
             }
         }
@@ -418,7 +418,7 @@ public class Node {
         }
         for (Edge edge : edgesIn) {
             if (edge.getOverrides() != null && Objects.equals(edge.getOverrides().getName(), name) &&
-                Objects.equals(edge.getOverrides().getValue(), getVersion())) {
+                Js.strictEquals(edge.getOverrides().getValue(), getVersion())) {
                 if (!edge.getOverrides().isEqual(edge.getFrom().getOverrides())) {
                     return true;
                 }
@@ -862,19 +862,23 @@ public class Node {
         }
     }
 
-    @SuppressWarnings("unchecked")
     void loadDeps() {
         Object pd = pkg.get("peerDependencies");
-        Object adRaw = pkg.get("acceptDependencies");
-        Map<String, Object> ad = adRaw instanceof Map ? (Map<String, Object>) adRaw : Collections.emptyMap();
-        if (pd instanceof Map && !legacyPeerDeps) {
-            Object pmRaw = pkg.get("peerDependenciesMeta");
-            Map<String, Object> pm = pmRaw instanceof Map ? (Map<String, Object>) pmRaw : Collections.emptyMap();
+        Object ad = truthy(pkg.get("acceptDependencies")) ? pkg.get("acceptDependencies") : Collections.emptyMap();
+        if ((pd instanceof Map || pd instanceof List) && !legacyPeerDeps) {
+            Object pm = pkg.get("peerDependenciesMeta");
+            if (!truthy(pm)) {
+                pm = Collections.emptyMap();
+            }
             Map<String, Object> peerDependencies = new LinkedHashMap<>();
             Map<String, Object> peerOptional = new LinkedHashMap<>();
-            for (Map.Entry<String, Object> dep : ((Map<String, Object>) pd).entrySet()) {
-                Object meta = pm.get(dep.getKey());
-                if (meta instanceof Map && truthy(((Map<String, Object>) meta).get("optional"))) {
+            for (Map.Entry<String, Object> dep : Js.entries(pd)) {
+                // assigning __proto__ on a plain object adds no property
+                if ("__proto__".equals(dep.getKey())) {
+                    continue;
+                }
+                Object meta = Js.get(pm, dep.getKey());
+                if (meta != null && meta != Js.UNDEFINED && truthy(Js.get(meta, "optional"))) {
                     peerOptional.put(dep.getKey(), dep.getValue());
                 } else {
                     peerDependencies.put(dep.getKey(), dep.getValue());
@@ -894,22 +898,19 @@ public class Node {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private void loadDepType(@Nullable Object deps, Edge.Type type, Map<String, Object> ad) {
-        if (!(deps instanceof Map)) {
-            return;
-        }
-        for (Map.Entry<String, Object> dep : ((Map<String, Object>) deps).entrySet()) {
+    private void loadDepType(@Nullable Object deps, Edge.Type type, Object ad) {
+        for (Map.Entry<String, Object> dep : Js.entries(truthy(deps) ? deps : Collections.emptyMap())) {
             Edge current = edgesOut.get(dep.getKey());
             if (current == null || current.getType() != Edge.Type.WORKSPACE) {
                 if (!(dep.getValue() instanceof String)) {
                     throw new IllegalArgumentException("must provide string spec");
                 }
-                Object accept = ad.get(dep.getKey());
-                if (accept != null && !(accept instanceof String)) {
+                Object accept = Js.get(ad, dep.getKey());
+                if (accept != Js.UNDEFINED && !(accept instanceof String)) {
                     throw new IllegalArgumentException("accept field must be a string if provided");
                 }
-                new Edge(this, type, dep.getKey(), (String) dep.getValue(), (String) accept, null);
+                new Edge(this, type, dep.getKey(), (String) dep.getValue(),
+                        accept == Js.UNDEFINED ? null : (String) accept, null);
             }
         }
     }
@@ -997,7 +998,8 @@ public class Node {
         }
 
         Set<String> ignore = new LinkedHashSet<>(ignorePeers);
-        Set<Node> depSet = GatherDepSet.gatherDepSet(Collections.singletonList(this), e -> e.getTo() != this && e.isValid());
+        Set<Node> depSet = GatherDepSet.gatherDepSet(Collections.singletonList(this),
+                e -> e.getTo() != this && e.isValid());
 
         for (Edge edge : edgesIn) {
             if (!isTop() && edge.getFrom().parent == parent && edge.isPeer() && ignore.contains(edge.getFrom().name)) {

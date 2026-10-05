@@ -41,7 +41,8 @@ final class DepValid {
         private final @Nullable String dependency;
         private final @Nullable Object requested;
 
-        DependencyError(String message, @Nullable String dependency, @Nullable Object requested, @Nullable Throwable cause) {
+        DependencyError(String message, @Nullable String dependency, @Nullable Object requested,
+                        @Nullable Throwable cause) {
             super(message, cause);
             this.dependency = dependency;
             this.requested = requested;
@@ -55,14 +56,17 @@ final class DepValid {
         Shrinkwrap meta = requestor.getRoot().getMeta();
         Map<String, Object> data = meta == null ? null : meta.getData();
         Object packages = data == null ? null : data.get("packages");
-        Object lock = packages instanceof Map ? ((Map<?, ?>) packages).get(requestor.getLocation()) : null;
-        if (!(lock instanceof Map)) {
+        String location = requestor.getLocation();
+        String name = child.getName();
+        Object lock = packages == null || location == null ? null : Js.get(packages, location);
+        if (!truthy(lock) || name == null) {
             return null;
         }
         Object spec = null;
-        for (String type : new String[]{"dependencies", "optionalDependencies", "devDependencies", "peerDependencies"}) {
-            Object deps = ((Map<?, ?>) lock).get(type);
-            spec = deps instanceof Map ? ((Map<?, ?>) deps).get(child.getName()) : null;
+        String[] types = {"dependencies", "optionalDependencies", "devDependencies", "peerDependencies"};
+        for (String type : types) {
+            Object deps = Js.get(lock, type);
+            spec = deps == null || deps == Js.UNDEFINED ? null : Js.get(deps, name);
             if (truthy(spec)) {
                 break;
             }
@@ -154,7 +158,8 @@ final class DepValid {
                     return true;
                 }
                 Object version = child.getPackage().get("version");
-                return version instanceof String && NodeSemver.satisfies((String) version, requested.getGitRange(), LOOSE);
+                return version instanceof String &&
+                       NodeSemver.satisfies((String) version, requested.getGitRange(), LOOSE);
             }
             default:
                 break;

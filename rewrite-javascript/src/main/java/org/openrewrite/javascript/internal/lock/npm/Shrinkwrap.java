@@ -129,7 +129,8 @@ public final class Shrinkwrap {
 
         String resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
         if (truthy(resolved)) {
-            String written = node.isRegistryDependency() ? OverrideResolves.overrideResolves(resolved, options) : resolved;
+            String written = node.isRegistryDependency() ?
+                    OverrideResolves.overrideResolves(resolved, options) : resolved;
             if (written != null) {
                 meta.put("resolved", written);
             }
@@ -199,7 +200,7 @@ public final class Shrinkwrap {
             return null;
         }
 
-        return lockFromLoc(asObject(object.get("dependencies")).get(path.get(i)), path, i + 1);
+        return lockFromLoc(Js.get(object.get("dependencies"), path.get(i)), path, i + 1);
     }
 
     @SuppressWarnings("unchecked")
@@ -225,7 +226,6 @@ public final class Shrinkwrap {
         }
     }
 
-    @SuppressWarnings("unchecked")
     public Map<String, Object> get(String nodePath) {
         Map<String, Object> data = loadedData();
 
@@ -234,9 +234,9 @@ public final class Shrinkwrap {
             updateWaitingNode(location);
         }
 
-        Object meta = packages().get(location);
+        Object meta = Js.get(packages(), location);
         if (truthy(meta)) {
-            return (Map<String, Object>) meta;
+            return asObject(meta);
         }
 
         List<String> path = Arrays.asList(NODE_MODULES.split(location, -1));
@@ -261,7 +261,7 @@ public final class Shrinkwrap {
             link.put("link", true);
             link.put("resolved", target);
             packages().put(location, link);
-            if (!truthy(packages().get(target))) {
+            if (!truthy(Js.get(packages(), target))) {
                 Map<String, Object> targetLock = new LinkedHashMap<>(lock);
                 targetLock.put("version", null);
                 metaFromLock(target, name, targetLock);
@@ -362,8 +362,10 @@ public final class Shrinkwrap {
                 }
             }
 
-            boolean resolvedOk = !truthy(resolved) || !truthy(node.getResolved()) || node.getResolved().equals(pathFixed);
-            boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) || node.getIntegrity().equals(integrity);
+            boolean resolvedOk = !truthy(resolved) || !truthy(node.getResolved()) ||
+                                 node.getResolved().equals(pathFixed);
+            boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) ||
+                                  node.getIntegrity().equals(integrity);
             boolean versionOk = !truthy(version) || !truthy(node.getVersion()) || node.getVersion().equals(version);
 
             boolean allOk = (truthy(resolved) || truthy(integrity) || truthy(version)) &&
@@ -421,7 +423,8 @@ public final class Shrinkwrap {
         }
 
         Object entryResolved = entry.get("resolved");
-        if (entryResolved instanceof String && YARN_REGISTRY.matcher((String) entryResolved).find() && spec.isRegistry()) {
+        if (entryResolved instanceof String && YARN_REGISTRY.matcher((String) entryResolved).find() &&
+            spec.isRegistry()) {
             entryResolved = YARN_REGISTRY.matcher((String) entryResolved).replaceFirst("https://registry.npmjs.org/");
             entry.set("resolved", entryResolved);
         }

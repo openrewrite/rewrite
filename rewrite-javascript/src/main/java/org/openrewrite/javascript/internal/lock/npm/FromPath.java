@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
 /**
  * Port of @npmcli/arborist lib/from-path.js (npm 11.17.0).
  */
@@ -27,7 +29,7 @@ final class FromPath {
 
     static @Nullable String fromPath(Node node, @Nullable Edge edge) {
         if (edge != null && edge.getOverrides() != null && edge.getName().equals(edge.getOverrides().getName()) &&
-            edge.getOverrides().getValue() != null && !edge.getOverrides().getValue().isEmpty()) {
+            truthy(edge.getOverrides().getValue())) {
             if (node.getSourceReference() != null) {
                 return node.getSourceReference().getRoot().getRealpath();
             }

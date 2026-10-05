@@ -19,6 +19,7 @@
 # were last written; NPM_NODE_MODULES names another) and from checkouts of the upstream repositories at
 # the tags that npm bundles: npm/cli, npm/npm-package-arg and npm/hosted-git-info.
 # The fixtures are JSON with no file extension, so the license plugin does not prepend a header to them.
+# root-collation.js, which writes the collation data in the main resources, runs apart: see its header.
 # Usage: bash regenerate.sh <npm/cli checkout> <npm-package-arg checkout> <hosted-git-info checkout>
 set -e
 G=$(cd "$(dirname "$0")" && pwd)
@@ -27,6 +28,7 @@ node "$G/tree-dumps.js" > "$R/tree-dumps"
 node "$G/shrinkwrap-dumps.js" > "$R/shrinkwrap-dumps"
 node "$G/yarn-lock-dumps.js" "$1/workspaces/arborist" > "$R/yarn-lock-dumps"
 node "$G/spec-from-lock-cases.js" > "$R/spec-from-lock-cases"
+node "$G/package-shapes.js" > "$R/package-shapes"
 node "$G/locale-compare-cases.js" > "$R/locale-compare-cases"
 node "$G/npa-tables.js" "$2" "$R/npa-tables" 2> /dev/null
 node "$G/hosted-git-tables.js" "$3" "$R/hosted-git-tables"
