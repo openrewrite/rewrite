@@ -225,8 +225,20 @@ def _fully_qualified_repr(self) -> str:
     return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
 
 
+# Mirrors Java, where every kind of type implements the `JavaType` interface. A nested class
+# cannot name the class that encloses it, so at runtime the nested bases resolve to this
+# placeholder and are rebased onto the real `JavaType` once its body has run.
+if not TYPE_CHECKING:
+    class JavaType:
+        __slots__ = ()
+
+    _JavaTypePlaceholder = JavaType
+
+
 class JavaType(ABC):
-    class FullyQualified:
+    __slots__ = ()
+
+    class FullyQualified(JavaType):
         __slots__ = ()
 
         class Kind(Enum):
@@ -396,7 +408,7 @@ class JavaType(ABC):
                 return self._reference_values
 
     @dataclass(slots=True)
-    class GenericTypeVariable:
+    class GenericTypeVariable(JavaType):
         _name: str = field(default="")
         _variance: GenericTypeVariable.Variance = field(default=None)
         _bounds: Optional[List[JavaType]] = field(default=None)
@@ -419,7 +431,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Union:
+    class Union(JavaType):
         """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -428,7 +440,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Intersection:
+    class Intersection(JavaType):
         """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -436,7 +448,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]:
             return self._bounds if self._bounds is not None else []
 
-    class Primitive(Enum):
+    class Primitive(JavaType, Enum):
         Boolean = 0
         Byte = 1
         Char = 2
@@ -457,7 +469,7 @@ class JavaType(ABC):
             return super()._missing_(value)
 
     @dataclass(slots=True)
-    class Method:
+    class Method(JavaType):
         _flags_bit_map: int = field(default=0)
         _declaring_type: Optional[JavaType.FullyQualified] = field(default=None)
         _name: str = field(default="")
@@ -516,7 +528,7 @@ class JavaType(ABC):
             return self._declared_formal_type_names
 
     @dataclass(slots=True)
-    class Variable:
+    class Variable(JavaType):
         _flags_bit_map: int = field(default=0)
         _name: str = field(default="")
         _owner: Optional[JavaType] = field(default=None)
@@ -544,7 +556,7 @@ class JavaType(ABC):
             return self._annotations
 
     @dataclass(slots=True)
-    class Array:
+    class Array(JavaType):
         _elem_type: Optional[JavaType] = field(default=None)
         _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
@@ -555,6 +567,12 @@ class JavaType(ABC):
         @property
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
             return self._annotations
+
+
+for _nested in vars(JavaType).values():
+    if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
+        _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
+del _nested, _JavaTypePlaceholder
 
 
 T = TypeVar('T')

@@ -52,7 +52,7 @@ class MethodCall(Expression):
     pass
 
 class JavaType(ABC):
-    class FullyQualified:
+    class FullyQualified(JavaType):
         class Kind(Enum):
             Class: Kind
             Enum: Kind
@@ -161,7 +161,7 @@ class JavaType(ABC):
         def interfaces(self) -> List[JavaType.FullyQualified]: ...
 
     @dataclass(frozen=True)
-    class GenericTypeVariable:
+    class GenericTypeVariable(JavaType):
         class Variance(Enum):
             Invariant: Variance
             Covariant: Variance
@@ -181,7 +181,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]: ...
 
     @dataclass(frozen=True)
-    class Union:
+    class Union(JavaType):
         _bounds: Optional[List[JavaType]] = ...
 
         def replace(self, **kwargs: Any) -> Self: ...
@@ -190,7 +190,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]: ...
 
     @dataclass(frozen=True)
-    class Intersection:
+    class Intersection(JavaType):
         _bounds: Optional[List[JavaType]] = ...
 
         def replace(self, **kwargs: Any) -> Self: ...
@@ -198,7 +198,7 @@ class JavaType(ABC):
         @property
         def bounds(self) -> List[JavaType]: ...
 
-    class Primitive(Enum):
+    class Primitive(JavaType, Enum):
         Boolean: Primitive
         Byte: Primitive
         Char: Primitive
@@ -213,7 +213,7 @@ class JavaType(ABC):
         Null: Primitive
 
     @dataclass(frozen=True)
-    class Method:
+    class Method(JavaType):
         _flags_bit_map: int = ...
         _declaring_type: Optional[JavaType.FullyQualified] = ...
         _name: str = ...
@@ -251,7 +251,7 @@ class JavaType(ABC):
         def declared_formal_type_names(self) -> Optional[List[str]]: ...
 
     @dataclass(frozen=True)
-    class Variable:
+    class Variable(JavaType):
         _flags_bit_map: int = ...
         _name: str = ...
         _owner: Optional[JavaType] = ...
@@ -272,7 +272,7 @@ class JavaType(ABC):
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]: ...
 
     @dataclass(frozen=True)
-    class Array:
+    class Array(JavaType):
         _elem_type: Optional[JavaType] = ...
         _annotations: Optional[List[JavaType.FullyQualified]] = ...
 

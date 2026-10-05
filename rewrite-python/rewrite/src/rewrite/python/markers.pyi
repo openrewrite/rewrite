@@ -35,6 +35,8 @@ class Quoted(Marker):
         TRIPLE_SINGLE: Style
         TRIPLE_DOUBLE: Style
         BACKTICK: Style
+        @property
+        def quote(self) -> str: ...
 
     _id: UUID
     _style: Style
