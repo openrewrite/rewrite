@@ -1,7 +1,9 @@
 import {Json} from "../../src/json";
 import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
-import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
+import {IntelliJ, JavaScriptParser, JS, sourceFileCache, SpacesStyleDetailKind, StyleKind} from "../../src/javascript";
+import {MarkersKind} from "../../src/markers";
+import {NamedStyles} from "../../src/style";
 import {TreePrinters} from "../../src/print";
 import {ExecutionContext} from "../../src/execution";
 
@@ -73,6 +75,58 @@ describe("RPC queues", () => {
 
         expect(await queue.receive(undefined)).toEqual({kind: "org.openrewrite.rpc.RpcMarker", id: "1", tool: "example"});
         expect(await queue.receive(undefined)).toBeNull();
+    });
+
+    test("a set of styles changed here travels with its type, in the shape Java decodes", async () => {
+        const before: NamedStyles = {
+            kind: MarkersKind.NamedStyles,
+            id: "1",
+            name: "example",
+            displayName: "Example",
+            tags: [],
+            styles: [IntelliJ.TypeScript.tabsAndIndents()]
+        };
+        const after: NamedStyles = {...before, styles: [{...IntelliJ.TypeScript.tabsAndIndents(), indentSize: 2} as any]};
+
+        const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(after, before);
+
+        expect(batch[0]).toEqual({
+            state: RpcObjectState.CHANGE,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                ...before, styles: [{
+                    "@c": StyleKind.TabsAndIndentsStyle,
+                    "@ref": 2,
+                    useTabCharacter: false,
+                    tabSize: 4,
+                    indentSize: 2,
+                    continuationIndent: 4,
+                    keepIndentsOnEmptyLines: false,
+                    indentChainedMethods: true,
+                    indentAllChainedCallsInAGroup: false
+                }]
+            }
+        });
+    });
+
+    test("a set of styles from Java has the kinds the styles here are found by", async () => {
+        const batch: RpcObjectData[] = [{
+            state: RpcObjectState.ADD,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                "@c": MarkersKind.NamedStyles, "@ref": 1, id: "1", name: "example", displayName: "Example", tags: [],
+                styles: [
+                    {"@c": StyleKind.SpacesStyle, "@ref": 2, within: {es6ImportExportBraces: true}},
+                    {"@c": "org.openrewrite.style.GeneralFormatStyle", "@ref": 3, useCRLFNewLines: false}
+                ]
+            }
+        }];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+
+        expect((await q.receive<NamedStyles>(undefined)).styles).toEqual([
+            {kind: StyleKind.SpacesStyle, within: {kind: SpacesStyleDetailKind.SpacesStyleWithin, es6ImportExportBraces: true}},
+            {kind: "org.openrewrite.style.GeneralFormatStyle", useCRLFNewLines: false}
+        ]);
     });
 
     test("an unchanged list is a single NO_CHANGE", async () => {

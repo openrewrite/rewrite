@@ -19,6 +19,7 @@ import {emptySpace, J} from "../../src/java";
 import {
     autodetect,
     createNodeResolutionResultMarker,
+    IntelliJ,
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
@@ -67,7 +68,11 @@ const samples: { [kind: string]: () => Marker } = {
         displayName: "Example",
         description: "An example.",
         tags: ["example"],
-        styles: []
+        styles: [
+            {...IntelliJ.TypeScript.spaces(), within: {...IntelliJ.TypeScript.spaces().within, es6ImportExportBraces: true}},
+            IntelliJ.TypeScript.wrappingAndBraces(),
+            {...IntelliJ.TypeScript.tabsAndIndents(), indentSize: 2}
+        ]
     } as Marker),
     [MarkersKind.RpcMarker]: () => marker(randomId(), {tool: "example", version: 1}),
     [J.Markers.Semicolon]: () => ({kind: J.Markers.Semicolon, id: randomId()}),
@@ -86,6 +91,7 @@ const samples: { [kind: string]: () => Marker } = {
     }),
     [StyleKind.Autodetect]: () => autodetect(randomId(), []),
     [StyleKind.PrettierStyle]: () => prettierStyle(randomId(), {semi: false}, "3.0.0"),
+    [`${StyleKind.PrettierStyle} without a version`]: () => prettierStyle(randomId(), {semi: false}),
     [Yaml.Markers.OmitColon]: () => omitColon(),
 };
 
