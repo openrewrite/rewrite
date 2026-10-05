@@ -39,7 +39,7 @@ class Facade:
     def install_recipes(self, params: dict) -> dict:
         recipes = params.get("recipes")
         if isinstance(recipes, str):
-            return self._install_local(recipes)
+            return self._install_local(recipes, params.get("venv"))
         if isinstance(recipes, dict):
             package = recipes.get("packageName")
             version = recipes.get("version")
@@ -53,10 +53,13 @@ class Facade:
             return {"recipesInstalled": len(rows), "version": self._children.resolved_version(package)}
         raise ValueError(f"Invalid recipes parameter: {recipes!r}")
 
-    def _install_local(self, local_path: str) -> dict:
+    def _install_local(self, local_path: str, venv=None) -> dict:
         dist = distribution_name_from_source(Path(local_path))
         if not dist:
             raise ValueError(f"Could not determine the distribution name for local path '{local_path}'")
+        if venv:
+            rows = self._children.attach(dist, venv, attribution_name=local_path)
+            return {"recipesInstalled": len(rows), "version": self._children.resolved_version(venv)}
         rows = self._children.install(dist, local_path, force=True, attribution_name=local_path)
         return {"recipesInstalled": len(rows), "version": self._children.resolved_version(dist)}
 

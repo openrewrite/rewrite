@@ -1483,6 +1483,7 @@ def handle_install_recipes(params: dict) -> dict:
             - 'recipes': str - A local file path (installed into the recipe-install
               dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+            - 'venv': str - Only in facade mode, a prebuilt venv to run a local path's bundle on
 
     Returns:
         Dict with:
@@ -1503,6 +1504,9 @@ def handle_install_recipes(params: dict) -> dict:
     installed_version = None
     package_name: Optional[str] = None
     recipes_added = 0
+
+    if params.get('venv'):
+        raise ValueError("Attaching a prebuilt venv needs facade mode (--recipe-install-dir)")
 
     if isinstance(recipes, str):
         # Local file path. When a recipe-install dir is configured, install the
