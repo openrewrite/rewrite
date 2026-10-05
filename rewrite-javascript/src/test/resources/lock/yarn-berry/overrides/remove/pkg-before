@@ -1,0 +1,9 @@
+{
+  "name": "x",
+  "dependencies": {
+    "is-odd": "0.1.2"
+  },
+  "resolutions": {
+    "is-buffer": "2.0.0"
+  }
+}

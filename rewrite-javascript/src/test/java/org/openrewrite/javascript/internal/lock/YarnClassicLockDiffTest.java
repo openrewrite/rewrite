@@ -25,6 +25,7 @@ import java.util.*;
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * Unit tests for the graph-to-yarn.lock diff's decisions, driven by an in-memory {@link Registry}. The
@@ -58,7 +59,7 @@ class YarnClassicLockDiffTest {
     }
 
     @Test
-    void gainedSelectorMergesIntoTheExistingBlock() {
+    void gainedSelectorJoinsTheExistingBlock() {
         // The root newly declares n@1.0.0, which resolves to the version p already required at ^1.0.0: yarn
         // merges the new selector into the existing block's header rather than adding a block.
         FakeRegistry registry = new FakeRegistry()
@@ -84,7 +85,7 @@ class YarnClassicLockDiffTest {
         assertThat(edits).hasSize(1);
         assertThat(edits.get(0).getKind()).isEqualTo(PackageEdit.Kind.PROMOTION);
         assertThat(edits.get(0).getName()).isEqualTo("n");
-        assertThat(edits.get(0).getNewConstraint()).isEqualTo("1.0.0");
+        assertThat(edits.get(0).getSelectors()).containsExactlyInAnyOrder("1.0.0", "^1.0.0");
     }
 
     @Test
@@ -184,7 +185,7 @@ class YarnClassicLockDiffTest {
         assertThat(edits.get(0).getKind()).isEqualTo(PackageEdit.Kind.FORCED_MOVE);
         assertThat(edits.get(0).getName()).isEqualTo("b");
         assertThat(edits.get(0).getNewVersion()).isEqualTo("1.2.0");
-        assertThat(edits.get(0).getNewConstraint()).isEqualTo("^1.0.0");
+        assertThat(edits.get(0).getSelectors()).containsExactly("^1.0.0");
     }
 
     @Test
@@ -204,9 +205,8 @@ class YarnClassicLockDiffTest {
     }
 
     @Test
-    void mergedHeaderThatMustDropASelectorDefers() {
-        // The block serves n@1.0.0 and n@^1.0.0; the edit drops the exact pin, so the header must split, which
-        // the patcher cannot do byte-exact.
+    void mergedHeaderDropsASelectorNothingRequests() {
+        // The block serves n@1.0.0 and n@^1.0.0; the edit drops the exact pin, so the header keeps only ^1.0.0.
         FakeRegistry registry = new FakeRegistry().add("n", "1.0.0", emptyMap());
         String lock = HEADER +
                 "n@1.0.0, n@^1.0.0:\n" +
@@ -214,15 +214,14 @@ class YarnClassicLockDiffTest {
                 "  resolved \"https://registry.yarnpkg.com/n/-/n-1.0.0.tgz#sha1-n-1.0.0\"\n" +
                 "  integrity sha512-n-1.0.0\n";
 
-        assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> diff(registry, app(singletonMap("n", "^1.0.0")), lock))
-                .withMessageContaining("merged header");
+        List<PackageEdit> edits = diff(registry, app(singletonMap("n", "^1.0.0")), lock);
+        assertThat(edits).hasSize(1);
+        assertThat(edits.get(0).getSelectors()).containsExactly("^1.0.0");
     }
 
     @Test
-    void freshForkBesideADeclaredMemberDefers() {
-        // b forks fresh: the root declares ^1.0.0 and c needs ^2.0.0, both new. The patcher would fold the
-        // declared range into the transitive member's header, so the shape defers.
+    void freshForkBesideADeclaredMemberHeadsEachCopyByItsOwnRange() {
+        // b forks fresh: the root declares ^1.0.0 and c needs ^2.0.0, both new, so each copy gets its own block.
         FakeRegistry registry = new FakeRegistry()
                 .add("c", "1.0.0", singletonMap("b", "^2.0.0"))
                 .add("b", "1.9.0", emptyMap())
@@ -231,9 +230,10 @@ class YarnClassicLockDiffTest {
         deps.put("b", "^1.0.0");
         deps.put("c", "^1.0.0");
 
-        assertThatExceptionOfType(EngineFailure.class)
-                .isThrownBy(() -> diff(registry, app(deps), HEADER))
-                .withMessageContaining("header cannot be derived");
+        List<PackageEdit> edits = diff(registry, app(deps), HEADER);
+        assertThat(edits).filteredOn(e -> "b".equals(e.getName()))
+                .extracting(PackageEdit::getNewVersion, PackageEdit::getSelectors)
+                .containsExactlyInAnyOrder(tuple("1.9.0", singletonList("^1.0.0")), tuple("2.0.0", singletonList("^2.0.0")));
     }
 
     @Test

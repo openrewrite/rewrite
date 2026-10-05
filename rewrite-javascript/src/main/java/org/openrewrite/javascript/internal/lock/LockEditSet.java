@@ -93,9 +93,13 @@ public class LockEditSet {
         @Nullable
         String oldConstraint;
 
-        /** New declared range for a berry forced-move: the requirer's new constraint that re-heads the moved entry's descriptor. */
+        /** The range a moved entry is re-headed to, and for a berry add the range its descriptor is keyed by. */
         @Nullable
         String newConstraint;
+
+        /** yarn classic: every range the block's header lists once the edit lands, when the diff has settled them all. */
+        @Nullable
+        List<String> selectors;
 
         /** pnpm's peer-suffixed form of {@link #newVersion} ({@code version(peer@version)…}) for snapshot keys and references. */
         @Nullable

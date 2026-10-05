@@ -1,0 +1,1 @@
+{"name":"x","version":"1.0.0","dependencies":{"is-odd":"0.1.2"},"overrides":{"kind-of@>=3.0.0":{"is-buffer":"2.0.0"}}}

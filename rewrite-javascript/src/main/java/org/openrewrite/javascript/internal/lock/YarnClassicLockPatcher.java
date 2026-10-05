@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,6 +68,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         for (PackageEdit edit : edits.getEdits()) {
             if (edit.getKind() == ADD) {
                 adds.add(edit);
+            } else if (edit.getSelectors() != null) {
+                content = applySettledHeader(content, edit);
             } else if (edit.getKind() == FORCED_MOVE) {
                 content = applyForcedMove(content, edit);
             } else if (edit.getKind() == PROMOTION) {
@@ -146,7 +149,8 @@ public final class YarnClassicLockPatcher implements LockPatcher {
     private String applyAdds(String content, List<PackageEdit> adds, @Nullable String editedPackageJson) {
         Blocks blocks = Blocks.parse(content);
         for (PackageEdit edit : adds) {
-            blocks.insertSorted(synthesizeBlock(mergedHeader(edit, adds, editedPackageJson), edit));
+            blocks.insertSorted(synthesizeBlock(edit.getSelectors() != null ?
+                    header(edit.getName(), edit.getSelectors()) : mergedHeader(edit, adds, editedPackageJson), edit));
         }
         return blocks.reconstruct();
     }
@@ -172,6 +176,11 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         if (ranges.isEmpty()) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no declaring range found for added " + name);
         }
+        return header(name, ranges);
+    }
+
+    /** A block header listing {@code name@range} for each range, {@code sortAlpha}-ordered and {@code shouldWrapKey}-quoted. */
+    private static String header(String name, Collection<String> ranges) {
         List<String> selectors = new ArrayList<>();
         for (String range : ranges) {
             selectors.add(name + "@" + range);
@@ -185,6 +194,27 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             header.append(maybeWrap(selectors.get(i)));
         }
         return header.toString();
+    }
+
+    /** The block heading {@code name@oldConstraint}, re-headed to the edit's settled selector set and moved in place. */
+    private String applySettledHeader(String content, PackageEdit edit) {
+        String name = edit.getName();
+        String oldDescriptor = name + "@" + edit.getOldConstraint();
+        Blocks blocks = Blocks.parse(content);
+        int bi = blocks.indexOfSelector(oldDescriptor);
+        if (bi < 0) {
+            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no yarn block for " + oldDescriptor);
+        }
+        //noinspection DataFlowIssue
+        String newHeader = header(name, edit.getSelectors());
+        if (edit.getKind() == PROMOTION) {
+            String block = blocks.get(bi);
+            blocks.set(bi, newHeader + ":" + block.substring(block.indexOf('\n')));
+            return blocks.reconstruct();
+        }
+        recordDroppedEdges(blocks.get(bi), edit);
+        blocks.set(bi, inPlace(blocks.get(bi), newHeader, edit));
+        return blocks.reconstruct();
     }
 
     private String applyEdit(String content, PackageEdit edit, @Nullable String editedPackageJson) {
@@ -212,14 +242,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
             return blocks.reconstruct();
         }
 
-        if (edit.isPrunesOrphans()) {
-            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
-            for (String dep : blockDepNames(blocks.get(bi))) {
-                if (!kept.contains(dep)) {
-                    droppedTargets.add(dep);
-                }
-            }
-        }
+        recordDroppedEdges(blocks.get(bi), edit);
 
         String newConstraint = LockManifests.declaredConstraint(editedPackageJson, edit.getScope(), name);
         if (newConstraint == null) {
@@ -236,7 +259,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
 
         List<String> selectors = headerTokens(blocks.get(bi));
         if (selectors.size() == 1) {
-            blocks.set(bi, inPlace(blocks.get(bi), newDescriptor, edit));
+            blocks.set(bi, inPlace(blocks.get(bi), maybeWrap(newDescriptor), edit));
         } else if (edit.getNewVersion().equals(edit.getOldVersion())) {
             // Widening a constraint on a merged header: the moving selector may be one a transitive still
             // requires (so it must stay) or the new descriptor may already be present. The engine cannot prove
@@ -249,11 +272,22 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         return blocks.reconstruct();
     }
 
-    /** Single-selector block: rename the header, rewrite the resolution lines on a move, and re-pin changed deps. */
-    private String inPlace(String block, String newDescriptor, PackageEdit edit) {
+    /** A pruning move's dropped edges become orphan candidates for the GC. */
+    private void recordDroppedEdges(String block, PackageEdit edit) {
+        if (edit.isPrunesOrphans()) {
+            Set<String> kept = edit.getNewDependencies() == null ? emptySet() : edit.getNewDependencies().keySet();
+            for (String dep : blockDepNames(block)) {
+                if (!kept.contains(dep)) {
+                    droppedTargets.add(dep);
+                }
+            }
+        }
+    }
+
+    /** Re-head a block to {@code newHeader}, rewrite the resolution lines on a move, and re-pin changed deps. */
+    private String inPlace(String block, String newHeader, PackageEdit edit) {
         int nl = block.indexOf('\n');
         String body = block.substring(nl);
-        String newHeader = maybeWrap(newDescriptor) + ":";
         if (edit.getNewVersion() != null && !edit.getNewVersion().equals(edit.getOldVersion())) {
             body = replaceFieldLine(body, "  version ", "  version " + maybeWrap(edit.getNewVersion()));
             body = replaceFieldLine(body, "  resolved ", "  resolved " + maybeWrap(resolved(edit)));
@@ -263,7 +297,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         if (edit.isPrunesOrphans()) {
             body = dropOrphanedDeps(body, edit.getNewDependencies());
         }
-        return newHeader + body;
+        return newHeader + ":" + body;
     }
 
     /** Drop every {@code dependencies:} line whose edge the bump removed, and the section header if it empties. */
@@ -375,7 +409,7 @@ public final class YarnClassicLockPatcher implements LockPatcher {
         if (headerTokens(blocks.get(bi)).size() != 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " shares a merged selector; resolution required");
         }
-        blocks.set(bi, inPlace(blocks.get(bi), name + "@" + newConstraint, edit));
+        blocks.set(bi, inPlace(blocks.get(bi), maybeWrap(name + "@" + newConstraint), edit));
         return blocks.reconstruct();
     }
 
