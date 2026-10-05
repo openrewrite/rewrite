@@ -42,9 +42,12 @@ dependencies {
     }
 }
 
-// sbt's JLine 2 fork (CVE-2023-50572) only backs util-logging's interactive terminal, which Gradle's Zinc integration never opens.
+// Zinc never opens an interactive terminal or REPL, so neither JLine bundle is needed: sbt's JLine 2 fork
+// (CVE-2023-50572) backs util-logging's terminal, and org.jline:jline 3.x (shading the Telnet server of
+// CVE-2026-56740/56741, fixed only in 4.2.1) backs the scala-compiler 2.13 REPL.
 configurations.named("zinc") {
     exclude(group = "org.scala-sbt.jline", module = "jline")
+    exclude(group = "org.jline", module = "jline")
 }
 
 // Scala publishes release candidates as full Maven Central releases (3.10.0-RC1 today), with a
