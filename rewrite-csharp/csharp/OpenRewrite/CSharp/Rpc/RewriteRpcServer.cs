@@ -1448,12 +1448,15 @@ public class RewriteRpcServer
             recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        // Validate required options on the instantiated recipe — the root against the caller's
-        // options, and every child against the values its parent set in GetRecipeList(). Because
-        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
-        // gets validated: declarative recipes bundled in an artifact often ship without a test that
-        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
-        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        // Validate required options and the recipe's own Validate() constraints on the instantiated
+        // recipe — the root against the caller's options, and every child against the values its
+        // parent set in GetRecipeList(). Because PrepareInstance recurses, this covers the whole
+        // tree, and it's the only place the C# tree gets validated: declarative recipes bundled in
+        // an artifact often ship without a test that runs validateAll, so this is the safety net
+        // against executing a broken recipe. It is also the only place that reports a bad option
+        // once: the visitor factories run per source file, so validating there turns one
+        // misconfiguration into one error per file. Delegating recipes forward to a Java recipe that
+        // validates its own options, so they are skipped here.
         if (recipe is not IDelegatesTo)
         {
             var descriptor = recipe.GetDescriptor();
@@ -1464,6 +1467,13 @@ public class RewriteRpcServer
                     throw new ArgumentException(
                         $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
                 }
+            }
+
+            var validationErrors = recipe.Validate().ToList();
+            if (validationErrors.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"Invalid options for recipe `{descriptor.Name}`: {string.Join(" ", validationErrors)}");
             }
         }
 
