@@ -115,7 +115,7 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
         return Preconditions.check(minimumVersionInRange(acc, versionComparator), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile instanceof JavaSourceFile;
+                return sourceFile instanceof JavaSourceFile && !isBuildScript(sourceFile);
             }
 
             @Override
@@ -133,6 +133,12 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
 
     private boolean minimumVersionInRange(AtomicReference<JavaVersion> acc, VersionComparator versionComparator) {
         return acc.get() != null && versionComparator.isValid(null, Integer.toString(majorVersion(acc.get())));
+    }
+
+    // Build tool integrations never attribute a Java version to Gradle scripts
+    private static boolean isBuildScript(SourceFile sourceFile) {
+        String path = sourceFile.getSourcePath().toString();
+        return path.endsWith(".gradle") || path.endsWith(".gradle.kts");
     }
 
     private int majorVersion(JavaVersion javaVersion) {
