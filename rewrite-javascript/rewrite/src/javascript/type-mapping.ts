@@ -784,6 +784,27 @@ export class JavaScriptTypeMapping {
         return node && ts.isStringLiteral(node.moduleSpecifier) ? moduleName(node.moduleSpecifier.text) : undefined;
     }
 
+    /**
+     * The module a function declared in a parsed source file belongs to, named after the file's
+     * path relative to the source root and without its extension (like Go's type_mapper.go).
+     * A declaration and a call of the function both take it, so a pattern written from one matches the other.
+     */
+    private sourceModuleType(sourceFile: ts.SourceFile): Type.FullyQualified {
+        const fileName = sourceFile.fileName;
+        const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
+        return this.moduleType(relative.replace(/\.[^/.]+$/, ''));
+    }
+
+    /**
+     * The declaration of a function in a parsed source file. A `.d.ts` file is not parsed, so a
+     * function such as `parseInt` has none.
+     */
+    private parsedFunctionDeclaration(symbol: ts.Symbol): ts.FunctionDeclaration | undefined {
+        const declaration = symbol.valueDeclaration;
+        return declaration && ts.isFunctionDeclaration(declaration) && !declaration.getSourceFile().isDeclarationFile ?
+            declaration : undefined;
+    }
+
     private moduleType(module: string): Type.FullyQualified {
         return {
             kind: Type.Kind.Class,
@@ -1091,7 +1112,11 @@ export class JavaScriptTypeMapping {
                     }
                 }
 
-                if (moduleSpecifier) {
+                const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
+                if (declared) {
+                    declaringType = this.sourceModuleType(declared.getSourceFile());
+                    methodName = declared.name ? declared.name.text : "<anonymous>";
+                } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
                     declaringType = {
                         kind: Type.Kind.Class,
@@ -1212,23 +1237,7 @@ export class JavaScriptTypeMapping {
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
 
-            // Derive declaring type from source file module path (like Go's type_mapper.go).
-            // Use the same relativization as getFullyQualifiedName() so that declarations
-            // and invocations produce matching FQNs.
-            let moduleFqn: string;
-            const fileName = node.getSourceFile().fileName;
-            if (this.sourceRoot && path.isAbsolute(fileName)) {
-                moduleFqn = path.relative(this.sourceRoot, fileName);
-            } else {
-                moduleFqn = fileName;
-            }
-            // Strip file extension to get the module name
-            moduleFqn = moduleFqn.replace(/\.[^/.]+$/, '');
-            declaringType = {
-                kind: Type.Kind.Class,
-                flags: 0,
-                fullyQualifiedName: moduleFqn
-            } as Type.FullyQualified;
+            declaringType = this.sourceModuleType(node.getSourceFile());
 
             // Get type parameters from node
             if (node.typeParameters) {
