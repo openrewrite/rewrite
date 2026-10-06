@@ -137,13 +137,8 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
 
     answer = name if name is not None else f'{spelled_module}.{to_member}'
     visitor._after_visit.append(_RebindImport(from_module, from_member, to_module, to_member, moved, name,
-                                              through, spelled_module, identities or set(), declared_in,
-                                              answer))
-    if new_module_import:
-        # Appended after the rebind, which writes the references it binds. `maybe_add_import`
-        # would defer to an identical import an earlier `maybe_bind` queued, which runs before
-        # those references exist.
-        visitor._after_visit.append(AddImport(AddImportOptions(module=to_module, only_if_referenced=False)))
+                                              through, spelled_module, new_module_import, identities or set(),
+                                              declared_in, answer))
     return answer
 
 
@@ -207,6 +202,9 @@ def _taken(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, name: str,
 
     for v in visitor._after_visit or []:
         if isinstance(v, _RebindImport) and v.bound_name == name and other(v.to_module, v.to_member, True):
+            return True
+        if (isinstance(v, _RebindImport) and v.new_module_import and v.to_module.split('.')[0] == name
+                and other(v.to_module, None, False)):
             return True
         if isinstance(v, AddImport) and (v.alias or v.name or v.module.split('.')[0]) == name and other(
                 v.module, v.name, v.alias is not None):
@@ -505,8 +503,8 @@ class _RebindImport(PythonVisitor[Any]):
 
     def __init__(self, from_module: str, from_member: Optional[str], to_module: str,
                  to_member: Optional[str], moved: Optional[Binding], bound_name: Optional[str],
-                 through: Optional[Binding], spelled_module: Optional[str], identities: Set[str],
-                 declared_in: Optional[str], answer: str) -> None:
+                 through: Optional[Binding], spelled_module: Optional[str], new_module_import: bool,
+                 identities: Set[str], declared_in: Optional[str], answer: str) -> None:
         super().__init__()
         self.key = (from_module, from_member)
         self.from_module = from_module
@@ -518,6 +516,7 @@ class _RebindImport(PythonVisitor[Any]):
         self.through_name = through.name if through is not None else None
         self.through_at_module_level = through is not None and not through.guarded
         self.spelled_module = spelled_module
+        self.new_module_import = new_module_import
         self.identities = identities
         self.declared_in = declared_in
         self.answer = answer
@@ -543,6 +542,9 @@ class _RebindImport(PythonVisitor[Any]):
             maybe_add_import(self, AddImportOptions(
                 module=self.to_module, name=self.to_member, alias=self._import_alias(),
                 only_if_referenced=False))
+        if self.new_module_import:
+            # Ahead of the removal, since `import a.b` binds the `a` that frees `import a`.
+            maybe_add_import(self, AddImportOptions(module=self.to_module, only_if_referenced=False))
         if self.rewrote_qualified:
             maybe_remove_import(self, RemoveImportOptions(module=self.from_module))
         return result

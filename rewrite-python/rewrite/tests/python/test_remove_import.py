@@ -725,6 +725,30 @@ class TestImportsInBlocks:
             )
         )
 
+    def test_remove_a_read_import_an_enclosing_block_binds(self, arm):
+        RecipeSpec(recipe=from_visitor(_remove_import_visitor(arm, 'collections'))).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+                    if TYPE_CHECKING:
+                        import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+            )
+        )
+
     def test_keep_import_when_emptying_would_lose_a_comment(self, arm):
         spec = RecipeSpec(recipe=from_visitor(
             _remove_import_visitor(arm, 'typing', 'List', only_if_unused=False)))
