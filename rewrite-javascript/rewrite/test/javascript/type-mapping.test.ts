@@ -1136,8 +1136,15 @@ describe('JavaScript type mapping', () => {
 
         test('a class declared in a script or a declare global block is a global, so it has no module', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes((node, type) =>
-                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.ClassDeclaration) {
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
+                }
+                if (node?.kind === J.Kind.MethodInvocation && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                return null;
+            });
 
             const script = typescript(
                 `
@@ -1152,18 +1159,56 @@ describe('JavaScript type mapping', () => {
             script.path = 'src/script.ts';
             const augmentation = typescript(
                 `
-                    declare global { interface Shared {} }
+                    declare global { interface Shared { m(): void } }
+                    declare const shared: Shared;
+                    shared.m();
                     export {};
                 `,
                 //@formatter:off
                 `
-                    declare global { /*~~(Shared)~~>*/interface Shared {} }
+                    declare global { /*~~(Shared)~~>*/interface Shared { m(): void } }
+                    declare const shared: Shared;
+                    /*~~(Shared)~~>*/shared.m();
                     export {};
                 `
                 //@formatter:on
             );
             augmentation.path = 'src/augmentation.ts';
-            await spec.rewriteRun(script, augmentation);
+            const moduleNamedGlobal = typescript(
+                `
+                    class Local {}
+                    export {};
+                `,
+                //@formatter:off
+                `
+                    /*~~(global.Local)~~>*/class Local {}
+                    export {};
+                `
+                //@formatter:on
+            );
+            moduleNamedGlobal.path = 'global.ts';
+            await spec.rewriteRun(script, augmentation, moduleNamedGlobal);
+        });
+
+        test('a local class in a dependency\'s source is named after its package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+
+            const src = typescript(
+                `
+                    class Local {}
+                    export { Local };
+                `,
+                //@formatter:off
+                `
+                    /*~~(pkg.Local)~~>*/class Local {}
+                    export { Local };
+                `
+                //@formatter:on
+            );
+            src.path = 'node_modules/pkg/index.ts';
+            await spec.rewriteRun(src);
         });
 
         test.skip('should map generic types', async () => {
