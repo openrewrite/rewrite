@@ -188,41 +188,6 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void enginesLeafAddByteExact() {
-        // A dependency-free package carrying object metadata (engines) now inserts byte-exact (I1-follow).
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/npm/add-meta-engines/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/7.0.0",
-                resource("lock/npm/add-meta-engines/http/is-number-7.0.0"));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-meta-engines/pkg-after"),
-                resource("lock/npm/add-meta-engines/pkg-before"),
-                resource("lock/npm/add-meta-engines/before"),
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-meta-engines/after"));
-    }
-
-    @Test
-    void richMetadataLeafAddByteExact() {
-        // os (array, groups with scalars) + a derived hasInstallScript + license, then engines (object,
-        // groups last) — the full value-kind partition, end-to-end through the engine.
-        routes.put("https://registry.npmjs.org/fsevents", resource("lock/npm/add-meta-rich/http/fsevents"));
-        routes.put("https://registry.npmjs.org/fsevents/2.3.3",
-                resource("lock/npm/add-meta-rich/http/fsevents-2.3.3"));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-meta-rich/pkg-after"),
-                resource("lock/npm/add-meta-rich/pkg-before"),
-                resource("lock/npm/add-meta-rich/before"),
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-meta-rich/after"));
-    }
-
-    @Test
     void leafAddByteExact() {
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
@@ -249,12 +214,6 @@ class NativeLockEngineTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
     }
-
-    // --- C1 / I5: reverse-dependent nesting ------------------------------
-
-    // --- closure surfaces (each fails loud individually) -----------------
-
-    // --- other fail-loud guards ------------------------------------------
 
     @Test
     void nullLockFailsLoud() {

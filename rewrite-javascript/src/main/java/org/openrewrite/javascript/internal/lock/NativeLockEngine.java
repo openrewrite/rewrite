@@ -52,7 +52,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Deque;
 import java.util.EnumSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -67,17 +66,18 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 /**
  * Native lock regeneration, by package manager. npm goes through {@link NpmLockRegenerator}: the ported
  * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. pnpm, Yarn and Bun
- * still take the per-dependency flow below: diff the pre-edit and post-edit {@code package.json}, prove each
- * moving dependency leaves the resolved closure unchanged, resolve the target version against the registry,
- * and hand a proven {@link LockEditSet} to the format's {@link LockPatcher}; when that proof cannot be made,
- * the whole closure is resolved instead, seeded by the existing lock, and diffed into the same edits.
+ * take the per-dependency flow below until each follows its own resolver: diff the pre-edit and post-edit
+ * {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
+ * version against the registry, and hand a proven {@link LockEditSet} to the format's {@link LockPatcher};
+ * when that proof cannot be made, the whole closure is resolved instead, seeded by the existing lock, and
+ * diffed into the same edits.
  * <p>
  * Whatever a route cannot express byte-exactly fails loud with a structured {@link Failure} and no lock; there
  * is no shell-out (it would leak registry credentials).
  */
 public final class NativeLockEngine {
 
-    // Bun's lock is JSONC (trailing commas, // comments); npm's is strict JSON, so this mapper reads both.
+    // Bun's lock is JSONC (trailing commas, // comments); package.json is strict JSON, so this mapper reads both.
     private static final ObjectMapper JSON = JsonMapper.builder()
             .enable(JsonReadFeature.ALLOW_TRAILING_COMMA)
             .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
@@ -247,9 +247,6 @@ public final class NativeLockEngine {
             throw perDependency;
         }
         try {
-            if (pm == PackageManager.Npm) {
-                return resolveAndPatchNpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
-            }
             if (pm == PackageManager.Pnpm) {
                 return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
@@ -269,23 +266,6 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Resolve the whole closure seeded by the existing lock, then patch only the difference: a locked version
-     * still satisfying its range is kept (as a real incremental install would), the resolved graph is diffed
-     * against the lock, and the same patcher applies the edits — untouched entries keep their bytes.
-     */
-    private static Result resolveAndPatchNpm(String editedPackageJson, String existingLock,
-                                             @Nullable Path packageJsonPath, NodeRegistries registries,
-                                             NpmRegistryClient client) {
-        Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true, lockedVersionsNpm(existingLock), true)
-                .build(singletonMap("", editedPackageJson));
-        List<LockEditSet.PackageEdit> edits = NpmLockDiff.diff(graph, existingLock);
-        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Npm, packageJsonPath),
-                PackageManager.Npm, editedPackageJson, edits);
-        return Result.success(new NpmLockPatcher().patch(editSet));
-    }
-
-    /**
      * Resolve the closure seeded by the existing berry lock, diff it, and patch only the difference. Untouched
      * entries keep their recorded checksums; only fresh or moved entries reproduce theirs from the tarball.
      */
@@ -293,7 +273,7 @@ public final class NativeLockEngine {
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBerry(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsBerry(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
@@ -327,15 +307,12 @@ public final class NativeLockEngine {
         return locked;
     }
 
-    /**
-     * The classic-yarn variant of {@link #resolveAndPatchNpm}: resolve the closure seeded by the existing
-     * yarn.lock, diff against its flat blocks, and patch only the difference.
-     */
+    /** Resolve the closure seeded by the existing yarn.lock, diff against its flat blocks, and patch only the difference. */
     private static Result resolveAndPatchYarnClassic(String editedPackageJson, String existingLock,
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsYarnClassic(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsYarnClassic(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
@@ -370,7 +347,7 @@ public final class NativeLockEngine {
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsPnpm(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsPnpm(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
@@ -396,37 +373,19 @@ public final class NativeLockEngine {
     }
 
     /**
-     * The bun analogue of {@link #resolveAndPatchNpm}: resolve the closure seeded by the existing bun.lock
-     * (bun keeps a satisfying locked version, like npm, but does not auto-install missing peers), diff the
-     * graph against the lock, and patch only the difference.
+     * Resolve the closure seeded by the existing bun.lock (bun keeps a satisfying locked version but does not
+     * auto-install missing peers), diff the graph against the lock, and patch only the difference.
      */
     private static Result resolveAndPatchBun(String editedPackageJson, String existingLock,
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
         Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false, lockedVersionsBun(existingLock))
+        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsBun(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
                 PackageManager.Bun, editedPackageJson, edits);
         return Result.success(new BunLockPatcher().patch(editSet));
-    }
-
-    /** The versions the lock already installs, keyed by tree-slot name (an alias seeds under its slot). */
-    private static Map<String, Set<String>> lockedVersionsNpm(String lock) {
-        Map<String, Set<String>> locked = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : installedPackagesNpm(lock).entrySet()) {
-            String key = e.getKey();
-            String slot = key.substring(key.lastIndexOf("node_modules/") + "node_modules/".length());
-            if (e.getValue() instanceof Map) {
-                Map<?, ?> entry = (Map<?, ?>) e.getValue();
-                Object version = entry.get("version");
-                if (version instanceof String && !Boolean.TRUE.equals(entry.get("link"))) {
-                    locked.computeIfAbsent(slot, k -> new LinkedHashSet<>()).add((String) version);
-                }
-            }
-        }
-        return locked;
     }
 
     /** The versions the bun.lock already installs, keyed by tree-slot name (the key's last package segment). */
@@ -459,7 +418,7 @@ public final class NativeLockEngine {
 
     /**
      * Whether the project has more than the single root importer whole-closure resolution reproduces. A workspace root manifest
-     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}, npm/bun
+     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}, bun
      * workspace importer entries, berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
      * a manifest in a sub-directory is treated as a member conservatively.
      */
@@ -488,10 +447,8 @@ public final class NativeLockEngine {
 
     private static boolean multiImporterLock(PackageManager pm, String lock) {
         switch (pm) {
-            case Npm:
-                return jsonImporterCount(lock, "packages", true) > 1;
             case Bun:
-                return jsonImporterCount(lock, "workspaces", false) > 1;
+                return bunImporterCount(lock) > 1;
             case Pnpm:
                 return pnpmImporterKeys(lock).size() > 1;
             case YarnBerry:
@@ -501,15 +458,14 @@ public final class NativeLockEngine {
         }
     }
 
-    /** Count importer entries in a JSON lock's {@code section} map (npm skips nested {@code node_modules/} keys). */
-    private static int jsonImporterCount(String lock, String section, boolean skipNodeModules) {
-        Object entries = parseJsonObject(lock, false).get(section);
+    private static int bunImporterCount(String lock) {
+        Object entries = parseJsonObject(lock, false).get("workspaces");
         if (!(entries instanceof Map)) {
             return 0;
         }
         int count = 0;
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) entries).entrySet()) {
-            if (e.getValue() instanceof Map && !(skipNodeModules && String.valueOf(e.getKey()).contains("node_modules/"))) {
+        for (Object importer : ((Map<?, ?>) entries).values()) {
+            if (importer instanceof Map) {
                 count++;
             }
         }
@@ -551,8 +507,8 @@ public final class NativeLockEngine {
 
         if (change.oldConstraint == null) {
             if ("optionalDependencies".equals(change.scope) || "peerDependencies".equals(change.scope)) {
-                // A fresh optional or peer declaration marks flags and scopes across the tree (npm 7+ even
-                // auto-installs a missing peer); only whole-closure resolution reproduces that.
+                // A fresh optional or peer declaration marks flags and scopes across the tree; only
+                // whole-closure resolution reproduces that.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                         "adding " + name + " to " + change.scope + " requires resolution");
             }
@@ -590,19 +546,6 @@ public final class NativeLockEngine {
             Set<String> importerVersions = importerResolvedVersionsPnpm(existingLock, name, change.oldConstraint);
             if (importerVersions.size() == 1) {
                 lockedVersions = importerVersions;
-            }
-        }
-
-        boolean npmForkRescoped = false;
-        if (pm == PackageManager.Npm && lockedVersions.size() > 1) {
-            // The npm analogue: npm hoists a root-declared direct dep to the top-level node_modules/<name>, so
-            // the same package forked (nested under a reverse-dependent) at another version is unambiguous at the
-            // importer edge. Re-scope the bump to that top-level version; the nested forks this direct bump does
-            // not touch stay byte-identical. A member/transitive fork (empty here) stays fail-loud below.
-            Set<String> importerVersions = importerResolvedVersionsNpm(existingLock, name, change.oldConstraint);
-            if (importerVersions.size() == 1) {
-                lockedVersions = importerVersions;
-                npmForkRescoped = true;
             }
         }
 
@@ -645,18 +588,10 @@ public final class NativeLockEngine {
             return singletonList(edit.build());
         }
 
-        if (npmForkRescoped) {
-            // The re-scoped top-level bump is byte-safe only while every nested fork stays a fork; a fork whose
-            // requirer would accept the bumped target dedupes up into the new top-level (a reshape). Defer those.
-            requireForksStayForkedNpm(name, oldVersion, targetVersion, existingLock);
-        }
-
         // A reverse-dependent whose recorded constraint excludes the new version keeps the old version nested
         // under itself; the safe single-leaf slice resolves it, everything else defers.
         List<LockEditSet.PackageEdit> nestEdits;
-        if (pm == PackageManager.Npm) {
-            nestEdits = planReverseDependentNestsNpm(name, oldVersion, targetVersion, existingLock, registries, client);
-        } else if (pm == PackageManager.Bun) {
+        if (pm == PackageManager.Bun) {
             nestEdits = planReverseDependentNestsBun(name, oldVersion, targetVersion, existingLock, registries, client);
         } else if (pm == PackageManager.Pnpm) {
             // pnpm never nests; a reverse-dependent that keeps the old version becomes a content-fork that
@@ -677,15 +612,14 @@ public final class NativeLockEngine {
         VersionManifest newManifest = client.getManifest(registry, name, targetVersion);
 
         // Every closure surface but `dependencies` must be unchanged; a `dependencies` delta no longer fails
-        // loud outright, it seeds the greedy-forward cascade below. A peer-surface delta whose already-installed
-        // providers still satisfy the new ranges is written through rather than deferred (npm only).
+        // loud outright, it seeds the greedy-forward cascade below.
         boolean depsEqual = dependenciesEqual(oldManifest, newManifest);
-        LockEditSet.EntryMetadata surfaces =
-                diffEntryMetadata(pm, name, oldManifest, newManifest, existingLock, depsEqual);
+        proveNonDependencySurfacesUnchanged(name, oldManifest, newManifest);
+        LockEditSet.EntryMetadata surfaces = metadataDelta(oldManifest, newManifest);
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (npm, pnpm v9, both yarns, bun).
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, both yarns, bun).
         boolean prunesOrphans = dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
@@ -701,16 +635,7 @@ public final class NativeLockEngine {
         edits.add(rootEdit);
         edits.addAll(nestEdits);
         if (!depsEqual) {
-            if (pm == PackageManager.Npm) {
-                CascadeResult cr = cascadeForcedMoves(name, newManifest,
-                        "devDependencies".equals(change.scope), existingLock, registries, client);
-                edits.addAll(cr.edits);
-                if (cr.rootAddsEdges) {
-                    // The bumped root's entry gains new dependency edges whose subtrees were placed above;
-                    // tell the patcher to graft the full new dependencies map rather than fail loud.
-                    edits.set(0, rootEdit.toBuilder().addsDependencyEdges(true).build());
-                }
-            } else if (pm == PackageManager.Pnpm) {
+            if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
                 edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
@@ -722,326 +647,6 @@ public final class NativeLockEngine {
             }
         }
         return edits;
-    }
-
-    /** The cascade's emitted edits, plus whether the bumped root's own {@code dependencies} map gained new edges. */
-    private static final class CascadeResult {
-        final List<LockEditSet.PackageEdit> edits;
-        final boolean rootAddsEdges;
-
-        CascadeResult(List<LockEditSet.PackageEdit> edits, boolean rootAddsEdges) {
-            this.edits = edits;
-            this.rootAddsEdges = rootAddsEdges;
-        }
-    }
-
-    /**
-     * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move.
-     * Each forced transitive resolves over the union of all live constraints on it (the bumped dep's new
-     * constraint substituted for its stale lock entry). When a moved transitive's own target ALSO changes ITS
-     * {@code dependencies} (a multi-level cascade), those changed edges seed the next wave via the same worklist,
-     * each wave byte-exact-or-fail-loud. A brand-new transitive the root introduces (add-during-bump) resolves and
-     * hoists its own fresh subtree via {@link #placeAddedTransitivesNpm}; only the root can introduce one (a deeper
-     * mover's edge set must be identical, else it already fails loud). Any move that would reshape fails loud:
-     * union unsatisfiable (npm would fork/nest), an added/dropped edge mid-cascade, or a transitive re-touched
-     * across waves (an earlier union missed a requirer).
-     */
-    private static CascadeResult cascadeForcedMoves(String rootName, VersionManifest rootNew, boolean dev,
-                                                    String existingLock, NodeRegistries registries,
-                                                    NpmRegistryClient client) {
-        // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop only
-        // re-resolves kept edges. Each resolves over the actual installed tree via npm's hoisting walk, so an
-        // edge already satisfied by a nested copy is a no-op.
-        Map<String, Object> installed = installedPackagesNpm(existingLock);
-
-        // Every mover's new constraint map, seeded with the bumped root and grown by each cascade wave. It lets a
-        // shared transitive's union substitute EVERY moved requirer's new constraint for its stale lock value.
-        Map<String, Map<String, String>> movedNewDeps = new LinkedHashMap<>();
-        movedNewDeps.put(rootName, rootNew.getDependencies() == null ?
-                emptyMap() : rootNew.getDependencies());
-        Deque<String> worklist = new ArrayDeque<>();
-        worklist.add(rootName);
-
-        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
-        Set<String> movedDeps = new LinkedHashSet<>();
-        Map<String, String> newTransitives = new LinkedHashMap<>();
-        while (!worklist.isEmpty()) {
-            String moverName = worklist.poll();
-            String moverKey = "node_modules/" + moverName;
-            for (Map.Entry<String, String> e : movedNewDeps.get(moverName).entrySet()) {
-                String dep = e.getKey();
-                String constraint = e.getValue();
-                String resolvedKey = NpmLockPatcher.resolveFrom(installed.keySet(), moverKey, dep);
-                String cur = installedVersion(installed, resolvedKey);
-                if (cur == null) {
-                    // A brand-new transitive. Only the initially-bumped root can introduce one; a deeper mover's
-                    // edge set must be identical (resolveForcedMove fails loud otherwise), so this never fires for
-                    // a mover. Collect it; its fresh subtree is resolved+hoisted after the move waves settle.
-                    if (!moverName.equals(rootName)) {
-                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                                "upgrading " + moverName + " introduces new transitive " + dep +
-                                        " (add-during-bump) not yet supported");
-                    }
-                    newTransitives.put(dep, constraint);
-                    continue;
-                }
-                if (isUnsupportedProtocol(constraint) || !Semver.validate(constraint, null, NODE).isValid()) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            dep + " is constrained by an unresolvable range: " + constraint);
-                }
-                if (Semver.satisfies(cur, constraint, NODE)) {
-                    continue; // kept edge already satisfied by the installed version (constraint re-pin only)
-                }
-                if (!resolvedKey.equals("node_modules/" + dep)) {
-                    // A nested copy that no longer satisfies would move within its own subtree; the mover path
-                    // assumes a top-level entry, so defer rather than risk a non-byte-exact tree.
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            "moving nested " + dep + " to satisfy the upgraded " + moverName +
-                                    " constraint is not yet supported");
-                }
-                if (!movedDeps.add(dep)) {
-                    // A transitive forced by more than one wave means an earlier union missed a requirer; the
-                    // second resolve would not be byte-safe. Defer.
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            dep + " is forced to move by more than one cascade wave; deferred");
-                }
-                ForcedMove move = resolveForcedMove(dep, cur, movedNewDeps, existingLock, registries, client);
-                moves.add(move.edit);
-                if (move.cascadeDeps != null) {
-                    // The moved transitive's target changes its own edges: seed the next wave.
-                    movedNewDeps.put(dep, move.cascadeDeps);
-                    worklist.add(dep);
-                }
-            }
-        }
-        if (!newTransitives.isEmpty()) {
-            moves.addAll(placeAddedTransitivesNpm(newTransitives, dev, installed, movedNewDeps.keySet(),
-                    existingLock, registries, client));
-        }
-        return new CascadeResult(moves, !newTransitives.isEmpty());
-    }
-
-    /**
-     * Resolve and hoist the fresh subtree(s) a bump pulls into the closure (add-during-bump), reusing npm's
-     * hoisting placement. Maximally conservative: every subtree member must land at a free top-level
-     * {@code node_modules/<name>} slot — a name that already sits anywhere in the tree, that the cascade moves,
-     * or that is required at two incompatible versions within the added subtree, all fail loud (dedupe/nest/fork
-     * are left to a full resolver). Each placed member is emitted as a fresh {@code ADD}.
-     */
-    private static List<LockEditSet.PackageEdit> placeAddedTransitivesNpm(Map<String, String> seeds, boolean dev,
-                                                                          Map<String, Object> installed,
-                                                                          Set<String> cascadeNames, String existingLock,
-                                                                          NodeRegistries registries,
-                                                                          NpmRegistryClient client) {
-        Map<String, String> existingTop = topLevelVersionsNpm(existingLock);
-        Map<String, Placement> placed = new LinkedHashMap<>();
-        Deque<Requirement> queue = new ArrayDeque<>();
-        for (Map.Entry<String, String> e : seeds.entrySet()) {
-            queue.add(new Requirement(e.getKey(), e.getValue(), dev));
-        }
-        while (!queue.isEmpty()) {
-            Requirement req = queue.poll();
-            if (cascadeNames.contains(req.name)) {
-                // The added subtree needs a package the same bump is moving; the two interact, defer.
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                        "the added transitive subtree needs " + req.name + " which the bump also moves; deferred");
-            }
-            String existingVersion = existingTop.get(req.name);
-            if (existingVersion != null) {
-                if (existingSatisfies(existingVersion, req.constraint)) {
-                    continue; // dedup to the stable top-level pin the bump does not touch
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is installed at " +
-                        existingVersion + " which does not satisfy the added " + req.constraint +
-                        " (npm would nest/move it); deferred");
-            }
-            if (installedAnywhereNpm(installed, req.name)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                        req.name + " already exists nested in the tree; hoisting the added copy is not yet supported");
-            }
-            Placement already = placed.get(req.name);
-            if (already != null) {
-                if (existingSatisfies(already.version, req.constraint)) {
-                    continue;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
-                        " is required at two incompatible versions within the added subtree (" +
-                        already.version + " vs " + req.constraint + "); deferred");
-            }
-
-            NodeRegistry registry = registries.registryFor(req.name);
-            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-            VersionManifest manifest = client.getManifest(registry, req.name, version);
-            requireEmittableClosureMember(req.name, manifest);
-            VersionManifest.Dist dist = manifest.getDist();
-            if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
-                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                        req.name + "@" + version + " has no registry tarball/integrity");
-            }
-            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
-            proveReverseDependentsAccept(PackageManager.Npm, req.name, version, version, existingLock);
-
-            placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
-            enqueueDeps(queue, manifest.getOptionalDependencies(), req.dev, req.name);
-        }
-
-        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
-        for (Map.Entry<String, Placement> e : placed.entrySet()) {
-            Placement p = e.getValue();
-            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(e.getKey())
-                    .oldVersion("")
-                    .newVersion(p.version)
-                    .newResolved(dist.getTarball())
-                    .newIntegrity(dist.getIntegrity())
-                    .newShasum(dist.getShasum())
-                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
-                    .scope(p.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .metadata(leafMetadata(p.manifest, p.dev))
-                    .build());
-        }
-        return edits;
-    }
-
-    /** Whether {@code name} is installed at any depth ({@code node_modules/<name>} top-level or nested). */
-    private static boolean installedAnywhereNpm(Map<String, Object> installed, String name) {
-        String suffix = "node_modules/" + name;
-        for (String key : installed.keySet()) {
-            if (key.equals(suffix) || key.endsWith("/" + suffix)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** A forced move's emitted edit, plus the mover's changed edges when its target seeds a deeper cascade wave. */
-    private static final class ForcedMove {
-        final LockEditSet.PackageEdit edit;
-        final @Nullable Map<String, String> cascadeDeps;
-
-        ForcedMove(LockEditSet.PackageEdit edit, @Nullable Map<String, String> cascadeDeps) {
-            this.edit = edit;
-            this.cascadeDeps = cascadeDeps;
-        }
-    }
-
-    /**
-     * Resolve and emit the move of a single forced transitive, failing loud on any reshape. When the target
-     * changes the transitive's OWN {@code dependencies} (same edge set, changed constraints), the changed edges
-     * are returned to seed the next cascade wave; an added/dropped edge reshapes the tree and fails loud.
-     */
-    private static ForcedMove resolveForcedMove(String dep, String oldVersion,
-                                                Map<String, Map<String, String>> movedNewDeps, String existingLock,
-                                                NodeRegistries registries, NpmRegistryClient client) {
-        // A transitive that is also directly declared would need its importer declaration reconciled too.
-        if (importerDeclaresNpm(existingLock, dep)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is directly declared; moving it via cascade is not yet supported");
-        }
-
-        Set<String> union = liveConstraintsNpm(existingLock, dep, movedNewDeps);
-        NodeRegistry registry = registries.registryFor(dep);
-        Set<String> published = client.getPackument(registry, dep).getVersions();
-        String target = maxSatisfyingAll(published, union);
-        if (target == null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    "no single version of " + dep + " satisfies all requirers " + union +
-                            " (npm would fork/nest; deferred)");
-        }
-        if (target.equals(oldVersion)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " resolves back to its locked version under the union; deferred");
-        }
-
-        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
-        VersionManifest newManifest = client.getManifest(registry, dep, target);
-        // A mover must be a clean bump on every non-`dependencies` surface; a `dependencies` delta seeds the next
-        // wave, but only when the edge SET is identical (an added/dropped edge mid-cascade would place/GC a
-        // subtree — npm reshapes, so it defers).
-        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
-        Map<String, String> cascadeDeps = null;
-        if (!dependenciesEqual(oldManifest, newManifest)) {
-            Map<String, String> oldDeps = oldManifest.getDependencies() == null ?
-                    emptyMap() : oldManifest.getDependencies();
-            Map<String, String> newDeps = newManifest.getDependencies() == null ?
-                    emptyMap() : newManifest.getDependencies();
-            if (!oldDeps.keySet().equals(newDeps.keySet())) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        "moving " + dep + " to " + target + " adds/drops a dependency edge " +
-                                "(mid-cascade reshape) not yet supported");
-            }
-            cascadeDeps = newManifest.getDependencies();
-        }
-
-        VersionManifest.Dist dist = newManifest.getDist();
-        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
-            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep,
-                    dep + "@" + target + " has no registry tarball/integrity");
-        }
-        LockEditSet.PackageEdit edit = LockEditSet.PackageEdit.builder()
-                .name(dep)
-                .oldVersion(oldVersion)
-                .newVersion(target)
-                .newResolved(dist.getTarball())
-                .newIntegrity(dist.getIntegrity())
-                .newShasum(dist.getShasum())
-                .newDependencies(newManifest.getDependencies())
-                .newOptionalDependencies(newManifest.getOptionalDependencies())
-                .metadata(metadataDelta(PackageManager.Npm, oldManifest, newManifest))
-                .scope("dependencies")
-                .importerDir(null)
-                .kind(FORCED_MOVE)
-                .build();
-        return new ForcedMove(edit, cascadeDeps);
-    }
-
-    /**
-     * Every recorded constraint on {@code dep} across the lock's installed entries, with each moved requirer's new
-     * constraint substituted for its stale lock entry ({@code movedNewDeps} holds the bumped root plus every
-     * cascade mover). If no version satisfies all of them, npm would fork/nest.
-     */
-    private static Set<String> liveConstraintsNpm(String lock, String dep,
-                                                  Map<String, Map<String, String>> movedNewDeps) {
-        Set<String> constraints = new LinkedHashSet<>();
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            String prefix = "node_modules/";
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                int nm = key.lastIndexOf(prefix);
-                if (nm < 0 || !(e.getValue() instanceof Map)) {
-                    continue; // importer entries: dep is not importer-declared (guarded above)
-                }
-                if (movedNewDeps.containsKey(key.substring(nm + prefix.length()))) {
-                    continue; // a mover: its lock constraint is stale, its new one is substituted below
-                }
-                Map<?, ?> entry = (Map<?, ?>) e.getValue();
-                addConstraintOn(constraints, entry.get("dependencies"), dep);
-                addConstraintOn(constraints, entry.get("optionalDependencies"), dep);
-                addConstraintOn(constraints, entry.get("peerDependencies"), dep);
-            }
-        }
-        for (Map<String, String> newDeps : movedNewDeps.values()) {
-            String rootConstraint = newDeps.get(dep);
-            if (rootConstraint != null) {
-                constraints.add(rootConstraint);
-            }
-        }
-        return constraints;
-    }
-
-    private static void addConstraintOn(Set<String> constraints, @Nullable Object scopeMap, String dep) {
-        if (scopeMap instanceof Map) {
-            Object c = ((Map<?, ?>) scopeMap).get(dep);
-            if (c instanceof String) {
-                constraints.add((String) c);
-            }
-        }
     }
 
     /** The highest published version satisfying every constraint, or {@code null} if none does. */
@@ -1062,25 +667,8 @@ public final class NativeLockEngine {
         return best;
     }
 
-    private static boolean importerDeclaresNpm(String lock, String dep) {
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if (key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
-                    continue; // importer entries only
-                }
-                if (declaredConstraintIn((Map<?, ?>) e.getValue(), dep, DECLARED_SCOPES) != null) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     /**
-     * The pnpm counterpart of {@link #cascadeForcedMoves}. pnpm records resolved versions in
+     * A direct-dependency bump whose new {@code dependencies} force a locked transitive to move. pnpm records resolved versions in
      * {@code snapshots.<root>@<v>.dependencies}, not constraints, so the transitive's current version is read
      * from the bumped root's own snapshot and the reverse-edge safety is a single-requirer check: a shared
      * transitive, whose other requirers' ranges are not in the lock, fails loud rather than risk a fork.
@@ -1173,7 +761,7 @@ public final class NativeLockEngine {
                 .newVersion(target)
                 .newIntegrity(dist.getIntegrity())
                 .newDependencies(newManifest.getDependencies())
-                .metadata(metadataDelta(PackageManager.Pnpm, oldManifest, newManifest))
+                .metadata(metadataDelta(oldManifest, newManifest))
                 .scope("dependencies")
                 .importerDir(null)
                 .kind(FORCED_MOVE)
@@ -1334,10 +922,10 @@ public final class NativeLockEngine {
 
     /**
      * A direct dependency the recipe added, plus its runtime closure. The added dep is resolved over the
-     * packument, then its dependencies are walked transitively; each closure member either hoists to a fresh
-     * top-level {@code node_modules/<name>} entry or dedups to an already-satisfying pin. Any placement that
-     * would move, nest, or fork an already-placed package fails loud (an incompatible top-level pin, a member
-     * needed at two versions, an excluding reverse-dependent, or an unverified metadata surface).
+     * packument, then its dependencies are walked transitively; each closure member either lands as a fresh
+     * entry or dedups to an already-satisfying pin. Any placement that would move, nest, or fork an
+     * already-placed package fails loud (an incompatible top-level pin, a member needed at two versions, an
+     * excluding reverse-dependent, or an unverified metadata surface).
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAdd(PackageManager pm, DepChange change,
                                                                    String existingLock, @Nullable String memberImporterDir,
@@ -1349,190 +937,38 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, rootName,
                     rootName + " uses an unsupported entry type: " + rootConstraint);
         }
-        if (pm == PackageManager.Pnpm) {
-            // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
-            // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
-            return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
+        switch (pm) {
+            case Pnpm:
+                // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
+                // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
+                return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
+            case Bun:
+                // bun hoists: one packages tuple per member, failing loud on any conflict/nest (bun's
+                // parent/name fork keys).
+                return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
+            case YarnClassic:
+            case YarnBerry:
+                // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
+                // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
+                // checksums enriched afterward; scoped members (leaf or clean closure) are byte-exact.
+                return resolveClosureAddYarn(pm, change, rootName, rootConstraint, existingLock, registries, client);
+            default:
+                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
         }
-        if (pm == PackageManager.Bun) {
-            // bun hoists like npm: the closure resolves identically, one packages tuple per member, failing
-            // loud on any conflict/nest (bun's parent/name fork keys).
-            return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
-        }
-        if (pm == PackageManager.YarnClassic || pm == PackageManager.YarnBerry) {
-            // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
-            // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
-            // checksums enriched afterward; scoped members (leaf or clean closure) are byte-exact.
-            return resolveClosureAddYarn(pm, change, rootName, rootConstraint, existingLock, registries, client);
-        }
-        // Only the npm patcher can insert closure entries so far; other formats defer.
-        if (pm != PackageManager.Npm) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
-        }
-
-        Map<String, String> existingTopLevel = topLevelVersionsNpm(existingLock);
-        boolean dev = "devDependencies".equals(change.scope);
-
-        Map<String, Placement> placed = new LinkedHashMap<>();
-        Map<String, NestedPlacement> nested = new LinkedHashMap<>();
-        LockEditSet.PackageEdit promotion = null;
-        Deque<Requirement> queue = new ArrayDeque<>();
-        queue.add(new Requirement(rootName, rootConstraint, dev));
-
-        while (!queue.isEmpty()) {
-            Requirement req = queue.poll();
-
-            String existingVersion = existingTopLevel.get(req.name);
-            if (existingVersion != null) {
-                if (req.name.equals(rootName)) {
-                    // Already installed as a transitive: npm reuses that install (writing only the importer edge,
-                    // clearing "dev" on a dev->prod promotion) when its version equals what the constraint resolves to.
-                    NodeRegistry registry = registries.registryFor(rootName);
-                    String resolved = resolveAddedVersion(client, registry, rootName, rootConstraint);
-                    if (!resolved.equals(existingVersion)) {
-                        throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is installed at " +
-                                existingVersion + " but the added " + rootConstraint + " resolves to " + resolved +
-                                " (promotion would change the version); deferred");
-                    }
-                    promotion = promotionEdit(rootName, change.scope, dev, existingLock);
-                    continue;
-                }
-                // Dedup to the already-placed pin, or nest the required version under its parent where an
-                // incompatible version holds the top slot.
-                if (existingSatisfies(existingVersion, req.constraint)) {
-                    continue;
-                }
-                nestUnderParent(PackageManager.Npm, req, existingVersion, placed, nested, existingLock, registries, client);
-                continue;
-            }
-
-            Placement already = placed.get(req.name);
-            if (already != null) {
-                if (existingSatisfies(already.version, req.constraint)) {
-                    continue;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
-                        " is required at two incompatible versions within the added closure (" +
-                        already.version + " vs " + req.constraint + "); deferred");
-            }
-
-            NodeRegistry registry = registries.registryFor(req.name);
-            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-            VersionManifest manifest = client.getManifest(registry, req.name, version);
-            requireEmittableClosureMember(req.name, manifest);
-
-            VersionManifest.Dist dist = manifest.getDist();
-            if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
-                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                        req.name + "@" + version + " has no registry tarball/integrity");
-            }
-
-            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
-            proveReverseDependentsAccept(pm, req.name, version, version, existingLock);
-
-            placed.put(req.name, new Placement(version, manifest, req.dev));
-
-            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
-            enqueueDeps(queue, manifest.getOptionalDependencies(), req.dev, req.name);
-        }
-
-        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
-        for (Map.Entry<String, Placement> e : placed.entrySet()) {
-            Placement p = e.getValue();
-            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
-            // Only the root writes an importer constraint; the patcher no-ops the transitives, absent from the
-            // edited package.json. Scope carries dev-ness so a dev-rooted closure marks every fresh entry.
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(e.getKey())
-                    .oldVersion("")
-                    .newVersion(p.version)
-                    .newResolved(dist.getTarball())
-                    .newIntegrity(dist.getIntegrity())
-                    .newShasum(dist.getShasum())
-                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
-                    .scope(p.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .metadata(leafMetadata(p.manifest, p.dev))
-                    .build());
-        }
-        for (NestedPlacement np : nested.values()) {
-            VersionManifest.Dist dist = Objects.requireNonNull(np.manifest.getDist());
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(np.name)
-                    .oldVersion("")
-                    .newVersion(np.version)
-                    .newResolved(dist.getTarball())
-                    .newIntegrity(dist.getIntegrity())
-                    .newShasum(dist.getShasum())
-                    .scope(np.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .nestedUnder(np.parent)
-                    .metadata(leafMetadata(np.manifest, np.dev))
-                    .build());
-        }
-        if (promotion != null) {
-            edits.add(promotion);
-        }
-        return edits;
     }
 
     /**
-     * Build the promotion edit for an already-installed transitive: the install entry stays, only the importer
-     * edge is written, and a dev->prod promotion clears the top-level {@code "dev": true}. A non-leaf dev->prod
-     * promotion needs subtree dev-flag propagation and fails loud; a nested copy under another parent is an
-     * independent placement and is left untouched.
+     * A closure member an incompatible top-level pin excludes: nest it at {@code "<parent>/<name>"}. Safe slice
+     * only: the requirer is freshly placed, some requirer pins the top-level version exactly (so bun forks rather
+     * than cascades), and the nested version is a leaf.
      */
-    private static LockEditSet.PackageEdit promotionEdit(String rootName, String scope, boolean dev, String existingLock) {
-        Map<String, Object> installed = installedPackagesNpm(existingLock);
-        String entryKey = "node_modules/" + rootName;
-        Object entry = installed.get(entryKey);
-        boolean existingDev = entry instanceof Map && Boolean.TRUE.equals(((Map<?, ?>) entry).get("dev"));
-        boolean clearDev = existingDev && !dev;
-        if (clearDev && entry instanceof Map) {
-            Object deps = ((Map<?, ?>) entry).get("dependencies");
-            if (deps instanceof Map && !((Map<?, ?>) deps).isEmpty()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
-                        "promoting non-leaf dev transitive " + rootName + " to production needs dev-flag propagation; deferred");
-            }
-        }
-        String version = installedVersion(installed, entryKey);
-        LockEditSet.PackageEdit.PackageEditBuilder promotion = LockEditSet.PackageEdit.builder()
-                .name(rootName)
-                .oldVersion(version == null ? "" : version)
-                .newVersion(version)
-                .scope(scope)
-                .importerDir(null)
-                .kind(PROMOTION);
-        if (clearDev) {
-            // Exact-set flags: dev cleared, the entry's other flags carried unchanged.
-            Map<?, ?> e = (Map<?, ?>) entry;
-            promotion.metadata(LockEditSet.EntryMetadata.builder()
-                    .flagsChanged(true)
-                    .optional(Boolean.TRUE.equals(e.get("optional")) ? Boolean.TRUE : null)
-                    .devOptional(Boolean.TRUE.equals(e.get("devOptional")) ? Boolean.TRUE : null)
-                    .peer(Boolean.TRUE.equals(e.get("peer")) ? Boolean.TRUE : null)
-                    .build());
-        }
-        return promotion.build();
-    }
-
-    /**
-     * A closure member an incompatible top-level pin excludes: nest it at
-     * {@code node_modules/<parent>/node_modules/<name>}. Safe slice only: the requirer is freshly placed, some
-     * requirer pins the top-level version exactly (so npm/bun fork rather than cascade), and the nested version is a leaf.
-     */
-    private static void nestUnderParent(PackageManager pm, Requirement req, String existingVersion,
-                                        Map<String, Placement> placed, Map<String, NestedPlacement> nested,
-                                        String existingLock, NodeRegistries registries, NpmRegistryClient client) {
-        boolean bun = pm == PackageManager.Bun;
+    private static void nestUnderParentBun(Requirement req, String existingVersion, Map<String, Placement> placed,
+                                           Map<String, NestedPlacement> nested, String existingLock,
+                                           NodeRegistries registries, NpmRegistryClient client) {
         if (req.parent == null || !placed.containsKey(req.parent) ||
-                !(bun ? topLevelPinnedBun(existingLock, req.name, existingVersion) :
-                        topLevelPinnedNpm(existingLock, req.name, existingVersion))) {
+                !topLevelPinnedBun(existingLock, req.name, existingVersion)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                    existingVersion + " which does not satisfy " + req.constraint +
-                    " (" + (bun ? "bun" : "npm") + " would nest/move it; deferred)");
+                    existingVersion + " which does not satisfy " + req.constraint + " (bun would nest/move it; deferred)");
         }
         String nestKey = req.parent + "/" + req.name;
         NestedPlacement already = nested.get(nestKey);
@@ -1551,15 +987,11 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
                     "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
         }
-        if (bun) {
-            requireEmittableBunClosureMember(req.name, manifest);
-        } else {
-            requireEmittableClosureMember(req.name, manifest);
-        }
+        requireEmittableBunClosureMember(req.name, manifest);
         VersionManifest.Dist dist = manifest.getDist();
-        if (dist == null || dist.getIntegrity() == null || (!bun && dist.getTarball() == null)) {
+        if (dist == null || dist.getIntegrity() == null) {
             throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                    req.name + "@" + version + " has no registry " + (bun ? "integrity" : "tarball/integrity"));
+                    req.name + "@" + version + " has no registry integrity");
         }
         nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
     }
@@ -1681,7 +1113,7 @@ public final class NativeLockEngine {
                 if (existingSatisfies(existingVersion, req.constraint)) {
                     continue;
                 }
-                nestUnderParent(PackageManager.Bun, req, existingVersion, placed, nested, existingLock, registries, client);
+                nestUnderParentBun(req, existingVersion, placed, nested, existingLock, registries, client);
                 continue;
             }
             Placement already = placed.get(req.name);
@@ -1877,7 +1309,7 @@ public final class NativeLockEngine {
                 .build());
     }
 
-    /** The pnpm/bun/yarn add gates reject any optional or peer dependency (only npm models the optional-peer skip). */
+    /** The add gates reject any optional or peer dependency: none of these placements models them. */
     private static void requireNoOptionalOrPeer(String name, VersionManifest m, String pm) {
         if (notEmpty(m.getOptionalDependencies())) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
@@ -2055,69 +1487,8 @@ public final class NativeLockEngine {
     }
 
     /** Every installed {@code node_modules/...} entry (keyed by full path), the candidate set for hoisting resolution. */
-    private static Map<String, Object> installedPackagesNpm(String lock) {
-        Map<String, Object> installed = new LinkedHashMap<>();
-        Object packages = parseJsonObject(lock, false).get("packages");
-        if (packages instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if (key.contains("node_modules/")) {
-                    installed.put(key, e.getValue());
-                }
-            }
-        }
-        return installed;
-    }
-
-    private static @Nullable String installedVersion(Map<String, Object> installed, @Nullable String key) {
-        Object entry = key == null ? null : installed.get(key);
-        if (!(entry instanceof Map)) {
-            return null;
-        }
-        Object v = ((Map<?, ?>) entry).get("version");
-        return v == null ? null : String.valueOf(v);
-    }
 
     /** The single top-level version of each hoisted package ({@code packages["node_modules/<name>"]}). */
-    private static Map<String, String> topLevelVersionsNpm(String lock) {
-        Map<String, String> versions = new LinkedHashMap<>();
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            String prefix = "node_modules/";
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if (key.startsWith(prefix) && key.indexOf('/', prefix.length()) < 0 && e.getValue() instanceof Map) {
-                    Object v = ((Map<?, ?>) e.getValue()).get("version");
-                    if (v != null) {
-                        versions.put(key.substring(prefix.length()), String.valueOf(v));
-                    }
-                }
-            }
-        }
-        return versions;
-    }
-
-    /**
-     * The top-level version the root importer pins for {@code name} through a declared edge matching
-     * {@code oldConstraint}. npm hoists a root-declared direct dependency to {@code node_modules/<name>}, so a
-     * single value means the direct dep is unambiguous at its importer even when the package is separately forked
-     * (nested under a reverse-dependent) at another version. A non-root (workspace member) declaration returns
-     * empty, so a member edge stays deferred rather than re-scoped to a version it may not resolve to.
-     */
-    private static Set<String> importerResolvedVersionsNpm(String lock, String name, @Nullable String oldConstraint) {
-        Object packages = parseJsonObject(lock, false).get("packages");
-        Object rootImporter = packages instanceof Map ? ((Map<?, ?>) packages).get("") : null;
-        if (!(rootImporter instanceof Map)) {
-            return emptySet();
-        }
-        String declared = declaredConstraintIn((Map<?, ?>) rootImporter, name, DECLARED_SCOPES);
-        if (declared == null || (oldConstraint != null && !oldConstraint.equals(declared))) {
-            return emptySet();
-        }
-        String topLevel = topLevelVersionsNpm(lock).get(name);
-        return topLevel == null ? emptySet() : singleton(topLevel);
-    }
 
     private static String resolveAddedVersion(NpmRegistryClient client, NodeRegistry registry,
                                               String name, String constraint) {
@@ -2136,94 +1507,15 @@ public final class NativeLockEngine {
                 "no published version of " + name + " satisfies " + constraint);
     }
 
-    /**
-     * A closure member whose lock entry the npm patcher can insert byte-exactly. Its dependencies are recorded as
-     * the entry's dependency map (v2 {@code requires}), and the scalar/array metadata tier plus
-     * {@code peerDependencies}/{@code peerDependenciesMeta} is written through verbatim. An optional peer is
-     * skipped (npm does not auto-install it); a non-optional peer npm auto-installs, {@code optionalDependencies},
-     * a string {@code bin} or non-string {@code funding}, or bundled/shrinkwrap/accept/workspaces all fail loud.
-     */
-    private static void requireEmittableClosureMember(String name, VersionManifest m) {
-        if (notEmpty(m.getOptionalDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " pulls in optionalDependencies not yet supported for native adds");
-        }
-        Set<String> autoInstalled = nonOptionalPeers(m);
-        if (!autoInstalled.isEmpty()) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " declares non-optional peerDependencies " + autoInstalled +
-                            " (peer auto-install) not yet supported for native adds");
-        }
-        String metadata = unserializableMetadata(m);
-        if (metadata != null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " carries " + metadata + " metadata not yet supported for native adds");
-        }
-    }
-
     /** The peers npm would auto-install: declared in {@code peerDependencies} and not marked optional. */
-    private static Set<String> nonOptionalPeers(VersionManifest m) {
-        Map<String, String> peers = m.getPeerDependencies();
-        if (peers == null || peers.isEmpty()) {
-            return emptySet();
-        }
-        JsonNode meta = m.getPeerDependenciesMeta();
-        Set<String> result = new LinkedHashSet<>();
-        for (String peer : peers.keySet()) {
-            JsonNode entry = meta == null ? null : meta.get(peer);
-            if (entry == null || !entry.path("optional").asBoolean(false)) {
-                result.add(peer);
-            }
-        }
-        return result;
-    }
 
     /** The metadata surfaces whose byte-exact npm serialization is not yet verified; each defers the add. */
-    private static @Nullable String unserializableMetadata(VersionManifest m) {
-        if (m.getBin() != null && !m.getBin().isObject()) return "non-object bin";
-        if (m.getFunding() != null && !m.getFunding().isTextual()) return "non-string funding";
-        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
-        if (bool(m.getHasShrinkwrap())) return "hasShrinkwrap";
-        if (notEmpty(m.getAcceptDependencies())) return "acceptDependencies";
-        if (m.getWorkspaces() != null) return "workspaces";
-        return null;
-    }
-
-    private static LockEditSet.@Nullable EntryMetadata leafMetadata(VersionManifest m, boolean dev) {
-        boolean peers = notEmpty(m.getPeerDependencies()) || nonEmptyObject(m.getPeerDependenciesMeta());
-        boolean any = dev || m.getLicenseString() != null || m.getDeprecated() != null || notEmpty(m.getEngines()) ||
-                notEmpty(m.getOs()) || notEmpty(m.getCpu()) || notEmpty(m.getLibc()) ||
-                bool(m.getHasInstallScript()) || m.getBin() != null || m.getFunding() != null || peers;
-        if (!any) {
-            return null;
-        }
-        return LockEditSet.EntryMetadata.builder()
-                .dev(dev ? Boolean.TRUE : null)
-                .license(m.getLicenseString())
-                .deprecated(m.getDeprecated())
-                .engines(notEmpty(m.getEngines()) ? m.getEngines() : null)
-                .os(notEmpty(m.getOs()) ? m.getOs() : null)
-                .cpu(notEmpty(m.getCpu()) ? m.getCpu() : null)
-                .libc(notEmpty(m.getLibc()) ? m.getLibc() : null)
-                .hasInstallScript(bool(m.getHasInstallScript()) ? Boolean.TRUE : null)
-                .bin(m.getBin())
-                .funding(normalizeFunding(m.getFunding()))
-                .peerDependencies(notEmpty(m.getPeerDependencies()) ? m.getPeerDependencies() : null)
-                .peerDependenciesMeta(nonEmptyObject(m.getPeerDependenciesMeta()) ? m.getPeerDependenciesMeta() : null)
-                .build();
-    }
 
     private static boolean nonEmptyObject(@Nullable JsonNode node) {
         return node != null && node.isObject() && node.size() > 0;
     }
 
     /** npm records a string {@code funding} as {@code {url: <string>}}; object/array forms are gated out upstream. */
-    private static @Nullable JsonNode normalizeFunding(@Nullable JsonNode funding) {
-        if (funding == null) {
-            return null;
-        }
-        return JSON.createObjectNode().set("url", funding);
-    }
 
     private static boolean notEmpty(@Nullable Map<String, ?> map) {
         return map != null && !map.isEmpty();
@@ -2274,169 +1566,6 @@ public final class NativeLockEngine {
         // guard plus the cascade's reverse-edge check reject the common triggers.
     }
 
-    /**
-     * A direct-dependency bump's non-{@code dependencies} surfaces, returning the metadata written through instead
-     * of deferred. The platform gates and {@code optionalDependencies} stay strict. A {@code peerDependencies} and/or
-     * {@code peerDependenciesMeta} delta is written through — but only for npm, only for a pure-metadata bump (a
-     * {@code dependencies} reshape defers), and only when the installed tree provably does not reshape: no peer
-     * dropped (npm may GC an auto-installed provider), every peer the new version requires is already installed at a
-     * satisfying version (an absent optional peer counts as satisfied), and no peer that flips to optional could let
-     * npm GC its provider — each such provider is a root-anchored dependency npm never prunes. Anything else defers.
-     */
-    private static LockEditSet.@Nullable EntryMetadata diffEntryMetadata(
-            PackageManager pm, String name, VersionManifest oldM, VersionManifest newM, String lock, boolean depsEqual) {
-        provePlatformSurfacesUnchanged(name, oldM, newM);
-        requireEqual(name, "optionalDependencies", oldM.getOptionalDependencies(), newM.getOptionalDependencies());
-
-        boolean peerChanged = !Objects.equals(normalize(oldM.getPeerDependencies()), normalize(newM.getPeerDependencies()));
-        boolean peerMetaChanged =
-                !Objects.equals(normalize(oldM.getPeerDependenciesMeta()), normalize(newM.getPeerDependenciesMeta()));
-        LockEditSet.EntryMetadata base = metadataDelta(pm, oldM, newM);
-        if (!peerChanged && !peerMetaChanged) {
-            return base;
-        }
-
-        if (pm != PackageManager.Npm || !depsEqual || removesPeer(oldM, newM) || metaReferencesUndeclaredPeer(newM)) {
-            requireEqual(name, "peerDependencies", oldM.getPeerDependencies(), newM.getPeerDependencies());
-            requireEqual(name, "peerDependenciesMeta", oldM.getPeerDependenciesMeta(), newM.getPeerDependenciesMeta());
-            return base;
-        }
-        requirePeerProvidersSatisfy(pm, name, newM, lock);
-        requireOptionalFlipsAnchored(pm, name, oldM, newM, lock);
-
-        LockEditSet.EntryMetadata.EntryMetadataBuilder b =
-                base == null ? LockEditSet.EntryMetadata.builder() : base.toBuilder();
-        if (peerChanged) {
-            b.peerDependencies(notEmpty(newM.getPeerDependencies()) ? newM.getPeerDependencies() : null)
-                    .peerDependenciesChanged(true);
-        }
-        if (peerMetaChanged) {
-            JsonNode meta = newM.getPeerDependenciesMeta();
-            b.peerDependenciesMeta(nonEmptyObject(meta) ? meta : null).peerDependenciesMetaChanged(true);
-        }
-        return b.build();
-    }
-
-    /**
-     * A peer that flips from required to optional lets npm GC a provider it auto-installed only for that peer. The
-     * cheap sound proof it survives is a root direct dependency: npm never prunes one. A flipped peer whose provider
-     * is installed but not root-anchored defers (proving another anchor needs the full hoisting graph).
-     */
-    private static void requireOptionalFlipsAnchored(PackageManager pm, String name, VersionManifest oldM,
-                                                     VersionManifest newM, String lock) {
-        Map<String, String> newPeers = newM.getPeerDependencies();
-        if (newPeers == null) {
-            return;
-        }
-        Map<String, String> oldPeers = oldM.getPeerDependencies() == null ?
-                emptyMap() : oldM.getPeerDependencies();
-        JsonNode oldMeta = oldM.getPeerDependenciesMeta();
-        JsonNode newMeta = newM.getPeerDependenciesMeta();
-        Set<String> rootAnchored = rootDirectDependencyNames(lock);
-        for (String peer : newPeers.keySet()) {
-            boolean wasRequired = oldPeers.containsKey(peer) && !isOptionalPeer(oldMeta, peer);
-            if (wasRequired && isOptionalPeer(newMeta, peer) && !rootAnchored.contains(peer) &&
-                    !findLockedVersions(pm, lock, peer).isEmpty()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer +
-                        " flips to optional and its provider is not a root dependency; npm may prune it");
-            }
-        }
-    }
-
-    /** Names the root importer declares directly; npm never prunes a top-level direct dependency. */
-    private static Set<String> rootDirectDependencyNames(String lock) {
-        Set<String> names = new LinkedHashSet<>();
-        Object packages = parseJsonObject(lock, false).get("packages");
-        if (packages instanceof Map) {
-            Object root = ((Map<?, ?>) packages).get("");
-            if (root instanceof Map) {
-                for (String scope : Arrays.asList("dependencies", "devDependencies", "optionalDependencies")) {
-                    Object deps = ((Map<?, ?>) root).get(scope);
-                    if (deps instanceof Map) {
-                        for (Object key : ((Map<?, ?>) deps).keySet()) {
-                            names.add(String.valueOf(key));
-                        }
-                    }
-                }
-            }
-        }
-        return names;
-    }
-
-    /** Whether {@code peerDependenciesMeta} names a peer absent from {@code peerDependencies} (an unverified shape). */
-    private static boolean metaReferencesUndeclaredPeer(VersionManifest m) {
-        JsonNode meta = m.getPeerDependenciesMeta();
-        if (meta == null || !meta.isObject()) {
-            return false;
-        }
-        Set<String> declared = m.getPeerDependencies() == null ?
-                emptySet() : m.getPeerDependencies().keySet();
-        for (Iterator<String> it = meta.fieldNames(); it.hasNext(); ) {
-            if (!declared.contains(it.next())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /** Whether the new version drops a {@code peerDependencies} name the old version declared. */
-    private static boolean removesPeer(VersionManifest oldM, VersionManifest newM) {
-        Map<String, String> oldPeers = oldM.getPeerDependencies();
-        if (oldPeers == null || oldPeers.isEmpty()) {
-            return false;
-        }
-        Map<String, String> newPeers = newM.getPeerDependencies() == null ?
-                emptyMap() : newM.getPeerDependencies();
-        for (String p : oldPeers.keySet()) {
-            if (!newPeers.containsKey(p)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Every non-optional peer the new version declares must already be installed at a version its new range admits;
-     * an optional peer (per the new {@code peerDependenciesMeta}) may be absent. A peer present at multiple versions
-     * is ambiguous. Any auto-install or re-resolve fails loud — that hard tail is out of scope.
-     */
-    private static void requirePeerProvidersSatisfy(PackageManager pm, String name, VersionManifest newM, String lock) {
-        Map<String, String> peers = newM.getPeerDependencies();
-        if (peers == null) {
-            return;
-        }
-        JsonNode meta = newM.getPeerDependenciesMeta();
-        for (Map.Entry<String, String> e : peers.entrySet()) {
-            String peer = e.getKey();
-            String range = e.getValue();
-            Set<String> installed = findLockedVersions(pm, lock, peer);
-            if (installed.isEmpty()) {
-                if (isOptionalPeer(meta, peer)) {
-                    continue;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        name + " peer " + peer + " is not installed; auto-installing a peer is not yet supported");
-            }
-            if (installed.size() > 1) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer +
-                        " is present at multiple versions " + installed + "; cannot prove the graph is unchanged");
-            }
-            String v = installed.iterator().next();
-            if (!(Semver.validate(range, null, NODE).isValid() && Semver.satisfies(v, range, NODE))) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " peer " + peer + "@" + v +
-                        " does not satisfy the new range " + range + "; resolving a new provider is not yet supported");
-            }
-        }
-    }
-
-    private static boolean isOptionalPeer(@Nullable JsonNode meta, String peer) {
-        if (meta == null) {
-            return false;
-        }
-        JsonNode entry = meta.get(peer);
-        return entry != null && entry.path("optional").asBoolean(false);
-    }
-
     private static boolean dependenciesEqual(VersionManifest oldM, VersionManifest newM) {
         return Objects.equals(normalize(oldM.getDependencies()), normalize(newM.getDependencies()));
     }
@@ -2463,136 +1592,11 @@ public final class NativeLockEngine {
         }
     }
 
-    /**
-     * A direct-dependency bump whose new version a reverse-dependent's recorded constraint excludes. npm keeps the
-     * new version at the top-level slot and nests the old version under the reverse-dependent
-     * ({@code node_modules/<dependent>/node_modules/<name>}, plus the v2 legacy tree). Only the accuracy-safe slice
-     * is planned (a single top-level reverse-dependent, the constraint still resolving to the locked version, a leaf
-     * nested), so the patcher relocates the pre-edit entry byte-for-byte; anything wider fails loud.
-     *
-     * @return one nest edit when the safe slice applies, or an empty list when no reverse-dependent conflicts.
-     */
-    private static List<LockEditSet.PackageEdit> planReverseDependentNestsNpm(String name, String oldVersion,
-                                                                              String targetVersion, String lock,
-                                                                              NodeRegistries registries,
-                                                                              NpmRegistryClient client) {
-        Map<String, String> conflicts = conflictingReverseDependentsNpm(lock, name, targetVersion);
-        if (conflicts.isEmpty()) {
-            return emptyList();
-        }
-        if (conflicts.size() > 1) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " is required at excluding versions by " + conflicts.keySet() +
-                            "; nesting more than one reverse-dependent is not yet supported");
-        }
-        Map.Entry<String, String> only = conflicts.entrySet().iterator().next();
-        String dependentKey = only.getKey();
-        String constraint = only.getValue();
-
-        // The dependent must be a plain top-level install; a nested/forked dependent reshapes further.
-        if (dependentKey.indexOf("node_modules/", 1) >= 0) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + "'s reverse-dependent " + dependentKey + " is itself nested; not yet supported");
-        }
-        String dependentName = dependentKey.substring("node_modules/".length());
-
-        // The moved package's existing entry must be a plain registry leaf so relocating it byte-for-byte is
-        // sound: no own dependencies to re-nest, a real registry locator, not a workspace link or dev-only.
-        Map<String, Object> packages = packagesMap(lock);
-        requireNestableLeaf(name, entryMap(packages.get("node_modules/" + name)), "nested copy of " + name);
-        Map<?, ?> dependentEntry = entryMap(packages.get(dependentKey));
-        if (dependentEntry != null && bool(asBoolean(dependentEntry.get("dev")))) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + "'s reverse-dependent " +
-                    dependentName + " is a devDependency; dev nesting is not yet supported");
-        }
-
-        // The nested version must be exactly the currently-locked one, so the relocation reuses its bytes; a
-        // newer in-range version would be a fresh resolve npm serializes into a new entry instead.
-        NodeRegistry registry = registries.registryFor(name);
-        Set<String> published = client.getPackument(registry, name).getVersions();
-        String nested = maxSatisfyingAll(published, singleton(constraint));
-        if (!oldVersion.equals(nested)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependentName + " requires " + name + "@" +
-                    constraint + " which resolves to " + nested + ", not the locked " + oldVersion +
-                    "; nesting a re-resolved version is not yet supported");
-        }
-
-        return singletonList(LockEditSet.PackageEdit.builder()
-                .name(name)
-                .oldVersion(oldVersion)
-                .newVersion(oldVersion)
-                .scope("dependencies")
-                .kind(REVERSE_NEST)
-                .nestedUnder(dependentName)
-                .build());
-    }
-
     /** Installed lock entries whose recorded constraint on {@code name} excludes {@code target}, keyed by their packages key. */
-    private static Map<String, String> conflictingReverseDependentsNpm(String lock, String name, String target) {
-        Map<String, Object> packages = packagesMap(lock);
-        Map<String, String> conflicts = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : packages.entrySet()) {
-            // Importer entries are the user's package.json, re-pinned by the patcher; never a nest trigger.
-            if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
-                continue;
-            }
-            String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, target);
-            // A dependent already served by its own pre-existing nested copy is a fork the bump leaves untouched,
-            // not a new nest npm must create; skip it so a top-level bump of an already-forked dep stays clean.
-            if (c != null && !nestedCopySatisfiesNpm(packages, e.getKey(), name, c)) {
-                conflicts.put(e.getKey(), c);
-            }
-        }
-        return conflicts;
-    }
-
-    /**
-     * A re-scoped fork bump's dedupe guard: every reverse-dependent that currently forks {@code name} (its
-     * recorded constraint excludes the old top-level version, so it holds its own nested copy) must also exclude
-     * the bumped {@code target}. A requirer that now accepts the target would have npm dedupe its nest up into the
-     * new top-level — a reshape the per-dependency bump cannot express — so any such case fails loud.
-     */
-    private static void requireForksStayForkedNpm(String name, String oldVersion, String target, String lock) {
-        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
-            if (!e.getKey().contains("node_modules/") || !(e.getValue() instanceof Map)) {
-                continue;
-            }
-            String c = firstExcludingConstraint((Map<?, ?>) e.getValue(), name, oldVersion);
-            if (c != null && Semver.satisfies(target, c, NODE)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " forked under " + e.getKey() +
-                        " (" + c + ") would dedupe into the bumped " + target + "; deferred");
-            }
-        }
-    }
 
     /** Whether {@code dependentKey} already carries its own nested {@code node_modules/<name>} satisfying {@code constraint}. */
-    private static boolean nestedCopySatisfiesNpm(Map<String, Object> packages, String dependentKey,
-                                                  String name, String constraint) {
-        Object nested = packages.get(dependentKey + "/node_modules/" + name);
-        if (!(nested instanceof Map)) {
-            return false;
-        }
-        Object v = ((Map<?, ?>) nested).get("version");
-        return v != null && Semver.validate(constraint, null, NODE).isValid() && Semver.satisfies(String.valueOf(v), constraint, NODE);
-    }
 
     /** Whether some importer or installed entry pins {@code name} at exactly {@code version} (so its top slot cannot move). */
-    private static boolean topLevelPinnedNpm(String lock, String name, String version) {
-        for (Object value : packagesMap(lock).values()) {
-            if (value instanceof Map) {
-                for (String scope : DECLARED_SCOPES) {
-                    Object scopeMap = ((Map<?, ?>) value).get(scope);
-                    if (scopeMap instanceof Map) {
-                        Object c = ((Map<?, ?>) scopeMap).get(name);
-                        if (c instanceof String && version.equals(((String) c).trim())) {
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        return false;
-    }
 
     private static @Nullable String firstExcludingConstraint(Map<?, ?> entry, String name, String target) {
         for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
@@ -2608,24 +1612,6 @@ public final class NativeLockEngine {
     }
 
     /** The moving package's existing entry must be a plain registry leaf to relocate byte-for-byte. */
-    private static void requireNestableLeaf(String name, @Nullable Map<?, ?> entry, String desc) {
-        if (entry == null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no lock entry to relocate for the " + desc);
-        }
-        if (bool(asBoolean(entry.get("dev")))) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " is a dev entry; dev nesting is not yet supported");
-        }
-        if (bool(asBoolean(entry.get("link")))) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " is a workspace link; not yet supported");
-        }
-        if (!(entry.get("resolved") instanceof String) || !(entry.get("integrity") instanceof String)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, desc + " has no registry locator to relocate");
-        }
-        if (notEmptyMapValue(entry.get("dependencies")) || notEmptyMapValue(entry.get("optionalDependencies"))) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    desc + " has its own dependencies; nesting a non-leaf is not yet supported");
-        }
-    }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> packagesMap(String lock) {
@@ -2633,21 +1619,16 @@ public final class NativeLockEngine {
         return packages instanceof Map ? (Map<String, Object>) packages : emptyMap();
     }
 
-    private static @Nullable Map<?, ?> entryMap(@Nullable Object value) {
-        return value instanceof Map ? (Map<?, ?>) value : null;
-    }
-
     private static boolean notEmptyMapValue(@Nullable Object value) {
         return value instanceof Map && !((Map<?, ?>) value).isEmpty();
     }
 
-    private static @Nullable Boolean asBoolean(@Nullable Object value) {
-        return value instanceof Boolean ? (Boolean) value : null;
-    }
-
     /**
-     * The bun analogue of {@link #planReverseDependentNestsNpm}: the same single-leaf slice, relocating the old
-     * version to a {@code "<dependent>/<name>"} tuple. Only the lock reads differ (bun keys {@code packages} by name).
+     * A direct-dependency bump whose new version a reverse-dependent's recorded constraint excludes: bun keeps the
+     * new version at the top-level slot and nests the old version in a {@code "<dependent>/<name>"} tuple. Only the
+     * accuracy-safe slice is planned (a single top-level reverse-dependent, the constraint still resolving to the
+     * locked version, a leaf nested), so the patcher relocates the pre-edit tuple byte-for-byte; anything wider
+     * fails loud.
      */
     private static List<LockEditSet.PackageEdit> planReverseDependentNestsBun(String name, String oldVersion,
                                                                               String targetVersion, String lock,
@@ -2733,9 +1714,6 @@ public final class NativeLockEngine {
     private static void proveReverseDependentsAccept(PackageManager pm, String name, String oldVersion,
                                                      String targetVersion, String lock) {
         switch (pm) {
-            case Npm:
-                proveReverseDependentsNpm(name, targetVersion, lock);
-                break;
             case Bun:
                 proveReverseDependentsBun(name, targetVersion, lock);
                 break;
@@ -2783,39 +1761,6 @@ public final class NativeLockEngine {
         if (Semver.validate(range, null, NODE).isValid() && !Semver.satisfies(targetVersion, range, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " is required by " + dependent + " at " + value + " which excludes " + targetVersion);
-        }
-    }
-
-    private static void proveReverseDependentsNpm(String name, String targetVersion, String lock) {
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                // Only true transitive reverse-dependents (installed packages), never importer manifests
-                // (those constraints are the user's package.json, re-pinned by the patcher).
-                if (!key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
-                    continue;
-                }
-                Map<?, ?> entry = (Map<?, ?>) e.getValue();
-                checkReverseConstraint(name, targetVersion, key, entry.get("dependencies"));
-                checkReverseConstraint(name, targetVersion, key, entry.get("optionalDependencies"));
-                checkReverseConstraint(name, targetVersion, key, entry.get("peerDependencies"));
-            }
-        }
-        checkLegacyRequires(root.get("dependencies"), name, targetVersion);
-    }
-
-    private static void checkLegacyRequires(@Nullable Object node, String name, String targetVersion) {
-        if (!(node instanceof Map)) {
-            return;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) node).entrySet()) {
-            if (e.getValue() instanceof Map) {
-                Map<?, ?> entry = (Map<?, ?>) e.getValue();
-                checkReverseConstraint(name, targetVersion, String.valueOf(e.getKey()), entry.get("requires"));
-                checkLegacyRequires(entry.get("dependencies"), name, targetVersion);
-            }
         }
     }
 
@@ -2904,12 +1849,11 @@ public final class NativeLockEngine {
         return paren >= 0 ? k.substring(0, paren) : k;
     }
 
-    private static LockEditSet.@Nullable EntryMetadata metadataDelta(PackageManager pm, VersionManifest oldM, VersionManifest newM) {
+    private static LockEditSet.@Nullable EntryMetadata metadataDelta(VersionManifest oldM, VersionManifest newM) {
         LockEditSet.EntryMetadata.EntryMetadataBuilder b = LockEditSet.EntryMetadata.builder();
         boolean any = false;
         if (!Objects.equals(normalize(oldM.getEngines()), normalize(newM.getEngines()))) {
             b.engines(newM.getEngines());
-            b.enginesChanged(true);
             any = true;
         }
         if (!Objects.equals(oldM.getLicenseString(), newM.getLicenseString())) {
@@ -2922,18 +1866,6 @@ public final class NativeLockEngine {
         }
         if (!Objects.equals(oldM.getBin(), newM.getBin())) {
             b.bin(newM.getBin());
-            any = true;
-        }
-        // Only npm records funding in its lock; pnpm/bun/yarn omit it, so a funding delta is a no-op there.
-        if (pm == PackageManager.Npm && !Objects.equals(oldM.getFunding(), newM.getFunding())) {
-            JsonNode funding = newM.getFunding();
-            if (funding != null && !funding.isTextual()) {
-                // npm reshapes object/array funding; only the string form is byte-reproducible (as leaf adds gate).
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, newM.getName(),
-                        newM.getName() + " funding changed to a non-string form the entry patch does not rewrite");
-            }
-            b.funding(normalizeFunding(funding));
-            b.fundingChanged(true);
             any = true;
         }
         return any ? b.build() : null;
@@ -2990,9 +1922,8 @@ public final class NativeLockEngine {
     private static @Nullable String findImporterDir(PackageManager pm, String lock, String name,
                                                     @Nullable String oldConstraint) {
         switch (pm) {
-            case Npm:
             case Bun:
-                return findImporterDirJson(pm, lock, name, oldConstraint);
+                return findImporterDirBun(lock, name, oldConstraint);
             case Pnpm:
                 return findImporterDirPnpm(lock, name, oldConstraint);
             case YarnBerry:
@@ -3076,34 +2007,10 @@ public final class NativeLockEngine {
         return count;
     }
 
-    private static @Nullable String findImporterDirJson(PackageManager pm, String lock, String name,
-                                                        @Nullable String oldConstraint) {
-        Map<String, Object> root = parseJsonObject(lock, false);
+    /** The bun importer ({@code workspaces.<dir>.<scope>.<name>}) that declares the dependency, or {@code null} for the root. */
+    private static @Nullable String findImporterDirBun(String lock, String name, @Nullable String oldConstraint) {
         String unique = null;
-        if (pm == PackageManager.Npm) {
-            Object packages = root.get("packages");
-            if (packages instanceof Map) {
-                for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                    String key = String.valueOf(e.getKey());
-                    if (key.contains("node_modules/") || !(e.getValue() instanceof Map)) {
-                        continue; // only importer entries
-                    }
-                    String c = declaredConstraintIn((Map<?, ?>) e.getValue(), name, DECLARED_SCOPES);
-                    if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
-                        if (key.isEmpty()) {
-                            return null; // the root importer owns it
-                        }
-                        if (unique != null) {
-                            return null; // ambiguous, fall back to the root importer
-                        }
-                        unique = key;
-                    }
-                }
-            }
-            return unique;
-        }
-        // bun: workspaces.<dir>.<scope>.<name>
-        Object workspaces = root.get("workspaces");
+        Object workspaces = parseJsonObject(lock, false).get("workspaces");
         if (workspaces instanceof Map) {
             for (Map.Entry<?, ?> e : ((Map<?, ?>) workspaces).entrySet()) {
                 String key = String.valueOf(e.getKey());
@@ -3113,10 +2020,10 @@ public final class NativeLockEngine {
                 String c = declaredConstraintIn((Map<?, ?>) e.getValue(), name, DECLARED_SCOPES);
                 if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
                     if (key.isEmpty()) {
-                        return null;
+                        return null; // the root importer owns it
                     }
                     if (unique != null) {
-                        return null;
+                        return null; // ambiguous, fall back to the root importer
                     }
                     unique = key;
                 }
@@ -3217,8 +2124,6 @@ public final class NativeLockEngine {
 
     private static Set<String> findLockedVersions(PackageManager pm, String lock, String name) {
         switch (pm) {
-            case Npm:
-                return findLockedVersionsJson(lock, name);
             case Bun:
                 return findLockedVersionsBun(lock, name);
             case Pnpm:
@@ -3606,27 +2511,6 @@ public final class NativeLockEngine {
         return cacheKey;
     }
 
-    private static Set<String> findLockedVersionsJson(String lock, String name) {
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Set<String> versions = new LinkedHashSet<>();
-        String suffix = "node_modules/" + name;
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if ((key.equals(suffix) || key.endsWith("/" + suffix)) && e.getValue() instanceof Map) {
-                    Object v = ((Map<?, ?>) e.getValue()).get("version");
-                    if (v != null) {
-                        versions.add(String.valueOf(v));
-                    }
-                }
-            }
-        }
-        // package-lock v1 (and the v2 legacy tree) keep resolved versions under `dependencies`.
-        collectJsonDependencyTree(root.get("dependencies"), name, versions);
-        return versions;
-    }
-
     /** bun keys its {@code packages} by name (or {@code parent/name} when nested), so read the version off each tuple's locator. */
     private static Set<String> findLockedVersionsBun(String lock, String name) {
         Set<String> versions = new LinkedHashSet<>();
@@ -3641,23 +2525,6 @@ public final class NativeLockEngine {
             }
         }
         return versions;
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void collectJsonDependencyTree(@Nullable Object node, String name, Set<String> versions) {
-        if (!(node instanceof Map)) {
-            return;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) node).entrySet()) {
-            if (!(e.getValue() instanceof Map)) {
-                continue;
-            }
-            Map<String, Object> entry = (Map<String, Object>) e.getValue();
-            if (name.equals(String.valueOf(e.getKey())) && entry.get("version") != null) {
-                versions.add(String.valueOf(entry.get("version")));
-            }
-            collectJsonDependencyTree(entry.get("dependencies"), name, versions);
-        }
     }
 
     private static Set<String> findLockedVersionsPnpm(String lock, String name) {
@@ -3832,7 +2699,6 @@ public final class NativeLockEngine {
 
     private static @Nullable LockPatcher patcherFor(PackageManager pm) {
         switch (pm) {
-            case Npm:         return new NpmLockPatcher();
             case Pnpm:        return new PnpmLockPatcher();
             case YarnClassic: return new YarnClassicLockPatcher();
             case YarnBerry:   return new YarnBerryLockPatcher();
@@ -3959,7 +2825,7 @@ public final class NativeLockEngine {
         }
     }
 
-    /** A closure member npm nests under a freshly-placed parent because an incompatible version holds the top slot. */
+    /** A closure member bun nests under a freshly-placed parent because an incompatible version holds the top slot. */
     private static final class NestedPlacement {
         final String parent;
         final String name;

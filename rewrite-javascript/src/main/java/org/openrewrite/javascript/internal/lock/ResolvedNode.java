@@ -31,8 +31,8 @@ import static java.util.Collections.unmodifiableMap;
  * The {@code dev}/{@code optional}/{@code devOptional} flags carry npm's reachability classification (a node is
  * {@code dev} when every path from the root reaches it through a dev edge, {@code optional} likewise through an
  * optional edge, {@code devOptional} when every path is dev-or-optional but the two overlap). They are computed
- * once by the graph builder and consumed by the serializers that mark them (npm on each entry, pnpm on the
- * snapshot); the yarn/bun serializers, which record dev/optional only as importer scopes, ignore them.
+ * once by the graph builder and consumed by the serializers that mark them (pnpm on the snapshot); the yarn/bun
+ * serializers, which record dev/optional only as importer scopes, ignore them.
  */
 @Getter
 public final class ResolvedNode {

@@ -51,17 +51,13 @@ public class LockEditSet {
     public static class PackageEdit {
         String name;
 
-        /** For an {@code npm:} alias, the real package name written as the entry's {@code name} field; else {@code null}. */
-        @Nullable
-        String aliasName;
-
         String oldVersion;
 
         /** The resolved target version, or {@code null} for a removal. */
         @Nullable
         String newVersion;
 
-        /** Format-specific resolved locator (npm tarball URL, yarn {@code url#sha1}, …); omitted for pnpm's default registry. */
+        /** Format-specific resolved locator (a tarball URL, yarn {@code url#sha1}, …); omitted for pnpm's default registry. */
         @Nullable
         String newResolved;
 
@@ -122,9 +118,6 @@ public class LockEditSet {
         /** An add-during-bump: this bump's entry gains new dependency edges whose subtrees are placed as fresh ADDs. */
         boolean addsDependencyEdges;
 
-        /** A removal of the importer's edge only: the package stays installed as another package's dependency. */
-        boolean retainsEntry;
-
         /**
          * ADD is a brand-new dependency; ADD with a {@link #nestedUnder} is a fresh nested add. FORCED_MOVE is a
          * transitive a bump pushes to a new version; CONTENT_FORK is pnpm's non-nesting fork; PROMOTION reuses an
@@ -134,8 +127,8 @@ public class LockEditSet {
     }
 
     /**
-     * The metadata a bump patches cleanly without reshaping the tree (engines/license/deprecated/bin/funding, plus a
-     * leaf add's serialized metadata). Only changed fields are non-null; the engine has already normalized them.
+     * The metadata a bump patches cleanly without reshaping the tree (engines/license/deprecated/bin, plus a leaf
+     * add's serialized metadata). Only changed fields are non-null; the engine has already normalized them.
      */
     @Value
     @Builder(toBuilder = true)
@@ -143,16 +136,13 @@ public class LockEditSet {
         @Nullable
         Map<String, String> engines;
 
-        /** Distinguishes an engines removal ({@link #engines} null but changed) from no change. */
-        boolean enginesChanged;
-
         @Nullable
         String license;
 
         @Nullable
         String deprecated;
 
-        /** {@code bin} object ({@code {name: path}}); the engine fails loud on the string form npm would normalize. */
+        /** {@code bin} object ({@code {name: path}}). */
         @Nullable
         JsonNode bin;
 
@@ -168,26 +158,13 @@ public class LockEditSet {
         @Nullable
         Boolean hasInstallScript;
 
-        /** {@code funding}, normalized to npm's object form ({@code {url: ...}}). */
-        @Nullable
-        JsonNode funding;
-
-        /** Distinguishes a funding removal ({@link #funding} null but changed) from no change. */
-        boolean fundingChanged;
-
         /** A closure member's {@code peerDependencies} map, copied verbatim (object group). */
         @Nullable
         Map<String, String> peerDependencies;
 
-        /** A bump rewrote {@code peerDependencies} (add/widen), so the patcher replaces the entry's field in place. */
-        boolean peerDependenciesChanged;
-
         /** Raw {@code peerDependenciesMeta} node ({@code {name: {optional: bool}}}), copied verbatim (object group). */
         @Nullable
         JsonNode peerDependenciesMeta;
-
-        /** A bump rewrote {@code peerDependenciesMeta} (optionality delta), so the patcher replaces the field in place. */
-        boolean peerDependenciesMetaChanged;
 
         /** Entry flag members ({@code dev}/{@code optional}/{@code devOptional}/{@code peer}); written iff {@code TRUE}. */
         @Nullable
@@ -201,8 +178,5 @@ public class LockEditSet {
 
         @Nullable
         Boolean peer;
-
-        /** The flag set changed: an in-place patch makes the entry's flag members exactly the four values above. */
-        boolean flagsChanged;
     }
 }

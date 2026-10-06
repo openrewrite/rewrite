@@ -33,7 +33,7 @@ import static java.util.Collections.singletonList;
 
 /**
  * Keyed access and byte-exact edit helpers over the rewrite-json LST, which exposes only a raw member list.
- * The npm and bun patchers both edit their locks losslessly (Jackson would reformat), so both lean on these.
+ * The bun patcher edits its lock losslessly (Jackson would reformat), so it leans on these.
  */
 final class LockJson {
 

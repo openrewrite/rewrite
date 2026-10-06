@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
- * Unit tests for the npm clean-closure graph builder, driven by an in-memory {@link Registry} (no network).
+ * Unit tests for the closure resolver pnpm, Yarn and Bun share, driven by an in-memory {@link Registry} (no network).
  */
 class NpmGraphBuilderTest {
 
@@ -103,66 +103,13 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void autoInstallsMissingLeafPeerTopLevel() {
-        // react is a published leaf; has-peer peer-depends on it and root does not, so npm auto-installs react.
-        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
-        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
-        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
-
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true)
-                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
-
-        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
-        // The auto-installed peer carries no dev/optional flag in an all-prod closure.
-        assertThat(graph.node("react", "18.2.0").isDev()).isFalse();
-        assertThat(graph.node("react", "18.2.0").isOptional()).isFalse();
-        assertThat(graph.node("react", "18.2.0").isDevOptional()).isFalse();
-    }
-
-    @Test
-    void missingNonOptionalPeerDefersWhenAutoInstallDisabled() {
-        // The shared builder (pnpm/bun/yarn) keeps the classic deferral: a missing non-optional peer fails loud.
+    void missingNonOptionalPeerDefers() {
         FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
         registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
         registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
 
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
                 new NpmGraphBuilder(registry).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
-    }
-
-    @Test
-    void peerAutoInstallWithNoSatisfyingVersionDefers() {
-        // has-peer needs react, but the registry publishes no react version to auto-install — defer.
-        FakeRegistry registry = new FakeRegistry();
-        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
-        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
-
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
-    }
-
-    @Test
-    void autoInstalledPeerWithOwnDepsDefers() {
-        // the missing peer would itself pull a dependency; only a pure-leaf auto-install is reproduced.
-        FakeRegistry registry = new FakeRegistry()
-                .add("react", "18.2.0", singletonMap("loose-envify", "^1.0.0"))
-                .add("loose-envify", "1.4.0", emptyMap());
-        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
-        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
-
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}")));
-    }
-
-    @Test
-    void peerAutoInstallIntoDevClosureDefers() {
-        // has-peer is a dev dependency, so its auto-installed peer would inherit dev-ness; a non-prod closure defers.
-        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
-        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
-        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
-
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
-                new NpmGraphBuilder(registry, true).build(singletonMap("", "{\"devDependencies\":{\"has-peer\":\"^1.0.0\"}}")));
     }
 
     @Test
@@ -179,24 +126,8 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void autoInstallsRootPeerTopLevel() {
-        // The root is a library declaring peerDependencies.react (a leaf) with no other deps; npm auto-installs it.
-        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
-
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true)
-                .build(singletonMap("", "{\"name\":\"lib\",\"peerDependencies\":{\"react\":\">=17\"}}"));
-
-        assertThat(graph.getNodes()).containsOnlyKeys("react@18.2.0");
-        // The auto-installed root peer carries no dev/optional flag, and the root entry mirrors the scope verbatim.
-        assertThat(graph.node("react", "18.2.0").isDev()).isFalse();
-        assertThat(graph.node("react", "18.2.0").isOptional()).isFalse();
-        assertThat(graph.getImporters()).singleElement().satisfies(imp ->
-                assertThat(imp.getDeclared()).containsExactly(Map.entry("peerDependencies", singletonMap("react", ">=17"))));
-    }
-
-    @Test
-    void rootPeerDefersWhenAutoInstallDisabled() {
-        // The shared builder (pnpm/bun/yarn) keeps the classic deferral even for a library root's own peer.
+    void rootPeerDefers() {
+        // A library root's own peer defers like any other missing peer.
         FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
 
         assertThatExceptionOfType(EngineFailure.class).isThrownBy(() ->
@@ -204,20 +135,11 @@ class NpmGraphBuilderTest {
     }
 
     @Test
-    void rootPeerIntoDevClosureDefers() {
-        // A root peer alongside a devDependency is not an all-prod closure, so the auto-install defers.
-        FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap()).add("dev", "1.0.0", emptyMap());
-
-        assertThatExceptionOfType(EngineFailure.class).isThrownBy(() -> new NpmGraphBuilder(registry, true)
-                .build(singletonMap("", "{\"devDependencies\":{\"dev\":\"^1.0.0\"},\"peerDependencies\":{\"react\":\">=17\"}}")));
-    }
-
-    @Test
     void satisfiedRootPeerResolvesWithNoExtraNode() {
         // The root declares react both as a dependency and a peer; the peer is a constraint already met (no node added).
         FakeRegistry registry = new FakeRegistry().add("react", "18.2.0", emptyMap());
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true).build(singletonMap("",
+        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
                 "{\"dependencies\":{\"react\":\"^18.0.0\"},\"peerDependencies\":{\"react\":\">=17\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("react@18.2.0");
@@ -401,7 +323,7 @@ class NpmGraphBuilderTest {
                 .add("b", "2.1.0", emptyMap())
                 .add("b", "2.3.0", emptyMap());
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+        ResolutionGraph graph = new NpmGraphBuilder(registry,
                 singletonMap("b", singleton("2.1.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
 
@@ -417,27 +339,11 @@ class NpmGraphBuilderTest {
                 .add("b", "1.9.0", emptyMap())
                 .add("b", "2.3.0", emptyMap());
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+        ResolutionGraph graph = new NpmGraphBuilder(registry,
                 singletonMap("b", singleton("1.9.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"a\":\"^1.0.0\"}}"));
 
         assertThat(graph.getNodes()).containsOnlyKeys("a@1.2.0", "b@2.3.0");
-    }
-
-    @Test
-    void seedsAutoInstalledPeerFromLock() {
-        // The auto-installed peer keeps the lock's react 18.2.0 rather than the registry's newer 18.3.0.
-        FakeRegistry registry = new FakeRegistry()
-                .add("react", "18.2.0", emptyMap())
-                .add("react", "18.3.0", emptyMap());
-        registry.versionsByName.computeIfAbsent("has-peer", k -> new TreeSet<>()).add("1.0.0");
-        registry.manifests.put("has-peer@1.0.0", vm("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17")));
-
-        ResolutionGraph graph = new NpmGraphBuilder(registry, true,
-                singletonMap("react", singleton("18.2.0")))
-                .build(singletonMap("", "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}"));
-
-        assertThat(graph.getNodes()).containsOnlyKeys("has-peer@1.0.0", "react@18.2.0");
     }
 
     @Test
@@ -447,7 +353,7 @@ class NpmGraphBuilderTest {
                 .add("react-is", "18.2.0", emptyMap())
                 .add("react-is", "18.3.1", emptyMap());
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry, false,
+        ResolutionGraph graph = new NpmGraphBuilder(registry,
                 singletonMap("react-is-18", singleton("18.2.0")))
                 .build(singletonMap("", "{\"dependencies\":{\"react-is-18\":\"npm:react-is@^18.0.0\"}}"));
 

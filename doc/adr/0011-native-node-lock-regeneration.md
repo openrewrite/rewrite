@@ -4,7 +4,9 @@ Date: 2026-07-28
 
 ## Status
 
-Accepted.
+Accepted. For npm, superseded by [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md):
+the npm route is a port of arborist that writes the whole lock, so the byte-preserving patching, the
+per-dependency whitelist and the `RESOLUTION_REQUIRED` refusals below describe pnpm, Yarn and Bun only.
 
 ## Context
 
@@ -85,7 +87,8 @@ closure effect (the strict layout whitelist below), and hands `PackageEdit`s to 
 range is kept exactly as a real incremental install would keep it — and diffs the resolved graph
 against the existing lock into the same `PackageEdit`s for the same patcher. There is no whole-file
 serialization: untouched entries keep their bytes because the lossless trees preserve everything the
-edits do not name, and only what actually changed is ever verified or rewritten.
+edits do not name, and only what actually changed is ever verified or rewritten. (npm no longer takes
+either scope: ADR 0013 loads the lock as a tree, rebuilds it and writes the whole file as npm does.)
 
 The per-dependency whitelist: a version change of a package that is not fork/peer-duplicated in the
 lock, whose new version's `dependencies` are unchanged and already satisfied, with no change to
@@ -123,20 +126,16 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
   minimal-update (keep the locked version if it still satisfies, else max-satisfying), honors
   overrides/resolutions, builds a `LockEditSet`, and dispatches to the format's `LockPatcher`.
 - **Whole-closure resolution** — `NpmGraphBuilder` resolves the closure from the importer manifest
-  (regular/dev/optional scopes, satisfied peers, npm 7+ peer auto-install, `npm:` aliases),
-  preferring a locked version that still satisfies its range over the registry maximum;
-  `ResolutionGraph` / `ResolvedNode` are the plain value model. A per-format graph-to-lock diff
-  (`NpmLockDiff`, `PnpmLockDiff`, `BunLockDiff`, `YarnClassicLockDiff`, `YarnBerryLockDiff`) matches
-  the graph to the lock's own keys — hoisted `node_modules` slots, `name@version` content addresses,
-  flat selector blocks, or merged descriptors — and expresses the difference as `PackageEdit`s.
-  For npm, a peer that resolves to several versions (a peer fork) is verified per placement by
-  `NpmLockDiff`: each placement of its requirer must see a satisfying copy up its `node_modules`
-  chain (an optional peer may see none), else it fails loud. A lock holding a `peer: true` copy of
-  such a peer defers, since the graph does not model peer-only providers. Other formats still defer a
-  peer fork. An edge already met by the copy its requirer sees is left in place rather than
-  re-hoisted, as npm does. A dependency the importer no longer declares but that is still resolved
-  keeps its entry; only the importer's edge is removed.
-- **`LockPatcher`** per format — `NpmLockPatcher` (v2 + v3, workspaces, via rewrite-json),
+  (regular/dev/optional scopes, satisfied peers, `npm:` aliases), preferring a locked version that
+  still satisfies its range over the registry maximum; `ResolutionGraph` / `ResolvedNode` are the
+  plain value model. A per-format graph-to-lock diff (`PnpmLockDiff`, `BunLockDiff`,
+  `YarnClassicLockDiff`, `YarnBerryLockDiff`) matches the graph to the lock's own keys —
+  `name@version` content addresses, hoisted bun slots, flat selector blocks, or merged descriptors —
+  and expresses the difference as `PackageEdit`s. A peer that resolves to several versions (a peer
+  fork) and a missing non-optional peer defer: the graph models neither placement nor auto-install
+  (npm's `PlaceDep` does, ADR 0013). A dependency the importer no longer declares but that is still
+  resolved keeps its entry; only the importer's edge is removed.
+- **`LockPatcher`** per format —
   `PnpmLockPatcher` (v9 + v6, workspaces, via rewrite-yaml; v5.4 fails loud), `YarnClassicLockPatcher`
   (targeted text patch with merged-header split), `BunLockPatcher` (JSONC via rewrite-json),
   `YarnBerryLockPatcher` (via rewrite-yaml; each moving entry's `checksum` reproduced from its
@@ -151,7 +150,9 @@ fields kept for back-compat). Reasons: `REGISTRY_UNREACHABLE`, `AUTH_FAILED`, `P
 package manager rejects the edit, or would write a lock its next install rejects; the detail names both
 sides as npm's message does). Every detail says which kind the failure is: the package manager rejects
 the edit (with its error code), or the engine cannot know something (a tarball's contents, a manifest
-outside the registry, the filesystem, the host). Recipes surface failures via the
+outside the registry, the filesystem, the host). `RESOLUTION_REQUIRED` for a shape the proof cannot
+express is a pnpm, Yarn or Bun failure only; on the npm route the kinds are those of ADR 0013, and a
+lock npm's next install would reject is `PEER_CONFLICT`. Recipes surface failures via the
 existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table (source path, package,
 reason, detail) for fleet aggregation. On failure the old lock is untouched.
 
@@ -165,11 +166,12 @@ The shell-out path is deleted; `PackageManagerExecutor` survives only for `Depen
 | **A** | Registry client + discovery/creds, isolated node-semver, `NativeLockEngine` with the strict layout whitelist, and byte-exact patchers for npm (v2/v3), pnpm (v9/v6), yarn-classic, and bun, all with full workspace support; failure model + data table; recipe wiring; PM-free E2E tests against goldens recorded from real installs. | Implemented |
 | **A-follow** | Yarn Berry checksum reproduction (tarball fetch + yarn's normalized-zip hash). | Implemented |
 | **B** | Whole-closure regeneration for adds and closure-changing upgrades. | Implemented as lock-seeded resolution plus per-format graph-to-lock diffs feeding the same patchers; two-phase incremental fixtures (a real before lock, then the real incremental after) pin the bytes |
+| **C** | npm follows arborist. | [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md): the npm diff, patcher and per-dependency proof are gone; recorded scenarios replace the hand-listed fixtures |
 
 ## Testing strategy
 
-Byte-level goldens recorded from real `npm`/`pnpm`/`yarn`/`bun` output, asserted through the native
-patch with no package manager at test time; a node-semver conformance corpus alongside the unchanged
+Byte-level goldens recorded from real `pnpm`/`yarn`/`bun` output, asserted through the native patch
+with no package manager at test time (npm: the scenario corpus of ADR 0013); a node-semver conformance corpus alongside the unchanged
 Maven/Gradle suites; an in-process stub `HttpSender` serving recorded packument/manifest responses for
 the engine and recipe tests. The previous PM-driven recipe tests are retained as a package-manager-
 gated parity cross-check that keeps the goldens honest.
