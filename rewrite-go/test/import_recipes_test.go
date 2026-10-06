@@ -677,6 +677,122 @@ func TestOrderImports_AlphabeticalWithinGroupAndBlankLineBetween(t *testing.T) {
 	spec.RewriteRun(t, Golang(before, after))
 }
 
+// Go allows several import declarations; gofmt sorts each on its own, so
+// imports never move between them.
+func TestOrderImports_GroupedDeclarationThenSingle(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package mocks
+
+		import (
+			"github.com/x/y"
+			"fmt"
+		)
+
+		import mock "github.com/stretchr/testify/mock"
+
+		var _ = fmt.Sprint(y.Hello, mock.Anything)
+	`
+	after := `
+		package mocks
+
+		import (
+			"fmt"
+
+			"github.com/x/y"
+		)
+
+		import mock "github.com/stretchr/testify/mock"
+
+		var _ = fmt.Sprint(y.Hello, mock.Anything)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_SingleThenGroupedDeclaration(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package mocks
+
+		import "fmt"
+
+		import (
+			"github.com/x/y"
+			"context"
+		)
+
+		var _ = fmt.Sprint(y.Hello, context.TODO)
+	`
+	after := `
+		package mocks
+
+		import "fmt"
+
+		import (
+			"context"
+
+			"github.com/x/y"
+		)
+
+		var _ = fmt.Sprint(y.Hello, context.TODO)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_TwoGroupedDeclarations(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	before := `
+		package main
+
+		import (
+			"strings"
+			"fmt"
+		)
+
+		import (
+			"github.com/x/y"
+			"context"
+		)
+
+		var _ = fmt.Sprint(strings.ToUpper, y.Hello, context.TODO)
+	`
+	after := `
+		package main
+
+		import (
+			"fmt"
+			"strings"
+		)
+
+		import (
+			"context"
+
+			"github.com/x/y"
+		)
+
+		var _ = fmt.Sprint(strings.ToUpper, y.Hello, context.TODO)
+	`
+	spec.RewriteRun(t, Golang(before, after))
+	spec.RewriteRun(t, Golang(after))
+}
+
+func TestOrderImports_DeclarationsSortedButNotAcross(t *testing.T) {
+	spec := NewRecipeSpec().WithRecipe(&recipes.OrderImports{})
+	spec.RewriteRun(t,
+		Golang(`
+			package main
+
+			import "os"
+
+			import "fmt"
+
+			var _ = fmt.Sprint(os.Args)
+		`),
+	)
+}
+
 func TestRemoveUnusedImports_DropsFirstOfGroupedBlock(t *testing.T) {
 	spec := NewRecipeSpec().WithRecipe(&recipes.RemoveUnusedImports{})
 	before := `
