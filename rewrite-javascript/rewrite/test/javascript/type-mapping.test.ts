@@ -641,6 +641,77 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('records the interfaces a type implements or extends, unparameterized, beside its supertype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && ['Base', 'Mid', 'Saver2'].includes((node as J.Identifier).simpleName) &&
+                    Type.isClass(type) && type.fullyQualifiedName === (node as J.Identifier).simpleName) {
+                    const ifaces = type.interfaces.map(i => i.fullyQualifiedName).join(',');
+                    return `${type.supertype?.fullyQualifiedName ?? ''}[${ifaces}]`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Saver2 extends Saver, Box<string> {}
+                        class Base implements Saver2 { save(): void {} get(): string { return ''; } }
+                        class Mid extends Base implements Box<number>, Saver { }
+                    `,
+                    //@formatter:off
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface /*~~([Saver,Box])~~>*/Saver2 extends Saver, Box<string> {}
+                        class /*~~([Saver2])~~>*/Base implements /*~~([Saver,Box])~~>*/Saver2 { save(): void {} get(): string { return ''; } }
+                        class /*~~(Base[Box,Saver])~~>*/Mid extends /*~~([Saver2])~~>*/Base implements Box<number>, Saver { }
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
+        test('reads a class\'s heritage from its class declaration, among merged ones or as an expression', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.NewClass && Type.isClass(type)) {
+                    const ifaces = type.interfaces.map(i => i.fullyQualifiedName).join(',');
+                    return `${type.supertype?.fullyQualifiedName ?? ''}[${ifaces}]`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Merged extends Saver {}
+                        class Merged implements Box<number>, Saver { save(): void {} get(): number { return 0; } }
+                        const Expr = class implements Saver { save(): void {} };
+                        new Merged();
+                        new Expr();
+                    `,
+                    //@formatter:off
+                    `
+                        interface Saver { save(): void }
+                        interface Box<T> { get(): T }
+                        interface Merged extends Saver {}
+                        class Merged implements Box<number>, Saver { save(): void {} get(): number { return 0; } }
+                        const Expr = class implements Saver { save(): void {} };
+                        /*~~([Saver,Box])~~>*/new Merged();
+                        /*~~([Saver])~~>*/new Expr();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('should map array types as class types', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {

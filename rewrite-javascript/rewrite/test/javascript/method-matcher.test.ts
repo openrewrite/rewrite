@@ -412,7 +412,7 @@ describe('MethodMatcher', () => {
         const hierarchy = `
             interface Saver { save(): void }
             interface Store extends Saver { save(): void }
-            class Base { save(): void {} }
+            class Base implements Saver { save(): void {} }
             class Mid extends Base {}
             class Leaf extends Mid { save(): void {} }
             declare const store: Store;
@@ -443,6 +443,14 @@ describe('MethodMatcher', () => {
                     `${hierarchy}
                     /*~~>*/store.save();
                     `
+                ),
+                typescript(
+                    `${hierarchy}
+                    new Leaf().save();
+                    `,
+                    `${hierarchy}
+                    /*~~>*/new Leaf().save();
+                    `
                 )
             );
         });
@@ -457,6 +465,29 @@ describe('MethodMatcher', () => {
                     `${hierarchy}
                     const base: Base = new Leaf();
                     base.save();
+                    `
+                )
+            );
+        });
+
+        test('terminates on heritage cycles TypeScript accepts', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Unrelated save()', true);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    interface I extends B { save(): void }
+                    class B implements I { save(): void {} }
+                    new B().save();
+                    `
+                ),
+                typescript(
+                    `
+                    class D implements J { save(): void {} }
+                    class C extends D { save(): void {} }
+                    interface J extends C {}
+                    new C().save();
                     `
                 )
             );
