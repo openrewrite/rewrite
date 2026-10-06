@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Replays the arborist test sequences (test/node.js, test/link.js) whose snapshots print whole trees, on
+// Replays the arborist test sequences (test/node.js, test/link.js, test/calc-dep-flags.js) whose snapshots print whole trees, on
 // the arborist npm bundles, and prints a structural dump at each snapshot point. NpmTreeSupport.describe
 // renders the Java tree in the same format. Where a sequence attaches lock metadata, the raw lock data
 // (" / data") and what the metadata answers (" / get") are dumped too.
@@ -24,6 +24,7 @@ const Node = npm('@npmcli/arborist/lib/node.js')
 const Link = npm('@npmcli/arborist/lib/link.js')
 const OverrideSet = npm('@npmcli/arborist/lib/override-set.js')
 const Shrinkwrap = npm('@npmcli/arborist/lib/shrinkwrap.js')
+const calcDepFlags = npm('@npmcli/arborist/lib/calc-dep-flags.js')
 
 const loc = n => n ? (n.location === undefined ? '?' : JSON.stringify(n.location)) : '-'
 const describe = root => {
@@ -318,6 +319,70 @@ depTree('with meta: ', emptyLock('/home/user/projects/root'))
   dumps['instantiate without providing target / tree'] = String(meta.tree === l1.target)
   const l2 = new Link({ path: '/home/user/some/other/path', target: root })
   dump('instantiate with target specified', l2.root)
+}
+
+// test/calc-dep-flags.js
+{
+  const root = new Node({
+    path: '/x',
+    realpath: '/x',
+    pkg: {
+      dependencies: { prod: '' },
+      devDependencies: { dev: '' },
+      optionalDependencies: { optional: '' },
+      peerDependencies: { peer: '', peeroptional: '' },
+      peerDependenciesMeta: { peeroptional: { optional: true } },
+    },
+  })
+  new Node({ pkg: { name: 'optional', version: '1.2.3', dependencies: { devoptional: '', missing: '' } }, parent: root })
+  new Node({ pkg: { name: 'devoptional', version: '1.2.3' }, parent: root })
+  new Node({ pkg: { name: 'extraneous' }, parent: root })
+  new Node({ pkg: { name: 'peer', version: '1.2.3', dependencies: { peerdep: '' } }, parent: root })
+  new Node({ pkg: { name: 'peerdep', version: '1.2.3' }, parent: root })
+  new Node({ pkg: { name: 'prod', version: '1.2.3', dependencies: { proddep: '' }, peerDependencies: { metapeer: '' } }, parent: root })
+  new Node({ pkg: { name: 'metapeer', version: '1.2.3', dependencies: { metapeerdep: '' } }, parent: root })
+  new Node({ pkg: { name: 'metapeerdep', version: '1.2.3' }, parent: root })
+  new Node({ pkg: { name: 'proddep', version: '1.2.3', dependencies: { proddep: '' } }, parent: root })
+  new Node({ pkg: { name: 'dev', version: '1.2.3', dependencies: { devdep: '' } }, parent: root })
+  const devdep = new Node({
+    pkg: {
+      name: 'devdep', version: '1.2.3',
+      dependencies: { proddep: '', linky: '', devoptional: '' },
+      optionalDependencies: { devandoptional: '' },
+    },
+    parent: root,
+  })
+  new Node({ pkg: { name: 'devandoptional', version: '1.2.3' }, parent: root })
+  const linky = new Link({ pkg: { name: 'linky', version: '1.2.3', dependencies: { linklink: '' } }, realpath: '/x/y/z', parent: devdep })
+  new Link({ pkg: { name: 'linklink', version: '1.2.3' }, realpath: '/l/i/n/k/link', parent: linky.target })
+  new Node({ pkg: { name: 'peeroptional', version: '1.2.3', dependencies: { optional: '' } }, parent: root })
+  calcDepFlags(root)
+  dump('flag stuff', root)
+}
+{
+  const root = new Node({ path: '/some/path', realpath: '/some/path', pkg: { dependencies: { foo: '' } } })
+  new Node({ parent: root, pkg: { name: 'foo', version: '1.2.3' } })
+  root.optional = false
+  root.dev = true
+  root.extraneous = false
+  calcDepFlags(root, false)
+  dump('no reset', root)
+}
+{
+  const { resolve } = require('path')
+  const root = new Node({
+    path: '/some/path',
+    realpath: '/some/path',
+    pkg: { dependencies: { baz: 'file:node_modules/asdf/node_modules/baz', foo: 'file:bar/foo' } },
+  })
+  const bar = new Node({ root, path: resolve(root.path, 'bar') })
+  const foo = new Node({ root, path: resolve(bar.path, 'foo'), pkg: { name: 'foo', version: '1.2.3' } })
+  const asdf = new Node({ parent: root, pkg: { name: 'asdf', version: '1.2.3' } })
+  const baz = new Node({ parent: asdf, pkg: { name: 'baz', version: '1.2.3' } })
+  new Link({ name: 'foo', target: foo, parent: root, realpath: foo.path })
+  new Link({ name: 'baz', target: baz, parent: root, realpath: baz.path })
+  calcDepFlags(root, true)
+  dump('set parents to not extraneous when visiting', root)
 }
 
 console.log(JSON.stringify(dumps, null, 1))
