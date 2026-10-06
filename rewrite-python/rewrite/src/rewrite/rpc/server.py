@@ -664,11 +664,10 @@ def handle_parse(params: dict) -> List[str]:
         _last_dependency_path = dependency_path
     results = []
 
-    # If no relativeTo provided, try to infer from absolute input paths
-    if not relative_to:
-        relative_to = _infer_project_root(inputs)
+    # Only roots ty: the host's other parsers keep its input paths as given when it
+    # sent no `relativeTo`, so relativizing against an inferred root would desync them.
     if not project_root:
-        project_root = relative_to
+        project_root = relative_to or _infer_project_root(inputs)
 
     # Resolve project-level language version once per request; per-file
     # detection (shebang / magic comment) can still override this inside
@@ -879,7 +878,7 @@ def _richness(cls) -> int:
 
 def _artifact_files(path: Path) -> List[str]:
     """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
-    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    its runtime sibling (.py)."""
     files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
     files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
     return [str(f) for f in files]
@@ -943,6 +942,10 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
 
     for fp in files:
         own_module = _module_name(fp, root)
+        # ty resolves a module with a stub to the stub, so the runtime file's
+        # classes are ones no consumer can reference.
+        if fp.endswith('.py') and os.path.exists(fp + 'i'):
+            continue
         try:
             with open(fp, 'r', encoding='utf-8') as fh:
                 source = fh.read()
@@ -1487,6 +1490,7 @@ def handle_install_recipes(params: dict) -> dict:
             - 'recipes': str - A local file path (installed into the recipe-install
               dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+            - 'venv': str - Only in facade mode, a prebuilt venv to run a local path's bundle on
 
     Returns:
         Dict with:
@@ -1507,6 +1511,9 @@ def handle_install_recipes(params: dict) -> dict:
     installed_version = None
     package_name: Optional[str] = None
     recipes_added = 0
+
+    if params.get('venv'):
+        raise ValueError("Attaching a prebuilt venv needs facade mode (--recipe-install-dir)")
 
     if isinstance(recipes, str):
         # Local file path. When a recipe-install dir is configured, install the

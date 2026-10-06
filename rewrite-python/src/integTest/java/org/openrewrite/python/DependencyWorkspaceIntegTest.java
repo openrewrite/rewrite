@@ -125,4 +125,27 @@ class DependencyWorkspaceIntegTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void pythonSourcesAreRootedLikeThePyproject() {
+        rewriteRun(
+          spec -> spec.recipe(Recipe.noop()),
+          uv(
+            tempDir,
+            pyproject(
+              """
+                [project]
+                name = "test-project"
+                version = "0.1.0"
+                """,
+              spec -> spec.afterRecipe(doc -> assertThat(doc.getSourcePath()).isEqualTo(tempDir.resolve("pyproject.toml")))
+            ),
+            python(
+              "x = 1",
+              spec -> spec.path("demo/http.py")
+                .afterRecipe(cu -> assertThat(cu.getSourcePath()).isEqualTo(tempDir.resolve("demo/http.py")))
+            )
+          )
+        );
+    }
 }

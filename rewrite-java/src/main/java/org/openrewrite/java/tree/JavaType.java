@@ -1768,9 +1768,10 @@ public interface JavaType {
             return this;
         }
 
-        public Variable unsafeSet(String name, JavaType owner, @Nullable JavaType type,
+        public Variable unsafeSet(String name, long flagsBitMap, JavaType owner, @Nullable JavaType type,
                                   FullyQualified @Nullable [] annotations) {
             this.name = name;
+            this.flagsBitMap = flagsBitMap;
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = annotations;

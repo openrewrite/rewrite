@@ -18,8 +18,8 @@ import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
 import {compilationUnitOf, cursorOf, declarationsOf, namesUsedIn, scopeOf} from "./scope";
 import {
-    AddImportOptions, bindImport, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs, memberName,
-    moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
+    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
+    memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
@@ -318,17 +318,13 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
     return a.length === b.length && a.every((callee, i) => callee === b[i]);
 }
 
-/** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
-function bindingShape(member: string | undefined): "default" | "namespace" | "named" {
-    const key = memberName(member);
-    return key === undefined ? "default" : key === "*" ? "namespace" : "named";
-}
-
 /**
- * Moves the binding for `from` to `to` and answers with the name it now carries — the primitive
- * behind a member rename or a module move. Returns `undefined`, changing nothing, where the move
- * is not safely expressible; the refusals and the choice of name are listed in CLAUDE.md:
- * JavaScript module bindings.
+ * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
+ * changing nothing, where the move cannot be expressed safely. One call moves one binding.
+ * Named members of one import moved to one module, a call each, end up in one import of it,
+ * whether the calls share a visit or come from separate recipes.
+ * On an ES import, every type in the file naming what moved is renamed the way a parse of the result names it.
+ * It is renamed, not re-resolved, so a moved member keeps its old declaration's signature.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
@@ -361,10 +357,9 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (existing === undefined) {
         return undefined;
     }
-    if (existing.onlyMemberOfStatement && bindingShape(options.from.member) !== bindingShape(options.to.member)) {
-        return undefined;
-    }
-    if (!existing.onlyMemberOfStatement && isCommonJs(cu)) {
+    // `RebindImport` replaces a statement it cannot rewrite in place, and a CommonJS file can gain no import.
+    if (isCommonJs(cu) &&
+        (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
     const boundName = rebindingName(visitor, cu, options, existing);

@@ -108,6 +108,7 @@ export namespace Type {
 
     export interface Variable extends Type {
         readonly kind: typeof Kind.Variable;
+        flags: number;
         name: string;
         owner?: Type;
         type: Type;

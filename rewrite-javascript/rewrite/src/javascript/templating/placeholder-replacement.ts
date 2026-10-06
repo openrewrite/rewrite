@@ -171,27 +171,17 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * array-level access for variadic expansion.
      */
     override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
-        const hasPlaceholder = block.statements.some(stmt => {
-            const stmtElement = stmt.element;
-            // Check if it's an ExpressionStatement containing a placeholder
-            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmtElement as JS.ExpressionStatement;
-                return this.isPlaceholder(exprStmt.expression);
-            }
-            return this.isPlaceholder(stmtElement);
-        });
-
-        if (!hasPlaceholder) {
-            return super.visitBlock(block, p);
-        }
-
-        // Unwrap function to extract placeholder from ExpressionStatement
+        // An object literal's body is a block too, whose placeholders are shorthand properties
         const unwrapStatement = (element: J): J => {
             if (element.kind === JS.Kind.ExpressionStatement) {
                 return (element as JS.ExpressionStatement).expression;
             }
-            return element;
+            return PlaceholderUtils.shorthandPropertyName(element) ?? element;
         };
+
+        if (!block.statements.some(stmt => this.isPlaceholder(unwrapStatement(stmt.element)))) {
+            return super.visitBlock(block, p);
+        }
 
         const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
 
@@ -385,7 +375,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 const placeholderText = this.getPlaceholderText(placeholderNode);
                 let wrapperToUse = wrapped;
 
-                if (placeholderText && this.isPlaceholder(placeholderNode)) {
+                // A shorthand property keeps its own wrapper, since a captured one belongs to the name alone
+                if (placeholderText && this.isPlaceholder(placeholderNode) && element.kind !== JS.Kind.PropertyAssignment) {
                     const param = this.substitutions.get(placeholderText);
                     if (param) {
                         const isCapture = param.value instanceof CaptureImpl ||

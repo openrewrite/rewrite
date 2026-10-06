@@ -17,7 +17,7 @@ import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {maybeBind} from '../binding';
-import {ContextBinding} from './engine';
+import {ContextBinding, opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
 import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
@@ -176,7 +176,8 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
-    private _cachedTemplate?: J;
+    /** The parsed code, keyed by whether it was parsed as an expression. */
+    private _cachedTemplates = new Map<boolean, J>();
     private _contextBindings?: Promise<ContextBinding[]>;
 
     /**
@@ -230,14 +231,14 @@ export class Template {
         }
         this.options = {...this.options, ...options};
         // Invalidate cache when configuration changes
-        this._cachedTemplate = undefined;
+        this._cachedTemplates.clear();
         this._contextBindings = undefined;
         return this;
     }
 
     /**
-     * Gets the template tree for this template, using two-level caching:
-     * - Level 1: Instance cache (this._cachedTemplate) - fastest, no lookup needed
+     * Gets the template tree for this template, using three-level caching:
+     * - Level 1: Instance cache (this._cachedTemplates) - fastest, no lookup needed
      * - Level 2: Global cache (globalAstCache) - fast, shared across all templates
      * - Level 3: TemplateEngine - slow, parses and processes the template
      *
@@ -248,10 +249,11 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(): Promise<J> {
+    private async getTemplateTree(expression: boolean): Promise<J> {
         // Level 1: Instance cache (fastest path)
-        if (this._cachedTemplate) {
-            return this._cachedTemplate;
+        const instanceCached = this._cachedTemplates.get(expression);
+        if (instanceCached) {
+            return instanceCached;
         }
 
         // Generate cache key for global lookup
@@ -265,7 +267,7 @@ export class Template {
                 return `raw:${value.code}`;
             }
             return i.toString();
-        }).join(',');
+        }).join(',') + (expression ? '::expression' : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
@@ -278,7 +280,7 @@ export class Template {
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplate = cached;
+            this._cachedTemplates.set(expression, cached);
             return cached;
         }
 
@@ -288,12 +290,13 @@ export class Template {
             this.parameters,
             contextStatements,
             this.options.dependencies || {},
-            this.options.types
+            this.options.types,
+            expression
         );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
-        this._cachedTemplate = result;
+        this._cachedTemplates.set(expression, result);
 
         return result;
     }
@@ -424,8 +427,8 @@ export class Template {
             }
         }
 
-        // Use instance-level cache to get the template tree
-        const ast = await this.getTemplateTree();
+        const expression = opensWithBrace(this.templateParts) && replacedByObjectLiteral(tree, cursor);
+        const ast = await this.getTemplateTree(expression);
 
         // Delegate to TemplateEngine for placeholder substitution and application
         return TemplateEngine.applyTemplateFromAst(

@@ -816,6 +816,7 @@ public class JavaReceiver : JavaVisitor<RpcReceiveQueue>
                 break;
 
             case JavaType.Variable variable:
+                variable.FlagsBitMap = q.Receive(variable.FlagsBitMap);
                 variable.Name = q.Receive(variable.Name)!;
                 variable.Owner = q.Receive(variable.Owner, t => VisitType(t, q)!);
                 variable.Type = q.Receive(variable.Type, t => VisitType(t, q)!);

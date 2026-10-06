@@ -251,19 +251,33 @@ pass rather than run it alongside.
 
 ### What a rebind's attribution follows
 
-The move carries the attribution of what it moved, so `UsesType` and any recipe matching on types
-read the new module rather than the old one. It reaches the references of the moved binding and
-nothing else: a member's `Type.Method`/`Type.Variable` name is the module's name for it, never the
-local alias, so it follows the member rather than the binding, while a sibling named under that
-same module stays behind.
+Moving an ES import renames every type in the file that names what moved, following each type's
+signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
+function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
+declared beside a moved member keeps the old name.
 
-A name the move does not reach keeps the attribution it had — a variable whose type is inferred
-from the moved binding, say. That boundary is deliberate: reaching those means rewriting by
-qualified name across the file, and a qualified name cannot tell a sibling's type from the moved
-one, nor a type another module re-exports from one the move applies to.
+The rewrite renames, it does not re-resolve. A moved member keeps its old declaration's parameter,
+return and member types under the new names, which is wrong where the target's API differs.
 
-Moving a whole module carries the types named after the module itself. A type attributed to a
-binding's own declared shape rather than to the module name stays where it is.
+A name another binding in the file shares stays as it is:
+
+- a module object, on a whole-module move, while the file binds that module some other way too
+- a class name, while another subpath of the same package exports a class of that name
+
+A type that reaches the moved name through another import follows the move too. Where the result
+differs from a fresh parse:
+
+- the specifier is relative, since the mapper names those types after the file path
+- the target re-exports the class from another package, whose name a fresh parse gives it
+- the target is a default binding, where a fresh parse uses the name the class declares
+
+### Several rebinds in one file
+
+Each rebind decides between rewriting its statement in place and replacing it when it runs, so it
+sees what the rebinds before it left: a statement another rebind emptied, or an import of the
+target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
+renames only the types naming its own member, so a later rebind still finds its own.
 
 ### When `maybeBind` returns `undefined`
 
@@ -279,13 +293,14 @@ binding's own declared shape rather than to the module name stays where it is.
 
 ### When `maybeRebind` returns `undefined`
 
-The four above that still apply, plus: nothing binds `from`; `from` or `to` names a member on the
-AMD lane, or `to` an alias there other than the parameter's own name; `to.alias` is not a legal
-identifier, or is a name the file already spells; or the two differ in default/namespace/named
-shape while `from`'s statement binds nothing else. That last one is a layering boundary rather than an oversight — the only edit
-available in place is a rewrite of the existing clause, and changing shape needs whole-statement
-replacement with the header-preserving prefix transfer that `RemoveImport` does over the statement
-list.
+The four above that still apply, plus these:
+
+- nothing binds `from`
+- `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
+  parameter's own name
+- `to.alias` is not a legal identifier, or is a name the file already spells
+- the file binds its modules with `require` and the move would need a new import, because `from`'s
+  statement binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.
