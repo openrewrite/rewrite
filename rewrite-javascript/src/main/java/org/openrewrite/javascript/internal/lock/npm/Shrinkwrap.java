@@ -286,15 +286,28 @@ public final class Shrinkwrap {
         }
     }
 
+    public Shrinkwrap load(@Nullable String lock, @Nullable String yarn, @Nullable String packageJson) {
+        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .lock(lock == null ? null : new LockFile(lock))
+                .yarnLock(yarn);
+        if (packageJson != null) {
+            files.manifest("", packageJson);
+        }
+        return load(files.build());
+    }
+
     /**
      * Arborist's {@code load()} over the files it would read from the project directory: the lock
      * (npm-shrinkwrap.json or package-lock.json, null when there is none), yarn.lock and package.json
      * (read only to type the dependencies of a lockfileVersion 1 lock).
      */
-    public Shrinkwrap load(@Nullable String lock, @Nullable String yarn, @Nullable String packageJson) {
+    public Shrinkwrap load(VirtualTreeLoader.ProjectFiles files) {
+        LockFile lock = files.getLock();
+        String yarn = files.getYarnLock();
+        String packageJson = files.getManifests().get("");
         Object data;
         try {
-            loadedFromDisk = truthy(lock);
+            loadedFromDisk = lock != null && truthy(lock.getText());
 
             if (truthy(yarn)) {
                 yarnLock = new YarnLock();
@@ -304,7 +317,8 @@ public final class Shrinkwrap {
                 }
             }
 
-            JsonParseEvenBetterErrors.Parsed parsed = JsonParseEvenBetterErrors.parse(truthy(lock) ? lock : "{}");
+            JsonParseEvenBetterErrors.Parsed parsed = loadedFromDisk ? Objects.requireNonNull(lock).parsed() :
+                    JsonParseEvenBetterErrors.parse("{}");
             data = parsed.getValue();
             loadedFromObject = data instanceof Map;
             // inferFormattingOptions destructures the parsed value, which throws for null

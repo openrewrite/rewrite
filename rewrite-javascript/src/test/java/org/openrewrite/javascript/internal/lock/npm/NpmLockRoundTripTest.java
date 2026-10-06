@@ -141,7 +141,7 @@ class NpmLockRoundTripTest {
             manifests = fromLock;
         }
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
-          .lock(lock.getText())
+          .lock(new LockFile(lock.getText()))
           .yarnLock(lock.getYarnLock())
           .manifests(manifests)
           .build();

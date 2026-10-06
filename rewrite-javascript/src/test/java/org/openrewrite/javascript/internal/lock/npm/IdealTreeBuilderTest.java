@@ -163,7 +163,7 @@ class IdealTreeBuilderTest {
             manifests = fromLock;
         }
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
-          .lock(edit.getStart().getText())
+          .lock(new LockFile(edit.getStart().getText()))
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(manifests)
           .build();

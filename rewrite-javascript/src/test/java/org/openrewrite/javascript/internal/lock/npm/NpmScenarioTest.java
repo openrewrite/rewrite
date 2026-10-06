@@ -80,7 +80,7 @@ class NpmScenarioTest {
           .lock(edit.getStart().getText())
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(edit.manifests())
-          .options(NpmOptions.fromNpmrc(npmrc + scenario.argsAfter()))
+          .npmrc(npmrc + scenario.argsAfter())
           .host(IdealTreeBuilderTest.RECORDED_ON.toBuilder()
             .nodeVersion(scenario.nodeVersion())
             .now(recordedAt != null ? recordedAt : Instant.now())

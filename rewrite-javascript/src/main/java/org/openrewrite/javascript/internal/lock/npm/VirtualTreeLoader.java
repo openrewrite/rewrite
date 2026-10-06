@@ -45,7 +45,7 @@ public final class VirtualTreeLoader {
     @Builder
     public static class ProjectFiles {
         @Nullable
-        String lock;
+        LockFile lock;
 
         @Nullable
         String yarnLock;
@@ -122,7 +122,7 @@ public final class VirtualTreeLoader {
             return Objects.requireNonNull(virtualTree);
         }
 
-        Shrinkwrap s = new Shrinkwrap(path, options).load(files.getLock(), files.getYarnLock(), manifests.get(""));
+        Shrinkwrap s = new Shrinkwrap(path, options).load(files);
         if (!s.isLoadedFromDisk() && root == null) {
             throw new NoLockException();
         }

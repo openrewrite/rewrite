@@ -393,8 +393,7 @@ class ShrinkwrapTest {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files(c.get("inputs").asText());
         NpmOptions options = c.get("lockfileVersion").isNull() ? NpmOptions.DEFAULT :
           NpmOptions.builder().lockfileVersion(c.get("lockfileVersion").asInt()).build();
-        return new Shrinkwrap(VirtualTreeLoaderTest.path(c.get("inputs").asText()), options)
-          .load(files.getLock(), files.getYarnLock(), files.getManifests().get(""));
+        return new Shrinkwrap(VirtualTreeLoaderTest.path(c.get("inputs").asText()), options).load(files);
     }
 
     // test/shrinkwrap.js's load, lockfileVersion, reset, format and commit cases, over arborist's fixtures
@@ -463,15 +462,13 @@ class ShrinkwrapTest {
     void loadAndChangeLockfileVersion() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
         String path = VirtualTreeLoaderTest.path("install-types");
-        Shrinkwrap vDefault = new Shrinkwrap(path).load(files.getLock(), null, files.getManifests().get(""));
-        Shrinkwrap v1 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(1).build()).load(files.getLock(),
-          null,
+        String lock = files.getLock().getText();
+        Shrinkwrap vDefault = new Shrinkwrap(path).load(lock, null, files.getManifests().get(""));
+        Shrinkwrap v1 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(1).build()).load(lock, null,
           files.getManifests().get(""));
-        Shrinkwrap v2 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(2).build()).load(files.getLock(),
-          null,
+        Shrinkwrap v2 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(2).build()).load(lock, null,
           files.getManifests().get(""));
-        Shrinkwrap v3 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(3).build()).load(files.getLock(),
-          null,
+        Shrinkwrap v3 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(3).build()).load(lock, null,
           files.getManifests().get(""));
         assertThat(canonical(vDefault.getData())).as("default is same as version 3").isEqualTo(canonical(v3.getData()));
         Map<String, Object> v1Data = v1.commit();
@@ -503,7 +500,7 @@ class ShrinkwrapTest {
     @Test
     void lookUpFromLocksAndSuch() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
-        Shrinkwrap m = new Shrinkwrap(VirtualTreeLoaderTest.path("install-types")).load(files.getLock(), null,
+        Shrinkwrap m = new Shrinkwrap(VirtualTreeLoaderTest.path("install-types")).load(files.getLock().getText(), null,
           files.getManifests().get(""));
         assertThat(canonical(m.get(""))).as("root metadata").isEqualTo(canonical(obj("name", "a", "version", "1.2.3",
           "dependencies", obj("abbrev", "^1.1.1", "full-git-url", "git+https://github.com/isaacs/abbrev-js.git",
@@ -674,7 +671,7 @@ class ShrinkwrapTest {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
         String fixture = VirtualTreeLoaderTest.path("install-types");
         Shrinkwrap s = new Shrinkwrap(fixture, NpmOptions.builder().lockfileVersion(2).build())
-          .load(files.getLock(), null, files.getManifests().get(""));
+          .load(files.getLock().getText(), null, files.getManifests().get(""));
         Node node = node(opts().path(fixture + "/node_modules/newthing").pkg(obj("name", "newthing", "version",
           "1.2.3")));
         s.add(node);

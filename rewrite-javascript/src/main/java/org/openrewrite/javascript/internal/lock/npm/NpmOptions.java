@@ -242,22 +242,6 @@ public class NpmOptions {
      * @throws NeedsEnvironment for a {@code ${VAR}} reference in the value of a key read, or in a key
      *                          that could expand to one
      */
-    /**
-     * The same, from the npmrc's keys and values as the host read them, written back as {@code ini.stringify}
-     * would.
-     */
-    public static NpmOptions fromProperties(Map<String, @Nullable String> properties) {
-        StringBuilder npmrc = new StringBuilder();
-        for (Map.Entry<String, @Nullable String> entry : properties.entrySet()) {
-            npmrc.append(Ini.safe(entry.getKey()));
-            if (entry.getValue() != null) {
-                npmrc.append('=').append(Ini.safe(entry.getValue()));
-            }
-            npmrc.append('\n');
-        }
-        return fromNpmrc(npmrc.toString());
-    }
-
     public static NpmOptions fromNpmrc(@Nullable String npmrc) {
         NpmOptionsBuilder options = builder();
         if (npmrc == null) {

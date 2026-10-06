@@ -48,7 +48,7 @@ class VirtualTreeLoaderTest {
     static VirtualTreeLoader.ProjectFiles files(String inputs) {
         JsonNode in = DUMPS.get("inputs").get(inputs);
         VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
-          .lock(in.get("lock").isNull() ? null : in.get("lock").asText())
+          .lock(in.get("lock").isNull() ? null : new LockFile(in.get("lock").asText()))
           .yarnLock(in.get("yarnLock").isNull() ? null : in.get("yarnLock").asText());
         in.get("manifests").fields().forEachRemaining(e -> files.manifest(e.getKey(), e.getValue().asText()));
         return files.build();
@@ -125,8 +125,7 @@ class VirtualTreeLoaderTest {
     void loadFromRootThatAlreadyHasShrinkwrap() {
         String name = "tap-and-flow";
         VirtualTreeLoader.ProjectFiles files = files(name);
-        Shrinkwrap meta = new Shrinkwrap(path(name)).load(files.getLock(), files.getYarnLock(), files.getManifests()
-          .get(""));
+        Shrinkwrap meta = new Shrinkwrap(path(name)).load(files);
         Node root = node(opts().path(path(name)).pkg(json(files.getManifests().get(""))).meta(meta));
         VirtualTreeLoader loader = new VirtualTreeLoader(path(name), NpmOptions.DEFAULT);
         assertThat(loader.loadVirtual(files, root)).isSameAs(root);
@@ -185,9 +184,9 @@ class VirtualTreeLoaderTest {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
           .manifest("", "{\"name\":\"root\",\"workspaces\":[\"packages/*\"]}")
           .manifest("packages/some-folder/my-package", "{\"name\":\"@my-scope/my-package\",\"version\":\"1.0.0\"}")
-          .lock(JsonStringifyNice.stringify(obj("name", "root", "lockfileVersion", 3, "packages", obj(
+          .lock(new LockFile(JsonStringifyNice.stringify(obj("name", "root", "lockfileVersion", 3, "packages", obj(
             "", obj("workspaces", NpmTreeSupport.arr("packages/*")),
-            "node_modules/@my-scope/my-package", obj("resolved", "packages/some-folder/my-package", "link", true)))))
+            "node_modules/@my-scope/my-package", obj("resolved", "packages/some-folder/my-package", "link", true))))))
           .build();
         assertThatThrownBy(() -> new VirtualTreeLoader("/project", NpmOptions.DEFAULT).loadVirtual(files))
           .isInstanceOf(VirtualTreeLoader.MissingTargetException.class)
@@ -201,12 +200,12 @@ class VirtualTreeLoaderTest {
           .manifest("",
                     "{\"name\":\"project\",\"version\":\"1.0.0\",\"dependencies\":{\"sibling\":\"file:../sibling\"}}")
           .manifest("../sibling", "{\"name\":\"sibling\",\"version\":\"1.0.0\"}")
-          .lock(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion", 3, "requires",
-                                                true,
+          .lock(new LockFile(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion", 3,
+            "requires", true,
             "packages", obj(
               "", obj("name", "project", "version", "1.0.0", "dependencies", obj("sibling", "file:../sibling")),
               "../sibling", obj("name", "sibling", "version", "1.0.0"),
-              "node_modules/sibling", obj("resolved", "../sibling", "link", true)))))
+              "node_modules/sibling", obj("resolved", "../sibling", "link", true))))))
           .build();
         Node tree = new VirtualTreeLoader("/dir/project", NpmOptions.DEFAULT).loadVirtual(files);
         assertThat(tree.getChildren().get("sibling")).as("external file:../ link still loads").isNotNull();

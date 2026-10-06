@@ -24,6 +24,7 @@ import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
@@ -274,14 +275,63 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmjs.org/is-odd/3.0.0", resource("lock/npm/v3/http/is-odd-3.0.0"));
         routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/npm/v3/http/is-odd-3.0.1"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/workspace/pkg-after"),
-                resource("lock/npm/workspace/pkg-before"),
-                resource("lock/npm/workspace/before"),
-                null, Paths.get("packages/foo/package.json"), ctx);
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
+                .packageJson(resource("lock/npm/workspace/pkg-after"))
+                .originalPackageJson(resource("lock/npm/workspace/pkg-before"))
+                .lock(resource("lock/npm/workspace/before"))
+                .packageJsonPath(Paths.get("packages/foo/package.json"))
+                .manifest(Paths.get("package.json"), "{\n  \"name\": \"npm-lock-ws\",\n  \"version\": \"1.0.0\",\n" +
+                                                     "  \"workspaces\": [\n    \"packages/*\"\n  ]\n}\n")
+                .build(), ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/workspace/after"));
+    }
+
+    @Test
+    void rootManifestWithoutNameAtTheRepositoryRootKeepsTheLockName() {
+        String before = "{\n  \"dependencies\": {\n    \"lodash\": \"^4.17.20\"\n  }\n}\n";
+        String after = "{\n  \"dependencies\": {}\n}\n";
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
+                .packageJson(after)
+                .originalPackageJson(before)
+                .lock(npmLock("4.17.20"))
+                .packageJsonPath(Paths.get("package.json"))
+                .manifest(Paths.get("package.json"), before)
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).startsWith("{\n  \"name\": \"x\",\n").doesNotContain("null");
+    }
+
+    @Test
+    void npmrcValueNpmRejectsFailsLoud() {
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.Project, Map.of("lockfile-version", "abc"))));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail()).startsWith("npm fails on this edit: Invalid lockfileVersion config: NaN");
+    }
+
+    @Test
+    void npmrcReadingTheEnvironmentFailsLoud() {
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.Project, Map.of("legacy-peer-deps", "${LPD}"))));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
+        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the environment: \"${LPD}\"");
     }
 
     // --- C4: credentials never leak into a failure detail ----------------

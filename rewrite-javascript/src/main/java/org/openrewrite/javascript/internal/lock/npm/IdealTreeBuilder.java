@@ -122,6 +122,13 @@ public final class IdealTreeBuilder {
     private final List<NpmInstallChecks.UnsupportedEngine> engineWarnings = new ArrayList<>();
 
     /**
+     * The root package.json as normalized, with the formatting the lock is written in; null when the project
+     * has none.
+     */
+    @Getter
+    private @Nullable PackageJson rootManifest;
+
+    /**
      * @param path     the project directory, as the lock's locations are resolved against it
      * @param files    the lock and the manifests of the project
      * @param registry where manifests come from
@@ -208,14 +215,13 @@ public final class IdealTreeBuilder {
     private void initTree() {
         Map<String, String> manifests = files.getManifests();
         String rootText = manifests.get("");
-        PackageJson manifest = null;
         Node root;
         if (rootText == null) {
             root = rootNodeFromPackage(new LinkedHashMap<>());
         } else {
             try {
-                manifest = PackageJson.normalize(rootText);
-                root = rootNodeFromPackage(manifest.getContent());
+                rootManifest = PackageJson.normalize(rootText);
+                root = rootNodeFromPackage(rootManifest.getContent());
             } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles err) {
                 throw err;
             } catch (RuntimeException err) {
@@ -238,8 +244,8 @@ public final class IdealTreeBuilder {
             throw new MalformedLock("the lock's JSON root is not an object");
         }
         flagsSuspect = loader.isFlagsSuspect();
-        if (manifest != null) {
-            meta.inferFormattingOptions(manifest);
+        if (rootManifest != null) {
+            meta.inferFormattingOptions(rootManifest);
         }
 
         queueProblemNodes(tree, new LinkedHashSet<>());

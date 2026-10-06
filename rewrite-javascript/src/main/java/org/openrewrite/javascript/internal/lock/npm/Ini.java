@@ -181,6 +181,21 @@ final class Ini {
     }
 
     /**
+     * {@code ini.stringify} of a flat map: one {@code key=value} line per entry, the bare key for a null value.
+     */
+    static String encode(Map<String, @Nullable String> properties) {
+        StringBuilder out = new StringBuilder();
+        for (Map.Entry<String, @Nullable String> entry : properties.entrySet()) {
+            out.append(safe(entry.getKey()));
+            if (entry.getValue() != null) {
+                out.append('=').append(safe(entry.getValue()));
+            }
+            out.append('\n');
+        }
+        return out.toString();
+    }
+
+    /**
      * {@code ini.safe(val)}: a key or value as {@code ini.stringify} writes it, so that {@link #decode} reads it
      * back as the same text.
      */

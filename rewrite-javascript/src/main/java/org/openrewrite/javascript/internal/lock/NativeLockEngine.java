@@ -31,7 +31,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
-import org.openrewrite.javascript.internal.lock.npm.NpmOptions;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.internal.lock.npm.RegistryPackuments;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
@@ -46,7 +45,6 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.semver.Semver;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayDeque;
@@ -150,99 +148,13 @@ public final class NativeLockEngine {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         PackumentSource packuments = new RegistryPackuments(registries, view.getRegistryClient());
-        return new NpmLockRegenerator(npmInputs(request, view), packuments).regenerate();
-    }
-
-    static NpmLockRegenerator.Inputs npmInputs(Request request, NodeExecutionContextView view) {
-        Path packageJsonPath = request.getPackageJsonPath() == null ? Paths.get("package.json") :
-                request.getPackageJsonPath();
-        Path dir = packageJsonPath.getParent();
-        Path rootDir = npmRootDirectory(request, dir);
-        NpmLockRegenerator.Inputs.InputsBuilder inputs = NpmLockRegenerator.Inputs.builder()
-                .lock(request.getLock())
-                .options(npmOptions(request.getMarker()))
-                .host(Host.builder()
-                        .nodeVersion(view.getNodeVersion())
-                        .os(view.getOs())
-                        .cpu(view.getCpu())
-                        .libc(view.getLibc())
-                        .build())
-                .directoryName(rootDir == null || rootDir.getFileName() == null ? null : rootDir.getFileName().toString());
-        for (Map.Entry<Path, String> manifest : request.getManifests().entrySet()) {
-            inputs.manifest(npmLocation(rootDir, manifest.getKey().getParent()), manifest.getValue());
-        }
-        inputs.manifest(npmLocation(rootDir, dir), request.getPackageJson());
-        return inputs.build();
-    }
-
-    /**
-     * The options the project's own npmrc sets; the host's user and global npmrc are not an input.
-     */
-    private static NpmOptions npmOptions(@Nullable NodeResolutionResult marker) {
-        if (marker == null || marker.getNpmrcConfigs() == null) {
-            return NpmOptions.DEFAULT;
-        }
-        for (NodeResolutionResult.Npmrc npmrc : marker.getNpmrcConfigs()) {
-            if (npmrc.getScope() == NodeResolutionResult.NpmrcScope.Project) {
-                return NpmOptions.fromProperties(npmrc.getProperties());
-            }
-        }
-        return NpmOptions.DEFAULT;
-    }
-
-    /**
-     * The directory the lock is in: that of the topmost manifest given, else the edited manifest's own, less
-     * the location the lock gives a workspace member of its name.
-     */
-    private static @Nullable Path npmRootDirectory(Request request, @Nullable Path dir) {
-        Path root = null;
-        for (Path path : request.getManifests().keySet()) {
-            Path candidate = path.getParent() == null ? Paths.get("") : path.getParent().normalize();
-            boolean ancestor = candidate.toString().isEmpty() ||
-                               dir != null && dir.normalize().startsWith(candidate);
-            if (ancestor && (root == null || candidate.toString().length() < root.toString().length())) {
-                root = candidate;
-            }
-        }
-        if (root != null) {
-            return root;
-        }
-        String location = npmLocationInLock(request.getLock(), request.getPackageJson(), dir);
-        for (int i = 0; i < Paths.get(location).getNameCount() && !location.isEmpty() && dir != null; i++) {
-            dir = dir.getParent();
-        }
-        return dir;
-    }
-
-    private static String npmLocationInLock(@Nullable String lock, String manifest, @Nullable Path dir) {
-        if (lock == null || dir == null) {
-            return "";
-        }
-        try {
-            JsonNode packages = JSON.readTree(lock).path("packages");
-            String name = JSON.readTree(manifest).path("name").asText(null);
-            if (name != null && name.equals(packages.path("").path("name").asText(null))) {
-                return "";
-            }
-            String candidate = dir.toString().replace('\\', '/');
-            if (packages.has(candidate)) {
-                return candidate;
-            }
-            JsonNode link = packages.path("node_modules/" + name);
-            if (link.path("link").asBoolean(false) && link.path("resolved").isTextual()) {
-                return link.path("resolved").asText();
-            }
-        } catch (IOException ignored) {
-            // an unreadable lock or manifest is the regenerator's to report
-        }
-        return "";
-    }
-
-    private static String npmLocation(@Nullable Path rootDir, @Nullable Path dir) {
-        Path from = rootDir == null ? Paths.get("") : rootDir;
-        Path to = dir == null ? Paths.get("") : dir;
-        String location = from.normalize().relativize(to.normalize()).toString().replace('\\', '/');
-        return ".".equals(location) ? "" : location;
+        Host host = Host.builder()
+                .nodeVersion(view.getNodeVersion())
+                .os(view.getOs())
+                .cpu(view.getCpu())
+                .libc(view.getLibc())
+                .build();
+        return new NpmLockRegenerator(NpmLockRegenerator.Inputs.from(request, host), packuments).regenerate();
     }
 
     private static Result doRegenerate(PackageManager pm,
