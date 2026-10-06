@@ -50,7 +50,7 @@ public final class Spec {
      * An error npm-package-arg throws; {@code code} is its {@code err.code} when it sets one.
      */
     @Getter
-    public static final class InvalidSpecException extends IllegalArgumentException {
+    public static final class InvalidSpecException extends IllegalArgumentException implements NpmError {
         private final @Nullable String code;
 
         InvalidSpecException(String message, @Nullable String code) {

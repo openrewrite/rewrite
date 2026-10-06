@@ -37,12 +37,17 @@ final class MapWorkspaces {
      * The errors map-workspaces throws, with their codes.
      */
     @Getter
-    public static final class WorkspacesException extends IllegalArgumentException {
+    public static final class WorkspacesException extends IllegalArgumentException implements NpmError {
         private final String code;
 
         WorkspacesException(String message, String code) {
             super(message);
             this.code = code;
+        }
+
+        @Override
+        public String getCode() {
+            return code;
         }
     }
 

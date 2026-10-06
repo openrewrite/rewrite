@@ -1,0 +1,27 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+/**
+ * A root package.json arborist cannot build a node from (an override key it cannot parse, a dependency
+ * whose spec is not a string, ...): npm discards the manifest, resolves nothing and writes an empty lock.
+ * The message names what was refused.
+ */
+public final class MalformedManifest extends IllegalStateException {
+    public MalformedManifest(String message, Throwable cause) {
+        super(message, cause);
+    }
+}

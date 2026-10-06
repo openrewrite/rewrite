@@ -1262,11 +1262,12 @@ public class Node {
     /**
      * npm's {@code EOVERRIDE}.
      */
-    public static final class OverrideConflict extends IllegalStateException {
+    public static final class OverrideConflict extends IllegalStateException implements NpmError {
         OverrideConflict(String message) {
             super(message);
         }
 
+        @Override
         public String getCode() {
             return "EOVERRIDE";
         }

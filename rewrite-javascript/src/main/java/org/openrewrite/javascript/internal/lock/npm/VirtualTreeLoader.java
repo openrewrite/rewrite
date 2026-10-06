@@ -57,19 +57,29 @@ public final class VirtualTreeLoader {
     /**
      * {@code ENOLOCK}: no lock to load a tree from.
      */
-    public static final class NoLockException extends IllegalStateException {
+    public static final class NoLockException extends IllegalStateException implements NpmError {
         NoLockException() {
             super("loadVirtual requires existing shrinkwrap file");
+        }
+
+        @Override
+        public String getCode() {
+            return "ENOLOCK";
         }
     }
 
     /**
      * {@code EMISSINGTARGET}: a link whose target the lock does not hold.
      */
-    public static final class MissingTargetException extends IllegalStateException {
+    public static final class MissingTargetException extends IllegalStateException implements NpmError {
         MissingTargetException(String targetLoc, String location) {
             super("Missing target in lock file: \"" + targetLoc + "\" is referenced by \"" + location +
                   "\" but does not exist.\nTo fix:\n1. rm package-lock.json\n2. npm install");
+        }
+
+        @Override
+        public String getCode() {
+            return "EMISSINGTARGET";
         }
     }
 

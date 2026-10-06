@@ -20,6 +20,9 @@
  * <ul>
  *     <li>@npmcli/arborist: Copyright npm, Inc.</li>
  *     <li>npm-pick-manifest: Copyright (c) npm, Inc.</li>
+ *     <li>npm-install-checks: Copyright (c) Robert Kowalski and Isaac Z. Schlueter ("Authors")</li>
+ *     <li>pacote: Copyright (c) Isaac Z. Schlueter, Kat Marchán, npm, Inc., and Contributors</li>
+ *     <li>ssri: Copyright (c) npm, Inc.</li>
  *     <li>npm-package-arg: Copyright (c) npm, Inc.</li>
  *     <li>hosted-git-info: Copyright (c) 2015, Rebecca Turner</li>
  *     <li>validate-npm-package-name: Copyright (c) 2015, npm, Inc</li>

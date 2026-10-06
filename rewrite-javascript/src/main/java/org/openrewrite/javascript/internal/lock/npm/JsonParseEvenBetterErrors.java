@@ -37,12 +37,13 @@ final class JsonParseEvenBetterErrors {
     /**
      * Thrown as {@code JSONParseError} is, with its {@code EJSONPARSE} code.
      */
-    static final class JsonParseException extends IllegalArgumentException {
+    static final class JsonParseException extends IllegalArgumentException implements NpmError {
         JsonParseException(String message, Throwable cause) {
             super(message, cause);
         }
 
-        String getCode() {
+        @Override
+        public String getCode() {
             return "EJSONPARSE";
         }
     }

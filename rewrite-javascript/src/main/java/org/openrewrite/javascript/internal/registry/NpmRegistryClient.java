@@ -24,6 +24,7 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException.Reason;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -45,13 +46,48 @@ public class NpmRegistryClient {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
+    private static final String FULL_ACCEPT = "application/json";
+
     private final HttpSender httpSender;
     private final Map<String, AbbreviatedPackument> packumentCache = new ConcurrentHashMap<>();
     private final Map<String, VersionManifest> manifestCache = new ConcurrentHashMap<>();
     private final Map<String, byte[]> tarballCache = new ConcurrentHashMap<>();
+    private final Map<String, String> documentCache = new ConcurrentHashMap<>();
 
     public NpmRegistryClient(HttpSender httpSender) {
         this.httpSender = httpSender;
+    }
+
+    /**
+     * The packument as the registry serves it: abbreviated ({@code application/vnd.npm.install-v1+json}) or,
+     * with {@code fullMetadata}, full ({@code application/json}, with publish times). Cached per run.
+     */
+    public String getPackumentText(NodeRegistry registry, String name, boolean fullMetadata) {
+        String key = (fullMetadata ? "full:" : "corgi:") + registry.getUrl() + "#" + name;
+        String cached = documentCache.get(key);
+        if (cached == null) {
+            guard(registry);
+            String url = base(registry) + "/" + Urls.encodeName(name);
+            cached = new String(send(registry, name, null, url, fullMetadata ? FULL_ACCEPT : PACKUMENT_ACCEPT, true),
+                    StandardCharsets.UTF_8);
+            documentCache.put(key, cached);
+        }
+        return cached;
+    }
+
+    /**
+     * The single-version manifest as the registry serves it. Cached per run.
+     */
+    public String getManifestText(NodeRegistry registry, String name, String version) {
+        String key = "manifest:" + registry.getUrl() + "#" + name + "@" + version;
+        String cached = documentCache.get(key);
+        if (cached == null) {
+            guard(registry);
+            String url = base(registry) + "/" + Urls.encodeName(name) + "/" + version;
+            cached = new String(send(registry, name, version, url, FULL_ACCEPT, false), StandardCharsets.UTF_8);
+            documentCache.put(key, cached);
+        }
+        return cached;
     }
 
     public AbbreviatedPackument getPackument(NodeRegistry registry, String name) {

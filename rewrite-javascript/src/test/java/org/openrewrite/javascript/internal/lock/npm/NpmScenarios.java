@@ -28,6 +28,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -58,6 +59,7 @@ final class NpmScenarios {
     private static final Pattern LOCK_FILE = Pattern.compile("^(before|after|fresh|again)(?:-(.+))?$");
     private static final Set<String> NOT_LOCKS = new HashSet<>(Arrays.asList("yarn", "npm", "npmrc"));
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
+    private static final Pattern RECORDED_AT = Pattern.compile("after exit=-?\\d+ at ([^,\\s]+)");
 
     private NpmScenarios() {
     }
@@ -192,6 +194,64 @@ final class NpmScenarios {
         }
     }
 
+    /**
+     * One edit of a scenario: the lock it starts from, the manifests after the edit, and the lock npm wrote
+     * for it ({@code result}), absent when npm failed.
+     */
+    @Getter
+    static final class Edit {
+        private final Scenario scenario;
+        private final String startFile;
+        private final @Nullable String resultFile;
+        private final String manifestFile;
+
+        Edit(Scenario scenario, String startFile, @Nullable String resultFile, String manifestFile) {
+            this.scenario = scenario;
+            this.startFile = startFile;
+            this.resultFile = resultFile;
+            this.manifestFile = manifestFile;
+        }
+
+        // the locks are read on demand: holding every corpus edit's text at once does not fit a test JVM
+        Lock getStart() {
+            return scenario.lock(startFile, "pkg-before", "tree-before", scenario.treeYarn("tree-before"),
+              scenario.beforeNpmrc());
+        }
+
+        @Nullable
+        Lock getResult() {
+            return resultFile == null ? null : inputs();
+        }
+
+        /**
+         * The lock npm wrote, or, when it failed, the starting lock standing in for it, with the manifests,
+         * tree, yarn.lock and npmrc of the edit.
+         */
+        Lock getInputs() {
+            return inputs();
+        }
+
+        private Lock inputs() {
+            String yarn = scenario.has("before-yarn") ? scenario.file("before-yarn") : scenario.treeYarn("tree");
+            Lock lock = scenario.lock(resultFile != null ? resultFile : startFile, manifestFile, "tree", yarn,
+              scenario.npmrc());
+            return resultFile != null ? lock : new Lock(scenario, "after", lock.getText(), lock.getManifestFileName(),
+              lock.getManifest(), lock.getTree(), yarn, scenario.npmrc());
+        }
+
+        /**
+         * The project's manifests after the edit, by location.
+         */
+        Map<String, String> manifests() {
+            return inputs().manifests();
+        }
+
+        @Override
+        public String toString() {
+            return scenario.getLabel() + "/" + startFile;
+        }
+    }
+
     @Getter
     static final class Scenario {
         private final String name;
@@ -203,11 +263,92 @@ final class NpmScenarios {
         private final Path dir;
         private final @Nullable Path httpCache;
 
-        Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
+        /**
+         * Every root scenarios are discovered under: a scenario's registry responses may sit under its name in
+         * another root ({@code <root>/<name>/http/}) when its own directory is read-only.
+         */
+        private final List<Path> roots;
+
+        Scenario(String name, String label, Path dir, @Nullable Path httpCache, List<Path> roots) {
             this.name = name;
             this.label = label;
             this.dir = dir;
             this.httpCache = httpCache;
+            this.roots = roots;
+        }
+
+        /**
+         * The edits the scenario records: one per {@code before} lock (and its {@code -v2} and similar
+         * variants), or from {@code before-input} when that is the only start.
+         */
+        List<Edit> edits() {
+            List<Edit> edits = new ArrayList<>();
+            List<String> files = files();
+            for (String start : files) {
+                Matcher m = LOCK_FILE.matcher(start);
+                if (!m.matches() || !"before".equals(m.group(1)) || "before-again".equals(start) ||
+                    m.group(2) != null && NOT_LOCKS.contains(m.group(2))) {
+                    continue;
+                }
+                boolean input = "before-input".equals(start);
+                if (input && has("before")) {
+                    continue;
+                }
+                String suffix = input ? "" : start.substring("before".length());
+                String result = files.contains("after" + suffix) ? "after" + suffix : null;
+                String manifestFile = has("pkg-after" + suffix) ? "pkg-after" + suffix : has("pkg-after") ?
+                  "pkg-after" : "pkg";
+                if (result == null && !has(manifestFile)) {
+                    // a lock with neither an edited manifest nor a recorded result is not an edit
+                    continue;
+                }
+                edits.add(new Edit(this, start, result, manifestFile));
+            }
+            return edits;
+        }
+
+        /**
+         * The extra command-line arguments of the edit, such as {@code --os=linux}, as npmrc lines.
+         */
+        String argsAfter() {
+            String args = file("args-after");
+            if (args == null) {
+                return "";
+            }
+            StringBuilder lines = new StringBuilder();
+            String[] tokens = args.trim().split("\\s+");
+            for (int i = 0; i < tokens.length; i++) {
+                String token = tokens[i];
+                if (!token.startsWith("--")) {
+                    continue;
+                }
+                String key = token.substring(2);
+                int eq = key.indexOf('=');
+                if (eq >= 0) {
+                    lines.append(key, 0, eq).append('=').append(key.substring(eq + 1)).append('\n');
+                } else if (key.startsWith("no-")) {
+                    lines.append(key.substring(3)).append("=false\n");
+                } else if (i + 1 < tokens.length && !tokens[i + 1].startsWith("--")) {
+                    lines.append(key).append('=').append(tokens[++i]).append('\n');
+                } else {
+                    lines.append(key).append("=true\n");
+                }
+            }
+            return lines.toString();
+        }
+
+        /**
+         * When the edit was recorded ({@code after exit=0 at <instant>} in {@code recorded-with}), for the
+         * clock {@code min-release-age} counts from.
+         */
+        @Nullable
+        Instant recordedAt() {
+            String recordedWith = recordedWith();
+            if (recordedWith == null) {
+                return null;
+            }
+            Matcher m = RECORDED_AT.matcher(recordedWith);
+            return m.find() ? Instant.parse(m.group(1)) : null;
         }
 
         boolean has(String file) {
@@ -260,6 +401,12 @@ final class NpmScenarios {
             Path own = dir.resolve("http").resolve(name);
             if (Files.isRegularFile(own)) {
                 return read(own);
+            }
+            for (Path root : roots) {
+                Path sibling = root.resolve(this.name).resolve("http").resolve(name);
+                if (Files.isRegularFile(sibling)) {
+                    return read(sibling);
+                }
             }
             if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
                 return read(httpCache.resolve(name));
@@ -414,28 +561,32 @@ final class NpmScenarios {
      */
     static List<Scenario> discover() {
         Map<String, Scenario> found = new TreeMap<>();
+        List<Path> classpathRoots = new ArrayList<>();
         try {
             Enumeration<URL> roots = NpmScenarios.class.getClassLoader().getResources("lock/npm");
             while (roots.hasMoreElements()) {
                 URL url = roots.nextElement();
                 if ("file".equals(url.getProtocol())) {
-                    collect(Paths.get(url.toURI()), null, found);
+                    classpathRoots.add(Paths.get(url.toURI()));
                 }
             }
         } catch (IOException | URISyntaxException e) {
             throw new IllegalStateException(e);
+        }
+        for (Path root : classpathRoots) {
+            collect(root, null, classpathRoots, found);
         }
         String corpus = System.getenv(SCENARIOS_ENV);
         if (corpus != null && !corpus.isEmpty() && Files.isDirectory(Paths.get(corpus))) {
             String cache = System.getenv(HTTP_CACHE_ENV);
             Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
               Paths.get(cache) : null;
-            collect(Paths.get(corpus), httpCache, found);
+            collect(Paths.get(corpus), httpCache, classpathRoots, found);
         }
         return new ArrayList<>(found.values());
     }
 
-    private static void collect(Path root, @Nullable Path httpCache, Map<String, Scenario> found) {
+    private static void collect(Path root, @Nullable Path httpCache, List<Path> roots, Map<String, Scenario> found) {
         try (Stream<Path> walk = Files.walk(root)) {
             walk.filter(Files::isDirectory).forEach(dir -> {
                 if (dir.equals(root) || !isScenario(dir) || inScenario(dir, root)) {
@@ -443,7 +594,7 @@ final class NpmScenarios {
                 }
                 String name = root.relativize(dir).toString().replace('\\', '/');
                 String label = found.containsKey(name) ? name + " (" + root + ")" : name;
-                found.put(label, new Scenario(name, label, dir, httpCache));
+                found.put(label, new Scenario(name, label, dir, httpCache, roots));
             });
         } catch (IOException e) {
             throw new UncheckedIOException(e);

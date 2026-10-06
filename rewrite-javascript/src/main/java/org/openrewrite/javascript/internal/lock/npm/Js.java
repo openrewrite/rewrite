@@ -21,6 +21,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.DateTimeException;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -380,6 +384,44 @@ final class Js {
             return "type string ('" + value + "')";
         }
         return "an instance of " + (value instanceof List ? "Array" : "Object");
+    }
+
+    private static final Pattern DATE_TIME_STRING = Pattern.compile(
+            "^([+-]\\d{6}|\\d{4})(?:-(\\d{2})(?:-(\\d{2}))?)?" +
+            "(?:[T ](\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.(\\d{1,3})\\d*)?)?(Z|[+-]\\d{2}:\\d{2})?)?$");
+
+    /**
+     * {@code Date.parse(text)} for the ECMAScript date-time string format: the time value in
+     * milliseconds, or NaN. A date-only form is UTC.
+     *
+     * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
+     */
+    static double dateParse(String text) {
+        Matcher m = DATE_TIME_STRING.matcher(trim(text));
+        if (!m.matches()) {
+            return Double.NaN;
+        }
+        if (m.group(4) != null && m.group(8) == null) {
+            throw new CannotKnow("the host's time zone (\"" + text + "\" names no offset)");
+        }
+        try {
+            int year = Integer.parseInt(m.group(1));
+            int month = m.group(2) == null ? 1 : Integer.parseInt(m.group(2));
+            int day = m.group(3) == null ? 1 : Integer.parseInt(m.group(3));
+            int hour = m.group(4) == null ? 0 : Integer.parseInt(m.group(4));
+            int minute = m.group(5) == null ? 0 : Integer.parseInt(m.group(5));
+            int second = m.group(6) == null ? 0 : Integer.parseInt(m.group(6));
+            String fraction = m.group(7) == null ? "0" : (m.group(7) + "00").substring(0, 3);
+            if (hour == 24 && (minute != 0 || second != 0 || !"000".equals(fraction))) {
+                return Double.NaN;
+            }
+            ZoneOffset offset = m.group(8) == null || "Z".equals(m.group(8)) ? ZoneOffset.UTC : ZoneOffset.of(m.group(8));
+            long millis = LocalDate.of(year, month, day).atStartOfDay(offset).toInstant().toEpochMilli() +
+                          hour * 3600000L + minute * 60000L + second * 1000L + Integer.parseInt(fraction);
+            return (double) millis;
+        } catch (DateTimeException | NumberFormatException e) {
+            return Double.NaN;
+        }
     }
 
     static boolean isWhitespace(char c) {

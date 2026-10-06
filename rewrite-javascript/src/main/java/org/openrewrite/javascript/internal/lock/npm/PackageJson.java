@@ -87,6 +87,12 @@ public final class PackageJson {
         }
         // an array has none of the properties the steps read, so it normalizes to an empty manifest
         Map<String, Object> data = value instanceof Map ? (Map<String, Object>) value : new LinkedHashMap<>();
+        Object directories = data.get("directories");
+        Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
+        if (truthy(binDir) && !truthy(data.get("bin"))) {
+            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(binDir)) +
+                                        "} names the package's files, which are not known");
+        }
         normalizeBin(data);
         syncSteps(data, NORMALIZE_STEPS);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
@@ -160,14 +166,11 @@ public final class PackageJson {
         return data;
     }
 
+    /**
+     * npm-normalize-package-bin, in place.
+     */
     @SuppressWarnings("unchecked")
-    private static void normalizeBin(Map<String, Object> pkg) {
-        Object directories = pkg.get("directories");
-        Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
-        if (truthy(binDir) && !truthy(pkg.get("bin"))) {
-            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(binDir)) +
-                                        "} names the package's files, which are not known");
-        }
+    static void normalizeBin(Map<String, Object> pkg) {
         Object bin = pkg.get("bin");
         if (truthy(bin)) {
             if (bin instanceof String && truthy(pkg.get("name"))) {

@@ -49,6 +49,11 @@ public final class PlaceDep {
     @Value
     public static class PeerConflict {
         Edge edge;
+
+        /**
+         * The node being placed; null for the conflict the ideal tree builder raises while loading a peer set.
+         */
+        @Nullable
         Node dep;
 
         /**
@@ -76,7 +81,7 @@ public final class PlaceDep {
      * npm's {@code ERESOLVE}: the placement conflicts and is neither forced nor someone else's.
      */
     @Getter
-    public static final class CouldNotResolve extends IllegalStateException {
+    public static final class CouldNotResolve extends IllegalStateException implements NpmError {
         private final PeerConflict conflict;
 
         /**
@@ -85,11 +90,16 @@ public final class PlaceDep {
         private final List<PeerConflict> warnings;
 
         CouldNotResolve(PeerConflict conflict, List<PeerConflict> warnings) {
-            super("could not resolve");
+            this("could not resolve", conflict, warnings);
+        }
+
+        CouldNotResolve(String message, PeerConflict conflict, List<PeerConflict> warnings) {
+            super(message);
             this.conflict = conflict;
             this.warnings = warnings;
         }
 
+        @Override
         public String getCode() {
             return "ERESOLVE";
         }

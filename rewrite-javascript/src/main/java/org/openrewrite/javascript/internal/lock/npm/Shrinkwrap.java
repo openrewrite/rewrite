@@ -101,6 +101,12 @@ public final class Shrinkwrap {
     @Getter
     private boolean ancientLockfile;
 
+    /**
+     * Whether the lock text parsed to a JSON object; arborist spreads any other value into its data.
+     */
+    @Getter
+    private boolean loadedFromObject;
+
     @Getter
     private @Nullable Throwable loadingError;
 
@@ -215,7 +221,10 @@ public final class Shrinkwrap {
      * loaded, with {@code resolved} and {@code integrity} added to {@code options} for the fetch.
      */
     public Spec checkYarnLock(String spec, Map<String, Object> options) {
-        Spec parsed = Spec.npa(spec);
+        return checkYarnLock(Spec.npa(spec), options);
+    }
+
+    public Spec checkYarnLock(Spec parsed, Map<String, Object> options) {
         YarnLock yarnLock = this.yarnLock;
         boolean useYarnLock = yarnLock != null && !loadedFromDisk;
         YarnLock.Entry fromYarn = useYarnLock ? yarnLock.getEntries().get(parsed.getRaw()) : null;
@@ -297,6 +306,7 @@ public final class Shrinkwrap {
 
             JsonParseEvenBetterErrors.Parsed parsed = JsonParseEvenBetterErrors.parse(truthy(lock) ? lock : "{}");
             data = parsed.getValue();
+            loadedFromObject = data instanceof Map;
             // inferFormattingOptions destructures the parsed value, which throws for null
             Js.get(data, "lockfileVersion");
             if (parsed.getIndent() != null) {

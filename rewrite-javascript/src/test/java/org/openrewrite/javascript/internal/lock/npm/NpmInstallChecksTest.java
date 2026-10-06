@@ -1,0 +1,230 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
+
+/**
+ * npm-install-checks 8.0.0 test/check-engine.js and test/check-platform.js, with the machine this
+ * process runs on replaced by a known {@link Host}; the libc detection cases (which mock the OS) are not
+ * ported, since the host's libc is an input here.
+ */
+class NpmInstallChecksTest {
+
+    private static final Host DARWIN = Host.builder().os("darwin").cpu("arm64").build();
+
+    private static Map<String, Object> e(@Nullable String npm, @Nullable String node) {
+        return e(npm, node, "pkg@1.2.3");
+    }
+
+    private static Map<String, Object> e(@Nullable String npm, @Nullable String node, String id) {
+        Map<String, Object> engines = new LinkedHashMap<>();
+        if (npm != null) {
+            engines.put("npm", npm);
+        }
+        if (node != null) {
+            engines.put("node", node);
+        }
+        Map<String, Object> target = new LinkedHashMap<>();
+        target.put("engines", engines);
+        target.put("_id", id);
+        return target;
+    }
+
+    @Test
+    void noEngine() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(new LinkedHashMap<>(), "1.3.2", "0.2.1", false))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void emptyEngineObject() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, null), "1.1.2", "0.2.1", false))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nodeVersionTooOld() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e(null, "0.10.24"), "1.1.2", "0.10.18", false))
+          .isInstanceOf(NpmInstallChecks.UnsupportedEngine.class)
+          .matches(t -> "0.10.24".equals(Js.get(((NpmInstallChecks.UnsupportedEngine) t).getRequired(), "node")))
+          .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
+    }
+
+    @Test
+    void npmVersionTooOld() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e("^1.4.6", null), "1.3.2", "0.2.1", false))
+          .matches(t -> "^1.4.6".equals(Js.get(((NpmInstallChecks.UnsupportedEngine) t).getRequired(), "npm")))
+          .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
+    }
+
+    @Test
+    void forceNodeVersionTooOld() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, "0.1.0", "test@1.0.0"), "1.3.2", "0.2.1", true))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void cannotForceWhenNpmVersionTooOld() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(e("^1.4.6", null, "test@1.0.0"), "1.3.2", "0.2.1", false))
+          .matches(t -> "EBADENGINE".equals(((NpmError) t).getCode()));
+    }
+
+    @Test
+    void npmPrerelease() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "69.420.0-yolo", "69.420.0-yolo", false))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nodePrerelease() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", "69.420.0-yolo", false))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void noNodeVersion() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "1.2.3", null, false))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void noNpmVersion() {
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), null, "1.2.3", false))
+          .doesNotThrowAnyException();
+    }
+
+    private static void platform(String target) {
+        platform(target, false, Host.UNKNOWN);
+    }
+
+    private static void platform(String target, boolean force, Host environment) {
+        NpmInstallChecks.checkPlatform(json(target), force, environment, DARWIN);
+    }
+
+    private static boolean badPlatform(Throwable t) {
+        return t instanceof NpmInstallChecks.UnsupportedPlatform && "EBADPLATFORM".equals(((NpmError) t).getCode());
+    }
+
+    @Test
+    void targetCpuWrong() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void osWrong() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void nothingWrong() {
+        assertThatCode(() -> platform("{\"cpu\":\"any\",\"os\":\"any\"}")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void force() {
+        assertThatCode(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", true, Host.UNKNOWN))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void noOpinions() {
+        assertThatCode(() -> platform("{}")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void onlyTargetCpuWrong() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void onlyOsWrong() {
+        assertThatThrownBy(() -> platform("{\"os\":\"enten-os\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void everythingWrongWithArrays() {
+        assertThatThrownBy(() -> platform("{\"cpu\":[\"enten-cpu\"],\"os\":[\"enten-os\"]}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void osWrongNegation() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"!darwin\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void nothingWrongNegation() {
+        assertThatCode(() -> platform("{\"cpu\":\"!enten-cpu\",\"os\":\"!enten-os\"}")).doesNotThrowAnyException();
+    }
+
+    @Test
+    void nothingWrongWithOverriddenOs() {
+        assertThatCode(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("enten-os").build()))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nothingWrongWithOverriddenCpu() {
+        assertThatCode(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("enten-cpu").build()))
+          .doesNotThrowAnyException();
+    }
+
+    @Test
+    void nothingWrongWithOverriddenLibc() {
+        assertThatCode(() -> platform("{\"cpu\":\"enten-cpu\",\"libc\":\"enten-libc\"}", false,
+          Host.builder().cpu("enten-cpu").libc("enten-libc").build())).doesNotThrowAnyException();
+    }
+
+    @Test
+    void wrongOsWithOverriddenOs() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("another-os").build()))
+          .matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void wrongCpuWithOverriddenCpu() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("another-cpu").build()))
+          .matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void wrongLibcWithOverriddenLibc() {
+        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\",\"libc\":\"enten-libc\"}", false,
+          Host.builder().libc("another-libc").build())).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void libcFailsWhereTheHostReportsNone() {
+        assertThatThrownBy(() -> platform("{\"libc\":\"glibc\"}")).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> platform("{\"libc\":\"musl\"}")).matches(NpmInstallChecksTest::badPlatform);
+    }
+
+    @Test
+    void unknownHostSatisfiesEveryCheck() {
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\",\"libc\":\"musl\"}"),
+          false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
+        assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=99"), "11.17.0", null, false))
+          .doesNotThrowAnyException();
+    }
+}
