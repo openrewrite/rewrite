@@ -18,10 +18,11 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Union, TYPE_CHECKING
 
-from rewrite.java import J
+from rewrite.java import J, JavaType
 
 from .capture import Capture
 from .engine import TemplateEngine, TemplateOptions
+from .placeholder import from_placeholder
 
 if TYPE_CHECKING:
     from rewrite.visitor import Cursor
@@ -190,11 +191,13 @@ class Pattern:
             The parsed AST node representing the pattern.
         """
         if self._cached_tree is None:
-            self._cached_tree = TemplateEngine.get_template_tree(
+            tree = TemplateEngine.get_template_tree(
                 self._code,
                 self._captures,
                 self._options,
             )
+            _check_type_hints_resolved(tree, self._captures)
+            self._cached_tree = tree
         return self._cached_tree
 
     def match(
@@ -306,3 +309,29 @@ def pattern(
         context=context,
         dependencies=dependencies,
     )
+
+
+def _check_type_hints_resolved(tree: J, captures: Dict[str, Capture]) -> None:
+    """Raise if ty attributed no type to a typed capture's placeholder, which would then match nothing."""
+    if not any(cap.is_typed for cap in captures.values()):
+        return
+    from rewrite.python.visitor import PythonVisitor
+
+    unresolved: List[str] = []
+
+    class Check(PythonVisitor[None]):
+        def visit_identifier(self, ident, p):
+            name = from_placeholder(ident.simple_name)
+            cap = captures.get(name) if name is not None else None
+            if cap is not None and cap.is_typed and (
+                    ident.type is None or isinstance(ident.type, JavaType.Unknown)):
+                unresolved.append(f"{name}: {cap.type_hint}")
+            return ident
+
+    Check().visit(tree, None)
+    if unresolved:
+        raise ValueError(
+            f"Capture type hints did not resolve to a type: {', '.join(unresolved)}. "
+            "Import what a hint names through the pattern's `context`, and check that "
+            "ty-types is installed."
+        )
