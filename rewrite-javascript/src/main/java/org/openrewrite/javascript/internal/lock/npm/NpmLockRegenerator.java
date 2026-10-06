@@ -155,13 +155,16 @@ public final class NpmLockRegenerator {
         String written;
         try {
             options = NpmOptions.fromNpmrc(inputs.getNpmrc());
+            if (options.isGlobal()) {
+                throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
+            }
             LockFile lock = truthy(inputs.getLock()) ? new LockFile(inputs.getLock()) : null;
             Object lockData = lockData(lock);
             manifests = manifests(lockData);
             path = projectPath(lockData, manifests.get(""));
             IdealTreeBuilder arb = arborist(path, lock, manifests, options);
             arb.buildIdealTree();
-            if (!options.isSave()) {
+            if (!options.isSave() || options.isDryRun()) {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
             }
             written = saveIdealTree(arb, options);

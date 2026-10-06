@@ -61,7 +61,7 @@ public class NpmOptions {
             "prefer-dedupe", "strict-peer-deps", "force", "install-strategy", "global-style", "legacy-bundling",
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
-            "os", "cpu", "libc", "save", "tag", "format-package-lock");
+            "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global");
 
     /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
@@ -183,6 +183,16 @@ public class NpmOptions {
     boolean formatPackageLock = true;
 
     /**
+     * {@code dry-run}
+     */
+    boolean dryRun;
+
+    /**
+     * {@code global}
+     */
+    boolean global;
+
+    /**
      * {@code tag}: the dist-tag a bare name or {@code *} range resolves through; null for an empty or
      * null config value, which pacote reads as {@code latest}.
      */
@@ -299,6 +309,12 @@ public class NpmOptions {
                     break;
                 case "format-package-lock":
                     options.formatPackageLock(truthy(parseField(value, true)));
+                    break;
+                case "dry-run":
+                    options.dryRun(truthy(parseField(value, true)));
+                    break;
+                case "global":
+                    options.global(truthy(parseField(value, true)));
                     break;
                 case "install-strategy":
                     options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :

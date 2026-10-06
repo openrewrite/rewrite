@@ -31,7 +31,8 @@ public interface PackumentSource {
     Map<String, Object> packument(String name, boolean fullMetadata);
 
     /**
-     * {@code GET /<name>/<version>}: the version's manifest as the full packument holds it.
+     * {@code GET /<name>/<version>}: the version document, which holds what the full packument's entry does
+     * but in the registry's own key order.
      */
     Map<String, Object> manifest(String name, String version);
 }

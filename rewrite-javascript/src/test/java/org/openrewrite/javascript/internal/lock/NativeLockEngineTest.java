@@ -334,6 +334,40 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the environment: \"${LPD}\"");
     }
 
+    @Test
+    void npmrcDryRunLeavesTheLockUnchanged() {
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.Project, Map.of("dry-run", "true"))));
+        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
+        routes.put("https://registry.npmjs.org/lodash/4.17.21",
+                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
+                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
+                        "\"integrity\":\"sha512-NEW\"}}");
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(npmLock("4.17.20"));
+    }
+
+    @Test
+    void npmrcGlobalFailsLoud() {
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.Project, Map.of("global", "true"))));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail())
+                .startsWith("npm rejects this edit (ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
+    }
+
     // --- C4: credentials never leak into a failure detail ----------------
 
     @Test

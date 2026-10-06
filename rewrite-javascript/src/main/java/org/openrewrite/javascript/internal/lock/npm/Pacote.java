@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -95,7 +96,7 @@ final class Pacote {
                         .npmVersion(opts.getNpmVersion())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
-                source.manifest(name, versionKey(packument, picked));
+                withVersionDocument(picked, source.manifest(name, versionKey(packument, picked)));
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani);
 
@@ -140,6 +141,18 @@ final class Pacote {
             mani.put("_integrity", integrity);
         } else if (heldRaw) {
             mani.put("_integrity", Js.string(held));
+        }
+        return mani;
+    }
+
+    // npm reads the full packument's entry, whose key order the abbreviated entry shares and the version
+    // document does not: the document only supplies what the abbreviated form omits (license, libc)
+    private static Map<String, Object> withVersionDocument(Map<String, Object> entry, Map<String, Object> document) {
+        Map<String, Object> mani = new LinkedHashMap<>(entry);
+        for (Map.Entry<String, Object> extra : document.entrySet()) {
+            if (!mani.containsKey(extra.getKey())) {
+                mani.put(extra.getKey(), extra.getValue());
+            }
         }
         return mani;
     }

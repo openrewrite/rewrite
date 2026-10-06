@@ -1,0 +1,1 @@
+Bump kind-of 3.1.0 -> 3.2.2 while is-number@3.0.0 (kind-of ^3.0.2) accepts the new version: the root copy is replaced in place, nothing nests; is-buffer@1.1.6 satisfies the old and the new range.
