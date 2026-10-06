@@ -183,9 +183,10 @@ def _rebinding_name(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, moved: 
     if get_alias_name(moved.imp) is not None:
         return moved.name
     if to_member is not None:
-        if to_member == moved.name or not _taken(visitor, cu, to_member) or any(
-                b.name == to_member and b.module == to_module and b.member == to_member
-                for b in import_bindings(cu)):
+        if to_member == moved.name or not _taken(visitor, cu, to_member) or (
+                any(b.name == to_member and b.module == to_module and b.member == to_member
+                    for b in import_bindings(cu))
+                and not _declared_besides_module_imports(cu, to_member)):
             return to_member
         return moved.name
     # `import m` binds the module's own name, which references spell.
@@ -197,6 +198,32 @@ def _rebinding_name(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, moved: 
     if '.' not in to_module and not _taken(visitor, cu, to_module):
         return to_module
     return moved.name
+
+
+def _declared_besides_module_imports(cu: CompilationUnit, name: str) -> bool:
+    """Whether a statement other than a module-scope import binds ``name``. A parameter or a
+    nested import of it would capture a reference renamed onto it."""
+    module_scope = {stmt.id for stmt in cu.statements}
+    for block in module_scope_blocks(cu.statements):
+        module_scope.update(stmt.id for stmt in block.statements)
+    found: List[bool] = []
+
+    class Declares(PythonVisitor[None]):
+        def visit_multi_import(self, multi: MultiImport, p: None) -> Any:
+            if multi.id not in module_scope and any(
+                    (get_alias_name(imp) or get_qualid_name(imp.qualid).split('.')[0]) == name
+                    for imp in multi.names):
+                found.append(True)
+            return multi
+
+        def visit_identifier(self, ident: Identifier, p: None) -> Any:
+            if (ident.simple_name == name and resolves_in_scope(self.cursor, ident)
+                    and not is_reference(self.cursor, ident)):
+                found.append(True)
+            return ident
+
+    Declares().visit(cu, None)
+    return bool(found)
 
 
 def _reads_name(cu: CompilationUnit, name: str) -> bool:

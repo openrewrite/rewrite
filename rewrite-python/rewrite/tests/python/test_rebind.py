@@ -272,6 +272,21 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             from acme import HttpClient
             h = HttpClient(HttpClient())
             '''))
+    # A parameter of that name would capture the renamed reference inside its function.
+    _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
+                                              to_member='HttpClient')).rewrite_run(
+        python(
+            '''
+            from acme import HttpClient
+            from legacy import Http
+            def f(HttpClient):
+                return Http(HttpClient)
+            ''',
+            '''
+            from acme import HttpClient as Http, HttpClient
+            def f(HttpClient):
+                return Http(HttpClient)
+            '''))
     # A pinned alias the file spells elsewhere would capture its references, so nothing moves.
     _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
                                               alias='HttpClient')).rewrite_run(
@@ -279,7 +294,7 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             from legacy import Http
             class HttpClient: ...
             '''))
-    assert answers == ['Http', 'HttpClient', None]
+    assert answers == ['Http', 'HttpClient', 'Http', None]
 
 
 def test_rebinds_in_one_visit_end_in_one_import():
