@@ -1986,28 +1986,47 @@ describe('JavaScript type mapping', () => {
         await spec.rewriteRun(src);
     });
 
-    test('a call to a function declared in the same file has the declaration\'s declaringType', async () => {
+    test('a call to a function declared in a parsed source has the declaration\'s declaringType', async () => {
         const spec = new RecipeSpec();
         spec.recipe = markTypes((node, type) =>
             (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type) ?
                 `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
 
-        const src = typescript(
+        const util = typescript(
             `
+                export function shared(): void {}
+                export default function fallback(): void {}
+            `,
+            //@formatter:off
+            `
+                /*~~(util#shared)~~>*/export function shared(): void {}
+                /*~~(util#fallback)~~>*/export default function fallback(): void {}
+            `
+            //@formatter:on
+        );
+        util.path = 'util.ts';
+        const main = typescript(
+            `
+                import fb, {shared as s} from './util';
                 function helper(): void {}
                 helper();
+                s();
+                fb();
                 parseInt('1');
             `,
             //@formatter:off
             `
+                import fb, {shared as s} from './util';
                 /*~~(main#helper)~~>*/function helper(): void {}
                 /*~~(main#helper)~~>*/helper();
+                /*~~(util#shared)~~>*/s();
+                /*~~(util#fallback)~~>*/fb();
                 /*~~(𝑓#parseInt)~~>*/parseInt('1');
             `
             //@formatter:on
         );
-        src.path = 'main.ts';
-        await spec.rewriteRun(src);
+        main.path = 'main.ts';
+        await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
     });
 
     test('FindMissingTypes produces no results on a complex class', async () => {

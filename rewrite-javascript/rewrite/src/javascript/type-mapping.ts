@@ -788,6 +788,16 @@ export class JavaScriptTypeMapping {
         return this.moduleType(relative.replace(/\.[^/.]+$/, ''));
     }
 
+    /**
+     * The declaration of a function in a parsed source file. A `.d.ts` file is not parsed, so a
+     * function such as `parseInt` has none.
+     */
+    private parsedFunctionDeclaration(symbol: ts.Symbol): ts.FunctionDeclaration | undefined {
+        const declaration = symbol.valueDeclaration;
+        return declaration && ts.isFunctionDeclaration(declaration) && !declaration.getSourceFile().isDeclarationFile ?
+            declaration : undefined;
+    }
+
     private moduleType(module: string): Type.FullyQualified {
         return {
             kind: Type.Kind.Class,
@@ -1110,7 +1120,11 @@ export class JavaScriptTypeMapping {
                     }
                 }
 
-                if (moduleSpecifier) {
+                const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
+                if (declared) {
+                    declaringType = this.sourceModuleType(declared.getSourceFile());
+                    methodName = declared.name ? declared.name.text : "<anonymous>";
+                } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
                     if (moduleSpecifier.startsWith('node:')) {
                         // Node.js built-in module
@@ -1145,9 +1159,6 @@ export class JavaScriptTypeMapping {
                     // `const m = require('m'); m()` calls the module's default export.
                     declaringType = this.moduleType(this.requiredModuleOfExpression(node.expression)!);
                     methodName = '<default>';
-                } else if (symbol.valueDeclaration && ts.isFunctionDeclaration(symbol.valueDeclaration) &&
-                    !symbol.valueDeclaration.getSourceFile().isDeclarationFile) {
-                    declaringType = this.sourceModuleType(symbol.valueDeclaration.getSourceFile());
                 } else {
                     // Fall back to the original logic for non-imported functions
                     const exprType = this.checker.getTypeAtLocation(node.expression);
