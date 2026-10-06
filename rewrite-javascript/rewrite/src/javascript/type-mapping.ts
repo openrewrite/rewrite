@@ -790,9 +790,13 @@ export class JavaScriptTypeMapping {
      * take it, so a pattern written from one matches the other.
      */
     private sourceModuleType(sourceFile: ts.SourceFile): Type.FullyQualified {
+        return this.moduleType(this.sourceModuleName(sourceFile));
+    }
+
+    private sourceModuleName(sourceFile: ts.SourceFile): string {
         const fileName = sourceFile.fileName;
         const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
-        return this.moduleType(relative.replace(/\.[^/.]+$/, ''));
+        return relative.replace(/\.[^/.]+$/, '');
     }
 
     /**
@@ -930,11 +934,8 @@ export class JavaScriptTypeMapping {
             }
             owner = type;
         }
-        if (!owner) {
-            return undefined;
-        }
-        const declaringType = this.declaringType(owner);
-        return Type.isParameterized(declaringType) ? declaringType.type : declaringType;
+        const declaringType = owner && this.declaringType(owner);
+        return declaringType === Type.unknownType ? undefined : declaringType;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
@@ -1406,8 +1407,9 @@ export class JavaScriptTypeMapping {
 
     /**
      * The module of the parsed source file a symbol is local to, such as a class a module does not
-     * export. TypeScript names such a symbol as bare as a global, so the module is what keeps a
-     * module's own `class Array` apart from the built-in. A script's top-level declarations are globals.
+     * export at its top level. TypeScript names such a symbol as bare as a global, so the module is
+     * what keeps a module's own `class Array` apart from the built-in. A script's top-level
+     * declarations are globals.
      */
     private sourceModuleOf(symbol: ts.Symbol): string | undefined {
         let outermost = symbol;
@@ -1415,14 +1417,13 @@ export class JavaScriptTypeMapping {
             outermost = (outermost as any).parent;
         }
         const declaration = outermost.declarations?.[0];
-        if (!declaration || ts.isSourceFile(declaration) || ts.isModuleDeclaration(declaration) &&
+        if (!declaration?.parent || !ts.isSourceFile(declaration.parent) || ts.isModuleDeclaration(declaration) &&
             (ts.isStringLiteral(declaration.name) || declaration.flags & ts.NodeFlags.GlobalAugmentation)) {
             return undefined;
         }
-        const sourceFile = declaration.getSourceFile();
+        const sourceFile = declaration.parent;
         const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
-        return isModule && !sourceFile.isDeclarationFile ?
-            Type.FullyQualified.getFullyQualifiedName(this.sourceModuleType(sourceFile)) : undefined;
+        return isModule && !sourceFile.isDeclarationFile ? this.sourceModuleName(sourceFile) : undefined;
     }
 
     /**

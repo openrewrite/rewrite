@@ -1115,6 +1115,7 @@ describe('JavaScript type mapping', () => {
                     export class Exported {}
                     class Array { indexOf(n: number) { return n; } }
                     namespace NS { export class Inner {} }
+                    function scoped() { class Exported {} }
                     new Array().indexOf(1);
                     [1].indexOf(1);
                 `,
@@ -1123,6 +1124,7 @@ describe('JavaScript type mapping', () => {
                     /*~~(src/main.Exported)~~>*/export class Exported {}
                     /*~~(src/main.Array)~~>*/class Array { indexOf(n: number) { return n; } }
                     namespace NS { /*~~(src/main.NS.Inner)~~>*/export class Inner {} }
+                    function scoped() { /*~~(Exported)~~>*/class Exported {} }
                     /*~~(src/main.Array)~~>*/new Array().indexOf(1);
                     /*~~(Array)~~>*/[1].indexOf(1);
                 `
