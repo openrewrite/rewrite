@@ -95,15 +95,12 @@ export class MethodMatcher {
     }
 
     private matchesTargetType(type: Type | undefined): boolean {
-        const fq = Type.isParameterized(type) ? type.type : type;
-        if (!fq) {
-            return false;
-        }
-        if (this.matchesTypeName(withoutGlobalPrefix(FullyQualified.getFullyQualifiedName(fq as FullyQualified)))) {
-            return true;
-        }
-        return this.matchOverrides && Type.isClass(fq) &&
-            (this.matchesTargetType(fq.supertype) || fq.interfaces.some(i => this.matchesTargetType(i)));
+        const matches = (name: string) => this.matchesTypeName(withoutGlobalPrefix(name));
+        // A call on an untyped receiver declares on the unknown type, which a wildcard pattern
+        // matches by name. Java's matcher has no such case because Java calls are always typed.
+        return type?.kind === Type.Kind.Unknown
+            ? matches(FullyQualified.getFullyQualifiedName(type))
+            : Type.isOfTypeWithName(type, this.matchOverrides, matches);
     }
 
     private matchesTypeName(fullyQualifiedName: string): boolean {

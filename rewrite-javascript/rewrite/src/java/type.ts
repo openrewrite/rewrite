@@ -317,6 +317,23 @@ export namespace Type {
         }
     }
 
+    /**
+     * Whether `matches` accepts the fully qualified name of `type` or, with `matchOverride`, of a
+     * class or interface it extends.
+     */
+    export function isOfTypeWithName(type: Type | undefined, matchOverride: boolean,
+                                     matches: (fullyQualifiedName: string) => boolean): boolean {
+        if (!isFullyQualified(type) || isArray(type)) {
+            return false;
+        }
+        if (matches(FullyQualified.getFullyQualifiedName(type))) {
+            return true;
+        }
+        const c = isParameterized(type) ? type.type : type;
+        return matchOverride && isClass(c) &&
+            (isOfTypeWithName(c.supertype, true, matches) || c.interfaces.some(i => isOfTypeWithName(i, true, matches)));
+    }
+
     // Track type variable names and parameterized types to prevent infinite recursion
     let typeVariableNameStack: Set<string> | null = null;
     let parameterizedStack: Set<Type> | null = null;

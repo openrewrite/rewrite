@@ -88,13 +88,14 @@ export function usesMethod(methodPattern: string, matchOverrides: boolean = fals
  * {@link UsesType} visitor for in-process evaluation; see
  * {@link hasSourcePath} for the introspection / lazy-evaluation pattern.
  *
- * Delegates to {@code org.openrewrite.java.search.HasType}.
+ * Delegates to {@code org.openrewrite.java.search.HasType}, which matches a type through any class
+ * or interface it extends and reads `checkAssignability` as `UsesType`'s `includeImplicit`.
  */
 export function usesType(fullyQualifiedTypeName: string, checkAssignability: boolean = false): RecipeRef {
     return new RecipeRef(
         "org.openrewrite.java.search.HasType",
         {fullyQualifiedTypeName, checkAssignability},
-        new UsesType(fullyQualifiedTypeName),
+        new UsesType(fullyQualifiedTypeName, {assignable: true, includeImplicit: checkAssignability}),
     );
 }
 

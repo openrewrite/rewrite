@@ -408,6 +408,18 @@ describe('MethodMatcher', () => {
         });
     });
 
+    test('a wildcard type pattern matches a call on an untyped receiver', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markMatchedMethods('*..* baz(..)');
+        //language=typescript
+        await spec.rewriteRun(
+            typescript(
+                `declare const a: any;\na.baz();`,
+                `declare const a: any;\n/*~~>*/a.baz();`
+            )
+        );
+    });
+
     describe('matchOverrides', () => {
         const hierarchy = `
             interface Saver { save(): void }
