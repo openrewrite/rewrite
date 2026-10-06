@@ -68,6 +68,8 @@ export function isVendoredOrBundled(): RecipeRef {
  * ``methodPattern`` follows the OpenRewrite method-pattern syntax:
  * ``<receiver-type> <method-name>(<args>)`` — e.g.
  * ``"*..* tostring(..)"`` or ``"java.util.Collections emptyList()"``.
+ * For a pattern that does not fire, ``REWRITE_JAVASCRIPT_DUMP_TYPES=1`` prints the
+ * declaring type each call got during the test run.
  *
  * Delegates to {@code org.openrewrite.java.search.HasMethod}.
  */
