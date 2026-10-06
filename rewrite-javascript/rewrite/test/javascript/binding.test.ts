@@ -871,7 +871,9 @@ export declare function request(url: string): string;
 function installHttpPackages(root: string) {
     installPackage(root, "legacy-http", {
         "package.json": `{"name":"legacy-http","version":"1.0.0","types":"index.d.ts"}`,
-        "index.d.ts": httpApi
+        "index.d.ts": httpApi,
+        "compat/package.json": `{"types":"index.d.ts"}`,
+        "compat/index.d.ts": httpApi
     });
     installPackage(root, "@acme/common", {
         "package.json": `{"name":"@acme/common","version":"1.0.0","types":"index.d.ts"}`,
@@ -1435,6 +1437,29 @@ describe("maybeRebind", () => {
         }, {unsafeCleanup: true});
         // The namespace and `request` share one module object, and `request` did not move.
         expect(attribution).toContain("request() legacy-http{name=request,return=String,parameters=[String]}");
+    }, 60000);
+
+    test("a class another subpath of the package also exports keeps its name, since the two cannot be told apart", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "legacy-http", member: "Http"}, to: {module: "@acme/common/http", member: "HttpClient"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        let attribution: string[] = [];
+        await withDir(async (repo) => {
+            installHttpPackages(repo.path);
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import {Http} from 'legacy-http';\nimport {Http as Compat} from 'legacy-http/compat';\n\nlet a: Http;\nlet b: Compat;\n`,
+                    `import {HttpClient} from '@acme/common/http';\nimport {Http as Compat} from 'legacy-http/compat';\n\nlet a: HttpClient;\nlet b: Compat;\n`),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    attribution = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+        expect(attribution).toContain("Compat legacy-http.Http <null>");
     }, 60000);
 
     test("a class moved onto a default binding keeps its own name under the target's package", async () => {

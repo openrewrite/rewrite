@@ -4,6 +4,7 @@ import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
+import {packageNameOf} from "./package-name";
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
@@ -1819,11 +1820,11 @@ function isOnlyMember(jsImport: JS.Import): boolean {
     return (hasDefault ? 1 : 0) + (hasNamespace ? 1 : 0) + namedImportCount(jsImport) === 1;
 }
 
-/** Whether `jsImport` binds anything from `module`. */
-function importsModule(jsImport: JS.Import, module: string): boolean {
+function importedModule(jsImport: JS.Import): string | undefined {
     const specifier = jsImport.moduleSpecifier?.element;
-    return jsImport.importClause !== undefined && specifier?.kind === J.Kind.Literal &&
-        moduleNameOf(specifier as J.Literal) === module;
+    return jsImport.importClause !== undefined && specifier?.kind === J.Kind.Literal
+        ? moduleNameOf(specifier as J.Literal)
+        : undefined;
 }
 
 /** Whether `AddImport` merges a named member of `module` into `jsImport` rather than adding a statement. */
@@ -2037,10 +2038,21 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: P): Promise<J | undefined> {
         this.cu = cu;
-        const imports = cu.statements.filter(s => s.element?.kind === JS.Kind.Import &&
-            importsModule(s.element as JS.Import, this.from.module));
-        this.movedTypes = new MovedTypes(this.from, this.to,
-            imports.length > 1 || imports.some(s => !isOnlyMember(s.element as JS.Import)));
+        const imports = cu.statements
+            .filter(s => s.element?.kind === JS.Kind.Import)
+            .map(s => s.element as JS.Import);
+        const ofModule = imports.filter(imp => importedModule(imp) === this.from.module);
+        const fromPackage = packageOf(this.from.module);
+        const member = declaredMember(this.from);
+        this.movedTypes = new MovedTypes(this.from, this.to, {
+            module: ofModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)),
+            // Same-named classes from two subpaths of one package share a name.
+            className: member !== undefined && imports.filter(imp => {
+                const module = importedModule(imp);
+                return module !== undefined && packageOf(module) === fromPackage &&
+                    importBinds(imp, module, member) !== undefined;
+            }).length > 1
+        });
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
@@ -2223,27 +2235,27 @@ class MovedTypes extends TypeVisitor<undefined> {
     private readonly toMember?: string;
 
     /**
-     * `sharedModule` says the file binds `from`'s module some other way too. Its module object then
-     * stands for that binding as well, so a whole-module move leaves it alone.
+     * `shared` says what another binding in the file shares with the moved one. A shared module
+     * object or package-qualified class name stands for that binding too, so it keeps its name.
      */
     constructor(
         private readonly from: {module: string; member?: string},
         private readonly to: {module: string; member?: string},
-        sharedModule: boolean
+        shared: {module: boolean; className: boolean}
     ) {
         super();
         this.fromMember = declaredMember(from);
         this.toMember = declaredMember(to);
         if (this.fromMember === undefined) {
-            this.classes = new Map(sharedModule ? [] : [[from.module, qualifiedName(to)]]);
+            this.classes = new Map(shared.module ? [] : [[from.module, qualifiedName(to)]]);
         } else {
             // A default export declares no member name, so the class keeps its own.
             const toClass = `${packageOf(to.module)}.${this.toMember ?? this.fromMember}`;
+            const packaged = `${packageOf(from.module)}.${this.fromMember}`;
             // The type mapper names an imported alias symbol after the specifier.
-            this.classes = new Map([
-                [`${packageOf(from.module)}.${this.fromMember}`, toClass],
-                [qualifiedName(from), toClass]
-            ]);
+            this.classes = new Map([packaged, qualifiedName(from)]
+                .filter(name => !shared.className || name !== packaged)
+                .map(name => [name, toClass]));
         }
     }
 
@@ -2306,7 +2318,6 @@ class MovedTypes extends TypeVisitor<undefined> {
             Type.isFullyQualified(owner) && Type.FullyQualified.getFullyQualifiedName(owner) === this.from.module;
     }
 
-    /** The module object `owner` stands for, under the module moved to. */
     private movedModule(owner: Type): Type.FullyQualified {
         let moved = this.modules.get(owner);
         if (moved === undefined) {
@@ -2317,16 +2328,9 @@ class MovedTypes extends TypeVisitor<undefined> {
     }
 }
 
-/**
- * The package a bare module specifier resolves into, which the type mapper names a class after.
- * For `@scope/pkg/sub` that is `@scope/pkg`. A relative specifier names no package, so it stands for itself.
- */
+/** The package a class `module` exports is named after. A relative specifier names none, so it stands for itself. */
 function packageOf(module: string): string {
-    if (module.startsWith('.') || module.startsWith('/')) {
-        return module;
-    }
-    const segments = module.split('/');
-    return segments.slice(0, module.startsWith('@') ? 2 : 1).join('/');
+    return module.startsWith('.') || module.startsWith('/') ? module : packageNameOf(module);
 }
 
 /** A member's qualified name, or the module's own where no member is named. */

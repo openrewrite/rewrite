@@ -16,6 +16,7 @@
 import ts from "typescript";
 import * as path from "path";
 import {Type} from "../java";
+import {packageNameOf} from "./package-name";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
@@ -805,59 +806,16 @@ export class JavaScriptTypeMapping {
         const lastNodeModulesIndex = fileName.lastIndexOf('node_modules/');
         const afterNodeModules = fileName.substring(lastNodeModulesIndex + 'node_modules/'.length);
 
-        // Split by '/' to get path segments
-        const segments = afterNodeModules.split('/');
-        if (segments.length === 0) {
-            return undefined;
-        }
-
-        let moduleName: string;
-
-        // Handle scoped packages (@scope/package)
-        if (segments[0].startsWith('@') && segments.length > 1) {
-            moduleName = `${segments[0]}/${segments[1]}`;
-        } else {
-            moduleName = segments[0];
-        }
-
         // Skip pnpm's .pnpm directory - it contains versioned package paths
         // In pnpm, the actual package is in: .pnpm/pkg@version/node_modules/pkg
         // So we already handled this by using lastIndexOf above
-        if (moduleName === '.pnpm') {
+        if (afterNodeModules.split('/')[0] === '.pnpm') {
             return undefined;
         }
 
-        return this.normalizePackageName(moduleName);
+        return packageNameOf(afterNodeModules);
     }
 
-    /**
-     * Normalize a node_modules package name to the specifier consumers actually import.
-     *
-     * DefinitelyTyped packages (`@types/<pkg>`) are never importable under that name — the
-     * importable specifier is `<pkg>`, with DefinitelyTyped's `__` scoped-package encoding
-     * decoded back to a `@scope/name` form. Using the importable specifier keeps attributed
-     * fully qualified names consistent regardless of whether a type is reached through a direct
-     * import (which already resolves via the module specifier) or transitively (e.g. a call's
-     * return type), which falls back to the declaration file's `node_modules` path.
-     *
-     * Examples:
-     * - `@types/express-serve-static-core` -> `express-serve-static-core`
-     * - `@types/node`                      -> `node`
-     * - `@types/testing-library__react`    -> `@testing-library/react`
-     */
-    private normalizePackageName(packageName: string): string {
-        if (packageName.startsWith('@types/')) {
-            packageName = packageName.substring('@types/'.length);
-            // Decode __ encoding for scoped packages: testing-library__react -> @testing-library/react
-            if (packageName.includes('__')) {
-                const parts = packageName.split('__');
-                if (parts.length === 2) {
-                    packageName = `@${parts[0]}/${parts[1]}`;
-                }
-            }
-        }
-        return packageName;
-    }
 
     /**
      * Helper to create a Type.Method object from common parameters
@@ -1380,36 +1338,20 @@ export class JavaScriptTypeMapping {
             const nodeModulesIndex = cleanedName.indexOf('node_modules/');
             const afterNodeModules = cleanedName.substring(nodeModulesIndex + 'node_modules/'.length);
 
-            // Split by '/' to get parts of the path
-            const pathParts = afterNodeModules.split('/');
+            const packageName = packageNameOf(afterNodeModules);
 
-            if (pathParts.length > 0) {
-                // First part is the package name (might be scoped like @types)
-                let packageName = pathParts[0];
-
-                // Handle scoped packages
-                if (packageName.startsWith('@') && pathParts.length > 1) {
-                    packageName = `${packageName}/${pathParts[1]}`;
-                }
-
-                // Normalize `@types/<pkg>` to the importable specifier `<pkg>` so that types
-                // reached transitively (e.g. a call's return type, resolved via the declaration
-                // file's node_modules path) match the names used for directly imported types.
-                packageName = this.normalizePackageName(packageName);
-
-                // The symbol name is appended to the declaration file's path, so it is whatever
-                // follows the last dot of the final path segment. Directory names carry dots of
-                // their own — `.pnpm`, `.yarn`, a hidden parent such as `.claude`, a versioned
-                // pnpm directory — so a search over the whole path would split there instead and
-                // fold most of the path into the name.
-                const lastSegmentIndex = cleanedName.lastIndexOf('/') + 1;
-                const lastDotIndex = cleanedName.lastIndexOf('.');
-                if (lastDotIndex > lastSegmentIndex) {
-                    const symbolName = cleanedName.substring(lastDotIndex + 1);
-                    cleanedName = `${packageName}.${symbolName}`;
-                } else {
-                    cleanedName = packageName;
-                }
+            // The symbol name is appended to the declaration file's path, so it is whatever
+            // follows the last dot of the final path segment. Directory names carry dots of
+            // their own — `.pnpm`, `.yarn`, a hidden parent such as `.claude`, a versioned
+            // pnpm directory — so a search over the whole path would split there instead and
+            // fold most of the path into the name.
+            const lastSegmentIndex = cleanedName.lastIndexOf('/') + 1;
+            const lastDotIndex = cleanedName.lastIndexOf('.');
+            if (lastDotIndex > lastSegmentIndex) {
+                const symbolName = cleanedName.substring(lastDotIndex + 1);
+                cleanedName = `${packageName}.${symbolName}`;
+            } else {
+                cleanedName = packageName;
             }
         } else if (path.isAbsolute(cleanedName)) {
             // TypeScript returns absolute file paths as module names for project source files

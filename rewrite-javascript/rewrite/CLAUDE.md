@@ -251,48 +251,33 @@ pass rather than run it alongside.
 
 ### What a rebind's attribution follows
 
-Moving an ES import rewrites every type in the file that names what moved. A field typed by a
-moved class, a call on it, and a type argument all follow, so `UsesType` and `MethodMatcher` see
-what a fresh parse of the result would give. An AMD dependency swap rewrites no attribution.
+Moving an ES import renames every type in the file that names what moved, following each type's
+signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
+function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
+declared beside a moved member keeps the old name.
 
-Types are named the way the type mapper names them:
+The rewrite renames, it does not re-resolve. A moved member keeps its old declaration's parameter,
+return and member types under the new names, which is wrong where the target's API differs.
 
-- A class takes its package's name, not the specifier's. `HttpClient` from `@acme/common/http` is
-  `@acme/common.HttpClient`, so a move between subpaths of one package leaves a class alone.
-- A function, constant or constructor is declared on the module object, which is named after the
-  specifier: `@acme/common/http.request`. Only the moved member's declaration takes the new one,
-  and a sibling declared beside it keeps the old.
-- A member's `Type.Method`/`Type.Variable` name is the module's name for it, never the local alias.
-- Moving a whole module renames its module object, and the classes it declares keep their names.
-  Where the file binds the module some other way too, the module object stands for that binding as
-  well, so it keeps its name.
+A name another binding in the file shares stays as it is:
 
-The rewrite renames, it does not re-resolve. A moved member keeps its old declaration's shape, so
-its parameter, return and member types are the old ones under new names. That is right when the
-API moved unchanged. A recipe whose target differs in shape, or that needs the new module's own
-declarations, cannot rely on the attribution and has to tolerate it being off. The rewrite follows
-a type's signature and not a class's members, so a renamed class still lists its old declarations.
+- a module object, on a whole-module move, while the file binds that module some other way too
+- a class name, while another subpath of the same package exports a class of that name
 
-The derived name differs from a fresh parse where:
+A type that reaches the moved name through another import follows the move too. Where the result
+differs from a fresh parse:
 
 - the specifier is relative, since the mapper names those types after the file path
 - the target re-exports the class from another package, whose name a fresh parse gives it
-- the target is a default binding, where a fresh parse names the class after the name it declares
-  and the rewrite keeps the name it had
-
-A qualified name cannot tell the moved binding's uses from another import's. A type reached
-through another import, such as a value a third package returns, follows the move too.
+- the target is a default binding, where a fresh parse uses the name the class declares
 
 ### Several rebinds in one file
 
-One call moves one binding, and calls compose. Named members of one import moved to one module, a
-call each, end up in one import of it, whether the calls share a visit or come from separate
-recipes. Each rebind decides between rewriting its statement in place and replacing it when it
-runs, so it sees what the rebinds before it left: a statement another rebind emptied, or an import
-of the target to merge into. A name a queued rebind binds counts as taken for later ones.
-
-Each rebind renames only the types naming its own member, so a later rebind still finds its own
-under their old names.
+Each rebind decides between rewriting its statement in place and replacing it when it runs, so it
+sees what the rebinds before it left: a statement another rebind emptied, or an import of the
+target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
+renames only the types naming its own member, so a later rebind still finds its own.
 
 ### When `maybeBind` returns `undefined`
 
