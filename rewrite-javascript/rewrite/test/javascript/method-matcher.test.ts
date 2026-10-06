@@ -185,6 +185,72 @@ describe('MethodMatcher', () => {
         });
     });
 
+    describe('Pattern: Array indexOf(..)', () => {
+        test('a type without a package matches only the type of that name in no package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Array indexOf(..)');
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        namespace NS {
+                            export class Array {
+                                indexOf(x: number): number { return x; }
+                            }
+                        }
+                        new NS.Array().indexOf(1);
+                        [1].indexOf(1);
+                    `,
+                    //@formatter:off
+                `
+                    namespace NS {
+                        export class Array {
+                            indexOf(x: number): number { return x; }
+                        }
+                    }
+                    new NS.Array().indexOf(1);
+                    /*~~>*/[1].indexOf(1);
+                `
+                //@formatter:on
+                )
+            );
+        });
+    });
+
+    describe('Pattern: Foo bar(..)', () => {
+        test('a `declare global` augmentation is in no package, with or without its `global.` prefix', async () => {
+            for (const pattern of ['Foo bar(..)', 'global.Foo bar(..)']) {
+                const spec = new RecipeSpec();
+                spec.recipe = markMatchedMethods(pattern);
+
+                //language=typescript
+                await spec.rewriteRun(
+                    typescript(
+                        `
+                            declare global {
+                                interface Foo { bar(): void }
+                            }
+                            declare const f: Foo;
+                            f.bar();
+                            export {};
+                        `,
+                        //@formatter:off
+                    `
+                        declare global {
+                            interface Foo { bar(): void }
+                        }
+                        declare const f: Foo;
+                        /*~~>*/f.bar();
+                        export {};
+                    `
+                    //@formatter:on
+                    )
+                );
+            }
+        });
+    });
+
     describe('Pattern: Math m*(..)', () => {
         test('should match Math methods starting with m', async () => {
             const spec = new RecipeSpec();
