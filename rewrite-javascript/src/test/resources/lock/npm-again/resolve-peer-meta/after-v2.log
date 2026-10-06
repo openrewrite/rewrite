@@ -1,0 +1,10 @@
+resolve-peer-meta/after-v2: rewritten (exit=0)
+20d19
+<       "peer": true,
+57,58c56
+<       "integrity": "sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw==",
+<       "peer": true
+---
+>       "integrity": "sha512-PWaYA1L/q9u2u7xYQi+Y3L3Yfnie7XyLeaJICV1MGD6LprsBxcAqGjYyr0eY3p+QdsA+x/Irkt4Qif8D63+Sbw=="
+up to date in 102ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg over after-v2, nothing changed

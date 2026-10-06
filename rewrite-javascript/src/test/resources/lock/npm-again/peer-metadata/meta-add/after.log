@@ -1,0 +1,17 @@
+meta-add/after: rewritten (exit=0)
+41c41,42
+<       "license": "MIT"
+---
+>       "license": "MIT",
+>       "peer": true
+64c65,66
+<       "license": "MIT"
+---
+>       "license": "MIT",
+>       "peer": true
+104d105
+<       "peer": true,
+166d166
+<       "peer": true,
+up to date in 93ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg-after over after, nothing changed

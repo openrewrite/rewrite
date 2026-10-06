@@ -48,4 +48,45 @@ public class NpmOptions {
      * {@code omit-lockfile-registry-resolved}
      */
     boolean omitLockfileRegistryResolved;
+
+    /**
+     * The options a project's {@code .npmrc} sets, over npm's defaults; keys this type does not hold
+     * yet are passed over.
+     */
+    public static NpmOptions fromNpmrc(@Nullable String npmrc) {
+        NpmOptionsBuilder options = builder();
+        if (npmrc == null) {
+            return options.build();
+        }
+        for (String line : npmrc.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+                continue;
+            }
+            int eq = trimmed.indexOf('=');
+            String key = (eq < 0 ? trimmed : trimmed.substring(0, eq)).trim();
+            String value = eq < 0 ? "true" : trimmed.substring(eq + 1).trim();
+            switch (key) {
+                case "lockfile-version":
+                    options.lockfileVersion(value.isEmpty() || "null".equals(value) ? null : Integer.parseInt(value));
+                    break;
+                case "legacy-peer-deps":
+                    options.legacyPeerDeps(bool(value));
+                    break;
+                case "install-links":
+                    options.installLinks(bool(value));
+                    break;
+                case "omit-lockfile-registry-resolved":
+                    options.omitLockfileRegistryResolved(bool(value));
+                    break;
+                default:
+                    break;
+            }
+        }
+        return options.build();
+    }
+
+    private static boolean bool(String value) {
+        return !"false".equalsIgnoreCase(value) && !"0".equals(value) && !"null".equals(value);
+    }
 }

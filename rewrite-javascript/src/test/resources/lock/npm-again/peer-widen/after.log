@@ -1,0 +1,5 @@
+peer-widen/after: rewritten (exit=0)
+38d37
+<       "peer": true,
+up to date in 89ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg-after over after, nothing changed

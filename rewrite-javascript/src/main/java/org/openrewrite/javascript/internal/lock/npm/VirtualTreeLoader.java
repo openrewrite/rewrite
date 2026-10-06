@@ -120,7 +120,7 @@ public final class VirtualTreeLoader {
         Map<String, Object> pkg = rootPackage(s);
         rootOptionProvided = root;
         if (root == null) {
-            root = setWorkspaces(loadNode("", pkg, true));
+            root = setWorkspaces(loadNode("", pkg, true), manifests);
         }
 
         loadFromShrinkwrap(s, root);
@@ -141,7 +141,11 @@ public final class VirtualTreeLoader {
         return truthy(fromLock) && fromLock instanceof Map ? (Map<String, Object>) fromLock : new LinkedHashMap<>();
     }
 
-    private Node setWorkspaces(Node node) {
+    /**
+     * Arborist's {@code setWorkspaces}: the members the node's {@code workspaces} patterns name among the
+     * project's manifests become its workspace edges.
+     */
+    static Node setWorkspaces(Node node, Map<String, String> manifests) {
         Map<String, String> workspaces = MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(), manifests);
         if (!workspaces.isEmpty()) {
             node.setWorkspaces(workspaces);

@@ -1,0 +1,5 @@
+resolve-peer-meta/after: rewritten (exit=0)
+20d19
+<       "peer": true,
+up to date in 103ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg over after, nothing changed

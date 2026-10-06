@@ -1,0 +1,5 @@
+resolve-fork-peer/after: rewritten (exit=0)
+102d101
+<       "peer": true,
+up to date in 91ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg over after, nothing changed
