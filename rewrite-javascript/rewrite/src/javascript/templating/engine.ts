@@ -19,10 +19,10 @@ import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
-import {PlaceholderReplacementVisitor} from './placeholder-replacement';
+import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
 import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
-import {maybeAutoFormat} from '../format';
+import {autoIndent, maybeAutoFormat} from '../format';
 import {renameBindings} from './bindings';
 import {isExpression, isStatement} from '../parser-utils';
 import {randomId} from '../../uuid';
@@ -379,7 +379,7 @@ export class TemplateEngine {
         const uniqueAst = await retainIds(unsubstitutedAst, retainable);
 
         // Apply the template to the current AST
-        return new TemplateApplier(cursor, coordinates, uniqueAst, format).apply();
+        return new TemplateApplier(cursor, coordinates, uniqueAst, format, visitor.substituted).apply();
     }
 
     /**
@@ -822,7 +822,8 @@ export class TemplateApplier {
         private readonly cursor: Cursor,
         private readonly coordinates: JavaCoordinates,
         private readonly ast: J,
-        private readonly shouldFormat: boolean = true
+        private readonly shouldFormat: boolean = true,
+        private readonly substituted: boolean = false
     ) {
     }
 
@@ -854,7 +855,7 @@ export class TemplateApplier {
         const {tree} = this.coordinates;
 
         if (!tree) {
-            return this.ast;
+            return this.substituted ? new SubstitutedLayoutVisitor().visit(this.ast, undefined) : this.ast;
         }
 
         const originalTree = tree as J;
@@ -905,7 +906,8 @@ export class TemplateApplier {
         };
 
         if (!this.shouldFormat) {
-            return {...result, id: resultToUse.id};
+            const unmarked = this.substituted ? await new SubstitutedLayoutVisitor().visit<J>(result, undefined) : result;
+            return {...unmarked!, id: resultToUse.id};
         }
 
         // A recipe can apply a template to a child while its cursor still points at the
@@ -916,9 +918,18 @@ export class TemplateApplier {
             (await treeIds(owner as J)).has(originalTree.id) ? this.cursor : this.cursor?.parent;
         const formatted =
             await maybeAutoFormat(originalTree, result, null, undefined, parent);
+        // A value Prettier lays out arrives unmarked, since reconciling takes the markers of Prettier's parse
+        let laidOut = formatted;
+        if (this.substituted) {
+            const restore = new SubstitutedLayoutVisitor(await substitutedValues(result));
+            laidOut = (await restore.visit<J>(formatted, undefined))!;
+            if (restore.restored) {
+                laidOut = await autoIndent(laidOut, null, parent);
+            }
+        }
 
         // Restore the original ID
-        return {...formatted, id: resultToUse.id};
+        return {...laidOut!, id: resultToUse.id};
     }
 
     private wrapTree(originalTree: J, resultToUse: J) {
@@ -942,7 +953,7 @@ export class TemplateApplier {
                         kind: JS.Kind.ExpressionStatement,
                         id: randomId(),
                         prefix: expression.prefix,
-                        markers: expression.markers,
+                        markers: wrapperMarkers(expression),
                         expression: { ...expression, prefix: emptySpace }
                     } as JS.ExpressionStatement;
                 }
@@ -954,12 +965,60 @@ export class TemplateApplier {
                         kind: JS.Kind.StatementExpression,
                         id: randomId(),
                         prefix: stmt.prefix,
-                        markers: stmt.markers,
+                        markers: wrapperMarkers(stmt),
                         statement: { ...stmt, prefix: emptySpace }
                     } as JS.StatementExpression;
                 }
             }
         }
         return resultToUse;
+    }
+}
+
+/** The markers of a node wrapping `wrapped`, less the {@link SubstitutedValue} that belongs to `wrapped` alone. */
+function wrapperMarkers(wrapped: J): J['markers'] {
+    return {...wrapped.markers, markers: wrapped.markers.markers.filter(m => m.kind !== SubstitutedValue.KIND)};
+}
+
+/** The substituted values in `tree`, by the id of the {@link SubstitutedValue} marking each. */
+async function substitutedValues(tree: J): Promise<Map<string, J>> {
+    const values = new Map<string, J>();
+    await new class extends JavaScriptVisitor<undefined> {
+        protected override async preVisit(t: J): Promise<J | undefined> {
+            const marker = findMarker<SubstitutedValue>(t, SubstitutedValue.KIND);
+            if (marker) {
+                values.set(marker.id, t);
+            }
+            return t;
+        }
+    }().visit(tree, undefined);
+    return values;
+}
+
+/**
+ * Puts each substituted value back as it was in `unformatted`, under the prefix its marker assigns it,
+ * and drops its {@link SubstitutedValue} marker. Re-indenting them is left to the indent pass.
+ */
+class SubstitutedLayoutVisitor extends JavaScriptVisitor<undefined> {
+    /** Whether any value was put back. */
+    restored = false;
+
+    constructor(private readonly unformatted: Map<string, J> = new Map()) {
+        super();
+    }
+
+    override async visit<R extends J>(tree: Tree, p: undefined, parent?: Cursor): Promise<R | undefined> {
+        const marker = isTree(tree) ? findMarker<SubstitutedValue>(tree as J, SubstitutedValue.KIND) : undefined;
+        if (!marker) {
+            return super.visit(tree, p, parent);
+        }
+        const formatted = tree as J;
+        const before = this.unformatted.get(marker.id);
+        this.restored ||= before !== undefined;
+        const value = before ? {...before, prefix: marker.ownPrefix ? before.prefix : formatted.prefix} : formatted;
+        return {
+            ...value,
+            markers: {...value.markers, markers: value.markers.markers.filter(m => m !== marker)}
+        } as J as R;
     }
 }

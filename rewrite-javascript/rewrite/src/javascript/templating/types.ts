@@ -533,9 +533,12 @@ export interface ApplyOptions {
     values?: Map<Capture | string, J> | MatchResult | Record<string, J>;
 
     /**
-     * Whether the result is fitted to where it lands. Defaults to `true`; pass `false` to assemble
-     * several results into one subtree and format that subtree once, rather than once per application.
-     * The anchor supplies the result's prefix either way.
+     * Whether the template's own code is fitted to where it lands. Defaults to `true`. A substituted
+     * capture, parameter or container is only re-indented to the file's style, and keeps its line
+     * breaks and spacing.
+     * In a file Prettier formats, Prettier lays out the whole result.
+     * Pass `false` to assemble several results into one subtree and format that subtree once, rather
+     * than once per application. The anchor supplies the result's prefix either way.
      */
     format?: boolean;
 
