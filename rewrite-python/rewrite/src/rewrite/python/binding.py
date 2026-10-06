@@ -186,7 +186,8 @@ def _rebinding_name(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, moved: 
         if to_member == moved.name or not _taken(visitor, cu, to_member) or (
                 any(b.name == to_member and b.module == to_module and b.member == to_member
                     for b in import_bindings(cu))
-                and not _declared_besides_module_imports(cu, to_member)):
+                and not _declared_besides_module_imports(cu, to_member)
+                and not _queued_claim(visitor, to_member)):
             return to_member
         return moved.name
     # `import m` binds the module's own name, which references spell.
@@ -198,6 +199,12 @@ def _rebinding_name(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, moved: 
     if '.' not in to_module and not _taken(visitor, cu, to_module):
         return to_module
     return moved.name
+
+
+def _queued_claim(visitor: TreeVisitor[Any, Any], name: str) -> bool:
+    """Whether a rebind queued earlier in the visit binds ``name``, or moves the binding holding it."""
+    return any(isinstance(v, _RebindImport) and name in (v.bound_name, v.local_name)
+               for v in visitor._after_visit or [])
 
 
 def _declared_besides_module_imports(cu: CompilationUnit, name: str) -> bool:

@@ -287,6 +287,22 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             def f(HttpClient):
                 return Http(HttpClient)
             '''))
+    # Nor is it one where a rebind queued earlier in the visit moves that import away.
+    _visiting(answers,
+              lambda v: maybe_rebind(v, 'acme', 'other', from_member='HttpClient'),
+              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
+                                     to_member='HttpClient')).rewrite_run(
+        python(
+            '''
+            from acme import HttpClient
+            from legacy import Http
+            h = Http(HttpClient())
+            ''',
+            '''
+            from other import HttpClient
+            from acme import HttpClient as Http
+            h = Http(HttpClient())
+            '''))
     # A pinned alias the file spells elsewhere would capture its references, so nothing moves.
     _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
                                               alias='HttpClient')).rewrite_run(
@@ -294,7 +310,7 @@ def test_the_moved_binding_keeps_its_name_where_the_new_one_is_spelled():
             from legacy import Http
             class HttpClient: ...
             '''))
-    assert answers == ['Http', 'HttpClient', 'Http', None]
+    assert answers == ['Http', 'HttpClient', 'Http', 'HttpClient', 'Http', None]
 
 
 def test_rebinds_in_one_visit_end_in_one_import():
