@@ -238,6 +238,41 @@ class TestChangeImport:
             )
         )
 
+    def test_change_aliased_qualified_ref_into_submodule(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                d: c.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                from collections import OrderedDict
+                d: c.Mapping = c.Counter(OrderedDict())
+                """,
+                """
+                import collections as c
+                from collections import OrderedDict
+                import collections.abc
+                d: collections.abc.Mapping = c.Counter(OrderedDict())
+                """,
+            )
+        )
+
     def test_change_qualified_ref_with_different_new_name(self):
         """Qualified ref rewrite when new_name differs from old_name."""
         spec = RecipeSpec(recipe=ChangeImport(

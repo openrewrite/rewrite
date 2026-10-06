@@ -169,6 +169,16 @@ def _spelled_in(cu: CompilationUnit) -> FrozenSet[str]:
     names: Set[str] = set()
 
     class Spelled(PythonVisitor[None]):
+        # A module path binds nothing, so an import spells only the name it binds.
+        def visit_multi_import(self, multi: MultiImport, p: None) -> Any:
+            for imp in multi.names:
+                self.visit_import(imp, p)
+            return multi
+
+        def visit_import(self, import_: Import, p: None) -> Any:
+            names.add(get_alias_name(import_) or get_qualid_name(import_.qualid).split('.')[0])
+            return import_
+
         def visit_identifier(self, ident: Identifier, p: None) -> Any:
             names.add(ident.simple_name)
             return ident
