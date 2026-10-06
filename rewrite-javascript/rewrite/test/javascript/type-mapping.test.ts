@@ -2310,6 +2310,43 @@ describe('JavaScript type mapping', () => {
             !(node.kind === J.Kind.MethodInvocation && node.name.simpleName === 'require') ?
                 `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null;
 
+        test('a function imported from a node: specifier attributes like one from the bare specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes(declaringTypeAndName);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        const required = require('node:url');
+
+                        parse('x');
+                        fmt('x');
+                        nodeUrl.parse('x');
+                        url.parse('x');
+                        required.parse('x');
+                    `,
+                    //@formatter:off
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        const required = require('node:url');
+
+                        /*~~(url#parse)~~>*/parse('x');
+                        /*~~(url#format)~~>*/fmt('x');
+                        /*~~(url#parse)~~>*/nodeUrl.parse('x');
+                        /*~~(url#parse)~~>*/url.parse('x');
+                        /*~~(url#parse)~~>*/required.parse('x');
+                    `
+                    //@formatter:on
+                )
+            );
+        });
+
         test('a static method on an imported class attributes to the class', async () => {
             // Previously the import's local name replaced the class's package, giving \`URL.URL\`.
             const spec = new RecipeSpec();
