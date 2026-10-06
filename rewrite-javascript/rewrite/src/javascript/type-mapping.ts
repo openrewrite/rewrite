@@ -1421,12 +1421,42 @@ export class JavaScriptTypeMapping {
         } as Type.Class;
     }
 
+    private baseClass(classType: Type.Class, baseType: ts.Type): Type.Class | undefined {
+        const mapped = this.getType(baseType);
+        const base = Type.isParameterized(mapped) ? mapped.type : mapped;
+        // TypeScript accepts heritage cycles (`class A implements A`). Whichever edge closes one,
+        // in mapping order, is dropped.
+        return Type.isClass(base) && !this.inheritsFrom(base, classType, new Set()) ? base : undefined;
+    }
+
+    private inheritsFrom(type: Type.Class, ancestor: Type.Class, seen: Set<Type.Class>): boolean {
+        if (type === ancestor) {
+            return true;
+        }
+        if (seen.has(type)) {
+            return false;
+        }
+        seen.add(type);
+        return (type.supertype !== undefined && this.inheritsFrom(type.supertype, ancestor, seen)) ||
+            type.interfaces.some(i => this.inheritsFrom(i, ancestor, seen));
+    }
+
+    private addInterface(classType: Type.Class, baseType: ts.Type): void {
+        const iface = this.baseClass(classType, baseType);
+        if (iface && !classType.interfaces.includes(iface)) {
+            classType.interfaces.push(iface);
+        }
+    }
+
     /**
      * Populates the class type with members, methods, heritage, and type parameters
      * Since the shell is already in the cache, any recursive references will find it
      */
     private populateClassType(classType: Type.Class, type: ts.Type): void {
         const symbol = type.getSymbol?.();
+        const classSymbol = symbol && symbol.flags & ts.SymbolFlags.Alias ?
+            this.checker.getAliasedSymbol(symbol) : symbol;
+        const classDeclaration = classSymbol?.declarations?.find(ts.isClassLike);
 
         // Try to get base types using TypeScript's getBaseTypes API
         // This works for both local and external types (from node_modules)
@@ -1444,9 +1474,6 @@ export class JavaScriptTypeMapping {
             } else if (symbol) {
                 // For constructor functions or type references, we need to get the actual class type
                 // Try to get the type of the class itself (not the constructor or instance)
-                const classSymbol = symbol.flags & ts.SymbolFlags.Alias ?
-                    this.checker.getAliasedSymbol(symbol) : symbol;
-
                 if (classSymbol && classSymbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)) {
                     // Get the type of the class declaration itself
                     const declaredType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
@@ -1472,32 +1499,27 @@ export class JavaScriptTypeMapping {
             }
 
             if (baseTypes && baseTypes.length > 0) {
-                // For classes, the first base type is usually the superclass
-                // Additional base types are interfaces
-                if (classType.classKind === Type.Class.Kind.Class) {
-                    const firstBase = this.getType(baseTypes[0]);
-                    // Handle both Class and Parameterized (e.g., Component<Props>)
-                    if (Type.isClass(firstBase)) {
-                        (classType as any).supertype = firstBase;
-                    } else if (Type.isParameterized(firstBase)) {
-                        // For parameterized types, use the base class as the supertype
-                        (classType as any).supertype = (firstBase as Type.Parameterized).type;
+                // A merged interface's bases follow the class's, so the first is a superclass only beside `extends`
+                let interfaces = baseTypes;
+                if (classType.classKind === Type.Class.Kind.Class && (!classDeclaration ||
+                    classDeclaration.heritageClauses?.some(c => c.token === ts.SyntaxKind.ExtendsKeyword))) {
+                    const supertype = this.baseClass(classType, baseTypes[0]);
+                    if (supertype) {
+                        classType.supertype = supertype;
                     }
-                    // Rest are interfaces
-                    for (let i = 1; i < baseTypes.length; i++) {
-                        const interfaceType = this.getType(baseTypes[i]);
-                        if (Type.isClass(interfaceType)) {
-                            classType.interfaces.push(interfaceType);
-                        }
-                    }
-                } else {
-                    // For interfaces, all base types are extended interfaces
-                    for (const baseType of baseTypes) {
-                        const interfaceType = this.getType(baseType);
-                        if (Type.isClass(interfaceType)) {
-                            classType.interfaces.push(interfaceType);
-                        }
-                    }
+                    interfaces = baseTypes.slice(1);
+                }
+                for (const baseType of interfaces) {
+                    this.addInterface(classType, baseType);
+                }
+            }
+        }
+
+        // `getBaseTypes` omits a class's `implements` clause
+        for (const clause of classDeclaration?.heritageClauses ?? []) {
+            if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
+                for (const implemented of clause.types) {
+                    this.addInterface(classType, this.checker.getTypeAtLocation(implemented));
                 }
             }
         }
