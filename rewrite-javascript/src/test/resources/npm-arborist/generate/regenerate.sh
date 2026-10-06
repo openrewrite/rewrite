@@ -27,6 +27,8 @@ R=$(dirname "$G")
 node "$G/tree-dumps.js" > "$R/tree-dumps"
 node "$G/shrinkwrap-dumps.js" > "$R/shrinkwrap-dumps"
 node "$G/yarn-lock-dumps.js" "$1/workspaces/arborist" > "$R/yarn-lock-dumps"
+node "$G/placement-cases.js" "$1/workspaces/arborist" can-place-dep "$R/can-place-dep-cases.gz"
+node "$G/placement-cases.js" "$1/workspaces/arborist" place-dep "$R/place-dep-cases.gz"
 node "$G/spec-from-lock-cases.js" > "$R/spec-from-lock-cases"
 node "$G/package-shapes.js" > "$R/package-shapes"
 node "$G/version-shapes.js" > "$R/version-shapes"

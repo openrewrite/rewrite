@@ -73,6 +73,42 @@ public class NpmOptions {
     boolean omitLockfileRegistryResolved;
 
     /**
+     * {@code prefer-dedupe}
+     */
+    boolean preferDedupe;
+
+    /**
+     * {@code strict-peer-deps}
+     */
+    boolean strictPeerDeps;
+
+    /**
+     * {@code force}
+     */
+    boolean force;
+
+    /**
+     * {@code install-strategy}
+     */
+    @Builder.Default
+    InstallStrategy installStrategy = InstallStrategy.HOISTED;
+
+    public enum InstallStrategy {
+        HOISTED("hoisted"), NESTED("nested"), SHALLOW("shallow"), LINKED("linked");
+
+        private final String value;
+
+        InstallStrategy(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public String toString() {
+            return value;
+        }
+    }
+
+    /**
      * The options a project's {@code .npmrc} sets, over npm's defaults, read as npm's config loads the
      * file ({@code ini.parse}, then {@code parseField} per key); keys this type does not hold yet are
      * passed over.
