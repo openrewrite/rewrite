@@ -603,6 +603,16 @@ class ShrinkwrapTest {
     }
 
     @Test
+    void emptyYarnLockIsNoYarnLock() {
+        String lock = "{\"name\":\"p\",\"lockfileVersion\":3,\"packages\":{\"\":{\"name\":\"p\"}}}\n";
+        assertThat(new Shrinkwrap("/dir").load(lock, "", null).getYarnLock()).isNull();
+        assertThat(new Shrinkwrap("/dir").load(null, "", null).getYarnLock()).isNull();
+        Shrinkwrap blank = new Shrinkwrap("/dir").load(lock, "\n", null);
+        assertThat(blank.getYarnLock()).isNotNull();
+        assertThat(blank.getYarnLock().getEntries()).isEmpty();
+    }
+
+    @Test
     void skipInertNodesInCommit() {
         String path = "/proxy";
         Shrinkwrap meta = lock(path, obj("lockfileVersion", 3, "packages", obj()));

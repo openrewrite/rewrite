@@ -841,7 +841,7 @@ public final class Shrinkwrap {
             }
         } else if (!node.isRoot() && truthy(node.getPackageName()) &&
                    !Js.strictEquals(node.getPackageName(), node.getName())) {
-            lock.put("version", "npm:" + node.getPackageName() + "@" + node.getVersion());
+            lock.put("version", "npm:" + Js.string(node.getPackageName()) + "@" + Js.string(node.getVersion()));
         } else if (truthy(node.getVersion())) {
             lock.put("version", node.getVersion());
         }

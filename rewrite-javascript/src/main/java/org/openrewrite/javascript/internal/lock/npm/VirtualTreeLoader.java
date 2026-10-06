@@ -203,24 +203,24 @@ public final class VirtualTreeLoader {
         }
 
         Map<String, Object> lock = s.get("");
-        Map<String, Object> prod = depMap(lock.get("dependencies"));
-        Map<String, Object> dev = depMap(lock.get("devDependencies"));
-        Map<String, Object> optional = depMap(lock.get("optionalDependencies"));
-        Map<String, Object> peer = depMap(lock.get("peerDependencies"));
+        Object prod = or(lock.get("dependencies"));
+        Object dev = or(lock.get("devDependencies"));
+        Object optional = or(lock.get("optionalDependencies"));
+        Object peer = or(lock.get("peerDependencies"));
         Map<String, Object> peerOptional = new LinkedHashMap<>();
 
         if (truthy(lock.get("peerDependenciesMeta"))) {
             for (Map.Entry<String, Object> entry : Js.entries(lock.get("peerDependenciesMeta"))) {
                 String name = entry.getKey();
                 if (truthy(Js.get(entry.getValue(), "optional")) && Js.get(peer, name) != Js.UNDEFINED) {
-                    peerOptional.put(name, peer.get(name));
-                    peer.remove(name);
+                    peerOptional.put(name, Js.get(peer, name));
+                    Js.delete(peer, name);
                 }
             }
         }
 
         for (String name : Js.keys(optional)) {
-            prod.remove(name);
+            Js.delete(prod, name);
         }
 
         Map<String, Object> lockWS = new LinkedHashMap<>();
@@ -231,7 +231,7 @@ public final class VirtualTreeLoader {
 
         Set<String> rootNames = new LinkedHashSet<>(root.getEdgesOut().keys());
 
-        Map<Edge.Type, Map<String, Object>> lockByType = new LinkedHashMap<>();
+        Map<Edge.Type, Object> lockByType = new LinkedHashMap<>();
         lockByType.put(Edge.Type.DEV, dev);
         lockByType.put(Edge.Type.OPTIONAL, optional);
         lockByType.put(Edge.Type.PEER, peer);
@@ -239,7 +239,7 @@ public final class VirtualTreeLoader {
         lockByType.put(Edge.Type.PROD, prod);
         lockByType.put(Edge.Type.WORKSPACE, lockWS);
 
-        for (Map.Entry<Edge.Type, Map<String, Object>> byType : lockByType.entrySet()) {
+        for (Map.Entry<Edge.Type, Object> byType : lockByType.entrySet()) {
             for (Map.Entry<String, Object> dep : Js.entries(byType.getValue())) {
                 String name = dep.getKey();
                 Edge edge = root.getEdgesOut().get(name);
@@ -256,9 +256,9 @@ public final class VirtualTreeLoader {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> depMap(@Nullable Object deps) {
-        return truthy(deps) && deps instanceof Map ? (Map<String, Object>) deps : new LinkedHashMap<>();
+    // deps || {}
+    private static Object or(@Nullable Object deps) {
+        return truthy(deps) ? deps : new LinkedHashMap<>();
     }
 
     private void resolveLinks(Map<String, Object> links, Map<String, Node> nodes) {

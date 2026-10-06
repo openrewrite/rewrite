@@ -117,7 +117,7 @@ final class JsonStringifyNice {
     private static void serialize(@Nullable Object raw, Sorter sorter, String gap, String indent, StringBuilder out,
                                   List<Object> stack) {
         Object value = sorter.apply(raw);
-        if (value == null || value == Js.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED || value == Js.HOLE) {
             out.append("null");
         } else if (value instanceof String) {
             out.append(Js.quote((String) value));

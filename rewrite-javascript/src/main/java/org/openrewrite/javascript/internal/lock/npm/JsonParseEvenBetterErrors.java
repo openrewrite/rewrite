@@ -77,6 +77,17 @@ final class JsonParseEvenBetterErrors {
     private JsonParseEvenBetterErrors() {
     }
 
+    /**
+     * {@code JSON.parse(text)}.
+     */
+    static @Nullable Object jsonParse(String text) {
+        try {
+            return MAPPER.readValue(text, Object.class);
+        } catch (IOException e) {
+            throw new JsonParseException(e.getMessage(), e);
+        }
+    }
+
     static Parsed parse(String raw) {
         String txt = raw.startsWith("﻿") ? raw.substring(1) : raw;
         Object result;

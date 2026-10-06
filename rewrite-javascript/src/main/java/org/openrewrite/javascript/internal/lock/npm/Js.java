@@ -62,6 +62,16 @@ final class Js {
         }
     };
 
+    /**
+     * The hole {@code delete array[i]} leaves: no key for {@link #entries}, {@link #UNDEFINED} when read.
+     */
+    static final Object HOLE = new Object() {
+        @Override
+        public String toString() {
+            return "undefined";
+        }
+    };
+
     // the prototypes of V8 13.6, which Node 24 runs npm 11 on
     private static final Set<String> OBJECT_MEMBERS = members(
             "__defineGetter__ __defineSetter__ __lookupGetter__ __lookupSetter__ __proto__ constructor " +
@@ -108,7 +118,8 @@ final class Js {
             List<?> array = (List<?>) receiver;
             long index = arrayIndex(key);
             if (index >= 0 && index < array.size()) {
-                return array.get((int) index);
+                Object element = array.get((int) index);
+                return element == HOLE ? UNDEFINED : element;
             }
             if ("length".equals(key)) {
                 return array.size();
@@ -160,7 +171,9 @@ final class Js {
         } else if (value instanceof List) {
             List<?> array = (List<?>) value;
             for (int i = 0; i < array.size(); i++) {
-                entries.add(new SimpleImmutableEntry<>(String.valueOf(i), array.get(i)));
+                if (array.get(i) != HOLE) {
+                    entries.add(new SimpleImmutableEntry<>(String.valueOf(i), array.get(i)));
+                }
             }
         } else if (value instanceof String) {
             String string = (String) value;
@@ -180,6 +193,43 @@ final class Js {
             keys.add(entry.getKey());
         }
         return keys;
+    }
+
+    /**
+     * {@code delete receiver[key]} in strict mode, which every class body is: an object loses the property,
+     * an array keeps a {@link #HOLE}, and a property that cannot be deleted (a string's characters, a
+     * length) is JavaScript's TypeError.
+     */
+    static void delete(@Nullable Object receiver, String key) {
+        if (receiver instanceof String || receiver instanceof List) {
+            long index = arrayIndex(key);
+            boolean fixed = "length".equals(key) ||
+                            receiver instanceof String && index >= 0 && index < ((String) receiver).length();
+            if (fixed) {
+                throw new IllegalArgumentException("Cannot delete property '" + key + "' of [object " +
+                                                   (receiver instanceof String ? "String" : "Array") + "]");
+            }
+        }
+        deleteSloppy(receiver, key);
+    }
+
+    /**
+     * {@code delete receiver[key]} outside strict mode: a property that cannot be deleted is left alone.
+     */
+    @SuppressWarnings("unchecked")
+    static void deleteSloppy(@Nullable Object receiver, String key) {
+        if (receiver == null || receiver == UNDEFINED) {
+            throw new IllegalArgumentException("Cannot convert undefined or null to object");
+        }
+        if (receiver instanceof Map) {
+            ((Map<String, Object>) receiver).remove(key);
+        } else if (receiver instanceof List) {
+            List<Object> array = (List<Object>) receiver;
+            long index = arrayIndex(key);
+            if (index >= 0 && index < array.size()) {
+                array.set((int) index, HOLE);
+            }
+        }
     }
 
     /**
@@ -274,7 +324,7 @@ final class Js {
                     sb.append(',');
                 }
                 Object element = array.get(i);
-                if (element != null && element != UNDEFINED) {
+                if (element != null && element != UNDEFINED && element != HOLE) {
                     sb.append(string(element));
                 }
             }
@@ -300,7 +350,7 @@ final class Js {
     }
 
     static boolean truthy(@Nullable Object val) {
-        if (val == null || val == UNDEFINED || Boolean.FALSE.equals(val)) {
+        if (val == null || val == UNDEFINED || val == HOLE || Boolean.FALSE.equals(val)) {
             return false;
         }
         if (val instanceof String) {

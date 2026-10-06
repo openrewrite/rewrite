@@ -136,10 +136,8 @@ public final class PackageJson {
         Object dependencies = data.get("dependencies");
         Object optionalDependencies = data.get("optionalDependencies");
         if (truthy(dependencies) && (optionalDependencies instanceof Map || optionalDependencies instanceof List)) {
-            if (dependencies instanceof Map) {
-                for (String optional : Js.keys(optionalDependencies)) {
-                    ((Map<String, Object>) dependencies).remove(optional);
-                }
+            for (String optional : Js.keys(optionalDependencies)) {
+                Js.deleteSloppy(dependencies, optional);
             }
             if (Js.keys(dependencies).isEmpty()) {
                 data.remove("dependencies");
@@ -174,13 +172,17 @@ public final class PackageJson {
         if (truthy(bin)) {
             if (bin instanceof String && truthy(pkg.get("name"))) {
                 Map<String, Object> object = new LinkedHashMap<>();
-                object.put(String.valueOf(pkg.get("name")), bin);
+                object.put(Js.string(pkg.get("name")), bin);
                 bin = object;
                 pkg.put("bin", bin);
             } else if (bin instanceof List) {
                 Map<String, Object> object = new LinkedHashMap<>();
                 for (Object k : (List<Object>) bin) {
-                    object.put(PosixPath.basename(String.valueOf(k)), k);
+                    if (!(k instanceof String)) {
+                        throw new IllegalArgumentException(
+                                "The \"path\" argument must be of type string. Received " + Js.received(k));
+                    }
+                    object.put(PosixPath.basename((String) k), k);
                 }
                 bin = object;
                 pkg.put("bin", bin);
