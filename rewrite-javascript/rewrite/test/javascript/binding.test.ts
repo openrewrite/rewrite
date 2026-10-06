@@ -1381,7 +1381,8 @@ describe("maybeRebind", () => {
             `        return this.http.post('u', headers);\n` +
             `    }\n` +
             `}\n` +
-            `const modules = [${module}];\n`;
+            `const modules = [${module}];\n` +
+            `export {${http === "Http" ? http : `${http} as Http`}};\n`;
         const after = `import {request} from 'legacy-http';\n` +
             `import {HttpClient, HttpClientModule, HttpHeaders} from '@acme/common/http';\n\n` +
             body("HttpClient", "HttpHeaders", "HttpClientModule");
@@ -1410,6 +1411,54 @@ describe("maybeRebind", () => {
             "new @acme/common/http{name=HttpHeaders,return=@acme/common.HttpHeaders,parameters=[]}",
             "request() legacy-http{name=request,return=String,parameters=[String]}"
         ]));
+    }, 60000);
+
+    test("a whole-module move leaves the module's attribution alone while another binding of it remains", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "legacy-http", member: "*"}, to: {module: "@acme/common/http", member: "*"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        let attribution: string[] = [];
+        await withDir(async (repo) => {
+            installHttpPackages(repo.path);
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import * as legacy from 'legacy-http';\nimport {request} from 'legacy-http';\n\nrequest('x');\n`,
+                    `import * as legacy from '@acme/common/http';\nimport {request} from 'legacy-http';\n\nrequest('x');\n`),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    attribution = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+        // The namespace and `request` share one module object, and `request` did not move.
+        expect(attribution).toContain("request() legacy-http{name=request,return=String,parameters=[String]}");
+    }, 60000);
+
+    test("a class moved onto a default binding keeps its own name under the target's package", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "legacy-http", member: "Http"}, to: {module: "@acme/common/http", member: "default"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        let attribution: string[] = [];
+        await withDir(async (repo) => {
+            installHttpPackages(repo.path);
+            await spec.rewriteRun(npm(repo.path, {
+                ...typescript(
+                    `import {Http} from 'legacy-http';\n\nlet h: Http;\n`,
+                    `import Http from '@acme/common/http';\n\nlet h: Http;\n`),
+                afterRecipe: async (cu: JS.CompilationUnit) => {
+                    attribution = await attributionOf(cu);
+                }
+            } as any, packageJson(`{"name":"t"}`)));
+        }, {unsafeCleanup: true});
+        // A fresh parse names a default-exported class after the name it declares, never after the module.
+        expect(attribution).toContain("Http @acme/common.Http <null>");
     }, 60000);
 
     test("an AMD dependency swap keeps the parameter and its index", async () => {

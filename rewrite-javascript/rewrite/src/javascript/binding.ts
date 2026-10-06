@@ -323,7 +323,7 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
  * changing nothing, where the move cannot be expressed safely. One call moves one binding.
  * Named members of one import moved to one module, a call each, end up in one import of it,
  * whether the calls share a visit or come from separate recipes.
- * Every type in the file naming what moved is renamed the way a parse of the result names it.
+ * On an ES import, every type in the file naming what moved is renamed the way a parse of the result names it.
  * It is renamed, not re-resolved, so a moved member keeps its old declaration's signature.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {

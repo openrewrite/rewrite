@@ -251,9 +251,9 @@ pass rather than run it alongside.
 
 ### What a rebind's attribution follows
 
-The move rewrites every type in the file that names what moved. A field typed by a moved class, a
-call on it, and a type argument all follow, so `UsesType` and `MethodMatcher` see what a fresh
-parse of the result would give.
+Moving an ES import rewrites every type in the file that names what moved. A field typed by a
+moved class, a call on it, and a type argument all follow, so `UsesType` and `MethodMatcher` see
+what a fresh parse of the result would give. An AMD dependency swap rewrites no attribution.
 
 Types are named the way the type mapper names them:
 
@@ -264,6 +264,8 @@ Types are named the way the type mapper names them:
   and a sibling declared beside it keeps the old.
 - A member's `Type.Method`/`Type.Variable` name is the module's name for it, never the local alias.
 - Moving a whole module renames its module object, and the classes it declares keep their names.
+  Where the file binds the module some other way too, the module object stands for that binding as
+  well, so it keeps its name.
 
 The rewrite renames, it does not re-resolve. A moved member keeps its old declaration's shape, so
 its parameter, return and member types are the old ones under new names. That is right when the
@@ -274,8 +276,9 @@ a type's signature and not a class's members, so a renamed class still lists its
 The derived name differs from a fresh parse where:
 
 - the specifier is relative, since the mapper names those types after the file path
-- the target re-exports the class from another package, which a fresh parse names after
-- the target is a default or namespace binding, which declares no member name
+- the target re-exports the class from another package, whose name a fresh parse gives it
+- the target is a default binding, where a fresh parse names the class after the name it declares
+  and the rewrite keeps the name it had
 
 A qualified name cannot tell the moved binding's uses from another import's. A type reached
 through another import, such as a value a third package returns, follows the move too.
