@@ -55,7 +55,8 @@ final class BraceExpansion {
 
     private static @Nullable Balanced balanced(String str) {
         int[] r = range(str);
-        return r == null ? null : new Balanced(str.substring(0, r[0]), str.substring(r[0] + 1, r[1]), str.substring(r[1] + 1));
+        return r == null ? null : new Balanced(str.substring(0, r[0]), str.substring(r[0] + 1, r[1]),
+                                               str.substring(r[1] + 1));
     }
 
     private static int @Nullable [] range(String str) {

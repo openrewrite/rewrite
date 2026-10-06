@@ -117,7 +117,7 @@ public final class Edge {
             return false;
         }
 
-        if (node.isHasShrinkwrap() || node.isInShrinkwrap() || node.isInBundle()) {
+        if (truthy(node.getHasShrinkwrap()) || node.isInShrinkwrap() || node.isInBundle()) {
             return DepValid.depValid(node, getRawSpec(), accept, from);
         }
 

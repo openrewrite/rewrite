@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
 /**
  * Port of @npmcli/arborist lib/consistent-resolve.js (npm 11.17.0).
  */
@@ -27,18 +29,19 @@ final class ConsistentResolve {
     private ConsistentResolve() {
     }
 
-    static @Nullable String consistentResolve(@Nullable String resolved) {
+    static @Nullable Object consistentResolve(@Nullable Object resolved) {
         return consistentResolve(resolved, null, null, false);
     }
 
-    static @Nullable String consistentResolve(@Nullable String resolved, @Nullable String fromPath,
+    // a resolved of another JSON type comes back untouched: npa throws on it and the catch returns the input
+    static @Nullable Object consistentResolve(@Nullable Object resolved, @Nullable String fromPath,
                                               @Nullable String toPath, boolean relPaths) {
-        if (resolved == null || resolved.isEmpty()) {
+        if (!truthy(resolved)) {
             return null;
         }
         try {
             return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths);
-        } catch (IllegalArgumentException e) {
+        } catch (RuntimeException e) {
             return resolved;
         }
     }
@@ -47,7 +50,7 @@ final class ConsistentResolve {
                                               @Nullable String toPath, boolean relPaths) {
         try {
             return consistentResolve(Spec.npa(resolved, fromPath), toPath, relPaths);
-        } catch (IllegalArgumentException e) {
+        } catch (RuntimeException e) {
             return resolved.toString();
         }
     }

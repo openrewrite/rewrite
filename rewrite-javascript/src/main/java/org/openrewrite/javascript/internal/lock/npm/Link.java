@@ -124,7 +124,7 @@ public class Link extends Node {
     }
 
     @Override
-    public void setResolved(@Nullable String resolved) {
+    public void setResolved(@Nullable Object resolved) {
     }
 
     @Override

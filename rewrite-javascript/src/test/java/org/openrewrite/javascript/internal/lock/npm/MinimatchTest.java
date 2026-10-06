@@ -39,7 +39,8 @@ class MinimatchTest {
     static Stream<Arguments> pairs() {
         List<Arguments> out = new ArrayList<>();
         for (JsonNode pair : CASES.get("pairs")) {
-            out.add(Arguments.of(pair.get("path").asText(), pair.get("pattern").asText(), pair.get("options"), pair.get("matches").asBoolean()));
+            out.add(Arguments.of(pair.get("path").asText(), pair.get("pattern").asText(), pair.get("options"),
+                                 pair.get("matches").asBoolean()));
         }
         return out.stream();
     }

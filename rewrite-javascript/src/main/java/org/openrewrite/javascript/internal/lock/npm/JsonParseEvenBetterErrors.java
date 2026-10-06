@@ -86,8 +86,8 @@ final class JsonParseEvenBetterErrors {
             }
             result = MAPPER.readValue(txt, Object.class);
         } catch (IOException e) {
-            throw new JsonParseException(e.getMessage() + " while parsing " +
-                                         (txt.isEmpty() ? "empty string" : Js.quote(txt.length() > 40 ? txt.substring(0, 40) : txt)), e);
+            String parsing = txt.isEmpty() ? "empty string" : Js.quote(txt.length() > 40 ? txt.substring(0, 40) : txt);
+            throw new JsonParseException(e.getMessage() + " while parsing " + parsing, e);
         }
         if (result instanceof Map || result instanceof List) {
             Matcher empty = EMPTY.matcher(txt);

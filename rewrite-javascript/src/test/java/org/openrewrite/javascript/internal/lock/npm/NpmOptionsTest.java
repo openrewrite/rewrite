@@ -23,8 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * What npm 11.17.0 does with each {@code lockfile-version} an .npmrc can hold: the config layer's
- * parseField and flatten, then arborist's own check in its constructor.
+ * What npm 11.17.0 does with each {@code lockfile-version} an .npmrc can hold (the config layer's
+ * parseField and flatten, then arborist's own check in its constructor) and with each boolean's
+ * value (parseField maps four words; arborist reads any other string as truthy).
  */
 class NpmOptionsTest {
 
@@ -61,10 +62,24 @@ class NpmOptionsTest {
         assertThat(NpmOptions.fromNpmrc("legacy-peer-deps").isLegacyPeerDeps()).isTrue();
     }
 
+    // each value installed with npm 11.17.0: the peer chain of arb-legacy-peer-deps-add stays out when legacy
+    @ParameterizedTest
+    @CsvSource({
+      "true, true", "false, false", "0, true", "FALSE, true", "True, true", "yes, true", "00, true", "2, true",
+      "undefined, false", "null, false", "'', true", "'true ', true", "' false', false"
+    })
+    void booleansAreNpmConfigsTruthiness(String value, boolean expected) {
+        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=" + value).isLegacyPeerDeps()).isEqualTo(expected);
+        assertThat(NpmOptions.fromNpmrc("install-links=" + value).isInstallLinks()).isEqualTo(expected);
+        assertThat(NpmOptions.fromNpmrc("omit-lockfile-registry-resolved=" + value).isOmitLockfileRegistryResolved())
+          .isEqualTo(expected);
+    }
+
     @Test
     void otherKeysPassOver() {
         NpmOptions options = NpmOptions.fromNpmrc("# comment\n; another\nforce=true\nlegacy-peer-deps=true\n\n" +
-                                                  "install-links=false\nomit-lockfile-registry-resolved=1\nlockfile-version=3\n");
+                                                  "install-links=false\nomit-lockfile-registry-resolved=1\n" +
+                                                  "lockfile-version=3\n");
         assertThat(options.getLockfileVersion()).isEqualTo(3);
         assertThat(options.isLegacyPeerDeps()).isTrue();
         assertThat(options.isInstallLinks()).isFalse();

@@ -122,7 +122,8 @@ class JsonStringifyNiceTest {
 
     @Test
     void arraysSortBeforeObjectsAndKeepTheirOrder() {
-        assertThat(JsonStringifyNice.stringify(obj("b", obj("x", 1), "a", arr(3, obj("z", 1, "a", 2), arr()), "c", arr())))
+        assertThat(JsonStringifyNice.stringify(obj("b", obj("x", 1), "a", arr(3, obj("z", 1, "a", 2), arr()), "c",
+                                                   arr())))
           .isEqualTo("{\n  \"a\": [\n    3,\n    {\n      \"a\": 2,\n      \"z\": 1\n    },\n    []\n  ],\n  \"c\": [],\n" +
                      "  \"b\": {\n    \"x\": 1\n  }\n}\n");
     }

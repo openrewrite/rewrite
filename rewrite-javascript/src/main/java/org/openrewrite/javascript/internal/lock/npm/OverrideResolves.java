@@ -25,7 +25,7 @@ final class OverrideResolves {
     private OverrideResolves() {
     }
 
-    static @Nullable String overrideResolves(String resolved, NpmOptions opts) {
+    static @Nullable Object overrideResolves(Object resolved, NpmOptions opts) {
         return opts.isOmitLockfileRegistryResolved() ? null : resolved;
     }
 }

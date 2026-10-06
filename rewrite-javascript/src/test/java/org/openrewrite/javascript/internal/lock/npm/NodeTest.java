@@ -620,7 +620,7 @@ class NodeTest {
         Node a = child(root, "a");
         Node b = child(a, "b");
         Node c = child(b, "c");
-        assertThat(a.isHasShrinkwrap()).as("a has a shrinkwrap").isTrue();
+        assertThat(a.getHasShrinkwrap()).as("a has a shrinkwrap").isEqualTo(true);
         assertThat(b.isInShrinkwrap()).as("b is in shrinkwrap").isTrue();
         assertThat(c.isInShrinkwrap()).as("c is in shrinkwrap").isTrue();
     }

@@ -24,7 +24,6 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -401,7 +400,8 @@ final class Minimatch {
         return ".".equals(f) || "..".equals(f) || (!options.isDot() && f.startsWith("."));
     }
 
-    private boolean matchGlobstar(List<String> file, List<Object> pattern, boolean partial, int fileIndex, int patternIndex) {
+    private boolean matchGlobstar(List<String> file, List<Object> pattern, boolean partial, int fileIndex,
+                                  int patternIndex) {
         int firstgs = patternIndex;
         while (pattern.get(firstgs) != GLOBSTAR) {
             firstgs++;
@@ -472,7 +472,8 @@ final class Minimatch {
         for (int s = 0; s < bodySegments.size(); s++) {
             after[s] = fileLength - (nonGsPartsSums.get(i--) + bodySegments.get(s).size());
         }
-        return Boolean.TRUE.equals(matchGlobStarBodySections(file, bodySegments, after, fileIndex, 0, partial, 0, fileTailMatch != 0));
+        return Boolean.TRUE.equals(matchGlobStarBodySections(file, bodySegments, after, fileIndex, 0, partial, 0,
+                                                             fileTailMatch != 0));
     }
 
     private @Nullable Boolean matchGlobStarBodySections(List<String> file, List<List<Object>> bodySegments, int[] after,
@@ -492,8 +493,8 @@ final class Minimatch {
         while (fileIndex <= last) {
             boolean m = matchOne(slice(file, 0, fileIndex + body.size()), body, partial, fileIndex, 0);
             if (m && globStarDepth < MAX_GLOBSTAR_RECURSION) {
-                Boolean sub = matchGlobStarBodySections(file, bodySegments, after, fileIndex + body.size(), bodyIndex + 1,
-                        partial, globStarDepth + 1, sawTail);
+                Boolean sub = matchGlobStarBodySections(file, bodySegments, after, fileIndex + body.size(),
+                        bodyIndex + 1, partial, globStarDepth + 1, sawTail);
                 if (!Boolean.FALSE.equals(sub)) {
                     return sub;
                 }
@@ -506,7 +507,8 @@ final class Minimatch {
         return partial ? Boolean.TRUE : null;
     }
 
-    private boolean matchOne(List<String> file, List<Object> pattern, boolean partial, int fileIndex, int patternIndex) {
+    private boolean matchOne(List<String> file, List<Object> pattern, boolean partial, int fileIndex,
+                             int patternIndex) {
         int fi = fileIndex;
         int pi = patternIndex;
         int fl = file.size();

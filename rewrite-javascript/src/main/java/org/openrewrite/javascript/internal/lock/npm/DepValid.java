@@ -129,11 +129,12 @@ final class DepValid {
             case ALIAS:
                 return depValid(child, requested.getSubSpec(), requestor);
             case TAG:
-                return truthy(child.getResolved()) && Spec.npa(child.getResolved()).getType() == Spec.Type.REMOTE;
+                return truthy(child.getResolved()) && Spec.npa(child.getResolved(), null).getType() == Spec.Type.REMOTE;
             case REMOTE:
-                return requested.getFetchSpec() != null && requested.getFetchSpec().equals(child.getResolved());
+                return requested.getFetchSpec() != null && Js.strictEquals(child.getResolved(),
+                        requested.getFetchSpec());
             case GIT: {
-                Spec resRepo = Spec.npa(child.getResolved() == null ? "" : child.getResolved());
+                Spec resRepo = Spec.npa(truthy(child.getResolved()) ? child.getResolved() : "", null);
                 GitHost resHost = resRepo.getHosted();
                 GitHost reqHost = requested.getHosted();
                 String reqCommittish = requested.getGitCommittish() == null ? "" : requested.getGitCommittish();
@@ -181,7 +182,11 @@ final class DepValid {
             return false;
         }
         if (truthy(child.getResolved())) {
-            return child.getResolved().replace('\\', '/').equals("file:" + requested.getFetchSpec().replace('\\', '/'));
+            if (!(child.getResolved() instanceof String)) {
+                throw new IllegalArgumentException("child.resolved.replace is not a function");
+            }
+            String resolved = (String) child.getResolved();
+            return resolved.replace('\\', '/').equals("file:" + requested.getFetchSpec().replace('\\', '/'));
         }
         Object legacyRequested = child.getPackage().get("_requested");
         if (legacyRequested instanceof Map) {

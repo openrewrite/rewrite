@@ -25,11 +25,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ConsistentResolveTest {
 
-    private static @Nullable String cr(@Nullable String resolved, @Nullable String fromPath, @Nullable String toPath, boolean rel) {
+    private static @Nullable Object cr(@Nullable String resolved, @Nullable String fromPath, @Nullable String toPath,
+                                       boolean rel) {
         return ConsistentResolve.consistentResolve(resolved, fromPath, toPath, rel);
     }
 
-    private static @Nullable String cr(@Nullable String resolved) {
+    private static @Nullable Object cr(@Nullable String resolved) {
         return cr(resolved, null, null, false);
     }
 

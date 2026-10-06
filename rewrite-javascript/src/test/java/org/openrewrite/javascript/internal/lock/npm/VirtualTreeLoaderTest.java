@@ -27,8 +27,10 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.canonical;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.describe;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
+import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.jsValue;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.node;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
@@ -71,14 +73,16 @@ class VirtualTreeLoaderTest {
     void loadsTheTreeArboristLoads(String name, JsonNode c) {
         VirtualTreeLoader loader = new VirtualTreeLoader(path(name), NpmOptions.DEFAULT);
         if (c.has("error")) {
-            assertThatThrownBy(() -> loader.loadVirtual(files(name))).hasMessage(c.get("error").get("message").asText());
+            assertThatThrownBy(() -> loader.loadVirtual(files(name))).hasMessage(c.get("error").get("message")
+              .asText());
             return;
         }
         Node tree = loader.loadVirtual(files(name));
         assertThat(describe(tree)).as("tree").isEqualTo(c.get("tree").asText());
         assertThat(loader.isFlagsSuspect()).as("flagsSuspect").isEqualTo(c.get("flagsSuspect").asBoolean());
         Shrinkwrap meta = tree.getMeta();
-        assertThat(meta.getLockfileVersion()).isEqualTo(c.get("lockfileVersion").asInt());
+        assertThat(canonical(jsValue(meta.getLockfileVersion()))).as("lockfileVersion")
+          .isEqualTo(canonical(json(c.get("lockfileVersion"))));
         assertThat(meta.isLoadedFromDisk()).isEqualTo(c.get("loadedFromDisk").asBoolean());
         assertThat(meta.isAncientLockfile()).isEqualTo(c.get("ancientLockfile").asBoolean());
         assertThat(meta.toString()).as("toString").isEqualTo(c.get("string").asText());
@@ -87,7 +91,8 @@ class VirtualTreeLoaderTest {
         assertThat(describe(tree)).as("tree after flags")
           .isEqualTo(c.get("treeAfterFlags").isNull() ? c.get("tree").asText() : c.get("treeAfterFlags").asText());
         assertThat(meta.toString()).as("toString after flags")
-          .isEqualTo(c.get("stringAfterFlags").isNull() ? c.get("string").asText() : c.get("stringAfterFlags").asText());
+          .isEqualTo(c.get("stringAfterFlags").isNull() ? c.get("string").asText() : c.get("stringAfterFlags")
+            .asText());
         if (c.has("yarnLockAfter")) {
             assertThat(meta.getYarnLock().toString()).isEqualTo(c.get("yarnLockAfter").asText());
         }
@@ -120,7 +125,8 @@ class VirtualTreeLoaderTest {
     void loadFromRootThatAlreadyHasShrinkwrap() {
         String name = "tap-and-flow";
         VirtualTreeLoader.ProjectFiles files = files(name);
-        Shrinkwrap meta = new Shrinkwrap(path(name)).load(files.getLock(), files.getYarnLock(), files.getManifests().get(""));
+        Shrinkwrap meta = new Shrinkwrap(path(name)).load(files.getLock(), files.getYarnLock(), files.getManifests()
+          .get(""));
         Node root = node(opts().path(path(name)).pkg(json(files.getManifests().get(""))).meta(meta));
         VirtualTreeLoader loader = new VirtualTreeLoader(path(name), NpmOptions.DEFAULT);
         assertThat(loader.loadVirtual(files, root)).isSameAs(root);
@@ -164,10 +170,13 @@ class VirtualTreeLoaderTest {
 
     @Test
     void doNotBundleTheEntireUniverse() {
-        Node tree = new VirtualTreeLoader(path("tap-old-lockfile"), NpmOptions.DEFAULT).loadVirtual(files("tap-old-lockfile"));
-        List<Object> bundled = new ArrayList<>((List<?>) tree.getChildren().get("tap").getPackage().get("bundleDependencies"));
+        Node tree = new VirtualTreeLoader(path("tap-old-lockfile"), NpmOptions.DEFAULT)
+          .loadVirtual(files("tap-old-lockfile"));
+        List<Object> bundled = new ArrayList<>((List<?>) tree.getChildren().get("tap").getPackage()
+          .get("bundleDependencies"));
         bundled.sort(null);
-        assertThat(bundled).containsExactly("@types/react", "import-jsx", "ink", "minipass", "signal-exit", "tap-parser",
+        assertThat(bundled).containsExactly("@types/react", "import-jsx", "ink", "minipass", "signal-exit",
+                                            "tap-parser",
           "tap-yaml", "treport", "yaml");
     }
 
@@ -189,9 +198,11 @@ class VirtualTreeLoaderTest {
     @Test
     void withoutSubtreeOnlyRootLockfilesWithFileEntriesStillLoad() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
-          .manifest("", "{\"name\":\"project\",\"version\":\"1.0.0\",\"dependencies\":{\"sibling\":\"file:../sibling\"}}")
+          .manifest("",
+                    "{\"name\":\"project\",\"version\":\"1.0.0\",\"dependencies\":{\"sibling\":\"file:../sibling\"}}")
           .manifest("../sibling", "{\"name\":\"sibling\",\"version\":\"1.0.0\"}")
-          .lock(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion", 3, "requires", true,
+          .lock(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion", 3, "requires",
+                                                true,
             "packages", obj(
               "", obj("name", "project", "version", "1.0.0", "dependencies", obj("sibling", "file:../sibling")),
               "../sibling", obj("name", "sibling", "version", "1.0.0"),

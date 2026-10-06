@@ -55,7 +55,8 @@ class NpmLockRoundTripTest {
     static final Set<String> PLACED_ON_SECOND_INSTALL = new LinkedHashSet<>(Arrays.asList(
       // again adds packages/m/node_modules/is-odd and drops node_modules/is-odd: the root override reaches the member
       "override-ws-member-add-root-overrides-direct/after",
-      // after-again moves node_modules/is-odd/node_modules/is-number to node_modules/is-number: a file: override's link re-placed
+      // after-again moves node_modules/is-odd/node_modules/is-number to node_modules/is-number: a file: override's link
+      // re-placed
       "open-override-value-directory/after",
       "open-override-value-directory-up/after"));
 
@@ -120,8 +121,10 @@ class NpmLockRoundTripTest {
             if (entry.getKey().isEmpty()) {
                 manifests.put("", JsonStringifyNice.stringify(meta));
             } else if (Boolean.TRUE.equals(((Map<String, Object>) meta).get("link")) && resolved instanceof String &&
-                       !((String) resolved).contains("node_modules/") && ((Map<String, Object>) packages).get(resolved) instanceof Map) {
-                manifests.put((String) resolved, JsonStringifyNice.stringify(((Map<String, Object>) packages).get(resolved)));
+                       !((String) resolved).contains("node_modules/") && ((Map<String, Object>) packages)
+                         .get(resolved) instanceof Map) {
+                manifests.put((String) resolved, JsonStringifyNice.stringify(((Map<String, Object>) packages)
+                  .get(resolved)));
             }
         }
         return manifests;
@@ -216,7 +219,8 @@ class NpmLockRoundTripTest {
               .hasMessage(loadError);
             return;
         }
-        String rewritten = PLACED_ON_SECOND_INSTALL.contains(name) ? null : lock.rewritten();
+        String key = lock.getScenario().getName() + "/" + lock.getFileName();
+        String rewritten = PLACED_ON_SECOND_INSTALL.contains(key) ? null : lock.rewritten();
         String expected = rewritten != null ? rewritten : lock.getText();
         assertThat(load(lock, options, projectPath(expected)).getMeta().toString()).isEqualTo(expected);
     }

@@ -46,8 +46,10 @@ final class MapWorkspaces {
         }
     }
 
-    private static final Minimatch.Options PARTIAL = Minimatch.Options.builder().partial(true).windowsPathsNoEscape(true).build();
-    private static final Minimatch.Options IGNORE = Minimatch.Options.builder().dot(true).nocomment(true).nonegate(true).build();
+    private static final Minimatch.Options PARTIAL =
+            Minimatch.Options.builder().partial(true).windowsPathsNoEscape(true).build();
+    private static final Minimatch.Options IGNORE =
+            Minimatch.Options.builder().dot(true).nocomment(true).nonegate(true).build();
 
     private MapWorkspaces() {
     }
@@ -60,7 +62,11 @@ final class MapWorkspaces {
     private static Patterns appendNegatedPatterns(List<?> allPatterns) {
         Patterns out = new Patterns();
         for (Object raw : allPatterns) {
-            String pattern = String.valueOf(raw);
+            if (!(raw instanceof String)) {
+                Js.get(raw, "match");
+                throw new IllegalArgumentException("pattern.match is not a function");
+            }
+            String pattern = (String) raw;
             int excl = 0;
             while (excl < pattern.length() && pattern.charAt(excl) == '!') {
                 excl++;
@@ -88,17 +94,17 @@ final class MapWorkspaces {
     }
 
     private static Patterns getPatterns(@Nullable Object workspaces) {
-        Object declaration = workspaces instanceof Map && ((Map<?, ?>) workspaces).get("packages") instanceof List ?
-                ((Map<?, ?>) workspaces).get("packages") : workspaces;
+        Object packages = Js.get(workspaces, "packages");
+        Object declaration = packages instanceof List ? packages : workspaces;
         if (!(declaration instanceof List)) {
             throw new WorkspacesException("workspaces config expects an Array", "EWORKSPACESCONFIG");
         }
         return appendNegatedPatterns((List<?>) declaration);
     }
 
-    private static String getPackageName(@Nullable Object pkg, String pathname) {
+    private static Object getPackageName(@Nullable Object pkg, String pathname) {
         Object name = Js.get(pkg, "name");
-        return truthy(name) ? String.valueOf(name) : Node.nameFromFolder(pathname);
+        return truthy(name) ? name : Node.nameFromFolder(pathname);
     }
 
     /**
@@ -142,7 +148,7 @@ final class MapWorkspaces {
             }
         }
 
-        Map<String, Set<String>> seen = new LinkedHashMap<>();
+        Map<Object, Set<String>> seen = new LinkedHashMap<>();
         for (String match : orderedMatches) {
             String location = ".".equals(match) ? "" : match;
             String text = manifests.get(location);
@@ -151,24 +157,32 @@ final class MapWorkspaces {
             }
             PackageJson manifest = PackageJson.normalize(text);
             String path = PosixPath.join(cwd, match);
-            String name = getPackageName(manifest.getContent(), path);
+            Object name = getPackageName(manifest.getContent(), path);
             seen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(path);
         }
 
         List<String> errors = new ArrayList<>();
         errors.add("must not have multiple workspaces with the same name");
-        for (Map.Entry<String, Set<String>> entry : seen.entrySet()) {
+        Map<Object, String> byName = new LinkedHashMap<>();
+        for (Map.Entry<Object, Set<String>> entry : seen.entrySet()) {
             if (entry.getValue().size() > 1) {
-                errors.add("package '" + entry.getKey() + "' has conflicts in the following paths:");
+                errors.add("package '" + Js.string(entry.getKey()) + "' has conflicts in the following paths:");
                 for (String pathname : entry.getValue()) {
                     errors.add("    " + pathname);
                 }
             } else {
-                results.put(entry.getKey(), entry.getValue().iterator().next());
+                byName.put(entry.getKey(), entry.getValue().iterator().next());
             }
         }
         if (errors.size() > 1) {
             throw new WorkspacesException(String.join("\n", errors), "EDUPLICATEWORKSPACE");
+        }
+        for (Map.Entry<Object, String> entry : byName.entrySet()) {
+            // the workspace edge the name becomes is what refuses it
+            if (!(entry.getKey() instanceof String)) {
+                throw new IllegalArgumentException("must provide dependency name");
+            }
+            results.put((String) entry.getKey(), entry.getValue());
         }
         return results;
     }
@@ -185,10 +199,12 @@ final class MapWorkspaces {
                 return true;
             }
             if (pattern.endsWith("/**") || "**".equals(pattern)) {
-                for (String ancestor = PosixPath.dirname(dir); !".".equals(ancestor) && !ancestor.isEmpty(); ancestor = PosixPath.dirname(ancestor)) {
+                String ancestor = PosixPath.dirname(dir);
+                while (!".".equals(ancestor) && !ancestor.isEmpty()) {
                     if (mm.match(ancestor + "/")) {
                         return true;
                     }
+                    ancestor = PosixPath.dirname(ancestor);
                 }
             }
         }
@@ -222,7 +238,7 @@ final class MapWorkspaces {
         for (String pattern : p.patterns) {
             for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Options.DEFAULT)) {
                 String pathname = PosixPath.join(cwd, key);
-                byPath.put(pathname, getPackageName(Js.get(packages, key), pathname));
+                byPath.put(pathname, Js.string(getPackageName(Js.get(packages, key), pathname)));
             }
         }
 

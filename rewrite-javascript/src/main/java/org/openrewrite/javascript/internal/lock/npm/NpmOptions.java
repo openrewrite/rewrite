@@ -92,8 +92,9 @@ public class NpmOptions {
         return options.build();
     }
 
+    // npm's parseField maps only these four words; any other value stays a string, which arborist tests for truthiness
     private static boolean bool(String value) {
-        return !"false".equalsIgnoreCase(value) && !"0".equals(value) && !"null".equals(value);
+        return !"false".equals(value) && !"null".equals(value) && !"undefined".equals(value);
     }
 
     // npm's parseField, then the definition's flatten (obj[key] && parseInt(obj[key], 10)), then arborist's own check

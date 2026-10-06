@@ -66,6 +66,8 @@ public final class PackageJson {
      * {@code PackageJson.normalize(path)}: the manifest at a package's root as arborist loads it.
      *
      * @throws JsonParseEvenBetterErrors.JsonParseException as {@code Invalid package.json}
+     * @throws IllegalStateException    for a falsy JSON value ({@code Can not normalize without content})
+     * @throws IllegalArgumentException for a truthy one that is not an object or array
      */
     @SuppressWarnings("unchecked")
     public static PackageJson normalize(String text) {
@@ -75,8 +77,16 @@ public final class PackageJson {
         } catch (JsonParseEvenBetterErrors.JsonParseException e) {
             throw new JsonParseEvenBetterErrors.JsonParseException("Invalid package.json: " + e.getMessage(), e);
         }
-        Map<String, Object> data = parsed.getValue() instanceof Map ?
-                (Map<String, Object>) parsed.getValue() : new LinkedHashMap<>();
+        Object value = parsed.getValue();
+        if (!truthy(value)) {
+            throw new IllegalStateException("Can not normalize without content");
+        }
+        if (!(value instanceof Map) && !(value instanceof List)) {
+            throw new IllegalArgumentException(
+                    "Cannot use 'in' operator to search for 'bundleDependencies' in " + Js.string(value));
+        }
+        // an array has none of the properties the steps read, so it normalizes to an empty manifest
+        Map<String, Object> data = value instanceof Map ? (Map<String, Object>) value : new LinkedHashMap<>();
         normalizeBin(data);
         syncSteps(data, NORMALIZE_STEPS);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
@@ -155,8 +165,9 @@ public final class PackageJson {
     @SuppressWarnings("unchecked")
     private static void normalizeBin(Map<String, Object> pkg) {
         Object directories = pkg.get("directories");
-        if (directories instanceof Map && truthy(((Map<?, ?>) directories).get("bin")) && !truthy(pkg.get("bin"))) {
-            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(((Map<?, ?>) directories).get("bin"))) +
+        Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
+        if (truthy(binDir) && !truthy(pkg.get("bin"))) {
+            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(binDir)) +
                                         "} names the package's files, which are not known");
         }
         Object bin = pkg.get("bin");

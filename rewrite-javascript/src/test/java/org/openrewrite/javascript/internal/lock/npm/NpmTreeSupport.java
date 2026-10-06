@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -172,6 +173,17 @@ final class NpmTreeSupport {
     }
 
     /**
+     * {@code JSON.stringify} with sorted keys and no indentation, for comparing data of any shape.
+     */
+    static String canonical(@Nullable Object data) {
+        return JsonStringifyNice.stringify(data, Collections.emptyList(), 0);
+    }
+
+    static @Nullable Object jsValue(@Nullable Object value) {
+        return value == Js.UNDEFINED ? null : value;
+    }
+
+    /**
      * Every inventoried node with its relations and edges, in inventory order, as the dump script prints them.
      */
     static String describe(Node root) {
@@ -179,12 +191,13 @@ final class NpmTreeSupport {
         for (Map.Entry<String, Node> entry : root.getInventory().entries()) {
             Node n = entry.getValue();
             out.add("\"" + entry.getKey() + "\" " + n.getClass().getSimpleName() + " name=" + n.getName() +
-                    " pkg=" + n.getPackageName() + "@" + n.getVersion() +
+                    " pkg=" + Js.string(n.getPackageName()) + "@" + Js.string(n.getVersion()) +
                     " path=" + n.getPath() + " realpath=" + n.getRealpath() +
                     " parent=" + loc(n.getParent()) + " fsParent=" + loc(n.getFsParent()) +
                     " target=" + loc(n.getTarget()) + " root=" + loc(n.getRoot()) +
-                    " flags=" + flag(n.isDev()) + flag(n.isOptional()) + flag(n.isDevOptional()) + flag(n.isPeer()) + flag(n.isExtraneous()) +
-                    " resolved=" + n.getResolved() + " integrity=" + n.getIntegrity());
+                    " flags=" + flag(n.isDev()) + flag(n.isOptional()) + flag(n.isDevOptional()) + flag(n.isPeer()) +
+                      flag(n.isExtraneous()) +
+                    " resolved=" + Js.string(n.getResolved()) + " integrity=" + Js.string(n.getIntegrity()));
             for (Map.Entry<String, Node> c : n.getChildren().entries()) {
                 out.add("  child " + c.getKey() + " " + loc(c.getValue()));
             }
@@ -221,7 +234,8 @@ final class NpmTreeSupport {
         return tree;
     }
 
-    private static void check(@Nullable Node node, Node root, Inventory inventory, Set<Node> seen, Node via, String viaType) {
+    private static void check(@Nullable Node node, Node root, Inventory inventory, Set<Node> seen, Node via,
+                              String viaType) {
         if (node == null || !seen.add(node)) {
             return;
         }

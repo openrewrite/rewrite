@@ -67,8 +67,13 @@ public final class Shrinkwrap {
      * The lock as JSON; {@code packages} lags the tree until an entry is read through {@link #get}.
      */
     @Getter
-    @Setter
     private @Nullable Map<String, Object> data;
+
+    /**
+     * A {@code packages} array as loaded: indexed like an object in {@link #data}, written back as the
+     * array until a tree replaces it.
+     */
+    private @Nullable List<Object> packagesArray;
 
     @Getter
     @Setter
@@ -155,16 +160,16 @@ public final class Shrinkwrap {
         if (node.isInBundle()) {
             meta.put("inBundle", true);
         }
-        if (node.isHasShrinkwrap()) {
-            meta.put("hasShrinkwrap", true);
+        if (truthy(node.getHasShrinkwrap())) {
+            meta.put("hasShrinkwrap", node.getHasShrinkwrap());
         }
         if (node.hasInstallScript()) {
             meta.put("hasInstallScript", true);
         }
 
-        String resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
+        Object resolved = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
         if (truthy(resolved)) {
-            String written = node.isRegistryDependency() ?
+            Object written = node.isRegistryDependency() ?
                     OverrideResolves.overrideResolves(resolved, options) : resolved;
             if (written != null) {
                 meta.put("resolved", written);
@@ -219,13 +224,16 @@ public final class Shrinkwrap {
             Object version = fromYarn.get("version");
             Object integrity = fromYarn.get("integrity");
             String resolvedString = resolved instanceof String ? (String) resolved : null;
-            boolean isYarnReg = parsed.isRegistry() && resolvedString != null && YARN_REGISTRY.matcher(resolvedString).find();
+            boolean isYarnReg = parsed.isRegistry() && resolvedString != null &&
+                                YARN_REGISTRY.matcher(resolvedString).find();
             boolean isnpmReg = parsed.isRegistry() && !isYarnReg && resolvedString != null &&
                                NPM_REGISTRY.matcher(resolvedString).find();
             boolean isReg = isnpmReg || isYarnReg;
-            VersionFromTgz.NameVersion tgz = isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
+            VersionFromTgz.NameVersion tgz =
+                    isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
             Object yspec = resolved;
-            if (tgz != null && Objects.equals(tgz.getName(), parsed.getName()) && Js.strictEquals(tgz.getVersion(), version)) {
+            if (tgz != null && Objects.equals(tgz.getName(), parsed.getName()) &&
+                Js.strictEquals(tgz.getVersion(), version)) {
                 yspec = version;
             } else if (isReg && tgz != null && truthy(tgz.getName()) && truthy(tgz.getVersion())) {
                 yspec = "npm:" + tgz.getName() + "@" + tgz.getVersion();
@@ -240,9 +248,15 @@ public final class Shrinkwrap {
         return parsed;
     }
 
+    public void setData(@Nullable Map<String, Object> data) {
+        this.data = data;
+        packagesArray = null;
+    }
+
     public void reset() {
         tree = null;
         awaitingUpdate = new LinkedHashMap<>();
+        packagesArray = null;
         Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion : DEFAULT_LOCKFILE_VERSION;
         originalLockfileVersion = lockfileVersion;
 
@@ -268,13 +282,12 @@ public final class Shrinkwrap {
      * (npm-shrinkwrap.json or package-lock.json, null when there is none), yarn.lock and package.json
      * (read only to type the dependencies of a lockfileVersion 1 lock).
      */
-    @SuppressWarnings("unchecked")
     public Shrinkwrap load(@Nullable String lock, @Nullable String yarn, @Nullable String packageJson) {
-        Map<String, Object> data;
+        Object data;
         try {
             loadedFromDisk = truthy(lock);
 
-            if (yarn != null) {
+            if (truthy(yarn)) {
                 yarnLock = new YarnLock();
                 try {
                     yarnLock.parse(yarn);
@@ -282,18 +295,15 @@ public final class Shrinkwrap {
                 }
             }
 
-            JsonParseEvenBetterErrors.Parsed parsed = JsonParseEvenBetterErrors.parse(lock != null && !lock.isEmpty() ? lock : "{}");
+            JsonParseEvenBetterErrors.Parsed parsed = JsonParseEvenBetterErrors.parse(truthy(lock) ? lock : "{}");
+            data = parsed.getValue();
+            // inferFormattingOptions destructures the parsed value, which throws for null
+            Js.get(data, "lockfileVersion");
             if (parsed.getIndent() != null) {
                 indent = parsed.getIndent();
             }
             if (parsed.getNewline() != null) {
                 newline = parsed.getNewline();
-            }
-            if (!(parsed.getValue() instanceof Map)) {
-                Js.get(parsed.getValue(), "lockfileVersion");
-                data = new LinkedHashMap<>();
-            } else {
-                data = (Map<String, Object>) parsed.getValue();
             }
         } catch (RuntimeException er) {
             loadingError = er;
@@ -309,11 +319,16 @@ public final class Shrinkwrap {
             lockfileVersion = fileVersion;
         }
 
-        Map<String, Object> merged = new LinkedHashMap<>(data);
+        Object packages = Js.get(data, "packages");
+        Object dependencies = Js.get(data, "dependencies");
+        Map<String, Object> merged = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : Js.entries(data)) {
+            merged.put(entry.getKey(), entry.getValue());
+        }
         merged.put("lockfileVersion", lockfileVersion);
         merged.put("requires", true);
-        merged.put("packages", truthy(data.get("packages")) ? data.get("packages") : new LinkedHashMap<>());
-        merged.put("dependencies", truthy(data.get("dependencies")) ? data.get("dependencies") : new LinkedHashMap<>());
+        merged.put("packages", truthy(packages) ? indexed(packages) : new LinkedHashMap<>());
+        merged.put("dependencies", truthy(dependencies) ? dependencies : new LinkedHashMap<>());
         this.data = merged;
 
         originalLockfileVersion = fileVersion;
@@ -321,20 +336,35 @@ public final class Shrinkwrap {
         if (!truthy(this.lockfileVersion)) {
             this.lockfileVersion = lockfileVersion;
         }
-        ancientLockfile = loadedFromDisk && !(Js.toNumber(fileVersion) >= 2) && !truthy(data.get("requires"));
+        ancientLockfile = loadedFromDisk && !(Js.toNumber(fileVersion) >= 2) && !truthy(Js.get(data, "requires"));
 
-        if (truthy(data.get("dependencies")) && !truthy(data.get("packages"))) {
+        if (truthy(dependencies) && !truthy(packages)) {
             Map<String, Object> pkg = new LinkedHashMap<>();
             if (packageJson != null) {
                 try {
                     pkg = PackageJson.normalize(packageJson).getContent();
-                } catch (JsonParseEvenBetterErrors.JsonParseException ignored) {
+                } catch (PackageJson.NeedsPackageFiles e) {
+                    throw e;
+                } catch (RuntimeException ignored) {
                 }
             }
             loadAll("", null, this.data);
             fixDependencies(pkg);
         }
         return this;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object indexed(Object packages) {
+        if (!(packages instanceof List)) {
+            return packages;
+        }
+        packagesArray = (List<Object>) packages;
+        Map<String, Object> indexed = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : Js.entries(packages)) {
+            indexed.put(entry.getKey(), entry.getValue());
+        }
+        return indexed;
     }
 
     private void loadAll(String location, @Nullable String name, @Nullable Object lock) {
@@ -407,9 +437,15 @@ public final class Shrinkwrap {
         return data;
     }
 
+    // the first use of a packages primitive is the root entry's write, where arborist fails
     @SuppressWarnings("unchecked")
     private Map<String, Object> packages() {
-        return (Map<String, Object>) Objects.requireNonNull(loadedData().get("packages"));
+        Object packages = Objects.requireNonNull(loadedData().get("packages"));
+        if (!(packages instanceof Map)) {
+            throw new IllegalArgumentException("Cannot create property '' on " + Js.typeOf(packages) + " '" +
+                                               Js.string(packages) + "'");
+        }
+        return (Map<String, Object>) packages;
     }
 
     private @Nullable Map<String, Object> lockFromLoc(@Nullable Object lock, List<String> path, int i) {
@@ -451,8 +487,22 @@ public final class Shrinkwrap {
         List<String> path = Arrays.asList(NODE_MODULES.split(location, -1));
         String name = path.get(path.size() - 1);
         Map<String, Object> pLock = lockFromLoc(data, path.subList(0, path.size() - 1), 0);
-        if (pLock != null && pLock.get("dependencies") instanceof Map) {
-            ((Map<?, ?>) pLock.get("dependencies")).remove(name);
+        if (pLock != null && truthy(pLock.get("dependencies"))) {
+            deleteProperty(pLock.get("dependencies"), name);
+        }
+    }
+
+    // delete value[name] in strict mode: an own property a string or array cannot lose throws
+    private static void deleteProperty(Object value, String name) {
+        if (value instanceof Map) {
+            ((Map<?, ?>) value).remove(name);
+            return;
+        }
+        boolean ownIndex = value instanceof String && Js.arrayIndex(name) >= 0 &&
+                           Js.arrayIndex(name) < ((String) value).length();
+        if ((value instanceof String || value instanceof List) && ("length".equals(name) || ownIndex)) {
+            throw new IllegalArgumentException("Cannot delete property '" + name + "' of [object " +
+                                               (value instanceof List ? "Array" : "String") + "]");
         }
     }
 
@@ -586,17 +636,21 @@ public final class Shrinkwrap {
 
             Object pathFixed = null;
             if (truthy(resolved)) {
-                if (!(resolved instanceof String) || !((String) resolved).startsWith("file:")) {
+                if (!Js.string(resolved).startsWith("file:")) {
                     pathFixed = resolved;
-                } else {
+                } else if (resolved instanceof String) {
                     pathFixed = "file:" + PosixPath.resolve(path, ((String) resolved).substring(5));
+                } else {
+                    // only an array reads as a file: string, and Array.prototype.slice hands path.resolve an array
+                    throw new IllegalArgumentException(
+                            "The \"paths[1]\" argument must be of type string. Received an instance of Array");
                 }
             }
 
             boolean resolvedOk = !truthy(resolved) || !truthy(node.getResolved()) ||
-                                 node.getResolved().equals(pathFixed);
+                                 Js.strictEquals(node.getResolved(), pathFixed);
             boolean integrityOk = !truthy(integrity) || !truthy(node.getIntegrity()) ||
-                                  node.getIntegrity().equals(integrity);
+                                  Js.strictEquals(node.getIntegrity(), integrity);
             boolean versionOk = !truthy(version) || !truthy(node.getVersion()) ||
                                 Js.strictEquals(version, node.getVersion());
 
@@ -609,11 +663,10 @@ public final class Shrinkwrap {
                 integrity = fromNode.get("integrity");
                 hasShrinkwrap = fromNode.get("hasShrinkwrap");
             }
-            node.setResolved(truthy(node.getResolved()) ? node.getResolved() :
-                    truthy(pathFixed) ? String.valueOf(pathFixed) : null);
-            node.setIntegrity(truthy(node.getIntegrity()) ? node.getIntegrity() :
-                    truthy(integrity) ? String.valueOf(integrity) : null);
-            node.setHasShrinkwrap(node.isHasShrinkwrap() || truthy(hasShrinkwrap));
+            node.setResolved(truthy(node.getResolved()) ? node.getResolved() : truthy(pathFixed) ? pathFixed : null);
+            node.setIntegrity(truthy(node.getIntegrity()) ? node.getIntegrity() : truthy(integrity) ? integrity : null);
+            node.setHasShrinkwrap(truthy(node.getHasShrinkwrap()) ? node.getHasShrinkwrap() :
+                    truthy(hasShrinkwrap) ? hasShrinkwrap : false);
         }
         awaitingUpdate.put(loc, node);
     }
@@ -635,9 +688,9 @@ public final class Shrinkwrap {
             return;
         }
 
-        String pathFixed = null;
+        Object pathFixed = null;
         if (truthy(node.getResolved())) {
-            if (!node.getResolved().contains("file:")) {
+            if (!Js.string(node.getResolved()).contains("file:")) {
                 pathFixed = node.getResolved();
             } else {
                 pathFixed = ConsistentResolve.consistentResolve(node.getResolved(), node.getPath(), path, true);
@@ -663,10 +716,9 @@ public final class Shrinkwrap {
 
         Object entryIntegrity = entry.get("integrity");
         node.setIntegrity(truthy(node.getIntegrity()) ? node.getIntegrity() :
-                entryIntegrity instanceof String && truthy(entryIntegrity) ? (String) entryIntegrity : null);
-        String resolved = truthy(node.getResolved()) ? node.getResolved() :
-                ConsistentResolve.consistentResolve(entryResolved instanceof String ? (String) entryResolved : null,
-                        path, node.getPath(), false);
+                truthy(entryIntegrity) ? entryIntegrity : null);
+        Object resolved = truthy(node.getResolved()) ? node.getResolved() :
+                ConsistentResolve.consistentResolve(entryResolved, path, node.getPath(), false);
         node.setResolved(truthy(resolved) ? resolved : null);
 
         awaitingUpdate.put(Relpath.relpath(path, node.getPath()), node);
@@ -694,6 +746,7 @@ public final class Shrinkwrap {
             Map<String, Object> root = metaFromNode(Objects.requireNonNull(tree.getTarget()), path, resolveOptions);
             Map<String, Object> packages = new LinkedHashMap<>();
             data.put("packages", packages);
+            packagesArray = null;
             if (!root.isEmpty()) {
                 packages.put("", root);
             }
@@ -729,6 +782,9 @@ public final class Shrinkwrap {
         }
 
         Map<String, Object> out = new LinkedHashMap<>(data);
+        if (packagesArray != null) {
+            out.put("packages", packagesArray);
+        }
         if (version >= 3) {
             out.remove("dependencies");
         } else if (version < 2) {
@@ -764,7 +820,7 @@ public final class Shrinkwrap {
         });
         Edge edge = valid.isEmpty() ? null : valid.get(0);
 
-        String res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true);
+        Object res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true);
         Spec rSpec = specFromResolved(res);
 
         Spec spec = rSpec;
@@ -798,7 +854,7 @@ public final class Shrinkwrap {
             rType != Spec.Type.GIT && rType != Spec.Type.FILE && rType != Spec.Type.DIRECTORY &&
             specType != Spec.Type.DIRECTORY && specType != Spec.Type.GIT && specType != Spec.Type.FILE &&
             specType != Spec.Type.REMOTE) {
-            String resolved = OverrideResolves.overrideResolves(node.getResolved(), resolveOptions);
+            Object resolved = OverrideResolves.overrideResolves(node.getResolved(), resolveOptions);
             if (resolved != null) {
                 lock.put("resolved", resolved);
             }
@@ -871,9 +927,9 @@ public final class Shrinkwrap {
         return lock;
     }
 
-    private static @Nullable Spec specFromResolved(@Nullable String resolved) {
+    private static @Nullable Spec specFromResolved(@Nullable Object resolved) {
         try {
-            return resolved == null ? null : Spec.npa(resolved);
+            return Spec.npa(resolved, null);
         } catch (RuntimeException er) {
             return null;
         }

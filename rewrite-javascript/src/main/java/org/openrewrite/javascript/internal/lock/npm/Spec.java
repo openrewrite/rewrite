@@ -22,6 +22,7 @@ import org.openrewrite.semver.NodeSemver;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -135,6 +136,45 @@ public final class Spec {
             return resolve(arg.name, arg.rawSpec, where);
         }
         return npa(arg.raw, where);
+    }
+
+    /**
+     * {@code npa(arg, where)} for a value read from package or lock data, which may not be a string.
+     *
+     * @throws IllegalArgumentException npa's TypeError for a value of another type
+     */
+    public static Spec npa(@Nullable Object arg, @Nullable String where) {
+        if (arg instanceof Spec) {
+            return npa((Spec) arg, where);
+        }
+        if (arg instanceof String) {
+            return npa((String) arg, where);
+        }
+        if (arg == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'name')");
+        }
+        if (arg == Js.UNDEFINED) {
+            throw new IllegalArgumentException("Cannot read properties of undefined (reading 'indexOf')");
+        }
+        if (!(arg instanceof Map) && !(arg instanceof List)) {
+            throw new IllegalArgumentException("arg.indexOf is not a function");
+        }
+        Object name = Js.get(arg, "name");
+        Object rawSpec = Js.get(arg, "rawSpec");
+        Object argWhere = Js.get(arg, "where");
+        String resolvedWhere = truthy(where) ? where : argWhere instanceof String ? (String) argWhere : null;
+        if (truthy(name) && truthy(rawSpec)) {
+            if (!(name instanceof String)) {
+                String pkgid = Js.string(name) + "@" + Js.string(rawSpec);
+                throw new InvalidSpecException("Invalid package name \"" + Js.string(name) + "\" of package \"" +
+                                               pkgid + "\": name must be a string.", "EINVALIDPACKAGENAME");
+            }
+            if (!(rawSpec instanceof String)) {
+                throw new IllegalArgumentException("spec.toLowerCase is not a function");
+            }
+            return resolve((String) name, (String) rawSpec, resolvedWhere);
+        }
+        return npa(Js.get(arg, "raw"), resolvedWhere);
     }
 
     public static Spec npa(String arg, @Nullable String where) {

@@ -91,7 +91,8 @@ public final class DepFlags {
                     changed = true;
                 }
 
-                if (to.isDevOptional() && !node.isDevOptional() && !node.isDev() && !node.isOptional() && !dev && !optional) {
+                if (to.isDevOptional() && !node.isDevOptional() && !node.isDev() && !node.isOptional() && !dev &&
+                    !optional) {
                     to.setDevOptional(false);
                     changed = true;
                 }

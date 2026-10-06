@@ -36,9 +36,8 @@ final class FromPath {
             return node.getRoot().getRealpath();
         }
 
-        String resolved = node.getResolved();
-        if (resolved != null && !resolved.isEmpty()) {
-            Spec spec = Spec.npa(resolved);
+        if (truthy(node.getResolved())) {
+            Spec spec = Spec.npa(node.getResolved(), null);
             if (spec.getType() == Spec.Type.FILE) {
                 return PosixPath.dirname(spec.getFetchSpec());
             }

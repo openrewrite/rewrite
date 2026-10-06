@@ -397,8 +397,8 @@ val generateTestClasspath by tasks.registering {
 extensions.configure<LicenseExtension> {
     header = file("${rootProject.projectDir}/gradle/msalLicenseHeader.txt")
     exclude("**/rewrite-javascript-version.txt")
-    // recorded package-manager scenarios: a workspace member's package.json must stay as npm read it
-    exclude("**/src/test/resources/lock/**")
+    // recorded package-manager scenarios (patterns are relative to the source root, src/test/resources)
+    exclude("lock/**")
 //    includePatterns.addAll(
 //        listOf("**/*.ts")
 //    )

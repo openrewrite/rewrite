@@ -117,7 +117,7 @@ public final class VirtualTreeLoader {
             throw new NoLockException();
         }
 
-        Map<String, Object> pkg = rootPackage(s);
+        Object pkg = rootPackage(s);
         rootOptionProvided = root;
         if (root == null) {
             root = setWorkspaces(loadNode("", pkg, true), manifests);
@@ -128,17 +128,19 @@ public final class VirtualTreeLoader {
         return Objects.requireNonNull(virtualTree);
     }
 
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> rootPackage(Shrinkwrap s) {
+    // PackageJson.normalize(this.path).then(p => p.content).catch(() => s.data.packages[''] || {})
+    private Object rootPackage(Shrinkwrap s) {
         String text = manifests.get("");
         if (text != null) {
             try {
                 return PackageJson.normalize(text).getContent();
-            } catch (JsonParseEvenBetterErrors.JsonParseException ignored) {
+            } catch (PackageJson.NeedsPackageFiles e) {
+                throw e;
+            } catch (RuntimeException ignored) {
             }
         }
         Object fromLock = Js.get(Objects.requireNonNull(s.getData()).get("packages"), "");
-        return truthy(fromLock) && fromLock instanceof Map ? (Map<String, Object>) fromLock : new LinkedHashMap<>();
+        return truthy(fromLock) ? fromLock : new LinkedHashMap<>();
     }
 
     /**
@@ -222,7 +224,8 @@ public final class VirtualTreeLoader {
         }
 
         Map<String, Object> lockWS = new LinkedHashMap<>();
-        for (Map.Entry<String, String> ws : MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData())).entrySet()) {
+        Map<String, String> workspaces = MapWorkspaces.virtual(path, Objects.requireNonNull(s.getData()));
+        for (Map.Entry<String, String> ws : workspaces.entrySet()) {
             lockWS.put(ws.getKey(), "file:" + ws.getValue());
         }
 
@@ -240,7 +243,8 @@ public final class VirtualTreeLoader {
             for (Map.Entry<String, Object> dep : Js.entries(byType.getValue())) {
                 String name = dep.getKey();
                 Edge edge = root.getEdgesOut().get(name);
-                if (edge == null || edge.getType() != byType.getKey() || !Js.strictEquals(edge.getSpec(), dep.getValue())) {
+                if (edge == null || edge.getType() != byType.getKey() ||
+                    !Js.strictEquals(edge.getSpec(), dep.getValue())) {
                     flagsSuspect = true;
                     return;
                 }
@@ -298,7 +302,8 @@ public final class VirtualTreeLoader {
         for (Map.Entry<String, Node> entry : nodes.entrySet()) {
             String location = entry.getKey();
             Node node = entry.getValue();
-            if (location.isEmpty() || node.isLink() && !truthy(Objects.requireNonNull(node.getTarget()).getLocation())) {
+            if (location.isEmpty() ||
+                node.isLink() && !truthy(Objects.requireNonNull(node.getTarget()).getLocation())) {
                 continue;
             }
             Node parent = node.getParent();
@@ -334,18 +339,16 @@ public final class VirtualTreeLoader {
         if (!truthy(sw.get("name"))) {
             sw.put("name", Node.nameFromFolder(nodePath));
         }
-        Object integrity = sw.get("integrity");
-        Object resolved = sw.get("resolved");
         return new Node(Node.options()
                 .installLinks(options.isInstallLinks())
                 .legacyPeerDeps(options.isLegacyPeerDeps())
                 .root(virtualTree)
                 .path(nodePath)
                 .realpath(nodePath)
-                .integrity(integrity instanceof String ? (String) integrity : null)
-                .resolved(ConsistentResolve.consistentResolve(resolved instanceof String ? (String) resolved : null, path, nodePath, false))
+                .integrity(sw.get("integrity"))
+                .resolved(ConsistentResolve.consistentResolve(sw.get("resolved"), path, nodePath, false))
                 .pkg(sw)
-                .hasShrinkwrap(truthy(sw.get("hasShrinkwrap")))
+                .hasShrinkwrap(sw.get("hasShrinkwrap"))
                 .loadOverrides(loadOverrides)
                 .extraneous(truthy(sw.get("extraneous")))
                 .devOptional(truthy(sw.get("devOptional")) || truthy(sw.get("dev")) || truthy(sw.get("optional")))

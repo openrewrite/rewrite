@@ -45,7 +45,8 @@ class MapWorkspacesTest {
         List<Arguments> out = new ArrayList<>();
         for (JsonNode layout : CASES.get("layouts")) {
             for (JsonNode c : layout.get("cases")) {
-                out.add(Arguments.of(layout.get("name").asText(), c.get("workspaces").toString(), layout.get("manifests"), c));
+                out.add(Arguments.of(layout.get("name").asText(), c.get("workspaces").toString(),
+                                     layout.get("manifests"), c));
             }
         }
         return out.stream();
@@ -79,7 +80,8 @@ class MapWorkspacesTest {
                   .isInstanceOf(JsonParseEvenBetterErrors.JsonParseException.class)
                   .hasMessageStartingWith("Invalid package.json: ");
             } else {
-                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared))).hasMessage(message);
+                assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared)))
+                  .hasMessage(message);
             }
         } else {
             assertThat(relative(MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared))))
@@ -97,12 +99,14 @@ class MapWorkspacesTest {
             if (!p.isEmpty() && pkg instanceof Map) {
                 packages.put(p, pkg);
                 Object name = ((Map<?, ?>) pkg).get("name");
-                packages.put("node_modules/" + (name != null ? name : PosixPath.basename(p)), obj("resolved", p, "link", true));
+                packages.put("node_modules/" + (name != null ? name : PosixPath.basename(p)), obj("resolved", p, "link",
+                  true));
             }
         });
         Map<String, Object> lockfile = obj("packages", packages);
         if (c.has("virtualError")) {
-            assertThatThrownBy(() -> MapWorkspaces.virtual(CWD, lockfile)).hasMessage(c.get("virtualError").get("message").asText());
+            assertThatThrownBy(() -> MapWorkspaces.virtual(CWD, lockfile)).hasMessage(c.get("virtualError")
+              .get("message").asText());
         } else {
             assertThat(relative(MapWorkspaces.virtual(CWD, lockfile))).isEqualTo(json(c.get("virtual")));
         }

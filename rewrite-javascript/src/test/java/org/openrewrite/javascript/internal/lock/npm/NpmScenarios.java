@@ -77,7 +77,8 @@ final class NpmScenarios {
         private final @Nullable String yarnLock;
         private final @Nullable String npmrc;
 
-        Lock(Scenario scenario, String fileName, String text, @Nullable String manifestFileName, @Nullable String manifest,
+        Lock(Scenario scenario, String fileName, String text, @Nullable String manifestFileName,
+             @Nullable String manifest,
              Map<String, String> tree, @Nullable String yarnLock, @Nullable String npmrc) {
             this.scenario = scenario;
             this.fileName = fileName;
@@ -159,7 +160,8 @@ final class NpmScenarios {
                 return scenario.file("again");
             }
             if ("before".equals(fileName) && scenario.has("after") && scenario.pkg() != null &&
-                scenario.pkg().equals(scenario.pkgBefore()) && scenario.tree("tree").equals(scenario.tree("tree-before"))) {
+                scenario.pkg().equals(scenario.pkgBefore()) && scenario.tree("tree")
+                  .equals(scenario.tree("tree-before"))) {
                 return scenario.after();
             }
             if (scenario.has(fileName + "-again")) {
@@ -186,18 +188,24 @@ final class NpmScenarios {
 
         @Override
         public String toString() {
-            return scenario.getName() + "/" + fileName;
+            return scenario.getLabel() + "/" + fileName;
         }
     }
 
     @Getter
     static final class Scenario {
         private final String name;
+
+        /**
+         * The name, plus the root it came from when another root holds a scenario of the same name.
+         */
+        private final String label;
         private final Path dir;
         private final @Nullable Path httpCache;
 
-        Scenario(String name, Path dir, @Nullable Path httpCache) {
+        Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             this.name = name;
+            this.label = label;
             this.dir = dir;
             this.httpCache = httpCache;
         }
@@ -235,7 +243,8 @@ final class NpmScenarios {
                 return out;
             }
             try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile).forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
+                walk.filter(Files::isRegularFile).forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'),
+                                                                       read(p)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -319,7 +328,8 @@ final class NpmScenarios {
             List<Lock> locks = new ArrayList<>();
             for (String file : files()) {
                 Matcher m = LOCK_FILE.matcher(file);
-                if (!m.matches() || (m.group(2) != null && NOT_LOCKS.contains(m.group(2)) && !"input".equals(m.group(2)))) {
+                if (!m.matches() || (m.group(2) != null && NOT_LOCKS.contains(m.group(2)) &&
+                                     !"input".equals(m.group(2)))) {
                     continue;
                 }
                 if ("before-input".equals(file)) {
@@ -331,7 +341,8 @@ final class NpmScenarios {
                     String manifestFile = has("pkg-before" + suffix) ? "pkg-before" + suffix : "pkg-before";
                     locks.add(lock(file, manifestFile, "tree-before", treeYarn("tree-before"), beforeNpmrc()));
                 } else {
-                    String manifestFile = has("pkg-after" + suffix) ? "pkg-after" + suffix : has("pkg-after") ? "pkg-after" : "pkg";
+                    String manifestFile = has("pkg-after" + suffix) ? "pkg-after" + suffix : has("pkg-after") ?
+                      "pkg-after" : "pkg";
                     String yarn = has("before-yarn") ? file("before-yarn") : treeYarn("tree");
                     locks.add(lock(file, manifestFile, "tree", yarn, npmrc()));
                 }
@@ -345,15 +356,18 @@ final class NpmScenarios {
 
         private @Nullable String treeYarn(String treeDir) {
             String yarn = tree("tree-before").get("yarn.lock");
-            return "tree".equals(treeDir) && tree("tree").containsKey("yarn.lock") ? tree("tree").get("yarn.lock") : yarn;
+            return "tree".equals(treeDir) && tree("tree").containsKey("yarn.lock") ? tree("tree").get("yarn.lock") :
+              yarn;
         }
 
-        private Lock lock(String file, String manifestFile, String treeDir, @Nullable String yarnLock, @Nullable String npmrc) {
+        private Lock lock(String file, String manifestFile, String treeDir, @Nullable String yarnLock,
+                          @Nullable String npmrc) {
             Map<String, String> tree = new TreeMap<>(tree("tree-before"));
             if ("tree".equals(treeDir)) {
                 tree.putAll(tree("tree"));
             }
-            return new Lock(this, file, file(file), has(manifestFile) ? manifestFile : null, file(manifestFile), tree, yarnLock, npmrc);
+            return new Lock(this, file, file(file), has(manifestFile) ? manifestFile : null, file(manifestFile), tree,
+                            yarnLock, npmrc);
         }
 
         @Override
@@ -414,7 +428,8 @@ final class NpmScenarios {
         String corpus = System.getenv(SCENARIOS_ENV);
         if (corpus != null && !corpus.isEmpty() && Files.isDirectory(Paths.get(corpus))) {
             String cache = System.getenv(HTTP_CACHE_ENV);
-            Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ? Paths.get(cache) : null;
+            Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
+              Paths.get(cache) : null;
             collect(Paths.get(corpus), httpCache, found);
         }
         return new ArrayList<>(found.values());
@@ -427,7 +442,8 @@ final class NpmScenarios {
                     return;
                 }
                 String name = root.relativize(dir).toString().replace('\\', '/');
-                found.put(name, new Scenario(name, dir, httpCache));
+                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
+                found.put(label, new Scenario(name, label, dir, httpCache));
             });
         } catch (IOException e) {
             throw new UncheckedIOException(e);

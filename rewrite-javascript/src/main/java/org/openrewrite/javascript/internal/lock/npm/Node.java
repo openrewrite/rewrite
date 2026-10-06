@@ -79,14 +79,15 @@ public class Node {
         @Nullable
         Node fsParent;
 
-        boolean hasShrinkwrap;
+        @Nullable
+        Object hasShrinkwrap;
 
         boolean inert;
 
         boolean installLinks;
 
         @Nullable
-        String integrity;
+        Object integrity;
 
         boolean legacyPeerDeps;
 
@@ -127,7 +128,7 @@ public class Node {
         String realpath;
 
         @Nullable
-        String resolved;
+        Object resolved;
 
         @Nullable
         Node root;
@@ -158,15 +159,16 @@ public class Node {
     @Setter(AccessLevel.PACKAGE)
     private @Nullable String realpath;
 
-    private @Nullable String resolved;
+    // resolved, integrity and hasShrinkwrap hold the lock's values as read, whatever JSON type they have
+    private @Nullable Object resolved;
 
     @Getter
     @Setter
-    private @Nullable String integrity;
+    private @Nullable Object integrity;
 
     @Getter
     @Setter
-    private boolean hasShrinkwrap;
+    private @Nullable Object hasShrinkwrap;
 
     @Getter
     @Setter
@@ -283,17 +285,17 @@ public class Node {
 
         setResolved(truthy(options.getResolved()) ? options.getResolved() : null);
         if (!truthy(getResolved())) {
-            Object legacyResolved = pkg.get("_resolved");
-            String resolved = legacyResolved instanceof String ?
-                    ConsistentResolve.consistentResolve((String) legacyResolved) : null;
-            if (truthy(resolved) && !(resolved.startsWith("file:") && truthy(pkg.get("_where")))) {
+            Object resolved = ConsistentResolve.consistentResolve(pkg.get("_resolved"));
+            if (truthy(resolved) && !(Js.string(resolved).startsWith("file:") && truthy(pkg.get("_where")))) {
                 setResolved(resolved);
             }
         }
         Object legacyIntegrity = pkg.get("_integrity");
         this.integrity = truthy(options.getIntegrity()) ? options.getIntegrity() :
-                truthy(legacyIntegrity) ? String.valueOf(legacyIntegrity) : null;
-        this.hasShrinkwrap = options.isHasShrinkwrap() || truthy(pkg.get("_hasShrinkwrap"));
+                truthy(legacyIntegrity) ? legacyIntegrity : null;
+        Object legacyHasShrinkwrap = pkg.get("_hasShrinkwrap");
+        this.hasShrinkwrap = truthy(options.getHasShrinkwrap()) ? options.getHasShrinkwrap() :
+                truthy(legacyHasShrinkwrap) ? legacyHasShrinkwrap : false;
         this.installLinks = options.isInstallLinks();
         this.legacyPeerDeps = options.isLegacyPeerDeps();
 
@@ -1102,10 +1104,10 @@ public class Node {
             return Objects.equals(path, node.path);
         }
         if (truthy(integrity) && truthy(node.integrity)) {
-            return Objects.equals(integrity, node.integrity);
+            return Js.strictEquals(integrity, node.integrity);
         }
         if (truthy(getResolved()) && truthy(node.getResolved())) {
-            return Objects.equals(getResolved(), node.getResolved());
+            return Js.strictEquals(getResolved(), node.getResolved());
         }
         return truthy(getPackageName()) && truthy(node.getPackageName()) &&
                Js.strictEquals(getPackageName(), node.getPackageName()) &&
@@ -1147,7 +1149,7 @@ public class Node {
     }
 
     public boolean isInShrinkwrap() {
-        return parent != null && (parent.hasShrinkwrap || parent.isInShrinkwrap());
+        return parent != null && (truthy(parent.hasShrinkwrap) || parent.isInShrinkwrap());
     }
 
     public @Nullable Node getParent() {
@@ -1388,11 +1390,11 @@ public class Node {
         return children;
     }
 
-    public @Nullable String getResolved() {
+    public @Nullable Object getResolved() {
         return resolved;
     }
 
-    public void setResolved(@Nullable String resolved) {
+    public void setResolved(@Nullable Object resolved) {
         this.resolved = resolved;
     }
 

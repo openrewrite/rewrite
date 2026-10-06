@@ -182,7 +182,10 @@ final class Js {
         return keys;
     }
 
-    private static long arrayIndex(String key) {
+    /**
+     * The canonical array index {@code key} names, or -1.
+     */
+    static long arrayIndex(String key) {
         int length = key.length();
         if (length == 0 || length > 10 || (length > 1 && key.charAt(0) == '0')) {
             return -1;
@@ -244,10 +247,56 @@ final class Js {
             }
             return Double.NaN;
         }
-        if (val instanceof List && ((List<?>) val).isEmpty()) {
-            return 0;
+        if (val instanceof List) {
+            return toNumber(string(val));
         }
         return Double.NaN;
+    }
+
+    /**
+     * {@code String(value)} for a value parsed from JSON.
+     */
+    static String string(@Nullable Object val) {
+        if (val == null || val == UNDEFINED || val == INHERITED || val instanceof Boolean) {
+            return String.valueOf(val);
+        }
+        if (val instanceof Number) {
+            return numberToString((Number) val);
+        }
+        if (val instanceof String) {
+            return (String) val;
+        }
+        if (val instanceof List) {
+            List<?> array = (List<?>) val;
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < array.size(); i++) {
+                if (i > 0) {
+                    sb.append(',');
+                }
+                Object element = array.get(i);
+                if (element != null && element != UNDEFINED) {
+                    sb.append(string(element));
+                }
+            }
+            return sb.toString();
+        }
+        return "[object Object]";
+    }
+
+    /**
+     * How JavaScript's TypeError names a primitive it cannot create a property on.
+     */
+    static String typeOf(Object val) {
+        if (val instanceof Number) {
+            return "number";
+        }
+        if (val instanceof Boolean) {
+            return "boolean";
+        }
+        if (val instanceof String) {
+            return "string";
+        }
+        return val == UNDEFINED ? "undefined" : "object";
     }
 
     static boolean truthy(@Nullable Object val) {

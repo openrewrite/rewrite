@@ -188,6 +188,72 @@ const main = async () => {
     await loadCase(name, dir)
   }
 
+  // values of another JSON type where a lock-only install reads them raw: resolved, integrity and hasShrinkwrap
+  // go to the Node as they are; a link target's manifest that is not an object fails package-json's normalize
+  // (#resolveLinks swallows that, mapWorkspaces does not); map-workspaces calls pattern.match on each workspaces
+  // entry and the workspace Edge refuses a non-string name; the lock's top level is spread into the data; a
+  // lockfileVersion array compares through its string
+  const custom = async (name, lock, manifests) => {
+    const dir = path.join(tmp, name)
+    for (const [rel, text] of Object.entries(manifests)) {
+      fs.mkdirSync(path.join(dir, rel), { recursive: true })
+      fs.writeFileSync(path.join(dir, rel, 'package.json'), text)
+    }
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), lock)
+    out.inputs[name] = inputs(dir)
+    await loadCase(name, dir)
+  }
+  const lock3 = (packages, extra = {}) => JSON.stringify({ name: 'p', version: '1.0.0', lockfileVersion: 3, requires: true, packages, ...extra }, null, 2) + '\n'
+  const rootEntry = (deps, extra = {}) => ({ name: 'p', version: '1.0.0', dependencies: deps, ...extra })
+  const pkg = (deps, extra = {}) => JSON.stringify({ name: 'p', version: '1.0.0', dependencies: deps, ...extra }, null, 2) + '\n'
+  const a100 = { version: '1.0.0', resolved: 'https://registry.npmjs.org/a/-/a-1.0.0.tgz', integrity: 'sha512-abc' }
+  for (const [kind, entry] of [
+    ['resolved-number', { version: '1.0.0', resolved: 5, integrity: 'sha512-abc' }],
+    ['resolved-array', { version: '1.0.0', resolved: ['x'], integrity: 'sha512-abc' }],
+    ['resolved-object', { version: '1.0.0', resolved: { x: 1 }, integrity: 'sha512-abc' }],
+    ['resolved-true', { version: '1.0.0', resolved: true, integrity: 'sha512-abc' }],
+    ['resolved-file-array', { version: '1.0.0', resolved: ['file:x'] }],
+    ['integrity-number', { ...a100, integrity: 7 }],
+    ['integrity-object', { ...a100, integrity: { x: 1 } }],
+    ['hasShrinkwrap-string', { ...a100, hasShrinkwrap: 'yes' }],
+    ['hasShrinkwrap-number', { ...a100, hasShrinkwrap: 1 }],
+  ]) {
+    await custom('lock-value-' + kind, lock3({ '': rootEntry({ a: '^1.0.0' }), 'node_modules/a': entry }), { '': pkg({ a: '^1.0.0' }) })
+  }
+  const fileLock = lock3({ '': rootEntry({ a: 'file:packages/a' }), 'node_modules/a': { resolved: 'packages/a', link: true },
+    'packages/a': { name: 'a', version: '1.0.0', dependencies: { b: '^1.0.0' } }, 'node_modules/b': a100 })
+  const wsLock = lock3({ '': rootEntry({}, { workspaces: ['packages/*'] }), 'node_modules/a': { resolved: 'packages/a', link: true },
+    'packages/a': { name: 'a', version: '1.0.0', dependencies: { b: '^1.0.0' } }, 'node_modules/b': a100 })
+  const wsPkg = pkg({}, { workspaces: ['packages/*'] })
+  for (const [kind, text] of [['string', '"abc"'], ['null', 'null'], ['number', '7'], ['false', 'false'], ['array', '[]'], ['empty', '{}']]) {
+    await custom('file-dep-manifest-' + kind, fileLock, { '': pkg({ a: 'file:packages/a' }), 'packages/a': text })
+    await custom('ws-member-manifest-' + kind, wsLock, { '': wsPkg, 'packages/a': text })
+  }
+  await custom('ws-pattern-number', lock3({ '': rootEntry({}, { workspaces: [5] }) }), { '': pkg({}, { workspaces: [5] }) })
+  await custom('ws-pattern-number-lock-only', lock3({ '': rootEntry({}, { workspaces: [5] }) }), { '': pkg({}) })
+  await custom('ws-pattern-null', lock3({ '': rootEntry({}, { workspaces: [null] }) }), { '': pkg({}, { workspaces: [null] }) })
+  await custom('ws-pattern-object', lock3({ '': rootEntry({}, { workspaces: [{}] }) }), { '': pkg({}, { workspaces: [{}] }) })
+  await custom('ws-null', lock3({ '': rootEntry({}) }), { '': pkg({}, { workspaces: null }) })
+  await custom('ws-null-lock-only', lock3({ '': rootEntry({}, { workspaces: null }) }), { '': pkg({}) })
+  await custom('ws-member-name-number', wsLock, { '': wsPkg, 'packages/a': '{"name":5,"version":"1.0.0"}' })
+  await custom('ws-member-name-number-twice', lock3({ '': rootEntry({}, { workspaces: ['packages/*'] }),
+    'node_modules/a': { resolved: 'packages/a', link: true }, 'packages/a': { name: 5, version: '1.0.0' }, 'packages/b': { name: 5, version: '1.0.0' } }),
+  { '': wsPkg, 'packages/a': '{"name":5,"version":"1.0.0"}', 'packages/b': '{"name":5,"version":"1.0.0"}' })
+  await custom('ws-member-name-number-lock-only', lock3({ '': rootEntry({}, { workspaces: ['packages/*'] }),
+    'node_modules/a': { resolved: 'packages/a', link: true }, 'packages/a': { name: 5, version: '1.0.0' } }), { '': wsPkg })
+  await custom('ws-member-name-array-lock-only', lock3({ '': rootEntry({}, { workspaces: ['packages/*'] }),
+    'node_modules/a': { resolved: 'packages/a', link: true }, 'packages/a': { name: ['a'], version: '1.0.0' } }), { '': wsPkg, 'packages/a': '{"name":"a","version":"1.0.0"}' })
+  for (const [kind, text] of [['string', '"abc"\n'], ['array', '[1,2]\n'], ['number', '5\n'], ['true', 'true\n'], ['null', 'null\n']]) {
+    await custom('lock-text-' + kind, text, { '': pkg({}) })
+  }
+  for (const [kind, packages] of [['string', 'ab'], ['number', 5], ['true', true], ['array', [{ name: 'x' }]], ['array-empty', []], ['null', null]]) {
+    await custom('lock-packages-' + kind, lock3(packages), { '': pkg({}) })
+  }
+  for (const [kind, v] of [['array-3', [3]], ['array-1', [1]], ['array-empty', []], ['object', { a: 1 }], ['string-abc', 'abc']]) {
+    await custom('lock-lfv-' + kind, lock3({ '': rootEntry({ a: '^1.0.0' }), 'node_modules/a': a100 }, { lockfileVersion: v }), { '': pkg({ a: '^1.0.0' }) })
+  }
+  await custom('v1-deps-string', JSON.stringify({ name: 'p', version: '1.0.0', lockfileVersion: 1, requires: true, dependencies: 'abc' }, null, 2) + '\n', { '': pkg({}) })
+
   // test/arborist/load-virtual.js 'do not reset flags on supplied root option'
   {
     const name = 'test-package-with-shrinkwrap'
@@ -308,6 +374,21 @@ const main = async () => {
     try {
       const s = await Shrinkwrap.load({ path: dir })
       c.loaded = { lockfileVersion: s.lockfileVersion, originalLockfileVersion: s.originalLockfileVersion ?? null, data: json(s.data) }
+      c.string = s.toString()
+    } catch (e) {
+      c.error = { code: e.code, message: e.message }
+    }
+    out.shrinkwrap.push(c)
+  }
+  // a v1 lock whose dependencies is a string loads its characters as entries; deleting one is a strict-mode TypeError
+  {
+    const name = 'v1-deps-string'
+    const dir = path.join(tmp, name)
+    const s = await Shrinkwrap.load({ path: dir })
+    const c = { name: 'v1 dependencies string, delete', lockfileVersion: null, inputs: name, delete: 'node_modules/0',
+      loaded: { lockfileVersion: s.lockfileVersion, originalLockfileVersion: s.originalLockfileVersion ?? null, data: json(s.data) } }
+    try {
+      s.delete(path.join(dir, 'node_modules/0'))
       c.string = s.toString()
     } catch (e) {
       c.error = { code: e.code, message: e.message }
