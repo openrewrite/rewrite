@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
-import {emptySpace, J, Statement, Type} from '../../java';
+import {emptySpace, J, Statement, Type, TypedTree} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, wrapCode} from './utils';
-import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode} from './capture';
+import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
 import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
@@ -232,10 +232,10 @@ export class TemplateEngine {
         contextStatements: string[],
         dependencies: Record<string, string>,
         types: string[] | undefined,
-        expression: boolean = false
+        expression: boolean = false,
+        preamble: string[] = TemplateEngine.parameterPreamble(parameters)
     ): Promise<JS.CompilationUnit> {
-        // A capture's declared type reaches the parse as a declaration, so it belongs with context.
-        const preamble = TemplateEngine.parameterPreamble(parameters);
+        // A capture's type reaches the parse as a declaration, so it belongs with context.
         const templateString = TemplateEngine.buildTemplateString(templateParts, parameters, expression);
         const contextWithPreamble = preamble.length > 0
             ? [...contextStatements, ...preamble]
@@ -302,6 +302,7 @@ export class TemplateEngine {
      * @param contextStatements Context declarations (imports, types, etc.) to prepend for type attribution
      * @param dependencies NPM dependencies for type attribution
      * @param expression Whether to parse the code as an expression
+     * @param preamble The parameters' declarations, from {@link parameterPreamble}
      * @returns A Promise resolving to the extracted template AST
      */
     static async getTemplateTree(
@@ -310,9 +311,10 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {},
         types?: string[],
-        expression: boolean = false
+        expression: boolean = false,
+        preamble?: string[]
     ): Promise<J> {
-        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, expression);
+        const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, expression, preamble);
 
         // The template code is always the last statement (after context + preamble)
         const lastStatement = cu.statements[cu.statements.length - 1].element;
@@ -413,60 +415,40 @@ export class TemplateEngine {
         return preamble;
     }
 
-    /** The parameter counterpart of {@link capturePreamble}. */
-    static parameterPreamble(parameters: Parameter[]): string[] {
+    /**
+     * The parameter counterpart of {@link capturePreamble}. A capture without a declared type takes
+     * the type of the expression bound to it, as an expression parameter takes its own. A variadic
+     * capture binds a list, which has no one type to declare.
+     */
+    static parameterPreamble(parameters: Parameter[], values?: Pick<Map<string, J | J[]>, 'get'>): string[] {
         const preamble: string[] = [];
-
         for (let i = 0; i < parameters.length; i++) {
-            const param = parameters[i].value;
-            const placeholder = `${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__`;
-
-            // Check for Capture (could be a Proxy, so check for symbol property)
-            const isCapture = param instanceof CaptureImpl ||
-                (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL]);
-            const isCaptureValue = param instanceof CaptureValue;
-            const isTreeArray = Array.isArray(param) && param.length > 0 && isTree(param[0]);
-
-            if (isCapture) {
-                const captureType = param[CAPTURE_TYPE_SYMBOL];
-                if (captureType) {
-                    const typeString = typeof captureType === 'string'
-                        ? captureType
-                        : this.typeToString(captureType);
-                    // Only add preamble if we have a concrete type (not 'any')
-                    if (typeString !== 'any') {
-                        preamble.push(`let ${placeholder}: ${typeString};`);
-                    }
-                }
-            } else if (isCaptureValue) {
-                // For CaptureValue, check if the root capture has a type
-                const rootCapture = param.rootCapture;
-                if (rootCapture) {
-                    const captureType = (rootCapture as any)[CAPTURE_TYPE_SYMBOL];
-                    if (captureType) {
-                        const typeString = typeof captureType === 'string'
-                            ? captureType
-                            : this.typeToString(captureType);
-                        // Only add preamble if we have a concrete type (not 'any')
-                        if (typeString !== 'any') {
-                            preamble.push(`let ${placeholder}: ${typeString};`);
-                        }
-                    }
-                }
-            } else if (isTree(param) && !isTreeArray) {
-                // For J elements, derive type from the element's type property if it exists
-                const jElement = param as J;
-                if ((jElement as any).type) {
-                    const typeString = this.typeToString((jElement as any).type);
-                    // Only add preamble if we have a concrete type (not 'any')
-                    if (typeString !== 'any') {
-                        preamble.push(`let ${placeholder}: ${typeString};`);
-                    }
-                }
+            const type = this.parameterType(parameters[i].value, values);
+            const typeString = typeof type === 'string' ? type : type && this.typeToString(type);
+            if (typeString && typeString !== 'any') {
+                preamble.push(`let ${PlaceholderUtils.PLACEHOLDER_PREFIX}${i}__: ${typeString};`);
             }
         }
-
         return preamble;
+    }
+
+    private static parameterType(param: any, values?: Pick<Map<string, J | J[]>, 'get'>): Type | string | undefined {
+        // A Capture may be a Proxy, so it is recognised by its symbol
+        if (param instanceof CaptureImpl || (param && typeof param === 'object' && param[CAPTURE_NAME_SYMBOL])) {
+            return param[CAPTURE_TYPE_SYMBOL] ?? this.treeType(values?.get(param[CAPTURE_NAME_SYMBOL] || param.getName()));
+        } else if (param instanceof CaptureValue) {
+            // The root's declared type is the root's alone, not that of a property or element of it
+            return values && this.treeType(param.resolve(values));
+        } else if (param instanceof TemplateParamImpl) {
+            return this.treeType(values?.get(param.name));
+        }
+        return this.treeType(param);
+    }
+
+    private static treeType(value: unknown): Type | undefined {
+        // A declaration's type is that of what it declares, which is no value the placeholder holds
+        return isTree(value) && (isExpression(value as J) || !isStatement(value as J)) ?
+            TypedTree.getType(value as TypedTree) : undefined;
     }
 
     /**

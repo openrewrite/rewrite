@@ -20,7 +20,7 @@ import {maybeBind} from '../binding';
 import {ContextBinding, opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -176,8 +176,8 @@ export class TemplateBuilder {
  */
 export class Template {
     private options: TemplateOptions = {};
-    /** The parsed code, keyed by whether it was parsed as an expression. */
-    private _cachedTemplates = new Map<boolean, J>();
+    /** The parsed code, keyed by whether it was parsed as an expression and by its parameters' declarations. */
+    private _cachedTemplates = new LRUCache<string, J>(10);
     private _contextBindings?: Promise<ContextBinding[]>;
 
     /**
@@ -249,9 +249,13 @@ export class Template {
      * @returns The cached or newly computed template tree
      * @internal
      */
-    private async getTemplateTree(expression: boolean): Promise<J> {
+    private async getTemplateTree(expression: boolean, values?: Pick<Map<string, J | J[]>, 'get'>): Promise<J> {
+        // The types of the bound values shape the parse, so each set of them is a tree of its own
+        const preamble = TemplateEngine.parameterPreamble(this.parameters, values);
+        const instanceKey = `${expression}::${preamble.join('')}`;
+
         // Level 1: Instance cache (fastest path)
-        const instanceCached = this._cachedTemplates.get(expression);
+        const instanceCached = this._cachedTemplates.get(instanceKey);
         if (instanceCached) {
             return instanceCached;
         }
@@ -271,8 +275,7 @@ export class Template {
         const cacheKey = generateCacheKey(
             this.templateParts,
             parametersKey,
-            // As in Pattern.getAstPattern: a parameter's type reaches the parse as a declaration
-            [...contextStatements, ...TemplateEngine.parameterPreamble(this.parameters)],
+            [...contextStatements, ...preamble],
             this.options.dependencies || {},
             this.options.types
         );
@@ -280,7 +283,7 @@ export class Template {
         // Level 2: Global cache (fast path - shared with Pattern)
         const cached = globalAstCache.get(cacheKey);
         if (cached) {
-            this._cachedTemplates.set(expression, cached);
+            this._cachedTemplates.set(instanceKey, cached);
             return cached;
         }
 
@@ -291,12 +294,13 @@ export class Template {
             contextStatements,
             this.options.dependencies || {},
             this.options.types,
-            expression
+            expression,
+            preamble
         );
 
         // Cache in both levels
         globalAstCache.set(cacheKey, result);
-        this._cachedTemplates.set(expression, result);
+        this._cachedTemplates.set(instanceKey, result);
 
         return result;
     }
@@ -428,7 +432,7 @@ export class Template {
         }
 
         const expression = opensWithBrace(this.templateParts) && replacedByObjectLiteral(tree, cursor);
-        const ast = await this.getTemplateTree(expression);
+        const ast = await this.getTemplateTree(expression, normalizedValues);
 
         // Delegate to TemplateEngine for placeholder substitution and application
         return TemplateEngine.applyTemplateFromAst(
