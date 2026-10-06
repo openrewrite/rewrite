@@ -319,10 +319,12 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
 }
 
 /**
- * Moves the binding for `from` to `to` and answers with the name it now carries — the primitive
- * behind a member rename or a module move. Returns `undefined`, changing nothing, where the move
- * is not safely expressible; the refusals and the choice of name are listed in CLAUDE.md:
- * JavaScript module bindings.
+ * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
+ * changing nothing, where the move cannot be expressed safely. One call moves one binding.
+ * Named members of one import moved to one module, a call each, end up in one import of it,
+ * whether the calls share a visit or come from separate recipes.
+ * Every type in the file naming what moved is renamed the way a parse of the result names it.
+ * It is renamed, not re-resolved, so a moved member keeps its old declaration's signature.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);

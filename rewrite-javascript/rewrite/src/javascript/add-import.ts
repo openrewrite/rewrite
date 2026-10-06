@@ -7,7 +7,6 @@ import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
 import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
-import {TypeVisitor} from "../java/type-visitor";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
 
@@ -2022,8 +2021,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private dropped?: UUID;
     private droppedQuote?: QuoteChar;
     private readonly movedTypes = new MovedTypes(this.from, this.to);
-    /** Identifiers settled as references to the binding, so a parent need not settle it again. */
-    private readonly references = new Set<string>();
 
     private get renaming(): boolean {
         return this.boundName !== this.localName;
@@ -2097,56 +2094,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
-        if (!this.referencesBinding(identifier)) {
-            return super.visitIdentifier(identifier, p);
-        }
-        this.references.add(identifier.id);
-        // The name follows the binding, and so does what the name is attributed to; an aliased
-        // binding keeps its name and still resolves somewhere new.
-        const type = await this.movedTypes.visit(identifier.type, undefined);
-        const fieldType = await this.movedTypes.visit(identifier.fieldType, undefined) as Type.Variable | undefined;
-        return !this.renaming && type === identifier.type && fieldType === identifier.fieldType
-            ? identifier
-            : {...identifier, simpleName: this.boundName, type, fieldType} as J.Identifier;
+        const renamed = this.renaming && this.referencesBinding(identifier);
+        const visited = await super.visitIdentifier(identifier, p) as J.Identifier;
+        return renamed ? {...visited, simpleName: this.boundName} as J.Identifier : visited;
     }
 
-    override async visitMethodInvocation(method: J.MethodInvocation, p: P): Promise<J | undefined> {
-        const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
-        if (!this.referencesMovedBinding(m.name)) {
-            return m;
-        }
-        const methodType = await this.movedTypes.visit(m.methodType, undefined) as Type.Method | undefined;
-        return methodType === m.methodType ? m : {...m, methodType} as J.MethodInvocation;
-    }
-
-    override async visitNewClass(newClass: J.NewClass, p: P): Promise<J | undefined> {
-        const nc = await super.visitNewClass(newClass, p) as J.NewClass;
-        if (!this.referencesMovedBinding(nc.class)) {
-            return nc;
-        }
-        const type = await this.movedTypes.visit(nc.type, undefined);
-        const methodType = await this.movedTypes.visit(nc.methodType, undefined) as Type.Method | undefined;
-        const constructorType = await this.movedTypes.visit(nc.constructorType, undefined) as Type.Method | undefined;
-        return type === nc.type && methodType === nc.methodType && constructorType === nc.constructorType
-            ? nc
-            : {...nc, type, methodType, constructorType} as J.NewClass;
-    }
-
-    override async visitFunctionCall(functionCall: JS.FunctionCall, p: P): Promise<J | undefined> {
-        const fc = await super.visitFunctionCall(functionCall, p) as JS.FunctionCall;
-        if (!this.referencesMovedBinding(fc.function?.element)) {
-            return fc;
-        }
-        const methodType = await this.movedTypes.visit(fc.methodType, undefined) as Type.Method | undefined;
-        return methodType === fc.methodType ? fc : {...fc, methodType} as JS.FunctionCall;
-    }
-
-    /**
-     * Whether `callee` is the identifier `visitIdentifier` settled as a reference to the binding.
-     * A rewrite keeps the identifier's id, so the one it settled is the one still standing here.
-     */
-    private referencesMovedBinding(callee: J | undefined): boolean {
-        return callee?.kind === J.Kind.Identifier && this.references.has(callee.id);
+    /** Any type in the file can name what moved, whether or not it references the binding. */
+    protected override async visitType(javaType: Type | undefined, p: P): Promise<Type | undefined> {
+        return this.movedTypes.map(javaType);
     }
 
     /**
@@ -2211,11 +2166,18 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit) {
             // The key names a property rather than the binding, so it carries no attribution,
             // the same way `aliasing` builds a property name that stands for nothing.
+            const reference = name as J.Identifier;
             return {
                 ...propertyAssignment,
                 name: {...propertyAssignment.name, element: {...name, type: undefined, fieldType: undefined}},
                 assigmentToken: JS.PropertyAssignment.Token.Colon,
-                initializer: {...(name as J.Identifier), prefix: singleSpace, simpleName: this.boundName}
+                initializer: {
+                    ...reference,
+                    prefix: singleSpace,
+                    simpleName: this.boundName,
+                    type: this.movedTypes.map(reference.type),
+                    fieldType: this.movedTypes.map(reference.fieldType)
+                }
             } as JS.PropertyAssignment;
         }
         return super.visitPropertyAssignment(propertyAssignment, p);
@@ -2223,82 +2185,150 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 }
 
 /**
- * Rewrites the attribution a move invalidates, onto the module and member it moved to. Applied at
- * a reference to the moved binding. See CLAUDE.md: What a rebind's attribution follows.
+ * Rewrites a file's attribution onto the module and member a binding moved to, naming each type
+ * the way the type mapper names it. A type nothing moved keeps its identity.
  */
-class MovedTypes extends TypeVisitor<undefined> {
+class MovedTypes {
+    /** Each type already rewritten, answered by its rewrite, or by itself where nothing in it moved. */
+    private readonly answered = new Map<Type, Type>();
     private readonly onPath = new Set<Type>();
-    private readonly answered = new Map<Type, Type | undefined>();
-    private readonly renamed: ReadonlyMap<string, string>;
+    private readonly modules = new Map<Type, Type.FullyQualified>();
+    private readonly classes: ReadonlyMap<string, string>;
     private readonly fromMember?: string;
     private readonly toMember?: string;
-    private readonly toModule: string;
 
-    constructor(from: {module: string; member?: string}, to: {module: string; member?: string}) {
-        super();
-        // Where no member is named the two keys coincide, and both name the module.
-        this.renamed = new Map([[from.module, to.module], [qualifiedName(from), qualifiedName(to)]]);
+    constructor(private readonly from: {module: string; member?: string}, private readonly to: {module: string; member?: string}) {
         this.fromMember = declaredMember(from);
         this.toMember = declaredMember(to);
-        this.toModule = to.module;
+        const toClass = this.toMember === undefined ? qualifiedName(to) : `${packageOf(to.module)}.${this.toMember}`;
+        this.classes = this.fromMember === undefined
+            ? new Map([[from.module, toClass]])
+            // The type mapper names an imported alias symbol after the specifier.
+            : new Map([[`${packageOf(from.module)}.${this.fromMember}`, toClass], [qualifiedName(from), toClass]]);
     }
 
     /**
-     * A type reached while it is still being visited is a cycle — a class holds a method whose
-     * declaring type is that class — and answers with itself, which is what ends the walk. Every
-     * type visited is remembered by its answer, so a graph whose references fan out or rejoin is
-     * walked once rather than once per path that reaches into it. An answer settled inside a cycle
-     * stands for the path it was on, so a walk reusing it can leave a rename unapplied.
+     * A type reached while it is still being rewritten answers with itself, which ends a cycle
+     * through a type variable's bounds. An answer settled inside such a cycle can miss a rename.
      */
-    override async visit<T extends Type>(type: T | undefined, p: undefined): Promise<T | undefined> {
+    map<T extends Type>(type: T | undefined): T | undefined {
         if (type === undefined || this.onPath.has(type)) {
             return type;
         }
-        if (this.answered.has(type)) {
-            return this.answered.get(type) as T | undefined;
-        }
-        this.onPath.add(type);
-        try {
-            const answer = await super.visit(type, p);
+        let answer = this.answered.get(type);
+        if (answer === undefined) {
+            this.onPath.add(type);
+            try {
+                answer = this.rewrite(type);
+            } finally {
+                this.onPath.delete(type);
+            }
             this.answered.set(type, answer);
-            return answer;
-        } finally {
-            this.onPath.delete(type);
         }
+        return answer as T;
     }
 
-    protected override async visitClass(aClass: Type.Class, p: undefined): Promise<Type | undefined> {
-        const visited = await super.visitClass(aClass, p) as Type.Class;
-        const moved = this.renamed.get(visited.fullyQualifiedName);
-        return moved === undefined || moved === visited.fullyQualifiedName
-            ? visited
-            : {...visited, fullyQualifiedName: moved} as Type.Class;
+    private rewrite(type: Type): Type {
+        const original = type as any;
+        let copy: any;
+        for (const slot of signatureOf(type)) {
+            const value = original[slot];
+            const mapped = Array.isArray(value) ? this.mapAll(value) : this.map(value);
+            if (mapped !== value) {
+                (copy ??= {...type})[slot] = mapped;
+            }
+        }
+        if (!this.renames(type)) {
+            return copy ?? type;
+        }
+        copy ??= {...type};
+        if (type.kind === Type.Kind.Method) {
+            copy.declaringType = this.movedModule(original.declaringType);
+            copy.name = this.toMember ?? copy.name;
+        } else if (type.kind === Type.Kind.Variable) {
+            copy.owner = this.movedModule(original.owner);
+            copy.name = this.toMember ?? copy.name;
+        } else {
+            copy.fullyQualifiedName = this.classes.get(original.fullyQualifiedName);
+        }
+        return copy;
     }
 
-    protected override async visitMethod(method: Type.Method, p: undefined): Promise<Type | undefined> {
-        const visited = await super.visitMethod(method, p) as Type.Method;
-        return this.declaresMovedMember(visited.name, visited.declaringType)
-            ? {...visited, name: this.toMember} as Type.Method
-            : visited;
+    private mapAll(types: Type[]): Type[] {
+        const mapped = types.map(t => this.map(t)!);
+        return mapped.every((t, i) => t === types[i]) ? types : mapped;
     }
 
-    protected override async visitVariable(variable: Type.Variable, p: undefined): Promise<Type | undefined> {
-        const visited = await super.visitVariable(variable, p) as Type.Variable;
-        return this.declaresMovedMember(visited.name, visited.owner)
-            ? {...visited, name: this.toMember} as Type.Variable
-            : visited;
+    private renames(type: Type): boolean {
+        switch (type.kind) {
+            case Type.Kind.Class:
+            case Type.Kind.ShallowClass:
+                return this.classes.has((type as Type.Class).fullyQualifiedName);
+            case Type.Kind.Method:
+                return this.isMovedMember(type as Type.Method, (type as Type.Method).declaringType);
+            case Type.Kind.Variable:
+                return this.isMovedMember(type as Type.Variable, (type as Type.Variable).owner);
+            default:
+                return false;
+        }
     }
 
     /**
-     * Whether `name`, declared on `owner`, is the member that moved. `owner` has already followed
-     * the move by the time this runs, so it is the module moved *to* that it has to name. A
-     * default or namespace binding declares no member, so there is no name for one to take.
+     * Whether `member` is what the module object `owner` declares under the moved name: a function,
+     * a constant, or a moved class's constructor. A default or namespace binding declares none.
      */
-    private declaresMovedMember(name: string, owner: Type | undefined): boolean {
-        return this.toMember !== undefined && name === this.fromMember && this.toMember !== this.fromMember &&
-            owner !== undefined && Type.isFullyQualified(owner) &&
-            Type.FullyQualified.getFullyQualifiedName(owner) === this.toModule;
+    private isMovedMember(member: {name: string}, owner: Type | undefined): boolean {
+        return this.fromMember !== undefined && member.name === this.fromMember && owner !== undefined &&
+            Type.isFullyQualified(owner) && Type.FullyQualified.getFullyQualifiedName(owner) === this.from.module;
     }
+
+    /** The module object `owner` stands for, under the module moved to. A sibling's keeps the old one. */
+    private movedModule(owner: Type): Type.FullyQualified {
+        let moved = this.modules.get(owner);
+        if (moved === undefined) {
+            moved = {...owner, fullyQualifiedName: this.to.module} as Type.FullyQualified;
+            this.modules.set(owner, moved);
+        }
+        return moved;
+    }
+}
+
+/**
+ * The slots of `type` that make up its signature, as Java's `ChangeType` walks them. A class's
+ * members are left out, which keeps the walk to the signature.
+ */
+function signatureOf(type: Type): readonly string[] {
+    switch (type.kind) {
+        case Type.Kind.Class:
+        case Type.Kind.ShallowClass:
+            return ["supertype", "interfaces"];
+        case Type.Kind.Method:
+            return ["declaringType", "returnType", "parameterTypes"];
+        case Type.Kind.Variable:
+            return ["owner", "type"];
+        case Type.Kind.Parameterized:
+            return ["type", "typeParameters"];
+        case Type.Kind.Array:
+            return ["elemType"];
+        case Type.Kind.GenericTypeVariable:
+        case Type.Kind.Union:
+        case Type.Kind.Intersection:
+            return ["bounds"];
+        default:
+            return [];
+    }
+}
+
+/**
+ * The package a bare module specifier resolves into, which is what the type mapper names a class
+ * after: `@scope/pkg/sub` is `@scope/pkg`. A relative specifier names no package, so it stands for itself.
+ */
+function packageOf(module: string): string {
+    if (module.startsWith('.') || module.startsWith('/')) {
+        return module;
+    }
+    const segments = module.split('/');
+    return segments.slice(0, module.startsWith('@') ? 2 : 1).join('/');
 }
 
 /** A member's qualified name, or the module's own where no member is named. */
