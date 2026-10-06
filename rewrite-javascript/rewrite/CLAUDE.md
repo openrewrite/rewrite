@@ -227,13 +227,20 @@ with the name its binding carries after the move, whether or not the cursor reac
 
 ### Which name a rebind binds
 
-`to.alias` settles it when given, or refuses the move where the file already spells that name.
+`to.alias` settles it when given, or refuses the move where that name is taken.
 Otherwise a binding the source named itself — an aliased specifier,
 or a default, namespace or AMD binding, whose name never came from a member — keeps that name; an
 unaliased named specifier follows its member to the new name, since that is what the source would
 have written had it imported the member all along — but only where the file spells that name nowhere
 else, since a rename onto a name already in use would capture its references or be captured by them.
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
+
+A name the file spells is still not taken when it is a value import of `to`'s named member, and the
+moved binding is a value too. Outside the imports the file may spell it only as a reference, and no
+queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
+alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
+default or namespace target, would get a second declaration of the name instead, so the name stays
+taken there.
 
 Where the name changes, the file's references to the binding change with it — the occurrences that
 resolve to the binding, so a name a nearer scope binds and a property that merely reads alike both
@@ -298,7 +305,8 @@ The four above that still apply, plus these:
 - nothing binds `from`
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
-- `to.alias` is not a legal identifier, or is a name the file already spells
+- `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
+  rebind binds"
 - the file binds its modules with `require` and the move would need a new import, because `from`'s
   statement binds something else too or the two differ in default/namespace/named shape
 
