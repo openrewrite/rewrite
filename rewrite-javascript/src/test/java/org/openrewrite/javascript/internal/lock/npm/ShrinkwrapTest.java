@@ -62,6 +62,8 @@ class ShrinkwrapTest {
         assertThatThrownBy(() -> unloaded.get("")).hasMessage("run load() before getting or setting data");
         assertThatThrownBy(() -> unloaded.delete("")).hasMessage("run load() before getting or setting data");
         assertThatThrownBy(() -> unloaded.add(node)).hasMessage("run load() before getting or setting data");
+        assertThatThrownBy(unloaded::toJSON).hasMessage("run load() before getting or setting data");
+        assertThatThrownBy(unloaded::toString).hasMessage("run load() before getting or setting data");
     }
 
     // resolveOptions, for the v2 packages entries; the legacy dependencies come from commit()
