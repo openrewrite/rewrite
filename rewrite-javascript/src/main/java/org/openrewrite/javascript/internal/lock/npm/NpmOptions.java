@@ -110,8 +110,8 @@ public class NpmOptions {
     boolean engineStrict;
 
     /**
-     * {@code before}, as the time value of the Date npm parses it to (NaN for an invalid date); null when
-     * the config leaves it unset or sets it to null.
+     * {@code before}, as the time value of the Date npm parses it to: NaN for an invalid date or a value
+     * that is not one, on which npm exits at its first fetch; null when the config leaves it unset or false.
      */
     @Nullable
     Double before;
@@ -122,10 +122,10 @@ public class NpmOptions {
     boolean beforeConfigured;
 
     /**
-     * {@code min-release-age}, in days (NaN for a value that is not a number).
+     * {@code min-release-age} as npm's config parses it: a number of days, or the text when it is not one.
      */
     @Nullable
-    Double minReleaseAge;
+    Object minReleaseAge;
 
     /**
      * {@code min-release-age-exclude}: package names or minimatch globs.
@@ -194,13 +194,14 @@ public class NpmOptions {
             return value;
         }
 
-        static @Nullable InstallStrategy of(@Nullable Object value) {
+        // arborist compares with === against nested, shallow and linked: any other value hoists
+        static InstallStrategy of(@Nullable Object value) {
             for (InstallStrategy strategy : values()) {
                 if (strategy.value.equals(value)) {
                     return strategy;
                 }
             }
-            return null;
+            return HOISTED;
         }
     }
 
@@ -212,10 +213,15 @@ public class NpmOptions {
         if (beforeConfigured) {
             return before;
         }
-        if (minReleaseAge != null) {
-            return truthy(minReleaseAge) ? (double) now.toEpochMilli() - 86400000d * minReleaseAge : null;
+        if (minReleaseAge != null && minReleaseAge != Js.UNDEFINED) {
+            return truthy(minReleaseAge) ? timeClip(now.toEpochMilli() - 86400000d * Js.toNumber(minReleaseAge)) : null;
         }
         return null;
+    }
+
+    // new Date(ms) holds no time value beyond 8.64e15 milliseconds from the epoch
+    private static double timeClip(double ms) {
+        return Math.abs(ms) > 8.64e15 ? Double.NaN : ms;
     }
 
     /**
@@ -238,9 +244,9 @@ public class NpmOptions {
         Object dev = null;
         Object optional = null;
         Object also = null;
-        Object globalStyle = null;
-        Object legacyBundling = null;
-        Object installStrategy = null;
+        // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
+        // which install-strategy's own flatten then reads, wherever it stands in the file
+        String installStrategyWritten = null;
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
             Pattern expansions = expansions(entry.getKey());
             if (expansions != null) {
@@ -282,23 +288,29 @@ public class NpmOptions {
                     options.save(truthy(parseField(value, true)));
                     break;
                 case "install-strategy":
-                    installStrategy = parseField(value, false);
+                    options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :
+                            parseField(value, false)));
                     break;
                 case "global-style":
-                    globalStyle = parseField(value, true);
+                    if (truthy(parseField(value, true))) {
+                        installStrategyWritten = "shallow";
+                        options.installStrategy(InstallStrategy.SHALLOW);
+                    }
                     break;
                 case "legacy-bundling":
-                    legacyBundling = parseField(value, true);
+                    if (truthy(parseField(value, true))) {
+                        installStrategyWritten = "nested";
+                        options.installStrategy(InstallStrategy.NESTED);
+                    }
                     break;
                 case "before":
                     Object before = parseField(value, false);
                     options.beforeConfigured(true);
-                    options.before(before == null || before == Js.UNDEFINED ? null :
-                            before instanceof String ? Js.dateParse((String) before) : PickManifest.timeValue(before));
+                    options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
+                            before instanceof String ? Js.dateParse((String) before) : Double.NaN);
                     break;
                 case "min-release-age":
-                    Object age = parseNumberField(value);
-                    options.minReleaseAge(age == null || age == Js.UNDEFINED ? null : Js.toNumber(age));
+                    options.minReleaseAge(parseNumberField(value));
                     break;
                 case "min-release-age-exclude":
                     options.minReleaseAgeExclude(parseListField(value));
@@ -325,16 +337,16 @@ public class NpmOptions {
                     also = parseField(value, false);
                     break;
                 case "allow-git":
-                    options.allowGit(Js.string(parseField(value, false)));
+                    options.allowGit(allowField(value));
                     break;
                 case "allow-file":
-                    options.allowFile(Js.string(parseField(value, false)));
+                    options.allowFile(allowField(value));
                     break;
                 case "allow-directory":
-                    options.allowDirectory(Js.string(parseField(value, false)));
+                    options.allowDirectory(allowField(value));
                     break;
                 case "allow-remote":
-                    options.allowRemote(Js.string(parseField(value, false)));
+                    options.allowRemote(allowField(value));
                     break;
                 case "os":
                     options.os(platformField(value));
@@ -352,19 +364,14 @@ public class NpmOptions {
                     break;
             }
         }
-        // the definitions flatten in their own order: global-style, then install-strategy, then legacy-bundling
-        if (truthy(globalStyle)) {
-            options.installStrategy(InstallStrategy.SHALLOW);
-        }
-        InstallStrategy strategy = InstallStrategy.of(installStrategy);
-        if (strategy != null) {
-            options.installStrategy(strategy);
-        }
-        if (truthy(legacyBundling)) {
-            options.installStrategy(InstallStrategy.NESTED);
-        }
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
         return options.build();
+    }
+
+    // arborist reads the allow-* option as `?? 'all'`
+    private static String allowField(@Nullable Object f) {
+        Object value = parseField(f, false);
+        return value == null || value == Js.UNDEFINED ? "all" : Js.string(value);
     }
 
     // npm's buildOmitList over the flattened config

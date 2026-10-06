@@ -20,11 +20,11 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * An error npm raises while fetching a package, with its code: {@code E404}, {@code EALLOWGIT},
- * {@code EINCOMPLETEMANIFEST}, ...
+ * {@code EINCOMPLETEMANIFEST}, ... The code is null where npm exits on an error that carries none.
  */
 @Getter
 public final class NpmRejection extends IllegalStateException implements NpmError {
-    private final String code;
+    private final @Nullable String code;
 
     /**
      * The spec npm names in the error ({@code err.package}), when it does.
@@ -36,7 +36,7 @@ public final class NpmRejection extends IllegalStateException implements NpmErro
      */
     private @Nullable String requiredBy;
 
-    public NpmRejection(String code, String message, @Nullable String pkg) {
+    public NpmRejection(@Nullable String code, String message, @Nullable String pkg) {
         super(message);
         this.code = code;
         this.pkg = pkg;

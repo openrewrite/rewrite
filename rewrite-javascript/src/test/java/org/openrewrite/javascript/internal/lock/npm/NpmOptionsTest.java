@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.time.Instant;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -221,5 +223,72 @@ class NpmOptionsTest {
           .hasMessage("Invalid lockfileVersion config: NaN");
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${}\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
+    }
+
+    // each layout installed with npm 11.17.0: global-style and legacy-bundling write install-strategy into the
+    // file's config as they flatten, so a truthy one overrides install-strategy wherever it stands and the later
+    // of the two wins; a value arborist does not know hoists
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "legacy-bundling=true+install-strategy=hoisted|NESTED",
+      "install-strategy=nested+global-style=true|SHALLOW",
+      "global-style=true+install-strategy=nested|SHALLOW",
+      "global-style=true+legacy-bundling=true|NESTED",
+      "legacy-bundling=true+global-style=true|SHALLOW",
+      "legacy-bundling=true+install-strategy=bogus|NESTED",
+      "install-strategy=bogus|HOISTED",
+      "install-strategy=nested|NESTED",
+      "install-strategy=shallow|SHALLOW",
+      "install-strategy=linked|LINKED",
+      "install-strategy=null|HOISTED",
+      "global-style=false+install-strategy=nested|NESTED",
+      "legacy-bundling=0+install-strategy=shallow|NESTED"
+    })
+    void installStrategyFlattensAsNpmDoes(String npmrc, NpmOptions.InstallStrategy expected) {
+        assertThat(NpmOptions.fromNpmrc(npmrc.replace('+', '\n') + "\n").getInstallStrategy()).isEqualTo(expected);
+    }
+
+    // installed with npm 11.17.0: before=abc exits 1 with "Invalid time value" at the first fetch, since nopt
+    // rejects the value only after the options are flattened; min-release-age is npm's `age ? new Date(...) : null`
+    @Test
+    void beforeAndMinReleaseAge() {
+        Instant now = Instant.parse("2026-10-06T12:00:00Z");
+        double day = 86400000d;
+        assertThat(NpmOptions.fromNpmrc("before=2021-04-23T16:24:00.000Z\n").before(now))
+          .isEqualTo((double) Instant.parse("2021-04-23T16:24:00Z").toEpochMilli());
+        assertThat(NpmOptions.fromNpmrc("before=2021-04-23\n").before(now))
+          .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
+        assertThat(NpmOptions.fromNpmrc("before=abc\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("before=\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("before=true\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("before=false\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("before=null\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=7\n").before(now)).isEqualTo(now.toEpochMilli() - 7 * day);
+        assertThat(NpmOptions.fromNpmrc("min-release-age\n").before(now)).isEqualTo(now.toEpochMilli() - day);
+        assertThat(NpmOptions.fromNpmrc("min-release-age=0\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=\n").before(now)).isNull();
+        // ini itself reads the literal as null, quoted or not
+        assertThat(NpmOptions.fromNpmrc("min-release-age=null\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=\"null\"\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=NaN\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=abc\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=Infinity\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=1e12\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=7\nbefore=null\n").before(now)).isNull();
+        assertThat(NpmOptions.fromNpmrc("before=2021-04-23\nmin-release-age=7\n").before(now))
+          .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
+    }
+
+    // installed with npm 11.17.0: allow-directory=bogus still refuses a non-root directory dependency
+    // (EALLOWDIRECTORY), as nopt's rejection comes after the options are flattened; arborist reads `?? 'all'`
+    @Test
+    void allowValuesAreReadAsArboristReads() {
+        assertThat(NpmOptions.fromNpmrc("allow-git=null\n").getAllowGit()).isEqualTo("all");
+        assertThat(NpmOptions.fromNpmrc("allow-git=undefined\n").getAllowGit()).isEqualTo("all");
+        assertThat(NpmOptions.fromNpmrc("allow-directory=root\n").getAllowDirectory()).isEqualTo("root");
+        assertThat(NpmOptions.fromNpmrc("allow-directory=bogus\n").getAllowDirectory()).isEqualTo("bogus");
+        assertThat(NpmOptions.fromNpmrc("allow-file\n").getAllowFile()).isEqualTo("true");
+        assertThat(NpmOptions.fromNpmrc("allow-remote=\n").getAllowRemote()).isEmpty();
+        assertThat(NpmOptions.DEFAULT.getAllowGit()).isEqualTo("all");
     }
 }

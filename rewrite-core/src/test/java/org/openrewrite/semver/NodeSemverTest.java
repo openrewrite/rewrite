@@ -227,4 +227,16 @@ class NodeSemverTest {
         assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, ">=1 || x", Options.DEFAULT)).hasMessage(length);
         assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "x || 1", Options.DEFAULT)).hasMessage(length);
     }
+
+    // satisfies catches what the Range constructor throws: `range.trim is not a function` for these
+    @Test
+    void rangeThatIsNotAString() {
+        assertThat(NodeSemver.satisfies("1.0.0", (Object) 5, Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0", (Object) true, Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0", (Object) null, Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0", new ArrayList<>(), Options.DEFAULT)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0", new HashMap<>(), Options.INCLUDE_PRERELEASE)).isFalse();
+        assertThat(NodeSemver.satisfies("1.0.0", (Object) "", Options.DEFAULT)).isTrue();
+        assertThat(NodeSemver.satisfies("1.0.0", (Object) "^1", Options.DEFAULT)).isTrue();
+    }
 }

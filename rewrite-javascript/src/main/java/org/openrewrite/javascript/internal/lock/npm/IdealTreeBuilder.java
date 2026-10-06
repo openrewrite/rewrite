@@ -157,13 +157,18 @@ public final class IdealTreeBuilder {
         if (options.getInstallStrategy() == NpmOptions.InstallStrategy.LINKED) {
             throw new CannotKnow("the filesystem (install-strategy=linked places packages outside node_modules)");
         }
-        initTree();
-        inflateAncientLockfile();
-        applyUserRequests();
-        buildDeps();
-        fixDepFlags();
-        pruneFailedOptional();
-        checkEngineAndPlatform();
+        try {
+            initTree();
+            inflateAncientLockfile();
+            applyUserRequests();
+            buildDeps();
+            fixDepFlags();
+            pruneFailedOptional();
+            checkEngineAndPlatform();
+        } catch (StackOverflowError e) {
+            // arborist recurses the same way (some peer cycles nest placements without end): npm's RangeError
+            throw new NpmRejection(null, "Maximum call stack size exceeded", null);
+        }
         return Objects.requireNonNull(idealTree);
     }
 
@@ -304,18 +309,20 @@ public final class IdealTreeBuilder {
             Object id = useResolved ? resolved : version;
             Spec spec = Spec.resolve(node.getName(), Js.string(id), PosixPath.dirname(node.getPath()));
             try {
-                Map<String, Object> mani = Pacote.manifest(spec, Pacote.Options.builder()
+                Pacote.Options pacoteOptions = Pacote.Options.builder()
                         .fullMetadata(false)
                         .before(releaseAgeBefore(spec))
                         .defaultTag(options.getTag())
                         .nodeVersion(host.getNodeVersion())
                         .npmVersion(NPM_VERSION)
                         .integrity(node.getIntegrity())
-                        .build(), registry);
+                        .build();
+                Map<String, Object> mani = spec.getType() == Spec.Type.DIRECTORY ?
+                        directoryFetch(spec, pacoteOptions) : Pacote.manifest(spec, pacoteOptions, registry);
                 Map<String, Object> pkg = new LinkedHashMap<>(mani);
-                pkg.put("_id", Js.string(mani.get("name")) + "@" + Js.string(mani.get("version")));
+                pkg.put("_id", Js.string(Js.get(mani, "name")) + "@" + Js.string(Js.get(mani, "version")));
                 node.setPackage(pkg);
-            } catch (CannotKnow er) {
+            } catch (CannotKnow | PackageJson.NeedsPackageFiles er) {
                 throw er;
             } catch (RuntimeException er) {
                 // npm warns "Could not fetch metadata" and keeps the lock's entry
@@ -406,13 +413,8 @@ public final class IdealTreeBuilder {
 
             List<Runnable> promises = new ArrayList<>();
             for (Task task : tasks) {
-                PlaceDep pd;
-                try {
-                    pd = new PlaceDep(task.getEdge(), task.getDep(), options, explicitRequests.contains(task.getEdge()),
-                            updateNames);
-                } catch (StackOverflowError e) {
-                    throw new IllegalStateException("Maximum call stack size exceeded");
-                }
+                PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options,
+                        explicitRequests.contains(task.getEdge()), updateNames);
                 warnings.addAll(pd.getWarnings());
                 visitPlacement(pd, promises);
             }
@@ -746,7 +748,9 @@ public final class IdealTreeBuilder {
         Map<String, Object> pkg;
         try {
             pkg = fetchManifest(spec, edge);
-        } catch (NpmRejection | PickManifest.PickFailure | Spec.InvalidSpecException error) {
+        } catch (CannotKnow | PackageJson.NeedsPackageFiles error) {
+            throw error;
+        } catch (RuntimeException error) {
             return failureNode(name, parent, error, edge);
         }
         if (!truthy(pkg.get("version")) && spec.isRegistry()) {
@@ -764,11 +768,7 @@ public final class IdealTreeBuilder {
 
     // PackageJson.normalize(realpath).catch(() => ({ content: {} })), from the manifests the project supplied
     private Map<String, Object> directoryManifest(String realpath, Spec spec) {
-        String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
-        String text = files.getManifests().get(location);
-        if (text == null) {
-            throw new CannotKnow("directory manifest " + spec.getRawSpec() + " (" + location + ")");
-        }
+        String text = directoryManifestText(realpath, spec);
         try {
             return PackageJson.normalize(text).getContent();
         } catch (PackageJson.NeedsPackageFiles e) {
@@ -776,6 +776,28 @@ public final class IdealTreeBuilder {
         } catch (RuntimeException e) {
             return new LinkedHashMap<>();
         }
+    }
+
+    private String directoryManifestText(String realpath, Spec spec) {
+        String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
+        String text = files.getManifests().get(location);
+        if (text == null) {
+            throw new CannotKnow("directory manifest " + spec.getRawSpec() + " (" + location + ")");
+        }
+        return text;
+    }
+
+    // pacote's DirFetcher.manifest() over the manifests the project supplied
+    private Map<String, Object> directoryFetch(Spec spec, Pacote.Options opts) {
+        Pacote.checkBefore(opts);
+        String realpath = Objects.requireNonNull(spec.getFetchSpec());
+        Map<String, Object> mani = new LinkedHashMap<>(
+                PackageJson.normalize(directoryManifestText(realpath, spec)).getContent());
+        Object integrity = opts.getIntegrity();
+        mani.put("_integrity", truthy(integrity) ? Js.string(integrity) : integrity);
+        mani.put("_resolved", realpath);
+        mani.put("_from", spec.getSaveSpec());
+        return mani;
     }
 
     private Node loadPeerSet(Node node, Set<Node> required) {

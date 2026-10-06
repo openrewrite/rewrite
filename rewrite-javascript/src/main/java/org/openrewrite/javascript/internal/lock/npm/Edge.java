@@ -211,7 +211,7 @@ public final class Edge {
     }
 
     /**
-     * @throws IllegalStateException    when a {@code $name} override references a dependency neither the
+     * @throws MalformedManifest        when a {@code $name} override references a dependency neither the
      *                                  root nor this edge's package declares, as arborist throws.
      * @throws IllegalArgumentException when the override, or what its reference names, is not a string:
      *                                  arborist's TypeError, there or in whatever reads the spec next.
@@ -235,7 +235,7 @@ public final class Edge {
                 if (specValue != null) {
                     return specValue;
                 }
-                throw new IllegalStateException("Unable to resolve reference " + value);
+                throw new MalformedManifest("Unable to resolve reference " + value);
             }
             return value;
         }

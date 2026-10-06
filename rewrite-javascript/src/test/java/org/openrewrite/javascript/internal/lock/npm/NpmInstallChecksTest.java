@@ -220,6 +220,30 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"libc\":\"musl\"}")).matches(NpmInstallChecksTest::badPlatform);
     }
 
+    // node-semver's satisfies answers false where the Range constructor throws, so npm reports EBADENGINE;
+    // the platform lists throw as JavaScript does (npm-install-checks 8.0.0 run on these values)
+    @Test
+    void valuesOfTheWrongType() {
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
+          "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"npm\":true}}"),
+          "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":[\">=1\"]}}"),
+          "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":{}}}"),
+          "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
+        assertThatCode(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":5}}"),
+          null, "v20.0.0", true)).doesNotThrowAnyException();
+
+        assertThatThrownBy(() -> platform("{\"os\":5}")).hasMessage("list is not iterable");
+        assertThatThrownBy(() -> platform("{\"os\":{}}")).hasMessage("list is not iterable");
+        assertThatThrownBy(() -> platform("{\"cpu\":true}")).hasMessage("list is not iterable");
+        assertThatThrownBy(() -> platform("{\"os\":[\"any\"],\"cpu\":5}")).hasMessage("list is not iterable");
+        assertThatThrownBy(() -> platform("{\"os\":[null]}"))
+          .hasMessage("Cannot read properties of null (reading 'charAt')");
+        assertThatThrownBy(() -> platform("{\"os\":[5]}")).hasMessage("entry.charAt is not a function");
+    }
+
     @Test
     void unknownHostSatisfiesEveryCheck() {
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\",\"libc\":\"musl\"}"),

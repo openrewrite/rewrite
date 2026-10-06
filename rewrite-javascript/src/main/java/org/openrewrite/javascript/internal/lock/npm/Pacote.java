@@ -62,7 +62,15 @@ final class Pacote {
     private Pacote() {
     }
 
+    // every fetcher renders --before in its constructor: an invalid date is a RangeError there
+    static void checkBefore(Options opts) {
+        if (opts.getBefore() != null && opts.getBefore().isNaN()) {
+            throw new NpmRejection(null, "Invalid time value", null);
+        }
+    }
+
     static Map<String, Object> manifest(Spec spec, Options opts, PackumentSource source) {
+        checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {
             case GIT:

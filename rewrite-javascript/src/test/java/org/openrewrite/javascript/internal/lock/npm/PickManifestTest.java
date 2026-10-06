@@ -323,4 +323,22 @@ class PickManifestTest {
         assertThatThrownBy(() -> PickManifest.pickManifest(packument("{\"name\":\"package\"}"), "1.1.1"))
           .hasMessageContaining("No matching version found");
     }
+
+    // beyond upstream's cases, what npm-pick-manifest 11.0.3 answers: a spread of an empty pick, and a nameless packument
+    @Test
+    void avoidStrictWithNothingToPick() {
+        Map<String, Object> oddly = packument("{\"name\":\"oddly\",\"dist-tags\":{\"latest\":\"1.0.2\"},\"versions\":{" +
+                                              "\"1.0.0\":{\"version\":\"1.0.0\"},\"1.0.2\":{\"version\":\"2.5.0\"}}}");
+        assertThat(PickManifest.pickManifest(oddly, "1.0.2", PickManifest.Options.builder().avoid(">=2").avoidStrict(true).build()))
+          .isEqualTo(json("{\"_outsideDependencyRange\":true,\"_isSemVerMajor\":false}"));
+    }
+
+    @Test
+    void namelessPackumentRendersUndefined() {
+        Map<String, Object> nameless = packument("{\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}}}");
+        assertThatThrownBy(() -> PickManifest.pickManifest(nameless, "2.0.0"))
+          .hasMessage("No matching version found for undefined@2.0.0.");
+        assertThatThrownBy(() -> PickManifest.pickManifest(packument("{\"versions\":{}}"), null))
+          .hasMessage("No versions available for undefined");
+    }
 }

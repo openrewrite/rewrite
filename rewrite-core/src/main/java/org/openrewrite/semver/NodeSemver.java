@@ -70,6 +70,14 @@ public class NodeSemver {
     }
 
     /**
+     * {@code satisfies} with the range as JSON package data may hold it, in any type: node-semver answers
+     * false for every range its {@code Range} constructor rejects, a non-string among them.
+     */
+    public static boolean satisfies(String version, @Nullable Object range, Options options) {
+        return range instanceof String && satisfies(version, (String) range, options);
+    }
+
+    /**
      * {@code satisfies} with the version as JSON package data may hold it, in any type: a falsy value
      * fails, and a truthy one that is not a string throws the TypeError node-semver raises on it.
      */

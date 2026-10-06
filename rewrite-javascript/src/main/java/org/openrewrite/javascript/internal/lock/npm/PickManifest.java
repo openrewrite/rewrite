@@ -116,15 +116,19 @@ public final class PickManifest {
 
     private static @Nullable Object decorateAvoid(@Nullable Object result, @Nullable String avoid) {
         if (truthy(result) && shouldAvoid(Js.get(result, "version"), avoid)) {
-            Map<String, Object> decorated = copy(result);
+            Map<String, Object> decorated = spread(result);
             decorated.put("_shouldAvoid", true);
             return decorated;
         }
         return result;
     }
 
-    private static Map<String, Object> copy(@Nullable Object object) {
+    // { ...object }: nothing from null or undefined
+    private static Map<String, Object> spread(@Nullable Object object) {
         Map<String, Object> copy = new LinkedHashMap<>();
+        if (object == null || object == Js.UNDEFINED) {
+            return copy;
+        }
         for (Map.Entry<String, @Nullable Object> entry : Js.entries(object)) {
             copy.put(entry.getKey(), entry.getValue());
         }
@@ -160,7 +164,7 @@ public final class PickManifest {
         Object before = opts.getBefore();
         String avoid = opts.getAvoid();
 
-        Object name = packument.get("name");
+        Object name = Js.get(packument, "name");
         Object verTimes = packument.get("time");
         Object versions = truthy(packument.get("versions")) ? packument.get("versions") : new LinkedHashMap<>();
 
@@ -174,7 +178,7 @@ public final class PickManifest {
 
             Object caret = pick(packument, "^" + Js.string(Js.get(result, "version")), looseOpts);
             if (!truthy(caret) || !truthy(Js.get(caret, "_shouldAvoid"))) {
-                Map<String, Object> outside = copy(caret);
+                Map<String, Object> outside = spread(caret);
                 outside.put("_outsideDependencyRange", true);
                 outside.put("_isSemVerMajor", false);
                 return outside;
@@ -182,7 +186,7 @@ public final class PickManifest {
 
             Object star = pick(packument, "*", looseOpts);
             if (!truthy(star) || !truthy(Js.get(star, "_shouldAvoid"))) {
-                Map<String, Object> outside = copy(star);
+                Map<String, Object> outside = spread(star);
                 outside.put("_outsideDependencyRange", true);
                 outside.put("_isSemVerMajor", true);
                 return outside;
@@ -345,13 +349,14 @@ public final class PickManifest {
         Object restricted = truthy(restrictedVersions) ? restrictedVersions : new LinkedHashMap<>();
 
         if (truthy(picked) && !truthy(Js.get(restricted, Js.string(Js.get(picked, "version"))))) {
-            return picked instanceof Map ? asMap(picked) : copy(picked);
+            return picked instanceof Map ? asMap(picked) : spread(picked);
         }
 
         Object before = opts.getBefore();
         String bstr = truthy(before) ? Instant.ofEpochMilli((long) timeValue(before)).toString() : "";
-        Object name = packument.get("name");
-        String pckg = Js.string(name) + "@" + wanted + (truthy(before) ? " with a date before " + bstr : "");
+        Object name = Js.get(packument, "name");
+        String pckg = Js.string(name) + "@" + (wanted == null ? "undefined" : wanted) +
+                      (truthy(before) ? " with a date before " + bstr : "");
 
         boolean isForbidden = truthy(picked) && truthy(Js.get(restricted, Js.string(Js.get(picked, "version"))));
         String polMsg = isForbidden ? Js.string(Js.get(policyRestrictions, "message")) : "";

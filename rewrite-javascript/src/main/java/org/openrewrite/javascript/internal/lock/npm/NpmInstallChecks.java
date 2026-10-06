@@ -96,11 +96,8 @@ final class NpmInstallChecks {
         }
     }
 
-    private static boolean satisfies(String version, Object range) {
-        if (!(range instanceof String)) {
-            throw new IllegalArgumentException("range.trim is not a function");
-        }
-        return NodeSemver.satisfies(version, (String) range, NodeSemver.Options.INCLUDE_PRERELEASE);
+    private static boolean satisfies(String version, @Nullable Object range) {
+        return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE);
     }
 
     /**
@@ -140,13 +137,23 @@ final class NpmInstallChecks {
 
     @SuppressWarnings("unchecked")
     private static boolean checkList(String value, Object list) {
-        List<Object> entries = list instanceof String ? Collections.singletonList(list) : (List<Object>) list;
+        List<Object> entries;
+        if (list instanceof String) {
+            entries = Collections.singletonList(list);
+        } else if (list instanceof List) {
+            entries = (List<Object>) list;
+        } else {
+            throw new IllegalArgumentException("list is not iterable");
+        }
         if (entries.size() == 1 && "any".equals(entries.get(0))) {
             return true;
         }
         int negated = 0;
         boolean match = false;
         for (Object entry : entries) {
+            if (entry == null || entry == Js.UNDEFINED) {
+                throw new IllegalArgumentException("Cannot read properties of " + entry + " (reading 'charAt')");
+            }
             if (!(entry instanceof String)) {
                 throw new IllegalArgumentException("entry.charAt is not a function");
             }
