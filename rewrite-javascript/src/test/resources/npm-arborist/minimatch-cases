@@ -1837,6 +1837,54 @@
        "packages/a"
       ]
      ]
+    },
+    {
+     "workspaces": [
+      "!packages/b/**",
+      "!packages/b/*",
+      "packages/b/nested"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/b/*",
+      "!packages/b/**",
+      "packages/b/nested"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/b",
+      "!packages/*",
+      "!packages/**",
+      "packages/b"
+     ],
+     "members": [],
+     "virtual": []
+    },
+    {
+     "workspaces": [
+      "!packages/*",
+      "!packages/b",
+      "packages/b",
+      "packages/a"
+     ],
+     "members": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "packages/a"
+      ]
+     ]
     }
    ]
   },

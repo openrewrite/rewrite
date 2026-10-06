@@ -1,0 +1,1 @@
+Member m gains a dependency whose spec is a number: load-virtual swallows the Edge error for a link target's manifest, npm exits 0 and writes the raw value into the member's entry; the next install over that lock exits 1 (must provide string spec).

@@ -42,7 +42,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * the lock ({@link NpmScenarios.Lock#rewritten()}). Where that second install also placed a node
  * ({@link #PLACED_ON_SECOND_INSTALL}), what npm writes is the builder's to reproduce, and the data alone
  * must still write back the lock. A scenario whose {@code expect} says its override key is malformed is
- * one npm writes an empty lock for; its locks load only with the manifest before the edit.
+ * one npm writes an empty lock for; its locks load only with the manifest before the edit. A lock whose
+ * second install npm records as failing to load ({@link NpmScenarios.Lock#loadError()}) fails to load
+ * here with the same error.
  */
 class NpmLockRoundTripTest {
 
@@ -200,8 +202,18 @@ class NpmLockRoundTripTest {
     void writesBackWhatNpmWrites(String name, NpmScenarios.Lock lock) {
         String expect = lock.getScenario().expect();
         NpmOptions options = NpmOptions.fromNpmrc(lock.getNpmrc());
-        if (expect != null && expect.startsWith("malformed override") && !lock.isBefore()) {
-            assertThatThrownBy(() -> roundTrip(lock, options)).as(expect).isInstanceOf(RuntimeException.class);
+        if (expect != null && expect.startsWith("malformed override key ") && !lock.isBefore()) {
+            String key = expect.substring("malformed override key ".length());
+            assertThatThrownBy(() -> roundTrip(lock, options)).as(expect)
+              .isInstanceOf(IllegalArgumentException.class)
+              .hasMessageContaining(key);
+            return;
+        }
+        String loadError = lock.loadError();
+        if (loadError != null) {
+            assertThatThrownBy(() -> roundTrip(lock, options)).as("npm-again.log")
+              .isInstanceOf(IllegalArgumentException.class)
+              .hasMessage(loadError);
             return;
         }
         String rewritten = PLACED_ON_SECOND_INSTALL.contains(name) ? null : lock.rewritten();

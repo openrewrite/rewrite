@@ -168,6 +168,22 @@ final class NpmScenarios {
             return resource("lock/npm-again/" + scenario.getName() + "/" + fileName);
         }
 
+        /**
+         * The error npm raised while loading this lock as data when it installed the lock's manifest over
+         * it again: {@code npm-again.log} records exit 1 with an error that carries no code (a rejection
+         * with a code, such as {@code ERESOLVE}, is the builder's and the lock still loads).
+         */
+        @Nullable
+        String loadError() {
+            String log = "after".equals(fileName) ? scenario.file("npm-again.log") : null;
+            if (log == null || !Arrays.asList(log.split("\n")).contains("exit=1")) {
+                return null;
+            }
+            String first = log.split("\n")[0];
+            return first.startsWith("npm error ") && !first.startsWith("npm error code ") ?
+              first.substring("npm error ".length()) : null;
+        }
+
         @Override
         public String toString() {
             return scenario.getName() + "/" + fileName;

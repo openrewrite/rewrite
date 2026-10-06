@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -42,6 +43,10 @@ public final class PackageJson {
             super(message);
         }
     }
+
+    private static final List<String> NORMALIZE_STEPS = Arrays.asList(
+            "_id", "_attributes", "bundledDependencies", "bundleDependencies", "optionalDedupe", "scripts",
+            "funding", "bin", "binDir");
 
     private final Map<String, Object> content;
 
@@ -73,21 +78,23 @@ public final class PackageJson {
         Map<String, Object> data = parsed.getValue() instanceof Map ?
                 (Map<String, Object>) parsed.getValue() : new LinkedHashMap<>();
         normalizeBin(data);
-        syncSteps(data, true);
+        syncSteps(data, NORMALIZE_STEPS);
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
     }
 
     static Map<String, Object> syncNormalize(Map<String, Object> data) {
-        return syncSteps(data, false);
+        List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
+        steps.remove("_attributes");
+        return syncSteps(data, steps);
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> syncSteps(Map<String, Object> data, boolean attributes) {
+    private static Map<String, Object> syncSteps(Map<String, Object> data, List<String> steps) {
         Object name = data.get("name");
         Object version = data.get("version");
         String pkgId = name + "@" + version;
 
-        if (attributes) {
+        if (steps.contains("_attributes")) {
             for (String key : Js.keys(data)) {
                 if (key.startsWith("_")) {
                     data.remove(key);

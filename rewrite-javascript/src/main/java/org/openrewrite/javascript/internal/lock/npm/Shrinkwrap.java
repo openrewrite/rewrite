@@ -337,16 +337,16 @@ public final class Shrinkwrap {
         return this;
     }
 
-    private void loadAll(String location, @Nullable String name, Map<String, Object> lock) {
+    private void loadAll(String location, @Nullable String name, @Nullable Object lock) {
         Map<String, Object> meta = metaFromLock(location, name, lock);
         if (truthy(meta.get("link"))) {
             location = String.valueOf(meta.get("resolved"));
         }
-        Object dependencies = lock.get("dependencies");
+        Object dependencies = Js.get(lock, "dependencies");
         if (truthy(dependencies)) {
             for (Map.Entry<String, Object> dep : Js.entries(dependencies)) {
                 String loc = location + (location.isEmpty() ? "" : "/") + "node_modules/" + dep.getKey();
-                loadAll(loc, dep.getKey(), asObject(dep.getValue()));
+                loadAll(loc, dep.getKey(), dep.getValue());
             }
         }
     }
@@ -477,10 +477,11 @@ public final class Shrinkwrap {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> metaFromLock(String location, @Nullable String name, @Nullable Map<String, Object> lock) {
-        if (lock == null) {
+    private Map<String, Object> metaFromLock(String location, @Nullable String name, @Nullable Object entry) {
+        if (!truthy(entry)) {
             return new LinkedHashMap<>();
         }
+        Map<String, Object> lock = asObject(entry);
 
         Spec spec = SpecFromLock.specFromLock(name, lock, path);
         Spec.Type type = spec == null ? null : spec.getType();

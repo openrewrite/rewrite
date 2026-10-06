@@ -89,6 +89,8 @@ const layouts = [
       ['apps/*', 'packages/*'], ['pack*/*'], ['packages/*/'], ['packages'], ['.'], [''], ['packages/c/**'],
       ['packages/*/*'], ['packages/*', '!packages/**'], ['**/*', '!**/node_modules/**'], ['packages/*', 'packages/*'],
       ['!!packages/a'], ['!packages/*', 'packages/a'],
+      ['!packages/b/**', '!packages/b/*', 'packages/b/nested'], ['!packages/b/*', '!packages/b/**', 'packages/b/nested'],
+      ['!packages/b', '!packages/*', '!packages/**', 'packages/b'], ['!packages/*', '!packages/b', 'packages/b', 'packages/a'],
     ],
   },
   {

@@ -164,7 +164,7 @@ public final class VirtualTreeLoader {
         checkRootEdges(s, root);
         root.setMeta(s);
         virtualTree = root;
-        Map<String, Map<String, Object>> links = new LinkedHashMap<>();
+        Map<String, Object> links = new LinkedHashMap<>();
         Map<String, Node> nodes = new LinkedHashMap<>();
         nodes.put("", root);
         for (Map.Entry<String, Object> entry : Js.entries(Objects.requireNonNull(s.getData()).get("packages"))) {
@@ -172,9 +172,8 @@ public final class VirtualTreeLoader {
             if (location.isEmpty()) {
                 continue;
             }
-            Map<String, Object> meta = entry.getValue() instanceof Map ?
-                    (Map<String, Object>) entry.getValue() : new LinkedHashMap<>();
-            if (truthy(meta.get("link"))) {
+            Object meta = entry.getValue();
+            if (truthy(Js.get(meta, "link"))) {
                 links.put(location, meta);
             } else {
                 nodes.put(location, loadNode(location, meta, false));
@@ -258,13 +257,14 @@ public final class VirtualTreeLoader {
         return truthy(deps) && deps instanceof Map ? (Map<String, Object>) deps : new LinkedHashMap<>();
     }
 
-    private void resolveLinks(Map<String, Map<String, Object>> links, Map<String, Node> nodes) {
-        for (Map.Entry<String, Map<String, Object>> entry : links.entrySet()) {
+    private void resolveLinks(Map<String, Object> links, Map<String, Node> nodes) {
+        for (Map.Entry<String, Object> entry : links.entrySet()) {
             String location = entry.getKey();
-            Map<String, Object> meta = entry.getValue();
-            Object resolved = meta.get("resolved");
+            Object meta = entry.getValue();
+            Object resolved = Js.get(meta, "resolved");
             if (!(resolved instanceof String)) {
-                throw new IllegalArgumentException("The \"paths[1]\" argument must be of type string. Received " + resolved);
+                throw new IllegalArgumentException(
+                        "The \"paths[1]\" argument must be of type string. Received " + Js.received(resolved));
             }
             String targetPath = PosixPath.resolve(path, (String) resolved);
             String targetLoc = Relpath.relpath(path, targetPath);
@@ -283,7 +283,10 @@ public final class VirtualTreeLoader {
                 if (text != null) {
                     try {
                         link.getTarget().setPackage(PackageJson.normalize(text).getContent());
-                    } catch (JsonParseEvenBetterErrors.JsonParseException ignored) {
+                    } catch (PackageJson.NeedsPackageFiles e) {
+                        throw e;
+                    } catch (RuntimeException ignored) {
+                        // arborist's .catch(() => null): the package stays assigned, its edges loaded up to the failure
                     }
                 }
             }
@@ -317,9 +320,17 @@ public final class VirtualTreeLoader {
         }
     }
 
-    private Node loadNode(String location, Map<String, Object> sw, boolean loadOverrides) {
+    @SuppressWarnings("unchecked")
+    private Node loadNode(String location, Object meta, boolean loadOverrides) {
         String p = virtualTree != null ? virtualTree.getRealpath() : path;
         String nodePath = PosixPath.resolve(p, location);
+        if (!(meta instanceof Map) && !(meta instanceof List)) {
+            String type = meta instanceof Number ? "number" : meta instanceof Boolean ? "boolean" : "string";
+            Object value = meta instanceof Number ? Js.numberToString((Number) meta) : meta;
+            throw new IllegalArgumentException("Cannot create property 'name' on " + type + " '" + value + "'");
+        }
+        // an array has none of the properties read below, so it loads as an empty package, as in arborist
+        Map<String, Object> sw = meta instanceof Map ? (Map<String, Object>) meta : new LinkedHashMap<>();
         if (!truthy(sw.get("name"))) {
             sw.put("name", Node.nameFromFolder(nodePath));
         }

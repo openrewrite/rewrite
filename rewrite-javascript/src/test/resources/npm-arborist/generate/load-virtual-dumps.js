@@ -118,8 +118,7 @@ const main = async () => {
     'workspaces-transitive-deps-virtual', 'workspaces-ignore-nm-virtual', 'workspaces-with-overrides',
     'test-package-with-shrinkwrap', 'tap-old-lockfile', 'tap-with-yarn-lock', 'root',
   ]
-  for (const name of virtual) {
-    const dir = copy(name)
+  const loadCase = async (name, dir) => {
     const c = { name, inputs: name }
     const arb = new Arborist({ path: dir })
     try {
@@ -144,6 +143,49 @@ const main = async () => {
       c.error = { code: e.code, message: clean(e.message) }
     }
     out.loadVirtual.push(c)
+  }
+  for (const name of virtual) {
+    await loadCase(name, copy(name))
+  }
+
+  // packages entries that are not objects: #loadFromShrinkwrap reads meta.link and #loadNode assigns sw.name on the raw value
+  for (const [kind, entry] of [
+    ['null', 'null'], ['string', '"str"'], ['true', 'true'], ['number', '5'], ['array', '["x"]'],
+    ['link-without-resolved', '{"link":true}'], ['link-number-resolved', '{"link":true,"resolved":5}'],
+  ]) {
+    const name = 'packages-entry-' + kind
+    const dir = path.join(tmp, name)
+    fs.mkdirSync(dir)
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"p"}')
+    fs.writeFileSync(path.join(dir, 'package-lock.json'),
+      `{"name":"p","lockfileVersion":3,"packages":{"":{"name":"p"},"node_modules/a":${entry}}}`)
+    out.inputs[name] = inputs(dir)
+    await loadCase(name, dir)
+  }
+
+  // a workspace member's package.json with a non-string spec: #resolveLinks swallows what the package setter
+  // throws after assigning it, and the raw value is written back (npm exits 0; the next install cannot load it)
+  {
+    const name = 'member-spec-not-string'
+    const dir = path.join(tmp, name)
+    fs.mkdirSync(path.join(dir, 'packages', 'm'), { recursive: true })
+    const root = { name: 'root', version: '1.0.0', workspaces: ['packages/*'], dependencies: { 'is-number': '^7.0.0' } }
+    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(root, null, 2) + '\n')
+    fs.writeFileSync(path.join(dir, 'packages', 'm', 'package.json'),
+      JSON.stringify({ name: 'm', version: '1.0.0', dependencies: { 'is-odd': 5 } }, null, 2) + '\n')
+    fs.writeFileSync(path.join(dir, 'package-lock.json'), JSON.stringify({
+      name: 'root', version: '1.0.0', lockfileVersion: 3, requires: true,
+      packages: {
+        '': root,
+        'node_modules/is-number': { version: '7.0.0', resolved: 'https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz',
+          integrity: 'sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==',
+          license: 'MIT', engines: { node: '>=0.12.0' } },
+        'node_modules/m': { resolved: 'packages/m', link: true },
+        'packages/m': { version: '1.0.0' },
+      },
+    }, null, 2) + '\n')
+    out.inputs[name] = inputs(dir)
+    await loadCase(name, dir)
   }
 
   // test/arborist/load-virtual.js 'do not reset flags on supplied root option'
@@ -244,6 +286,32 @@ const main = async () => {
     c.string = s.toString()
     c.stringUnformatted = s.toString({ format: false })
     c.stringTab = s.toString({ format: '\t' })
+    out.shrinkwrap.push(c)
+  }
+  // lockfileVersion 1 dependency entries that are not objects: #metaFromLock skips a falsy one, #loadAll reads
+  // lock.dependencies on the rest
+  for (const [kind, deps] of [
+    ['falsy', '{"a":"","b":false,"c":0,"d":{"version":"1.0.0"}}'],
+    ['null', '{"a":null}'],
+    ['nested-null', '{"a":{"version":"1.0.0","dependencies":{"b":"","c":null}}}'],
+    ['string', '{"a":"abc"}'], ['number', '{"a":5}'], ['true', '{"a":true}'], ['array', '{"a":["x"]}'],
+    ['nested-falsy', '{"a":{"version":"1.0.0","requires":{"b":"1.0.0"},"dependencies":{"b":0,"e":{"version":"2.0.0"}}}}'],
+  ]) {
+    const name = 'v1-entry-' + kind
+    const dir = path.join(tmp, name)
+    fs.mkdirSync(dir)
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"name":"p","dependencies":{"a":"","d":""}}')
+    fs.writeFileSync(path.join(dir, 'package-lock.json'),
+      `{"name":"p","lockfileVersion":1,"requires":true,"dependencies":${deps}}`)
+    out.inputs[name] = inputs(dir)
+    const c = { name: 'v1 entry ' + kind, lockfileVersion: null, inputs: name }
+    try {
+      const s = await Shrinkwrap.load({ path: dir })
+      c.loaded = { lockfileVersion: s.lockfileVersion, originalLockfileVersion: s.originalLockfileVersion ?? null, data: json(s.data) }
+      c.string = s.toString()
+    } catch (e) {
+      c.error = { code: e.code, message: e.message }
+    }
     out.shrinkwrap.push(c)
   }
 

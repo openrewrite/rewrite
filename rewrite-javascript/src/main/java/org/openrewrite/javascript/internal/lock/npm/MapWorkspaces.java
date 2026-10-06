@@ -74,7 +74,6 @@ final class MapWorkspaces {
                 for (int i = 0; i < out.negatedPatterns.size(); i++) {
                     if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), Minimatch.Options.DEFAULT)) {
                         out.negatedPatterns.remove(i);
-                        i--;
                     }
                 }
                 out.patterns.add(pattern);
@@ -97,8 +96,9 @@ final class MapWorkspaces {
         return appendNegatedPatterns((List<?>) declaration);
     }
 
-    private static String getPackageName(Map<String, Object> pkg, String pathname) {
-        return truthy(pkg.get("name")) ? String.valueOf(pkg.get("name")) : Node.nameFromFolder(pathname);
+    private static String getPackageName(@Nullable Object pkg, String pathname) {
+        Object name = Js.get(pkg, "name");
+        return truthy(name) ? String.valueOf(name) : Node.nameFromFolder(pathname);
     }
 
     /**
@@ -222,9 +222,7 @@ final class MapWorkspaces {
         for (String pattern : p.patterns) {
             for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Options.DEFAULT)) {
                 String pathname = PosixPath.join(cwd, key);
-                Object entry = Js.get(packages, key);
-                Map<String, Object> meta = entry instanceof Map ? (Map<String, Object>) entry : new LinkedHashMap<>();
-                byPath.put(pathname, getPackageName(meta, pathname));
+                byPath.put(pathname, getPackageName(Js.get(packages, key), pathname));
             }
         }
 

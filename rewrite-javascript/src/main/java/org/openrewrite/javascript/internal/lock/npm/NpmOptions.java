@@ -19,6 +19,10 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * The npm configuration arborist reads, under npm's own names and with npm's defaults.
  */
@@ -27,6 +31,8 @@ import org.jspecify.annotations.Nullable;
 public class NpmOptions {
 
     public static final NpmOptions DEFAULT = NpmOptions.builder().build();
+
+    private static final Pattern LEADING_INTEGER = Pattern.compile("^[+-]?\\d+");
 
     /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
@@ -68,7 +74,7 @@ public class NpmOptions {
             String value = eq < 0 ? "true" : trimmed.substring(eq + 1).trim();
             switch (key) {
                 case "lockfile-version":
-                    options.lockfileVersion(value.isEmpty() || "null".equals(value) ? null : Integer.parseInt(value));
+                    options.lockfileVersion(lockfileVersion(value));
                     break;
                 case "legacy-peer-deps":
                     options.legacyPeerDeps(bool(value));
@@ -88,5 +94,22 @@ public class NpmOptions {
 
     private static boolean bool(String value) {
         return !"false".equalsIgnoreCase(value) && !"0".equals(value) && !"null".equals(value);
+    }
+
+    // npm's parseField, then the definition's flatten (obj[key] && parseInt(obj[key], 10)), then arborist's own check
+    private static @Nullable Integer lockfileVersion(String value) {
+        if ("null".equals(value) || "undefined".equals(value)) {
+            return null;
+        }
+        String lfv = value.isEmpty() || "false".equals(value) ? value : "true".equals(value) ? "NaN" : parseInt(value);
+        if ("1".equals(lfv) || "2".equals(lfv) || "3".equals(lfv)) {
+            return Integer.parseInt(lfv);
+        }
+        throw new IllegalArgumentException("Invalid lockfileVersion config: " + lfv);
+    }
+
+    private static String parseInt(String value) {
+        Matcher digits = LEADING_INTEGER.matcher(value);
+        return digits.find() ? Js.numberToString(new BigDecimal(digits.group()).doubleValue()) : "NaN";
     }
 }

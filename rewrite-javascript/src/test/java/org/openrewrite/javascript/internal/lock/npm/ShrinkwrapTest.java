@@ -395,6 +395,10 @@ class ShrinkwrapTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("loadCases")
     void loadsAndWritesAsArboristDoes(String name, JsonNode c) {
+        if (c.has("error")) {
+            assertThatThrownBy(() -> loaded(c)).hasMessage(c.get("error").get("message").asText());
+            return;
+        }
         Shrinkwrap s = loaded(c);
         JsonNode l = c.get("loaded");
         assertThat(canonical(jsValue(s.getLockfileVersion()))).as("lockfileVersion").isEqualTo(canonical(json(l.get("lockfileVersion"))));

@@ -347,10 +347,8 @@ public class Node {
             return null;
         }
         if (!(dir instanceof String)) {
-            String received = dir instanceof Number ? "type number (" + dir + ")" :
-                    dir instanceof Boolean ? "type boolean (" + dir + ")" :
-                            "an instance of " + (dir instanceof List ? "Array" : "Object");
-            throw new IllegalArgumentException("The \"path\" argument must be of type string. Received " + received);
+            throw new IllegalArgumentException(
+                    "The \"path\" argument must be of type string. Received " + Js.received(dir));
         }
         String parent = PosixPath.basename(PosixPath.dirname((String) dir));
         String base = PosixPath.basename((String) dir);

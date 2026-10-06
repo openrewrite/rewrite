@@ -264,6 +264,25 @@ final class Js {
         return true;
     }
 
+    /**
+     * How Node's {@code ERR_INVALID_ARG_TYPE} names the value it received.
+     */
+    static String received(@Nullable Object value) {
+        if (value == null || value == UNDEFINED) {
+            return String.valueOf(value);
+        }
+        if (value instanceof Number) {
+            return "type number (" + numberToString((Number) value) + ")";
+        }
+        if (value instanceof Boolean) {
+            return "type boolean (" + value + ")";
+        }
+        if (value instanceof String) {
+            return "type string ('" + value + "')";
+        }
+        return "an instance of " + (value instanceof List ? "Array" : "Object");
+    }
+
     static boolean isWhitespace(char c) {
         return c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r' || c == ' ' || c == 0xA0 ||
                c == 0x1680 || (c >= 0x2000 && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F ||
@@ -303,13 +322,20 @@ final class Js {
 
     private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
 
-    // the shortest decimal that reads back as the same double, as JavaScript prints
+    // the shortest decimal that reads back as the same double, the nearest when several do, as JavaScript prints
     private static BigDecimal shortest(double d) {
         BigDecimal exact = new BigDecimal(d);
         for (int precision = 1; precision < 17; precision++) {
-            BigDecimal rounded = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
-            if (rounded.doubleValue() == d) {
-                return rounded.stripTrailingZeros();
+            BigDecimal nearest = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
+            if (nearest.doubleValue() == d) {
+                return nearest.stripTrailingZeros();
+            }
+            // a power of two's interval is asymmetric: the far neighbor may read back when the nearest does not
+            BigDecimal floor = exact.round(new MathContext(precision, RoundingMode.FLOOR));
+            BigDecimal other = floor.compareTo(nearest) == 0 ?
+                    exact.round(new MathContext(precision, RoundingMode.CEILING)) : floor;
+            if (other.doubleValue() == d) {
+                return other.stripTrailingZeros();
             }
         }
         return exact.round(new MathContext(17, RoundingMode.HALF_EVEN)).stripTrailingZeros();

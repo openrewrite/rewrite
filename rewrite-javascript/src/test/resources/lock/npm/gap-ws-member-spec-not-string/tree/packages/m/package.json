@@ -1,0 +1,7 @@
+{
+  "name": "m",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-odd": 5
+  }
+}
