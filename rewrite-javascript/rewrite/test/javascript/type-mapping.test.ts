@@ -1986,6 +1986,30 @@ describe('JavaScript type mapping', () => {
         await spec.rewriteRun(src);
     });
 
+    test('a call to a function declared in the same file has the declaration\'s declaringType', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) =>
+            (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type) ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
+
+        const src = typescript(
+            `
+                function helper(): void {}
+                helper();
+                parseInt('1');
+            `,
+            //@formatter:off
+            `
+                /*~~(main#helper)~~>*/function helper(): void {}
+                /*~~(main#helper)~~>*/helper();
+                /*~~(𝑓#parseInt)~~>*/parseInt('1');
+            `
+            //@formatter:on
+        );
+        src.path = 'main.ts';
+        await spec.rewriteRun(src);
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 
