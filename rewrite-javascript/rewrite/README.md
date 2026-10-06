@@ -36,7 +36,7 @@ The `arg` rows give each argument's type and its kind, which is what a capture c
 
 `arr.tostring()` has no declaring type, and the indented `select` row names the receiver that lost it. `<none>` is a slot the parser left empty and `<unknown>` is `Type.unknownType`.
 
-The variable accepts comma-separated flags. `missing` lists only unattributed nodes, `all` widens the listing beyond calls and declarations, and `supertypes` shows each declaring type's ancestry, which bounds how general a pattern can be.
+The variable accepts comma-separated flags. `missing` lists only unattributed nodes, `all` widens the listing beyond calls and declarations, and `supertypes` shows each declaring type's superclass chain, whose types a `matchOverrides` pattern may name.
 
 A recipe gated on a type that never resolved is the usual reason a test sees no change, so that failure names the unattributed nodes without being asked:
 

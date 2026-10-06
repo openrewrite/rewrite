@@ -77,7 +77,7 @@ export function usesMethod(methodPattern: string, matchOverrides: boolean = fals
     return new RecipeRef(
         "org.openrewrite.java.search.HasMethod",
         {methodPattern, matchOverrides},
-        new UsesMethod(methodPattern),
+        new UsesMethod(methodPattern, matchOverrides),
     );
 }
 
@@ -111,7 +111,7 @@ export function findMethods(methodPattern: string, matchOverrides: boolean = fal
     return new RecipeRef(
         "org.openrewrite.java.search.FindMethods",
         {methodPattern, matchOverrides},
-        new UsesMethod(methodPattern),
+        new UsesMethod(methodPattern, matchOverrides),
     );
 }
 
