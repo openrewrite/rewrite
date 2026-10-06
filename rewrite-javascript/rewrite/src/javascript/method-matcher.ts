@@ -1,6 +1,10 @@
 import {Type} from "../java";
 import FullyQualified = Type.FullyQualified;
 
+/**
+ * Matches a method type against a `<declaring type> <name>(<args>)` pattern.
+ * `REWRITE_JAVASCRIPT_DUMP_TYPES=1` in a test run prints the pattern each call would match.
+ */
 export class MethodMatcher {
     private readonly packagePattern: string;
     private readonly typePattern: string;
@@ -20,7 +24,7 @@ export class MethodMatcher {
             throw new Error(`Invalid pattern format: ${pattern}`);
         }
 
-        const typeSpec = pattern.substring(0, lastSpaceBeforeParen).trim();
+        const typeSpec = withoutGlobalPrefix(pattern.substring(0, lastSpaceBeforeParen).trim());
         const methodSpec = pattern.substring(lastSpaceBeforeParen + 1).trim();
 
         // Parse type specification (package.Type or just Type)
@@ -31,7 +35,9 @@ export class MethodMatcher {
         } else {
             const lastDotIndex = typeSpec.lastIndexOf('.');
             if (lastDotIndex === -1) {
-                this.packagePattern = '*';
+                // As in Java, a type without a package matches only the type in no package, such as
+                // the global `Array` or the module `fs-extra`. `*.Array` matches any package.
+                this.packagePattern = '';
                 this.typePattern = typeSpec;
             } else {
                 // Check if we're splitting a *.. pattern incorrectly
@@ -72,7 +78,7 @@ export class MethodMatcher {
         }
 
         // Extract fully qualified name from declaringType
-        const fullyQualifiedName = FullyQualified.getFullyQualifiedName(method.declaringType);
+        const fullyQualifiedName = withoutGlobalPrefix(FullyQualified.getFullyQualifiedName(method.declaringType));
 
         // Split fully qualified name into package and type
         const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
@@ -97,11 +103,12 @@ export class MethodMatcher {
         }
 
         // Match arguments - convert Type[] to string representations
-        const argStrings = method.parameterTypes.map(type => this.typeToString(type));
+        const argStrings = method.parameterTypes.map(type => MethodMatcher.typeName(type));
         return this.matchesArguments(argStrings);
     }
 
-    private typeToString(type: Type): string {
+    /** The name an argument pattern compares against a parameter of this type. */
+    static typeName(type: Type): string {
         switch (type.kind) {
             case Type.Kind.Primitive:
                 return (type as Type.Primitive).keyword;
@@ -111,7 +118,7 @@ export class MethodMatcher {
                 return FullyQualified.getFullyQualifiedName((type as Type.Parameterized).type);
             case Type.Kind.Array:
                 const arrayType = type as Type.Array;
-                return this.typeToString(arrayType.elemType) + '[]';
+                return MethodMatcher.typeName(arrayType.elemType) + '[]';
             case Type.Kind.GenericTypeVariable:
                 return (type as Type.GenericTypeVariable).name;
             default:
@@ -247,4 +254,12 @@ export class MethodMatcher {
                 return type;
         }
     }
+}
+
+/**
+ * The type mapper names a type declared in a `declare global` block `global.<name>`. It lives in
+ * the same global scope as the built-ins, so `Buffer` and `global.Buffer` name the same type.
+ */
+function withoutGlobalPrefix(name: string): string {
+    return name.startsWith('global.') ? name.substring('global.'.length) : name;
 }

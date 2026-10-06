@@ -249,10 +249,14 @@ def _is_assignable_to_fqn(to: str, from_: JavaType | None) -> bool:
         return _is_assignable_to_fqn(to, from_.type)
     elif isinstance(from_, JavaType.Method):
         return _is_assignable_to_fqn(to, from_.return_type)
-    elif isinstance(from_, (JavaType.Intersection, JavaType.Union)):
+    elif isinstance(from_, JavaType.Intersection):
         for bound in from_.bounds:
             if _is_assignable_to_fqn(to, bound):
                 return True
+    elif isinstance(from_, JavaType.Union):
+        # A union value may hold any of its members.
+        if all(_is_assignable_to_fqn(to, bound) for bound in from_.bounds):
+            return True
     # Everything is ultimately an ``object``.
     return to in _OBJECT_NAMES
 
@@ -274,6 +278,11 @@ def _is_assignable_to_type(to: JavaType | None, from_: JavaType | None) -> bool:
         return _is_assignable_to_type(to, from_.type)
     if isinstance(from_, JavaType.Method):
         return _is_assignable_to_type(to, from_.return_type)
+
+    if isinstance(to, JavaType.Union):
+        return any(_is_assignable_to_type(bound, from_) for bound in to.bounds)
+    if isinstance(from_, JavaType.Union):
+        return all(_is_assignable_to_type(to, bound) for bound in from_.bounds)
 
     if isinstance(to, JavaType.Primitive):
         return _is_assignable_to_primitive(to, from_)

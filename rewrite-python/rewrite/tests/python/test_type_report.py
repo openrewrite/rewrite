@@ -77,7 +77,7 @@ def test_lists_calls_in_source_order_with_positions_and_matcher_syntax(tmp_path)
     # Positions are printer-derived, so they survive a comment in the prefix.
     assert (resolved.line, resolved.column) == (6, 5)
     assert resolved.source == "socket.getfqdn()"
-    assert resolved.type.startswith("socket getfqdn(..)")
+    assert resolved.type.startswith("socket getfqdn() ->")
     assert not resolved.missing
     # A note here would mean the rendered pattern fails to match the call it came from.
     assert resolved.note is None
@@ -106,6 +106,22 @@ def test_only_missing_keeps_the_receiver_and_all_nodes_widens_the_listing(tmp_pa
     assert all(e.missing for e in only_missing.entries)
     assert any(e.cause is not None for e in only_missing.entries)
     assert len(every_node.entries) > len(default.entries)
+    # A statement or block has no type slot, so listing it would only add a false ⚠.
+    assert not {"Block", "Return", "Empty"} & {e.kind for e in every_node.entries}
+    assert only_missing.to_dict()["nodeCount"] == len(default.entries)
+
+
+def test_renders_the_most_specific_pattern_and_each_arguments_type(tmp_path):
+    source = "import socket\n\n\ndef f(arr):\n    socket.gethostbyname('x', arr)\n"
+    cu = parse_for_types(_write(tmp_path, source), with_types=False)
+
+    call = next(e for e in build_type_report(cu).entries if e.kind == "MethodInvocation")
+
+    # An argument with no type the matcher can name matches any single argument.
+    assert call.type.startswith("socket gethostbyname(str, *) ->")
+    assert call.note is None
+    assert [(a.source, a.type, a.type_kind) for a in call.arguments] == [
+        ("'x'", "str", "Primitive"), ("arr", "<none>", "<none>")]
 
 
 def test_renders_a_cyclic_type_by_name_without_repeating_union_bounds():
@@ -176,8 +192,9 @@ def test_the_attribution_hint_never_displaces_the_assertion_it_annotates(tmp_pat
 
 def test_the_harness_reports_the_attribution_its_own_parse_produced(tmp_path, capsys, monkeypatch):
     monkeypatch.setenv(DUMP_TYPES_ENV, "1")
-    RecipeSpec().rewrite_run(python(SAMPLE))
-    assert "type attribution:" in capsys.readouterr().out
+    RecipeSpec(type_attribution=False).rewrite_run(python(SAMPLE))
+    # `<none>` reads the same whether ty was switched off or failed to start, so the header says which.
+    assert "(ty: off, type_attribution=False) ---" in capsys.readouterr().out
 
 
 def test_a_recipe_that_produces_no_change_names_the_unattributed_nodes():
@@ -188,6 +205,8 @@ def test_a_recipe_that_produces_no_change_names_the_unattributed_nodes():
         )
     assert "cannot fire" in str(failure.value)
     assert "arr.tostring()" in str(failure.value)
+    assert "└ select:Identifier" in str(failure.value)
+    assert ", ty: " in str(failure.value)
 
 
 @dataclass
@@ -220,7 +239,7 @@ def test_supertypes_reports_the_chain_above_the_declaring_class(tmp_path):
 
     # `append` is declared on `list`, so that is the pattern a MethodMatcher
     # takes; the chain reports which broader patterns also match it.
-    assert call.type.startswith("list append(..)")
+    assert call.type.startswith("list append(int)")
     assert call.supertypes is not None
     assert call.supertypes.split(" <: ")[0] == "list"
 
@@ -237,7 +256,13 @@ def test_diff_ty_separates_the_import_resolved_call_from_the_instance_receiver(t
     # `socket.getfqdn()` has a declaring type either way; only its return type
     # is new. `arr.tostring()` has no declaring type until ty runs, and an
     # unannotated parameter does not give it one.
-    assert ("socket.getfqdn()", "socket getfqdn(..) -> <none>",
-            "socket getfqdn(..) -> str") in differing
+    assert ("socket.getfqdn()", "socket getfqdn() -> <none>",
+            "socket getfqdn() -> str") in differing
     assert not any(source == "arr.tostring()" and not after.startswith("<unknown>")
                    for source, _, after in differing)
+
+    # A changed pattern decides whether a recipe needs ty. A changed return type rarely
+    # does, so pattern rows come first.
+    listing = out.getvalue()
+    assert listing.index("def probe") < listing.index("return type only") < listing.index("socket.getfqdn()")
+    assert "4 of 4 nodes differ, 2 of them before `->`" in listing
