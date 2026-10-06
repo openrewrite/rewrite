@@ -33,6 +33,7 @@ from typing import Any, Dict, List, Optional, Sequence, TextIO, Tuple
 from rewrite.java import tree as j
 from rewrite.java.support_types import JavaType, Space, TypedTree
 from rewrite.python import tree as py
+from rewrite.python.method_matcher import MethodMatcher, _get_fqn
 from rewrite.python.printer import PrintOutputCapture, PythonJavaPrinter, PythonPrinter
 from rewrite.python.type_utils import _PRIMITIVE_KEYWORDS
 from rewrite.visitor import Cursor
@@ -128,12 +129,7 @@ def render_type(type_: Optional[Any], _depth: int = 0, _seen: Optional[set] = No
 
 def render_method(method: Optional[JavaType.Method], _depth: int = 0,
                   _seen: Optional[set] = None) -> str:
-    """Render a method type as ``<declaring type> <name>(..) -> <return type>``.
-
-    The part before ``->`` is a MethodMatcher pattern. Its argument list is
-    ``(..)`` because MethodMatcher matches a pattern against the *call site's*
-    arguments, which the declared parameter types do not describe.
-    """
+    """Render a method type as ``<declaring type> <name>(..) -> <return type>``."""
     if method is None:
         return NONE
     declaring = render_type(method.declaring_type, _depth + 1, _seen)
@@ -154,6 +150,10 @@ class TypeEntry:
     note: Optional[str] = None
     cause: Optional[TypeEntry] = None
     supertypes: Optional[str] = None
+    # The kind of the rendered type, which decides the check a recipe needs.
+    type_kind: Optional[str] = None
+    # A call's arguments, each with the type a pattern capture over it sees.
+    arguments: Tuple[TypeEntry, ...] = ()
 
     def to_dict(self) -> Dict[str, Any]:
         out: Dict[str, Any] = {
@@ -170,6 +170,10 @@ class TypeEntry:
             out["cause"] = self.cause.to_dict()
         if self.supertypes:
             out["supertypes"] = self.supertypes
+        if self.type_kind:
+            out["typeKind"] = self.type_kind
+        if self.arguments:
+            out["arguments"] = [a.to_dict() for a in self.arguments]
         return out
 
 
@@ -177,6 +181,8 @@ class TypeEntry:
 class TypeReport:
     source_path: str
     entries: Tuple[TypeEntry, ...]
+    # The nodes the listing covers, before `only_missing` narrows it.
+    node_count: int
 
     @property
     def missing(self) -> Tuple[TypeEntry, ...]:
@@ -185,7 +191,7 @@ class TypeReport:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "sourcePath": self.source_path,
-            "nodeCount": len(self.entries),
+            "nodeCount": self.node_count,
             "missingCount": len(self.missing),
             "entries": [e.to_dict() for e in self.entries],
         }
@@ -313,24 +319,44 @@ def _method_type(node) -> Optional[JavaType.Method]:
     return getattr(node, "method_type", None)
 
 
-def _describe(node) -> Tuple[str, bool]:
-    """Render the node's load-bearing type slot, and whether it is missing."""
+def _describe(node) -> Tuple[str, bool, str, Optional[str]]:
+    """Render the node's load-bearing type slot: ``(type, missing, type kind, note)``."""
     if isinstance(node, (j.MethodInvocation, j.NewClass, j.MemberReference, j.MethodDeclaration)):
         method = _method_type(node)
-        rendered = render_method(method)
+        if method is None:
+            return NONE, True, NONE, None
         # The declaring type is what MethodMatcher gates on, so it alone decides
-        # whether the row is missing; an unresolved return type shows in the text.
-        declaring = NONE if method is None else render_type(method.declaring_type)
-        return rendered, declaring in _MISSING
+        # whether the row is missing. An unresolved return type shows in the text.
+        declaring = render_type(method.declaring_type)
+        pattern, note = f"{declaring} {method.name}(..)", None
+        if isinstance(node, j.MethodInvocation) and declaring not in _MISSING:
+            pattern, note = _matcher_pattern(node, declaring)
+        return (f"{pattern} -> {render_type(method.return_type)}", declaring in _MISSING,
+                _type_kind(method), note)
     if isinstance(node, j.VariableDeclarations.NamedVariable):
-        variable = node.variable_type
-        rendered = NONE if variable is None else render_type(variable.type)
-        return rendered, rendered in _MISSING
-    if isinstance(node, j.Identifier) and node.field_type is not None:
-        rendered = render_type(node.field_type.type)
-        return rendered, rendered in _MISSING
-    rendered = render_type(node.type) if isinstance(node, TypedTree) else NONE
-    return rendered, rendered in _MISSING
+        type_ = None if node.variable_type is None else node.variable_type.type
+    elif isinstance(node, j.Identifier) and node.field_type is not None:
+        type_ = node.field_type.type
+    else:
+        type_ = node.type if isinstance(node, TypedTree) else None
+    rendered = render_type(type_)
+    return rendered, rendered in _MISSING, _type_kind(type_), None
+
+
+def _has_type_slot(node) -> bool:
+    # An Empty stands for absent syntax, so its type is None by construction.
+    return not isinstance(node, j.Empty) and isinstance(node, (TypedTree, j.MethodInvocation, j.NewClass, j.MemberReference,
+                             j.MethodDeclaration, j.VariableDeclarations.NamedVariable))
+
+
+def _type_kind(type_) -> str:
+    return NONE if type_ is None else type(type_).__name__
+
+
+def _arguments(node) -> List[Any]:
+    if not isinstance(node, (j.MethodInvocation, j.NewClass)):
+        return []
+    return [a for a in (node.arguments or []) if not isinstance(a, j.Empty)]
 
 
 NO_SUPERTYPE = "(none recorded)"
@@ -363,23 +389,24 @@ def _supertype_chain(node) -> Optional[str]:
     return " <: ".join(chain)
 
 
-def _matcher_note(node) -> Optional[str]:
-    """Report a resolved call whose own rendered pattern does not match it."""
-    if not isinstance(node, j.MethodInvocation):
-        return None
-    method = node.method_type
-    if method is None or render_type(method.declaring_type) in _MISSING:
-        return None
-    pattern = f"{render_type(method.declaring_type)} {method.name}(..)"
-    from rewrite.python.method_matcher import MethodMatcher
-    try:
-        matcher = MethodMatcher.create(pattern)
-    except Exception as exc:
-        return f"pattern unparseable: {exc}"
-    try:
-        return None if matcher.matches(node) else "pattern does not match this call"
-    except Exception as exc:
-        return f"matching this call raised: {exc}"
+def _matcher_pattern(call: j.MethodInvocation, declaring: str) -> Tuple[str, Optional[str]]:
+    """The most specific MethodMatcher pattern that matches ``call``, and a note when none does.
+
+    MethodMatcher compares the call site's argument types, so each argument is named
+    as the matcher names it, or ``*`` where it has no such name. Each candidate is
+    checked against the matcher before it is shown.
+    """
+    names = [_get_fqn(getattr(a, "type", None)) or "*" for a in _arguments(call)]
+    candidates = [f"{declaring} {call.method_type.name}({', '.join(names)})",
+                  f"{declaring} {call.method_type.name}(..)"]
+    note = "pattern does not match this call"
+    for pattern in candidates:
+        try:
+            if MethodMatcher.create(pattern).matches(call):
+                return pattern, None
+        except Exception as exc:
+            note = f"matching this call raised: {exc}"
+    return candidates[-1], note
 
 
 def _descendant(located: List[_Located], parent: int, child) -> Optional[int]:
@@ -408,7 +435,7 @@ def build_type_report(source_file, *, only_missing: bool = False,
     for i, item in enumerate(located):
         content = item.start if item.content is None else item.content
         line, column = _line_col(starts, content)
-        rendered, missing = _describe(item.node)
+        rendered, missing, type_kind, note = _describe(item.node)
         body = _descendant(located, i, _body_start(item.node))
         stop = item.end if body is None else located[body].start
         built.append(TypeEntry(
@@ -418,15 +445,22 @@ def build_type_report(source_file, *, only_missing: bool = False,
             source=_excerpt(printed[content:stop]),
             type=rendered,
             missing=missing,
-            note=_matcher_note(item.node),
+            note=note,
             supertypes=_supertype_chain(item.node) if supertypes else None,
+            type_kind=type_kind,
         ))
 
     entries: List[TypeEntry] = []
+    node_count = 0
     for i, item in enumerate(located):
-        if not all_nodes and not isinstance(item.node, _DEFAULT_NODES):
+        if not (_has_type_slot(item.node) if all_nodes else isinstance(item.node, _DEFAULT_NODES)):
             continue
+        node_count += 1
         entry = built[i]
+        arguments = [built[a] for a in (_descendant(located, i, arg) for arg in _arguments(item.node))
+                     if a is not None]
+        if arguments:
+            entry = replace(entry, arguments=tuple(arguments))
         if entry.missing:
             cause = _descendant(located, i, getattr(item.node, "select", None))
             if cause is not None:
@@ -438,6 +472,7 @@ def build_type_report(source_file, *, only_missing: bool = False,
     return TypeReport(
         source_path=str(getattr(source_file, "source_path", "<unknown>")),
         entries=tuple(entries),
+        node_count=node_count,
     )
 
 
@@ -464,9 +499,13 @@ def print_types(source_file, *, out: Optional[TextIO] = None, only_missing: bool
         out.write("\n")
         return report
 
-    warning, branch = _glyphs(out)
+    out.write(_table(_rows(report.entries, *_glyphs(out))))
+    return report
+
+
+def _rows(entries: Sequence[TypeEntry], warning: str, branch: str) -> List[Tuple[str, str, str, str]]:
     rows: List[Tuple[str, str, str, str]] = []
-    for entry in report.entries:
+    for entry in entries:
         rows.append(_row(entry, warning))
         if entry.supertypes:
             rows.append((f"{entry.line}:{entry.column}", f"  {branch} supertypes",
@@ -479,13 +518,21 @@ def print_types(source_file, *, out: Optional[TextIO] = None, only_missing: bool
                 cause.source,
                 cause.type,
             ))
+        for n, arg in enumerate(entry.arguments):
+            rows.append((f"{arg.line}:{arg.column}", f"  {branch} arg{n}:{arg.kind}",
+                         arg.source, f"{arg.type} ({arg.type_kind})"))
+    return rows
 
-    header = ("line:col", "kind", "source", "type")
-    widths = [max(len(r[i]) for r in [header, *rows]) for i in range(3)]
+
+def _table(rows: Sequence[Tuple[str, ...]], header: Tuple[str, ...] = ("line:col", "kind", "source", "type")) -> str:
+    """Align every column but the last, which is left ragged."""
+    last = len(header) - 1
+    widths = [max(len(r[i]) for r in [header, *rows]) for i in range(last)]
+    lines = []
     for row in [header, *rows]:
         line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths))
-        out.write(f"{line}  {row[3]}".rstrip() + "\n")
-    return report
+        lines.append(f"{line}  {row[last]}".rstrip())
+    return "\n".join(lines) + "\n"
 
 
 def _row(entry: TypeEntry, warning: str) -> Tuple[str, str, str, str]:
@@ -504,7 +551,7 @@ def print_tree(source_file, *, out: Optional[TextIO] = None) -> None:
         content = item.start if item.content is None else item.content
         line, column = _line_col(starts, content)
         prefix = printed[item.start:content]
-        rendered, _ = _describe(item.node)
+        rendered = _describe(item.node)[0]
         out.write(
             f"{'  ' * item.depth}{type(item.node).__name__}"
             f"  prefix={prefix!r}  {_excerpt(printed[content:item.end], 30)!r}"
@@ -534,16 +581,22 @@ def diff_ty(path: str, *, project_root: Optional[str] = None,
     warning, _ = _glyphs(out)
     differing = [(a, b) for a, b in zip(without.entries, with_ty.entries) if a.type != b.type]
 
+    def pattern(entry: TypeEntry) -> str:
+        return entry.type.split(" -> ")[0]
+
     def mark(entry: TypeEntry) -> str:
         return f"{warning} {entry.type}" if entry.missing else entry.type
 
-    rows = [(f"{a.line}:{a.column}", a.kind, a.source, mark(a), mark(b)) for a, b in differing]
-    header = ("line:col", "kind", "source", "without ty", "with ty")
-    widths = [max(len(r[i]) for r in [header, *rows]) for i in range(4)]
-    for row in [header, *rows]:
-        line = "  ".join(cell.ljust(width) for cell, width in zip(row, widths))
-        out.write(f"{line}  {row[4]}".rstrip() + "\n")
-    out.write(f"\n{len(differing)} of {len(without.entries)} nodes differ\n")
+    # A matcher reads the part before `->`, so a change there decides whether a recipe needs ty.
+    in_pattern = [(a, b) for a, b in differing if pattern(a) != pattern(b)]
+    return_only = [(a, b) for a, b in differing if pattern(a) == pattern(b)]
+    rows = [(f"{a.line}:{a.column}", a.kind, a.source, mark(a), mark(b)) for a, b in in_pattern]
+    if return_only:
+        rows.append(("", "return type only", "", "", ""))
+        rows += [(f"{a.line}:{a.column}", a.kind, a.source, mark(a), mark(b)) for a, b in return_only]
+    out.write(_table(rows, ("line:col", "kind", "source", "without ty", "with ty")))
+    out.write(f"\n{len(differing)} of {len(without.entries)} nodes differ, "
+              f"{len(in_pattern)} of them before `->`\n")
     return differing
 
 
@@ -563,7 +616,8 @@ def _dump_options(value: str) -> Optional[Dict[str, bool]]:
     }
 
 
-def dump_types_if_requested(source_file, *, out: Optional[TextIO] = None) -> bool:
+def dump_types_if_requested(source_file, *, out: Optional[TextIO] = None,
+                            ty_status: Optional[str] = None) -> bool:
     """Print the report when ``REWRITE_PYTHON_DUMP_TYPES`` asks for it.
 
     Runs inside every test run, so it stays silent unless asked and swallows its
@@ -574,14 +628,15 @@ def dump_types_if_requested(source_file, *, out: Optional[TextIO] = None) -> boo
         return False
     out = sys.stdout if out is None else out
     try:
-        out.write(f"\n--- type attribution: {getattr(source_file, 'source_path', '?')} ---\n")
+        status = f" (ty: {ty_status})" if ty_status else ""
+        out.write(f"\n--- type attribution: {getattr(source_file, 'source_path', '?')}{status} ---\n")
         print_types(source_file, out=out, **options)
     except Exception as exc:
         out.write(f"(could not report type attribution: {exc})\n")
     return True
 
 
-def attribution_hint(source_file, *, limit: int = 12) -> str:
+def attribution_hint(source_file, *, limit: int = 12, ty_status: Optional[str] = None) -> str:
     """The unattributed rows, for appending to a failing assertion."""
     try:
         missing = build_type_report(source_file, only_missing=True).missing
@@ -589,13 +644,12 @@ def attribution_hint(source_file, *, limit: int = 12) -> str:
         return ""
     if not missing:
         return ""
-    shown = missing[:limit]
-    lines = "\n".join(
-        f"  {e.line}:{e.column}  {e.kind}  {e.source}  -> {e.type}" for e in shown
-    )
-    more = "" if len(missing) == len(shown) else f"\n  ... and {len(missing) - len(shown)} more"
-    return (f"\n\nNodes with no type attribution (a recipe gated on one of these "
-            f"cannot fire):\n{lines}{more}")
+    shown = [replace(e, arguments=()) for e in missing[:limit]]
+    table = "".join(f"  {line}\n" for line in _table(_rows(shown, "⚠", "└")).splitlines())
+    more = "" if len(missing) == len(shown) else f"  ... and {len(missing) - len(shown)} more\n"
+    status = f", ty: {ty_status}" if ty_status else ""
+    return (f"\n\nNodes with no type attribution{status} (a recipe gated on one of these "
+            f"cannot fire):\n{table}{more}").rstrip("\n")
 
 
 def parse_for_types(path: str, *, with_types: bool = True,

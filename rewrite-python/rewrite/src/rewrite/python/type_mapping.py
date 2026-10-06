@@ -2018,6 +2018,11 @@ class PythonTypeMapping:
         Mirrors the invocation-side logic from _get_declaring_type() to ensure
         declarations and invocations produce matching FQNs.
         """
+        declaring_id = descriptor.get('declaringClassId')
+        if declaring_id is not None:
+            declaring = self._resolve_declaring_type(declaring_id)
+            if declaring is not None:
+                return declaring
         if descriptor.get('className'):
             return self._class_reference(descriptor)
         module_name = descriptor.get('moduleName')

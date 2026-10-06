@@ -97,7 +97,7 @@ class TestTemplateEngine:
     def test_generate_wrapper_expression(self):
         """Test wrapper generation for expression."""
         from rewrite.python.template.engine import TemplateOptions
-        wrapper = TemplateEngine._generate_wrapper("x + 1", TemplateOptions())
+        wrapper = TemplateEngine._generate_wrapper("x + 1", TemplateOptions(), {})
 
         assert "def __WRAPPER__():" in wrapper
         assert "return x + 1" in wrapper
@@ -105,7 +105,7 @@ class TestTemplateEngine:
     def test_generate_wrapper_statement(self):
         """Test wrapper generation for statement."""
         from rewrite.python.template.engine import TemplateOptions
-        wrapper = TemplateEngine._generate_wrapper("return 42", TemplateOptions())
+        wrapper = TemplateEngine._generate_wrapper("return 42", TemplateOptions(), {})
 
         assert "def __WRAPPER__():" in wrapper
         # Statement should be indented, not have return
@@ -205,7 +205,7 @@ class TestEngineEdgeCases:
 
     def test_wrapper_with_imports(self):
         """Test that wrapper generation includes imports."""
-        wrapper = TemplateEngine._generate_wrapper("x", TemplateOptions(imports=("import os",)))
+        wrapper = TemplateEngine._generate_wrapper("x", TemplateOptions(imports=("import os",)), {})
         assert "import os" in wrapper
 
     def test_indented_template_dedented(self):
@@ -263,7 +263,7 @@ class TestEngineContextAndDependencies:
     def test_wrapper_with_context(self):
         """Test that wrapper generation includes context statements."""
         wrapper = TemplateEngine._generate_wrapper(
-            "x", TemplateOptions(context=("MyType = int",))
+            "x", TemplateOptions(context=("MyType = int",)), {}
         )
         assert "MyType = int" in wrapper
 
@@ -275,6 +275,7 @@ class TestEngineContextAndDependencies:
                 imports=("import os",),
                 context=("MY_CONST = 42",),
             ),
+            {},
         )
         assert "import os" in wrapper
         assert "MY_CONST = 42" in wrapper

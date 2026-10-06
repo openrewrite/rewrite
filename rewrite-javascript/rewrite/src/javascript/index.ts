@@ -29,6 +29,7 @@ export * from "./method-matcher";
 export * from "./format";
 export * from "./autodetect";
 export * from "./tree-debug";
+export * from "./type-report";
 export * from "./project-parser";
 
 export type {Scope} from "./scope";
