@@ -117,6 +117,18 @@ describe('template formatting', () => {
             `const config = {\n  providers: [\n    provide(() => {\n      const fn = (init)();\n      return {value: fn};\n    }),\n  ],\n};`);
     });
 
+    test('Prettier lays out a substituted value too', async () => {
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const m = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return m.name.simpleName === 'register' ?
+                    template`provide(${m.arguments.elements[0].element})`.apply(m, this.cursor) : m;
+            }
+        });
+
+        await runUnderPrettier({}, `provide({ a: 1 });`, `register({a:1});`);
+    });
+
     /** Runs the suite's recipe over one `register(init)` call under a Prettier configuration. */
     function runUnderPrettier(config: Record<string, unknown>, after: string,
                               before = `const config = {\n  providers: [\n    register(init),\n  ],\n};`) {
