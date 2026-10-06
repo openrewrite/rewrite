@@ -96,17 +96,6 @@ function writeWalledPackage(repo: string, name: string): void {
 }
 
 /**
- * A package with no `exports` map, whose subpath is a directory. Reaching its declarations means
- * the directory-index lookup that `Bundler` performs and the `node16` family does not.
- */
-function writeDirectorySubpathPackage(repo: string, name: string): void {
-    write(repo, `node_modules/${name}/package.json`, JSON.stringify({name, version: '1.0.0'}));
-    write(repo, `node_modules/${name}/sub/index.d.ts`,
-        //language=typescript
-        `export declare function go(a: string): string;`);
-}
-
-/**
  * A package publishing different typings per export condition, the `import` branch returning a
  * string and the `require` branch a number, so a resolution's chosen branch is visible as a type.
  */
@@ -257,25 +246,7 @@ describe('tsconfig.json compiler options', () => {
         expect(captured.get('deep')).toBe('walled.Thing{name=deep,return=String,parameters=[String]}');
     }, 60000);
 
-    test('a project\'s `module` kind sets its resolution without being adopted', async () => {
-        const resolution = new Map<string, string>();
-        const implied = new RecipeSpec();
-        implied.recipe = captureMethodTypes(['go'], resolution);
-
-        await withDir(async (repo) => {
-            writeDirectorySubpathPackage(repo.path, 'plain');
-            write(repo.path, 'tsconfig.json', `{"compilerOptions": {"module": "node16"}}`);
-
-            await implied.rewriteRun(npm(repo.path, typescript(`
-                import {go} from "plain/sub";
-
-                go("x");
-            `)));
-        }, {unsafeCleanup: true});
-
-        // Unresolved, the call has no signature, but keeps the name it was imported by.
-        expect(resolution.get('go')).toBe('plain/sub{name=go,return=<unknown>,parameters=[]}');
-
+    test('a project\'s `module` kind is not adopted', async () => {
         const conditions = new Map<string, string>();
         const notAdopted = new RecipeSpec();
         notAdopted.recipe = captureMethodTypes(['pick'], conditions);
@@ -292,7 +263,7 @@ describe('tsconfig.json compiler options', () => {
         }, {unsafeCleanup: true});
 
         expect(conditions.get('pick')).toBe('dual{name=pick,return=String,parameters=[]}');
-    }, 120000);
+    }, 60000);
 
     test('a declared resolution is the only one consulted, even where it resolves less', async () => {
         const captured = new Map<string, string>();

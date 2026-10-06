@@ -2442,19 +2442,42 @@ class TestDeclarationDeclaringType:
         assert result._declaring_type is None
 
     @requires_ty_types_cli
-    def test_declaration_declaring_type_with_ty_types(self):
-        """With ty-types, a function declaration should get a declaring type from the descriptor."""
-        source = 'def greet(name: str) -> str:\n    return name\n'
+    def test_declaring_type_is_the_enclosing_class_else_the_module(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(x): ...
+                @classmethod
+                def c(cls, x): ...
+                class Inner:
+                    def i(self): ...
+
+            def top(x): ...
+
+            def outer():
+                class Local:
+                    def m(self): ...
+
+            Mine().warn("x")
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            func_node = tree.body[0]
-            result = mapping.method_declaration_type(func_node)
-            assert result is not None
-            assert isinstance(result, JavaType.Method)
-            assert result._declaring_type is not None, \
-                "Declaration should have a declaring type, not None"
-            assert isinstance(result._declaring_type, JavaType.Class)
-            assert result._declaring_type._fully_qualified_name != "<unknown>"
+            declaring = {
+                node.name: mapping.method_declaration_type(node)._declaring_type.fully_qualified_name
+                for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+            }
+            assert declaring == {
+                'warn': 'test.Mine',
+                's': 'test.Mine',
+                'c': 'test.Mine',
+                'i': 'test.Mine.Inner',
+                'top': 'test',
+                'outer': 'test',
+                'm': "test.<locals of function 'outer'>.Local",
+            }
+            call = mapping.method_invocation_type(tree.body[-1].value)
+            assert call._declaring_type.fully_qualified_name == declaring['warn']
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

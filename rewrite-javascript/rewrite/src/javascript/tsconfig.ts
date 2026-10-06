@@ -144,30 +144,20 @@ export class TsConfigResolver {
                 resolution[option] = projectOptions[option];
             }
         }
-        if (resolution.moduleResolution === undefined) {
-            const paired = pairedModuleResolution(projectOptions);
-            if (paired !== undefined) {
-                resolution.moduleResolution = paired;
-            }
+        if (isNodeModuleResolution(resolution.moduleResolution)) {
+            delete resolution.moduleResolution;
         }
         return {...defaults, ...resolution};
     }
 }
 
 /**
- * The resolution TypeScript infers for a project that states only its `module`. Only the
- * inference is adopted, since a module kind such as `node16` classifies files as CJS or ESM,
- * and an ESM-only import from a CJS file is then the error TS1479, costing the file its LST.
- * `Classic` is declined as well, searching no `node_modules`, so the default stands in.
+ * Under the pinned `preserve` module kind every import resolves in ESM mode, where the `node16`
+ * family demands extensions on relative paths (TypeScript rejects the pairing, TS5110). The default
+ * `bundler` picks the same `import` branch of a dual package without that demand.
  */
-function pairedModuleResolution(projectOptions: ts.CompilerOptions): ts.ModuleResolutionKind | undefined {
-    const infer = (ts as Partial<{ getEmitModuleResolutionKind(options: ts.CompilerOptions): ts.ModuleResolutionKind }>)
-        .getEmitModuleResolutionKind;
-    if (projectOptions.module === undefined || !infer) {
-        return undefined;
-    }
-    const inferred = infer(projectOptions);
-    return inferred === ts.ModuleResolutionKind.Classic ? undefined : inferred;
+function isNodeModuleResolution(kind: ts.ModuleResolutionKind | undefined): boolean {
+    return kind === ts.ModuleResolutionKind.Node16 || kind === ts.ModuleResolutionKind.NodeNext;
 }
 
 function isAtOrUnder(dir: string, root: string): boolean {

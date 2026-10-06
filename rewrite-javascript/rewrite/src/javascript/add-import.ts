@@ -1785,6 +1785,13 @@ function namedSpecifierImports(specifier: JS.ImportSpecifier["specifier"], key: 
     return false;
 }
 
+/** Whether `imp` binds `member` type-only, by its clause's `type` or the specifier's own. */
+function bindsTypeOnly(imp: JS.Import, member: string | undefined): boolean {
+    const key = memberName(member);
+    return (imp.importClause?.typeOnly ?? false) ||
+        (key !== undefined && key !== '*' && namedSpecifierIsTypeOnly(imp, key));
+}
+
 /** Whether the named specifier binding `key` carries its own inline `type`, as in `{type a, b}`. */
 function namedSpecifierIsTypeOnly(imp: JS.Import, key: string): boolean {
     const namedBindings = imp.importClause?.namedBindings;
@@ -1850,6 +1857,9 @@ export interface ExistingImportBinding {
 
     /** Whether the source states this local name — `import {a as b}` — or takes it from the member. */
     aliased: boolean;
+
+    /** Whether the clause or the specifier itself is marked `type`. */
+    typeOnly: boolean;
 }
 
 /**
@@ -1871,7 +1881,8 @@ export function existingImportBinding(
             return {
                 localName,
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
-                aliased: localName !== memberName(member)
+                aliased: localName !== memberName(member),
+                typeOnly: bindsTypeOnly(element as JS.Import, member)
             };
         }
     }
@@ -2083,10 +2094,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             importBinds(imp, this.from.module, this.from.member) !== this.localName) {
             return imp;
         }
-        // A moved named specifier's own inline `type` marks it type-only even where the clause
-        // it's leaving is not — the replacement needs the same answer to stay type-safe.
-        this.typeOnly = (imp.importClause?.typeOnly ?? false) ||
-            (key !== undefined && key !== '*' && namedSpecifierIsTypeOnly(imp, key));
+        // The replacement takes the moved binding's `type` marking to stay type-safe.
+        this.typeOnly = bindsTypeOnly(imp, this.from.member);
 
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member);

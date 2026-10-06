@@ -190,6 +190,32 @@ describe('JavaScript type mapping', () => {
                 )
             );
         });
+        test('should map symbol and unique symbol to the Symbol class', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'for') {
+                    return formatKindAndName((type as Type.Method).returnType);
+                }
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'u') {
+                    return formatKindAndName(type);
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const s = Symbol.for("x");
+                        declare const u: unique symbol;
+                    `,
+                    `
+                        const s = /*~~(Class Symbol)~~>*/Symbol.for("x");
+                        declare const /*~~(Class Symbol)~~>*/u: unique symbol;
+                    `
+                )
+            );
+        });
     });
 
     describe('type annotations', () => {
@@ -833,6 +859,46 @@ describe('JavaScript type mapping', () => {
                     `,
                     `
                         const result = /*~~(sqrt() returns double)~~>*/Math.sqrt(16);
+                    `
+                )
+            );
+        });
+
+        test('should map a callback parameter of an instantiated generic method as a function type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'map') {
+                    const callback = (type as Type.Method).parameterTypes[0];
+                    const apply = Type.isClass(callback) ? callback.methods.find(m => m.name === 'apply') : undefined;
+                    return `${formatKindAndName(callback)} (${apply?.parameterTypes.map(formatKindAndName).join(', ')})`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `[1].map(x => x + 1);`,
+                    `/*~~(Class ${Type.FUNCTION_TYPE_NAME} (Primitive double, Primitive double, Parameterized Array))~~>*/[1].map(x => x + 1);`
+                )
+            );
+        });
+
+        test('should map a function type that instantiates itself without unbounded recursion', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'r' ? formatKindAndName(type) : null);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const r: Rec<number>;
+                    `,
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const /*~~(Class ${Type.FUNCTION_TYPE_NAME})~~>*/r: Rec<number>;
                     `
                 )
             );
@@ -1986,6 +2052,49 @@ describe('JavaScript type mapping', () => {
         await spec.rewriteRun(src);
     });
 
+    test('a call to a function declared in a parsed source has the declaration\'s declaringType', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markTypes((node, type) =>
+            (node?.kind === J.Kind.MethodDeclaration || node?.kind === J.Kind.MethodInvocation) && Type.isMethod(type) ?
+                `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null);
+
+        const util = typescript(
+            `
+                export function shared(): void {}
+                export default function fallback(): void {}
+            `,
+            //@formatter:off
+            `
+                /*~~(util#shared)~~>*/export function shared(): void {}
+                /*~~(util#fallback)~~>*/export default function fallback(): void {}
+            `
+            //@formatter:on
+        );
+        util.path = 'util.ts';
+        const main = typescript(
+            `
+                import fb, {shared as s} from './util';
+                function helper(): void {}
+                helper();
+                s();
+                fb();
+                parseInt('1');
+            `,
+            //@formatter:off
+            `
+                import fb, {shared as s} from './util';
+                /*~~(main#helper)~~>*/function helper(): void {}
+                /*~~(main#helper)~~>*/helper();
+                /*~~(util#shared)~~>*/s();
+                /*~~(util#fallback)~~>*/fb();
+                /*~~(𝑓#parseInt)~~>*/parseInt('1');
+            `
+            //@formatter:on
+        );
+        main.path = 'main.ts';
+        await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
+    });
+
     test('FindMissingTypes produces no results on a complex class', async () => {
         const findings: string[] = [];
 
@@ -2309,6 +2418,57 @@ describe('JavaScript type mapping', () => {
             (node?.kind === J.Kind.MethodInvocation || node?.kind === JS.Kind.FunctionCall) && Type.isMethod(type) &&
             !(node.kind === J.Kind.MethodInvocation && node.name.simpleName === 'require') ?
                 `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null;
+
+        test('an import from a node: specifier attributes like one from the bare specifier', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'sep') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return owner ? Type.FullyQualified.getFullyQualifiedName(owner) : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        import {sep} from 'node:path';
+                        import {run} from 'node:test';
+                        const required = require('node:url');
+
+                        parse('x');
+                        fmt('x');
+                        nodeUrl.parse('x');
+                        url.parse('x');
+                        required.parse('x');
+                        sep.length;
+                        run();
+                    `,
+                    //@formatter:off
+                    `
+                        import {parse, format as fmt} from 'node:url';
+                        import * as nodeUrl from 'node:url';
+                        import * as url from 'url';
+                        import {/*~~(path)~~>*/sep} from 'node:path';
+                        import {run} from 'node:test';
+                        const required = require('node:url');
+
+                        /*~~(url#parse)~~>*/parse('x');
+                        /*~~(url#format)~~>*/fmt('x');
+                        /*~~(url#parse)~~>*/nodeUrl.parse('x');
+                        /*~~(url#parse)~~>*/url.parse('x');
+                        /*~~(url#parse)~~>*/required.parse('x');
+                        /*~~(path)~~>*/sep.length;
+                        /*~~(node:test#run)~~>*/run();
+                    `
+                    //@formatter:on
+                )
+            );
+        });
 
         test('a static method on an imported class attributes to the class', async () => {
             // Previously the import's local name replaced the class's package, giving \`URL.URL\`.
@@ -2667,6 +2827,14 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
  */
 function formatPrimitiveType(type: Type | undefined): string | null {
     return Type.isPrimitive(type) ? type.keyword || 'None' : null;
+}
+
+function formatKindAndName(type: Type | undefined): string {
+    if (Type.isPrimitive(type)) {
+        return `Primitive ${type.keyword}`;
+    }
+    const kind = type?.kind.substring(type.kind.lastIndexOf('$') + 1);
+    return Type.isFullyQualified(type) ? `${kind} ${FullyQualified.getFullyQualifiedName(type)}` : `${kind}`;
 }
 
 function formatObjectType(type: Type | undefined): string | null {
