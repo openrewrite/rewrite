@@ -76,6 +76,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser.ts                    # JS/TS parser
 │   │   ├── rpc.ts                       # RPC sender/receiver for JS
 │   │   ├── assertions.ts               # Test helpers: typescript(), javascript(), jsx(), tsx(), packageJson()
+│   │   ├── type-report.ts, type-report-cli.ts  # Type attribution listing (rewrite-javascript-types)
 │   │   ├── add-import.ts, remove-import.ts  # Import manipulation
 │   │   ├── recipes/                     # Built-in recipes (order-imports, change-import, add-dependency, etc.)
 │   │   ├── format/                      # Formatting visitors
@@ -182,6 +183,9 @@ export class MyRecipe extends Recipe {
 
 ## Test Pattern
 
+`RecipeSpec` takes no constructor arguments. Vitest does not typecheck, so an argument passed to
+it is dropped silently and the test runs the no-op recipe. `npm run typecheck` catches it.
+
 Tests use relative imports. Source spec factories (`typescript()`, `javascript()`, `jsx()`, `tsx()`, `packageJson()`) are in `src/javascript/assertions.ts`.
 
 ```typescript
@@ -190,8 +194,11 @@ import { typescript } from "../../../src/javascript";
 import { OrderImports } from "../../../src/javascript/recipes/order-imports";
 
 describe('OrderImports', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = new OrderImports();
+
     test('sorts imports', () =>
-        new RecipeSpec({ recipe: new OrderImports() }).rewriteRun(
+        spec.rewriteRun(
             typescript(
                 `import {z} from 'zebra';\nimport {a} from 'alpha';`,
                 `import {a} from 'alpha';\nimport {z} from 'zebra';`
@@ -318,6 +325,12 @@ it is left as it stands: the name read from the first would bind twice if it wer
 Each language module has `rpc.ts` with a Sender (visit tree → serialize to queue) and Receiver (read queue → reconstruct tree). These must stay aligned with each other AND with the Java equivalents. Any mismatch causes deadlocks or corrupted trees.
 
 ## Debugging Tips
+
+### Type Attribution
+`REWRITE_JAVASCRIPT_DUMP_TYPES=1 npm run testhelper -- <test file>` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has to match. `missing`,
+`all` and `supertypes` are the other accepted values. `npx rewrite-javascript-types <file>` reports
+a file on disk. See the README section "Inspecting type attribution".
 
 ### RPC Hangs
 1. Check that both Java and TypeScript RPC methods are implemented
