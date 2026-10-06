@@ -190,6 +190,32 @@ describe('JavaScript type mapping', () => {
                 )
             );
         });
+        test('should map symbol and unique symbol to the Symbol class', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'for') {
+                    return formatKindAndName((type as Type.Method).returnType);
+                }
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'u') {
+                    return formatKindAndName(type);
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        const s = Symbol.for("x");
+                        declare const u: unique symbol;
+                    `,
+                    `
+                        const s = /*~~(Class Symbol)~~>*/Symbol.for("x");
+                        declare const /*~~(Class Symbol)~~>*/u: unique symbol;
+                    `
+                )
+            );
+        });
     });
 
     describe('type annotations', () => {
@@ -833,6 +859,46 @@ describe('JavaScript type mapping', () => {
                     `,
                     `
                         const result = /*~~(sqrt() returns double)~~>*/Math.sqrt(16);
+                    `
+                )
+            );
+        });
+
+        test('should map a callback parameter of an instantiated generic method as a function type', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.MethodInvocation && (node as J.MethodInvocation).name.simpleName === 'map') {
+                    const callback = (type as Type.Method).parameterTypes[0];
+                    const apply = Type.isClass(callback) ? callback.methods.find(m => m.name === 'apply') : undefined;
+                    return `${formatKindAndName(callback)} (${apply?.parameterTypes.map(formatKindAndName).join(', ')})`;
+                }
+                return null;
+            });
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `[1].map(x => x + 1);`,
+                    `/*~~(Class ${Type.FUNCTION_TYPE_NAME} (Primitive double, Primitive double, Parameterized Array))~~>*/[1].map(x => x + 1);`
+                )
+            );
+        });
+
+        test('should map a function type that instantiates itself without unbounded recursion', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'r' ? formatKindAndName(type) : null);
+
+            await spec.rewriteRun(
+                //language=typescript
+                typescript(
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const r: Rec<number>;
+                    `,
+                    `
+                        type Rec<T> = (x: T) => Rec<T[]>;
+                        declare const /*~~(Class ${Type.FUNCTION_TYPE_NAME})~~>*/r: Rec<number>;
                     `
                 )
             );
@@ -2667,6 +2733,14 @@ function markTypes(predicate: (node: any, type: Type | undefined) => string | nu
  */
 function formatPrimitiveType(type: Type | undefined): string | null {
     return Type.isPrimitive(type) ? type.keyword || 'None' : null;
+}
+
+function formatKindAndName(type: Type | undefined): string {
+    if (Type.isPrimitive(type)) {
+        return `Primitive ${type.keyword}`;
+    }
+    const kind = type?.kind.substring(type.kind.lastIndexOf('$') + 1);
+    return Type.isFullyQualified(type) ? `${kind} ${FullyQualified.getFullyQualifiedName(type)}` : `${kind}`;
 }
 
 function formatObjectType(type: Type | undefined): string | null {

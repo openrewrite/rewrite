@@ -48,6 +48,12 @@ export class JavaScriptTypeMapping {
     private readonly stringWrapperType: ts.Type | undefined;
     private readonly numberWrapperType: ts.Type | undefined;
     private readonly booleanWrapperType: ts.Type | undefined;
+    private readonly symbolWrapperType: ts.Type | undefined;
+
+    // The declarations of function types being populated. An instantiation of one of these is
+    // unknown, since `type Rec<T> = (x: T) => Rec<T[]>` instantiates without end and each
+    // instantiation has a type id of its own that the type cache cannot match.
+    private readonly functionTypesInProgress = new Set<ts.Symbol>();
 
 
     constructor(
@@ -65,6 +71,7 @@ export class JavaScriptTypeMapping {
         const stringSymbol = checker.resolveName("String", undefined, ts.SymbolFlags.Type, false);
         const numberSymbol = checker.resolveName("Number", undefined, ts.SymbolFlags.Type, false);
         const booleanSymbol = checker.resolveName("Boolean", undefined, ts.SymbolFlags.Type, false);
+        const symbolSymbol = checker.resolveName("Symbol", undefined, ts.SymbolFlags.Type, false);
 
         // Store the TypeScript types; conversion to Type happens on-demand
         if (stringSymbol) {
@@ -77,6 +84,10 @@ export class JavaScriptTypeMapping {
 
         if (booleanSymbol) {
             this.booleanWrapperType = checker.getDeclaredTypeOfSymbol(booleanSymbol);
+        }
+
+        if (symbolSymbol) {
+            this.symbolWrapperType = checker.getDeclaredTypeOfSymbol(symbolSymbol);
         }
     }
 
@@ -291,10 +302,13 @@ export class JavaScriptTypeMapping {
             }
             // Skip instantiated types ONLY if they're not type references
             // Type references like Array<string>, Promise<T> are instantiated but should be mapped
+            // Function types, such as a generic method's callback parameter, are mapped too
             // Other instantiated types (like object literals) should return unknown
             if (objectFlags & ts.ObjectFlags.Instantiated) {
                 const isTypeReference = objectFlags & ts.ObjectFlags.Reference;
-                if (!isTypeReference) {
+                const isFunctionType = type.getCallSignatures().length > 0 &&
+                    !this.functionTypesInProgress.has(type.symbol);
+                if (!isTypeReference && !isFunctionType) {
                     return Type.unknownType;
                 }
             }
@@ -394,11 +408,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & ts.SymbolFlags.Function) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-                    const functionType = this.createEmptyFunctionType();
-                    this.typeCache.set(signature, functionType);
-                    this.populateFunctionType(functionType, callSignatures[0]);
-                    return functionType;
+                    return this.createFunctionType(type, callSignatures[0], signature);
                 }
             }
 
@@ -406,11 +416,7 @@ export class JavaScriptTypeMapping {
             if (symbol.flags & (ts.SymbolFlags.FunctionScopedVariable | ts.SymbolFlags.BlockScopedVariable)) {
                 const callSignatures = type.getCallSignatures();
                 if (callSignatures.length > 0) {
-                    // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-                    const functionType = this.createEmptyFunctionType();
-                    this.typeCache.set(signature, functionType);
-                    this.populateFunctionType(functionType, callSignatures[0]);
-                    return functionType;
+                    return this.createFunctionType(type, callSignatures[0], signature);
                 }
             }
 
@@ -466,11 +472,7 @@ export class JavaScriptTypeMapping {
         // Check for function types without symbols (anonymous functions, function types)
         const callSignatures = type.getCallSignatures();
         if (callSignatures && callSignatures.length > 0) {
-            // Shell-cache: Create stub, cache it, then populate (prevents cycles)
-            const functionType = this.createEmptyFunctionType();
-            this.typeCache.set(signature, functionType);
-            this.populateFunctionType(functionType, callSignatures[0]);
-            return functionType;
+            return this.createFunctionType(type, callSignatures[0], signature);
         }
 
         // A structural type has no nominal name, so every object literal `{a: 1}` and type
@@ -1621,6 +1623,9 @@ export class JavaScriptTypeMapping {
             return Type.Primitive.String;
         } else if (type.flags & (ts.TypeFlags.Boolean | ts.TypeFlags.BooleanLiteral | ts.TypeFlags.BooleanLike)) {
             return Type.Primitive.Boolean;
+        } else if (type.flags & ts.TypeFlags.ESSymbolLike && this.symbolWrapperType) {
+            // Java has no primitive for a symbol, so it is typed as the class it boxes to.
+            return this.getType(this.symbolWrapperType);
         }
 
         // Check for type aliases that may resolve to primitives
@@ -1740,6 +1745,19 @@ export class JavaScriptTypeMapping {
             methods: [],
             toJSON: typeSignatureToJSON
         } as Type.Class;
+    }
+
+    private createFunctionType(type: ts.Type, signature: ts.Signature, cacheKey: string | number): Type.Class {
+        // Shell-cache: Create stub, cache it, then populate (prevents cycles)
+        const functionType = this.createEmptyFunctionType();
+        this.typeCache.set(cacheKey, functionType);
+        this.functionTypesInProgress.add(type.symbol);
+        try {
+            this.populateFunctionType(functionType, signature);
+        } finally {
+            this.functionTypesInProgress.delete(type.symbol);
+        }
+        return functionType;
     }
 
     /**
