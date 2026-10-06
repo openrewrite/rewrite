@@ -1134,7 +1134,7 @@ describe('JavaScript type mapping', () => {
             await spec.rewriteRun(src);
         });
 
-        test('a class declared in a script or a declare global block is a global, so it has no module', async () => {
+        test('a class in a script or a declare global block is a global, but one in a module named global is not', async () => {
             const spec = new RecipeSpec();
             spec.recipe = markTypes((node, type) => {
                 if (node?.kind === J.Kind.ClassDeclaration) {
