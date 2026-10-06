@@ -25,8 +25,10 @@
  *     <li>validate-npm-package-name: Copyright (c) 2015, npm, Inc</li>
  *     <li>@npmcli/package-json: Copyright GitHub Inc.</li>
  *     <li>@npmcli/name-from-folder: Copyright npm, Inc.</li>
+ *     <li>@npmcli/map-workspaces: Copyright npm, Inc.</li>
  *     <li>walk-up-path: Copyright (c) 2020-2023 Isaac Z. Schlueter</li>
  *     <li>treeverse: Copyright (c) npm, Inc. and Contributors</li>
+ *     <li>json-stringify-nice: Copyright (c) Isaac Z. Schlueter and Contributors</li>
  * </ul>
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -41,7 +43,10 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
- * {@code PosixPath} is a port of Node.js {@code lib/path.js}, distributed under the MIT License:
+ * {@code PosixPath} is a port of Node.js {@code lib/path.js}, {@code JsonParseEvenBetterErrors} of
+ * json-parse-even-better-errors (Copyright 2017 Kat Marchán, Copyright npm, Inc.) and
+ * {@code BraceExpansion} of brace-expansion and balanced-match (Copyright Julian Gruber, TypeScript
+ * port Copyright Isaac Z. Schlueter), all distributed under the MIT License:
  * <pre>
  * Copyright Joyent, Inc. and other Node contributors.
  *
@@ -64,6 +69,13 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  * </pre>
+ * {@code Minimatch} is a port of minimatch, distributed under the Blue Oak Model License 1.0.0
+ * (https://blueoakcouncil.org/license/1.0.0): each contributor licenses you to do everything with this
+ * software that would otherwise infringe that contributor's copyright in it, provided that everyone who
+ * gets a copy of any part of it from you also gets the text of that license or a link to it; as far as the
+ * law allows, this software comes as is, without any warranty or condition, and no contributor will be
+ * liable to anyone for any damages related to this software or this license, under any kind of legal claim.
+ * <p>
  * {@code LocaleCompare} reads data derived from the Unicode Character Database and the CLDR root
  * collation, distributed under the Unicode License V3:
  * <pre>
