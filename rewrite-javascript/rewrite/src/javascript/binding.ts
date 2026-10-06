@@ -16,7 +16,8 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, namesDeclaredWithin, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isValueReference, namesUsedIn, scopeOf} from "./scope";
+import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
     memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
@@ -385,8 +386,8 @@ function rebindingName(
     options: MaybeRebindOptions,
     existing: ExistingImportBinding
 ): string | undefined {
-    const taken = (name: string) => nameTaken(name, namesUsedIn(cu), visitor) &&
-        !(reusesTargetImport(cu, name, options.to, existing) && !nameTaken(name, new Set(), visitor));
+    const taken = (name: string) => nameTaken(name, noNames, visitor) ||
+        (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
     const alias = options.to.alias;
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
@@ -398,11 +399,9 @@ function rebindingName(
     return taken(member) ? existing.localName : member;
 }
 
-/**
- * Whether `name` is a value import of named member `to` that no nearer scope redeclares, so a value
- * binding moved there can take that name without changing what any reference reads. `RebindImport`
- * merges only that shape into the existing import.
- */
+const noNames: ReadonlySet<string> = new Set();
+
+/** Whether the moved binding can merge into a value import of `to`'s named member that `name` binds. */
 function reusesTargetImport(
     cu: JS.CompilationUnit,
     name: string,
@@ -411,8 +410,34 @@ function reusesTargetImport(
 ): boolean {
     const target = existingImportBinding(cu, to.module, to.member);
     return target?.localName === name && bindingShape(to.member) === "named" && !target.typeOnly &&
-        !moved.typeOnly && !cu.statements.some(s =>
-            s.element?.kind !== JS.Kind.Import && namesDeclaredWithin(s.element).has(name));
+        !moved.typeOnly && onlyReferences(cu, name);
+}
+
+/**
+ * Whether every spelling of `name` outside the imports is a reference. Any binder spells its name
+ * in a declaring position, so each reference then reads the import, whatever kind of scope it is in.
+ */
+function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
+    let references = true;
+    const visit = (node: any, parent: Cursor): void => {
+        if (!references) {
+            return;
+        }
+        if (Array.isArray(node)) {
+            node.forEach(child => visit(child, parent));
+            return;
+        }
+        const cursor = new Cursor(node, parent);
+        if (node?.kind === J.Kind.Identifier && node.simpleName === name) {
+            references = isValueReference(cursor, node);
+        } else if (isTree(node) || node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ||
+            node?.kind === J.Kind.Container) {
+            Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));
+        }
+    };
+    const root = new Cursor(cu);
+    cu.statements.filter(s => s.element?.kind !== JS.Kind.Import).forEach(s => visit(s, root));
+    return references;
 }
 
 /**

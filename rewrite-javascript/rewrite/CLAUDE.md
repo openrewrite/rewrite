@@ -236,10 +236,11 @@ else, since a rename onto a name already in use would capture its references or 
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
 
 A name the file spells is still not taken when it is a value import of `to`'s named member, and the
-moved binding is a value too. No nearer scope may redeclare it, and no queued edit may claim it.
-Every reference to it already reads the target, so the move binds that name, alias or not, and
-`RebindImport` merges into that import. A `type` import on either side, or a default or namespace
-target, would get a second declaration of the name instead, so the name stays taken there.
+moved binding is a value too. Outside the imports the file may spell it only as a reference, and no
+queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
+alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
+default or namespace target, would get a second declaration of the name instead, so the name stays
+taken there.
 
 Where the name changes, the file's references to the binding change with it — the occurrences that
 resolve to the binding, so a name a nearer scope binds and a property that merely reads alike both

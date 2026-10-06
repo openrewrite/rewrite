@@ -1131,7 +1131,7 @@ describe("maybeRebind", () => {
         expect(pinned.name).toBe("N");
     });
 
-    test("a target binding the move cannot merge into, or that a nearer scope shadows, still counts as taken", async () => {
+    test("a target binding the move cannot merge into, or whose name the file also declares, still counts as taken", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
         await spec.rewriteRun(
@@ -1146,6 +1146,14 @@ describe("maybeRebind", () => {
             typescript(
                 `import { New } from "m2";\nimport { Old } from "m";\n\nfunction f(New: number) { return Old(New); }`,
                 `import { New, New as Old } from "m2";\n\nfunction f(New: number) { return Old(New); }`
+            ),
+            typescript(
+                `import { New } from "m2";\nimport { Old } from "m";\n\nenum E { New = 1, X = Old }\nNew();`,
+                `import { New, New as Old } from "m2";\n\nenum E { New = 1, X = Old }\nNew();`
+            ),
+            typescript(
+                `import { New } from "m2";\nimport { Old } from "m";\n\ntype M<K extends string> = { [New in K]: Old };\nNew();`,
+                `import { New, New as Old } from "m2";\n\ntype M<K extends string> = { [New in K]: Old };\nNew();`
             )
         );
     });
