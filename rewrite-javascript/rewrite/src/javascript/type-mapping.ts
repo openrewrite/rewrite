@@ -15,6 +15,7 @@
  */
 import ts from "typescript";
 import * as path from "path";
+import {isBuiltin} from "module";
 import {Type} from "../java";
 import {packageNameOf} from "./package-name";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
@@ -39,11 +40,13 @@ function typeSignatureToJSON(this: Type): string {
 }
 
 /**
- * The name of the module a specifier imports. `node:url` and `url` import the same built-in
- * module, which is named without the scheme, as `@types/node` declares it.
+ * A module specifier with a redundant `node:` scheme removed.
+ * `node:url` and `url` import the same built-in, which is named without the scheme.
+ * A built-in such as `node:test` has no bare form, and `test` is another package, so it keeps it.
  */
 function moduleName(specifier: string): string {
-    return specifier.startsWith('node:') ? specifier.substring('node:'.length) : specifier;
+    const bare = specifier.substring('node:'.length);
+    return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
 }
 
 export class JavaScriptTypeMapping {
@@ -613,34 +616,21 @@ export class JavaScriptTypeMapping {
         // Check if the variable is imported
         if (symbol.flags & ts.SymbolFlags.Alias) {
             // For imported variables, find the module specifier
-            const declarations = symbol.declarations;
-            if (declarations && declarations.length > 0) {
-                let importNode: ts.Node | undefined = declarations[0];
-
-                // Traverse up to find the ImportDeclaration
-                while (importNode && !ts.isImportDeclaration(importNode)) {
-                    importNode = importNode.parent;
-                }
-
-                if (importNode && ts.isImportDeclaration(importNode)) {
-                    const importDecl = importNode as ts.ImportDeclaration;
-                    if (ts.isStringLiteral(importDecl.moduleSpecifier)) {
-                        const moduleSpecifier = importDecl.moduleSpecifier.text;
-                        // Create a Type.Class representing the module
-                        ownerType = {
-                            kind: Type.Kind.Class,
-                            flags: 0,
-                            classKind: Type.Class.Kind.Interface,
-                            fullyQualifiedName: moduleSpecifier,
-                            typeParameters: [],
-                            annotations: [],
-                            interfaces: [],
-                            members: [],
-                            methods: [],
-                            toJSON: typeSignatureToJSON
-                        } as Type.Class;
-                    }
-                }
+            const moduleSpecifier = this.importedModule(symbol.declarations?.[0]);
+            if (moduleSpecifier) {
+                // Create a Type.Class representing the module
+                ownerType = {
+                    kind: Type.Kind.Class,
+                    flags: 0,
+                    classKind: Type.Class.Kind.Interface,
+                    fullyQualifiedName: moduleSpecifier,
+                    typeParameters: [],
+                    annotations: [],
+                    interfaces: [],
+                    members: [],
+                    methods: [],
+                    toJSON: typeSignatureToJSON
+                } as Type.Class;
             }
         } else {
             // For non-imported variables, check if they belong to a class/interface/namespace
@@ -752,14 +742,10 @@ export class JavaScriptTypeMapping {
         if (!declaration) {
             return undefined;
         }
-        let importDecl: ts.Node | undefined = declaration;
-        while (importDecl && !ts.isImportDeclaration(importDecl)) {
-            importDecl = importDecl.parent;
-        }
-        if (!importDecl || !ts.isStringLiteral((importDecl as ts.ImportDeclaration).moduleSpecifier)) {
+        const module = this.importedModule(declaration);
+        if (!module) {
             return undefined;
         }
-        const module = ((importDecl as ts.ImportDeclaration).moduleSpecifier as ts.StringLiteral).text;
         if (ts.isNamespaceImport(declaration)) {
             return {module, namespace: true};
         }
@@ -783,6 +769,17 @@ export class JavaScriptTypeMapping {
         }
         const binding = this.importBinding(node);
         return binding && binding.exportName === undefined ? binding.module : undefined;
+    }
+
+    /**
+     * The module an import declaration containing `node` imports, or undefined when `node` is not
+     * part of one or its specifier is not a string literal.
+     */
+    private importedModule(node: ts.Node | undefined): string | undefined {
+        while (node && !ts.isImportDeclaration(node)) {
+            node = node.parent;
+        }
+        return node && ts.isStringLiteral(node.moduleSpecifier) ? moduleName(node.moduleSpecifier.text) : undefined;
     }
 
     private moduleType(module: string): Type.FullyQualified {
@@ -1087,22 +1084,7 @@ export class JavaScriptTypeMapping {
                             // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
                             moduleSpecifier = aliasedParentSymbol.name;
                         } else {
-                            // Now find the import declaration to get the module specifier
-                            if (exprSymbol.declarations && exprSymbol.declarations.length > 0) {
-                                let importNode: ts.Node = exprSymbol.declarations[0];
-
-                                // Traverse up to find the ImportDeclaration
-                                while (importNode && !ts.isImportDeclaration(importNode)) {
-                                    importNode = importNode.parent;
-                                }
-
-                                if (importNode && ts.isImportDeclaration(importNode)) {
-                                    const importDeclNode = importNode as ts.ImportDeclaration;
-                                    if (ts.isStringLiteral(importDeclNode.moduleSpecifier)) {
-                                        moduleSpecifier = moduleName(importDeclNode.moduleSpecifier.text);
-                                    }
-                                }
-                            }
+                            moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
                     }
                 }
@@ -1282,35 +1264,7 @@ export class JavaScriptTypeMapping {
         if (symbol.flags & ts.SymbolFlags.Alias) {
             const aliasedSymbol = this.checker.getAliasedSymbol(symbol);
             if (aliasedSymbol && aliasedSymbol !== symbol && symbol.declarations && symbol.declarations.length > 0) {
-                // Try to find the import declaration to get the module specifier
-                let importNode: ts.Node | undefined = symbol.declarations[0];
-
-                // Traverse up to find the ImportDeclaration or ImportSpecifier
-                while (importNode && importNode.parent && !ts.isImportDeclaration(importNode) && !ts.isImportSpecifier(importNode)) {
-                    importNode = importNode.parent;
-                }
-
-                let moduleSpecifier: string | undefined;
-
-                if (importNode && ts.isImportSpecifier(importNode)) {
-                    // Named import like: import { ClipLoader } from 'react-spinners'
-                    // ImportSpecifier -> NamedImports -> ImportClause -> ImportDeclaration
-                    const namedImports = importNode.parent; // NamedImports
-                    if (namedImports && ts.isNamedImports(namedImports)) {
-                        const importClause = namedImports.parent; // ImportClause
-                        if (importClause && ts.isImportClause(importClause)) {
-                            const importDecl = importClause.parent; // ImportDeclaration
-                            if (importDecl && ts.isImportDeclaration(importDecl) && ts.isStringLiteral(importDecl.moduleSpecifier)) {
-                                moduleSpecifier = importDecl.moduleSpecifier.text;
-                            }
-                        }
-                    }
-                } else if (importNode && ts.isImportDeclaration(importNode)) {
-                    // Default or namespace import
-                    if (ts.isStringLiteral(importNode.moduleSpecifier)) {
-                        moduleSpecifier = importNode.moduleSpecifier.text;
-                    }
-                }
+                const moduleSpecifier = this.importedModule(symbol.declarations[0]);
 
                 if (moduleSpecifier) {
                     // Build the fully qualified name from module specifier + symbol name

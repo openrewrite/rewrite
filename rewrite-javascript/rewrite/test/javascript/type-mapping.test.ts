@@ -2310,9 +2310,15 @@ describe('JavaScript type mapping', () => {
             !(node.kind === J.Kind.MethodInvocation && node.name.simpleName === 'require') ?
                 `${FullyQualified.getFullyQualifiedName(type.declaringType)}#${type.name}` : null;
 
-        test('a function imported from a node: specifier attributes like one from the bare specifier', async () => {
+        test('an import from a node: specifier attributes like one from the bare specifier', async () => {
             const spec = new RecipeSpec();
-            spec.recipe = markTypes(declaringTypeAndName);
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.Identifier && (node as J.Identifier).simpleName === 'sep') {
+                    const owner = (node as J.Identifier).fieldType?.owner;
+                    return owner ? Type.FullyQualified.getFullyQualifiedName(owner) : null;
+                }
+                return declaringTypeAndName(node, type);
+            });
 
             await spec.rewriteRun(
                 //language=typescript
@@ -2321,6 +2327,8 @@ describe('JavaScript type mapping', () => {
                         import {parse, format as fmt} from 'node:url';
                         import * as nodeUrl from 'node:url';
                         import * as url from 'url';
+                        import {sep} from 'node:path';
+                        import {run} from 'node:test';
                         const required = require('node:url');
 
                         parse('x');
@@ -2328,12 +2336,16 @@ describe('JavaScript type mapping', () => {
                         nodeUrl.parse('x');
                         url.parse('x');
                         required.parse('x');
+                        sep.length;
+                        run();
                     `,
                     //@formatter:off
                     `
                         import {parse, format as fmt} from 'node:url';
                         import * as nodeUrl from 'node:url';
                         import * as url from 'url';
+                        import {/*~~(path)~~>*/sep} from 'node:path';
+                        import {run} from 'node:test';
                         const required = require('node:url');
 
                         /*~~(url#parse)~~>*/parse('x');
@@ -2341,6 +2353,8 @@ describe('JavaScript type mapping', () => {
                         /*~~(url#parse)~~>*/nodeUrl.parse('x');
                         /*~~(url#parse)~~>*/url.parse('x');
                         /*~~(url#parse)~~>*/required.parse('x');
+                        /*~~(path)~~>*/sep.length;
+                        /*~~(node:test#run)~~>*/run();
                     `
                     //@formatter:on
                 )
