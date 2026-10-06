@@ -65,18 +65,15 @@ import static org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit.K
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
- * The shared, package-manager-agnostic orchestrator for native lock regeneration: resolve the new dependency
- * set, then edit the lock file in place. The per-dependency scope diffs the pre-edit and post-edit
- * {@code package.json}, proves each moving dependency leaves the resolved closure unchanged (the strict layout
- * whitelist), resolves the target version against the registry, and hands a proven {@link LockEditSet} to the
- * format's {@link LockPatcher}. When that proof cannot be made, the whole closure is resolved instead — seeded
- * by the existing lock so still-satisfying versions stay put — and diffed against the lock into the same edits
- * for the same patcher.
+ * Native lock regeneration, by package manager. npm goes through {@link NpmLockRegenerator}: the ported
+ * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. pnpm, Yarn and Bun
+ * still take the per-dependency flow below: diff the pre-edit and post-edit {@code package.json}, prove each
+ * moving dependency leaves the resolved closure unchanged, resolve the target version against the registry,
+ * and hand a proven {@link LockEditSet} to the format's {@link LockPatcher}; when that proof cannot be made,
+ * the whole closure is resolved instead, seeded by the existing lock, and diffed into the same edits.
  * <p>
- * Anything neither scope can express byte-exactly fails loud with a structured {@link Failure} and no lock;
- * there is no shell-out (it would leak registry credentials). Non-layout entry metadata
- * ({@code engines}/{@code license}/{@code deprecated}/flags) is patched without reshaping the tree.
- * Reads over the raw lock and manifests use Jackson/SnakeYAML directly, never the lossy adapter normalization.
+ * Whatever a route cannot express byte-exactly fails loud with a structured {@link Failure} and no lock; there
+ * is no shell-out (it would leak registry credentials).
  */
 public final class NativeLockEngine {
 

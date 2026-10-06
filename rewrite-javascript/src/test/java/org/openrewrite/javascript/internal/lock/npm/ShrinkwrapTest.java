@@ -381,6 +381,17 @@ class ShrinkwrapTest {
 
     private static final JsonNode LOAD_DUMPS = VirtualTreeLoaderTest.DUMPS;
 
+    private static VirtualTreeLoader.ProjectFiles projectFiles(@Nullable String lock, @Nullable String yarn,
+                                                               @Nullable String packageJson) {
+        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+          .lock(lock == null ? null : new LockFile(lock))
+          .yarnLock(yarn);
+        if (packageJson != null) {
+            files.manifest("", packageJson);
+        }
+        return files.build();
+    }
+
     static Stream<Arguments> loadCases() {
         List<Arguments> out = new ArrayList<>();
         for (JsonNode c : LOAD_DUMPS.get("shrinkwrap")) {
@@ -462,14 +473,10 @@ class ShrinkwrapTest {
     void loadAndChangeLockfileVersion() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
         String path = VirtualTreeLoaderTest.path("install-types");
-        String lock = files.getLock().getText();
-        Shrinkwrap vDefault = new Shrinkwrap(path).load(lock, null, files.getManifests().get(""));
-        Shrinkwrap v1 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(1).build()).load(lock, null,
-          files.getManifests().get(""));
-        Shrinkwrap v2 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(2).build()).load(lock, null,
-          files.getManifests().get(""));
-        Shrinkwrap v3 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(3).build()).load(lock, null,
-          files.getManifests().get(""));
+        Shrinkwrap vDefault = new Shrinkwrap(path).load(files);
+        Shrinkwrap v1 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(1).build()).load(files);
+        Shrinkwrap v2 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(2).build()).load(files);
+        Shrinkwrap v3 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(3).build()).load(files);
         assertThat(canonical(vDefault.getData())).as("default is same as version 3").isEqualTo(canonical(v3.getData()));
         Map<String, Object> v1Data = v1.commit();
         Map<String, Object> v2Data = v2.commit();
@@ -485,7 +492,7 @@ class ShrinkwrapTest {
     @Test
     void loadingInEmptyDirGetsEmptyLockfile() {
         String dir = "/fixtures/empty";
-        Shrinkwrap sw = new Shrinkwrap(dir).load(null, null, null);
+        Shrinkwrap sw = new Shrinkwrap(dir).load(projectFiles(null, null, null));
         assertThat(canonical(sw.getData())).isEqualTo(canonical(obj("lockfileVersion", 3, "requires", true,
           "dependencies", obj(), "packages", obj())));
         assertThat(sw.isLoadedFromDisk()).isFalse();
@@ -500,8 +507,7 @@ class ShrinkwrapTest {
     @Test
     void lookUpFromLocksAndSuch() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
-        Shrinkwrap m = new Shrinkwrap(VirtualTreeLoaderTest.path("install-types")).load(files.getLock().getText(), null,
-          files.getManifests().get(""));
+        Shrinkwrap m = new Shrinkwrap(VirtualTreeLoaderTest.path("install-types")).load(files);
         assertThat(canonical(m.get(""))).as("root metadata").isEqualTo(canonical(obj("name", "a", "version", "1.2.3",
           "dependencies", obj("abbrev", "^1.1.1", "full-git-url", "git+https://github.com/isaacs/abbrev-js.git",
             "ghshort", "github:isaacs/abbrev-js", "old", "npm:abbrev@^1.0.3", "pinned", "npm:abbrev@^1.1.1",
@@ -554,7 +560,7 @@ class ShrinkwrapTest {
                       "regalias@xyz:\n  version \"1.0.2\"\n" +
                       "  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#" + hash + "\"\n" +
                       "  integrity " + sha + "\n";
-        Shrinkwrap s = new Shrinkwrap("/path").load(null, yarn, "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"}}");
+        Shrinkwrap s = new Shrinkwrap("/path").load(projectFiles(null, yarn, "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"}}"));
         Map<String, Object> opt = new LinkedHashMap<>();
         assertThat(s.checkYarnLock("mkdirp@^1.0.2", opt).getRaw()).isEqualTo("mkdirp@1.0.2");
         assertThat(opt).isEqualTo(obj("resolved", "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz", "integrity",
@@ -594,7 +600,7 @@ class ShrinkwrapTest {
 
     @Test
     void ignoreYarnLockFileParseErrors() {
-        Shrinkwrap s = new Shrinkwrap("/dir").load(null, "this is not a yarn lock file!", null);
+        Shrinkwrap s = new Shrinkwrap("/dir").load(projectFiles(null, "this is not a yarn lock file!", null));
         assertThat(s.getYarnLock()).isNotNull();
         assertThat(s.getYarnLock().getEntries()).isEmpty();
     }
@@ -602,9 +608,9 @@ class ShrinkwrapTest {
     @Test
     void emptyYarnLockIsNoYarnLock() {
         String lock = "{\"name\":\"p\",\"lockfileVersion\":3,\"packages\":{\"\":{\"name\":\"p\"}}}\n";
-        assertThat(new Shrinkwrap("/dir").load(lock, "", null).getYarnLock()).isNull();
-        assertThat(new Shrinkwrap("/dir").load(null, "", null).getYarnLock()).isNull();
-        Shrinkwrap blank = new Shrinkwrap("/dir").load(lock, "\n", null);
+        assertThat(new Shrinkwrap("/dir").load(projectFiles(lock, "", null)).getYarnLock()).isNull();
+        assertThat(new Shrinkwrap("/dir").load(projectFiles(null, "", null)).getYarnLock()).isNull();
+        Shrinkwrap blank = new Shrinkwrap("/dir").load(projectFiles(lock, "\n", null));
         assertThat(blank.getYarnLock()).isNotNull();
         assertThat(blank.getYarnLock().getEntries()).isEmpty();
     }
@@ -670,8 +676,7 @@ class ShrinkwrapTest {
     void writeBackWithPendingChanges() {
         VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
         String fixture = VirtualTreeLoaderTest.path("install-types");
-        Shrinkwrap s = new Shrinkwrap(fixture, NpmOptions.builder().lockfileVersion(2).build())
-          .load(files.getLock().getText(), null, files.getManifests().get(""));
+        Shrinkwrap s = new Shrinkwrap(fixture, NpmOptions.builder().lockfileVersion(2).build()).load(files);
         Node node = node(opts().path(fixture + "/node_modules/newthing").pkg(obj("name", "newthing", "version",
           "1.2.3")));
         s.add(node);

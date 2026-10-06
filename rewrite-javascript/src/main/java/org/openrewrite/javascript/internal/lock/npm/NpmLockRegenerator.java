@@ -156,8 +156,9 @@ public final class NpmLockRegenerator {
         try {
             options = NpmOptions.fromNpmrc(inputs.getNpmrc());
             LockFile lock = truthy(inputs.getLock()) ? new LockFile(inputs.getLock()) : null;
-            manifests = manifests(lock);
-            path = projectPath(lock, manifests.get(""));
+            Object lockData = lockData(lock);
+            manifests = manifests(lockData);
+            path = projectPath(lockData, manifests.get(""));
             IdealTreeBuilder arb = arborist(path, lock, manifests, options);
             arb.buildIdealTree();
             if (!options.isSave()) {
@@ -199,9 +200,8 @@ public final class NpmLockRegenerator {
      * The manifests given, and for the root and the link targets outside node_modules the host did not
      * supply, the lock's own entries, as arborist reads a project without a package.json from its lock.
      */
-    private Map<String, String> manifests(@Nullable LockFile lock) {
+    private Map<String, String> manifests(@Nullable Object data) {
         Map<String, String> manifests = new LinkedHashMap<>();
-        Object data = lockData(lock);
         Object packages = data instanceof Map ? Js.get(data, "packages") : null;
         if (packages instanceof Map) {
             for (Map.Entry<String, @Nullable Object> entry : Js.entries(packages)) {
@@ -250,10 +250,9 @@ public final class NpmLockRegenerator {
      * The root takes the directory's name when its manifest has none (node.js: nameFromFolder). Without the
      * host's word, the lock's own top-level name stands in: npm wrote it from that directory.
      */
-    private String projectPath(@Nullable LockFile lock, @Nullable String rootText) {
+    private String projectPath(@Nullable Object data, @Nullable String rootText) {
         String directoryName = inputs.getDirectoryName();
         if (directoryName == null) {
-            Object data = lockData(lock);
             Object lockName = data instanceof Map ? Js.get(data, "name") : null;
             if (lockName instanceof String && !((String) lockName).isEmpty()) {
                 directoryName = (String) lockName;

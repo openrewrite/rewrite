@@ -19,7 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The lock as read from the project: its text, parsed once for everything that reads it.
+ * The lock as read from the project: its text, parsed once for everything that reads it, whether or not it parses.
  */
 public final class LockFile {
 
@@ -28,13 +28,23 @@ public final class LockFile {
 
     private JsonParseEvenBetterErrors.@Nullable Parsed parsed;
 
+    private @Nullable RuntimeException error;
+
     public LockFile(String text) {
         this.text = text;
     }
 
     JsonParseEvenBetterErrors.Parsed parsed() {
+        if (error != null) {
+            throw error;
+        }
         if (parsed == null) {
-            parsed = JsonParseEvenBetterErrors.parse(text);
+            try {
+                parsed = JsonParseEvenBetterErrors.parse(text);
+            } catch (RuntimeException e) {
+                error = e;
+                throw e;
+            }
         }
         return parsed;
     }

@@ -286,16 +286,6 @@ public final class Shrinkwrap {
         }
     }
 
-    public Shrinkwrap load(@Nullable String lock, @Nullable String yarn, @Nullable String packageJson) {
-        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
-                .lock(lock == null ? null : new LockFile(lock))
-                .yarnLock(yarn);
-        if (packageJson != null) {
-            files.manifest("", packageJson);
-        }
-        return load(files.build());
-    }
-
     /**
      * Arborist's {@code load()} over the files it would read from the project directory: the lock
      * (npm-shrinkwrap.json or package-lock.json, null when there is none), yarn.lock and package.json

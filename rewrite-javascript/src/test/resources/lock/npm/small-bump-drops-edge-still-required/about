@@ -1,0 +1,1 @@
+Bump is-fullwidth-code-point 1.0.0 (number-is-nan ^1.0.0) -> 2.0.0 (no dependencies) while is-finite@1.0.2 still requires number-is-nan: the root number-is-nan stays, only the bumped entry changes.
