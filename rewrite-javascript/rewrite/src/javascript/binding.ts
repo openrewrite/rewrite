@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, namesDeclaredWithin, namesUsedIn, scopeOf} from "./scope";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
     memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
@@ -385,7 +385,8 @@ function rebindingName(
     options: MaybeRebindOptions,
     existing: ExistingImportBinding
 ): string | undefined {
-    const taken = (name: string) => nameTaken(name, namesUsedIn(cu), visitor);
+    const taken = (name: string) =>
+        nameTaken(name, namesUsedIn(cu), visitor) && !bindsTargetEverywhere(cu, name, options.to);
     const alias = options.to.alias;
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
@@ -395,6 +396,16 @@ function rebindingName(
         return existing.localName;
     }
     return taken(member) ? existing.localName : member;
+}
+
+/**
+ * Whether `name` is a value import of `to` itself that no nearer scope redeclares, so the moved
+ * binding can take that name without changing what any reference reads.
+ */
+function bindsTargetEverywhere(cu: JS.CompilationUnit, name: string, to: MaybeRebindOptions["to"]): boolean {
+    const target = existingImportBinding(cu, to.module, to.member);
+    return target?.localName === name && !target.typeOnly && !cu.statements.some(s =>
+        s.element?.kind !== JS.Kind.Import && namesDeclaredWithin(s.element).has(name));
 }
 
 /**

@@ -1850,6 +1850,9 @@ export interface ExistingImportBinding {
 
     /** Whether the source states this local name — `import {a as b}` — or takes it from the member. */
     aliased: boolean;
+
+    /** Whether the clause or the specifier itself is marked `type`. */
+    typeOnly: boolean;
 }
 
 /**
@@ -1868,10 +1871,13 @@ export function existingImportBinding(
         }
         const localName = importBinds(element as JS.Import, module, member);
         if (localName !== undefined) {
+            const key = memberName(member);
             return {
                 localName,
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
-                aliased: localName !== memberName(member)
+                aliased: localName !== key,
+                typeOnly: ((element as JS.Import).importClause?.typeOnly ?? false) ||
+                    (key !== undefined && key !== '*' && namedSpecifierIsTypeOnly(element as JS.Import, key))
             };
         }
     }

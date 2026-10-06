@@ -4,7 +4,8 @@ import * as fs from "fs";
 import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
-    maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, maybeRemoveImport, removeNewlyUnusedAmdBindings
+    maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
+    removeNewlyUnusedAmdBindings
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -1100,6 +1101,47 @@ describe("maybeRebind", () => {
             `import { Event as Old } from "m2";\n\nfunction f(e: Event) { return Old(e); }`
         ));
         expect(bound.name).toBe("Old");
+    });
+
+    test("a name the file already binds to the target itself is free, pinned as an alias or not", async () => {
+        const rebindTo = (to: MaybeRebindOptions["to"], bound: {name?: string}) =>
+            fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                    bound.name = maybeRebind(this, {from: {module: "m", member: "Old"}, to});
+                    return super.visitJsCompilationUnit(cu, p);
+                }
+            });
+        const named: {name?: string} = {};
+        const spec = new RecipeSpec();
+        spec.recipe = rebindTo({module: "m2", member: "New"}, named);
+        await spec.rewriteRun(typescript(
+            `import { New, Other } from "m2";\nimport { Old } from "m";\n\nOld(New, Other);`,
+            `import { New, Other } from "m2";\n\nNew(New, Other);`
+        ));
+        expect(named.name).toBe("New");
+
+        const pinned: {name?: string} = {};
+        spec.recipe = rebindTo({module: "m2", member: "New", alias: "N"}, pinned);
+        await spec.rewriteRun(typescript(
+            `import { New as N } from "m2";\nimport { Old } from "m";\n\nOld(N);`,
+            `import { New as N } from "m2";\n\nN(N);`
+        ));
+        expect(pinned.name).toBe("N");
+    });
+
+    test("a target binding that is type-only, or that a nearer scope shadows, still counts as taken", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(
+            typescript(
+                `import type { New } from "m2";\nimport { Old } from "m";\n\nOld(1 as unknown as New);`,
+                `import type { New } from "m2";\nimport { New as Old } from "m2";\n\nOld(1 as unknown as New);`
+            ),
+            typescript(
+                `import { New } from "m2";\nimport { Old } from "m";\n\nfunction f(New: number) { return Old(New); }`,
+                `import { New, New as Old } from "m2";\n\nfunction f(New: number) { return Old(New); }`
+            )
+        );
     });
 
     test("a reference in type-name position renames: a decorator, and a generic's own base", async () => {
