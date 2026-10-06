@@ -49,6 +49,10 @@ function moduleName(specifier: string): string {
     return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
 }
 
+function isGlobalAugmentation(declaration: ts.Declaration): boolean {
+    return ts.isModuleDeclaration(declaration) && (declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
+}
+
 export class JavaScriptTypeMapping {
     // Primary cache: Use type signatures (preferring type.id) as cache keys
     // TypeScript assigns stable IDs to all types, so we don't need secondary caches
@@ -784,14 +788,17 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * The module a function declared in a parsed source file belongs to, named after the file's
-     * path relative to the source root and without its extension (like Go's type_mapper.go).
-     * A declaration and a call of the function both take it, so a pattern written from one matches the other.
+     * A parsed file's module, named after its path relative to the source root without its extension,
+     * as TypeScript names the module of an export. A function declared in the file is declared on it.
      */
     private sourceModuleType(sourceFile: ts.SourceFile): Type.FullyQualified {
+        return this.moduleType(this.sourceModuleName(sourceFile));
+    }
+
+    private sourceModuleName(sourceFile: ts.SourceFile): string {
         const fileName = sourceFile.fileName;
         const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
-        return this.moduleType(relative.replace(/\.[^/.]+$/, ''));
+        return relative.replace(/\.[^/.]+$/, '');
     }
 
     /**
@@ -910,6 +917,27 @@ export class JavaScriptTypeMapping {
             default:
                 return Type.unknownType as Type.FullyQualified;
         }
+    }
+
+    /**
+     * The class or interface that declares a member, which is a call's declaring type, as in Java.
+     * A union's member has one only when every member type inherits it from the same class.
+     */
+    private declaringClassOf(member: ts.Symbol): Type.FullyQualified | undefined {
+        let owner: ts.Type | undefined;
+        for (const declaration of member.declarations ?? []) {
+            const parent = declaration.parent;
+            if (!ts.isClassLike(parent) && !ts.isInterfaceDeclaration(parent)) {
+                return undefined;
+            }
+            const type = this.checker.getTypeAtLocation(parent);
+            if (owner && owner.symbol !== type.symbol) {
+                return undefined;
+            }
+            owner = type;
+        }
+        const declaringType = owner && this.declaringType(owner);
+        return declaringType === Type.unknownType ? undefined : declaringType;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
@@ -1032,8 +1060,10 @@ export class JavaScriptTypeMapping {
                 const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
                     (mappedType as Type.Class).fullyQualifiedName.startsWith('{');
 
-                // Handle different types
-                if (receiverBinding?.namespace && anonymous) {
+                const declaringClass = this.declaringClassOf(symbol);
+                if (declaringClass) {
+                    declaringType = declaringClass;
+                } else if (receiverBinding?.namespace && anonymous) {
                     declaringType = this.moduleType(receiverBinding.module);
                     if (methodName === 'default') {
                         methodName = '<default>';
@@ -1289,10 +1319,14 @@ export class JavaScriptTypeMapping {
         // e.g., '"React"."Component"' -> 'React.Component'
         const tsQualifiedName = this.checker.getFullyQualifiedName(symbol);
         let cleanedName = moduleName(tsQualifiedName.replace(/"/g, ''));
+        const outermost = this.outermostDeclaration(symbol);
+        const sourceModule = outermost && this.sourceModuleOf(outermost);
 
-        // Check if this is a file path from node_modules (happens with some packages)
-        // TypeScript sometimes returns full paths instead of module names
-        if (cleanedName.includes('node_modules/')) {
+        if (sourceModule) {
+            cleanedName = `${sourceModule}.${cleanedName}`;
+        } else if (cleanedName.includes('node_modules/')) {
+            // Check if this is a file path from node_modules (happens with some packages)
+            // TypeScript sometimes returns full paths instead of module names
             // Extract the module name from the path
             // Example: /private/var/.../node_modules/react-spinners/src/index.ClipLoader
             // Should become: react-spinners.ClipLoader
@@ -1349,7 +1383,7 @@ export class JavaScriptTypeMapping {
             // Preserved as-is:
             //  - UMD globals (`export as namespace X`, e.g. React, lodash `_`, jQuery `$`): the
             //    namespace name is the conventional public identifier;
-            //  - `global.*` (TypeScript's marker for ambient globals);
+            //  - `global.*`, a `declare global` augmentation, whose prefix is dropped below;
             //  - namespaces that already match the package name, and any non-node_modules type.
             const namespaceName = cleanedName.substring(0, cleanedName.indexOf('.'));
             if (namespaceName !== 'global') {
@@ -1364,9 +1398,38 @@ export class JavaScriptTypeMapping {
             }
         }
 
+        // A `declare global` augmentation is in the same global scope as the built-ins, which have no prefix.
+        if (outermost && isGlobalAugmentation(outermost) && cleanedName.startsWith('global.')) {
+            cleanedName = cleanedName.substring('global.'.length);
+        }
+
         return cleanedName.endsWith('Constructor') ?
             cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
             cleanedName;
+    }
+
+    /**
+     * The project module whose top level holds a declaration local to it, such as a class it does not
+     * export. TypeScript names that as bare as a global, so a module's own `class Array` needs the module.
+     */
+    private sourceModuleOf(declaration: ts.Declaration): string | undefined {
+        if (!declaration.parent || !ts.isSourceFile(declaration.parent) || isGlobalAugmentation(declaration) ||
+            ts.isModuleDeclaration(declaration) && ts.isStringLiteral(declaration.name)) {
+            return undefined;
+        }
+        const sourceFile = declaration.parent;
+        const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
+        return isModule && !sourceFile.isDeclarationFile && !sourceFile.fileName.includes('node_modules/') ?
+            this.sourceModuleName(sourceFile) : undefined;
+    }
+
+    /** The declaration of the symbol a qualified name starts from, such as a class's namespace. */
+    private outermostDeclaration(symbol: ts.Symbol): ts.Declaration | undefined {
+        let outermost = symbol;
+        while ((outermost as any).parent) {
+            outermost = (outermost as any).parent;
+        }
+        return outermost.declarations?.[0];
     }
 
     /**
