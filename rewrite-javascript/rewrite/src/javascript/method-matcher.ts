@@ -27,7 +27,7 @@ export class MethodMatcher {
             throw new Error(`Invalid pattern format: ${pattern}`);
         }
 
-        const typeSpec = withoutGlobalPrefix(pattern.substring(0, lastSpaceBeforeParen).trim());
+        const typeSpec = pattern.substring(0, lastSpaceBeforeParen).trim();
         const methodSpec = pattern.substring(lastSpaceBeforeParen + 1).trim();
 
         // Parse type specification (package.Type or just Type)
@@ -95,7 +95,7 @@ export class MethodMatcher {
     }
 
     private matchesTargetType(type: Type | undefined): boolean {
-        const matches = (name: string) => this.matchesTypeName(withoutGlobalPrefix(name));
+        const matches = (name: string) => this.matchesTypeName(name);
         // A call on an untyped receiver declares on the unknown type, which a wildcard pattern
         // matches by name. Java's matcher has no such case because Java calls are always typed.
         return type?.kind === Type.Kind.Unknown
@@ -259,12 +259,4 @@ export class MethodMatcher {
                 return type;
         }
     }
-}
-
-/**
- * The type mapper names a type declared in a `declare global` block `global.<name>`. It lives in
- * the same global scope as the built-ins, so `Buffer` and `global.Buffer` name the same type.
- */
-function withoutGlobalPrefix(name: string): string {
-    return name.startsWith('global.') ? name.substring('global.'.length) : name;
 }

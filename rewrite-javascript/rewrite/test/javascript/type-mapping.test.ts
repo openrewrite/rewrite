@@ -1042,6 +1042,128 @@ describe('JavaScript type mapping', () => {
             );
         });
 
+        test('a call is declared on the class that declares the method, not on the receiver\'s class', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    class Numbers extends Array<number> {}
+                    new Numbers().indexOf(1);
+                    function first<T extends string[]>(t: T) { return t.indexOf('a'); }
+                `,
+                //@formatter:off
+                `
+                    class Numbers extends Array<number> {}
+                    /*~~(Array)~~>*/new Numbers().indexOf(1);
+                    function first<T extends string[]>(t: T) { return /*~~(Array)~~>*/t.indexOf('a'); }
+                `
+                //@formatter:on
+            );
+            src.path = 'main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a call on a union is declared on the class every member inherits the method from, if there is one', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.MethodInvocation && Type.isMethod(type) ?
+                    FullyQualified.getFullyQualifiedName(type.declaringType) : null);
+
+            const src = typescript(
+                `
+                    class Shape { area() { return 0; } }
+                    class Square extends Shape {}
+                    class Circle extends Shape {}
+                    declare const shape: Square | Circle;
+                    declare const text: string | string[];
+                    shape.area();
+                    text.indexOf('a');
+                `,
+                //@formatter:off
+                `
+                    class Shape { area() { return 0; } }
+                    class Square extends Shape {}
+                    class Circle extends Shape {}
+                    declare const shape: Square | Circle;
+                    declare const text: string | string[];
+                    /*~~(Shape)~~>*/shape.area();
+                    /*~~(<unknown>)~~>*/text.indexOf('a');
+                `
+                //@formatter:on
+            );
+            src.path = 'main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a class declared in a module is named after the module, whether or not it is exported', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) => {
+                if (node?.kind === J.Kind.ClassDeclaration) {
+                    return Type.isClass(type) ? type.fullyQualifiedName : null;
+                }
+                if (node?.kind === J.Kind.MethodInvocation && Type.isMethod(type)) {
+                    return FullyQualified.getFullyQualifiedName(type.declaringType);
+                }
+                return null;
+            });
+
+            const src = typescript(
+                `
+                    export class Exported {}
+                    class Array { indexOf(n: number) { return n; } }
+                    namespace NS { export class Inner {} }
+                    new Array().indexOf(1);
+                    [1].indexOf(1);
+                `,
+                //@formatter:off
+                `
+                    /*~~(src/main.Exported)~~>*/export class Exported {}
+                    /*~~(src/main.Array)~~>*/class Array { indexOf(n: number) { return n; } }
+                    namespace NS { /*~~(src/main.NS.Inner)~~>*/export class Inner {} }
+                    /*~~(src/main.Array)~~>*/new Array().indexOf(1);
+                    /*~~(Array)~~>*/[1].indexOf(1);
+                `
+                //@formatter:on
+            );
+            src.path = 'src/main.ts';
+            await spec.rewriteRun(src);
+        });
+
+        test('a class declared in a script or a declare global block is a global, so it has no module', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markTypes((node, type) =>
+                node?.kind === J.Kind.ClassDeclaration && Type.isClass(type) ? type.fullyQualifiedName : null);
+
+            const script = typescript(
+                `
+                    class MyList {}
+                `,
+                //@formatter:off
+                `
+                    /*~~(MyList)~~>*/class MyList {}
+                `
+                //@formatter:on
+            );
+            script.path = 'src/script.ts';
+            const augmentation = typescript(
+                `
+                    declare global { interface Shared {} }
+                    export {};
+                `,
+                //@formatter:off
+                `
+                    declare global { /*~~(Shared)~~>*/interface Shared {} }
+                    export {};
+                `
+                //@formatter:on
+            );
+            augmentation.path = 'src/augmentation.ts';
+            await spec.rewriteRun(script, augmentation);
+        });
+
         test.skip('should map generic types', async () => {
             // TODO: Implement in Phase 5
             const spec = new RecipeSpec();
@@ -2422,7 +2544,7 @@ describe('JavaScript type mapping', () => {
                                 import fse from 'fs-extra';
                                 import {remove} from 'fs-extra';
                                 import * as ns from 'fs-extra';
-                                const required = /*~~(global.NodeJS)~~>*/require('fs-extra');
+                                const required = /*~~(NodeJS)~~>*/require('fs-extra');
 
                                 /*~~(fs-extra)~~>*/fse.ensureDir('a');
                                 /*~~(fs-extra)~~>*/remove('b');

@@ -146,7 +146,7 @@ describe('template dependencies integration', () => {
                 : undefined;
         };
 
-        expect(await processDeclaringTypeWith(['node'])).toBe('global.NodeJS.Process');
+        expect(await processDeclaringTypeWith(['node'])).toBe('NodeJS.Process');
 
         expect(await processDeclaringTypeWith([])).toBeUndefined();
     }, 120000);
