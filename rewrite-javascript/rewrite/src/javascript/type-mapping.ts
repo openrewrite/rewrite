@@ -620,7 +620,6 @@ export class JavaScriptTypeMapping {
             // For imported variables, find the module specifier
             const moduleSpecifier = this.importedModule(symbol.declarations?.[0]);
             if (moduleSpecifier) {
-                // Create a Type.Class representing the module
                 ownerType = {
                     kind: Type.Kind.Class,
                     flags: 0,
