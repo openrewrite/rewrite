@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from rewrite.visitor import Cursor
 
 from .capture import Capture
-from .placeholder import substitute_placeholders
+from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
 
 # Wrapper function name used to make template code parseable
@@ -138,7 +138,7 @@ class TemplateEngine:
         is_expression = cls._is_expression(dedented)
 
         # Generate wrapper and parse
-        wrapper_code = cls._generate_wrapper(substituted_code, options)
+        wrapper_code = cls._generate_wrapper(substituted_code, options, captures)
         compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
@@ -185,7 +185,8 @@ class TemplateEngine:
         options: TemplateOptions
     ) -> str:
         """Generate a cache key from template components."""
-        capture_names = ",".join(sorted(captures.keys()))
+        capture_names = ",".join(
+            f"{name}:{cap.type_hint}" for name, cap in sorted(captures.items()))
         imports_key = ",".join(sorted(options.imports))
         context_key = ",".join(options.context)  # preserve order: context is order-dependent
         deps_key = ",".join(
@@ -194,13 +195,19 @@ class TemplateEngine:
         return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
-    def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
+    def _generate_wrapper(
+        cls,
+        code: str,
+        options: TemplateOptions,
+        captures: Dict[str, Capture],
+    ) -> str:
         """
         Generate a parseable Python wrapper for the template code.
 
         Args:
             code: Template code (with placeholders already substituted).
             options: Template options including imports.
+            captures: Captures whose ``type_hint`` declares their placeholder's type.
 
         Returns:
             Complete Python source that can be parsed.
@@ -214,6 +221,9 @@ class TemplateEngine:
         # Add context statements (general-purpose, may include imports or other code)
         for ctx in options.context:
             lines.append(ctx)
+
+        # After the context, so that a hint can name what the context imports.
+        lines.extend(cls._capture_preamble(captures))
 
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
@@ -235,6 +245,11 @@ class TemplateEngine:
                 lines.append(f"    {line}")
 
         return '\n'.join(lines)
+
+    @classmethod
+    def _capture_preamble(cls, captures: Dict[str, Capture]) -> List[str]:
+        return [f"{to_placeholder(name)}: {cap.type_hint}"
+                for name, cap in captures.items() if cap.is_typed]
 
     @classmethod
     def _is_expression(cls, code: str) -> bool:

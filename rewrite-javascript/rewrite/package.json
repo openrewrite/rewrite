@@ -60,7 +60,7 @@
   "scripts": {
     "prebuild": "bun -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && bun -e \"require('fs').rmSync('tsconfig.build.tsbuildinfo',{force:true})\"",
     "build": "tsc --build tsconfig.build.json",
-    "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', 0o755)\" && npm link",
+    "postbuild": "bun -e \"require('fs').chmodSync('dist/rpc/server.js', 0o755); require('fs').chmodSync('dist/javascript/type-report-cli.js', 0o755)\" && npm link",
     "typecheck": "tsc --noEmit -p tsconfig.test.json",
     "dev": "tsc --watch -p tsconfig.json",
     "test": "npm run typecheck && npm run build && vitest run",
@@ -103,6 +103,7 @@
     "lodash": "^4.18.1"
   },
   "bin": {
-    "rewrite-rpc": "./dist/rpc/server.js"
+    "rewrite-rpc": "./dist/rpc/server.js",
+    "rewrite-javascript-types": "./dist/javascript/type-report-cli.js"
   }
 }

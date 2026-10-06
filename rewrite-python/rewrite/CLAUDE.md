@@ -118,6 +118,25 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
 - `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
 
+### Moving a binding: `maybe_bind` and `maybe_rebind`
+
+`binding.py` ports the JavaScript `maybeBind`/`maybeRebind`. `ChangeImport` is a thin wrapper over `maybe_rebind`.
+
+Which name a moved binding takes:
+
+- A pinned `alias` is used verbatim. If the file spells it elsewhere, nothing moves.
+- An aliased import keeps its alias.
+- An unaliased `from` import follows the new member's name. If the file spells that name for anything other than a module-scope import of that very member, it keeps its old name as an alias. A parameter or nested import of the name counts, since it would capture a renamed reference. So does an import or rebind queued earlier in the visit.
+- An unaliased `import m` follows the new module where nothing reads `m`, or where both names are single segments and the new one is free. Otherwise it keeps `m` as an alias. A dotted `import a.b` that is read refuses, since `a.b.x` has no counterpart.
+
+One call moves one binding, and a repeated call answers as the first did. A second import binding the member under another name stays, and so do its types. A member read through its module, as `m.member`, moves with it. A module-level import of the old module has the new one spelled through `maybe_bind`. An import in an `if` block gets the new module bound in that block.
+
+What the attribution follows:
+
+- The old identity is read from the canonical types on the import's own name and on `m.member` references, as well as from `module.member`.
+- A parse names a class or function after the module that defines it (`acme.http._client.HttpClient`). That module cannot be read off an import path, so `declared_in` names it. Without it the new names use `to_module`, which differs from a fresh parse wherever the target re-exports.
+- A whole-module move renames the module object, and with it the functions it declares and the classes declared directly in it. Classes from its submodules keep their names.
+
 ### Padding and Whitespace
 
 - `JRightPadded[T]`: element T with `.after` (whitespace before trailing delimiter)

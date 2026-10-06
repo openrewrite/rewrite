@@ -488,10 +488,8 @@ describe('template precedence', () => {
                 `,
                 `
                     function h() {
-                        (function () {
-                        });
-                        (class {
-                        });
+                        (function () {});
+                        (class {});
                     }
                 `));
         });

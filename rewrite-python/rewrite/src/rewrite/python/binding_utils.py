@@ -238,7 +238,7 @@ def _scan(statements: Iterable[Statement], guarded: bool) -> List[Binding]:
     bindings: List[Binding] = []
     for stmt in statements:
         if isinstance(stmt, MultiImport):
-            module = _dotted_path(stmt.from_) if stmt.from_ is not None else None
+            module = dotted_path(stmt.from_) if stmt.from_ is not None else None
             bindings.extend(_binding(imp, module, guarded) for imp in stmt.names)
         elif isinstance(stmt, Import):
             bindings.append(_binding(stmt, None, guarded))
@@ -250,14 +250,14 @@ def _scan(statements: Iterable[Statement], guarded: bool) -> List[Binding]:
 
 
 def _binding(imp: Import, from_module: Optional[str], guarded: bool) -> Binding:
-    qualid = _dotted_path(imp.qualid)
+    qualid = dotted_path(imp.qualid)
     alias = get_alias_name(imp)
     if from_module is not None:
         return Binding(alias or qualid, from_module, qualid, imp, guarded)
     return Binding(alias or qualid.split('.')[0], qualid, None, imp, guarded)
 
 
-def _dotted_path(name: Optional[J]) -> str:
+def dotted_path(name: Optional[J]) -> str:
     """A name tree as written, keeping the empty parts a relative import's leading dots parse to."""
     parts: List[str] = []
 
@@ -272,5 +272,5 @@ def _dotted_path(name: Optional[J]) -> str:
     return '.'.join(parts)
 
 
-__all__ = ['Binding', 'ImportBindings', 'import_bindings', 'is_reference',
+__all__ = ['Binding', 'ImportBindings', 'dotted_path', 'import_bindings', 'is_reference',
            'resolves_in_scope']
