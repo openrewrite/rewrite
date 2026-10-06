@@ -24,7 +24,7 @@ export class MethodMatcher {
             throw new Error(`Invalid pattern format: ${pattern}`);
         }
 
-        const typeSpec = pattern.substring(0, lastSpaceBeforeParen).trim();
+        const typeSpec = withoutGlobalPrefix(pattern.substring(0, lastSpaceBeforeParen).trim());
         const methodSpec = pattern.substring(lastSpaceBeforeParen + 1).trim();
 
         // Parse type specification (package.Type or just Type)
@@ -35,7 +35,9 @@ export class MethodMatcher {
         } else {
             const lastDotIndex = typeSpec.lastIndexOf('.');
             if (lastDotIndex === -1) {
-                this.packagePattern = '*';
+                // As in Java, a type without a package matches only the type in no package, such as
+                // the global `Array` or the module `fs-extra`. `*.Array` matches any package.
+                this.packagePattern = '';
                 this.typePattern = typeSpec;
             } else {
                 // Check if we're splitting a *.. pattern incorrectly
@@ -76,7 +78,7 @@ export class MethodMatcher {
         }
 
         // Extract fully qualified name from declaringType
-        const fullyQualifiedName = FullyQualified.getFullyQualifiedName(method.declaringType);
+        const fullyQualifiedName = withoutGlobalPrefix(FullyQualified.getFullyQualifiedName(method.declaringType));
 
         // Split fully qualified name into package and type
         const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
@@ -252,4 +254,12 @@ export class MethodMatcher {
                 return type;
         }
     }
+}
+
+/**
+ * The type mapper names a type declared in a `declare global` block `global.<name>`. It lives in
+ * the same global scope as the built-ins, so `Buffer` and `global.Buffer` name the same type.
+ */
+function withoutGlobalPrefix(name: string): string {
+    return name.startsWith('global.') ? name.substring('global.'.length) : name;
 }
