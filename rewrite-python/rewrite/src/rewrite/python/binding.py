@@ -211,11 +211,11 @@ def _taken(visitor: TreeVisitor[Any, Any], cu: CompilationUnit, name: str,
         return stands is None or not stands.shares(module, member, aliased)
 
     for v in visitor._after_visit or []:
-        if isinstance(v, _RebindImport) and v.bound_name == name and other(v.to_module, v.to_member, True):
-            return True
-        if (isinstance(v, _RebindImport) and v.new_module_import and v.to_module.split('.')[0] == name
-                and other(v.to_module, None, False)):
-            return True
+        if isinstance(v, _RebindImport):
+            if v.bound_name == name and other(v.to_module, v.to_member, True):
+                return True
+            if v.new_module_import and v.to_module.split('.')[0] == name and other(v.to_module, None, False):
+                return True
         if isinstance(v, AddImport) and (v.alias or v.name or v.module.split('.')[0]) == name and other(
                 v.module, v.name, v.alias is not None):
             return True
@@ -553,7 +553,7 @@ class _RebindImport(PythonVisitor[Any]):
                 module=self.to_module, name=self.to_member, alias=self._import_alias(),
                 only_if_referenced=False))
         if self.new_module_import:
-            # Ahead of the removal, since `import a.b` binds the `a` that frees `import a`.
+            # RemoveImport keeps a read `import a` unless another import binds `a`, so `import a.b` goes first.
             maybe_add_import(self, AddImportOptions(module=self.to_module, only_if_referenced=False))
         if self.rewrote_qualified:
             maybe_remove_import(self, RemoveImportOptions(module=self.from_module))
