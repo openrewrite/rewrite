@@ -35,7 +35,7 @@ export async function main(argv: string[]): Promise<number> {
             "directory node_modules and tsconfig resolve against (default: the nearest one with a package.json)")
         .option("--only-missing", "list only the nodes whose type is missing")
         .option("--all", "list every node with a type slot, not just calls and declarations")
-        .option("--supertypes", "show each declaring type's ancestry, which bounds how general a MethodMatcher pattern can be")
+        .option("--supertypes", "show each declaring type's superclass chain, whose types a matchOverrides pattern may name")
         .option("--tree", "print the nested structure with each node's type instead of the listing")
         .option("--json", "print the listing as JSON")
         .exitOverride();

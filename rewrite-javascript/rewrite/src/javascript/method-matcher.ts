@@ -4,6 +4,9 @@ import FullyQualified = Type.FullyQualified;
 /**
  * Matches a method type against a `<declaring type> <name>(<args>)` pattern.
  * `REWRITE_JAVASCRIPT_DUMP_TYPES=1` in a test run prints the pattern each call would match.
+ *
+ * With `matchOverrides`, the pattern's type may also be a supertype or interface of the declaring
+ * type, as in Java. A pattern naming a subtype of the declaring type never matches.
  */
 export class MethodMatcher {
     private readonly packagePattern: string;
@@ -11,7 +14,7 @@ export class MethodMatcher {
     private readonly methodPattern: string;
     private readonly argumentPatterns: string[];
 
-    constructor(pattern: string) {
+    constructor(pattern: string, private readonly matchOverrides: boolean = false) {
         // Find the last space before the method spec (which contains parentheses)
         const firstParenIndex = pattern.indexOf('(');
         if (firstParenIndex === -1) {
@@ -77,23 +80,7 @@ export class MethodMatcher {
             return false;
         }
 
-        // Extract fully qualified name from declaringType
-        const fullyQualifiedName = withoutGlobalPrefix(FullyQualified.getFullyQualifiedName(method.declaringType));
-
-        // Split fully qualified name into package and type
-        const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
-        const packageName = lastDotIndex === -1 ? '' : fullyQualifiedName.substring(0, lastDotIndex);
-        const typeName = lastDotIndex === -1 ? fullyQualifiedName : fullyQualifiedName.substring(lastDotIndex + 1);
-
-        // Match package
-        if (!this.matchesPackage(packageName)) {
-            return false;
-        }
-
-        // Match type (normalize primitives for matching)
-        const normalizedTypePattern = this.normalizePrimitiveType(this.typePattern);
-        const normalizedTypeName = this.normalizePrimitiveType(typeName);
-        if (!this.matchesPattern(normalizedTypePattern, normalizedTypeName)) {
+        if (!this.matchesTargetType(method.declaringType)) {
             return false;
         }
 
@@ -105,6 +92,27 @@ export class MethodMatcher {
         // Match arguments - convert Type[] to string representations
         const argStrings = method.parameterTypes.map(type => MethodMatcher.typeName(type));
         return this.matchesArguments(argStrings);
+    }
+
+    private matchesTargetType(type: Type | undefined): boolean {
+        const fq = Type.isParameterized(type) ? type.type : type;
+        if (!fq) {
+            return false;
+        }
+        if (this.matchesTypeName(withoutGlobalPrefix(FullyQualified.getFullyQualifiedName(fq as FullyQualified)))) {
+            return true;
+        }
+        return this.matchOverrides && Type.isClass(fq) &&
+            (this.matchesTargetType(fq.supertype) || fq.interfaces.some(i => this.matchesTargetType(i)));
+    }
+
+    private matchesTypeName(fullyQualifiedName: string): boolean {
+        const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
+        const packageName = lastDotIndex === -1 ? '' : fullyQualifiedName.substring(0, lastDotIndex);
+        const typeName = lastDotIndex === -1 ? fullyQualifiedName : fullyQualifiedName.substring(lastDotIndex + 1);
+
+        return this.matchesPackage(packageName) &&
+            this.matchesPattern(this.normalizePrimitiveType(this.typePattern), this.normalizePrimitiveType(typeName));
     }
 
     /** The name an argument pattern compares against a parameter of this type. */
