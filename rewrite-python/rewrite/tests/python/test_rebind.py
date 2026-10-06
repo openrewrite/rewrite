@@ -405,6 +405,47 @@ def test_rebinds_in_one_visit_end_in_one_import():
     assert answers == ['acme', 'acme.Http']
 
 
+def test_a_queued_module_import_claims_its_name():
+    answers: List[Optional[str]] = []
+    _visiting(answers,
+              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http'),
+              lambda v: maybe_bind(v, 'other', alias='acme')).rewrite_run(
+        python(
+            '''
+            import legacy
+            h = legacy.Http()
+            ''',
+            '''
+            import acme
+            h = acme.Http()
+            '''))
+    assert answers == ['acme.Http', None]
+
+
+def test_the_answered_module_is_imported_where_the_caller_writes_the_reference():
+    class WritesTheAnswer(PythonVisitor[Any]):
+        def visit_compilation_unit(self, cu: CompilationUnit, p: Any) -> Any:
+            assert maybe_rebind(self, 'legacy', 'acme', from_member='Http') == 'acme.Http'
+            return super().visit_compilation_unit(cu, p)
+
+        def visit_method_invocation(self, method: Any, p: Any) -> Any:
+            select = method.padding.select
+            return method.padding.replace(_select=select.replace(
+                _element=select.element.replace(_simple_name='acme')))
+
+    RecipeSpec(recipe=from_visitor(WritesTheAnswer()), type_attribution=False).rewrite_run(
+        python(
+            '''
+            import legacy
+            h = legacy.Http()
+            ''',
+            '''
+            import legacy
+            import acme
+            h = acme.Http()
+            '''))
+
+
 def test_the_import_a_move_rewrites_is_the_one_binding_it():
     answers: List[Optional[str]] = []
     # A relative import names its module with its leading dots.

@@ -116,7 +116,10 @@ When inserting after existing imports, the new import needs `prefix=Space([], '\
 ### Import Detection
 
 - `from datetime import datetime` → `MultiImport` with `from_=Identifier("datetime")`, names contain `Import` with qualid `"datetime"`
-- `import datetime` → `MultiImport` with `from_=None`, names contain `Import` with qualid `"datetime"`
+- `import datetime`, `import datetime as dt` and `import os.path` → a bare `Import` statement, with no `MultiImport` around it
+- `import os, sys` → `MultiImport` with `from_=None`, names contain one `Import` per module
+
+A visitor that only overrides `visit_multi_import` misses every single-module `import`.
 
 ### Moving a binding: `maybe_bind` and `maybe_rebind`
 
