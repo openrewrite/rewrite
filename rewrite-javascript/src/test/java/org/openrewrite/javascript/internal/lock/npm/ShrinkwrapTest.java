@@ -24,6 +24,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -39,9 +41,9 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Port of the cases of @npmcli/arborist test/shrinkwrap.js that concern the metadata a tree keeps
- * (add, get, delete, addEdge, metaFromNode). Expectations upstream keeps in snapshots, or reaches by
- * reading a tree from disk, are arborist's own answers in the shrinkwrap-dumps fixture.
+ * Port of @npmcli/arborist test/shrinkwrap.js. Expectations upstream keeps in snapshots, or reaches by
+ * reading a tree or a fixture directory from disk, are arborist's own answers in the shrinkwrap-dumps and
+ * load-virtual-dumps fixtures.
  */
 class ShrinkwrapTest {
 
@@ -67,7 +69,7 @@ class ShrinkwrapTest {
     void resolveOptions() {
         String url = "https://private.registry.org/deadbeef/registry/-/registry-1.2.3.tgz";
         for (boolean omit : new boolean[]{true, false}) {
-            Shrinkwrap meta = new Shrinkwrap("/dir", new Shrinkwrap.ResolveOptions(omit));
+            Shrinkwrap meta = new Shrinkwrap("/dir", NpmOptions.builder().omitLockfileRegistryResolved(omit).build());
             meta.setData(obj("lockfileVersion", 2, "requires", true, "packages", obj(), "dependencies", obj()));
             Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("registry", "^1.0.0",
               "some-other-registry", "^1.0.0", "@scoped/some-other-registry", "^1.0.0", "tar", url)))
@@ -359,6 +361,243 @@ class ShrinkwrapTest {
 
         assertThat(resalready.getResolved()).as("resolved only, from node settings").isEqualTo("pre-existing resolved");
         assertThat(resalready.getIntegrity()).as("resolved only, from node settings").isNull();
+    }
+
+    private static final JsonNode LOAD_DUMPS = VirtualTreeLoaderTest.DUMPS;
+
+    static Stream<Arguments> loadCases() {
+        List<Arguments> out = new ArrayList<>();
+        for (JsonNode c : LOAD_DUMPS.get("shrinkwrap")) {
+            out.add(Arguments.of(c.get("name").asText(), c));
+        }
+        return out.stream();
+    }
+
+    private static Shrinkwrap loaded(JsonNode c) {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files(c.get("inputs").asText());
+        NpmOptions options = c.get("lockfileVersion").isNull() ? NpmOptions.DEFAULT :
+          NpmOptions.builder().lockfileVersion(c.get("lockfileVersion").asInt()).build();
+        return new Shrinkwrap(VirtualTreeLoaderTest.path(c.get("inputs").asText()), options)
+          .load(files.getLock(), files.getYarnLock(), files.getManifests().get(""));
+    }
+
+    private static String canonical(@Nullable Object data) {
+        return JsonStringifyNice.stringify(data, Collections.emptyList(), 0);
+    }
+
+    private static @Nullable Object jsValue(@Nullable Object value) {
+        return value == Js.UNDEFINED ? null : value;
+    }
+
+    // test/shrinkwrap.js's load, lockfileVersion, reset, format and commit cases, over arborist's fixtures
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("loadCases")
+    void loadsAndWritesAsArboristDoes(String name, JsonNode c) {
+        Shrinkwrap s = loaded(c);
+        JsonNode l = c.get("loaded");
+        assertThat(canonical(jsValue(s.getLockfileVersion()))).as("lockfileVersion").isEqualTo(canonical(json(l.get("lockfileVersion"))));
+        assertThat(canonical(jsValue(s.getOriginalLockfileVersion()))).as("originalLockfileVersion")
+          .isEqualTo(canonical(json(l.get("originalLockfileVersion"))));
+        if (l.has("loadedFromDisk")) {
+            assertThat(s.isLoadedFromDisk()).as("loadedFromDisk").isEqualTo(l.get("loadedFromDisk").asBoolean());
+            assertThat(s.isAncientLockfile()).as("ancientLockfile").isEqualTo(l.get("ancientLockfile").asBoolean());
+            assertThat(s.getLoadingError() != null).as("loadingError").isEqualTo(!l.get("loadingError").isNull());
+            assertThat(canonical(s.getIndent())).as("indent").isEqualTo(canonical(json(l.get("indent"))));
+            assertThat(s.getNewline()).as("newline").isEqualTo(l.get("newline").asText());
+            if (l.has("yarnEntries")) {
+                assertThat(s.getYarnLock() == null ? null : s.getYarnLock().getEntries().size()).as("yarn entries")
+                  .isEqualTo(l.get("yarnEntries").isNull() ? null : l.get("yarnEntries").asInt());
+            }
+        }
+        if (l.has("data")) {
+            assertThat(canonical(s.getData())).as("data").isEqualTo(canonical(json(l.get("data").asText())));
+        }
+        assertThat(s.toString()).as("toString").isEqualTo(c.get("string").asText());
+        if (c.has("stringUnformatted")) {
+            assertThat(s.toString(false)).as("format: false").isEqualTo(c.get("stringUnformatted").asText());
+            assertThat(s.toString("\t")).as("format: tab").isEqualTo(c.get("stringTab").asText());
+        }
+        if (c.has("reset")) {
+            Shrinkwrap r = c.get("name").asText().startsWith("lockfileVersion ") ?
+              new Shrinkwrap(VirtualTreeLoaderTest.path(c.get("inputs").asText()), c.get("lockfileVersion").isNull() ? NpmOptions.DEFAULT :
+                NpmOptions.builder().lockfileVersion(c.get("lockfileVersion").asInt()).build()) : s;
+            r.reset();
+            JsonNode reset = c.get("reset");
+            assertThat(canonical(r.getData())).as("reset data").isEqualTo(canonical(json(reset.get("data").asText())));
+            assertThat(canonical(jsValue(r.getLockfileVersion()))).as("reset lockfileVersion")
+              .isEqualTo(canonical(json(reset.get("lockfileVersion"))));
+            assertThat(canonical(jsValue(r.getOriginalLockfileVersion()))).as("reset originalLockfileVersion")
+              .isEqualTo(canonical(json(reset.get("originalLockfileVersion"))));
+        }
+    }
+
+    @Test
+    void shrinkwrapKeyOrder() {
+        assertThat(Shrinkwrap.KEY_ORDER).containsExactly("name", "version", "lockfileVersion", "resolved", "integrity",
+          "requires", "packages", "dependencies");
+    }
+
+    @Test
+    void loadAndChangeLockfileVersion() {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
+        String path = VirtualTreeLoaderTest.path("install-types");
+        Shrinkwrap vDefault = new Shrinkwrap(path).load(files.getLock(), null, files.getManifests().get(""));
+        Shrinkwrap v1 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(1).build()).load(files.getLock(), null, files.getManifests().get(""));
+        Shrinkwrap v2 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(2).build()).load(files.getLock(), null, files.getManifests().get(""));
+        Shrinkwrap v3 = new Shrinkwrap(path, NpmOptions.builder().lockfileVersion(3).build()).load(files.getLock(), null, files.getManifests().get(""));
+        assertThat(canonical(vDefault.getData())).as("default is same as version 3").isEqualTo(canonical(v3.getData()));
+        Map<String, Object> v1Data = v1.commit();
+        Map<String, Object> v2Data = v2.commit();
+        Map<String, Object> v3Data = v3.commit();
+        Map<String, Object> merged = new LinkedHashMap<>(v1Data);
+        merged.putAll(v3Data);
+        merged.put("lockfileVersion", 2);
+        assertThat(canonical(v2Data)).as("v2 is superset of v1 and v3").isEqualTo(canonical(merged));
+        assertThat(v1Data).as("v1 data does not have packages").doesNotContainKey("packages");
+        assertThat(v3Data).as("v3 data does not have dependencies").doesNotContainKey("dependencies");
+    }
+
+    @Test
+    void loadingInEmptyDirGetsEmptyLockfile() {
+        String dir = "/fixtures/empty";
+        Shrinkwrap sw = new Shrinkwrap(dir).load(null, null, null);
+        assertThat(canonical(sw.getData())).isEqualTo(canonical(obj("lockfileVersion", 3, "requires", true,
+          "dependencies", obj(), "packages", obj())));
+        assertThat(sw.isLoadedFromDisk()).isFalse();
+        Node root = node(opts().path(dir).realpath(dir));
+        root.unsetDepFlags();
+        sw.add(root);
+        assertThat(canonical(sw.commit())).isEqualTo(canonical(obj("name", "empty", "lockfileVersion", 3, "requires", true,
+          "packages", obj())));
+    }
+
+    @Test
+    void lookUpFromLocksAndSuch() {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
+        Shrinkwrap m = new Shrinkwrap(VirtualTreeLoaderTest.path("install-types")).load(files.getLock(), null, files.getManifests().get(""));
+        assertThat(canonical(m.get(""))).as("root metadata").isEqualTo(canonical(obj("name", "a", "version", "1.2.3",
+          "dependencies", obj("abbrev", "^1.1.1", "full-git-url", "git+https://github.com/isaacs/abbrev-js.git",
+            "ghshort", "github:isaacs/abbrev-js", "old", "npm:abbrev@^1.0.3", "pinned", "npm:abbrev@^1.1.1",
+            "reg", "npm:abbrev@^1.1.1", "remote", "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+            "symlink", "file:./abbrev-link-target", "tarball", "file:abbrev-1.1.1.tgz", "bundler", "1.2.3"))));
+        assertThat(m.isLoadedFromDisk()).isTrue();
+        assertThat(m.get("package/not/found")).as("not found").isEmpty();
+        assertThat(m.get("node_modules/old/node_modules/notfound")).as("fall off the dep tree").isEmpty();
+    }
+
+    @Test
+    void loadAResolutionFromYarnLockIfWeDoNotHaveOurOwn() {
+        String sha = "sha512-N2REVrJ/X/jGPfit2d7zea2J1pf7EAR5chIUcfHffAZ7gmlam5U65sAm76+o4ntQbSRdTjYf7qZz3chuHlwXEA==";
+        String yarn = "\n# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n# yarn lockfile v1\n\n" +
+                      "mkdirp@^1.0.2:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity " + sha + "\n\n" +
+                      "mcdork@^1.0.0:\n  version \"1.0.2\"\n  resolved \"https://registry.npmjs.org/mcdork/-/mcdork-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity " + sha + "\n\n" +
+                      "otherreg@^1.0.0:\n  version \"1.0.2\"\n  resolved \"https://otherreg.registry.npm/othrreg/-/othrreg-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity " + sha + "\n\n" +
+                      "brokenempty@^1.2.3:\n  version \"1.2.3\"\n\n" +
+                      "regalias@xyz:\n  version \"1.0.2\"\n  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#5ccd93437619ca7050b538573fc918327eba98fb\"\n  integrity " + sha + "\n";
+        Shrinkwrap s = new Shrinkwrap("/path").load(null, yarn, "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"}}");
+        Map<String, Object> opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("mkdirp@^1.0.2", opt).getRaw()).isEqualTo("mkdirp@1.0.2");
+        assertThat(opt).isEqualTo(obj("resolved", "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz", "integrity", sha));
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("mcdork@^1.0.0", opt).getRaw()).isEqualTo("mcdork@1.0.2");
+        assertThat(opt).isEqualTo(obj("resolved", "https://registry.npmjs.org/mcdork/-/mcdork-1.0.2.tgz", "integrity", sha));
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("notfound@^1.0.0", opt).getRaw()).isEqualTo("notfound@^1.0.0");
+        assertThat(opt).isEmpty();
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("otherreg@^1.0.0", opt).getRaw()).isEqualTo("otherreg@https://otherreg.registry.npm/othrreg/-/othrreg-1.0.2.tgz");
+        assertThat(opt).isEqualTo(obj("resolved", "https://otherreg.registry.npm/othrreg/-/othrreg-1.0.2.tgz", "integrity", sha));
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("brokenempty@^1.2.3", opt).getRaw()).isEqualTo("brokenempty@^1.2.3");
+        assertThat(opt).isEmpty();
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("regalias@xyz", opt).getRaw()).isEqualTo("regalias@npm:mkdirp@1.0.2");
+        assertThat(opt).isEqualTo(obj("resolved", "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz", "integrity", sha));
+        assertThat(s.checkYarnLock("mkdirp", new LinkedHashMap<>()).getRaw()).isEqualTo("mkdirp");
+        s.setLoadedFromDisk(true);
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("regalias@xyz", opt).getRaw()).isEqualTo("regalias@xyz");
+        assertThat(opt).isEmpty();
+        s.setLoadedFromDisk(false);
+        YarnLock yarnLock = s.getYarnLock();
+        s.setYarnLock(null);
+        opt = new LinkedHashMap<>();
+        assertThat(s.checkYarnLock("regalias@xyz", opt).getRaw()).isEqualTo("regalias@xyz");
+        assertThat(opt).isEmpty();
+        s.setYarnLock(yarnLock);
+    }
+
+    @Test
+    void ignoreYarnLockFileParseErrors() {
+        Shrinkwrap s = new Shrinkwrap("/dir").load(null, "this is not a yarn lock file!", null);
+        assertThat(s.getYarnLock()).isNotNull();
+        assertThat(s.getYarnLock().getEntries()).isEmpty();
+    }
+
+    @Test
+    void skipInertNodesInCommit() {
+        String path = "/proxy";
+        Shrinkwrap meta = lock(path, obj("lockfileVersion", 3, "packages", obj()));
+        Node root = node(opts().pkg(obj("name", "proxy-registry-repro", "version", "1.0.0", "devDependencies", obj("esbuild", "^0.27.0")))
+          .path(path).realpath(path));
+        Node esbuild = node(opts().pkg(obj("name", "esbuild", "version", "0.27.7",
+          "optionalDependencies", obj("@esbuild/linux-x64", "0.27.7", "@esbuild/aix-ppc64", "0.27.7"))).name("esbuild").parent(root));
+        esbuild.setDev(true);
+        Node validDep = node(opts().pkg(obj("name", "@esbuild/linux-x64", "version", "0.27.7", "os", arr("linux"), "cpu", arr("x64")))
+          .name("@esbuild/linux-x64").parent(root));
+        validDep.setOptional(true);
+        validDep.setDev(true);
+        Node brokenDep = node(opts().pkg(obj("name", "@esbuild/aix-ppc64")).name("@esbuild/aix-ppc64").parent(esbuild));
+        brokenDep.setOptional(true);
+        brokenDep.setDev(true);
+        brokenDep.setExtraneous(false);
+        brokenDep.setInert(true);
+        Node fileDep = node(opts().pkg(obj("name", "my-local-optional")).name("my-local-optional").parent(root)
+          .resolved("file:../my-local-optional"));
+        fileDep.setOptional(true);
+        fileDep.setExtraneous(false);
+        Node localDep = node(opts().pkg(obj("name", "my-disk-optional")).name("my-disk-optional").parent(root));
+        localDep.setOptional(true);
+        localDep.setExtraneous(false);
+
+        meta.add(root);
+        Map<String, Object> packages = NpmTreeSupport.json(canonical(meta.commit().get("packages")));
+        assertThat(packages).as("valid optional dep is included").containsKey("node_modules/@esbuild/linux-x64");
+        assertThat(((Map<?, ?>) packages.get("node_modules/@esbuild/linux-x64")).get("version")).isEqualTo("0.27.7");
+        assertThat(packages).as("inert optional dep is excluded from lockfile").doesNotContainKey("node_modules/esbuild/node_modules/@esbuild/aix-ppc64");
+        assertThat(packages).as("file: optional dep without version is preserved").containsKey("node_modules/my-local-optional");
+        assertThat(packages).as("local optional dep without version is preserved").containsKey("node_modules/my-disk-optional");
+    }
+
+    @Test
+    void shrinkwrapWhereRootIsALinkNode() {
+        Shrinkwrap meta = new Shrinkwrap("/actual/project/path");
+        meta.reset();
+        Node root = link(opts().path("/some/link/path").realpath("/actual/project/path").meta(meta));
+        node(opts().root(root).path("/actual/project/path").pkg(obj("name", "path", "version", "1.2.3", "dependencies", obj("kid", "")))
+          .child(opts().pkg(obj("name", "kid", "version", "1.2.3")).build()));
+        assertThat(canonical(root.getMeta().commit())).isEqualTo(canonical(obj(
+          "lockfileVersion", 3, "requires", true,
+          "packages", obj("", obj("version", "1.2.3", "dependencies", obj("kid", ""), "extraneous", true),
+            "node_modules/kid", obj("version", "1.2.3", "extraneous", true)),
+          "name", "path", "version", "1.2.3", "extraneous", true)));
+    }
+
+    @Test
+    void writeBackWithPendingChanges() {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoaderTest.files("install-types");
+        String fixture = VirtualTreeLoaderTest.path("install-types");
+        Shrinkwrap s = new Shrinkwrap(fixture, NpmOptions.builder().lockfileVersion(2).build())
+          .load(files.getLock(), null, files.getManifests().get(""));
+        Node node = node(opts().path(fixture + "/node_modules/newthing").pkg(obj("name", "newthing", "version", "1.2.3")));
+        s.add(node);
+        String preCommit = canonical(s.getData());
+        Map<String, Object> postCommit = s.commit();
+        assertThat(canonical(postCommit)).as("committing changes the data").isNotEqualTo(preCommit);
+        s.delete(node.getLocation());
+        s.add(node);
+        s.toString();
+        assertThat(canonical(s.getData())).as("committed changes to data").isEqualTo(canonical(postCommit));
     }
 
     @Test

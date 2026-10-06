@@ -1,0 +1,236 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.npm;
+
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+
+/**
+ * Port of @npmcli/map-workspaces 5.0.3: the workspace members a root's {@code workspaces} patterns
+ * name, over the project's manifests in place of its directory tree, and over the lock.
+ */
+final class MapWorkspaces {
+
+    /**
+     * The errors map-workspaces throws, with their codes.
+     */
+    @Getter
+    public static final class WorkspacesException extends IllegalArgumentException {
+        private final String code;
+
+        WorkspacesException(String message, String code) {
+            super(message);
+            this.code = code;
+        }
+    }
+
+    private static final Minimatch.Options PARTIAL = Minimatch.Options.builder().partial(true).windowsPathsNoEscape(true).build();
+    private static final Minimatch.Options IGNORE = Minimatch.Options.builder().dot(true).nocomment(true).nonegate(true).build();
+
+    private MapWorkspaces() {
+    }
+
+    private static final class Patterns {
+        final List<String> patterns = new ArrayList<>();
+        final List<String> negatedPatterns = new ArrayList<>();
+    }
+
+    private static Patterns appendNegatedPatterns(List<?> allPatterns) {
+        Patterns out = new Patterns();
+        for (Object raw : allPatterns) {
+            String pattern = String.valueOf(raw);
+            int excl = 0;
+            while (excl < pattern.length() && pattern.charAt(excl) == '!') {
+                excl++;
+            }
+            pattern = pattern.substring(excl);
+            pattern = pattern.replaceFirst("^\\.?/+", "");
+            boolean negate = excl % 2 == 1;
+            if (negate) {
+                out.negatedPatterns.add(pattern);
+            } else {
+                for (int i = 0; i < out.negatedPatterns.size(); i++) {
+                    if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), Minimatch.Options.DEFAULT)) {
+                        out.negatedPatterns.remove(i);
+                        i--;
+                    }
+                }
+                out.patterns.add(pattern);
+            }
+        }
+        for (String negated : out.negatedPatterns) {
+            for (String pattern : Minimatch.match(new ArrayList<>(out.patterns), negated, Minimatch.Options.DEFAULT)) {
+                out.patterns.remove(pattern);
+            }
+        }
+        return out;
+    }
+
+    private static Patterns getPatterns(@Nullable Object workspaces) {
+        Object declaration = workspaces instanceof Map && ((Map<?, ?>) workspaces).get("packages") instanceof List ?
+                ((Map<?, ?>) workspaces).get("packages") : workspaces;
+        if (!(declaration instanceof List)) {
+            throw new WorkspacesException("workspaces config expects an Array", "EWORKSPACESCONFIG");
+        }
+        return appendNegatedPatterns((List<?>) declaration);
+    }
+
+    private static String getPackageName(Map<String, Object> pkg, String pathname) {
+        return truthy(pkg.get("name")) ? String.valueOf(pkg.get("name")) : Node.nameFromFolder(pathname);
+    }
+
+    /**
+     * {@code mapWorkspaces({cwd, pkg})} with the directories that hold a package.json standing in for
+     * the project tree: location (relative to {@code cwd}, {@code ""} for the root) to the manifest's text.
+     *
+     * @return package name to absolute path, in the order the patterns list them
+     */
+    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg, Map<String, String> manifests) {
+        Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
+        Patterns p = getPatterns(workspaces);
+        Map<String, String> results = new LinkedHashMap<>();
+        if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
+            return results;
+        }
+
+        List<String> ignore = new ArrayList<>();
+        ignore.add("**/node_modules/**");
+        ignore.addAll(p.negatedPatterns);
+        List<String> matches = new ArrayList<>();
+        for (String location : manifests.keySet()) {
+            String dir = location.isEmpty() ? "." : location;
+            if (ignored(dir, ignore)) {
+                continue;
+            }
+            for (String pattern : p.patterns) {
+                if (Minimatch.minimatch(dir, globPattern(pattern), Minimatch.Options.DEFAULT)) {
+                    matches.add(dir);
+                    break;
+                }
+            }
+        }
+        matches.sort(LocaleCompare::en);
+
+        List<String> orderedMatches = new ArrayList<>();
+        for (String pattern : p.patterns) {
+            for (String m : matches) {
+                if (Minimatch.minimatch(m, pattern, PARTIAL)) {
+                    orderedMatches.add(m);
+                }
+            }
+        }
+
+        Map<String, Set<String>> seen = new LinkedHashMap<>();
+        for (String match : orderedMatches) {
+            String location = ".".equals(match) ? "" : match;
+            String text = manifests.get(location);
+            if (text == null) {
+                continue;
+            }
+            PackageJson manifest = PackageJson.normalize(text);
+            String path = PosixPath.join(cwd, match);
+            String name = getPackageName(manifest.getContent(), path);
+            seen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(path);
+        }
+
+        List<String> errors = new ArrayList<>();
+        errors.add("must not have multiple workspaces with the same name");
+        for (Map.Entry<String, Set<String>> entry : seen.entrySet()) {
+            if (entry.getValue().size() > 1) {
+                errors.add("package '" + entry.getKey() + "' has conflicts in the following paths:");
+                for (String pathname : entry.getValue()) {
+                    errors.add("    " + pathname);
+                }
+            } else {
+                results.put(entry.getKey(), entry.getValue().iterator().next());
+            }
+        }
+        if (errors.size() > 1) {
+            throw new WorkspacesException(String.join("\n", errors), "EDUPLICATEWORKSPACE");
+        }
+        return results;
+    }
+
+    private static String globPattern(String pattern) {
+        return pattern.endsWith("/") ? pattern.substring(0, pattern.length() - 1) : pattern;
+    }
+
+    // glob's Ignore: a pattern matches the directory or its trailing-slash form, and one ending in ** ignores children
+    private static boolean ignored(String dir, List<String> ignore) {
+        for (String pattern : ignore) {
+            Minimatch mm = new Minimatch(pattern, IGNORE);
+            if (mm.match(dir) || mm.match(dir + "/")) {
+                return true;
+            }
+            if (pattern.endsWith("/**") || "**".equals(pattern)) {
+                for (String ancestor = PosixPath.dirname(dir); !".".equals(ancestor) && !ancestor.isEmpty(); ancestor = PosixPath.dirname(ancestor)) {
+                    if (mm.match(ancestor + "/")) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@code mapWorkspaces.virtual({cwd, lockfile})}: the members the lock's root entry and link
+     * entries describe.
+     */
+    static Map<String, String> virtual(String cwd, Map<String, Object> lockfile) {
+        Object packages = truthy(lockfile.get("packages")) ? lockfile.get("packages") : new LinkedHashMap<>();
+        Object root = Js.get(packages, "");
+        Object workspaces = root instanceof Map && ((Map<?, ?>) root).containsKey("workspaces") ?
+                ((Map<?, ?>) root).get("workspaces") : new ArrayList<>();
+        Map<String, String> results = new LinkedHashMap<>();
+        Patterns p = getPatterns(workspaces);
+        if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
+            return results;
+        }
+        p.negatedPatterns.add("**/node_modules/**");
+
+        List<String> packageKeys = new ArrayList<>(Js.keys(packages));
+        for (String pattern : p.negatedPatterns) {
+            for (String key : Minimatch.match(new ArrayList<>(packageKeys), pattern, Minimatch.Options.DEFAULT)) {
+                packageKeys.remove(key);
+            }
+        }
+
+        Map<String, String> byPath = new LinkedHashMap<>();
+        for (String pattern : p.patterns) {
+            for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Options.DEFAULT)) {
+                String pathname = PosixPath.join(cwd, key);
+                Object entry = Js.get(packages, key);
+                Map<String, Object> meta = entry instanceof Map ? (Map<String, Object>) entry : new LinkedHashMap<>();
+                byPath.put(pathname, getPackageName(meta, pathname));
+            }
+        }
+
+        for (Map.Entry<String, String> e : byPath.entrySet()) {
+            results.put(e.getValue(), e.getKey());
+        }
+        return results;
+    }
+}

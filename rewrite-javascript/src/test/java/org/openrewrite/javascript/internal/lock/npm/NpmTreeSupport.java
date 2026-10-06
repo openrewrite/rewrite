@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -77,7 +78,7 @@ final class NpmTreeSupport {
      */
     static JsonNode fixture(String name) {
         try (InputStream is = NpmTreeSupport.class.getResourceAsStream("/npm-arborist/" + name)) {
-            return MAPPER.readTree(is);
+            return MAPPER.readTree(name.endsWith(".gz") ? new GZIPInputStream(is) : is);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

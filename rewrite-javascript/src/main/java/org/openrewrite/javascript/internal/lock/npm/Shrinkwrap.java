@@ -17,9 +17,9 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,36 +31,34 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/arborist lib/shrinkwrap.js (npm 11.17.0): the lock metadata a tree's root carries,
- * kept current as nodes enter, move and leave.
+ * Port of @npmcli/arborist lib/shrinkwrap.js (npm 11.17.0): the lock as data. Loaded from the lock's
+ * text, kept current as nodes enter, move and leave a tree, rebuilt from the tree by {@link #commit()}
+ * and written by {@link #toString()}.
  */
 public final class Shrinkwrap {
 
+    public static final int DEFAULT_LOCKFILE_VERSION = 3;
+
+    public static final List<String> KEY_ORDER = Collections.unmodifiableList(Arrays.asList(
+            "name", "version", "lockfileVersion", "resolved", "integrity", "requires", "packages", "dependencies"));
+
     private static final Pattern NODE_MODULES = Pattern.compile("(?:^|/)node_modules/");
     private static final Pattern YARN_REGISTRY = Pattern.compile("^https?://registry\\.yarnpkg\\.com/");
+    private static final Pattern NPM_REGISTRY = Pattern.compile("^https?://registry\\.npmjs\\.org/");
+    private static final Pattern LAST_SEGMENT = Pattern.compile("(^|/)[^/]*$");
 
     private static final List<String> PKG_META_KEYS = Collections.unmodifiableList(Arrays.asList(
             "version", "dependencies", "peerDependencies", "peerDependenciesMeta", "optionalDependencies",
             "bundleDependencies", "acceptDependencies", "funding", "engines", "os", "cpu", "libc", "_integrity",
             "license", "_hasShrinkwrap", "hasInstallScript", "bin", "deprecated", "workspaces"));
 
-    /**
-     * Arborist's {@code resolveOptions}.
-     */
-    @Value
-    public static class ResolveOptions {
-        public static final ResolveOptions DEFAULT = new ResolveOptions(false);
-
-        boolean omitLockfileRegistryResolved;
-    }
-
-    private final Map<String, Node> awaitingUpdate = new LinkedHashMap<>();
+    private Map<String, Node> awaitingUpdate = new LinkedHashMap<>();
 
     @Getter
     private final String path;
 
     @Getter
-    private final ResolveOptions resolveOptions;
+    private final NpmOptions resolveOptions;
 
     @Getter
     private @Nullable Node tree;
@@ -76,20 +74,57 @@ public final class Shrinkwrap {
     @Setter
     private @Nullable YarnLock yarnLock;
 
+    /**
+     * The version written: the option, else the lock's own unless that is 1, else 3; null until loaded.
+     */
+    @Getter
+    @Setter
+    private @Nullable Object lockfileVersion;
+
+    /**
+     * The lock's {@code lockfileVersion} as loaded, whatever JSON type it had; {@link Js#UNDEFINED} when
+     * absent, null before loading.
+     */
+    @Getter
+    @Setter
+    private @Nullable Object originalLockfileVersion;
+
+    @Getter
+    @Setter
+    private boolean loadedFromDisk;
+
+    @Getter
+    private boolean ancientLockfile;
+
+    @Getter
+    private @Nullable Throwable loadingError;
+
+    /**
+     * {@code JSON.stringify}'s space: a number of spaces or the indent string; 2 until inferred.
+     */
+    @Getter
+    @Setter
+    private Object indent = 2;
+
+    @Getter
+    @Setter
+    private String newline = "\n";
+
     public Shrinkwrap(String path) {
-        this(path, ResolveOptions.DEFAULT);
+        this(path, NpmOptions.DEFAULT);
     }
 
-    public Shrinkwrap(String path, ResolveOptions resolveOptions) {
+    public Shrinkwrap(String path, NpmOptions options) {
         this.path = PosixPath.resolve(path);
-        this.resolveOptions = resolveOptions;
+        this.resolveOptions = options;
+        this.lockfileVersion = options.getLockfileVersion();
     }
 
     public static Map<String, Object> metaFromNode(Node node, String path) {
-        return metaFromNode(node, path, ResolveOptions.DEFAULT);
+        return metaFromNode(node, path, NpmOptions.DEFAULT);
     }
 
-    public static Map<String, Object> metaFromNode(Node node, String path, ResolveOptions options) {
+    public static Map<String, Object> metaFromNode(Node node, String path, NpmOptions options) {
         Map<String, Object> meta = new LinkedHashMap<>();
         if (node.isLink()) {
             meta.put("resolved", Relpath.relpath(path, node.getRealpath()));
@@ -165,6 +200,201 @@ public final class Shrinkwrap {
                                   val instanceof List && ((List<?>) val).isEmpty();
             if (!emptyObject) {
                 return val;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Arborist's {@code checkYarnLock}: the spec a yarn.lock resolves {@code spec} to when no lock was
+     * loaded, with {@code resolved} and {@code integrity} added to {@code options} for the fetch.
+     */
+    public Spec checkYarnLock(String spec, Map<String, Object> options) {
+        Spec parsed = Spec.npa(spec);
+        YarnLock yarnLock = this.yarnLock;
+        boolean useYarnLock = yarnLock != null && !loadedFromDisk;
+        YarnLock.Entry fromYarn = useYarnLock ? yarnLock.getEntries().get(parsed.getRaw()) : null;
+        if (fromYarn != null && truthy(fromYarn.get("version"))) {
+            Object resolved = fromYarn.get("resolved");
+            Object version = fromYarn.get("version");
+            Object integrity = fromYarn.get("integrity");
+            String resolvedString = resolved instanceof String ? (String) resolved : null;
+            boolean isYarnReg = parsed.isRegistry() && resolvedString != null && YARN_REGISTRY.matcher(resolvedString).find();
+            boolean isnpmReg = parsed.isRegistry() && !isYarnReg && resolvedString != null &&
+                               NPM_REGISTRY.matcher(resolvedString).find();
+            boolean isReg = isnpmReg || isYarnReg;
+            VersionFromTgz.NameVersion tgz = isReg ? VersionFromTgz.versionFromTgz(parsed.getName(), resolvedString) : null;
+            Object yspec = resolved;
+            if (tgz != null && Objects.equals(tgz.getName(), parsed.getName()) && Js.strictEquals(tgz.getVersion(), version)) {
+                yspec = version;
+            } else if (isReg && tgz != null && truthy(tgz.getName()) && truthy(tgz.getVersion())) {
+                yspec = "npm:" + tgz.getName() + "@" + tgz.getVersion();
+            }
+            if (truthy(yspec)) {
+                options.put("resolved", resolvedString == null ? resolved :
+                        YARN_REGISTRY.matcher(resolvedString).replaceFirst("https://registry.npmjs.org/"));
+                options.put("integrity", integrity);
+                return Spec.npa(parsed.getName() + "@" + yspec);
+            }
+        }
+        return parsed;
+    }
+
+    public void reset() {
+        tree = null;
+        awaitingUpdate = new LinkedHashMap<>();
+        Object lockfileVersion = truthy(this.lockfileVersion) ? this.lockfileVersion : DEFAULT_LOCKFILE_VERSION;
+        originalLockfileVersion = lockfileVersion;
+
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("lockfileVersion", lockfileVersion);
+        data.put("requires", true);
+        data.put("packages", new LinkedHashMap<>());
+        data.put("dependencies", new LinkedHashMap<>());
+        this.data = data;
+    }
+
+    public void inferFormattingOptions(PackageJson packageJson) {
+        if (packageJson.getIndent() != null) {
+            indent = packageJson.getIndent();
+        }
+        if (packageJson.getNewline() != null) {
+            newline = packageJson.getNewline();
+        }
+    }
+
+    /**
+     * Arborist's {@code load()} over the files it would read from the project directory: the lock
+     * (npm-shrinkwrap.json or package-lock.json, null when there is none), yarn.lock and package.json
+     * (read only to type the dependencies of a lockfileVersion 1 lock).
+     */
+    @SuppressWarnings("unchecked")
+    public Shrinkwrap load(@Nullable String lock, @Nullable String yarn, @Nullable String packageJson) {
+        Map<String, Object> data;
+        try {
+            loadedFromDisk = truthy(lock);
+
+            if (yarn != null) {
+                yarnLock = new YarnLock();
+                try {
+                    yarnLock.parse(yarn);
+                } catch (RuntimeException ignored) {
+                }
+            }
+
+            JsonParseEvenBetterErrors.Parsed parsed = JsonParseEvenBetterErrors.parse(lock != null && !lock.isEmpty() ? lock : "{}");
+            if (parsed.getIndent() != null) {
+                indent = parsed.getIndent();
+            }
+            if (parsed.getNewline() != null) {
+                newline = parsed.getNewline();
+            }
+            if (!(parsed.getValue() instanceof Map)) {
+                Js.get(parsed.getValue(), "lockfileVersion");
+                data = new LinkedHashMap<>();
+            } else {
+                data = (Map<String, Object>) parsed.getValue();
+            }
+        } catch (RuntimeException er) {
+            loadingError = er;
+            loadedFromDisk = false;
+            ancientLockfile = false;
+            data = new LinkedHashMap<>();
+        }
+        Object lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+        Object fileVersion = Js.get(data, "lockfileVersion");
+        if (truthy(this.lockfileVersion)) {
+            lockfileVersion = this.lockfileVersion;
+        } else if (truthy(fileVersion) && !Js.strictEquals(fileVersion, 1)) {
+            lockfileVersion = fileVersion;
+        }
+
+        Map<String, Object> merged = new LinkedHashMap<>(data);
+        merged.put("lockfileVersion", lockfileVersion);
+        merged.put("requires", true);
+        merged.put("packages", truthy(data.get("packages")) ? data.get("packages") : new LinkedHashMap<>());
+        merged.put("dependencies", truthy(data.get("dependencies")) ? data.get("dependencies") : new LinkedHashMap<>());
+        this.data = merged;
+
+        originalLockfileVersion = fileVersion;
+
+        if (!truthy(this.lockfileVersion)) {
+            this.lockfileVersion = lockfileVersion;
+        }
+        ancientLockfile = loadedFromDisk && !(Js.toNumber(fileVersion) >= 2) && !truthy(data.get("requires"));
+
+        if (truthy(data.get("dependencies")) && !truthy(data.get("packages"))) {
+            Map<String, Object> pkg = new LinkedHashMap<>();
+            if (packageJson != null) {
+                try {
+                    pkg = PackageJson.normalize(packageJson).getContent();
+                } catch (JsonParseEvenBetterErrors.JsonParseException ignored) {
+                }
+            }
+            loadAll("", null, this.data);
+            fixDependencies(pkg);
+        }
+        return this;
+    }
+
+    private void loadAll(String location, @Nullable String name, Map<String, Object> lock) {
+        Map<String, Object> meta = metaFromLock(location, name, lock);
+        if (truthy(meta.get("link"))) {
+            location = String.valueOf(meta.get("resolved"));
+        }
+        Object dependencies = lock.get("dependencies");
+        if (truthy(dependencies)) {
+            for (Map.Entry<String, Object> dep : Js.entries(dependencies)) {
+                String loc = location + (location.isEmpty() ? "" : "/") + "node_modules/" + dep.getKey();
+                loadAll(loc, dep.getKey(), asObject(dep.getValue()));
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void fixDependencies(Map<String, Object> pkg) {
+        Map<String, Object> root = asObject(packages().get(""));
+        for (String key : PKG_META_KEYS) {
+            Object val = metaFieldFromPkg(pkg, key);
+            if (truthy(val)) {
+                root.put(key.startsWith("_") ? key.substring(1) : key, val);
+            }
+        }
+
+        for (Map.Entry<String, Object> entry : Js.entries(packages())) {
+            String loc = entry.getKey();
+            Map<String, Object> meta = asObject(entry.getValue());
+            if (!truthy(meta.get("requires")) || loc.isEmpty()) {
+                continue;
+            }
+
+            for (Map.Entry<String, Object> require : Js.entries(meta.get("requires"))) {
+                String name = require.getKey();
+                Map<String, Object> dep = resolveMetaNode(loc, name);
+                String depType = "dependencies";
+                if (dep != null && truthy(dep.get("optional")) && !truthy(meta.get("optional"))) {
+                    depType = "optionalDependencies";
+                } else if (dep != null && truthy(dep.get("dev")) && !truthy(meta.get("dev"))) {
+                    depType = "devDependencies";
+                }
+                if (!truthy(meta.get(depType))) {
+                    meta.put(depType, new LinkedHashMap<>());
+                }
+                ((Map<String, Object>) meta.get(depType)).put(name, require.getValue());
+            }
+            meta.remove("requires");
+        }
+    }
+
+    private @Nullable Map<String, Object> resolveMetaNode(String loc, String name) {
+        for (String path = loc; ; path = LAST_SEGMENT.matcher(path).replaceFirst("")) {
+            String check = path + (path.isEmpty() ? "" : "/") + "node_modules/" + name;
+            Object found = Js.get(packages(), check);
+            if (truthy(found)) {
+                return asObject(found);
+            }
+            if (path.isEmpty()) {
+                break;
             }
         }
         return null;
@@ -247,7 +477,7 @@ public final class Shrinkwrap {
     }
 
     @SuppressWarnings("unchecked")
-    private Map<String, Object> metaFromLock(String location, String name, @Nullable Map<String, Object> lock) {
+    private Map<String, Object> metaFromLock(String location, @Nullable String name, @Nullable Map<String, Object> lock) {
         if (lock == null) {
             return new LinkedHashMap<>();
         }
@@ -448,5 +678,225 @@ public final class Shrinkwrap {
     private void updateWaitingNode(String loc) {
         Node node = awaitingUpdate.remove(loc);
         packages().put(loc, metaFromNode(node, path, resolveOptions));
+    }
+
+    /**
+     * Rebuilds the lock data from the tree and returns what is written for the lockfile version.
+     */
+    public Map<String, Object> commit() {
+        Map<String, Object> data = loadedData();
+        Node tree = this.tree;
+        if (tree != null) {
+            if (yarnLock != null) {
+                yarnLock.fromTree(tree);
+            }
+            Map<String, Object> root = metaFromNode(Objects.requireNonNull(tree.getTarget()), path, resolveOptions);
+            Map<String, Object> packages = new LinkedHashMap<>();
+            data.put("packages", packages);
+            if (!root.isEmpty()) {
+                packages.put("", root);
+            }
+            for (Node node : tree.getRoot().getInventory().values()) {
+                if (node == tree || node.isRoot() || "".equals(node.getLocation())) {
+                    continue;
+                }
+                String loc = Relpath.relpath(path, node.getPath());
+                if (node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc) &&
+                    (node.getFsParent() == null || node.getFsParent().isRoot())) {
+                    continue;
+                }
+                Map<String, Object> meta = metaFromNode(node, path, resolveOptions);
+                if (node.isInert() && !truthy(node.getPackage().get("version"))) {
+                    continue;
+                }
+                packages.put(loc, meta);
+            }
+        } else if (!awaitingUpdate.isEmpty()) {
+            for (String loc : new ArrayList<>(awaitingUpdate.keySet())) {
+                updateWaitingNode(loc);
+            }
+        }
+
+        if (!truthy(lockfileVersion)) {
+            lockfileVersion = DEFAULT_LOCKFILE_VERSION;
+        }
+        data.put("lockfileVersion", lockfileVersion);
+
+        double version = Js.toNumber(lockfileVersion);
+        if (tree != null && version <= 3) {
+            buildLegacyLockfile(tree, data, Collections.emptyList());
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>(data);
+        if (version >= 3) {
+            out.remove("dependencies");
+        } else if (version < 2) {
+            out.remove("packages");
+        }
+        return out;
+    }
+
+    private Map<String, Object> buildLegacyLockfile(Node node, Map<String, Object> lock, List<String> path) {
+        if (node == tree) {
+            lock.put("name", truthy(node.getPackageName()) ? node.getPackageName() : node.getName());
+            if (truthy(node.getVersion())) {
+                lock.put("version", node.getVersion());
+            }
+        }
+
+        List<Edge> valid = new ArrayList<>();
+        for (Edge e : node.getEdgesIn()) {
+            if (e.isValid()) {
+                valid.add(e);
+            }
+        }
+        valid.sort((a, b) -> {
+            String[] aloc = a.getFrom().getLocation().split("node_modules", -1);
+            String[] bloc = b.getFrom().getLocation().split("node_modules", -1);
+            if (aloc.length > bloc.length) {
+                return 1;
+            }
+            if (bloc.length > aloc.length) {
+                return -1;
+            }
+            return LocaleCompare.en(aloc[aloc.length - 1], bloc[bloc.length - 1]);
+        });
+        Edge edge = valid.isEmpty() ? null : valid.get(0);
+
+        String res = ConsistentResolve.consistentResolve(node.getResolved(), this.path, this.path, true);
+        Spec rSpec = specFromResolved(res);
+
+        Spec spec = rSpec;
+        if (edge != null) {
+            spec = Spec.resolve(node.getName(), edge.getSpec(), edge.getFrom().getRealpath());
+        }
+
+        Spec.Type specType = spec == null ? null : spec.getType();
+        Spec.Type rType = rSpec == null ? null : rSpec.getType();
+        if (node.isLink()) {
+            lock.put("version", "file:" + Relpath.relpath(this.path, node.getRealpath()));
+        } else if (specType == Spec.Type.FILE || specType == Spec.Type.REMOTE) {
+            lock.put("version", spec.getSaveSpec());
+        } else if (specType == Spec.Type.GIT || rType == Spec.Type.GIT) {
+            lock.put("version", node.getResolved());
+            if (spec != null && truthy(spec.getRaw())) {
+                lock.put("from", spec.getRaw());
+            }
+        } else if (!node.isRoot() && truthy(node.getPackageName()) &&
+                   !Js.strictEquals(node.getPackageName(), node.getName())) {
+            lock.put("version", "npm:" + node.getPackageName() + "@" + node.getVersion());
+        } else if (truthy(node.getVersion())) {
+            lock.put("version", node.getVersion());
+        }
+
+        if (node.isInDepBundle()) {
+            lock.put("bundled", true);
+        }
+
+        if (truthy(node.getResolved()) && !node.isLink() &&
+            rType != Spec.Type.GIT && rType != Spec.Type.FILE && rType != Spec.Type.DIRECTORY &&
+            specType != Spec.Type.DIRECTORY && specType != Spec.Type.GIT && specType != Spec.Type.FILE &&
+            specType != Spec.Type.REMOTE) {
+            String resolved = OverrideResolves.overrideResolves(node.getResolved(), resolveOptions);
+            if (resolved != null) {
+                lock.put("resolved", resolved);
+            }
+        }
+
+        if (truthy(node.getIntegrity())) {
+            lock.put("integrity", node.getIntegrity());
+        }
+
+        if (node.isExtraneous()) {
+            lock.put("extraneous", true);
+        } else if (!node.isLink()) {
+            if (node.isPeer()) {
+                lock.put("peer", true);
+            }
+            if (node.isDevOptional() && !node.isDev() && !node.isOptional()) {
+                lock.put("devOptional", true);
+            }
+            if (node.isDev()) {
+                lock.put("dev", true);
+            }
+            if (node.isOptional()) {
+                lock.put("optional", true);
+            }
+        }
+
+        Node depender = Objects.requireNonNull(node.getTarget());
+        if (depender.getEdgesOut().size() > 0) {
+            if (node != tree) {
+                Map<String, Object> requires = new LinkedHashMap<>();
+                for (Map.Entry<String, Edge> entry : depender.getEdgesOut().entries()) {
+                    Edge v = entry.getValue();
+                    if (v.isPeer()) {
+                        continue;
+                    }
+                    String edgeSpec = v.getSpec();
+                    if (edgeSpec.startsWith("file:")) {
+                        String p = PosixPath.resolve(node.getRealpath(), edgeSpec.substring("file:".length()));
+                        requires.put(entry.getKey(), "file:" + Relpath.relpath(node.getRealpath(), p));
+                    } else {
+                        requires.put(entry.getKey(), edgeSpec);
+                    }
+                }
+                lock.put("requires", requires);
+            } else {
+                lock.put("requires", true);
+            }
+        }
+
+        CaseInsensitiveMap<Node> children = depender.getChildren();
+        if (children.isEmpty()) {
+            lock.remove("dependencies");
+        } else {
+            List<String> kidPath = new ArrayList<>(path);
+            kidPath.add(node.getRealpath());
+            Map<String, Object> dependencies = new LinkedHashMap<>();
+            boolean found = false;
+            for (Map.Entry<String, Node> entry : children.entries()) {
+                Node kid = entry.getValue();
+                if (path.contains(kid.getRealpath())) {
+                    continue;
+                }
+                dependencies.put(entry.getKey(), buildLegacyLockfile(kid, new LinkedHashMap<>(), kidPath));
+                found = true;
+            }
+            if (found) {
+                lock.put("dependencies", dependencies);
+            }
+        }
+        return lock;
+    }
+
+    private static @Nullable Spec specFromResolved(@Nullable String resolved) {
+        try {
+            return resolved == null ? null : Spec.npa(resolved);
+        } catch (RuntimeException er) {
+            return null;
+        }
+    }
+
+    public Map<String, Object> toJSON() {
+        loadedData();
+        return commit();
+    }
+
+    @Override
+    public String toString() {
+        return toString(true);
+    }
+
+    /**
+     * @param format {@code true} for the lock's own indentation, {@code false} for none, or an indent
+     *               string or width of its own
+     */
+    public String toString(Object format) {
+        Map<String, Object> data = toJSON();
+        Object defaultIndent = truthy(indent) ? indent : 2;
+        Object indent = Boolean.TRUE.equals(format) ? defaultIndent : truthy(format) ? format : 0;
+        String eol = truthy(format) ? (truthy(newline) ? newline : "\n") : "";
+        return JsonStringifyNice.stringify(data, KEY_ORDER, indent).replace("\n", eol);
     }
 }

@@ -31,6 +31,7 @@ node "$G/spec-from-lock-cases.js" > "$R/spec-from-lock-cases"
 node "$G/package-shapes.js" > "$R/package-shapes"
 node "$G/version-shapes.js" > "$R/version-shapes"
 node "$G/locale-compare-cases.js" > "$R/locale-compare-cases"
+node "$G/minimatch-cases.js" > "$R/minimatch-cases"
 node "$G/npa-tables.js" "$2" "$R/npa-tables" 2> /dev/null
 node "$G/hosted-git-tables.js" "$3" "$R/hosted-git-tables"
 node "$G/url-cases.js" "$R/url-cases"

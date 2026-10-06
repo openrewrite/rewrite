@@ -15,6 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -24,21 +27,76 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of the synchronous normalize steps @npmcli/package-json 7 runs for {@code syncNormalize()}
- * ({@code _id}, {@code bundledDependencies}, {@code bundleDependencies}, {@code optionalDedupe},
- * {@code scripts}, {@code funding}), which arborist's {@code Node} applies to its package.
+ * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String)} parses the
+ * text and runs the {@code normalizeSteps}; {@link #syncNormalize(Map)} runs the synchronous ones, as
+ * {@code Node} does on its package.
  */
-final class PackageJson {
+@Getter
+public final class PackageJson {
 
-    private PackageJson() {
+    /**
+     * Thrown where npm would read the package's files: {@code directories.bin} without {@code bin}.
+     */
+    public static final class NeedsPackageFiles extends IllegalStateException {
+        NeedsPackageFiles(String message) {
+            super(message);
+        }
+    }
+
+    private final Map<String, Object> content;
+
+    /**
+     * The text's indentation and newline, as {@code json-parse-even-better-errors} noted them.
+     */
+    private final @Nullable String indent;
+    private final @Nullable String newline;
+
+    private PackageJson(Map<String, Object> content, @Nullable String indent, @Nullable String newline) {
+        this.content = content;
+        this.indent = indent;
+        this.newline = newline;
+    }
+
+    /**
+     * {@code PackageJson.normalize(path)}: the manifest at a package's root as arborist loads it.
+     *
+     * @throws JsonParseEvenBetterErrors.JsonParseException as {@code Invalid package.json}
+     */
+    @SuppressWarnings("unchecked")
+    public static PackageJson normalize(String text) {
+        JsonParseEvenBetterErrors.Parsed parsed;
+        try {
+            parsed = JsonParseEvenBetterErrors.parse(text);
+        } catch (JsonParseEvenBetterErrors.JsonParseException e) {
+            throw new JsonParseEvenBetterErrors.JsonParseException("Invalid package.json: " + e.getMessage(), e);
+        }
+        Map<String, Object> data = parsed.getValue() instanceof Map ?
+                (Map<String, Object>) parsed.getValue() : new LinkedHashMap<>();
+        normalizeBin(data);
+        syncSteps(data, true);
+        return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
+    }
+
+    static Map<String, Object> syncNormalize(Map<String, Object> data) {
+        return syncSteps(data, false);
     }
 
     @SuppressWarnings("unchecked")
-    static Map<String, Object> syncNormalize(Map<String, Object> data) {
+    private static Map<String, Object> syncSteps(Map<String, Object> data, boolean attributes) {
         Object name = data.get("name");
         Object version = data.get("version");
+        String pkgId = name + "@" + version;
+
+        if (attributes) {
+            for (String key : Js.keys(data)) {
+                if (key.startsWith("_")) {
+                    data.remove(key);
+                }
+            }
+        }
+
         if (truthy(name) && truthy(version)) {
-            data.put("_id", name + "@" + version);
+            data.put("_id", pkgId);
         }
 
         if (!data.containsKey("bundleDependencies") && data.containsKey("bundledDependencies")) {
@@ -85,5 +143,68 @@ final class PackageJson {
             data.put("funding", url);
         }
         return data;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void normalizeBin(Map<String, Object> pkg) {
+        Object directories = pkg.get("directories");
+        if (directories instanceof Map && truthy(((Map<?, ?>) directories).get("bin")) && !truthy(pkg.get("bin"))) {
+            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(((Map<?, ?>) directories).get("bin"))) +
+                                        "} names the package's files, which are not known");
+        }
+        Object bin = pkg.get("bin");
+        if (truthy(bin)) {
+            if (bin instanceof String && truthy(pkg.get("name"))) {
+                Map<String, Object> object = new LinkedHashMap<>();
+                object.put(String.valueOf(pkg.get("name")), bin);
+                bin = object;
+                pkg.put("bin", bin);
+            } else if (bin instanceof List) {
+                Map<String, Object> object = new LinkedHashMap<>();
+                for (Object k : (List<Object>) bin) {
+                    object.put(PosixPath.basename(String.valueOf(k)), k);
+                }
+                bin = object;
+                pkg.put("bin", bin);
+            }
+            if (bin instanceof Map) {
+                Map<String, Object> bins = (Map<String, Object>) bin;
+                for (String binKey : Js.keys(bins)) {
+                    Object target = bins.get(binKey);
+                    if (!(target instanceof String)) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    String base = PosixPath.basename(secureAndUnixifyPath(binKey));
+                    if (base.isEmpty()) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    String binTarget = secureAndUnixifyPath((String) target);
+                    if (binTarget.isEmpty()) {
+                        bins.remove(binKey);
+                        continue;
+                    }
+                    if (!base.equals(binKey)) {
+                        bins.remove(binKey);
+                    }
+                    bins.put(base, binTarget);
+                }
+                if (bins.isEmpty()) {
+                    pkg.remove("bin");
+                }
+                return;
+            }
+        }
+        pkg.remove("bin");
+    }
+
+    private static String unixifyPath(String ref) {
+        return ref.replace('\\', '/').replace(':', '/');
+    }
+
+    private static String secureAndUnixifyPath(String ref) {
+        String secured = unixifyPath(PosixPath.join(".", PosixPath.join("/", unixifyPath(ref))));
+        return secured.startsWith("./") ? "" : secured;
     }
 }

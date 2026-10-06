@@ -17,6 +17,10 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.math.MathContext;
+import java.math.RoundingMode;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 
 /**
  * JavaScript's semantics for the values and strings npm reads from package and lock data.
@@ -74,6 +79,7 @@ final class Js {
     private static final Set<String> NUMBER_MEMBERS = members("toExponential toFixed toPrecision");
 
     private static final long MAX_ARRAY_INDEX = 4294967294L;
+    private static final Pattern DECIMAL_LITERAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
 
     private Js() {
     }
@@ -205,6 +211,45 @@ final class Js {
         return a == b;
     }
 
+    /**
+     * {@code Number(value)} for a value parsed from JSON, as the relational operators coerce it.
+     */
+    static double toNumber(@Nullable Object val) {
+        if (val == null) {
+            return 0;
+        }
+        if (val instanceof Number) {
+            return ((Number) val).doubleValue();
+        }
+        if (val instanceof Boolean) {
+            return (Boolean) val ? 1 : 0;
+        }
+        if (val instanceof String) {
+            String s = trim((String) val);
+            if (s.isEmpty()) {
+                return 0;
+            }
+            if (DECIMAL_LITERAL.matcher(s).matches()) {
+                return Double.parseDouble(s);
+            }
+            if (s.length() > 2 && s.charAt(0) == '0') {
+                char radix = Character.toLowerCase(s.charAt(1));
+                int base = radix == 'x' ? 16 : radix == 'o' ? 8 : radix == 'b' ? 2 : 0;
+                if (base != 0) {
+                    try {
+                        return new BigInteger(s.substring(2), base).doubleValue();
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+            }
+            return Double.NaN;
+        }
+        if (val instanceof List && ((List<?>) val).isEmpty()) {
+            return 0;
+        }
+        return Double.NaN;
+    }
+
     static boolean truthy(@Nullable Object val) {
         if (val == null || val == UNDEFINED || Boolean.FALSE.equals(val)) {
             return false;
@@ -243,6 +288,72 @@ final class Js {
             end--;
         }
         return s.substring(0, end);
+    }
+
+    /**
+     * {@code Number.prototype.toString()} of a number parsed from JSON.
+     */
+    static String numberToString(Number n) {
+        if (n instanceof Integer || n instanceof Long || n instanceof Short || n instanceof Byte) {
+            long l = n.longValue();
+            return Math.abs(l) <= MAX_SAFE_INTEGER ? Long.toString(l) : numberToString((double) l);
+        }
+        return numberToString(n.doubleValue());
+    }
+
+    private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
+
+    // the shortest decimal that reads back as the same double, as JavaScript prints
+    private static BigDecimal shortest(double d) {
+        BigDecimal exact = new BigDecimal(d);
+        for (int precision = 1; precision < 17; precision++) {
+            BigDecimal rounded = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
+            if (rounded.doubleValue() == d) {
+                return rounded.stripTrailingZeros();
+            }
+        }
+        return exact.round(new MathContext(17, RoundingMode.HALF_EVEN)).stripTrailingZeros();
+    }
+
+    private static String numberToString(double d) {
+        if (Double.isNaN(d)) {
+            return "NaN";
+        }
+        if (d == 0) {
+            return "0";
+        }
+        if (Double.isInfinite(d)) {
+            return d > 0 ? "Infinity" : "-Infinity";
+        }
+        if (d < 0) {
+            return "-" + numberToString(-d);
+        }
+        BigDecimal decimal = shortest(d);
+        String digits = decimal.unscaledValue().toString();
+        int k = digits.length();
+        int n = k - decimal.scale();
+        StringBuilder sb = new StringBuilder();
+        if (k <= n && n <= 21) {
+            sb.append(digits);
+            for (int i = k; i < n; i++) {
+                sb.append('0');
+            }
+        } else if (0 < n && n <= 21) {
+            sb.append(digits, 0, n).append('.').append(digits, n, k);
+        } else if (-6 < n && n <= 0) {
+            sb.append("0.");
+            for (int i = n; i < 0; i++) {
+                sb.append('0');
+            }
+            sb.append(digits);
+        } else {
+            sb.append(digits.charAt(0));
+            if (k > 1) {
+                sb.append('.').append(digits, 1, k);
+            }
+            sb.append('e').append(n - 1 >= 0 ? "+" : "-").append(Math.abs(n - 1));
+        }
+        return sb.toString();
     }
 
     /**
