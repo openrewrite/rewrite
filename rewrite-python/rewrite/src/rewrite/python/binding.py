@@ -140,8 +140,9 @@ def maybe_rebind(visitor: TreeVisitor[Any, Any], from_module: str, to_module: st
                                               through, spelled_module, identities or set(), declared_in,
                                               answer))
     if new_module_import:
-        # Queued after the rebind, which writes the references it binds. A `maybe_bind` of the
-        # module queued earlier waited for a reference and found none.
+        # Appended after the rebind, which writes the references it binds. `maybe_add_import`
+        # would defer to an identical import an earlier `maybe_bind` queued, which runs before
+        # those references exist.
         visitor._after_visit.append(AddImport(AddImportOptions(module=to_module, only_if_referenced=False)))
     return answer
 
