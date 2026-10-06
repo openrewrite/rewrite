@@ -20,8 +20,10 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
@@ -29,10 +31,29 @@ import java.util.zip.GZIPInputStream;
  * {@code Intl.Collator('en').compare}, which npm sorts with through @isaacs/string-locale-compare: the
  * Unicode Collation Algorithm over the CLDR root collation, to its third level, with canonically
  * equivalent strings equal. The data is CLDR 48 and Unicode 17, as in the ICU of Node 24. ICU itself
- * tells some unnormalized strings from their normalized forms, where they hold combining characters
- * from beyond the Basic Multilingual Plane; this does not.
+ * tells some strings that are not in normalization form D from that form, where a contraction meets
+ * a character from beyond the Basic Multilingual Plane; rather than order such a string differently,
+ * this refuses it.
  */
 final class LocaleCompare {
+
+    /**
+     * A string whose order under ICU is not known: not in normalization form D, with a contraction
+     * matched through combining marks or across a composite from beyond the Basic Multilingual Plane.
+     */
+    static final class UnknownOrder extends IllegalArgumentException {
+        private final String string;
+
+        UnknownOrder(String string) {
+            super("The order of " + Js.quote(string) + " under Intl.Collator is not known: it is not in " +
+                  "normalization form D where a contraction meets a character beyond the Basic Multilingual Plane");
+            this.string = string;
+        }
+
+        String getString() {
+            return string;
+        }
+    }
 
     private static final int RANKED_BASE = 0x10000;
     private static final int UNASSIGNED_BASE = 0x1000000;
@@ -94,6 +115,7 @@ final class LocaleCompare {
         private final long[][] characterElements;
         private final Map<String, long[]> contractions = new HashMap<>();
         private final int[] contractionStarts;
+        private final int[] contractionCharacters;
         private final int[] decomposable;
         private final int[][] decompositions;
         private final int[] combining;
@@ -114,12 +136,18 @@ final class LocaleCompare {
                     }
                 }
                 int[] starts = new int[in.readInt()];
+                List<Integer> inContractions = new ArrayList<>();
                 for (int i = 0; i < starts.length; i++) {
                     int[] codePoints = readCodePoints(in);
                     starts[i] = codePoints[0];
+                    for (int codePoint : codePoints) {
+                        inContractions.add(codePoint);
+                    }
                     contractions.put(new String(codePoints, 0, codePoints.length), readElements(in));
                 }
                 contractionStarts = Arrays.stream(starts).sorted().distinct().toArray();
+                contractionCharacters = inContractions.stream().mapToInt(Integer::intValue).sorted().distinct()
+                        .toArray();
                 decomposable = new int[in.readInt()];
                 decompositions = new int[decomposable.length][];
                 for (int i = 0; i < decomposable.length; i++) {
@@ -182,7 +210,13 @@ final class LocaleCompare {
             for (int i = 0; i < elements.length; i++) {
                 char c = s.charAt(i);
                 if (c >= ascii.length) {
-                    return elements(normalize(s));
+                    int[] codePoints = s.codePoints().toArray();
+                    int[] decomposed = decompose(codePoints);
+                    int[] normalized = reorder(decomposed);
+                    if (s.length() > codePoints.length && orderUnknown(codePoints, decomposed, normalized)) {
+                        throw new UnknownOrder(s);
+                    }
+                    return elements(normalized);
                 }
                 elements[i] = ascii[c];
             }
@@ -252,34 +286,102 @@ final class LocaleCompare {
         }
 
         /**
-         * Normalization form D.
+         * Where ICU's answer for a string that is not in normalization form D is known to differ from
+         * the answer for that form: a contraction matched through a run of combining marks that the form
+         * reorders, or a contraction that a composite starts within, where a character from beyond the
+         * Basic Multilingual Plane is in the run or is the composite.
          */
-        private int[] normalize(String s) {
-            int[] out = new int[s.length() + 8];
-            int count = 0;
-            for (int i = 0; i < s.length(); ) {
-                int codePoint = s.codePointAt(i);
-                i += Character.charCount(codePoint);
-                int syllable = codePoint - HANGUL_BASE;
-                int decomposed = codePoint < 0xC0 ? -1 : Arrays.binarySearch(decomposable, codePoint);
-                int[] parts = decomposed < 0 ? null : decompositions[decomposed];
-                if (count + (parts == null ? 3 : parts.length) > out.length) {
-                    out = Arrays.copyOf(out, out.length * 2 + 16);
-                }
-                if (syllable >= 0 && syllable < HANGUL_COUNT) {
-                    out[count++] = 0x1100 + syllable / (HANGUL_VOWELS * HANGUL_TRAILS);
-                    out[count++] = 0x1161 + syllable % (HANGUL_VOWELS * HANGUL_TRAILS) / HANGUL_TRAILS;
-                    if (syllable % HANGUL_TRAILS != 0) {
-                        out[count++] = 0x11A7 + syllable % HANGUL_TRAILS;
-                    }
-                } else if (parts != null) {
-                    System.arraycopy(parts, 0, out, count, parts.length);
-                    count += parts.length;
-                } else {
-                    out[count++] = codePoint;
+        private boolean orderUnknown(int[] codePoints, int[] decomposed, int[] normalized) {
+            int[] rangeStart = new int[decomposed.length];
+            int[] rangeEnd = new int[decomposed.length];
+            boolean[] compositeNonStarter = new boolean[decomposed.length];
+            boolean[] supplementaryComposite = new boolean[decomposed.length];
+            int at = 0;
+            for (int codePoint : codePoints) {
+                int[] parts = decomposition(codePoint);
+                for (int k = 0; k < parts.length; k++, at++) {
+                    rangeStart[at] = at - k;
+                    rangeEnd[at] = at - k + parts.length;
+                    compositeNonStarter[at] = parts.length > 1 && combiningClass(parts[0]) != 0;
+                    supplementaryComposite[at] = parts.length > 1 && codePoint >= 0x10000;
                 }
             }
-            for (int i = 1; i < count; i++) {
+            int start = 0;
+            for (int i = 0; i <= decomposed.length; i++) {
+                if (i == decomposed.length || combiningClass(decomposed[i]) == 0) {
+                    boolean changed = false;
+                    boolean supplementary = false;
+                    boolean contraction = start > 0 && inContraction(decomposed[start - 1]);
+                    for (int k = start; k < i; k++) {
+                        changed |= normalized[k] != decomposed[k] || compositeNonStarter[k];
+                        supplementary |= decomposed[k] >= 0x10000;
+                        contraction |= inContraction(decomposed[k]);
+                    }
+                    if (changed && supplementary && contraction) {
+                        return true;
+                    }
+                    start = i + 1;
+                }
+            }
+            for (int i = 0; i < decomposed.length; ) {
+                int length = 1;
+                if (Arrays.binarySearch(contractionStarts, decomposed[i]) >= 0) {
+                    for (int l = Math.min(LONGEST_CONTRACTION, decomposed.length - i); l > 1; l--) {
+                        if (contractions.containsKey(new String(decomposed, i, l))) {
+                            length = l;
+                            break;
+                        }
+                    }
+                }
+                for (int k = i + 1; k < i + length; k++) {
+                    if (supplementaryComposite[k] && rangeStart[k] > i) {
+                        return true;
+                    }
+                }
+                i += length;
+            }
+            return false;
+        }
+
+        private boolean inContraction(int codePoint) {
+            return Arrays.binarySearch(contractionCharacters, codePoint) >= 0;
+        }
+
+        private int[] decomposition(int codePoint) {
+            int syllable = codePoint - HANGUL_BASE;
+            if (syllable >= 0 && syllable < HANGUL_COUNT) {
+                int lead = 0x1100 + syllable / (HANGUL_VOWELS * HANGUL_TRAILS);
+                int vowel = 0x1161 + syllable % (HANGUL_VOWELS * HANGUL_TRAILS) / HANGUL_TRAILS;
+                return syllable % HANGUL_TRAILS == 0 ? new int[]{lead, vowel} :
+                        new int[]{lead, vowel, 0x11A7 + syllable % HANGUL_TRAILS};
+            }
+            int decomposed = codePoint < 0xC0 ? -1 : Arrays.binarySearch(decomposable, codePoint);
+            return decomposed < 0 ? new int[]{codePoint} : decompositions[decomposed];
+        }
+
+        /**
+         * The full canonical decomposition of each code point, in the order given.
+         */
+        private int[] decompose(int[] codePoints) {
+            int[] out = new int[codePoints.length + 8];
+            int count = 0;
+            for (int codePoint : codePoints) {
+                int[] parts = decomposition(codePoint);
+                if (count + parts.length > out.length) {
+                    out = Arrays.copyOf(out, out.length * 2 + 16);
+                }
+                System.arraycopy(parts, 0, out, count, parts.length);
+                count += parts.length;
+            }
+            return Arrays.copyOf(out, count);
+        }
+
+        /**
+         * Normalization form D: the decomposition in canonical order.
+         */
+        private int[] reorder(int[] decomposed) {
+            int[] out = decomposed.clone();
+            for (int i = 1; i < out.length; i++) {
                 int mark = out[i];
                 int combiningClass = combiningClass(mark);
                 int j = i;
@@ -289,7 +391,7 @@ final class LocaleCompare {
                 }
                 out[j] = mark;
             }
-            return Arrays.copyOf(out, count);
+            return out;
         }
     }
 }

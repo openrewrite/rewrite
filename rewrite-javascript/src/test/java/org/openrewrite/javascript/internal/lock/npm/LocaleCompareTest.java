@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 
@@ -93,10 +94,60 @@ class LocaleCompareTest {
      * Node answers -1 for both: ICU tells each first string from its normalized form, the second. One has
      * a combining character from beyond the Basic Multilingual Plane before one of a lower combining
      * class; in the other a vowel sign from there decomposes into a contraction with the sign before it.
+     * The port refuses the first string of each rather than answer 0.
      */
     @Test
-    void canonicallyEquivalentStringsAreEqual() {
-        assertThat(LocaleCompare.en("\u0f71\ud800\udf78\u309a", "\u309a\u0f71\ud800\udf78")).isEqualTo(0);
-        assertThat(LocaleCompare.en("\ud818\udd1e\ud818\udd22", "\ud818\udd1e\ud818\udd1e\ud818\udd29")).isEqualTo(0);
+    void stringsBeyondTheBmpNotInNormalizationFormDAreRefused() {
+        String[][] pairs = {
+          {"\u0f71\ud800\udf78\u309a", "\u309a\u0f71\ud800\udf78"},
+          {"\ud818\udd1e\ud818\udd22", "\ud818\udd1e\ud818\udd1e\ud818\udd29"},
+        };
+        for (String[] pair : pairs) {
+            assertThatThrownBy(() -> LocaleCompare.en(pair[0], pair[1])).isInstanceOf(LocaleCompare.UnknownOrder.class)
+              .extracting("string").isEqualTo(pair[0]);
+            assertThatThrownBy(() -> LocaleCompare.en(pair[1], pair[0])).isInstanceOf(LocaleCompare.UnknownOrder.class);
+            assertThatThrownBy(() -> LocaleCompare.en(pair[0], "a")).isInstanceOf(LocaleCompare.UnknownOrder.class);
+            assertThat(LocaleCompare.en(pair[1], pair[1])).isEqualTo(0);
+        }
+    }
+
+    /**
+     * Node answers 0 for each, as the port does: strings that are not in normalization form D but hold
+     * no contraction meeting a character from beyond the Basic Multilingual Plane. The mark U+10D25
+     * after a precomposed letter, the Gurung Khema vowel sign U+16121 after a letter that starts no
+     * contraction, a compatibility ideograph and a letter beside an unassigned character stay ordered.
+     */
+    @Test
+    void otherUnnormalizedStringsAreOrderedAsTheirNormalizedForm() {
+        assertThat(LocaleCompare.en("caf\u00e9", "cafe\u0301")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\u0f71\u0301\u309a", "\u309a\u0f71\u0301")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\uac01", "\u1100\u1161\u11a8")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\ud87e\udc00", "\u4e3d")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\u00e9\udbff\udfff", "e\u0301\udbff\udfff")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\u00e9\ud803\udd25", "e\u0301\ud803\udd25")).isEqualTo(0);
+        assertThat(LocaleCompare.en("a\u0301\ud803\udd25\u0327", "a\u0327\u0301\ud803\udd25")).isEqualTo(0);
+        assertThat(LocaleCompare.en("a\ud818\udd21", "a\ud818\udd1e\ud818\udd1e")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\u0ddc\u0dca", "\u0ddd")).isEqualTo(0);
+        assertThat(LocaleCompare.en("\ud818\udd1e\ud818\udd1e", "\ud818\udd1e\ud818\udd1e\ud818\udd29")).isEqualTo(-1);
+    }
+
+    /**
+     * Node answers -1 for each of these against its normalized form: a contraction starter (Cyrillic \u0418,
+     * Tibetan U+0F71, Sinhala U+0DDC, whose decomposition is a contraction) followed by a mark from beyond
+     * the Basic Multilingual Plane and a mark of a lower class, or U+1138B before a vowel sign whose
+     * decomposition continues a contraction.
+     */
+    @Test
+    void contractionsMeetingSupplementaryCharactersAreRefused() {
+        String[] refused = {
+          "\u0418\ud800\udf78\u0327",
+          "\u04e4\ud805\udeb6\u0327",
+          "\u0f71\u0f73\ud800\udf78\u0344",
+          "\u0ddc\ud803\udf85\u09bc",
+          "\u1e1d\u030a\ud804\udf8b\ud804\udfc8",
+        };
+        for (String s : refused) {
+            assertThatThrownBy(() -> LocaleCompare.en(s, "a")).as(s).isInstanceOf(LocaleCompare.UnknownOrder.class);
+        }
     }
 }
