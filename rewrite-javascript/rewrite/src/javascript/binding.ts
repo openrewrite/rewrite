@@ -385,8 +385,8 @@ function rebindingName(
     options: MaybeRebindOptions,
     existing: ExistingImportBinding
 ): string | undefined {
-    const taken = (name: string) =>
-        nameTaken(name, namesUsedIn(cu), visitor) && !bindsTargetEverywhere(cu, name, options.to);
+    const taken = (name: string) => nameTaken(name, namesUsedIn(cu), visitor) &&
+        !(reusesTargetImport(cu, name, options.to, existing) && !nameTaken(name, new Set(), visitor));
     const alias = options.to.alias;
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
@@ -399,13 +399,20 @@ function rebindingName(
 }
 
 /**
- * Whether `name` is a value import of `to` itself that no nearer scope redeclares, so the moved
- * binding can take that name without changing what any reference reads.
+ * Whether `name` is a value import of named member `to` that no nearer scope redeclares, so a value
+ * binding moved there can take that name without changing what any reference reads. `RebindImport`
+ * merges only that shape into the existing import.
  */
-function bindsTargetEverywhere(cu: JS.CompilationUnit, name: string, to: MaybeRebindOptions["to"]): boolean {
+function reusesTargetImport(
+    cu: JS.CompilationUnit,
+    name: string,
+    to: MaybeRebindOptions["to"],
+    moved: ExistingImportBinding
+): boolean {
     const target = existingImportBinding(cu, to.module, to.member);
-    return target?.localName === name && !target.typeOnly && !cu.statements.some(s =>
-        s.element?.kind !== JS.Kind.Import && namesDeclaredWithin(s.element).has(name));
+    return target?.localName === name && bindingShape(to.member) === "named" && !target.typeOnly &&
+        !moved.typeOnly && !cu.statements.some(s =>
+            s.element?.kind !== JS.Kind.Import && namesDeclaredWithin(s.element).has(name));
 }
 
 /**
