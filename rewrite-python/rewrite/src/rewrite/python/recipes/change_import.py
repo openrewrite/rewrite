@@ -115,7 +115,9 @@ class ChangeImport(Recipe):
 
     @property
     def description(self) -> str:
-        return "Change a Python import from one module/name to another, updating all type attributions."
+        return ("Change a Python import from one module/name to another, renaming the types that name "
+                "what moved. Where the new module re-exports a member, set the declaring module for the "
+                "types to match a fresh parse.")
 
     def editor(self) -> TreeVisitor[Any, ExecutionContext]:
         recipe = self

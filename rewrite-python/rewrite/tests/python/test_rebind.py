@@ -35,8 +35,8 @@ from rewrite.python.visitor import PythonVisitor
 from rewrite.recipe import Recipe
 from rewrite.test import RecipeSpec, dedent, from_visitor, python
 
-pytestmark = pytest.mark.skipif(shutil.which('ty-types') is None,
-                                reason="ty-types CLI is not installed")
+requires_ty = pytest.mark.skipif(shutil.which('ty-types') is None,
+                                 reason="ty-types CLI is not installed")
 
 # The target re-exports its classes from a private submodule, as most packages do.
 _PACKAGES = {
@@ -46,10 +46,11 @@ _PACKAGES = {
         class Http:
             def post(self, url: str, headers: Headers) -> Headers: ...
         def make_headers() -> Headers: ...
+        NAMES = ["a"]
         ''',
     'acme_common/__init__.py': '',
     'acme_common/http/__init__.py': '''
-        from acme_common.http._client import HttpClient, HttpHeaders, make_http_headers
+        from acme_common.http._client import HttpClient, HttpHeaders, make_http_headers, NAMES
         ''',
     'acme_common/http/_client.py': '''
         class HttpHeaders:
@@ -57,6 +58,7 @@ _PACKAGES = {
         class HttpClient:
             def post(self, url: str, headers: HttpHeaders) -> HttpHeaders: ...
         def make_http_headers() -> HttpHeaders: ...
+        NAMES = ["a"]
         ''',
 }
 
@@ -146,6 +148,7 @@ def _assert_attributed_as_parsed(recipes: Sequence[Recipe], before: str, after: 
     assert _attribution(cu) == _attribution(_parse(after, packages))
 
 
+@requires_ty
 def test_moved_members_are_attributed_as_a_parse_of_the_result():
     _assert_attributed_as_parsed(
         [ChangeImport(old_module='legacy_http', old_name='Http',
@@ -178,6 +181,7 @@ def test_moved_members_are_attributed_as_a_parse_of_the_result():
     )
 
 
+@requires_ty
 def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result():
     _assert_attributed_as_parsed(
         [ChangeImport(old_module='legacy_http', old_name='Http',
@@ -195,7 +199,42 @@ def test_a_member_read_through_its_module_is_attributed_as_a_parse_of_the_result
         ''',
     )
 
+    # The file's own name for the new module spells the reference, and its type names the module.
+    _assert_attributed_as_parsed(
+        [ChangeImport(old_module='legacy_http', old_name='Http',
+                      new_module='acme_common.http', new_name='HttpClient',
+                      new_declaring_module='acme_common.http._client')],
+        '''
+        import legacy_http
+        import acme_common.http as h
+        client = legacy_http.Http()
+        ''',
+        '''
+        import acme_common.http as h
+        client = h.HttpClient()
+        ''',
+    )
 
+
+@requires_ty
+def test_a_moved_constant_leaves_the_type_of_its_value_alone():
+    _assert_attributed_as_parsed(
+        [ChangeImport(old_module='legacy_http', old_name='NAMES', new_module='acme_common.http',
+                      new_declaring_module='acme_common.http._client')],
+        '''
+        from legacy_http import NAMES
+        s = ["x"]
+        n = NAMES
+        ''',
+        '''
+        from acme_common.http import NAMES
+        s = ["x"]
+        n = NAMES
+        ''',
+    )
+
+
+@requires_ty
 def test_a_whole_module_move_carries_its_members_types():
     packages = {**_PACKAGES, 'acme_http/__init__.py': _PACKAGES['acme_common/http/_client.py']
                 .replace('HttpClient', 'Http').replace('HttpHeaders', 'Headers')
@@ -216,6 +255,7 @@ def test_a_whole_module_move_carries_its_members_types():
     )
 
 
+@requires_ty
 def test_a_second_binding_of_the_member_stays_and_keeps_its_types():
     cu = _run([ChangeImport(old_module='legacy_http', old_name='Http', new_module='acme_common.http',
                             new_name='HttpClient')],
@@ -330,6 +370,96 @@ def test_rebinds_in_one_visit_end_in_one_import():
             '''))
     assert answers == ['HttpClient', 'HttpHeaders']
 
+    # A repeated call answers as the first did, which is the name the file ends up binding.
+    answers.clear()
+    _visiting(answers,
+              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http', to_member='HttpClient'),
+              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http', to_member='HttpClient')
+              ).rewrite_run(
+        python(
+            '''
+            from legacy import Http
+            h = Http()
+            ''',
+            '''
+            from acme import HttpClient
+            h = HttpClient()
+            '''))
+    assert answers == ['HttpClient', 'HttpClient']
+
+    # The new module's import follows the rebind writing its references, even where an
+    # earlier `maybe_bind` queued that same import before anything read it.
+    answers.clear()
+    _visiting(answers,
+              lambda v: maybe_bind(v, 'acme'),
+              lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http')).rewrite_run(
+        python(
+            '''
+            import legacy
+            h = legacy.Http()
+            ''',
+            '''
+            import acme
+            h = acme.Http()
+            '''))
+    assert answers == ['acme', 'acme.Http']
+
+
+def test_the_import_a_move_rewrites_is_the_one_binding_it():
+    answers: List[Optional[str]] = []
+    # A relative import names its module with its leading dots.
+    _visiting(answers, lambda v: maybe_rebind(v, '.legacy', 'acme', from_member='Http',
+                                              to_member='HttpClient')).rewrite_run(
+        python(
+            '''
+            from .legacy import Http
+            h = Http()
+            ''',
+            '''
+            from acme import HttpClient
+            h = HttpClient()
+            '''))
+
+    # An alias spelling the new module's name still binds the member.
+    _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http',
+                                              to_member='HttpClient')).rewrite_run(
+        python(
+            '''
+            from legacy import Http as acme
+            h = acme()
+            ''',
+            '''
+            from acme import HttpClient as acme
+            h = acme()
+            '''))
+    assert answers == ['HttpClient', 'acme']
+
+
+def test_a_member_moves_only_where_it_is_read_through_its_module():
+    answers: List[Optional[str]] = []
+    # `os.sep` reads the `os` package, not the `os.path` module, which binds no name of its own.
+    _visiting(answers, lambda v: maybe_rebind(v, 'os.path', 'posixpath', from_member='sep')).rewrite_run(
+        python('''
+            import os.path
+            s = os.sep
+            '''))
+
+    # A parameter shadowing the module's name reads something else.
+    _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http')).rewrite_run(
+        python('''
+            import legacy
+            def f(legacy):
+                return legacy.Http
+            '''))
+
+    # Nothing reads the member, so there is no name to answer with.
+    _visiting(answers, lambda v: maybe_rebind(v, 'legacy', 'acme', from_member='Http')).rewrite_run(
+        python('''
+            import legacy
+            x = legacy.other()
+            '''))
+    assert answers == [None, None, None]
+
 
 def test_maybe_bind_answers_with_the_files_name_for_a_module():
     answers: List[Optional[str]] = []
@@ -337,10 +467,18 @@ def test_maybe_bind_answers_with_the_files_name_for_a_module():
               lambda v: maybe_bind(v, 'acme.http'),
               lambda v: maybe_bind(v, 'acme.http', alias='h'),
               lambda v: maybe_bind(v, 'json'),
-              lambda v: maybe_bind(v, 'os')).rewrite_run(
+              lambda v: maybe_bind(v, 'os'),
+              lambda v: maybe_bind(v, 'acme', 'Client'),
+              lambda v: maybe_bind(v, 'a', 'X'),
+              lambda v: maybe_bind(v, 'b', 'X')).rewrite_run(
         python('''
             import acme.http as h
+            from typing import TYPE_CHECKING
+            if TYPE_CHECKING:
+                from acme import Client
             os = 1
             '''))
-    # Nothing reads `json`, so its import waits for a reference the caller never wrote.
-    assert answers == ['h', 'h', 'json', None]
+    # Nothing reads `json`, so its import waits for a reference the caller never wrote. A
+    # type-checking import of `Client` binds the same member, so a runtime import may share its
+    # name. `X` is claimed by the import queued for `a`.
+    assert answers == ['h', 'h', 'json', None, 'Client', 'X', None]
