@@ -180,6 +180,18 @@ final class Ini {
         return (val.startsWith("\"") && val.endsWith("\"")) || (val.startsWith("'") && val.endsWith("'"));
     }
 
+    /**
+     * {@code ini.safe(val)}: a key or value as {@code ini.stringify} writes it, so that {@link #decode} reads it
+     * back as the same text.
+     */
+    static String safe(String val) {
+        if (val.matches("(?s).*[=\\r\\n].*") || val.startsWith("[") || (val.length() > 1 && isQuoted(val)) ||
+            !val.equals(val.trim())) {
+            return Js.quote(val);
+        }
+        return val.replace(";", "\\;").replace("#", "\\#");
+    }
+
     static @Nullable Object unsafe(@Nullable String raw) {
         String val = Js.trim(raw == null ? "" : raw);
         if (isQuoted(val)) {

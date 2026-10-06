@@ -1,0 +1,1 @@
+Add alias pc -> testing-peer-deps-c@1.2.3 beside testing-peer-deps-b@1 (peer c 1): the alias does not satisfy the peer, so the real c is auto-installed.

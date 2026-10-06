@@ -1,0 +1,21 @@
+npm warn using --force Recommended protections disabled.
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: @isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0
+npm warn Found: @isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0
+npm warn node_modules/@isaacs/testing-peer-dep-conflict-chain-single-a
+npm warn   @isaacs/testing-peer-dep-conflict-chain-single-a@"2.0.0" from the root project
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer @isaacs/testing-peer-dep-conflict-chain-single-a@"1" from @isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0
+npm warn node_modules/@isaacs/testing-peer-dep-conflict-chain-single-b
+npm warn   @isaacs/testing-peer-dep-conflict-chain-single-b@"1.0.0" from the root project
+npm warn
+npm warn Conflicting peer dependency: @isaacs/testing-peer-dep-conflict-chain-single-a@1.0.1
+npm warn node_modules/@isaacs/testing-peer-dep-conflict-chain-single-a
+npm warn   peer @isaacs/testing-peer-dep-conflict-chain-single-a@"1" from @isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0
+npm warn   node_modules/@isaacs/testing-peer-dep-conflict-chain-single-b
+npm warn     @isaacs/testing-peer-dep-conflict-chain-single-b@"1.0.0" from the root project
+
+up to date in 109ms
+exit=0
+lock unchanged

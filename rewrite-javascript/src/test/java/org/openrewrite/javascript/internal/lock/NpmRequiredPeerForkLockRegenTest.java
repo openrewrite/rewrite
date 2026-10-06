@@ -97,43 +97,6 @@ class NpmRequiredPeerForkLockRegenTest extends LockRegenTestSupport {
         assertThat(result.getLockFileContent()).isEqualTo(resource(FIXTURE + "after"));
     }
 
-    @Test
-    void requiredPeerUnsatisfiedAtAPlacementDefers() {
-        // Hand-edited: ajv-keywords at the top level sees ajv@6.15.0, outside its range; npm's re-placement is not
-        // reproduced.
-        String before = resource(FIXTURE + "before")
-                .replace("\"node_modules/schema-utils/node_modules/ajv-keywords\"", "\"node_modules/ajv-keywords\"");
-        String original = resource(FIXTURE + "pkg-before");
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm, withOverride(original), original, before,
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail())
-                .contains("ajv-keywords@5.1.0 at node_modules/ajv-keywords")
-                .contains("ajv@6.15.0");
-    }
-
-    @Test
-    void peerFlaggedProviderDefers() {
-        // Hand-edited: the ajv beside ajv-keywords is flagged as installed only for the peer, which the graph does
-        // not model.
-        String before = resource(FIXTURE + "before").replaceFirst(
-                "(\"node_modules/schema-utils/node_modules/ajv\": \\{\n)", "$1      \"peer\": true,\n");
-        assertThat(before).as("fixture edit applied").contains("\"peer\": true");
-        String original = resource(FIXTURE + "pkg-before");
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm, withOverride(original), original, before,
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail())
-                .contains("node_modules/schema-utils/node_modules/ajv")
-                .contains("installed as a peer");
-    }
-
     private static String requested(String name) {
         return name.replace("/", "%2F");
     }

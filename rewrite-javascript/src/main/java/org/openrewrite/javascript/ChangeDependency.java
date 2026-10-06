@@ -196,7 +196,8 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 if (ps.modifiedPackageJson != null) return;
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.changeDependency(doc, oldPackageName, newPackageName, newVersion, scope);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
+                        pkg, edit, ps.capturedLockContent,
+                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

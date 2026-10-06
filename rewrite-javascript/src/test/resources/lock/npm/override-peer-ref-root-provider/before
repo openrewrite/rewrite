@@ -1,0 +1,29 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-peer-deps-b": "1.2.4"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-deps-b": {
+      "version": "1.2.4",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-deps-b/-/testing-peer-deps-b-1.2.4.tgz",
+      "integrity": "sha512-7rfmqBPEKWlRnU+o495Cynlc1A3MxFf+rNEIdXYRawM3lU6RzY7BX2nOtQsEE4uIKnqbEJR5uj7XaR5RWFmcBw==",
+      "peerDependencies": {
+        "@isaacs/testing-peer-deps-c": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-deps-c": {
+      "version": "1.2.3",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-deps-c/-/testing-peer-deps-c-1.2.3.tgz",
+      "integrity": "sha512-sq2Bc2XsWCrvCm1Hw+hVEd9oadnsb7T/91v3OwtLx0KMqinj6ncn6p4uixsB6dZuC+sHJlFHZjbnB4crfeVSgw==",
+      "peer": true
+    }
+  }
+}

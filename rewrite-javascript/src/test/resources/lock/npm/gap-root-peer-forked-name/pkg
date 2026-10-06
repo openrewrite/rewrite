@@ -1,0 +1,11 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-odd": "3.0.1",
+    "to-regex-range": "5.0.1"
+  },
+  "peerDependencies": {
+    "is-number": "^7.0.0"
+  }
+}

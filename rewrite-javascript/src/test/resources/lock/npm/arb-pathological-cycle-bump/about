@@ -1,0 +1,1 @@
+Bump pathological-a ^1 -> ^2 (a@N -> b@N -> a@other -> ...).

@@ -1,0 +1,1 @@
+Removing an is-number 3.0.0 override: 6.0.0 replaces 3.0.0 at the root (newer) and npm prunes the orphaned kind-of and is-buffer.

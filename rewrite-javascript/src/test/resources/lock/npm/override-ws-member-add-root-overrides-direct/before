@@ -1,0 +1,31 @@
+{
+  "name": "ws",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "ws",
+      "version": "1.0.0",
+      "workspaces": [
+        "packages/m"
+      ]
+    },
+    "node_modules/isarray": {
+      "version": "2.0.5",
+      "resolved": "https://registry.npmjs.org/isarray/-/isarray-2.0.5.tgz",
+      "integrity": "sha512-xHjhDr3cNBK0BzdUJSPXZntQUx/mwMS5Rw4A7lPJ90XGAO6ISP/ePDNuo0vhqOZU+UD5JoodwCAAoZQd3FeAKw==",
+      "license": "MIT"
+    },
+    "node_modules/m": {
+      "resolved": "packages/m",
+      "link": true
+    },
+    "packages/m": {
+      "version": "1.0.0",
+      "dependencies": {
+        "isarray": "2.0.5"
+      }
+    }
+  }
+}

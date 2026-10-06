@@ -1,0 +1,1 @@
+Root holds b "1||2" (b@2 at root); adding a@1.0.1 (dep b@1) nests b@1 under a.

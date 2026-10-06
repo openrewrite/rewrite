@@ -61,46 +61,6 @@ class NpmMultiLevelCascadeLockRegenTest extends LockRegenTestSupport {
 
     // --- opportunistic deeper bump fails loud -----------------------------
 
-    @Test
-    void deeperMoverAddingAnEdgeFailsLoud() {
-        // alpha 1.0.0 -> 2.0.0 moves its `mid` edge ^1.0.0 -> ^2.0.0, forcing mid 1.0.0 -> 2.0.0. But mid 2.0.0
-        // ADDS a brand-new `leaf` edge mid-cascade — npm would place a fresh subtree; a minimal engine cannot
-        // reproduce that byte-for-byte, so it defers rather than emit a wrong lock.
-        routes.put(REG + "alpha", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put(REG + "alpha/1.0.0",
-                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"mid\":\"^1.0.0\"}}");
-        routes.put(REG + "alpha/2.0.0",
-                "{\"name\":\"alpha\",\"version\":\"2.0.0\",\"dependencies\":{\"mid\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-ALPHA2\"}}");
-        routes.put(REG + "mid", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put(REG + "mid/1.0.0",
-                "{\"name\":\"mid\",\"version\":\"1.0.0\"}");
-        routes.put(REG + "mid/2.0.0",
-                "{\"name\":\"mid\",\"version\":\"2.0.0\",\"dependencies\":{\"leaf\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/mid/-/mid-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-MID2\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"alpha\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/alpha\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\", \"integrity\": \"sha512-ALPHA1\", \"dependencies\": {\"mid\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/mid\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/mid/-/mid-1.0.0.tgz\", \"integrity\": \"sha512-MID1\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"alpha\":\"^2.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("mid");
-        assertThat(result.getFailure().getDetail()).contains("adds/drops a dependency edge");
-    }
-
     /**
      * Replay {@code dir}'s fixture offline and assert the engine output equals {@code dir/after} byte-for-byte.
      * Each {@code {name, v1, v2}} maps to a packument route ({@code http/<name>}) and one manifest route per

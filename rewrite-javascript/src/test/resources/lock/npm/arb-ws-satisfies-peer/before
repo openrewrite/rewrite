@@ -1,0 +1,26 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "root",
+      "version": "1.0.0",
+      "workspaces": [
+        "packages/*"
+      ],
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "*"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-a": {
+      "resolved": "packages/a",
+      "link": true
+    },
+    "packages/a": {
+      "name": "@isaacs/testing-peer-dep-conflict-chain-a",
+      "version": "1.0.0"
+    }
+  }
+}

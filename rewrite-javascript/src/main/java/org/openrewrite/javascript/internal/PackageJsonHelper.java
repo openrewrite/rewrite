@@ -37,6 +37,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 
 /**
@@ -686,6 +687,19 @@ public class PackageJsonHelper {
             java.util.function.Function<Json.Document, Json.Document> editFn,
             @Nullable String capturedLockContent,
             ExecutionContext ctx) {
+        return editAndRegenerate(packageJson, editFn, capturedLockContent, emptyMap(), ctx);
+    }
+
+    /**
+     * @param projectManifests the lock's other manifests by path (a workspace root and its members) as edited so
+     *                         far, so the regeneration sees the whole project
+     */
+    public static EditAndRegenerateResult editAndRegenerate(
+            SourceFile packageJson,
+            java.util.function.Function<Json.Document, Json.Document> editFn,
+            @Nullable String capturedLockContent,
+            Map<Path, String> projectManifests,
+            ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
@@ -697,7 +711,7 @@ public class PackageJsonHelper {
         SourceFile refreshed = refreshMarker(after);
         String originalPackageJsonContent = before.printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, ctx);
+                : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, projectManifests, ctx);
         return EditAndRegenerateResult.changed(withResolvedDeps(refreshed, regen), regen);
     }
 
@@ -741,6 +755,15 @@ public class PackageJsonHelper {
             @Nullable String originalPackageJsonContent,
             @Nullable String capturedLockContent,
             ExecutionContext ctx) {
+        return regenerateLockContent(packageJson, originalPackageJsonContent, capturedLockContent, emptyMap(), ctx);
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile packageJson,
+            @Nullable String originalPackageJsonContent,
+            @Nullable String capturedLockContent,
+            Map<Path, String> projectManifests,
+            ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null || marker.getPackageManager() == null) {
@@ -754,7 +777,13 @@ public class PackageJsonHelper {
         // handed to regeneration.
         String content = packageJson.printAll(
                 new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
-        return regen.regenerate(content, originalPackageJsonContent,
-                capturedLockContent, marker, packageJson.getSourcePath(), ctx);
+        return regen.regenerate(LockFileRegeneration.Request.builder()
+                .packageJson(content)
+                .originalPackageJson(originalPackageJsonContent)
+                .lock(capturedLockContent)
+                .marker(marker)
+                .packageJsonPath(packageJson.getSourcePath())
+                .manifests(projectManifests)
+                .build(), ctx);
     }
 }

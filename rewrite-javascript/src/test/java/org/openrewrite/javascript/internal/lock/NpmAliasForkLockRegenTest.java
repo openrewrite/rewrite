@@ -108,23 +108,4 @@ class NpmAliasForkLockRegenTest extends LockRegenTestSupport {
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(before);
     }
-
-    @Test
-    void aliasAddIntoV2LockDefers() {
-        // The alias resolves through whole-closure, but a fresh alias entry in a lockfileVersion 2 legacy tree is
-        // not yet serialized, so it fails loud rather than emit an unverified layout.
-        routes.put(REG + "emoji-regex", resource("lock/npm/alias-fork/http/emoji-regex"));
-        routes.put(REG + "emoji-regex/8.0.0", resource("lock/npm/alias-fork/http/emoji-regex-8.0.0"));
-        routes.put(REG + "emoji-regex/10.6.0", resource("lock/npm/alias-fork/http/emoji-regex-10.6.0"));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/alias-fork/pkg-after"),
-                resource("lock/npm/alias-fork/pkg-before"),
-                resource("lock/npm/alias-fork/before-v2"),
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("lockfileVersion 2");
-    }
 }

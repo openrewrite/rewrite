@@ -1,0 +1,1 @@
+Two-level nested override is-even > is-odd > is-number 4.0.0: applied; is-number 3.0.0 -> 4.0.0 at the root, kind-of and is-buffer pruned.

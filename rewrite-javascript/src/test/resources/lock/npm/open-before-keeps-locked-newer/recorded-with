@@ -1,0 +1,4 @@
+npm 11.17.0, node v24.19.0, 2026-10-05
+before exit=0 at 2026-10-05T21:01:02Z, after exit=0 at 2026-10-05T21:01:02Z, again exit=0
+before args:  (+npmrc-before)
+after args: 

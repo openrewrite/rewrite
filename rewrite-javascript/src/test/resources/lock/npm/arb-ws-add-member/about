@@ -1,0 +1,1 @@
+Add workspace b and make workspace a depend on it (b ^1.0.0).

@@ -1,0 +1,1 @@
+{"name":"local-pkg","version":"1.0.0","dependencies":{"local-shared":"file:../local-shared"}}

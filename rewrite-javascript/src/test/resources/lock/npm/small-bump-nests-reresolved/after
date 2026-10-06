@@ -1,0 +1,34 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-bundle-dupes-a": "2.0.0",
+        "@isaacs/testing-bundle-dupes-b": "1.0.0"
+      }
+    },
+    "node_modules/@isaacs/testing-bundle-dupes-a": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundle-dupes-a/-/testing-bundle-dupes-a-2.0.0.tgz",
+      "integrity": "sha512-L2LsNX6QYfIvsEVwlFOmyp04Z5gLc4oRD41T5Ih7sCqxhTUcWgCzGKsEeA0qCtDdtqhEsqznznsoDKwjFnn+KQ==",
+      "dependencies": {
+        "@isaacs/testing-bundle-dupes-b": "2"
+      }
+    },
+    "node_modules/@isaacs/testing-bundle-dupes-a/node_modules/@isaacs/testing-bundle-dupes-b": {
+      "version": "2.1.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundle-dupes-b/-/testing-bundle-dupes-b-2.1.0.tgz",
+      "integrity": "sha512-IA0NhfF2i7iURyGfTtoe6z4en6wUTerikYp0ZFFIFdgDN5j1WZIBK3OLFefjKEDaCX6hwOQR2vyjXv6KKK9xkQ=="
+    },
+    "node_modules/@isaacs/testing-bundle-dupes-b": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundle-dupes-b/-/testing-bundle-dupes-b-1.0.0.tgz",
+      "integrity": "sha512-ky9g4wHryNMfgAmz2+P/+YizWDEenh11V8yNpc4ZpUUOWfF6QZlCqwe5Tk58Rb1TuaX5bfN5Qe0Q90wogMK8XA=="
+    }
+  }
+}

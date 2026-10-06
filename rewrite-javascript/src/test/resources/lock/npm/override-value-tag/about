@@ -1,0 +1,1 @@
+Override value "latest": a tag spec accepts any registry-resolved node, so the locked 6.0.0 stays; lock byte-identical.

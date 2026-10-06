@@ -1,0 +1,1 @@
+Phase 1 with legacy-peer-deps=true places optional-conflict-b-x@1 (optional peer b-y@2) beside the root-declared b-y@1; phase 2 (default config) adds abbrev.

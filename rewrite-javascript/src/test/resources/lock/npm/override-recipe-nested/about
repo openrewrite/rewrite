@@ -1,0 +1,1 @@
+UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", "is-odd"): the nested override applies in place, 6.0.0 -> 7.0.0; locks byte-identical to the #8928 goldens.

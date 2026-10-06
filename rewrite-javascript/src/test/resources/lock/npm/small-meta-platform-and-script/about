@@ -1,0 +1,1 @@
+Add optionalDependency @typescript/typescript-linux-s390x@7.0.2 (os linux, cpu s390x; host darwin arm64) and @isaacs/testing-fail-postinstall@1.0.0 (postinstall): os and cpu are written on the optional entry, hasInstallScript on the other.

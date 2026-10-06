@@ -77,7 +77,8 @@ public final class RegistryPackuments implements PackumentSource {
                     throw new NpmRejection("E404", "404 Not Found - GET " + url(e) + " - Not found",
                             version == null ? name : name + "@" + version);
                 default:
-                    throw new CannotKnow("the registry " + e.getRegistryUrl() + ": " + e.getMessage());
+                    // unreachable or refusing the credentials: the registry's own failure, reported as such
+                    throw e;
             }
         }
     }

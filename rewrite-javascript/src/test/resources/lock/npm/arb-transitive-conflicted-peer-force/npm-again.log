@@ -1,0 +1,24 @@
+npm warn using --force Recommended protections disabled.
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: @isaacs/testing-transitive-conflicted-peer-c@1.0.0
+npm warn Found: @isaacs/testing-transitive-conflicted-peer-b@2.0.0
+npm warn node_modules/@isaacs/testing-transitive-conflicted-peer-b
+npm warn   @isaacs/testing-transitive-conflicted-peer-b@"2" from the root project
+npm warn   1 more (@isaacs/testing-transitive-conflicted-peer-a)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer @isaacs/testing-transitive-conflicted-peer-b@"1" from @isaacs/testing-transitive-conflicted-peer-c@1.0.0
+npm warn node_modules/@isaacs/testing-transitive-conflicted-peer-a/node_modules/@isaacs/testing-transitive-conflicted-peer-c
+npm warn   @isaacs/testing-transitive-conflicted-peer-c@"1" from @isaacs/testing-transitive-conflicted-peer-a@1.0.0
+npm warn   node_modules/@isaacs/testing-transitive-conflicted-peer-a
+npm warn
+npm warn Conflicting peer dependency: @isaacs/testing-transitive-conflicted-peer-b@1.0.0
+npm warn node_modules/@isaacs/testing-transitive-conflicted-peer-b
+npm warn   peer @isaacs/testing-transitive-conflicted-peer-b@"1" from @isaacs/testing-transitive-conflicted-peer-c@1.0.0
+npm warn   node_modules/@isaacs/testing-transitive-conflicted-peer-a/node_modules/@isaacs/testing-transitive-conflicted-peer-c
+npm warn     @isaacs/testing-transitive-conflicted-peer-c@"1" from @isaacs/testing-transitive-conflicted-peer-a@1.0.0
+npm warn     node_modules/@isaacs/testing-transitive-conflicted-peer-a
+
+up to date in 209ms
+exit=0
+lock unchanged

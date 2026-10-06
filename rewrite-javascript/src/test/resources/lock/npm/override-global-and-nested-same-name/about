@@ -1,0 +1,1 @@
+Global is-number 6.0.0 beside nested is-odd > is-number 7.0.0: the nested rule wins under is-odd (root becomes 7.0.0), the global one applies to to-regex-range (its nested copy becomes 6.0.0).

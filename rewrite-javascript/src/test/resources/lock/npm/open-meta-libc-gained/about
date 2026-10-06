@@ -1,0 +1,1 @@
+Bump the optional @node-rs/xxhash-linux-x64-musl 1.2.0 -> 1.2.1: libc ["musl"] appears (absent from the abbreviated packument). Recorded on darwin-arm64.

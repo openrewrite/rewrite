@@ -1,0 +1,1 @@
+Root holds dedupe-a@1.0.0 (b@2 nested) and b@1.0.0; adding override {a: {b: 1.0.0}} dedupes the nested b.

@@ -1,0 +1,31 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "a": "file:a"
+      }
+    },
+    "a": {
+      "version": "1.0.0",
+      "dependencies": {
+        "@ruyadorno/package-with-added-bin": "^1.0.0"
+      }
+    },
+    "node_modules/@ruyadorno/package-with-added-bin": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@ruyadorno/package-with-added-bin/-/package-with-added-bin-1.0.0.tgz",
+      "integrity": "sha512-hdo4fqsQASK9NDsw47yAjrMK0qVfnjW0fwQFz546ygzyoN96X2zOBf8Ri32lvFmjswtF/UyJterBnWhNHk7omQ==",
+      "license": "ISC"
+    },
+    "node_modules/a": {
+      "resolved": "a",
+      "link": true
+    }
+  }
+}

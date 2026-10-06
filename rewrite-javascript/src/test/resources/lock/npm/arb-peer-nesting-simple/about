@@ -1,0 +1,1 @@
+Root holds nesting-p@2; adding s@1 (dep x, x PEER p@1 q@1) must nest x with its peer set under s.

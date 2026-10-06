@@ -1,0 +1,1 @@
+yarn.lock beside package-lock.json; the edit adds kind-of@^6.0.0 while yarn.lock pins "kind-of@^6.0.0" at 6.0.2 (crafted key): does the incremental install read the pin, and what does it write to each file?

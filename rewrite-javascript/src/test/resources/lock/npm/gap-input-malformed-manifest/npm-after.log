@@ -1,0 +1,5 @@
+npm error code EJSONPARSE
+npm error JSON.parse Invalid package.json: JSONParseError: Expected double-quoted property name in JSON at position 63 (line 5 column 1) while parsing near "...s-number\": \"7.0.0\",\n"
+npm error JSON.parse Failed to parse JSON data.
+npm error JSON.parse Note: package.json must be actual JSON, not just JavaScript.
+npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T12_11_32_135Z-debug-0.log

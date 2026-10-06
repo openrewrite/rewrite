@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.Builder;
+import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
@@ -24,6 +26,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
+import java.util.Map;
 
 /**
  * Regenerate a JavaScript project's lock file natively — without executing the package manager — via
@@ -62,7 +65,29 @@ public final class LockFileRegeneration {
         UNSUPPORTED_LOCKFILE_VERSION,
         UNSUPPORTED_ENTRY_TYPE,
         MALFORMED_LOCK,
-        MALFORMED_MANIFEST
+        MALFORMED_MANIFEST,
+
+        /**
+         * A peer dependency the package manager cannot satisfy ({@code ERESOLVE}): either it rejects the edit, or
+         * it would write a lock that its next install rejects. The detail names both sides.
+         */
+        PEER_CONFLICT
+    }
+
+    /**
+     * What one regeneration is given: the edited manifest, the lock it updates, and the project's other
+     * manifests as edited so far (a workspace root and the members the recipe has), by path.
+     */
+    @Value
+    @Builder
+    public static class Request {
+        String packageJson;
+        @Nullable String originalPackageJson;
+        @Nullable String lock;
+        @Nullable NodeResolutionResult marker;
+        @Nullable Path packageJsonPath;
+        @Singular("manifest")
+        Map<Path, String> manifests;
     }
 
     @Value
@@ -148,7 +173,16 @@ public final class LockFileRegeneration {
                              @Nullable NodeResolutionResult marker,
                              @Nullable Path packageJsonPath,
                              ExecutionContext ctx) {
-        return NativeLockEngine.regenerate(pm, packageJsonContent, originalPackageJsonContent,
-                existingLockContent, marker, packageJsonPath, ctx);
+        return regenerate(Request.builder()
+                .packageJson(packageJsonContent)
+                .originalPackageJson(originalPackageJsonContent)
+                .lock(existingLockContent)
+                .marker(marker)
+                .packageJsonPath(packageJsonPath)
+                .build(), ctx);
+    }
+
+    public Result regenerate(Request request, ExecutionContext ctx) {
+        return NativeLockEngine.regenerate(pm, request, ctx);
     }
 }

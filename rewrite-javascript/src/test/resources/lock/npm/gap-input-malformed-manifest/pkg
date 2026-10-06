@@ -1,0 +1,4 @@
+{
+  "name": "p",
+  "dependencies": {
+    "is-number": "7.0.0",

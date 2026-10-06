@@ -1,0 +1,8 @@
+(node:61485) [DEP0060] DeprecationWarning: The `util._extend` API is deprecated. Please use Object.assign() instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:61485) [DEP0176] DeprecationWarning: fs.F_OK is deprecated, use fs.constants.F_OK instead
+npm WARN p@1.0.0 No description
+npm WARN p@1.0.0 No repository field.
+npm WARN p@1.0.0 No license field.
+
+added 3 packages in 0.111s

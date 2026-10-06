@@ -1,0 +1,1 @@
+Root holds testing-bundle-dupes-b@2.0.0 and a@2.0.0 (dep b 2, deduped); changing root b to 1.0.0: a's edge nests a b that is picked again for "2" (2.1.0), not the old 2.0.0.

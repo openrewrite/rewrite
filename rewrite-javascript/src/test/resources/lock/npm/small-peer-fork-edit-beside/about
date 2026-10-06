@@ -1,0 +1,1 @@
+Swap abbrev for wrappy beside an existing peer fork: testing-peer-deps-b@1 and its peer c@1 at the root, b@2 and c@2 under testing-peer-deps-d (via a@2).

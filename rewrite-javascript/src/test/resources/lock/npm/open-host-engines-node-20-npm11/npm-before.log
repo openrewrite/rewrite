@@ -1,0 +1,3 @@
+npm warn cli npm v11.17.0 does not support Node.js v20.15.1. This version of npm supports the following node versions: `^20.17.0 || >=22.9.0`. You can find the latest version at https://nodejs.org/.
+
+up to date in 289ms

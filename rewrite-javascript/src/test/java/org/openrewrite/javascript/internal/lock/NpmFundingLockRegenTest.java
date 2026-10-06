@@ -59,37 +59,6 @@ class NpmFundingLockRegenTest extends LockRegenTestSupport {
 
     // --- non-string funding npm reshapes: fail loud rather than mis-serialize ---
 
-    @Test
-    void nonStringFundingFailsLoud() {
-        // Bump funky 1.0.0 -> 2.0.0, whose new version declares an object-form funding. Only the string form
-        // is byte-reproducible (npm reshapes object/array funding), so the patch refuses.
-        routes.put(REG + "funky", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put(REG + "funky/1.0.0", "{\"name\":\"funky\",\"version\":\"1.0.0\"}");
-        routes.put(REG + "funky/2.0.0",
-                "{\"name\":\"funky\",\"version\":\"2.0.0\"," +
-                        "\"funding\":{\"type\":\"opencollective\",\"url\":\"https://opencollective.com/funky\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/funky/-/funky-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-FUNKY2\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"funky\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/funky\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/funky/-/funky-1.0.0.tgz\", \"integrity\": \"sha512-FUNKY1\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"funky\":\"^2.0.0\"}}",
-                "{\"dependencies\":{\"funky\":\"^1.0.0\"}}",
-                lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The deeper whole-closure attempt also defers on the funding entry shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("declares funding");
-    }
-
     private void assertFundingByteExact(String dir, String[][] packages) {
         for (String[] pkg : packages) {
             String route = REG + pkg[0].replace("/", "%2F");

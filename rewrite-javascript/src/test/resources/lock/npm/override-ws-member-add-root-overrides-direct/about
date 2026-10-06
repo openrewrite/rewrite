@@ -1,0 +1,1 @@
+Member adds is-odd ^3.0.0 under a root is-odd 3.0.0 override: npm ignores the override and places is-odd 3.0.1.

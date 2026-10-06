@@ -1,0 +1,52 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/peer-dep-conflict-infinite-loop-a": "1"
+      }
+    },
+    "node_modules/@isaacs/peer-dep-conflict-infinite-loop-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/peer-dep-conflict-infinite-loop-a/-/peer-dep-conflict-infinite-loop-a-1.0.0.tgz",
+      "integrity": "sha512-06b93/5+wHKYyiKTHiNETITYYKl0Ey1xLO/Fr+HtVoTl5Bce3aCtHdo08rULKAssT/M3f9Z3SXS1XsuNdkbZDQ==",
+      "dependencies": {
+        "@isaacs/peer-dep-conflict-infinite-loop-j": "1",
+        "@isaacs/peer-dep-conflict-infinite-loop-x": "",
+        "@isaacs/peer-dep-conflict-infinite-loop-y": ""
+      }
+    },
+    "node_modules/@isaacs/peer-dep-conflict-infinite-loop-a/node_modules/@isaacs/peer-dep-conflict-infinite-loop-j": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/peer-dep-conflict-infinite-loop-j/-/peer-dep-conflict-infinite-loop-j-1.0.0.tgz",
+      "integrity": "sha512-HBIUO+yxBeGEI1Y7yvPUKUHaRh2Js6blxpGsoUgGPGMBfn9aKuW5YbLVKopYi36sg8TuqO/nFVwrfw133MT0ig=="
+    },
+    "node_modules/@isaacs/peer-dep-conflict-infinite-loop-a/node_modules/@isaacs/peer-dep-conflict-infinite-loop-x": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/peer-dep-conflict-infinite-loop-x/-/peer-dep-conflict-infinite-loop-x-1.0.0.tgz",
+      "integrity": "sha512-pZvLJ9TkGSSZWLiQAUUTcc7RhGMuK8B63NpRAnl6m0Y0lVn7BzeS+bSCajEZ97h2KI0IctLo9XHkZFD8zzD7QA==",
+      "peerDependencies": {
+        "@isaacs/peer-dep-conflict-infinite-loop-j": "1"
+      }
+    },
+    "node_modules/@isaacs/peer-dep-conflict-infinite-loop-j": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/peer-dep-conflict-infinite-loop-j/-/peer-dep-conflict-infinite-loop-j-2.0.0.tgz",
+      "integrity": "sha512-hjDyThziyxiTT9APh+EypHDbka3p6e0Tev7KP02LzIIyeKaxAx/bJIBDbg0f+fsAaagZe2wfaZYjjgxi/VZsog==",
+      "peer": true
+    },
+    "node_modules/@isaacs/peer-dep-conflict-infinite-loop-y": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/peer-dep-conflict-infinite-loop-y/-/peer-dep-conflict-infinite-loop-y-1.0.0.tgz",
+      "integrity": "sha512-/XFfPjEI+qaf9gagTZRmqsw0dF689AaBEunVWj747y3NdQSir8k3ub8EbEfocfKrw9/auArzJD+8kg9mDi6G0w==",
+      "peerDependencies": {
+        "@isaacs/peer-dep-conflict-infinite-loop-j": "2"
+      }
+    }
+  }
+}

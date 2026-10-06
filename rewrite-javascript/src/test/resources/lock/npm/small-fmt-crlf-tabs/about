@@ -1,0 +1,1 @@
+The lock was written from a two-space LF package.json; the edit adds wrappy and rewrites package.json with tabs and CRLF: the whole lock follows the manifest's indentation and newline.

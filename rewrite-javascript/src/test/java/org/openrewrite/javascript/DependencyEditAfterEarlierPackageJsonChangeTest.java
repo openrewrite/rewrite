@@ -119,7 +119,8 @@ class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
                             }
                           }
                         }
-                        """
+                        """,
+                        s -> s.noTrim()
                 ),
                 packageJson(
                         """

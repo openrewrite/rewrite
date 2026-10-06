@@ -1,0 +1,1 @@
+Root links a (package-with-added-bin ^1, no bin); adding link b (bin, package-with-added-bin ^2 which adds a bin).

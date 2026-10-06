@@ -1,0 +1,1 @@
+Override 7.0.0 equal to the direct spec 7.0.0: accepted, and it also moves is-odd's ^6 edge onto the root copy (nested 6.0.0 pruned).

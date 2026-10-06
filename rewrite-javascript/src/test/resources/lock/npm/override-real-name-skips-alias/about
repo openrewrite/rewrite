@@ -1,0 +1,1 @@
+Override keyed is-number beside a direct alias num -> npm:is-number@6.0.0: is-odd's is-number moves 6.0.0 -> 7.0.0, node_modules/num stays is-number@6.0.0.

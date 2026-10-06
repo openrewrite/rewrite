@@ -59,35 +59,6 @@ class NpmDisjointAddLockRegenTest extends LockRegenTestSupport {
 
     // --- a name that collides with the fork still fails loud -------------
 
-    @Test
-    void entangledAddFailsLoud() {
-        // beta is only present nested under alpha. Adding beta at top-level could make npm re-hoist the fork, so
-        // the disjoint relaxation refuses: only adds disjoint from every nested name are byte-reproducible.
-        routes.put(REG + "beta", "{\"name\":\"beta\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{}}}");
-        routes.put(REG + "beta/1.0.0",
-                "{\"name\":\"beta\",\"version\":\"1.0.0\"," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/beta/-/beta-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-BETA1\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"alpha\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/alpha\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\", \"integrity\": \"sha512-ALPHA1\"},\n" +
-                "    \"node_modules/alpha/node_modules/beta\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/beta/-/beta-1.0.0.tgz\", \"integrity\": \"sha512-BETA1\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\"}}",
-                lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("nested placement");
-    }
-
     private void assertDisjointAddByteExact(String dir, String name, String version) {
         routes.put(REG + name.replace("/", "%2F"), resource(dir + "/http/" + name));
         routes.put(REG + name.replace("/", "%2F") + "/" + version, resource(dir + "/http/" + name + "-" + version));

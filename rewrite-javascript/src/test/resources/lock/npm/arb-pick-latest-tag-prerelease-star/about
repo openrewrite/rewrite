@@ -1,0 +1,1 @@
+Add latest-is-prerelease "*": the latest dist-tag 1.0.0-beta-rc.3 wins over the higher 1.0.0.

@@ -1,0 +1,1 @@
+Add escape-string-regexp@4.0.0 (funding is a string), function-bind@1.1.2 (an object) and anynum@1.0.1 (an array): string and object are written as objects, the array verbatim.

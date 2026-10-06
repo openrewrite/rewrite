@@ -1,0 +1,1 @@
+Workspaces "packages/*" minus "!packages/c"; root adds file:d (dep b ^1.0.0, a workspace) and workspace a adds d ^1.0.0.

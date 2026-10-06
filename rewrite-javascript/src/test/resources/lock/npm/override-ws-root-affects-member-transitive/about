@@ -1,0 +1,1 @@
+Root adds an is-number override over an existing workspace lock: not applied to the member's transitive (the link forwards only rules naming the member's own deps); lock byte-identical, npm ci accepts.

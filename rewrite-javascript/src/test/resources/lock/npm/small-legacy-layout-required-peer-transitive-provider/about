@@ -1,0 +1,1 @@
+Phase 1 with legacy-peer-deps=true hoists infinite-loop-a@1's deps x (peer j@1), y (peer j@2) and j@1 to the root, so y sees j@1; phase 2 (default config) adds abbrev.

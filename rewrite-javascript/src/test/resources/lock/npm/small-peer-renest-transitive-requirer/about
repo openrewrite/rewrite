@@ -1,0 +1,1 @@
+testing-peer-deps@2 holds a@1.2.4 (peer b 1) at the root with its auto-installed b@1.2.4; the root adds b@2.

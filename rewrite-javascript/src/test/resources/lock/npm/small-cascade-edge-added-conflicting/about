@@ -1,0 +1,1 @@
+Bump testing-peer-deps 2.0.0 (deps a 1, d 2) -> 3.0.0 (deps b 2, d 2) while the root declares testing-peer-deps-b 1: the new edge to b conflicts at the root; a@1 loses its last dependent.

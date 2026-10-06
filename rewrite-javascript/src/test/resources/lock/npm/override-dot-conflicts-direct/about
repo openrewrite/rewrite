@@ -1,0 +1,1 @@
+"." 3.0.0 differing from the direct spec 3.0.1: npm exits 1 with EOVERRIDE (Override for is-odd@3.0.1 conflicts with direct dependency).

@@ -1,0 +1,65 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/test-conflicted-optional-peer-dep-meta-peer": "1",
+        "@isaacs/test-conflicted-optional-peer-dep-meta-peer-optional": "1"
+      }
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-has-peer": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-has-peer/-/test-conflicted-optional-peer-dep-has-peer-1.0.0.tgz",
+      "integrity": "sha512-asey7Jpi/z+ViT7qkAC5I8xsCY3TYDE6L/EFB78gd1ARClKtM670t6mudqpc9i0wzaXRP8LQ3y/AD6Wwa4SSLQ==",
+      "peerDependencies": {
+        "@isaacs/test-conflicted-optional-peer-dep-peer": "1"
+      }
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-meta-peer": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-meta-peer/-/test-conflicted-optional-peer-dep-meta-peer-1.0.0.tgz",
+      "integrity": "sha512-KGNaUC0BaGnf9eIPQykmIQ5PH+6lX3UIXH3Julk7UroWpgRgdl9OyK/VkGY8O4D//iZzsqatFUWfHhg7+SJ+UA==",
+      "dependencies": {
+        "@isaacs/test-conflicted-optional-peer-dep-has-peer": "1"
+      }
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-meta-peer-optional": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-meta-peer-optional/-/test-conflicted-optional-peer-dep-meta-peer-optional-1.0.0.tgz",
+      "integrity": "sha512-bprq1pq7/oB6t4D+x/KwxaQWicKifsxtbqmjSmoqwF3aDj98ch9cwM0QwVS4JavoeFFg9evVFuO+8on9FSL+hA==",
+      "dependencies": {
+        "@isaacs/test-conflicted-optional-peer-dep-has-peer-optional": "1"
+      }
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-meta-peer-optional/node_modules/@isaacs/test-conflicted-optional-peer-dep-has-peer-optional": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-has-peer-optional/-/test-conflicted-optional-peer-dep-has-peer-optional-1.0.0.tgz",
+      "integrity": "sha512-T7Q34SzRbR04Cvg8/pV4DgpJypYcsN57yDdhwVdHfZkLjbUTAM44Yk5875JtmeVzlN0jdBo9vMING1CDubp8rA==",
+      "peerDependencies": {
+        "@isaacs/test-conflicted-optional-peer-dep-peer": "2"
+      },
+      "peerDependenciesMeta": {
+        "@isaacs/test-conflicted-optional-peer-dep-peer": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-meta-peer-optional/node_modules/@isaacs/test-conflicted-optional-peer-dep-peer": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-peer/-/test-conflicted-optional-peer-dep-peer-2.0.0.tgz",
+      "integrity": "sha512-BG4PCKGtDpG/pOkdcxhKdMPY9hgvgCmjB2T8SL2aER/OESuYPK6Au15lIIQCiywAvtDx9CfcAunIcY9qgHtUIw==",
+      "extraneous": true
+    },
+    "node_modules/@isaacs/test-conflicted-optional-peer-dep-peer": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-conflicted-optional-peer-dep-peer/-/test-conflicted-optional-peer-dep-peer-1.0.0.tgz",
+      "integrity": "sha512-mKz78cfkkQMunvHlumRqYz7YDv3aeswwX427NsL7+u0+FJHwhBisfaepvRce0w52mf40+p0eekB/ukShpVMDPw==",
+      "peer": true
+    }
+  }
+}

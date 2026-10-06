@@ -1,0 +1,8 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "kind-of": "^6.0.3",
+    "is-odd": "1.0.0"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "abbrev": "1.1.1",
+        "latest-is-prerelease": "*"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    },
+    "node_modules/latest-is-prerelease": {
+      "version": "1.0.0-beta-rc.3",
+      "resolved": "https://registry.npmjs.org/latest-is-prerelease/-/latest-is-prerelease-1.0.0-beta-rc.3.tgz",
+      "integrity": "sha512-Dp2hSgEN4QHNhsPo5KwPvJoA4jpgC2qbdmKdcW4h7T/txgOr3xVmWRFNycurYjpIjLqJAx8m8lxA0dv+VBNPNA==",
+      "license": "ISC"
+    }
+  }
+}

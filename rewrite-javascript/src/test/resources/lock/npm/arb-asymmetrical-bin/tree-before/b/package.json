@@ -1,0 +1,1 @@
+{"name":"b","version":"1.0.0","bin":{"b":"file.js"},"dependencies":{"@ruyadorno/package-with-added-bin":"^2.0.0"}}

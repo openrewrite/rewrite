@@ -1,0 +1,1 @@
+Add abbrev@latest with min-release-age=200 (cutoff = run time minus 200 days, see recorded-with): latest 5.0.0 (2026-05-08) is too new, the tag falls back to 4.0.0 (2025-10-20); full packuments in http/<name>@full.

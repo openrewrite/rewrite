@@ -60,41 +60,6 @@ class NpmCascadeLockRegenTest extends LockRegenTestSupport {
 
     // --- sideways cascade (reverse-edge conflict) fails loud --------------
 
-    @Test
-    void sidewaysCascadeFailsLoud() {
-        // alpha 1.0.0 -> 2.0.0 changes its `shared` edge ^1.0.0 -> ^2.0.0, forcing shared to move off 1.5.0.
-        // But sibling beta pins shared at 1.5.0 exactly — no single version satisfies both, so npm would
-        // fork/nest shared. The greedy-forward resolver refuses rather than reshape (a sideways cascade).
-        routes.put(REG + "alpha", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put(REG + "alpha/1.0.0",
-                "{\"name\":\"alpha\",\"version\":\"1.0.0\",\"dependencies\":{\"shared\":\"^1.0.0\"}}");
-        routes.put(REG + "alpha/2.0.0",
-                "{\"name\":\"alpha\",\"version\":\"2.0.0\",\"dependencies\":{\"shared\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-ALPHA2\"}}");
-        routes.put(REG + "shared", "{\"versions\":{\"1.5.0\":{},\"2.0.0\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"alpha\": \"^1.0.0\", \"beta\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/alpha\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\", \"integrity\": \"sha512-ALPHA1\", \"dependencies\": {\"shared\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/beta\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/beta/-/beta-1.0.0.tgz\", \"integrity\": \"sha512-BETA1\", \"dependencies\": {\"shared\": \"1.5.0\"}},\n" +
-                "    \"node_modules/shared\": {\"version\": \"1.5.0\", \"resolved\": \"https://registry.npmjs.org/shared/-/shared-1.5.0.tgz\", \"integrity\": \"sha512-SHARED\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"alpha\":\"^2.0.0\",\"beta\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"beta\":\"^1.0.0\"}}",
-                lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("shared");
-        assertThat(result.getFailure().getDetail()).contains("no single version of shared satisfies");
-    }
-
     /**
      * Replay {@code dir}'s fixture offline and assert the engine output equals {@code dir/after} byte-for-byte.
      * Each {@code {name, v1, v2}} maps to a packument route ({@code http/<name>}) and one manifest route per

@@ -1,0 +1,42 @@
+{
+  "name": "@isaacs/testing-bundledeps",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "@isaacs/testing-bundledeps",
+      "version": "1.0.0",
+      "bundleDependencies": [
+        "@isaacs/testing-bundledeps-a"
+      ],
+      "dependencies": {
+        "@isaacs/testing-bundledeps-a": "*",
+        "@isaacs/testing-bundledeps-c": "*"
+      }
+    },
+    "node_modules/@isaacs/testing-bundledeps-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundledeps-a/-/testing-bundledeps-a-1.0.0.tgz",
+      "integrity": "sha512-2b/w0tAsreSNReTbLmIf+1jtt8R0cvMgMCeLF4P2LAE6cmKw7aIjLPupeB+5R8dm1BoMUuZbzFCzw0P4vP6spw==",
+      "inBundle": true,
+      "dependencies": {
+        "@isaacs/testing-bundledeps-b": "*"
+      }
+    },
+    "node_modules/@isaacs/testing-bundledeps-b": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundledeps-b/-/testing-bundledeps-b-1.0.0.tgz",
+      "integrity": "sha512-UDbCq7GHRDb743m4VBpnsui6hNeB3o08qe/FRnX9JFo0VHnLoXkdtvm/WurwABLxL/xw5wP/tfN2jF90EjQehQ==",
+      "inBundle": true
+    },
+    "node_modules/@isaacs/testing-bundledeps-c": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundledeps-c/-/testing-bundledeps-c-2.0.0.tgz",
+      "integrity": "sha512-nwGzs5eUI+0/+CB2oF7ce3Xu070w38pB//NoV9I9RedeT/+Y4fiOcIbLXYzt/yVJkZEOmTYXa1lVsrTypPvtlA==",
+      "dependencies": {
+        "@isaacs/testing-bundledeps-b": "*"
+      }
+    }
+  }
+}

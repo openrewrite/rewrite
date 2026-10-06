@@ -1,0 +1,1 @@
+"$is-number" when the root does not declare is-number falls back to the edge owner's own spec (is-odd's ^6.0.0): no error, lock byte-identical.

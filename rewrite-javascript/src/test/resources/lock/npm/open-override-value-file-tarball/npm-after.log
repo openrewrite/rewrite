@@ -1,0 +1,10 @@
+npm warn tarball tarball data for is-number@file:vendor/is-number-6.0.0.tgz (null) seems to be corrupted. Trying again.
+npm warn tarball tarball data for is-number@file:vendor/is-number-6.0.0.tgz (null) seems to be corrupted. Trying again.
+npm error code ENOENT
+npm error syscall open
+npm error path /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.h1TwQcI60h/node_modules/is-odd/vendor/is-number-6.0.0.tgz
+npm error errno -2
+npm error enoent ENOENT: no such file or directory, open '/private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.h1TwQcI60h/node_modules/is-odd/vendor/is-number-6.0.0.tgz'
+npm error enoent This is related to npm not being able to find a file.
+npm error enoent
+npm error A complete log of this run can be found in: /var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/npm-proxied-cache-PVf9NQ/_logs/2026-10-05T21_16_31_205Z-debug-0.log

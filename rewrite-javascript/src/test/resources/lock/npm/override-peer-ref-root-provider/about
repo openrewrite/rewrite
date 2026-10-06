@@ -1,0 +1,1 @@
+Root adds c 2.0.0 against b's peer c "1" with override "$c": no warning, c 2.0.0 at the root; npm ci accepts.

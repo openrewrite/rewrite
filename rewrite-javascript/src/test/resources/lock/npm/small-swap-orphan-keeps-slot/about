@@ -1,0 +1,1 @@
+Swap dedupe-tests-a@1.0.1 (dep b@1, at the root) for alias x -> dedupe-tests-a@1.0.0 (dep b@2): the root b@1 is held only by the removed dependency, yet b@2 nests under x and b@1 is pruned.

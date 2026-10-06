@@ -1,0 +1,13 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 1,
+  "requires": true,
+  "dependencies": {
+    "@isaacs/testing-fail-postinstall": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-fail-postinstall/-/testing-fail-postinstall-1.0.0.tgz",
+      "integrity": "sha512-dOoHClc0+gQ+GYiFLinkdH6G7mfSdjex+iiDhN26/h/WA+t7rax4Vg+TOB/VXjIuHawfiS5RllIxtPt7Fyqv+g=="
+    }
+  }
+}

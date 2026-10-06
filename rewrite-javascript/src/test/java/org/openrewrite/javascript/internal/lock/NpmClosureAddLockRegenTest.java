@@ -128,29 +128,6 @@ class NpmClosureAddLockRegenTest extends LockRegenTestSupport {
                         {"estree-walker", "2.0.2"}, {"picomatch", "4.0.5"}});
     }
 
-    @Test
-    void nonOptionalPeerFailsLoud() {
-        // A non-optional peer npm auto-installs (placed top-level with a `peer: true` marker whose
-        // reachability propagation needs the full hoisting model) is deferred rather than guessed.
-        routes.put(REG + "has-peer", "{\"name\":\"has-peer\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put(REG + "has-peer/1.0.0",
-                "{\"name\":\"has-peer\",\"version\":\"1.0.0\",\"dependencies\":{}," +
-                        "\"peerDependencies\":{\"react\":\">=17\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/has-peer/-/has-peer-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-PEER\"}}");
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"has-peer\":\"^1.0.0\"}}",
-                "{\"dependencies\":{}}",
-                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}",
-                null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The resolver defers: the non-optional peer has no provider, so npm would auto-install it (harder tail).
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
-    }
-
     /**
      * Replay {@code dir}'s fixture offline and assert the engine output equals {@code dir/after} byte-for-byte.
      * Each {@code {name, version}} maps to two recorded routes: {@code http/<name>} (packument) and

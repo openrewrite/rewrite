@@ -1,0 +1,1 @@
+A workspace is named chain-a@1.0.0; it adds chain-v@1, whose peer chain-a@1 is satisfied by the workspace link.

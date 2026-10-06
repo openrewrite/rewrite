@@ -1,0 +1,1 @@
+Add to-regex-range@4.0.0 as an optionalDependency beside the devDependency is-odd@3: is-number becomes devOptional. (lockfileVersion 2)

@@ -1,0 +1,1 @@
+Adding is-odd under an existing is-number ^7.0.0 override: the new transitive is placed at 7.0.0, not the ^6 registry choice.

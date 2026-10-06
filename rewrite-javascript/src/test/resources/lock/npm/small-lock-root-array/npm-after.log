@@ -1,0 +1,8 @@
+npm warn ancient lockfile
+npm warn ancient lockfile The package-lock.json file was created with an old version of npm,
+npm warn ancient lockfile so supplemental metadata must be fetched from the registry.
+npm warn ancient lockfile
+npm warn ancient lockfile This is a one-time fix-up, please be patient...
+npm warn ancient lockfile
+
+up to date in 112ms

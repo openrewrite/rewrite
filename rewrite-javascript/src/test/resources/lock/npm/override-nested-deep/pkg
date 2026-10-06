@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","dependencies":{"is-even":"1.0.0"},"overrides":{"is-even":{"is-odd":{"is-number":"4.0.0"}}}}

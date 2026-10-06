@@ -1,0 +1,1 @@
+Override value npm:isarray@2.0.5: is-odd's is-number slot becomes isarray@2.0.5 (entry "name": "isarray"), nested under is-odd because 2.0.5 < 6.0.0; root 6.0.0 pruned.

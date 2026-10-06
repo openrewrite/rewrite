@@ -1,0 +1,9 @@
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'engine-specifying-test-package@1.0.0',
+npm warn EBADENGINE   required: { node: '8.17.0' },
+npm warn EBADENGINE   current: { node: 'v24.19.0', npm: '11.17.0' }
+npm warn EBADENGINE }
+
+up to date in 112ms
+exit=0
+lock unchanged

@@ -1,0 +1,1 @@
+The override-downgrade-transitive edit under prefer-dedupe=true: npm replaces node_modules/is-number 6.0.0 -> 5.0.0 in place.

@@ -1,0 +1,19 @@
+{
+  "name": "@isaacs/testing-peer-dep-conflict-chain-a",
+  "version": "2.3.4",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "@isaacs/testing-peer-dep-conflict-chain-a",
+      "version": "2.3.4",
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "file:."
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-a": {
+      "resolved": "",
+      "link": true
+    }
+  }
+}

@@ -1,0 +1,1 @@
+"$nope" on is-number, declared by neither the root nor is-odd: npm exits 1 with "Unable to resolve reference $nope" (no error code).

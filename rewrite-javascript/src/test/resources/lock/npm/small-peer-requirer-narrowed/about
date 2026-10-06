@@ -1,0 +1,1 @@
+Root holds testing-peer-deps-c@2.0.0 and b@2.0.0 (peer c "*"); changing root b to 1.2.4 narrows its peer to c 1 against the root-declared c@2.

@@ -1,0 +1,1 @@
+Root a@2 (nests b@2.0.0) and b@1; bumping root b to 2 resolves b@2.1.0 at root while the nested b@2.0.0 still satisfies a.

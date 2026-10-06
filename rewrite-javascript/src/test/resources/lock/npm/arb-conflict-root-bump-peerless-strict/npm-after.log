@@ -1,0 +1,13 @@
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: p@1.0.0
+npm warn Found: @isaacs/testing-peer-dep-conflict-chain-single-a@1.0.0
+npm warn node_modules/@isaacs/testing-peer-dep-conflict-chain-single-a
+npm warn   @isaacs/testing-peer-dep-conflict-chain-single-a@"2.0.0" from the root project
+npm warn   1 more (@isaacs/testing-peer-dep-conflict-chain-single-b)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer @isaacs/testing-peer-dep-conflict-chain-single-a@"1" from @isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0
+npm warn node_modules/@isaacs/testing-peer-dep-conflict-chain-single-b
+npm warn   @isaacs/testing-peer-dep-conflict-chain-single-b@"1.0.0" from the root project
+
+up to date in 117ms

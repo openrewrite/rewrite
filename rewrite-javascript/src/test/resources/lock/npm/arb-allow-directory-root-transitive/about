@@ -1,0 +1,1 @@
+Add a directory dependency whose own directory dependency is transitive, with allow-directory=root.

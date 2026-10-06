@@ -1,0 +1,1 @@
+Root holds a@1.0.1 (b@1 hoisted); adding root b "1||2" keeps b@1 because the edge is already valid.

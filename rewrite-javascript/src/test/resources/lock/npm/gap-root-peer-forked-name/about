@@ -1,0 +1,1 @@
+The project gains peerDependencies is-number ^7 while is-number is forked (6 at the root, 7 nested).

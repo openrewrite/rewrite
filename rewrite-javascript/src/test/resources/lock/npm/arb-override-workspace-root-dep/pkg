@@ -1,0 +1,1 @@
+{"name":"root","version":"1.0.0","workspaces":["onepackage"],"dependencies":{"abbrev":"^1.1.1","wrappy":"1.0.1"},"overrides":{"abbrev":"^1.1.1","wrappy":"1.0.1"}}

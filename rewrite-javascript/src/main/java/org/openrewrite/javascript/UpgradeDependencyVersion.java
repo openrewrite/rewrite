@@ -234,7 +234,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 List<MatchedDependency> matches = ps.matchedDeps;
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
+                        pkg, edit, ps.capturedLockContent,
+                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

@@ -1,0 +1,8 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "ansi-styles": "4.3.0",
+    "color-string": "1.9.1"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "color-convert": "0.3.0"
+  }
+}

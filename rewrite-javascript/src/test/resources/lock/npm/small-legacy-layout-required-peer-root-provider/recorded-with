@@ -1,0 +1,2 @@
+phase 1: npm 11.17.0 with before-npmrc; phase 2: npm 11.17.0, node v24.19.0, 2026-10-05
+before exit=0, after exit=0

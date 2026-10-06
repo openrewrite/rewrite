@@ -1,0 +1,27 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-bundle-dupes-b": "2",
+        "abbrev": "1.1.1"
+      }
+    },
+    "node_modules/@isaacs/testing-bundle-dupes-b": {
+      "version": "2.1.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-bundle-dupes-b/-/testing-bundle-dupes-b-2.1.0.tgz",
+      "integrity": "sha512-IA0NhfF2i7iURyGfTtoe6z4en6wUTerikYp0ZFFIFdgDN5j1WZIBK3OLFefjKEDaCX6hwOQR2vyjXv6KKK9xkQ=="
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "7.0.0"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "bin": {
+    "p": "cli.js"
+  },
+  "funding": "https://example.com/fund"
+}

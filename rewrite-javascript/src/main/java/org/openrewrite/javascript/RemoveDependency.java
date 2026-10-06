@@ -178,7 +178,8 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 Set<String> scopes = ps.scopesContainingPackage;
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
+                        pkg, edit, ps.capturedLockContent,
+                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

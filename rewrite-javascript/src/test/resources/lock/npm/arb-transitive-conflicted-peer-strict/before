@@ -1,0 +1,40 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-transitive-conflicted-peer-a": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-transitive-conflicted-peer-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-transitive-conflicted-peer-a/-/testing-transitive-conflicted-peer-a-1.0.0.tgz",
+      "integrity": "sha512-TLDCoqGI+uORzSuTeG7WYoeUG4SFGBcyFN8zGTFm5Ma0H7ZBgoSn5xE/S5XGvmFaB06832VzxJcI8Wh8NrSH+g==",
+      "dependencies": {
+        "@isaacs/testing-transitive-conflicted-peer-c": "1"
+      },
+      "peerDependencies": {
+        "@isaacs/testing-transitive-conflicted-peer-b": "1||2"
+      }
+    },
+    "node_modules/@isaacs/testing-transitive-conflicted-peer-b": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-transitive-conflicted-peer-b/-/testing-transitive-conflicted-peer-b-1.0.0.tgz",
+      "integrity": "sha512-EOtGPZhmJn81sQ9oEwuW4NCoYS8o5Y/mIWhCYhvBOvv2P1ej1Bx9FTIx0pvbweFiTgNru7jSKiABgLFfxjmLag==",
+      "peer": true
+    },
+    "node_modules/@isaacs/testing-transitive-conflicted-peer-c": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-transitive-conflicted-peer-c/-/testing-transitive-conflicted-peer-c-1.0.0.tgz",
+      "integrity": "sha512-X2dkYjFueiurTradpf0RycRUEZo1jj90vs309HPwEDK8AhvUU2LezdWC9lLOywzxNJB24FLtyaXWlqGvK+LhVA==",
+      "peerDependencies": {
+        "@isaacs/testing-transitive-conflicted-peer-b": "1"
+      }
+    }
+  }
+}

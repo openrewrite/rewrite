@@ -1,0 +1,1 @@
+Parent key is-odd@3.0.1 with the direct spec ^3.0.0: the key's version is also the rule's value, so npm exits 1 with EOVERRIDE (Override for is-odd@^3.0.0 conflicts with direct dependency).

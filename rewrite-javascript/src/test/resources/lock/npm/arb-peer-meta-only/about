@@ -1,0 +1,1 @@
+Add debug@4.3.7, whose manifest has peerDependenciesMeta for supports-color but no peerDependencies.

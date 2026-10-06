@@ -175,7 +175,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
 
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
+                        pkg, edit, ps.capturedLockContent,
+                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

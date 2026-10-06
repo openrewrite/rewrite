@@ -1,0 +1,1 @@
+{"name":"ws","version":"1.0.0","workspaces":["packages/m"],"overrides":{"is-odd":{"is-number":"7.0.0"}}}

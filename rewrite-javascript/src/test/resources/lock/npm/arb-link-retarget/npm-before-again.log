@@ -1,0 +1,5 @@
+arb-link-retarget/before: rewritten (exit=0)
+16d15
+<       "name": "x",
+up to date in 91ms
+npm 11.17.0, node v24.19.0, 2026-10-06: install --package-lock-only of pkg-before over before, nothing changed

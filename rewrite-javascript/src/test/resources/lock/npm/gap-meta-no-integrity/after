@@ -1,0 +1,23 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "color-convert": "0.3.0"
+      }
+    },
+    "node_modules/color-convert": {
+      "version": "0.3.0",
+      "resolved": "https://registry.npmjs.org/color-convert/-/color-convert-0.3.0.tgz",
+      "integrity": "sha1-uAqU5XkReevnC3UoTZXG1DrRNn4=",
+      "engines": {
+        "node": "*"
+      }
+    }
+  }
+}

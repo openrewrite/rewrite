@@ -1,0 +1,1 @@
+Phase 1 with legacy-peer-deps=true hoists testing-peer-deps-b@2.0.1 (peer c@2, via testing-peer-deps@3) beside the root-declared c@1; phase 2 (default config) adds abbrev.

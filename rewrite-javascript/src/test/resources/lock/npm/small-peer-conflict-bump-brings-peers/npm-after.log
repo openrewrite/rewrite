@@ -1,0 +1,26 @@
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: p@1.0.0
+npm error Found: @isaacs/testing-peer-deps-b@1.2.4
+npm error node_modules/@isaacs/testing-peer-deps-b
+npm error   @isaacs/testing-peer-deps-b@"2.0.1" from the root project
+npm error   peer @isaacs/testing-peer-deps-b@"1" from @isaacs/testing-peer-deps-a@1.2.4
+npm error   node_modules/@isaacs/testing-peer-deps-a
+npm error     @isaacs/testing-peer-deps-a@"1.2.4" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error @isaacs/testing-peer-deps-b@"2.0.1" from the root project
+npm error
+npm error Conflicting peer dependency: @isaacs/testing-peer-deps-c@2.0.0
+npm error node_modules/@isaacs/testing-peer-deps-c
+npm error   peer @isaacs/testing-peer-deps-c@"2" from @isaacs/testing-peer-deps-b@2.0.1
+npm error   node_modules/@isaacs/testing-peer-deps-b
+npm error     @isaacs/testing-peer-deps-b@"2.0.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /Users/jon/.npm/_logs/2026-10-05T21_45_24_080Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T21_45_24_080Z-debug-0.log

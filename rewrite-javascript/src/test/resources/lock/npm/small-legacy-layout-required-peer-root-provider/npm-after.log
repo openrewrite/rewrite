@@ -1,0 +1,22 @@
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: @isaacs/testing-peer-deps-b@2.0.1
+npm warn Found: @isaacs/testing-peer-deps-c@1.2.3
+npm warn node_modules/@isaacs/testing-peer-deps-c
+npm warn   @isaacs/testing-peer-deps-c@"1" from the root project
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer @isaacs/testing-peer-deps-c@"2" from @isaacs/testing-peer-deps-b@2.0.1
+npm warn node_modules/@isaacs/testing-peer-deps-b
+npm warn   @isaacs/testing-peer-deps-b@"2" from @isaacs/testing-peer-deps@3.0.0
+npm warn   node_modules/@isaacs/testing-peer-deps
+npm warn   1 more (@isaacs/testing-peer-deps-a)
+npm warn
+npm warn Conflicting peer dependency: @isaacs/testing-peer-deps-c@2.0.0
+npm warn node_modules/@isaacs/testing-peer-deps-c
+npm warn   peer @isaacs/testing-peer-deps-c@"2" from @isaacs/testing-peer-deps-b@2.0.1
+npm warn   node_modules/@isaacs/testing-peer-deps-b
+npm warn     @isaacs/testing-peer-deps-b@"2" from @isaacs/testing-peer-deps@3.0.0
+npm warn     node_modules/@isaacs/testing-peer-deps
+npm warn     1 more (@isaacs/testing-peer-deps-a)
+
+up to date in 117ms

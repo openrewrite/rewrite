@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","dependencies":{"abbrev":"1.1.1","asap":">=2.0.0 <2.0.3","get-func-name":">=2.0.0 <2.0.2","path-is-absolute":"*"}}

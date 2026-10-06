@@ -1,0 +1,1 @@
+Hand-made input: small-lock-control's lock with the JSON root is an array holding the lock; widen abbrev to ^1.0.9 and add wrappy@1.0.2 (abbrev 1.0.9 kept = lock honored).

@@ -1,0 +1,8 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-odd": "3.0.1",
+    "kind-of": "https://registry.npmjs.org/kind-of/-/kind-of-6.0.3.tgz"
+  }
+}

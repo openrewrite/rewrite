@@ -1,0 +1,34 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "abbrev": "1.1.1"
+      },
+      "optionalDependencies": {
+        "engine-specifying-test-package": "^1.0.0"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    },
+    "node_modules/engine-specifying-test-package": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/engine-specifying-test-package/-/engine-specifying-test-package-1.0.0.tgz",
+      "integrity": "sha512-JmEWb6ITItHkbeGYNpQ8IcvyFl32Nz7f3kDlYD2MukQQMLcWIzNeMd7NeSFxATKvuRnrlUT+8lKdWEjBlaPd4Q==",
+      "license": "ISC",
+      "optional": true,
+      "engines": {
+        "node": "8.17.0"
+      }
+    }
+  }
+}

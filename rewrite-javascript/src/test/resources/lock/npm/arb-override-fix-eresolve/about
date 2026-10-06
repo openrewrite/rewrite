@@ -1,0 +1,1 @@
+Root holds single-a@1.0.0; adding single-b@2.0.0 (PEER single-a@2) together with override {single-b: {single-a: 1.0.0}}.

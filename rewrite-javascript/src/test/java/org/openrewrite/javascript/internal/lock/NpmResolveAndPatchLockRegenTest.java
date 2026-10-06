@@ -57,47 +57,6 @@ class NpmResolveAndPatchLockRegenTest extends LockRegenTestSupport {
     }
 
     @Test
-    void forkWithPeerBearingMembersAdd() {
-        // before installs @conciv/serve (node-server 2.0.12) + hono; adding @doxajs/http-hono (pins 2.0.11) forks
-        // @hono/node-server with peer-bearing members. The locked 2.0.12 keeps the top slot, 2.0.11 nests, both
-        // record peerDependencies verbatim, and hono stays flagged `peer: true`.
-        assertResolveAndPatch("lock/npm/resolve-fork-peer", "before", "after",
-                new String[][]{{"@conciv/serve", "0.0.17"}, {"@doxajs/http-hono", "0.1.0-alpha.31"},
-                        {"@doxajs/core", "0.1.0-alpha.31"}, {"@doxajs/runtime", "0.1.0-alpha.31"},
-                        {"@doxajs/manifest", "0.1.0-alpha.31"}, {"@hono/node-server", "2.0.11"},
-                        {"@hono/node-server", "2.0.12"}, {"hono", "4.12.29"}, {"ws", "8.21.1"}});
-    }
-
-    @Test
-    void satisfiedPeerAdd() {
-        // before installs react alone; adding use-sync-external-store (whose react peer the lock already
-        // satisfies) writes one entry with peerDependencies verbatim and flags react `peer: true`.
-        assertResolveAndPatch("lock/npm/resolve-peer", "before", "after",
-                new String[][]{{"react", "19.2.8"}, {"use-sync-external-store", "1.4.0"}});
-    }
-
-    @Test
-    void satisfiedPeerAddV2() {
-        // The same edit into a lockfileVersion 2 lock also mirrors the add and the peer flag in the legacy tree.
-        assertResolveAndPatch("lock/npm/resolve-peer", "before-v2", "after-v2",
-                new String[][]{{"react", "19.2.8"}, {"use-sync-external-store", "1.4.0"}});
-    }
-
-    @Test
-    void satisfiedPeerWithMetaAdd() {
-        // use-callback-ref declares two peers (react satisfied, @types/react optional and absent) plus
-        // peerDependenciesMeta; the new entry records both objects verbatim and react gains `peer: true`.
-        assertResolveAndPatch("lock/npm/resolve-peer-meta", "before", "after",
-                new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
-    }
-
-    @Test
-    void satisfiedPeerWithMetaAddV2() {
-        assertResolveAndPatch("lock/npm/resolve-peer-meta", "before-v2", "after-v2",
-                new String[][]{{"react", "19.2.8"}, {"use-callback-ref", "1.3.3"}, {"tslib", "2.8.1"}});
-    }
-
-    @Test
     void peerAutoInstallIntoRootOnlyLock() {
         // before is a dependency-less project (a root-only lock); adding use-sync-external-store auto-installs its
         // react peer top-level (`peer: true`), npm 7+ behavior, both entries fresh.
@@ -147,19 +106,6 @@ class NpmResolveAndPatchLockRegenTest extends LockRegenTestSupport {
         // at its alias slot — the `name` field and the alias spec in the root deps stay byte-identical.
         assertResolveAndPatch("lock/npm/resolve-alias", "before", "after",
                 new String[][]{{"react-is", "18.2.0"}, {"react-is", "18.3.1"}});
-    }
-
-    @Test
-    void aliasBumpV2StaysDeferred() {
-        // The v2 legacy tree records the alias as version "npm:react-is@18.2.0", which the patcher cannot yet
-        // rewrite; the edit defers gracefully with the old lock untouched.
-        routePackages("lock/npm/resolve-alias", new String[][]{{"react-is", "18.2.0"}, {"react-is", "18.3.1"}});
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/resolve-alias/pkg"), resource("lock/npm/resolve-alias/pkg-before"),
-                resource("lock/npm/resolve-alias/before-v2"), null, Paths.get("package.json"), ctx);
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getLockFileContent()).isNull();
     }
 
     /**

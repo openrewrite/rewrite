@@ -1,0 +1,1 @@
+Key is-odd>is-number: OverrideSet throws EINVALIDTAGNAME, npm swallows it, builds the root from {} and exits 0 with an empty lock ("packages": {}, named after the folder); npm ci rejects that lock.

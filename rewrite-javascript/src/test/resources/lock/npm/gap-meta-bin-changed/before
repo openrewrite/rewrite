@@ -1,0 +1,24 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "opener": "1.4.3"
+      }
+    },
+    "node_modules/opener": {
+      "version": "1.4.3",
+      "resolved": "https://registry.npmjs.org/opener/-/opener-1.4.3.tgz",
+      "integrity": "sha512-4Im9TrPJcjAYyGR5gBe3yZnBzw5n3Bfh1ceHHGNOpMurINKc6RdSIPXMyon4BZacJbJc36lLkhipioGbWh5pwg==",
+      "license": "(WTFPL OR MIT)",
+      "bin": {
+        "opener": "opener.js"
+      }
+    }
+  }
+}

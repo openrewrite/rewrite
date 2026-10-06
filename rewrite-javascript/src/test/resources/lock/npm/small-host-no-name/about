@@ -1,0 +1,1 @@
+package.json has no name; adding wrappy beside abbrev: the lock's top-level name is the basename of the directory npm runs in (a mktemp directory here).

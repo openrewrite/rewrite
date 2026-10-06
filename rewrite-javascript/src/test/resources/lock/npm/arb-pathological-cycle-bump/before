@@ -1,0 +1,59 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-a": "^1.0.0"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/pathological-dep-nesting-a/-/pathological-dep-nesting-a-1.0.0.tgz",
+      "integrity": "sha512-6P5/xtng256kOJWRJ+eUBR2t35MBu7tK5SW5qfCY2gNFsRk5I1NLcAes+QvPTgL1BKlv1SDmMHvIqeMScUDTBw==",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-b": "1"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-b": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/pathological-dep-nesting-b/-/pathological-dep-nesting-b-1.0.0.tgz",
+      "integrity": "sha512-LqQrCAjQ7qusx217jWLvBDurGJyQNlzLrNOUCHNARMzc04x2BkHd7oPNBF+ozDz+zTpSRjywJKGdm7WVmHrHYA==",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-a": "2"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-a": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/pathological-dep-nesting-a/-/pathological-dep-nesting-a-2.0.0.tgz",
+      "integrity": "sha512-8P0eProppMw7BhAoyHHjupycQgM9fjCupArB9PytlrlUB0QTkp3a7d0WUF3+kdAXlOScpwtkoJUfcpE2RBqxtQ==",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-b": "2"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-b": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/pathological-dep-nesting-b/-/pathological-dep-nesting-b-2.0.0.tgz",
+      "integrity": "sha512-PCv+tRdRGwsEUn6dwj/xWZRwrSMTIibKMvqPiuYNT1JF7npv9ajLn5q/1JWOV6vXzRB/VtyiBICXC/LXEE2Iiw==",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-a": "1"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/pathological-dep-nesting-a/-/pathological-dep-nesting-a-1.0.0.tgz",
+      "integrity": "sha512-6P5/xtng256kOJWRJ+eUBR2t35MBu7tK5SW5qfCY2gNFsRk5I1NLcAes+QvPTgL1BKlv1SDmMHvIqeMScUDTBw==",
+      "dependencies": {
+        "@isaacs/pathological-dep-nesting-b": "1"
+      }
+    },
+    "node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-b/node_modules/@isaacs/pathological-dep-nesting-b": {
+      "resolved": "node_modules/@isaacs/pathological-dep-nesting-b",
+      "link": true
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Add a project-internal file: dependency (itself depending on a sibling file:) with install-links=true.

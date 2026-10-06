@@ -1,0 +1,1 @@
+Root holds testing-peer-deps-a@1.2.4 (PEER b@1 -> PEER c@1); override {a: {b: 2.0.0}} rewrites the peer edge.

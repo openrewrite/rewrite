@@ -43,22 +43,6 @@ class NpmPeerRemovalLockRegenTest extends LockRegenTestSupport {
         assertThat(result.getLockFileContent()).isEqualTo(resource(fixture + "after"));
     }
 
-    @Test
-    void removingARequiredPeerDefers() {
-        // npm keeps ajv for ajv-keywords' required peer and flags it and its peer-only subtree peer: true
-        // (the recorded after); auto-installing a non-leaf peer is not reproduced, so it defers.
-        String fixture = "lock/npm/required-peer-removal/";
-        route(fixture, "ajv@8.20.0", "ajv-keywords@5.1.0", "fast-deep-equal@3.1.3", "fast-uri@3.1.8",
-                "json-schema-traverse@1.0.0", "require-from-string@2.0.2");
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm, resource(fixture + "pkg-after"),
-                resource(fixture + "pkg-before"), resource(fixture + "before"), null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("ajv-keywords peer ajv is not installed");
-    }
-
     private void route(String fixture, String... nameVersions) {
         for (String nameVersion : nameVersions) {
             int at = nameVersion.lastIndexOf('@');

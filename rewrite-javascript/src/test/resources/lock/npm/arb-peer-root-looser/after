@@ -1,0 +1,33 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "devDependencies": {
+        "@isaacs/test-peer-looser-than-dev-devdep": "1"
+      },
+      "peerDependencies": {
+        "@isaacs/test-peer-looser-than-dev-a-peer-dep": ">=0"
+      }
+    },
+    "node_modules/@isaacs/test-peer-looser-than-dev-a-peer-dep": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-peer-looser-than-dev-a-peer-dep/-/test-peer-looser-than-dev-a-peer-dep-1.0.0.tgz",
+      "integrity": "sha512-yNZerk7tDLQP+CxtyOhcomqTF0DkP/RLHcSxFsM0TleLL4udeLE55LFy9f1ZdpZO0OUdlVkm0FTC2eVghBWEYA==",
+      "peer": true
+    },
+    "node_modules/@isaacs/test-peer-looser-than-dev-devdep": {
+      "version": "1.0.1",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-peer-looser-than-dev-devdep/-/test-peer-looser-than-dev-devdep-1.0.1.tgz",
+      "integrity": "sha512-fGK3qtEb5/max8Z/81dxBZAaw11n1UHGSJgdb5XDKT9iWeV9SLZI5tMwUu+A9kQanD4bMEC5mD1CiC254j3AXg==",
+      "dev": true,
+      "peerDependencies": {
+        "@isaacs/test-peer-looser-than-dev-a-peer-dep": "1"
+      }
+    }
+  }
+}

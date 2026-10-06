@@ -1,0 +1,1 @@
+Root lists abbrev and wrappy as peerOptional (wrappy also dev); adding abbrev to dependencies installs it.

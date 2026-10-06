@@ -1,0 +1,1 @@
+Add aliases x-a -> dedupe-tests-a@1.0.0 (dep b@2) and x_a -> dedupe-tests-a@1.0.1 (dep b@1): which alias wins the root b, and the key order, follow localeCompare(en) (V8 orders _ before -; ASCII orders - before _).

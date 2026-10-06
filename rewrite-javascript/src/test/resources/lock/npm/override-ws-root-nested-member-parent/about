@@ -1,0 +1,1 @@
+Root adds nested is-odd > is-number 7.0.0 over an existing workspace lock: is-odd's edge turns invalid but is never queued (reachable only through the link); lock byte-identical.

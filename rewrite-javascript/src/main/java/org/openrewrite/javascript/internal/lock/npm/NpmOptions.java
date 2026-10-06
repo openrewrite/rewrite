@@ -61,7 +61,7 @@ public class NpmOptions {
             "prefer-dedupe", "strict-peer-deps", "force", "install-strategy", "global-style", "legacy-bundling",
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
-            "os", "cpu", "libc", "save", "tag");
+            "os", "cpu", "libc", "save", "tag", "format-package-lock");
 
     /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
@@ -177,6 +177,12 @@ public class NpmOptions {
     boolean save = true;
 
     /**
+     * {@code format-package-lock}
+     */
+    @Builder.Default
+    boolean formatPackageLock = true;
+
+    /**
      * {@code tag}: the dist-tag a bare name or {@code *} range resolves through; null for an empty or
      * null config value, which pacote reads as {@code latest}.
      */
@@ -236,6 +242,22 @@ public class NpmOptions {
      * @throws NeedsEnvironment for a {@code ${VAR}} reference in the value of a key read, or in a key
      *                          that could expand to one
      */
+    /**
+     * The same, from the npmrc's keys and values as the host read them, written back as {@code ini.stringify}
+     * would.
+     */
+    public static NpmOptions fromProperties(Map<String, @Nullable String> properties) {
+        StringBuilder npmrc = new StringBuilder();
+        for (Map.Entry<String, @Nullable String> entry : properties.entrySet()) {
+            npmrc.append(Ini.safe(entry.getKey()));
+            if (entry.getValue() != null) {
+                npmrc.append('=').append(Ini.safe(entry.getValue()));
+            }
+            npmrc.append('\n');
+        }
+        return fromNpmrc(npmrc.toString());
+    }
+
     public static NpmOptions fromNpmrc(@Nullable String npmrc) {
         NpmOptionsBuilder options = builder();
         if (npmrc == null) {
@@ -290,6 +312,9 @@ public class NpmOptions {
                     break;
                 case "save":
                     options.save(truthy(parseField(value, true)));
+                    break;
+                case "format-package-lock":
+                    options.formatPackageLock(truthy(parseField(value, true)));
                     break;
                 case "install-strategy":
                     options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :

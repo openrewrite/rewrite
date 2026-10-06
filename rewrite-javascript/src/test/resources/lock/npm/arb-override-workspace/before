@@ -1,0 +1,34 @@
+{
+  "name": "root",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "root",
+      "workspaces": [
+        "packages/*"
+      ],
+      "dependencies": {
+        "foo": "1.0.1"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.0.3",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.0.3.tgz",
+      "integrity": "sha512-s07HMJf6O5iTLVDx9cH7c9VbOdrmzxE+AzWz9CPi94zVNBQQA3jIwIZKTrHQj4dGR1T/MdwMnVJzSpjaVEXtXw==",
+      "engines": {
+        "node": "*"
+      }
+    },
+    "node_modules/foo": {
+      "resolved": "packages/foo",
+      "link": true
+    },
+    "packages/foo": {
+      "version": "1.0.1",
+      "dependencies": {
+        "abbrev": "1.0.3"
+      }
+    }
+  }
+}

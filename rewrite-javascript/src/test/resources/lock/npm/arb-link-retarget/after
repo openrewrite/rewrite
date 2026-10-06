@@ -1,0 +1,27 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "x": "file:correct/x",
+        "y": "file:correct/x"
+      }
+    },
+    "correct/x": {
+      "version": "1.2.3"
+    },
+    "node_modules/x": {
+      "resolved": "correct/x",
+      "link": true
+    },
+    "node_modules/y": {
+      "resolved": "correct/x",
+      "link": true
+    }
+  }
+}

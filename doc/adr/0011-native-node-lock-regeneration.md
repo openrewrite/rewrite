@@ -147,7 +147,11 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
 `LockFileRegeneration.Result` grows a structured `Failure { Reason, packageName, detail }` (existing
 fields kept for back-compat). Reasons: `REGISTRY_UNREACHABLE`, `AUTH_FAILED`, `PACKAGE_NOT_FOUND`,
 `VERSION_NOT_FOUND`, `CHECKSUM_UNAVAILABLE`, `RESOLUTION_REQUIRED`, `UNSUPPORTED_LOCKFILE_VERSION`,
-`UNSUPPORTED_ENTRY_TYPE`, `MALFORMED_LOCK`, `MALFORMED_MANIFEST`. Recipes surface failures via the
+`UNSUPPORTED_ENTRY_TYPE`, `MALFORMED_LOCK`, `MALFORMED_MANIFEST`, `PEER_CONFLICT` (an `ERESOLVE`: the
+package manager rejects the edit, or would write a lock its next install rejects; the detail names both
+sides as npm's message does). Every detail says which kind the failure is: the package manager rejects
+the edit (with its error code), or the engine cannot know something (a tarball's contents, a manifest
+outside the registry, the filesystem, the host). Recipes surface failures via the
 existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table (source path, package,
 reason, detail) for fleet aggregation. On failure the old lock is untouched.
 

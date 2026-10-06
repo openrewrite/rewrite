@@ -1,0 +1,1 @@
+Removing an is-number 7.0.0 override: 6.0.0 cannot replace the newer root 7.0.0, so npm nests it under is-odd and prunes the root copy (a fresh install puts 6.0.0 at the root: override-fresh-removed-control).

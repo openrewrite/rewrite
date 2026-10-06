@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","devDependencies":{"wrappy":""},"peerDependencies":{"abbrev":"","wrappy":""},"peerDependenciesMeta":{"abbrev":{"optional":true},"wrappy":{"optional":true}},"dependencies":{"abbrev":"^1.1.1"}}

@@ -181,8 +181,7 @@ class AddDependencyLockRegenTest implements RewriteTest {
 
     @Test
     void closureAddFailsLoudWarnsAndRecordsDataTableRow() {
-        // A package declaring a peerDependency triggers npm's peer auto-install, which the greedy-forward
-        // resolver does not model — it defers rather than emit a maybe-wrong tree.
+        // The added package's peer is auto-installed, and the registry has no such package: npm's E404.
         routes.put("https://registry.npmjs.org/needs-transitive", "{\"versions\":{\"1.0.0\":{}}}");
         routes.put("https://registry.npmjs.org/needs-transitive/1.0.0",
                 "{\"name\":\"needs-transitive\",\"version\":\"1.0.0\",\"peerDependencies\":{\"react\":\">=17\"}}");
@@ -202,8 +201,8 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         .dataTable(NodeLockRegenerationFailures.Row.class, rows -> {
                             assertThat(rows).hasSize(1);
                             assertThat(rows.get(0).getSourcePath()).isEqualTo("package.json");
-                            assertThat(rows.get(0).getPackageName()).isEqualTo("needs-transitive");
-                            assertThat(rows.get(0).getReason()).isEqualTo("RESOLUTION_REQUIRED");
+                            assertThat(rows.get(0).getPackageName()).isEqualTo("react");
+                            assertThat(rows.get(0).getReason()).isEqualTo("PACKAGE_NOT_FOUND");
                         }),
                 packageJson(pkgBefore, null,
                         nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.0")),

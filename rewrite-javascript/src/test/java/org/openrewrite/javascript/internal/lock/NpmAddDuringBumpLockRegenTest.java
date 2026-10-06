@@ -56,44 +56,6 @@ class NpmAddDuringBumpLockRegenTest extends LockRegenTestSupport {
 
     // --- conflict with an existing placement fails loud -------------------
 
-    @Test
-    void newTransitiveSubtreeConflictsWithInstalledTopLevelFailsLoud() {
-        // alpha 1.0.0 -> 2.0.0 pulls a new `beta` ^1.0.0; beta needs gamma ^2.0.0, but gamma@1.0.0 already holds
-        // the top-level slot (a transitive of `other`). npm would nest gamma@2.0.0 under beta; the minimal engine
-        // cannot reproduce that byte-for-byte, so it defers rather than emit a wrong lock.
-        routes.put(REG + "alpha", "{\"name\":\"alpha\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put(REG + "alpha/1.0.0", "{\"name\":\"alpha\",\"version\":\"1.0.0\"}");
-        routes.put(REG + "alpha/2.0.0",
-                "{\"name\":\"alpha\",\"version\":\"2.0.0\",\"dependencies\":{\"beta\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/alpha/-/alpha-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-ALPHA2\"}}");
-        routes.put(REG + "beta", "{\"name\":\"beta\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{}}}");
-        routes.put(REG + "beta/1.0.0",
-                "{\"name\":\"beta\",\"version\":\"1.0.0\",\"dependencies\":{\"gamma\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/beta/-/beta-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-BETA1\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"alpha\": \"^1.0.0\", \"other\": \"^1.0.0\"}},\n" +
-                "    \"node_modules/alpha\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/alpha/-/alpha-1.0.0.tgz\", \"integrity\": \"sha512-ALPHA1\"},\n" +
-                "    \"node_modules/gamma\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/gamma/-/gamma-1.0.0.tgz\", \"integrity\": \"sha512-GAMMA1\"},\n" +
-                "    \"node_modules/other\": {\"version\": \"1.0.0\", \"resolved\": \"https://registry.npmjs.org/other/-/other-1.0.0.tgz\", \"integrity\": \"sha512-OTHER1\", \"dependencies\": {\"gamma\": \"^1.0.0\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"alpha\":\"^2.0.0\",\"other\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"alpha\":\"^1.0.0\",\"other\":\"^1.0.0\"}}",
-                lock, null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("gamma");
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy the added");
-    }
-
     /**
      * Replay {@code dir}'s fixture offline and assert the engine output equals {@code dir/after} byte-for-byte.
      * Each {@code {name, v...}} maps to a packument route ({@code http/<name>}) and one manifest route per version.

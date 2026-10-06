@@ -1,0 +1,25 @@
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: @isaacs/conflicted-peer-optional-from-dev-dep-b@1.0.0
+npm error Found: @isaacs/conflicted-peer-optional-from-dev-dep-peer@1.0.0
+npm error node_modules/@isaacs/conflicted-peer-optional-from-dev-dep-peer
+npm error   dev @isaacs/conflicted-peer-optional-from-dev-dep-peer@"1" from the root project
+npm error
+npm error Could not resolve dependency:
+npm error peerOptional @isaacs/conflicted-peer-optional-from-dev-dep-peer@"2" from @isaacs/conflicted-peer-optional-from-dev-dep-b@1.0.0
+npm error node_modules/@isaacs/conflicted-peer-optional-from-dev-dep-b
+npm error   dev @isaacs/conflicted-peer-optional-from-dev-dep-b@"" from the root project
+npm error
+npm error Conflicting peer dependency: @isaacs/conflicted-peer-optional-from-dev-dep-peer@2.0.0
+npm error node_modules/@isaacs/conflicted-peer-optional-from-dev-dep-peer
+npm error   peerOptional @isaacs/conflicted-peer-optional-from-dev-dep-peer@"2" from @isaacs/conflicted-peer-optional-from-dev-dep-b@1.0.0
+npm error   node_modules/@isaacs/conflicted-peer-optional-from-dev-dep-b
+npm error     dev @isaacs/conflicted-peer-optional-from-dev-dep-b@"" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /Users/jon/.npm/_logs/2026-10-05T12_07_42_319Z-eresolve-report.txt
+npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T12_07_42_319Z-debug-0.log

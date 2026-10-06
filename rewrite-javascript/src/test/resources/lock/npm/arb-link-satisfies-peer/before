@@ -1,0 +1,68 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "1",
+        "@isaacs/testing-peer-dep-conflict-chain-v": "file:v2"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-a": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-a/-/testing-peer-dep-conflict-chain-a-1.0.0.tgz",
+      "integrity": "sha512-yUUG0Sem+AzNZ0uPXmEZN/GHHMmAg3kbM/zrijnd+tAAKVV5PhWXVUuLKJ3Q6wSAxz3WuYG08OaJl3lpV4UFOA==",
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-b": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-b": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-b/-/testing-peer-dep-conflict-chain-b-1.0.0.tgz",
+      "integrity": "sha512-tbsZ8No4L7h5YiIqDwGlJ14dg44oG4ZstF/wx7eZKUlnZax392thEeac5MNGFsv1T0Uqtiby9+SdpIRpejrHSw==",
+      "peer": true,
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-c": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-c": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-c/-/testing-peer-dep-conflict-chain-c-1.0.0.tgz",
+      "integrity": "sha512-173OUwUJK8QN4CGTF+oPHwoOHbUzgxjC3tzg2kBVLE/eak02ZXJrW9l4LmW03vqcToADVhsVMcFLIaAb6yd1mQ==",
+      "peer": true,
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-d": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-d": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-d/-/testing-peer-dep-conflict-chain-d-1.0.0.tgz",
+      "integrity": "sha512-zOtmaure/xJHmz7yGU7T33hjV6MZpo8Y6v1GuxDBx0PbqGoCxxCMacNtTUsEL5Sj8T19r5UShGZQmirNqPuhww==",
+      "peer": true,
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-e": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-e": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-e/-/testing-peer-dep-conflict-chain-e-1.0.0.tgz",
+      "integrity": "sha512-EDuAVgd6DBGe2tKQKdQt7Z6RoptSWQem4W++F+bqC31E0JuRVJHu44sENtIviUGsi0jVJS5xD75cL6kvvbaw/Q==",
+      "peer": true,
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-v": {
+      "resolved": "v2",
+      "link": true
+    },
+    "v2": {
+      "name": "@isaacs/testing-peer-dep-conflict-chain-v",
+      "version": "2.0.0"
+    }
+  }
+}

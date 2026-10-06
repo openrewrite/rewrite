@@ -16,17 +16,22 @@
 package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.json.tree.Json;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /** Shared per-project scan-state for the Node dependency {@code ScanningRecipe}s. */
@@ -84,6 +89,44 @@ public final class NodeDependencyScan {
             return modified;
         }
         return PackageJsonHelper.reapplyEdit(visited, ps.edit, ps.regenResult);
+    }
+
+    /**
+     * The manifests of the project whose lock an edit of {@code packageJsonPath} regenerates, by path, as
+     * edited so far in this run: the package.json beside the lock and every workspace member in the source set.
+     */
+    public static Map<Path, String> projectManifests(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
+        Path root = null;
+        for (Path candidate : new LinkedHashSet<>(acc.lockToPackage.values())) {
+            ProjectState ps = acc.projects.get(candidate);
+            if (candidate.equals(packageJsonPath) || ps != null && ps.capturedPackageJson != null &&
+                                                     PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson)
+                                                             .contains(packageJsonPath)) {
+                root = candidate;
+                break;
+            }
+        }
+        ProjectState rootPs = root == null ? null : acc.projects.get(root);
+        if (rootPs == null || rootPs.capturedPackageJson == null) {
+            return emptyMap();
+        }
+        Map<Path, String> manifests = new LinkedHashMap<>();
+        manifests.put(root, print(ctx, root, rootPs));
+        for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
+            ProjectState memberPs = acc.projects.get(member);
+            if (memberPs != null && memberPs.capturedPackageJson != null) {
+                manifests.put(member, print(ctx, member, memberPs));
+            }
+        }
+        return manifests;
+    }
+
+    private static String print(ExecutionContext ctx, Path path, ProjectState ps) {
+        SourceFile current = PackageJsonHelper.getLiveTree(ctx, path);
+        if (current == null) {
+            current = ps.modifiedPackageJson != null ? ps.modifiedPackageJson : requireNonNull(ps.capturedPackageJson);
+        }
+        return current.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
     /** The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers. */

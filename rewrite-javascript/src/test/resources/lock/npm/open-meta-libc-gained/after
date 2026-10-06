@@ -1,0 +1,34 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "optionalDependencies": {
+        "@node-rs/xxhash-linux-x64-musl": "1.2.1"
+      }
+    },
+    "node_modules/@node-rs/xxhash-linux-x64-musl": {
+      "version": "1.2.1",
+      "resolved": "https://registry.npmjs.org/@node-rs/xxhash-linux-x64-musl/-/xxhash-linux-x64-musl-1.2.1.tgz",
+      "integrity": "sha512-mD3DEGqnxi39cMDIi5ZqcEUl4/eOcM4qGY/XFSFpUN7oUG4vnf/8U5mwzvAjU+nHWaq9ubteePA1GOXiATvv6w==",
+      "cpu": [
+        "x64"
+      ],
+      "libc": [
+        "musl"
+      ],
+      "license": "MIT",
+      "optional": true,
+      "os": [
+        "linux"
+      ],
+      "engines": {
+        "node": ">= 12"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Root holds testing-peer-deps-a@1.2.4 (peer b 1) and b@1.2.4 (peer c 1); bumping root b to 2.0.1, which brings its own peer c 2.

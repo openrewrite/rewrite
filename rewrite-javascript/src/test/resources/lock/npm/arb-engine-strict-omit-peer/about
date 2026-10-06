@@ -1,0 +1,1 @@
+Add an engine-mismatched root peerDependency with engine-strict=true and omit=peer.

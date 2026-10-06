@@ -1,0 +1,1 @@
+Add get-func-name ">=2.0.0 <2.0.2" (2.0.1 deprecated: picks 2.0.0), asap ">=2.0.0 <2.0.3" (all deprecated: picks 2.0.2) and path-is-absolute "*" (latest 2.0.0 deprecated: picks 1.0.1).

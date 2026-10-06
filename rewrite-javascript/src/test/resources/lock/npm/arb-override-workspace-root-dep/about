@@ -1,0 +1,1 @@
+Root and workspace onepackage both depend on abbrev (root ^1.1.1, member 1.0.3, nested); adding root overrides abbrev ^1.1.1.

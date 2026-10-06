@@ -1,0 +1,21 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "peerDependencies": {
+        "@isaacs/test-peer-looser-than-dev-a-peer-dep": ">=0"
+      }
+    },
+    "node_modules/@isaacs/test-peer-looser-than-dev-a-peer-dep": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/test-peer-looser-than-dev-a-peer-dep/-/test-peer-looser-than-dev-a-peer-dep-2.0.0.tgz",
+      "integrity": "sha512-I4+mZBpY2S9ALgxRPLWNabc0YCtFByYAN8r8h7GuFgXjBmU4Y83vSi9KgppPgkcGSA2qXiuJAi/rQixS5Sobqw==",
+      "peer": true
+    }
+  }
+}

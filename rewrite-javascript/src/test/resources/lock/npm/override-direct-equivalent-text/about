@@ -1,0 +1,1 @@
+Override 7.x of a direct dependency declared ^7.0.0 (same versions, different text): EOVERRIDE, so the check compares spec text.

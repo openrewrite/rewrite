@@ -177,7 +177,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                 if (ps.modifiedPackageJson != null) return;
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope());
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent, ctx);
+                        pkg, edit, ps.capturedLockContent,
+                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

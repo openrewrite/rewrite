@@ -1,0 +1,1 @@
+Workspace a depends on abbrev ^1.1.1; adding the same dependency to workspace b shares the hoisted abbrev.

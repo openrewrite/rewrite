@@ -1,0 +1,1 @@
+Add better-opn@0.1.0 (peer opn ^5.3.0, no opn installed) as a devDependency beside abbrev: npm auto-installs opn@5.5.0 and its own dependency is-wsl@1.1.0, both dev and peer.

@@ -1,0 +1,23 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "abbrev": "1.0.3"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.0.3",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.0.3.tgz",
+      "integrity": "sha512-s07HMJf6O5iTLVDx9cH7c9VbOdrmzxE+AzWz9CPi94zVNBQQA3jIwIZKTrHQj4dGR1T/MdwMnVJzSpjaVEXtXw==",
+      "engines": {
+        "node": "*"
+      }
+    }
+  }
+}

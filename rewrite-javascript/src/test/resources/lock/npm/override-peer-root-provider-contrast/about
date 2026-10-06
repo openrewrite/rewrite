@@ -1,0 +1,1 @@
+Root adds c 2.0.0 against b's peer c "1" without an override: npm warns ERESOLVE overriding peer dependency and writes the same lock, which npm ci rejects (ERESOLVE could not resolve).

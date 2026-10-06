@@ -1,0 +1,1 @@
+"$is-number" with devDependencies 7.0.0 and peerDependencies ^7.0.0: resolves to the dev spec, no EOVERRIDE, the nested 6.0.0 under is-odd is pruned.

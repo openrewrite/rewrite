@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","dependencies":{"abbrev":"1.1.1","x-a":"npm:@isaacs/dedupe-tests-a@1.0.0","x_a":"npm:@isaacs/dedupe-tests-a@1.0.1"}}

@@ -1,0 +1,21 @@
+{
+  "name": "@isaacs/conflicted-peer-optional-from-dev-dep",
+  "version": "1.2.3",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "@isaacs/conflicted-peer-optional-from-dev-dep",
+      "version": "1.2.3",
+      "devDependencies": {
+        "@isaacs/conflicted-peer-optional-from-dev-dep-peer": "1"
+      }
+    },
+    "node_modules/@isaacs/conflicted-peer-optional-from-dev-dep-peer": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/conflicted-peer-optional-from-dev-dep-peer/-/conflicted-peer-optional-from-dev-dep-peer-1.0.0.tgz",
+      "integrity": "sha512-aigW1kh3zkxch1C45Fkl4Xzb5pScrV3NoXefGffNArG+S/etd2vmrPXm4G6SFwwPgIcmlygsVgp4TkrAqGjqvg==",
+      "dev": true
+    }
+  }
+}

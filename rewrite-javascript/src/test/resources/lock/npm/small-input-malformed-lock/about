@@ -1,0 +1,1 @@
+The input lock is truncated JSON (hand-made before-input); the manifest declares wrappy@1.0.2: npm ignores the lock and resolves from scratch.

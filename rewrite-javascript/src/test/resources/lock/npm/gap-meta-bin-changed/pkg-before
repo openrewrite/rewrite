@@ -1,0 +1,7 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "dependencies": {
+    "opener": "1.4.3"
+  }
+}

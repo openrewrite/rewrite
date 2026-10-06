@@ -1,0 +1,3 @@
+npm error code EOVERRIDE
+npm error Override for is-odd@^3.0.0 conflicts with direct dependency
+npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T11_59_23_553Z-debug-0.log

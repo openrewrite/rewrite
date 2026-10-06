@@ -1,0 +1,1 @@
+Root holds dedupe-tests-a@1.0.1 (dep b 1) and b@1.0.0; changing a to 1.0.0 (dep b 2): the root keeps b@1 and b@2 nests under a.

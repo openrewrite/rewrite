@@ -114,9 +114,16 @@ class NativeLockEngineTest {
             });
         });
         String lock = "{\n" +
+                "  \"name\": \"x\",\n" +
                 "  \"lockfileVersion\": 3,\n" +
+                "  \"requires\": true,\n" +
                 "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
+                "    \"\": {\n" +
+                "      \"name\": \"x\",\n" +
+                "      \"dependencies\": {\n" +
+                "        \"lodash\": \"^4.17.20\"\n" +
+                "      }\n" +
+                "    },\n" +
                 "    \"node_modules/lodash\": {\n" +
                 "      \"version\": \"4.17.20\",\n" +
                 "      \"resolved\": \"" + registry + "lodash/-/lodash-4.17.20.tgz\",\n" +
@@ -126,8 +133,8 @@ class NativeLockEngineTest {
                 "}\n";
 
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
                 lock, marker, Paths.get("package.json"), ctx);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
@@ -137,40 +144,6 @@ class NativeLockEngineTest {
             assertThat(request.getUrl().toString()).startsWith(registry);
             assertThat(request.getRequestHeaders()).containsEntry("Authorization", "Bearer s3cret");
         });
-    }
-
-    @Test
-    void bumpIntroducingNewTransitiveWithPeerFailsLoud() {
-        // A clean single-leaf add-during-bump is now placed byte-exact (see NpmAddDuringBumpLockRegenTest); a NEW
-        // transitive that declares a non-optional peer (which npm auto-installs) is beyond the conservative slice,
-        // so it still defers rather than guess the peer placement.
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.18.0\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.18.0",
-                "{\"name\":\"lodash\",\"version\":\"4.18.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.18.0.tgz\"," +
-                        "\"integrity\":\"sha512-LODASH\"}}");
-        routes.put("https://registry.npmjs.org/tslib",
-                "{\"name\":\"tslib\",\"dist-tags\":{},\"versions\":{\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tslib/2.0.0",
-                "{\"name\":\"tslib\",\"version\":\"2.0.0\",\"peerDependencies\":{\"react\":\">=17\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tslib/-/tslib-2.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-TSLIB\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.18.0\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure()).isNotNull();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("tslib");
-        // The resolver made the deeper attempt and defers: the new transitive's non-optional peer is unsatisfied,
-        // so npm would auto-install it (the harder tail). Its detail is preferred over the per-dependency message.
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
     }
 
     @Test
@@ -203,103 +176,6 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void addedPeerDependencyFailsLoud() {
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"peerDependencies\":{\"react\":\">=17\"}}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The bumped version gains a non-optional peer nothing provides; the resolver defers on the auto-install.
-        assertThat(result.getFailure().getDetail()).contains("peer react is not installed");
-    }
-
-    @Test
-    void npmEnginesPatchedInPlace() {
-        // An engines-only delta is patched, not failed loud: the npm patcher rewrites the
-        // entry's `engines` object to the new value at npm's field position. (Byte-exact goldens for engines
-        // live in NpmOrphanPruneLockRegenTest#enginesChangeV3.)
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"engines\":{\"node\":\">=12\"}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"engines\":{\"node\":\">=14\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"name\": \"x\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"engines\": {\"node\": \">=12\"}\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("\"version\": \"4.17.21\"");
-        assertThat(result.getLockFileContent()).contains("\">=14\"");
-        assertThat(result.getLockFileContent()).doesNotContain("\">=12\"");
-    }
-
-    @Test
-    void npmBinChangeNotYetPatched() {
-        // A `bin` delta still fails loud (npm normalizes string/object bin; needs a real golden to pin bytes).
-        routes.put("https://registry.npmjs.org/lodash",
-                "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{},\"bin\":{\"lodash\":\"old.js\"}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{},\"bin\":{\"lodash\":\"new.js\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"name\": \"x\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"x\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"bin\": {\"lodash\": \"old.js\"}\n" +
-                "    }\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The deeper whole-closure attempt also defers on the bin entry shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("changed its bin");
-    }
-
-    @Test
     void pnpmLegacyLockfileVersionUnsupported() {
         Result result = regen(PackageManager.Pnpm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
@@ -308,99 +184,6 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_LOCKFILE_VERSION);
-    }
-
-    @Test
-    void closureAddTransitiveConflictFailsLoud() {
-        // is-odd pulls is-number ^7.0.0, but is-number is locked at 6.0.0 top-level under a *ranged* pin
-        // (^6.0.0). Nesting requires proof the top slot is frozen (an exact pin); a ranged pin might move
-        // (cascade), so the resolver conservatively defers rather than fork. (Exact-pin nesting: I5 add-nest.)
-        routes.put("https://registry.npmjs.org/is-odd", "{\"versions\":{\"3.0.1\":{}}}");
-        routes.put("https://registry.npmjs.org/is-odd/3.0.1",
-                "{\"name\":\"is-odd\",\"version\":\"3.0.1\",\"dependencies\":{\"is-number\":\"^7.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/is-odd/-/is-odd-3.0.1.tgz\"," +
-                        "\"integrity\":\"sha512-ODD\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"is-number\": \"^6.0.0\"}},\n" +
-                "    \"node_modules/is-number\": {\"version\": \"6.0.0\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"is-number\":\"^6.0.0\"}}",
-                "{\"dependencies\":{\"is-number\":\"^6.0.0\",\"is-odd\":\"^3.0.1\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("is-number");
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
-    }
-
-    @Test
-    void addNestOfNonLeafMemberFailsLoud() {
-        // wrapper needs tool ^2.0.0, but root pins tool 1.0.0 exact (frozen top). tool@2.0.0 would nest under
-        // wrapper — but it carries its own dependency (sub), so nesting it would cascade further: deferred.
-        routes.put("https://registry.npmjs.org/wrapper", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/wrapper/1.0.0",
-                "{\"name\":\"wrapper\",\"version\":\"1.0.0\",\"dependencies\":{\"tool\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/wrapper/-/wrapper-1.0.0.tgz\",\"integrity\":\"sha512-W\"}}");
-        routes.put("https://registry.npmjs.org/tool", "{\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/tool/2.0.0",
-                "{\"name\":\"tool\",\"version\":\"2.0.0\",\"dependencies\":{\"sub\":\"^1.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/tool/-/tool-2.0.0.tgz\",\"integrity\":\"sha512-T\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"tool\": \"1.0.0\"}},\n" +
-                "    \"node_modules/tool\": {\"version\": \"1.0.0\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"tool\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"tool\":\"1.0.0\",\"wrapper\":\"^1.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("tool");
-        assertThat(result.getFailure().getDetail()).contains("non-leaf");
-    }
-
-    @Test
-    void closureAddCascadeUpgradeFailsLoud() {
-        // Adding needy pulls color-name ~1.1.4, but color-name is locked at 1.1.3 top-level. Even though a
-        // ^-ranged reverse-dependent would accept 1.1.4, moving an already-placed package is a cascade —
-        // deferred to I3 rather than resolved greedily.
-        routes.put("https://registry.npmjs.org/needy", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/needy/1.0.0",
-                "{\"name\":\"needy\",\"version\":\"1.0.0\",\"dependencies\":{\"color-name\":\"~1.1.4\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/needy/-/needy-1.0.0.tgz\"," +
-                        "\"integrity\":\"sha512-NEEDY\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"has-color\": \"1.0.0\"}},\n" +
-                "    \"node_modules/color-name\": {\"version\": \"1.1.3\"},\n" +
-                "    \"node_modules/has-color\": {\"version\": \"1.0.0\", \"dependencies\": {\"color-name\": \"^1.1.0\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"has-color\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"has-color\":\"1.0.0\",\"needy\":\"^1.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("color-name");
-        assertThat(result.getFailure().getDetail()).contains("does not satisfy");
     }
 
     @Test
@@ -439,25 +222,6 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void unserializableMetadataLeafAddFailsLoud() {
-        // A dependency-free leaf whose only extra surface is one npm reshapes without a verified golden
-        // (bundleDependencies) defers rather than emit a maybe-wrong entry (exhaustive-or-fail).
-        routes.put("https://registry.npmjs.org/bundler", "{\"versions\":{\"1.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/bundler/1.0.0",
-                "{\"name\":\"bundler\",\"version\":\"1.0.0\",\"dependencies\":{},\"bundleDependencies\":[\"x\"]}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{}}",
-                "{\"dependencies\":{\"bundler\":\"^1.0.0\"}}",
-                "{\"lockfileVersion\":3,\"packages\":{\"\":{}}}");
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        // The deeper whole-closure attempt also defers on the bundleDependencies shape (its detail is preferred).
-        assertThat(result.getFailure().getDetail()).contains("bundleDependencies").contains("entry shape not yet patched");
-    }
-
-    @Test
     void leafAddByteExact() {
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
@@ -470,17 +234,6 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-leaf/after"));
-    }
-
-    @Test
-    void unsupportedEntryTypeFailsLoud() {
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"git+https://github.com/lodash/lodash.git\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_ENTRY_TYPE);
     }
 
     @Test
@@ -498,303 +251,9 @@ class NativeLockEngineTest {
 
     // --- C1 / I5: reverse-dependent nesting ------------------------------
 
-    @Test
-    void singleReverseDependentExactPinNestsUnderDependent() {
-        // needs-exact pins lodash 4.17.20 (excludes the bumped 4.17.21) -> npm keeps 4.17.21 top-level and
-        // nests 4.17.20 under needs-exact (I5). The engine emits the nest; the patcher relocates it.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent())
-                .contains("\"node_modules/needs-exact/node_modules/lodash\"")
-                .contains("sha512-OLD")   // the nested copy keeps the old integrity
-                .contains("sha512-NEW");  // the top-level slot takes the bumped one
-    }
-
-    @Test
-    void multipleReverseDependentsExcludingTargetFailLoud() {
-        // Two locked packages each exclude the new version -> npm would nest a copy under each; nesting more
-        // than one reverse-dependent reshapes further and is deferred.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}},\n" +
-                "    \"node_modules/also-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
-        assertThat(result.getFailure().getDetail())
-                .contains("more than one reverse-dependent");
-    }
-
-    @Test
-    void reverseDependentNestingANonLeafFailsLoud() {
-        // The excluded old version is not a leaf (its lock entry carries its own dependencies), so relocating
-        // it could force a further nest — deferred rather than guessed.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\",\n" +
-                "      \"dependencies\": {\"tiny\": \"^1.0.0\"}\n" +
-                "    },\n" +
-                "    \"node_modules/needs-exact\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.20\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("non-leaf");
-    }
-
-    @Test
-    void reverseDependentConstraintAcceptingTargetSucceeds() {
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/tolerant\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.0.0\"}}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent()).contains("4.17.21");
-    }
-
     // --- closure surfaces (each fails loud individually) -----------------
 
-    // The expected detail is the deeper whole-closure deferral (preferred over the per-dependency message): a leaf
-    // surface it cannot yet reproduce reports "declares <field>".
-    @Test
-    void osChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"os\":[\"linux\"]", ",\"os\":[\"darwin\"]", "changed its os");
-    }
-
-    @Test
-    void cpuChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"cpu\":[\"x64\"]", ",\"cpu\":[\"arm64\"]", "changed its cpu");
-    }
-
-    @Test
-    void libcChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud(",\"libc\":[\"glibc\"]", ",\"libc\":[\"musl\"]", "changed its libc");
-    }
-
-    @Test
-    void bundleDependenciesChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"bundleDependencies\":[\"x\"]", "declares bundleDependencies");
-    }
-
-    @Test
-    void optionalDependenciesChangeFailsLoud() {
-        // The per-dependency patch defers on the optional-add; whole-closure resolution would resolve a real optional
-        // dependency, but here the added `x` is unresolvable (no route), so the per-dependency deferral stands.
-        assertClosureSurfaceFailsLoud("", ",\"optionalDependencies\":{\"x\":\"^1.0.0\"}", "optionalDependencies changed");
-    }
-
-    @Test
-    void peerDependenciesMetaChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"peerDependenciesMeta\":{\"x\":{\"optional\":true}}",
-                "declares peerDependenciesMeta");
-    }
-
-    @Test
-    void hasInstallScriptChangeFailsLoud() {
-        assertClosureSurfaceFailsLoud("", ",\"hasInstallScript\":true", "hasInstallScript");
-    }
-
-    private void assertClosureSurfaceFailsLoud(String oldExtra, String newExtra, String expectedDetail) {
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}" + oldExtra + "}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}" + newExtra + "}");
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains(expectedDetail);
-    }
-
     // --- other fail-loud guards ------------------------------------------
-
-    @Test
-    void forkedTopLevelBumpRescopesLeavesNestUnchanged() {
-        // lodash is directly declared (hoisted to node_modules/lodash@4.17.20) while `wrapper` holds its own
-        // node_modules/wrapper/node_modules/lodash@3.10.1 fork. Bumping the direct lodash re-scopes to the
-        // top-level copy and moves only it; wrapper's nested fork stays byte-identical (see the byte-exact
-        // ajv/table golden in NpmBumpForkedLockRegenTest).
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.20",
-                "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/lodash/4.17.21",
-                "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
-                        "\"integrity\":\"sha512-NEW\",\"shasum\":\"abc\"}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\n" +
-                "      \"version\": \"4.17.20\",\n" +
-                "      \"resolved\": \"https://registry.npmjs.org/lodash/-/lodash-4.17.20.tgz\",\n" +
-                "      \"integrity\": \"sha512-OLD\"\n" +
-                "    },\n" +
-                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
-                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"3.10.1\", \"integrity\": \"sha512-OLD3\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
-        assertThat(result.getLockFileContent())
-                .contains("\"version\": \"4.17.21\"")  // top-level copy bumped
-                .contains("sha512-NEW")
-                .contains("\"node_modules/wrapper/node_modules/lodash\"")
-                .contains("sha512-OLD3")               // the nested fork is byte-identical
-                .contains("\"version\": \"3.10.1\"");
-    }
-
-    @Test
-    void forkedBumpThatWouldDedupeNestFailsLoud() {
-        // `wrapper` pins lodash 4.17.21 exactly (excludes the current top-level 4.17.20, so it forks a nested
-        // copy). Bumping the direct lodash to 4.17.21 would let wrapper's requirement resolve to the new top-level
-        // and npm would dedupe the nest away — a reshape the per-dependency bump cannot express, so it defers.
-        routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-
-        String lock = "{\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/wrapper\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"4.17.21\"}},\n" +
-                "    \"node_modules/wrapper/node_modules/lodash\": {\"version\": \"4.17.21\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getPackageName()).isEqualTo("lodash");
-        assertThat(result.getFailure().getDetail()).contains("dedupe");
-    }
-
-    @Test
-    void forkedMemberDeclaredDefersToMultipleVersions() {
-        // The forked lodash is declared by a workspace MEMBER (packages/foo), not the root importer. npm may nest
-        // the member's copy rather than hoist it, so the re-scope (which only owns a ROOT-declared top-level edge)
-        // does not apply and the bump stays fail-loud rather than guess which copy the member edge resolves.
-        String lock = "{\n" +
-                "  \"name\": \"root\",\n" +
-                "  \"lockfileVersion\": 3,\n" +
-                "  \"packages\": {\n" +
-                "    \"\": {\"name\": \"root\", \"workspaces\": [\"packages/foo\"]},\n" +
-                "    \"packages/foo\": {\"name\": \"foo\", \"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^4.17.20\"}},\n" +
-                "    \"node_modules/foo\": {\"resolved\": \"packages/foo\", \"link\": true},\n" +
-                "    \"node_modules/lodash\": {\"version\": \"4.17.20\"},\n" +
-                "    \"node_modules/legacy\": {\"version\": \"1.0.0\", \"dependencies\": {\"lodash\": \"^3.0.0\"}},\n" +
-                "    \"node_modules/legacy/node_modules/lodash\": {\"version\": \"3.10.1\"}\n" +
-                "  }\n" +
-                "}\n";
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                lock, null, Paths.get("packages/foo/package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("multiple versions");
-    }
-
-    @Test
-    void overridesOutsideDeclaredDependenciesFailsLoud() {
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"1.0.0\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"},\"overrides\":{\"a\":\"2.0.0\"}}",
-                npmLock("4.17.20"));
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("outside declared dependencies");
-    }
 
     @Test
     void nullLockFailsLoud() {
@@ -805,17 +264,6 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
-    }
-
-    @Test
-    void nullOriginalManifestFailsLoud() {
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                null, npmLock("4.17.20"), null, Paths.get("package.json"), ctx);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("pre-edit package.json");
     }
 
     // --- C7: workspace importer targeting --------------------------------

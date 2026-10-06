@@ -1,0 +1,1 @@
+Add alias dupes -> npm:bundle-dupes-b@2 with before set and the alias key excluded: the target is still filtered.

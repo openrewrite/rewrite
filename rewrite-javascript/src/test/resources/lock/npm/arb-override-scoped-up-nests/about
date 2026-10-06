@@ -1,0 +1,1 @@
+Root holds dedupe-a@1.0.1 and b@1.0.0 (shared); adding override {a: {b: 2.0.0}} needs b@2.0.0 nested under a.

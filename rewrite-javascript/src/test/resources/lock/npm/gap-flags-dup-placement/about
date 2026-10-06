@@ -1,0 +1,1 @@
+Move is-odd and to-regex-range to devDependencies: both nested is-number@6 copies become dev.

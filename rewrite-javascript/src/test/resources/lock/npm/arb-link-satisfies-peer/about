@@ -1,0 +1,1 @@
+Root holds chain-v as file:v2 (a local v@2 with no peers) and chain-a@1; adding vv@2 (peer v@2) is satisfied by the link.

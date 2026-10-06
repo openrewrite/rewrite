@@ -1,0 +1,13 @@
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: p@1.0.0
+npm warn Found: @isaacs/testing-peer-deps-c@1.2.3
+npm warn node_modules/@isaacs/testing-peer-deps-c
+npm warn   @isaacs/testing-peer-deps-c@"2.0.0" from the root project
+npm warn   1 more (@isaacs/testing-peer-deps-b)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peer @isaacs/testing-peer-deps-c@"1" from @isaacs/testing-peer-deps-b@1.2.4
+npm warn node_modules/@isaacs/testing-peer-deps-b
+npm warn   @isaacs/testing-peer-deps-b@"1.2.4" from the root project
+
+up to date in 102ms

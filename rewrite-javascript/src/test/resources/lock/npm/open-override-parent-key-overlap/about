@@ -1,0 +1,1 @@
+Override key is-odd@>0.1.2 > is-number: the key intersects is-even's ^0.1.2 but the installed is-odd 0.1.2 does not satisfy it.

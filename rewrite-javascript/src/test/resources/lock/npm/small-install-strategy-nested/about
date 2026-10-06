@@ -1,0 +1,1 @@
+Add bundle-metadep-duplication-y@1.0.0 (-> z@1 -> a@1 -> z@1, no bundles) with install-strategy=nested: each dependency nests under its requirer.

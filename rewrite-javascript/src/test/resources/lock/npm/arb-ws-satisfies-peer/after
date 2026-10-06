@@ -1,0 +1,37 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "root",
+      "version": "1.0.0",
+      "workspaces": [
+        "packages/*"
+      ],
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "*"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-a": {
+      "resolved": "packages/a",
+      "link": true
+    },
+    "node_modules/@isaacs/testing-peer-dep-conflict-chain-v": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-conflict-chain-v/-/testing-peer-dep-conflict-chain-v-1.0.0.tgz",
+      "integrity": "sha512-CyUzKJMsTwURFGIz1ju4dDgMZ3raA8Yig6N+3CFsa8pBJrhZbqTeDfXkWBA4XUxRl3PukmPCpySsXmhA64PPsg==",
+      "peerDependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-a": "1"
+      }
+    },
+    "packages/a": {
+      "name": "@isaacs/testing-peer-dep-conflict-chain-a",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-v": "1"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Add testing-peer-deps-b@1 as an optionalDependency: b@1.2.4 is optional and its auto-installed peer c@1.2.3 optional and peer.

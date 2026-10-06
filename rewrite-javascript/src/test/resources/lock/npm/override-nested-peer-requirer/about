@@ -1,0 +1,1 @@
+Nested P > b 2.0.0 (P = @isaacs/testing-peer-deps): the rule also reaches a's peer edge on b, because a is reached through P > d > a, so npm replaces the root b 2.0.1 -> 2.0.0 in place (older, but a peer must sit beside its requirer); npm ci accepts.

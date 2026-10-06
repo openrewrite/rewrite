@@ -1,0 +1,20 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-peer-dep-nesting-p": "2"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-dep-nesting-p": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-dep-nesting-p/-/testing-peer-dep-nesting-p-2.0.0.tgz",
+      "integrity": "sha512-e/Hx7lKTnGBlPObOtYUvZRseduFJ8rvSoDgz0g9af4cith0A41H/1pElj8S2IZGNZgKiGnS5dSmzSC8nu0A1qA=="
+    }
+  }
+}

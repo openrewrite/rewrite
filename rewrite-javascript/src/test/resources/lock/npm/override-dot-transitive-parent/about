@@ -1,0 +1,1 @@
+"." pins the transitive is-odd outside its ^0.1.2 range (0.1.2 -> 1.0.0) and its child is-number to 4.0.0: both applied in place; kind-of and is-buffer pruned.
