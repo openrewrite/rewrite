@@ -29,6 +29,8 @@
  *     <li>walk-up-path: Copyright (c) 2020-2023 Isaac Z. Schlueter</li>
  *     <li>treeverse: Copyright (c) npm, Inc. and Contributors</li>
  *     <li>json-stringify-nice: Copyright (c) Isaac Z. Schlueter and Contributors</li>
+ *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>
+ *     <li>@npmcli/config: Copyright (c) npm, Inc.</li>
  * </ul>
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
