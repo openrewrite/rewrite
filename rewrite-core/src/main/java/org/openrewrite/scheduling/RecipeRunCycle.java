@@ -102,7 +102,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
     Set<Recipe> madeChangesInThisCycle = newSetFromMap(new IdentityHashMap<>());
 
     /**
-     * Scanning recipes whose accumulator is incomplete because a scan was abandoned at the source file timeout.
+     * Scanning recipes whose accumulator is incomplete because a scan failed or was abandoned at the source file timeout.
      */
     Set<Recipe> incompleteScans = newSetFromMap(new IdentityHashMap<>());
 
@@ -247,6 +247,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                 return source;
                             });
                         } catch (Throwable t) {
+                            incompleteScans.add(recipe);
                             after = handleError(recipe, source, after, t);
                             // We don't normally consider anything the scanning phase does to be a change
                             // But this simplifies error reporting so that exceptions can all be handled the same
@@ -279,6 +280,9 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
             // Send BatchVisit — no getObject needed for scan phase
             batch.rpc.batchVisit(source, ctx, rootCursor, batch.items);
         } catch (Throwable t) {
+            for (List<Recipe> recipeStack : batch.recipeStacks) {
+                incompleteScans.add(leaf(recipeStack));
+            }
             if (!batch.recipeStacks.isEmpty()) {
                 handleError(leaf(batch.recipeStacks.get(0)), source, source, t);
             }
@@ -339,6 +343,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                                         return source;
                                     });
                                 } catch (Throwable t) {
+                                    incompleteScans.add(recipe);
                                     handleError(recipe, source, source, t);
                                 }
                             }

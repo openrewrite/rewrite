@@ -45,6 +45,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -82,6 +83,21 @@ class RecipeSchedulerTest implements RewriteTest {
             "hello",
             "~~(boom)~~>hello"
           )
+        );
+    }
+
+    @Test
+    void exceptionDuringScanSkipsEditingWithIncompleteAccumulator() {
+        rewriteRun(
+          spec -> spec
+            .executionContext(new InMemoryExecutionContext())
+            .recipe(new MarkUnreferencedRecipe())
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1)
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().getFirst().getAfter().getMarkers().findFirst(Markup.Error.class))
+              .hasValueSatisfying(err -> assertThat(err.getMessage()).isEqualTo("boom"))),
+          text("reference", "~~(boom)~~>reference", spec -> spec.path("boom.txt")),
+          text("no_change_done_here_as_scanning_fails")
         );
     }
 
@@ -385,6 +401,48 @@ class BoomGenerateRecipe extends ScanningRecipe<Integer> {
     @Override
     public Collection<? extends SourceFile> generate(Integer acc, ExecutionContext ctx) {
         throw wrapAsRecipeRunException ? new RecipeRunException(new BoomException(), null) : new BoomException();
+    }
+}
+
+class MarkUnreferencedRecipe extends ScanningRecipe<AtomicBoolean> {
+    @Getter
+    final String displayName = "Mark unreferenced";
+
+    @Getter
+    final String description = "Marks files as unreferenced when no file says `reference`. Throws while scanning `boom.txt`.";
+
+    @Override
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+        return new AtomicBoolean();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean referenced) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if ("boom.txt".equals(text.getSourcePath().toString())) {
+                    throw new BoomException();
+                }
+                if ("reference".equals(text.getText())) {
+                    referenced.set(true);
+                }
+                return text;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean referenced) {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (!referenced.get() && !"reference".equals(text.getText())) {
+                    return text.withText("ALTERED");
+                }
+                return text;
+            }
+        };
     }
 }
 
