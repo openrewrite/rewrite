@@ -53,6 +53,7 @@ public class NpmOptions {
 
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}?]+)(\\?)?\\}");
     private static final Pattern LEADING_INTEGER = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*([+-]?\\d+)");
+    private static final Pattern DIGIT = Pattern.compile("[0-9]");
     private static final Pattern NUMBER = Pattern.compile("^[+-]?(\\d+\\.?\\d*(e[+-]?\\d+)?|\\.\\d+(e[+-]?\\d+)?|Infinity)$",
             Pattern.CASE_INSENSITIVE);
     private static final List<String> KEYS = Arrays.asList(
@@ -111,10 +112,11 @@ public class NpmOptions {
 
     /**
      * {@code before}, as the time value of the Date npm parses it to: NaN for an invalid date or a value
-     * that is not one, on which npm exits at its first fetch; null when the config leaves it unset or false.
+     * that is not one, on which npm exits at its first fetch; the text itself when only V8's legacy date
+     * parser reads it, which the port lacks; null when the config leaves it unset or false.
      */
     @Nullable
-    Double before;
+    Object before;
 
     /**
      * Whether the config names {@code before} at all: within one source it wins over {@code min-release-age}.
@@ -175,8 +177,10 @@ public class NpmOptions {
     boolean save = true;
 
     /**
-     * {@code tag}: the dist-tag a bare name or {@code *} range resolves through.
+     * {@code tag}: the dist-tag a bare name or {@code *} range resolves through; null for an empty or
+     * null config value, which pacote reads as {@code latest}.
      */
+    @Nullable
     @Builder.Default
     String tag = "latest";
 
@@ -209,7 +213,7 @@ public class NpmOptions {
      * The {@code before} filter in effect at {@code now}: {@code before} itself, else the window
      * {@code min-release-age} opens, as npm flattens the two.
      */
-    public @Nullable Double before(Instant now) {
+    public @Nullable Object before(Instant now) {
         if (beforeConfigured) {
             return before;
         }
@@ -307,7 +311,7 @@ public class NpmOptions {
                     Object before = parseField(value, false);
                     options.beforeConfigured(true);
                     options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
-                            before instanceof String ? Js.dateParse((String) before) : Double.NaN);
+                            before instanceof String ? dateField((String) before) : Double.NaN);
                     break;
                 case "min-release-age":
                     options.minReleaseAge(parseNumberField(value));
@@ -358,7 +362,8 @@ public class NpmOptions {
                     options.libc(platformField(value));
                     break;
                 case "tag":
-                    options.tag(Js.string(stringField(value)));
+                    Object tag = stringField(value);
+                    options.tag(truthy(tag) ? Js.string(tag) : null);
                     break;
                 default:
                     break;
@@ -436,6 +441,12 @@ public class NpmOptions {
             default:
                 return envReplace(s);
         }
+    }
+
+    // new Date(text): the date-time string format, else V8's legacy parser, which never reads a digit-less string
+    private static Object dateField(String text) {
+        double time = Js.dateParse(text);
+        return !Double.isNaN(time) || !DIGIT.matcher(text).find() ? (Object) time : text;
     }
 
     // parseField for a String definition: the literals are not special

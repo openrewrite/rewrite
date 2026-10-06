@@ -114,13 +114,9 @@ final class NpmInstallChecks {
 
         boolean osOk = os == null || !truthy(target.get("os")) || checkList(os, target.get("os"));
         boolean cpuOk = cpu == null || !truthy(target.get("cpu")) || checkList(cpu, target.get("cpu"));
-        boolean libcOk = !truthy(target.get("libc")) || libc != null && checkList(libc, target.get("libc"));
-        if (truthy(target.get("libc")) && libc == null && os != null) {
-            libcOk = false;
-        }
-        if (os == null && cpu == null) {
-            libcOk = true;
-        }
+        // a machine that reports an os but no libc has none; an unknown machine's libc is unknown
+        boolean libcOk = !truthy(target.get("libc")) ||
+                         (libc != null ? checkList(libc, target.get("libc")) : current.getOs() == null);
 
         if (!osOk || !cpuOk || !libcOk) {
             Map<String, @Nullable String> currentValues = new LinkedHashMap<>();

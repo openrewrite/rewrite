@@ -744,6 +744,15 @@ public final class Shrinkwrap {
     }
 
     /**
+     * An extraneous node outside node_modules that is a direct fsChild of the root, or a detached link
+     * target: a workspace or {@code file:} dependency the manifest no longer names gets no entry.
+     */
+    static boolean isStaleTopLevelEntry(Node node, String loc) {
+        return node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc) &&
+               (node.getFsParent() == null || node.getFsParent().isRoot());
+    }
+
+    /**
      * Rebuilds the lock data from the tree and returns what is written for the lockfile version.
      */
     public Map<String, Object> commit() {
@@ -765,8 +774,7 @@ public final class Shrinkwrap {
                     continue;
                 }
                 String loc = Relpath.relpath(path, node.getPath());
-                if (node.isExtraneous() && !NODE_MODULES.matcher(loc).find() && !"node_modules".equals(loc) &&
-                    (node.getFsParent() == null || node.getFsParent().isRoot())) {
+                if (isStaleTopLevelEntry(node, loc)) {
                     continue;
                 }
                 Map<String, Object> meta = metaFromNode(node, path, resolveOptions);

@@ -258,9 +258,9 @@ class NpmOptionsTest {
           .isEqualTo((double) Instant.parse("2021-04-23T16:24:00Z").toEpochMilli());
         assertThat(NpmOptions.fromNpmrc("before=2021-04-23\n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
-        assertThat(NpmOptions.fromNpmrc("before=abc\n").before(now)).isNaN();
-        assertThat(NpmOptions.fromNpmrc("before=\n").before(now)).isNaN();
-        assertThat(NpmOptions.fromNpmrc("before=true\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("before=abc\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("before=\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("before=true\n").before(now)).isEqualTo(Double.NaN);
         assertThat(NpmOptions.fromNpmrc("before=false\n").before(now)).isNull();
         assertThat(NpmOptions.fromNpmrc("before=null\n").before(now)).isNull();
         assertThat(NpmOptions.fromNpmrc("min-release-age=7\n").before(now)).isEqualTo(now.toEpochMilli() - 7 * day);
@@ -270,13 +270,38 @@ class NpmOptionsTest {
         // ini itself reads the literal as null, quoted or not
         assertThat(NpmOptions.fromNpmrc("min-release-age=null\n").before(now)).isNull();
         assertThat(NpmOptions.fromNpmrc("min-release-age=\"null\"\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=NaN\n").before(now)).isNaN();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=abc\n").before(now)).isNaN();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=Infinity\n").before(now)).isNaN();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=1e12\n").before(now)).isNaN();
+        assertThat(NpmOptions.fromNpmrc("min-release-age=NaN\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("min-release-age=abc\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("min-release-age=Infinity\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("min-release-age=1e12\n").before(now)).isEqualTo(Double.NaN);
         assertThat(NpmOptions.fromNpmrc("min-release-age=7\nbefore=null\n").before(now)).isNull();
         assertThat(NpmOptions.fromNpmrc("before=2021-04-23\nmin-release-age=7\n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
+    }
+
+    // node 24: a string without an ASCII digit is never a date (300,000 random ones tried); one with a digit
+    // outside the date-time string format may be one through V8's legacy parser, which is not ported
+    @Test
+    void beforeOnlyTheLegacyDateParserReadsIsKeptAsText() {
+        Instant now = Instant.parse("2026-10-06T12:00:00Z");
+        assertThat(NpmOptions.fromNpmrc("before=2021/04/23\n").before(now)).isEqualTo("2021/04/23");
+        assertThat(NpmOptions.fromNpmrc("before=Apr 23 2021\n").before(now)).isEqualTo("Apr 23 2021");
+        assertThat(NpmOptions.fromNpmrc("before=0\n").before(now)).isEqualTo("0");
+        assertThat(NpmOptions.fromNpmrc("before=2021-4-23\n").before(now)).isEqualTo("2021-4-23");
+        assertThat(NpmOptions.fromNpmrc("before= 2021-04-23 \n").before(now))
+          .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
+        assertThat(NpmOptions.fromNpmrc("before=Apr\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("before=now\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(NpmOptions.fromNpmrc("before=\u0661\u0662\n").before(now)).isEqualTo(Double.NaN);
+    }
+
+    // pacote reads `opts.defaultTag || 'latest'`
+    @Test
+    void tag() {
+        assertThat(NpmOptions.fromNpmrc("").getTag()).isEqualTo("latest");
+        assertThat(NpmOptions.fromNpmrc("tag=beta\n").getTag()).isEqualTo("beta");
+        assertThat(NpmOptions.fromNpmrc("tag=\n").getTag()).isNull();
+        assertThat(NpmOptions.fromNpmrc("tag=null\n").getTag()).isNull();
     }
 
     // installed with npm 11.17.0: allow-directory=bogus still refuses a non-root directory dependency

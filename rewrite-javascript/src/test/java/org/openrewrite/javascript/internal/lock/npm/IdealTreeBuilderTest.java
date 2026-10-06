@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -40,6 +41,8 @@ import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -148,7 +151,11 @@ class IdealTreeBuilderTest {
     static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        NpmOptions options = NpmOptions.fromNpmrc(npmrc + scenario.argsAfter());
+        return builder(edit, http, path, NpmOptions.fromNpmrc(npmrc + scenario.argsAfter()));
+    }
+
+    static IdealTreeBuilder builder(NpmScenarios.Edit edit, ScenarioRegistry http, String path, NpmOptions options) {
+        NpmScenarios.Scenario scenario = edit.getScenario();
         Map<String, String> manifests = edit.manifests();
         if (!manifests.containsKey("")) {
             Map<String, String> fromLock = NpmLockRoundTripTest.manifestsFromLock(edit.getStart().getText());
@@ -169,12 +176,15 @@ class IdealTreeBuilderTest {
     }
 
     /**
-     * What the comparison reads per location: the fields of the task's contract, then the lock entry the
-     * node would be written as.
+     * What the comparison reads per location the lock writer emits: the fields of the task's contract,
+     * then the lock entry the node would be written as.
      */
     static Map<String, String> describe(Node tree, String path) {
         Map<String, String> out = new TreeMap<>();
         for (Node node : tree.getInventory().values()) {
+            if (!node.isRoot() && Shrinkwrap.isStaleTopLevelEntry(node, Relpath.relpath(path, node.getPath()))) {
+                continue;
+            }
             if (node.isInert() && !Js.truthy(node.getPackage().get("version"))) {
                 // a failed optional dependency: the lock writer leaves it out
                 continue;
@@ -257,6 +267,33 @@ class IdealTreeBuilderTest {
 
     private static void record(String label, String outcome, String detail) {
         results.add(label + "\t" + outcome + "\t" + detail.replace('\n', ' ').replace('\t', ' '));
+    }
+
+    // pacote renders --before with toISOString() in every fetcher's constructor, so the date is read at the
+    // first fetch it filters: an exempted package never reads it
+    @Test
+    void beforeIsReadAtTheFirstFetchItFilters() {
+        NpmScenarios.Edit edit = edit("add-leaf-dev");
+        String path = NpmLockRoundTripTest.projectPath(edit.getStart().getText());
+        ScenarioRegistry http = new ScenarioRegistry(edit.getScenario());
+        assertThatThrownBy(() -> builder(edit, http, path, NpmOptions.fromNpmrc("before=2021/04/23\n")).buildIdealTree())
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("before=2021/04/23");
+        assertThatThrownBy(() -> builder(edit, http, path, NpmOptions.fromNpmrc("before=abc\n")).buildIdealTree())
+          .isInstanceOf(NpmRejection.class)
+          .hasMessage("Invalid time value");
+        assertThatCode(() -> builder(edit, http, path,
+          NpmOptions.fromNpmrc("before=2021/04/23\nmin-release-age-exclude=left-pad\n")).buildIdealTree())
+          .doesNotThrowAnyException();
+    }
+
+    private static NpmScenarios.Edit edit(String scenario) {
+        for (NpmScenarios.Scenario s : NpmScenarios.discover()) {
+            if (s.getName().equals(scenario)) {
+                return s.edits().get(0);
+            }
+        }
+        throw new IllegalArgumentException(scenario);
     }
 
     @ParameterizedTest(name = "{0}")

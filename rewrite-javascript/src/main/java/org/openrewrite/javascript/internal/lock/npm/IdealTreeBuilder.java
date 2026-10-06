@@ -481,7 +481,6 @@ public final class IdealTreeBuilder {
                         try {
                             fetchManifest(Spec.resolve(e.getName(), e.getSpec(), FromPath.fromPath(placed, e)), e);
                         } catch (RuntimeException ignored) {
-                            // it may well be an optional dep that has gone missing; it fails later anyway
                         }
                     });
                 }
@@ -615,12 +614,18 @@ public final class IdealTreeBuilder {
     }
 
     private @Nullable Double releaseAgeBefore(Spec spec) {
-        Double before = options.before(host.getNow());
+        Object before = options.before(host.getNow());
         if (before == null) {
             return null;
         }
-        return ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
-                options.getMinReleaseAgeExclude()) ? null : before;
+        if (ReleaseAgeExclude.isReleaseAgeExcluded(ReleaseAgeExclude.trustedSpecName(spec),
+                options.getMinReleaseAgeExclude())) {
+            return null;
+        }
+        if (before instanceof String) {
+            throw new CannotKnow("the date before=" + before + " names (only V8's legacy date parser reads it)");
+        }
+        return (Double) before;
     }
 
     private Map<String, Object> fetchManifest(Spec spec, @Nullable Edge edge) {

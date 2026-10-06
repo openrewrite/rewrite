@@ -220,6 +220,18 @@ class NpmInstallChecksTest {
         assertThatThrownBy(() -> platform("{\"libc\":\"musl\"}")).matches(NpmInstallChecksTest::badPlatform);
     }
 
+    // environment.libc || currentEnv.libc(os): a configured libc is checked whatever the machine reports
+    @Test
+    void configuredLibcIsCheckedOnAnUnknownMachine() {
+        Host glibc = Host.builder().libc("glibc").build();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false, glibc, Host.UNKNOWN))
+          .matches(NpmInstallChecksTest::badPlatform);
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, glibc, Host.UNKNOWN))
+          .doesNotThrowAnyException();
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false,
+          Host.builder().os("linux").build(), Host.UNKNOWN)).doesNotThrowAnyException();
+    }
+
     // node-semver's satisfies answers false where the Range constructor throws, so npm reports EBADENGINE;
     // the platform lists throw as JavaScript does (npm-install-checks 8.0.0 run on these values)
     @Test

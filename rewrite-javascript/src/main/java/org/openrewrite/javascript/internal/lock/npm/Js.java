@@ -392,12 +392,13 @@ final class Js {
 
     /**
      * {@code Date.parse(text)} for the ECMAScript date-time string format: the time value in
-     * milliseconds, or NaN. A date-only form is UTC.
+     * milliseconds, or NaN, which V8's legacy parser may still turn into a date (surrounding whitespace
+     * among its forms). A date-only form is UTC.
      *
      * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
      */
     static double dateParse(String text) {
-        Matcher m = DATE_TIME_STRING.matcher(trim(text));
+        Matcher m = DATE_TIME_STRING.matcher(text);
         if (!m.matches()) {
             return Double.NaN;
         }

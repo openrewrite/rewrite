@@ -43,8 +43,8 @@ final class Pacote {
         @Nullable
         Double before;
 
-        @Builder.Default
-        String defaultTag = "latest";
+        @Nullable
+        String defaultTag;
 
         @Nullable
         String nodeVersion;
@@ -89,7 +89,7 @@ final class Pacote {
         Map<String, Object> packument = packument(source, name, full);
         Map<String, Object> picked = PickManifest.pickManifest(packument, fetched.getFetchSpec(),
                 PickManifest.Options.builder()
-                        .defaultTag(opts.getDefaultTag())
+                        .defaultTag(truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest")
                         .before(opts.getBefore())
                         .nodeVersion(opts.getNodeVersion())
                         .npmVersion(opts.getNpmVersion())
@@ -105,8 +105,11 @@ final class Pacote {
             mani.put("_time", time);
         }
 
+        // the fetcher's constructor parses a string integrity; a value of another type is kept as it is
+        Object held = opts.getIntegrity();
+        String integrity = held instanceof String ? Ssri.parse((String) held) : null;
+        boolean heldRaw = !(held instanceof String) && truthy(held);
         Object dist = mani.get("dist");
-        String integrity = null;
         if (truthy(dist)) {
             Object tarball = Js.get(dist, "tarball");
             if (tarball != Js.UNDEFINED) {
@@ -119,18 +122,24 @@ final class Pacote {
             String parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity)) :
                     truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1") : null;
             if (parsed != null) {
-                if (truthy(opts.getIntegrity()) && !Ssri.match(Js.string(opts.getIntegrity()), parsed)) {
-                    throw new NpmRejection("EINTEGRITY", "Integrity checksum failed: wanted " +
-                                                         Js.string(opts.getIntegrity()) + " but got " + parsed + ".", null);
+                if (heldRaw) {
+                    throw new IllegalArgumentException("this.integrity.match is not a function");
                 }
-                integrity = parsed;
+                if (integrity != null && !Ssri.match(integrity, parsed)) {
+                    for (String algorithm : Ssri.algorithms(integrity)) {
+                        if (Ssri.algorithms(parsed).contains(algorithm)) {
+                            throw new NpmRejection("EINTEGRITY", "Integrity checksum failed when using " + algorithm +
+                                                                 ": wanted " + integrity + " but got " + parsed + ".", null);
+                        }
+                    }
+                }
+                integrity = integrity == null ? parsed : Ssri.merge(integrity, parsed);
             }
         }
-        if (integrity == null && truthy(opts.getIntegrity())) {
-            integrity = Js.string(opts.getIntegrity());
-        }
-        if (truthy(integrity)) {
+        if (integrity != null) {
             mani.put("_integrity", integrity);
+        } else if (heldRaw) {
+            mani.put("_integrity", Js.string(held));
         }
         return mani;
     }
