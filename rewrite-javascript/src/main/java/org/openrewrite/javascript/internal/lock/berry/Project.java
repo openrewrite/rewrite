@@ -17,13 +17,18 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -170,27 +175,62 @@ final class Project {
     }
 
     /**
-     * {@code setupWorkspaces}: the root, then each workspace's members depth first, every one read from its
-     * manifest.
+     * {@code setupWorkspaces}: when a workspace's setup ends it claims each member it lists that no workspace has
+     * claimed and starts that member's setup; the setups end in the order they start, and the workspaces are added
+     * as the reducer's promise chain adds them, each followed by the members it claimed.
      *
-     * @param manifests the project's manifests by directory relative to the root ({@code .} the root)
+     * @param manifests a directory's package.json by its path relative to the root ({@code .} the root), null
+     *                  without one
+     * @throws CannotKnow when two workspaces whose setups may end in either order list one member
      */
-    void setupWorkspaces(Map<String, Manifest> manifests) {
+    void setupWorkspaces(FastGlob fastGlob, Function<String, @Nullable Manifest> manifests) {
         workspaces.clear();
         workspacesByCwd.clear();
         workspacesByIdent.clear();
-        loadWorkspace(".", manifests, new LinkedHashSet<>());
+
+        Set<String> pathsChecked = new HashSet<>();
+        Map<String, String> claimedBy = new HashMap<>();
+        Map<String, List<Workspace>> claimed = new HashMap<>();
+        Deque<Workspace> setups = new ArrayDeque<>();
+        Workspace root = new Workspace(this, ".");
+        pathsChecked.add(".");
+        setups.add(root);
+        while (!setups.isEmpty()) {
+            Workspace workspace = setups.poll();
+            workspace.setup(manifests.apply(workspace.getRelativeCwd()), fastGlob);
+            List<Workspace> members = new ArrayList<>();
+            for (String memberCwd : workspace.getWorkspacesCwds()) {
+                if (pathsChecked.add(memberCwd)) {
+                    Workspace member = new Workspace(this, memberCwd);
+                    claimedBy.put(memberCwd, workspace.getRelativeCwd());
+                    members.add(member);
+                    setups.add(member);
+                } else if (claimedBy.containsKey(memberCwd) &&
+                           !claimedAbove(workspace.getRelativeCwd(), claimedBy.get(memberCwd), claimedBy)) {
+                    throw new CannotKnow("the order of the workspaces: " + claimedBy.get(memberCwd) + " and " +
+                                         workspace.getRelativeCwd() + " both list " + memberCwd + ", which " +
+                                         "follows whichever of them Yarn finishes setting up first");
+                }
+            }
+            claimed.put(workspace.getRelativeCwd(), members);
+        }
+        addWorkspaces(root, claimed);
     }
 
-    private void loadWorkspace(String workspaceCwd, Map<String, Manifest> manifests, Set<String> pathsChecked) {
-        if (!pathsChecked.add(workspaceCwd)) {
-            return;
+    // the claimer's setup ended before this workspace's started: it claimed this workspace, or one that did
+    private static boolean claimedAbove(String workspaceCwd, String claimer, Map<String, String> claimedBy) {
+        for (String cwd = workspaceCwd; cwd != null; cwd = claimedBy.get(cwd)) {
+            if (cwd.equals(claimer)) {
+                return true;
+            }
         }
-        Workspace workspace = new Workspace(this, workspaceCwd, manifests.get(workspaceCwd));
-        workspace.setup(manifests.keySet());
+        return false;
+    }
+
+    private void addWorkspaces(Workspace workspace, Map<String, List<Workspace>> claimed) {
         addWorkspace(workspace);
-        for (String member : workspace.getWorkspacesCwds()) {
-            loadWorkspace(member, manifests, pathsChecked);
+        for (Workspace member : claimed.get(workspace.getRelativeCwd())) {
+            addWorkspaces(member, claimed);
         }
     }
 

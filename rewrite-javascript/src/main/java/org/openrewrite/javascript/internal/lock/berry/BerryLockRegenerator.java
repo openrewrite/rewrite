@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Port of @yarnpkg/plugin-essentials sources/commands/install.ts, {@code --mode=update-lockfile} (Yarn 4.10.3).
@@ -52,6 +53,13 @@ public final class BerryLockRegenerator {
          */
         @Singular
         Map<String, String> manifests;
+
+        /**
+         * The files the project holds relative to its root, when the host says; a package.json among them the host
+         * did not read is unknown.
+         */
+        @Nullable
+        Set<String> paths;
 
         /**
          * The rc files by path from the root: {@code .yarnrc.yml}, and {@code ../.yarnrc.yml} for a directory above.
@@ -149,16 +157,17 @@ public final class BerryLockRegenerator {
      * @throws BerryOptions.UsageError where the configuration rejects a setting
      */
     Loaded load(YarnRelease release) {
-        BerryOptions options = options();
+        BerryOptions options = options().copy();
         options.restrictTo(release.getSettings());
 
         Project project = new Project(new Configuration(options, release));
         project.setupResolutions(inputs.getLock());
-        Map<String, Manifest> manifests = new LinkedHashMap<>();
+        List<String> directories = new ArrayList<>();
         for (String location : inputs.getManifests().keySet()) {
-            manifests.put(location.isEmpty() ? "." : location, manifest(location));
+            directories.add(location.isEmpty() ? "." : location);
         }
-        project.setupWorkspaces(manifests);
+        project.setupWorkspaces(new FastGlob(directories, inputs.getPaths(), inputs.getHost()),
+                cwd -> manifest(".".equals(cwd) ? "" : cwd));
 
         Map<String, Object> migratedSettings = new LinkedHashMap<>();
         Object lockfileLastVersion = project.lockfileLastVersion;
@@ -204,6 +213,10 @@ public final class BerryLockRegenerator {
     private @Nullable Manifest manifest(String location) {
         String text = inputs.getManifests().get(location);
         if (text == null) {
+            String file = location.isEmpty() ? "package.json" : location + "/package.json";
+            if (inputs.getPaths() != null && inputs.getPaths().contains(file)) {
+                throw new CannotKnow(file + " (its contents were not read)");
+            }
             return null;
         }
         Object parsed = manifests.computeIfAbsent(location, l -> {

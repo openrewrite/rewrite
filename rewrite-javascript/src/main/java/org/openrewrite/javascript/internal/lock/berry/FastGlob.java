@@ -16,7 +16,9 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 
+import java.text.Normalizer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,13 +30,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * Port of fast-glob 3.3.2 as Workspace.ts calls it, over the project's directories on a POSIX host.
+ * Port of fast-glob 3.3.2 as Workspace.ts calls it, over the project's directories with POSIX paths.
  */
 final class FastGlob {
 
@@ -76,20 +79,57 @@ final class FastGlob {
     private final Map<String, Set<String>> children = new HashMap<>();
 
     /**
+     * Every directory and file by its folded spelling where the host's file system may ignore case, else null.
+     */
+    private final @Nullable Map<String, String> folded;
+
+    /**
      * @param manifestDirectories the directories that hold a package.json, relative to the project's root
      *                            ({@code .} the root)
+     * @param paths               the files the project holds relative to its root, when the host says
      */
-    FastGlob(Collection<String> manifestDirectories) {
+    FastGlob(Collection<String> manifestDirectories, @Nullable Collection<String> paths, Host host) {
         directories.add(".");
         for (String directory : manifestDirectories) {
-            String path = normalize(directory);
-            files.add(join(path, "package.json"));
-            while (!".".equals(path) && directories.add(path)) {
-                String parent = parent(path);
-                children.computeIfAbsent(parent, p -> new TreeSet<>()).add(path.substring(path.lastIndexOf('/') + 1));
-                path = parent;
+            add(join(normalize(directory), "package.json"));
+        }
+        if (paths != null) {
+            for (String path : paths) {
+                String normalized = normalize(path);
+                if (!".".equals(normalized) && !"..".equals(normalized) && !normalized.startsWith("../") &&
+                    !normalized.startsWith("/")) {
+                    add(normalized);
+                }
             }
         }
+        String os = host.getOs();
+        Map<String, String> folded = null;
+        if (os == null || "darwin".equals(os) || "win32".equals(os)) {
+            folded = new HashMap<>();
+            for (String directory : directories) {
+                folded.putIfAbsent(fold(directory), directory);
+            }
+            for (String file : files) {
+                folded.putIfAbsent(fold(file), file);
+            }
+        }
+        this.folded = folded;
+    }
+
+    // a file is never walked nor reported under onlyDirectories, so only directories are children
+    private void add(String file) {
+        files.add(file);
+        String path = parent(file);
+        while (!".".equals(path) && directories.add(path)) {
+            String parent = parent(path);
+            children.computeIfAbsent(parent, p -> new TreeSet<>()).add(path.substring(path.lastIndexOf('/') + 1));
+            path = parent;
+        }
+    }
+
+    // macOS's and Windows' file systems ignore case and normalization by default
+    private static String fold(String path) {
+        return Normalizer.normalize(path, Normalizer.Form.NFC).toLowerCase(Locale.ROOT);
     }
 
     /**
@@ -476,7 +516,14 @@ final class FastGlob {
      */
     boolean exists(String path) {
         String normalized = normalize(path);
-        return directories.contains(normalized) || files.contains(normalized);
+        if (directories.contains(normalized) || files.contains(normalized)) {
+            return true;
+        }
+        String other = folded == null ? null : folded.get(fold(normalized));
+        if (other != null) {
+            throw foundInAnotherSpelling(normalized, other);
+        }
+        return false;
     }
 
     private Kind stat(String path) {
@@ -490,10 +537,31 @@ final class FastGlob {
                 throw new JsError(JsError.ERROR, "ENOTDIR: not a directory, lstat '" + path + "'");
             }
             if (!directories.contains(prefix)) {
+                return absent(path);
+            }
+        }
+        return directories.contains(path) ? Kind.DIRECTORY : files.contains(path) ? Kind.FILE : absent(path);
+    }
+
+    private Kind absent(String path) {
+        if (folded == null) {
+            return Kind.ABSENT;
+        }
+        for (int end = path.indexOf('/'); ; end = path.indexOf('/', end + 1)) {
+            String prefix = end == -1 ? path : path.substring(0, end);
+            String other = folded.get(fold(prefix));
+            if (other != null && (end == -1 || files.contains(other))) {
+                throw foundInAnotherSpelling(prefix, other);
+            }
+            if (end == -1) {
                 return Kind.ABSENT;
             }
         }
-        return directories.contains(path) ? Kind.DIRECTORY : files.contains(path) ? Kind.FILE : Kind.ABSENT;
+    }
+
+    private static CannotKnow foundInAnotherSpelling(String path, String other) {
+        return new CannotKnow("whether the host's file system finds " + path + " as " + other + " (one that " +
+                              "ignores case, as macOS's and Windows' do by default, does)");
     }
 
     private static String normalize(String path) {

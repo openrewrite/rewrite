@@ -160,6 +160,17 @@ public final class BerryOptions {
     }
 
     /**
+     * The configuration as the sources set it, for one install to restrict and to apply migration rules to.
+     */
+    BerryOptions copy() {
+        BerryOptions copy = new BerryOptions(env);
+        copy.values.putAll(values);
+        copy.sources.putAll(sources);
+        copy.keySources.putAll(keySources);
+        return copy;
+    }
+
+    /**
      * The defaults, as a project with no rc file and no environment has them.
      */
     public static BerryOptions defaults() {

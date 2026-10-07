@@ -19,7 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -37,39 +36,40 @@ final class Workspace {
      */
     private final String relativeCwd;
 
-    private final Manifest manifest;
-    private final Descriptor anchoredDescriptor;
-    private final Locator anchoredLocator;
+    private Manifest manifest;
+    private Descriptor anchoredDescriptor;
+    private Locator anchoredLocator;
 
     /**
      * The member directories, relative to the project's root, in the order the sorted glob results give.
      */
     private final Set<String> workspacesCwds = new LinkedHashSet<>();
 
-    Workspace(Project project, String relativeCwd, @Nullable Manifest manifest) {
+    Workspace(Project project, String relativeCwd) {
         this.project = project;
         this.relativeCwd = relativeCwd;
+    }
+
+    /**
+     * {@code setup}: the manifest, the anchored descriptor and locator, and the directories fast-glob reports for
+     * the patterns, sorted, that hold a package.json.
+     *
+     * @param manifest the directory's package.json, null without one
+     */
+    void setup(@Nullable Manifest manifest, FastGlob fastGlob) {
         this.manifest = manifest != null ? manifest : new Manifest();
         Ident ident = this.manifest.name != null ? this.manifest.name : StructUtils.makeIdent(null,
                 computeCandidateName() + "-" + HashUtils.makeHash(relativeCwd).substring(0, 6));
         this.anchoredDescriptor = StructUtils.makeDescriptor(ident, WorkspaceResolver.PROTOCOL + relativeCwd);
         this.anchoredLocator = StructUtils.makeLocator(ident, WorkspaceResolver.PROTOCOL + relativeCwd);
-    }
 
-    /**
-     * {@code setup}'s glob: the directories fast-glob reports for the patterns, sorted, that hold a package.json.
-     *
-     * @param directories every directory of the project known to hold a package.json, relative to the root
-     */
-    void setup(Collection<String> directories) {
         List<String> patterns = new ArrayList<>();
-        for (Manifest.WorkspaceDefinition definition : manifest.workspaceDefinitions) {
+        for (Manifest.WorkspaceDefinition definition : this.manifest.workspaceDefinitions) {
             patterns.add(definition.getPattern());
         }
         if (patterns.isEmpty()) {
             return;
         }
-        FastGlob fastGlob = new FastGlob(directories);
         List<String> relativeCwds = fastGlob.glob(patterns, relativeCwd);
         relativeCwds.sort(String::compareTo);
         for (String relative : relativeCwds) {

@@ -16,11 +16,15 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -153,6 +157,118 @@ class WorkspaceTest {
     void aPatternOutsideTheProjectIsNotKnown() {
         assertThatThrownBy(() -> members("\"../x/*\"")).isInstanceOf(CannotKnow.class);
         assertThatThrownBy(() -> members("\"/abs/*\"")).isInstanceOf(CannotKnow.class);
+    }
+
+    /**
+     * Yarn 4.10.3's {@code yarn workspaces list}: a workspace claims the members it lists that no workspace has
+     * claimed when its setup ends, and each workspace is followed by the members it claimed.
+     */
+    @Test
+    void eachWorkspaceIsFollowedByTheMembersItClaimed() {
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a=[\"../c\"]", "packages/b", "packages/c")))
+                .containsExactly(".", "packages/a", "packages/b", "packages/c");
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a=[\"../c\"]", "packages/b",
+                "packages/c=[\"sub/*\"]", "packages/c/sub/x")))
+                .containsExactly(".", "packages/a", "packages/b", "packages/c", "packages/c/sub/x");
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a=[\"sub/*\"]", "packages/a/sub/x",
+                "packages/a/sub/y", "packages/b")))
+                .containsExactly(".", "packages/a", "packages/a/sub/x", "packages/a/sub/y", "packages/b");
+        assertThat(workspaces(tree("=[\"packages/*\", \"packages/a/sub/*\"]", "packages/a=[\"sub/*\"]",
+                "packages/a/sub/x", "packages/b")))
+                .containsExactly(".", "packages/a", "packages/a/sub/x", "packages/b");
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a=[\"../b\"]", "packages/b", "packages/c")))
+                .containsExactly(".", "packages/a", "packages/b", "packages/c");
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a=[\".\", \"../..\", \"../b\"]", "packages/b")))
+                .containsExactly(".", "packages/a", "packages/b");
+    }
+
+    /**
+     * Yarn 4.10.3 lists {@code shared} after {@code packages/a}, and after {@code packages/b} when
+     * {@code packages/a}'s glob walks four thousand directories; {@code packages/b/deep} likewise follows
+     * {@code packages/a/sub/x} when {@code packages/b}'s glob is the slow one.
+     */
+    @Test
+    void twoWorkspacesWhoseSetupsMayEndInEitherOrderListingOneMemberRace() {
+        assertThatThrownBy(() -> workspaces(tree("=[\"packages/*\"]", "packages/a=[\"../../shared\"]",
+                "packages/b=[\"../../shared\"]", "shared")))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("packages/a and packages/b both list shared");
+        assertThatThrownBy(() -> workspaces(tree("=[\"packages/*\"]", "packages/a=[\"sub/*\"]",
+                "packages/a/sub/x=[\"../../../b/deep\"]", "packages/b=[\"deep\"]", "packages/b/deep")))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("packages/b and packages/a/sub/x both list packages/b/deep");
+    }
+
+    /**
+     * Yarn 4.10.3 on a case-sensitive APFS volume, as on Linux, and on macOS's default volume, which finds
+     * {@code Packages/a}, {@code libs/MyLib} and {@code packages/A} under the spelling the pattern gives; a deeper
+     * segment is matched against the names the directory holds on both.
+     */
+    @Test
+    void aPathInAnotherCaseIsUnknownWhereTheFileSystemMayIgnoreCase() {
+        Host linux = Host.builder().os("linux").build();
+        assertThat(workspaces(tree("=[\"Packages/*\"]", "packages/a", "packages/b").host(linux)))
+                .containsExactly(".");
+        assertThat(workspaces(tree("=[\"packages/*\", \"libs/MyLib\"]", "packages/a", "libs/mylib").host(linux)))
+                .containsExactly(".", "packages/a");
+        assertThat(workspaces(tree("=[\"packages/A\"]", "packages/a").host(linux))).containsExactly(".");
+
+        for (Host host : Arrays.asList(Host.builder().os("darwin").build(), Host.builder().os("win32").build(),
+                Host.UNKNOWN)) {
+            assertThatThrownBy(() -> workspaces(tree("=[\"Packages/*\"]", "packages/a", "packages/b").host(host)))
+                    .isInstanceOf(CannotKnow.class)
+                    .hasMessageContaining("finds Packages as packages");
+            assertThatThrownBy(() -> workspaces(tree("=[\"packages/*\", \"libs/MyLib\"]", "packages/a",
+                    "libs/mylib").host(host)))
+                    .isInstanceOf(CannotKnow.class)
+                    .hasMessageContaining("finds libs/MyLib as libs/mylib");
+            assertThatThrownBy(() -> workspaces(tree("=[\"packages/A\"]", "packages/a").host(host)))
+                    .isInstanceOf(CannotKnow.class);
+        }
+
+        for (Host host : Arrays.asList(linux, Host.UNKNOWN)) {
+            assertThat(workspaces(tree("=[\"packages/*/Lib\"]", "packages/a/lib", "packages/b/Lib").host(host)))
+                    .containsExactly(".", "packages/b/Lib");
+        }
+    }
+
+    @Test
+    void thePathsTheHostHoldsAreTheFileSystem() {
+        Set<String> paths = new HashSet<>(Arrays.asList("package.json", "packages/a/package.json",
+                "packages/docs/README.md", "README.md"));
+        assertThat(workspaces(tree("=[\"packages/*\"]", "packages/a").paths(paths)))
+                .containsExactly(".", "packages/a");
+        assertThatThrownBy(() -> workspaces(tree("=[\"README.md/*\"]", "packages/a").paths(paths)))
+                .isInstanceOf(JsError.class)
+                .hasMessageStartingWith("ENOTDIR: not a directory, scandir");
+
+        paths.add("packages/b/package.json");
+        assertThatThrownBy(() -> workspaces(tree("=[\"packages/*\"]", "packages/a").paths(paths)))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("packages/b/package.json (its contents were not read)");
+    }
+
+    private static List<String> workspaces(BerryLockRegenerator.Inputs.InputsBuilder inputs) {
+        Project project = new BerryLockRegenerator(inputs.now(Instant.EPOCH).build()).load(YarnRelease.of("4.10.3"))
+                .getProject();
+        List<String> out = new ArrayList<>();
+        for (Workspace workspace : project.workspaces) {
+            out.add(workspace.getRelativeCwd());
+        }
+        return out;
+    }
+
+    // a directory's manifest, with the workspaces after an = ("" the root's)
+    private static BerryLockRegenerator.Inputs.InputsBuilder tree(String... directories) {
+        BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder();
+        for (String directory : directories) {
+            int eq = directory.indexOf('=');
+            String location = eq < 0 ? directory : directory.substring(0, eq);
+            inputs.manifest(location, "{\"name\": \"" + (location.isEmpty() ? "root" :
+                    "w-" + location.replace('/', '-').toLowerCase(Locale.ROOT)) + "\"" +
+                    (eq < 0 ? "" : ", \"private\": true, \"workspaces\": " + directory.substring(eq + 1)) + "}");
+        }
+        return inputs;
     }
 
     private static List<String> members(String patterns) {
