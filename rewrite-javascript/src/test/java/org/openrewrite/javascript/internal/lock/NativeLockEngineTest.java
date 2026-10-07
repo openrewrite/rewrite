@@ -195,6 +195,50 @@ class NativeLockEngineTest {
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
 
+    @Test
+    void yarnClassicRegeneratesFromTheRegistryItsConfigNames() {
+        String scenario = "lock/yarn-classic/small-registry-yarnrc-npmjs/";
+        routes.put("https://registry.npmjs.org/which-module", resource(scenario + "http/which-module"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.yarnrc"), resource(scenario + "yarnrc"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnClassicReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/yarn-classic/small-workspace-member-edit/";
+        Request request = Request.builder()
+                .packageJson(resource(scenario + "tree/packages/a/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/a/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/b/package.json"), resource(scenario + "tree-before/packages/b/package.json"))
+                .build();
+        routes.put("https://registry.yarnpkg.com/is-number", resource(scenario + "http/is-number"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, request, ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnClassicWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.YarnClassic, "{\"dependencies\":{}}",
+                "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
     private static String npmLock(String lockedVersion) {
         return "{\n" +
                 "  \"name\": \"x\",\n" +
