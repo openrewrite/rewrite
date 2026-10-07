@@ -367,6 +367,29 @@ describe('namesReferencedWithin', () => {
         expect(referenced).not.toContain('SameType');
         expect(referenced).not.toContain('subject');
     });
+
+    test('a type parameter binds across the declaration carrying it, for type reads alone', async () => {
+        const statements = (await parse(`
+            function f<Fn>(x: Fn): Fn { let y: Fn; return x; }
+            class K<Cls> extends Base<Cls> implements I<Cls> { x: Cls; m(): Cls { return this.x; } }
+            type A<Alias> = Alias[];
+            const g = <Arrow,>(x: Arrow): Arrow => x;
+            type F = <FnType>(x: FnType) => FnType;
+            type M<Keys extends string> = {[Mapped in Keys as \`x\${Mapped}\`]: Mapped};
+            type U<T> = T extends Promise<infer Inferred> ? Inferred : never;
+            type V<T> = T extends Promise<infer Hidden> ? never : Hidden;
+            type W = Checked extends Promise<infer Checked> ? never : never;
+            function w<Value>() { return Value; }
+        `)).statements;
+
+        const referenced = [...namesReferencedWithin(statements)];
+        for (const name of ['Fn', 'Cls', 'Alias', 'Arrow', 'FnType', 'Keys', 'Mapped', 'Inferred']) {
+            expect(referenced).not.toContain(name);
+        }
+        // An `infer` name reaches neither the check type nor the false branch, and a type parameter
+        // binds no value.
+        expect(referenced).toEqual(expect.arrayContaining(['Hidden', 'Checked', 'Value']));
+    });
 });
 
 describe('namesUsedWithin', () => {
