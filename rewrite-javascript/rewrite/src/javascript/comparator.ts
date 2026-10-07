@@ -2757,3 +2757,71 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return literal;
     }
 }
+
+/**
+ * Whether two trees are the same code. Whitespace, comments, optional semicolons and trailing
+ * commas, quote style (`'a'` and `"a"`), number spelling (`255` and `0xFF`) and type attribution
+ * do not count. Markers count only where they are syntax that changes meaning, such as `?.`, a non-null
+ * `!`, `function*` and `yield*`, so a marker a recipe attaches does not make trees differ.
+ */
+export async function isEqual(a: J, b: J): Promise<boolean> {
+    return new CodeComparator().compare(a, b);
+}
+
+class CodeComparator extends JavaScriptComparatorVisitor {
+    private readonly meaningfulMarkers: ReadonlySet<string> = new Set([
+        JS.Markers.Optional, JS.Markers.NonNullAssertion, JS.Markers.Generator, JS.Markers.DelegatedYield
+    ]);
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        if (this.match && this.meaningOf(j as J) !== this.meaningOf(p)) {
+            return this.structuralMismatch('markers') as R;
+        }
+        return super.visit(j, p, parent);
+    }
+
+    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
+        if (Type.isType(j) || Type.isType(other)) {
+            return j;
+        }
+        return super.visitProperty(j, other, propertyName);
+    }
+
+    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+        if (!this.match) return literal;
+        const otherLiteral = other as J.Literal;
+        if (denotation(literal) !== denotation(otherLiteral)) {
+            return this.valueMismatch('value', literal.value, otherLiteral.value);
+        }
+        return literal;
+    }
+
+    private meaningOf(tree: J): string {
+        if (!tree.markers?.markers.length) {
+            return '';
+        }
+        return tree.markers.markers
+            .map(marker => marker.kind)
+            .filter(kind => this.meaningfulMarkers.has(kind))
+            .sort()
+            .join(',');
+    }
+}
+
+/**
+ * What a literal stands for, as a comparable key. A regex holds its source text as its value, so it
+ * is told apart from a string by its slashes. A string with a `\uXXXX` surrogate escape holds no
+ * decoded value, so its text between the quotes and its escapes stand in for one.
+ */
+function denotation(literal: J.Literal): string {
+    const source = literal.valueSource ?? '';
+    const primitive = literal.type?.keyword;
+    if (source.startsWith('/')) {
+        return JSON.stringify(['regex', source]);
+    }
+    if (literal.unicodeEscapes) {
+        const quoted = source.startsWith("'") || source.startsWith('"');
+        return JSON.stringify([primitive, quoted ? source.slice(1, -1) : source, literal.unicodeEscapes]);
+    }
+    return JSON.stringify([primitive, literal.value]);
+}

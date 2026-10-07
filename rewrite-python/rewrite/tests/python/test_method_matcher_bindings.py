@@ -14,9 +14,9 @@
 
 """`MethodMatcher` resolving a receiver through import bindings.
 
-The parser synthesises a class per imported module, and a file where any scope also binds
-that name carries `JavaType.Unknown` on every call in it. Fixtures here therefore all hold a
-shadowing binding, since that is the state a cursor is needed for.
+The parser synthesises a class per imported module, and a file that also rebinds that name at
+module scope carries `JavaType.Unknown` on every call spelling it. Fixtures here therefore all
+rebind the name like `SHADOW` does, since that is the state a cursor is needed for.
 """
 
 import ast
@@ -29,8 +29,8 @@ from rewrite.python import MethodMatcher
 from rewrite.python._parser_visitor import ParserVisitor
 from rewrite.python.visitor import PythonVisitor
 
-# A binding of `socket` in some other scope, which costs the whole file its module type.
-SHADOW = 'def helper(socket):\n    return socket\n'
+# Rebinds `socket` at module scope from a function, which a cursor still resolves to the import.
+SHADOW = 'def helper():\n    global socket\n    socket = None\n'
 
 
 def matches(source: str, pattern: str, *, with_cursor: bool = True,
@@ -101,7 +101,7 @@ def test_a_local_that_spells_the_module_is_not_the_module():
 
 
 def test_a_relative_import_is_never_the_module_of_the_same_name():
-    source = 'from .socket import getfqdn\ngetfqdn()\ndef helper(getfqdn):\n    return getfqdn\n'
+    source = 'from .socket import getfqdn\ngetfqdn()\ndef helper():\n    global getfqdn\n    getfqdn = None\n'
     assert matches(source, 'socket getfqdn(..)') == [False]
 
 
@@ -134,36 +134,36 @@ def test_a_resolved_declaring_type_decides_it_against_the_imports_and_the_spelli
 def test_a_from_imported_receiver_is_the_member_not_its_module():
     source = ('from datetime import datetime\n'
               'datetime.now()\n'
-              'def helper(datetime):\n'
-              '    return datetime\n')
+              'def helper():\n'
+              '    global datetime\n    datetime = None\n')
     assert matches(source, 'datetime.datetime now(..)') == [True]
 
     assert matches(source, 'datetime now(..)') == [False]
 
 
 def test_a_bare_call_reads_the_member_the_import_bound_not_the_local_name():
-    plain = 'from socket import getfqdn\ngetfqdn()\ndef helper(getfqdn):\n    return getfqdn\n'
+    plain = 'from socket import getfqdn\ngetfqdn()\ndef helper():\n    global getfqdn\n    getfqdn = None\n'
     assert matches(plain, 'socket getfqdn(..)') == [True]
 
     aliased = ('from socket import gethostname as getfqdn\n'
                'getfqdn()\n'
-               'def helper(getfqdn):\n'
-               '    return getfqdn\n')
+               'def helper():\n'
+               '    global getfqdn\n    getfqdn = None\n')
     assert matches(aliased, 'socket gethostname(..)') == [True]
     assert matches(aliased, 'socket getfqdn(..)') == [False]
 
 
 def test_a_dotted_import_binds_its_root_and_an_alias_binds_the_whole_path():
-    plain = 'import os.path\nos.getcwd()\ndef helper(os):\n    return os\n'
+    plain = 'import os.path\nos.getcwd()\ndef helper():\n    global os\n    os = None\n'
     assert matches(plain, 'os getcwd(..)') == [True]
     assert matches(plain, 'os.path getcwd(..)') == [False]
 
-    aliased = 'import os.path as p\np.join(1)\ndef helper(p):\n    return p\n'
+    aliased = 'import os.path as p\np.join(1)\ndef helper():\n    global p\n    p = None\n'
     assert matches(aliased, 'os.path join(..)') == [True]
     assert matches(aliased, 'os join(..)') == [False]
 
     # An alias spelled like the root package still binds the whole path.
-    shadowing_alias = 'import os.path as os\nos.join(1)\ndef helper(os):\n    return os\n'
+    shadowing_alias = 'import os.path as os\nos.join(1)\ndef helper():\n    global os\n    os = None\n'
     assert matches(shadowing_alias, 'os.path join(..)') == [True]
     assert matches(shadowing_alias, 'os join(..)') == [False]
 
