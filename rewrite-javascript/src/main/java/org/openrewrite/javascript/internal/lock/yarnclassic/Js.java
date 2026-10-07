@@ -96,6 +96,63 @@ final class Js {
         return indices;
     }
 
+    /**
+     * {@code Object.keys} of any value yarn iterates: an array's and a string's indices, a primitive's none.
+     */
+    @SuppressWarnings("unchecked")
+    static List<String> keys(@Nullable Object value) {
+        if (value instanceof Map) {
+            return keys((Map<String, ?>) value);
+        }
+        List<String> indices = new ArrayList<>();
+        int length = value instanceof List ? ((List<?>) value).size() :
+                value instanceof String ? ((String) value).length() : 0;
+        for (int i = 0; i < length; i++) {
+            indices.add(String.valueOf(i));
+        }
+        return indices;
+    }
+
+    /**
+     * {@code value[key]}: a property, an array element or a string's character.
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Object get(@Nullable Object value, String key) {
+        if (value instanceof Map) {
+            return ((Map<String, ?>) value).get(key);
+        }
+        long index = arrayIndex(key);
+        if (index < 0) {
+            return null;
+        }
+        if (value instanceof List) {
+            List<?> list = (List<?>) value;
+            return index < list.size() ? list.get((int) index) : null;
+        }
+        if (value instanceof String) {
+            String s = (String) value;
+            return index < s.length() ? String.valueOf(s.charAt((int) index)) : null;
+        }
+        return null;
+    }
+
+    /**
+     * {@code value.length}: an array's or a string's, {@code -1} where JavaScript has {@code undefined}.
+     */
+    static int length(@Nullable Object value) {
+        if (value instanceof List) {
+            return ((List<?>) value).size();
+        }
+        return value instanceof String ? ((String) value).length() : -1;
+    }
+
+    static boolean hasOwnProperty(@Nullable Object value, String key) {
+        if (value instanceof Map) {
+            return ((Map<?, ?>) value).containsKey(key);
+        }
+        return (value instanceof List || value instanceof String) && get(value, key) != null;
+    }
+
     static long arrayIndex(String key) {
         if (key.isEmpty() || key.length() > 10 || (key.length() > 1 && key.charAt(0) == '0')) {
             return -1;
@@ -209,6 +266,42 @@ final class Js {
             }
         }
         return out.append('"').toString();
+    }
+
+    /**
+     * {@code JSON.stringify} without indentation; {@code undefined} for a value it has no representation of.
+     */
+    static @Nullable String jsonStringify(@Nullable Object value) {
+        if (value == null) {
+            return "null";
+        }
+        if (value instanceof String) {
+            return quote((String) value);
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            return Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d);
+        }
+        if (value instanceof Map) {
+            StringBuilder out = new StringBuilder("{");
+            Map<?, ?> map = (Map<?, ?>) value;
+            for (String key : keys(value)) {
+                String item = jsonStringify(map.get(key));
+                if (item != null) {
+                    out.append(out.length() > 1 ? "," : "").append(quote(key)).append(':').append(item);
+                }
+            }
+            return out.append('}').toString();
+        }
+        if (value instanceof List) {
+            List<String> items = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                String s = jsonStringify(item);
+                items.add(s == null ? "null" : s);
+            }
+            return "[" + String.join(",", items) + "]";
+        }
+        return value instanceof Boolean ? value.toString() : null;
     }
 
     private static boolean isLoneSurrogate(String s, int i) {

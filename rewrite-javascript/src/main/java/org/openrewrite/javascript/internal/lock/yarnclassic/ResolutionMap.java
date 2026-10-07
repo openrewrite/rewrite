@@ -37,7 +37,7 @@ final class ResolutionMap {
 
     private static final String GLOBAL_NESTED_DEP_PATTERN = "**/";
     private static final Pattern PACKAGE_PATH = Pattern.compile("(@[^/]+/)?([^/]+)");
-    private static final Pattern WRONG_PATTERNS = Pattern.compile("/$|/{2,}|\\*+$");
+    private static final Pattern WRONG_PATTERNS = Pattern.compile("/\\z|/{2,}|\\*+\\z");
 
     @Value
     static class Resolution {
@@ -59,7 +59,7 @@ final class ResolutionMap {
     /**
      * Reads the {@code resolutions} field.
      *
-     * @throws JsError the {@code TypeError} yarn raises on a value that is not a string, an object among them.
+     * @throws JsError the {@code TypeError} the exotic resolvers raise on a value that is not a string.
      */
     void init(@Nullable Map<String, @Nullable Object> resolutions) {
         if (resolutions == null) {
@@ -87,22 +87,18 @@ final class ResolutionMap {
         List<String> directories = parsePackagePath(globPattern);
         String name = directories.isEmpty() ? null : directories.remove(directories.size() - 1);
 
-        if (!(range instanceof String)) {
-            // getExoticResolver(range) runs each resolver's isVersion, whose first string method fails on it
-            throw new JsError(JsError.TYPE_ERROR, range instanceof Map ? "Cannot convert object to primitive value" :
-                    "pattern.startsWith is not a function");
-        }
-        String r = (String) range;
-        if (NodeSemver.validRange(r, YarnClassicOptions.SEMVER) == null &&
-            ExoticResolvers.getExoticResolver(r) == null) {
-            warnings.add(Lang.format("Resolution field $0 has an invalid version entry and may be ignored", r));
+        boolean validRange = range instanceof String &&
+                             NodeSemver.validRange((String) range, YarnClassicOptions.SEMVER) != null;
+        if (!validRange && ExoticResolvers.getExoticResolver(range) == null) {
+            warnings.add(Lang.format("Resolution field $0 has an invalid version entry and may be ignored", range));
             return null;
         }
+        String r = Js.string(range);
 
         if (globPattern.equals(name)) {
             globPattern = GLOBAL_NESTED_DEP_PATTERN + name;
         }
-        return new Resolution(String.valueOf(name), r, globPattern, name + "@" + r);
+        return new Resolution(Js.string(name), r, globPattern, Js.string(name) + "@" + r);
     }
 
     static List<String> parsePackagePath(String input) {

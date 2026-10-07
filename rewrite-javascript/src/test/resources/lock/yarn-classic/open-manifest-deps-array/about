@@ -1,0 +1,1 @@
+A dependencies field that is an array: yarn requests its index as a package name.

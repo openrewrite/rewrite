@@ -16,10 +16,15 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+import java.util.Map;
 
 /**
- * An error JavaScript itself raises inside yarn ({@code SyntaxError}, {@code TypeError}, a plain {@code Error}, an
- * invariant violation), which yarn prints as {@code <name>: <message>}.
+ * An error JavaScript or Node itself raises inside yarn ({@code SyntaxError}, {@code TypeError}, a plain
+ * {@code Error}, an invariant violation, {@code ERR_INVALID_ARG_TYPE}), which yarn prints as
+ * {@code <name>: <message>}, the first line of its stack.
  */
 @Getter
 class JsError extends RuntimeException {
@@ -28,12 +33,37 @@ class JsError extends RuntimeException {
     static final String TYPE_ERROR = "TypeError";
     static final String ERROR = "Error";
     static final String INVARIANT_VIOLATION = "Invariant Violation";
+    static final String INVALID_ARG_TYPE = "TypeError [ERR_INVALID_ARG_TYPE]";
 
     private final String name;
 
     JsError(String name, String message) {
         super(message);
         this.name = name;
+    }
+
+    /**
+     * Node's {@code ERR_INVALID_ARG_TYPE} for a value yarn read from JSON, whose objects have no prototype.
+     */
+    static JsError invalidArgType(String expected, @Nullable Object received) {
+        return new JsError(INVALID_ARG_TYPE, expected + ". Received " + specificType(received));
+    }
+
+    private static String specificType(@Nullable Object value) {
+        if (value == null) {
+            return "undefined";
+        }
+        if (value instanceof Map) {
+            return ((Map<?, ?>) value).isEmpty() ? "[Object: null prototype] {}" : "[Object: null prototype]";
+        }
+        if (value instanceof List) {
+            return "an instance of Array";
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            return "type number (" + (d == 0 && 1 / d < 0 ? "-0" : Js.numberToString(d)) + ")";
+        }
+        return "type " + Js.typeOf(value) + " (" + (value instanceof String ? "'" + value + "'" : value) + ")";
     }
 
     boolean isSyntaxError() {

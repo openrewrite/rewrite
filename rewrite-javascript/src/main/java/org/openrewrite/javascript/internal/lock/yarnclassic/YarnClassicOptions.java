@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
@@ -49,6 +50,7 @@ public final class YarnClassicOptions {
     private static final Map<String, String> NPM_MAP = new HashMap<>();
     private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(.*)$");
     private static final Pattern ENV_EXPR = Pattern.compile("(\\\\*)\\$\\{([^}]+)}");
+    private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
     private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
 
     static {
@@ -97,11 +99,16 @@ public final class YarnClassicOptions {
 
     private final boolean looseSemver = true;
     private final boolean production;
+    private final boolean workspacesEnabled;
+    private final boolean workspacesNohoistEnabled;
     private final boolean enableLockfileVersions;
     private final boolean linkFileDependencies;
     private final boolean packBuiltPackages;
     private final boolean autoAddIntegrity;
     private final boolean ignorePlatform;
+
+    @Getter(AccessLevel.NONE)
+    private final PackageConstraintResolver constraintResolver = new PackageConstraintResolver(this);
 
     /**
      * An option that reads an environment variable the host did not supply ({@code ${NAME}} in the .npmrc).
@@ -113,17 +120,29 @@ public final class YarnClassicOptions {
     }
 
     private YarnClassicOptions(Map<String, @Nullable Object> yarnConfig, Map<String, @Nullable Object> npmConfig,
-                               Map<String, @Nullable Object> commandLine) {
+                               Map<String, @Nullable Object> commandLine, @Nullable Map<String, String> env) {
         this.yarnConfig = yarnConfig;
         this.npmConfig = npmConfig;
         Object production = commandLine.get("production");
-        this.production = production != null ? boolify(production) : Js.truthy(getOption("production"));
+        // an environment the host does not know counts as one without these variables
+        boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
+                                !"false".equals(env.get("NPM_CONFIG_PRODUCTION")) &&
+                                !"false".equals(env.get("YARN_PRODUCTION"));
+        this.production = production != null ? boolify(production) :
+                Js.truthy(getOption("production")) || productionEnv;
+        this.workspacesEnabled = !Boolean.FALSE.equals(getOption("workspaces-experimental"));
+        this.workspacesNohoistEnabled = !Boolean.FALSE.equals(getOption("workspaces-nohoist-experimental"));
         this.enableLockfileVersions = Js.truthy(getOption("yarn-enable-lockfile-versions"));
         this.linkFileDependencies = Js.truthy(getOption("yarn-link-file-dependencies"));
         this.packBuiltPackages = Js.truthy(getOption("experimental-pack-script-packages-in-mirror"));
         this.autoAddIntegrity = !boolifyWithDefault(Js.string(getOption("unsafe-disable-integrity-migration")), true);
         this.ignorePlatform = Js.truthy(commandLine.get("ignorePlatform"));
         this.flags = normalizeFlags(commandLine);
+    }
+
+    @Nullable
+    String resolveConstraints(List<String> versions, String range) {
+        return constraintResolver.reduce(versions, range);
     }
 
     public static YarnClassicOptions defaults() {
@@ -164,7 +183,7 @@ public final class YarnClassicOptions {
             withDefaults.put("registry", registry);
             npmConfig.put("registry", registry);
         }
-        return new YarnClassicOptions(withDefaults, npmConfig, commandLine);
+        return new YarnClassicOptions(withDefaults, npmConfig, commandLine, env);
     }
 
     // rc.js buildRcArgs: a `--<option> <value>` line passes the value; a flag passes itself when the value is true
@@ -291,12 +310,9 @@ public final class YarnClassicOptions {
         return DEFAULT_REGISTRY;
     }
 
-    private static String getScope(String packageIdent) {
-        if (packageIdent.startsWith("@")) {
-            int slash = packageIdent.indexOf("%2f") >= 0 ? packageIdent.indexOf("%2f") : packageIdent.indexOf('/');
-            return slash > 0 ? packageIdent.substring(0, slash) : "";
-        }
-        return "";
+    static String getScope(String packageIdent) {
+        Matcher match = SCOPED_PKG.matcher(packageIdent);
+        return match.find() ? match.group(1) : "";
     }
 
     private static @Nullable Object normalizeConfigOption(@Nullable Object val) {

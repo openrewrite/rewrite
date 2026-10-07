@@ -1,0 +1,1 @@
+An empty workspaces list still builds the aggregator, so a resolution reaches a direct dependency.

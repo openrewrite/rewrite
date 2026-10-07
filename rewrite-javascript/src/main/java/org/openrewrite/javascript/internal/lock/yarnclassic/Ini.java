@@ -49,7 +49,7 @@ final class Ini {
                 continue;
             }
             if (match.group(1) != null) {
-                String section = unsafe(match.group(1));
+                String section = propertyKey(unsafe(match.group(1)));
                 Object existing = out.get(section);
                 if (!Js.truthy(existing)) {
                     existing = new LinkedHashMap<String, Object>();
@@ -58,7 +58,8 @@ final class Ini {
                 p = existing instanceof Map ? (Map<String, @Nullable Object>) existing : new LinkedHashMap<>();
                 continue;
             }
-            String key = unsafe(match.group(2));
+            Object rawKey = unsafe(match.group(2));
+            String key = propertyKey(rawKey);
             Object value = match.group(3) != null && !match.group(3).isEmpty() ? unsafe(match.group(4)) : true;
             if ("true".equals(value)) {
                 value = true;
@@ -67,7 +68,7 @@ final class Ini {
             } else if ("null".equals(value)) {
                 value = null;
             }
-            if (key.length() > 2 && key.endsWith("[]")) {
+            if (rawKey instanceof String && key.length() > 2 && key.endsWith("[]")) {
                 key = key.substring(0, key.length() - 2);
                 Object existing = p.get(key);
                 if (!Js.truthy(existing)) {
@@ -114,6 +115,11 @@ final class Ini {
         return out;
     }
 
+    // a quoted key JSON.parse made null is the property "null"
+    private static String propertyKey(@Nullable Object key) {
+        return key == null ? "null" : Js.string(key);
+    }
+
     private static List<String> dotSplit(String str) {
         List<String> parts = new ArrayList<>();
         StringBuilder part = new StringBuilder();
@@ -138,15 +144,18 @@ final class Ini {
                                   (val.charAt(0) == '\'' && val.endsWith("'")));
     }
 
-    static String unsafe(@Nullable String raw) {
+    /**
+     * A quoted value is what {@code JSON.parse} makes of it once single quotes are stripped: {@code '123'} is the
+     * number, {@code "123"} the string.
+     */
+    static @Nullable Object unsafe(@Nullable String raw) {
         String val = Js.trim(raw == null ? "" : raw);
         if (isQuoted(val)) {
             if (val.charAt(0) == '\'') {
                 val = val.length() >= 2 ? val.substring(1, val.length() - 1) : "";
             }
             try {
-                Object parsed = Js.jsonParse(val);
-                return parsed instanceof String ? (String) parsed : Js.string(parsed);
+                return Js.jsonParse(val);
             } catch (JsError e) {
                 return val;
             }

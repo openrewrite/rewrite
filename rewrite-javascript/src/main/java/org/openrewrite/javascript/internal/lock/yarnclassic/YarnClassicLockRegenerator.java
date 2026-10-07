@@ -144,11 +144,17 @@ public final class YarnClassicLockRegenerator {
         String registry = NpmResolver.NPM_REGISTRY_ID;
         Manifest projectManifestJson = readManifest("", rootText, config, true, warnings);
         Manifest manifest = projectManifestJson;
+        boolean workspaceRootFolder = isWorkspaceRoot(projectManifestJson);
+        if (workspaceRootFolder && !config.isWorkspacesEnabled()) {
+            throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
+                                   "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
+        }
 
-        resolutionMap.init(projectManifestJson.getMap("resolutions"));
+        Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
+        Js.assign(resolutions, projectManifestJson.get("resolutions"));
+        resolutionMap.init(resolutions);
         for (String packageName : Js.keys(resolutionMap.resolutionsByPackage)) {
-            Map<String, @Nullable Object> optionalDependencies = manifest.getMap("optionalDependencies");
-            boolean optional = optionalDependencies != null && optionalDependencies.containsKey(packageName) &&
+            boolean optional = objectPathHas(manifest.get("optionalDependencies"), packageName) &&
                                config.getFlags().isIgnoreOptional();
             for (ResolutionMap.Resolution resolution : resolutionMap.resolutionsByPackage.get(packageName)) {
                 resolutionDeps.add(DependencyRequestPattern.builder().registry(registry)
@@ -161,18 +167,17 @@ public final class YarnClassicLockRegenerator {
             if (flat && !isUsed) {
                 return;
             }
-            Map<String, @Nullable Object> depMap = depManifest.getMap(depType);
-            if (depMap == null) {
-                return;
-            }
+            Object depMap = depManifest.get(depType);
+            Object workspaceName = depManifest.getName();
             for (String name : Js.keys(depMap)) {
                 String pattern = name;
                 if (lockfile.getLocked(pattern) == null) {
-                    pattern += "@" + Js.string(depMap.get(name));
+                    pattern += "@" + Js.string(Js.get(depMap, name));
                 }
                 patterns.add(pattern);
                 deps.add(DependencyRequestPattern.builder().pattern(pattern).registry(registry).hint(hint)
-                        .optional(optional).workspaceName(Js.string(depManifest.getName())).build());
+                        .optional(optional).workspaceName(workspaceName == null ? null : Js.string(workspaceName))
+                        .build());
             }
         };
 
@@ -181,8 +186,9 @@ public final class YarnClassicLockRegenerator {
         pushDeps.push("optionalDependencies", projectManifestJson, "optional", true, true);
 
         WorkspaceLayout workspaceLayout = null;
-        Map<String, WorkspaceLayout.Workspace> workspaces = resolveWorkspaces(projectManifestJson, config, warnings);
-        if (workspaces != null) {
+        if (workspaceRootFolder) {
+            Map<String, WorkspaceLayout.Workspace> workspaces = resolveWorkspaces(projectManifestJson, config,
+                    warnings);
             workspaceLayout = new WorkspaceLayout(workspaces, config);
             Map<String, @Nullable Object> workspaceDependencies = new LinkedHashMap<>();
             Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));
@@ -215,11 +221,8 @@ public final class YarnClassicLockRegenerator {
 
             Map<String, @Nullable Object> implicitWorkspaceDependencies = new LinkedHashMap<>(workspaceDependencies);
             for (String type : OWNED_DEPENDENCY_TYPES) {
-                Map<String, @Nullable Object> owned = projectManifestJson.getMap(type);
-                if (owned != null) {
-                    for (String dependencyName : owned.keySet()) {
-                        implicitWorkspaceDependencies.remove(dependencyName);
-                    }
+                for (String dependencyName : Js.keys(projectManifestJson.get(type))) {
+                    implicitWorkspaceDependencies.remove(dependencyName);
                 }
             }
             Manifest implicit = new Manifest();
@@ -241,20 +244,113 @@ public final class YarnClassicLockRegenerator {
         void push(String depType, Manifest manifest, @Nullable String hint, boolean optional, boolean isUsed);
     }
 
+    // object-path's has: a dotted name is a path, so `lodash.get` looks for `lodash` then `get` under it
+    private static boolean objectPathHas(@Nullable Object obj, String path) {
+        for (String key : path.split("\\.", -1)) {
+            if (!Js.hasOwnProperty(obj, key)) {
+                return false;
+            }
+            obj = Js.get(obj, key);
+        }
+        return true;
+    }
+
     /**
-     * config.js {@code resolveWorkspaces}, with the members the host found for the root's {@code workspaces}
-     * patterns: {@code null} when the root is no workspace root (no patterns, or not private).
+     * config.js {@code findWorkspaceRoot} for the project's own directory: a {@code workspaces} array, even an
+     * empty one, or an object with one, makes the project a workspace root.
      */
+    static boolean isWorkspaceRoot(Manifest manifest) {
+        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
+        return ws != null && Js.truthy(ws.get("packages"));
+    }
+
     @SuppressWarnings("unchecked")
-    private @Nullable Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, YarnClassicOptions config,
-                                                                                List<String> warnings) {
-        Object ws = root.get("workspaces");
-        Object packages = ws instanceof List ? ws :
-                ws instanceof Map ? ((Map<String, Object>) ws).get("packages") : null;
-        if (!(packages instanceof List) || ((List<?>) packages).isEmpty() || !Js.truthy(root.get("private"))) {
+    static @Nullable Map<String, @Nullable Object> extractWorkspaces(Manifest manifest) {
+        Object workspaces = manifest.get("workspaces");
+        if (!Js.truthy(workspaces)) {
             return null;
         }
+        if (workspaces instanceof List) {
+            Map<String, @Nullable Object> ws = new LinkedHashMap<>();
+            ws.put("packages", workspaces);
+            return ws;
+        }
+        if (workspaces instanceof Map) {
+            Map<String, @Nullable Object> ws = (Map<String, @Nullable Object>) workspaces;
+            if ((Js.truthy(ws.get("packages")) && ws.get("packages") instanceof List) ||
+                (Js.truthy(ws.get("nohoist")) && ws.get("nohoist") instanceof List)) {
+                return ws;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * config.js {@code getWorkspaces}: the root's workspaces config once it is eligible.
+     *
+     * @throws MessageError members or a nohoist list in a root that is not private, when {@code shouldThrow}.
+     */
+    static @Nullable Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow,
+                                                                   YarnClassicOptions config,
+                                                                   List<String> warnings) {
+        if (!config.isWorkspacesEnabled()) {
+            return null;
+        }
+        Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
+        if (ws == null) {
+            return null;
+        }
+        Map<String, @Nullable Object> wsCopy = new LinkedHashMap<>(ws);
+        List<String> warned = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        boolean isPrivate = Js.truthy(manifest.get("private"));
+        Object packages = wsCopy.get("packages");
+        if (Js.truthy(packages) && Js.length(packages) > 0 && !isPrivate) {
+            errors.add("Workspaces can only be enabled in private projects.");
+            wsCopy = null;
+        }
+        if (wsCopy != null && Js.truthy(wsCopy.get("nohoist")) && Js.length(wsCopy.get("nohoist")) > 0) {
+            if (!config.isWorkspacesNohoistEnabled()) {
+                warned.add(Lang.format("$0 defines nohoist but the feature is disabled in your Yarn config " +
+                                       "(\"workspaces-nohoist-experimental\" in .yarnrc file)", manifest.getName()));
+                wsCopy.put("nohoist", null);
+            } else if (!isPrivate) {
+                errors.add(Lang.format("nohoist config is ignored in $0 because it is not a private package. If " +
+                                       "you think nohoist should be allowed in public packages, please submit an " +
+                                       "issue for your use case.", manifest.getName()));
+                wsCopy.put("nohoist", null);
+            }
+        }
+        if (!errors.isEmpty() && shouldThrow) {
+            throw new MessageError(String.join("\n", errors));
+        }
+        List<String> msg = new ArrayList<>(errors);
+        msg.addAll(warned);
+        if (!msg.isEmpty()) {
+            warnings.add(String.join("\n", msg));
+        }
+        return wsCopy;
+    }
+
+    /**
+     * config.js {@code resolveWorkspaces}: the members under the root's {@code workspaces} patterns. The host
+     * gives the members' manifests; matching them against the patterns is not ported yet, so every manifest given
+     * besides the root's is a member once there is a pattern at all.
+     */
+    private Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, YarnClassicOptions config,
+                                                                      List<String> warnings) {
         Map<String, WorkspaceLayout.Workspace> workspaces = new LinkedHashMap<>();
+        if (!config.isWorkspacesEnabled()) {
+            return workspaces;
+        }
+        Map<String, @Nullable Object> ws = getWorkspaces(root, true, config, warnings);
+        Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        if (!(patterns instanceof List)) {
+            throw new MessageError("The workspaces field in package.json must be an array.");
+        }
+        if (((List<?>) patterns).isEmpty()) {
+            return workspaces;
+        }
         for (Map.Entry<String, String> member : inputs.getManifests().entrySet()) {
             String loc = member.getKey();
             if (loc.isEmpty()) {

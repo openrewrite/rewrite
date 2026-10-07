@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,7 +32,7 @@ final class PackageRequest {
 
     private static final Pattern GIT_PROTOCOL = Pattern.compile("^git(\\+[a-z0-9]+)?://");
 
-    private static final List<String> REQUIRED_PACKAGE_KEYS = java.util.Arrays.asList("name", "version", "_uid");
+    private static final List<String> REQUIRED_PACKAGE_KEYS = Arrays.asList("name", "version", "_uid");
 
     final @Nullable PackageRequest parentRequest;
     final List<String> parentNames;

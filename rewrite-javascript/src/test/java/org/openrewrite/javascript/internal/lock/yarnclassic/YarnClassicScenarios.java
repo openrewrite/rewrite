@@ -115,14 +115,7 @@ final class YarnClassicScenarios {
         }
 
         YarnClassicLockRegenerator.Inputs inputs() {
-            return YarnClassicLockRegenerator.Inputs.builder()
-                    .lock(text)
-                    .manifests(manifests())
-                    .yarnrc(scenario.file("yarnrc"))
-                    .npmrc(scenario.file("npmrc"))
-                    .env(new LinkedHashMap<>())
-                    .now(scenario.now())
-                    .build();
+            return scenario.inputs(before, text);
         }
 
         @Override
@@ -187,8 +180,9 @@ final class YarnClassicScenarios {
         }
 
         /**
-         * Every lock yarn wrote or was given: {@code before}, {@code after}, and yarn's rewrite of {@code after} on an
-         * install that changes nothing ({@code again}).
+         * Every lock yarn wrote or was given: {@code before}, {@code after}, {@code before-given}, and what yarn wrote
+         * over each on an install that changes nothing ({@code again}, {@code <lock>-again}) or under
+         * {@code --force} ({@code <lock>-forced}).
          */
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();
@@ -202,7 +196,31 @@ final class YarnClassicScenarios {
             if (given != null && !given.equals(file("before"))) {
                 locks.add(new Lock(this, "before-given", given));
             }
+            for (String lock : Arrays.asList("before", "after", "before-given")) {
+                for (String written : Arrays.asList(lock + "-again", lock + "-forced")) {
+                    String text = file(written);
+                    if (text != null) {
+                        locks.add(new Lock(this, written, text));
+                    }
+                }
+            }
             return locks;
+        }
+
+        /**
+         * What yarn had in a phase: the lock it started from, the phase's manifests, and the .yarnrc and .npmrc the
+         * recorder placed (the scenario's {@code yarnrc} and {@code npmrc}, then the phase's tree over them).
+         */
+        YarnClassicLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
+            Map<String, String> tree = tree(before);
+            return YarnClassicLockRegenerator.Inputs.builder()
+                    .lock(lock)
+                    .manifests(manifests(before))
+                    .yarnrc(tree.containsKey(".yarnrc") ? tree.get(".yarnrc") : file("yarnrc"))
+                    .npmrc(tree.containsKey(".npmrc") ? tree.get(".npmrc") : file("npmrc"))
+                    .env(new LinkedHashMap<>())
+                    .now(now())
+                    .build();
         }
 
         /**

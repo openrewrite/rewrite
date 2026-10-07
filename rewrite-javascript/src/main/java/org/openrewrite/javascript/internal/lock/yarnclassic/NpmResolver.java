@@ -38,7 +38,7 @@ final class NpmResolver {
 
     /**
      * The version manifest a range picks: a dist-tag's version, the {@code latest} tag's when it satisfies the range
-     * (strictly), else the highest version that satisfies it loosely.
+     * (strictly), else what {@link PackageConstraintResolver} reduces the versions to.
      *
      * @throws MessageError when no version matches, as yarn fails a non-interactive install.
      */
@@ -67,8 +67,7 @@ final class NpmResolver {
             return (Map<String, @Nullable Object>) byVersion.get(Js.string(latestVersion));
         }
 
-        String satisfied = NodeSemver.maxSatisfying(new ArrayList<>(Js.keys(byVersion)), range,
-                config.isLooseSemver() ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER);
+        String satisfied = config.resolveConstraints(new ArrayList<>(Js.keys(byVersion)), range);
         if (satisfied != null) {
             return (Map<String, @Nullable Object>) byVersion.get(satisfied);
         }
@@ -101,7 +100,7 @@ final class NpmResolver {
             remote.reference = cleanRegistry(config, tarball);
             remote.hash = shasum instanceof String ? (String) shasum : null;
             remote.integrity = Js.truthy(d.get("integrity")) ? Ssri.parse(Js.string(d.get("integrity"))) :
-                    Ssri.fromHex(Js.string(shasum), "sha1");
+                    Ssri.fromHex(shasum, "sha1");
             remote.registry = NPM_REGISTRY_ID;
             remote.packageName = Js.string(info.get("name"));
             manifest.remote = remote;

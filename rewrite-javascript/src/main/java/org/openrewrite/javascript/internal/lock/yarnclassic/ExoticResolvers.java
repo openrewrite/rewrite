@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -53,9 +54,17 @@ final class ExoticResolvers {
     private ExoticResolvers() {
     }
 
-    static @Nullable Kind getExoticResolver(String pattern) {
+    /**
+     * @throws JsError what the git resolver's {@code isVersion} raises on a pattern that is not a string: the
+     *                 {@code TypeError} of a regex test on an object yarn read, else Node's
+     *                 {@code ERR_INVALID_ARG_TYPE} from {@code url.parse}.
+     */
+    static @Nullable Kind getExoticResolver(@Nullable Object pattern) {
+        if (isGit(pattern)) {
+            return Kind.GIT;
+        }
         for (Kind kind : Kind.values()) {
-            if (isVersion(kind, pattern)) {
+            if (kind != Kind.GIT && isVersion(kind, (String) pattern)) {
                 return kind;
             }
         }
@@ -94,13 +103,20 @@ final class ExoticResolvers {
         }
     }
 
-    private static boolean isGit(String pattern) {
+    private static boolean isGit(@Nullable Object pattern) {
+        if (pattern instanceof Map) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot convert object to primitive value");
+        }
+        String text = Js.string(pattern);
         for (Pattern matcher : GIT_PATTERN_MATCHERS) {
-            if (matcher.matcher(pattern).find()) {
+            if (matcher.matcher(text).find()) {
                 return true;
             }
         }
-        LegacyUrl url = LegacyUrl.parse(pattern);
+        if (!(pattern instanceof String)) {
+            throw JsError.invalidArgType("The \"url\" argument must be of type string", pattern);
+        }
+        LegacyUrl url = LegacyUrl.parse(text);
         if (url.hostname != null && url.path != null && GIT_HOSTS.contains(url.hostname)) {
             int segments = 0;
             for (String p : url.path.split("/", -1)) {
@@ -150,7 +166,19 @@ final class ExoticResolvers {
 
         static LegacyUrl parse(String input) {
             LegacyUrl url = new LegacyUrl();
-            String rest = Js.trim(input);
+            int start = 0;
+            int end = input.length();
+            while (start < end && isUrlWhitespace(input.charAt(start))) {
+                start++;
+            }
+            while (end > start && isUrlWhitespace(input.charAt(end - 1))) {
+                end--;
+            }
+            String rest = input.substring(start, end);
+            // backslashes before the query or fragment are slashes
+            int split = indexOfAny(rest, "?#");
+            rest = split == -1 ? rest.replace('\\', '/') :
+                    rest.substring(0, split).replace('\\', '/') + rest.substring(split);
             Matcher proto = PROTOCOL.matcher(rest);
             if (proto.find()) {
                 url.protocol = proto.group(1).toLowerCase(Locale.ROOT);
@@ -189,6 +217,10 @@ final class ExoticResolvers {
                 url.path = "/";
             }
             return url;
+        }
+
+        private static boolean isUrlWhitespace(char c) {
+            return c < 33 || c == ' ' || c == '﻿';
         }
 
         private static int indexOfAny(String s, String chars) {

@@ -36,7 +36,7 @@ import java.util.regex.Pattern;
  * that reach a lock or decide an install: the version cleaned, the name and version defaulted, an engines array
  * expanded, {@code bundledDependencies} renamed, each dependency map's {@code //} key dropped and empty values made
  * {@code ""}). The rest of fix.js (people, readme, license, bin, man, scripts) reads package files and never reaches
- * a lock.
+ * a lock. A dependency field that is an array is read by its indices, as yarn does; a string one by its characters.
  */
 final class NormalizeManifest {
 
@@ -48,7 +48,8 @@ final class NormalizeManifest {
     private static final List<String> MANIFEST_FIELDS = Arrays.asList("resolutions", "devDependencies",
             "dependencies", "optionalDependencies", "peerDependencies");
     private static final Pattern ILLEGAL_NAME_CHARS = Pattern.compile("[/@" + Js.WHITESPACE_CLASS + "+%:]");
-    private static final Pattern PATH_PREFIX = Pattern.compile("^\\.(/|$)");
+    private static final Pattern PATH_PREFIX = Pattern.compile("^\\.(/|\\z)");
+    private static final Pattern RELATIVE_PREFIX = Pattern.compile("^\\.{0,2}/");
     private static final Pattern ENGINES_SPLIT = Pattern.compile(" +");
 
     private NormalizeManifest() {
@@ -70,10 +71,10 @@ final class NormalizeManifest {
         if (name instanceof String) {
             human = (String) name;
         }
-        if (human != null && version instanceof String && !((String) version).isEmpty()) {
+        if (Js.truthy(human) && version instanceof String && !((String) version).isEmpty()) {
             human += "@" + version;
         }
-        String prefix = human == null ? "" : human + ": ";
+        String prefix = Js.truthy(human) ? human + ": " : "";
 
         fix(info, looseSemver);
         resolveRelative(info, moduleLoc, lockfileFolder);
@@ -114,9 +115,8 @@ final class NormalizeManifest {
         }
 
         for (String dependencyType : MANIFEST_FIELDS) {
-            Object dependencyList = info.get(dependencyType);
-            if (dependencyList instanceof Map) {
-                Map<String, @Nullable Object> deps = (Map<String, @Nullable Object>) dependencyList;
+            Map<String, @Nullable Object> deps = asObject(info, dependencyType);
+            if (deps != null) {
                 deps.remove("//");
                 for (String name : new ArrayList<>(deps.keySet())) {
                     Object value = deps.get(name);
@@ -126,8 +126,28 @@ final class NormalizeManifest {
         }
     }
 
+    // typeof === 'object': an array is one too, and yarn reads it by its indices from here on
+    @SuppressWarnings("unchecked")
+    private static @Nullable Map<String, @Nullable Object> asObject(Manifest info, String key) {
+        Object value = info.get(key);
+        if (value instanceof List) {
+            Map<String, @Nullable Object> indexed = new LinkedHashMap<>();
+            Js.assign(indexed, value);
+            info.put(key, indexed);
+            return indexed;
+        }
+        return value instanceof Map ? (Map<String, @Nullable Object>) value : null;
+    }
+
     /**
      * {@code file:} and {@code link:} dependencies made relative to the lock's directory.
+     *
+     * @param moduleLoc      the package's directory, relative to the project's
+     * @param lockfileFolder the lock's directory, relative to the project's
+     * @throws JsError                               Node's {@code ERR_INVALID_ARG_TYPE} from {@code path.isAbsolute}
+     *                                               on a value that is not a string.
+     * @throws YarnClassicLockRegenerator.CannotKnow an absolute target, which yarn writes relative to where the
+     *                                               project sits on disk.
      */
     @SuppressWarnings("unchecked")
     static void resolveRelative(Manifest info, String moduleLoc, @Nullable String lockfileFolder) {
@@ -136,14 +156,13 @@ final class NormalizeManifest {
         }
         for (String dependencyType : DEPENDENCY_TYPES) {
             Object dependencies = info.get(dependencyType);
-            if (!(dependencies instanceof Map)) {
+            if (!Js.truthy(dependencies)) {
                 continue;
             }
-            Map<String, @Nullable Object> deps = (Map<String, @Nullable Object>) dependencies;
-            for (String name : Js.keys(deps)) {
-                Object raw = deps.get(name);
+            for (String name : Js.keys(dependencies)) {
+                Object raw = Js.get(dependencies, name);
                 if (!(raw instanceof String)) {
-                    continue;
+                    throw JsError.invalidArgType("The \"path\" argument must be of type string", raw);
                 }
                 String value = (String) raw;
                 if (value.startsWith("/")) {
@@ -157,22 +176,45 @@ final class NormalizeManifest {
                 } else {
                     continue;
                 }
+                // yarn computes the target first, but a string's index is read-only wherever the project sits
+                if (dependencies instanceof String) {
+                    throw new JsError(JsError.TYPE_ERROR, "Cannot assign to read only property '" + name +
+                                                          "' of string '" + dependencies + "'");
+                }
                 String unprefixed = value.substring(prefix.length());
+                if (unprefixed.startsWith("/")) {
+                    throw new YarnClassicLockRegenerator.CannotKnow("where the project sits on disk, which the " +
+                            dependencyType + " entry " + name + "@" + value + " is written relative to");
+                }
                 boolean hasPathPrefix = PATH_PREFIX.matcher(unprefixed).find();
-                String root = PosixPath.resolve("/", lockfileFolder);
-                String absoluteTarget = PosixPath.resolve(root, moduleLoc, unprefixed);
+                String project = deeperThanAnyClimb(lockfileFolder, moduleLoc, unprefixed);
+                String root = PosixPath.resolve(project, lockfileFolder);
+                String absoluteTarget = PosixPath.resolve(project, moduleLoc, unprefixed);
                 String relativeTarget = PosixPath.relative(root, absoluteTarget);
                 if (relativeTarget.isEmpty()) {
                     relativeTarget = ".";
                 }
                 if (absoluteTarget.equals(root)) {
                     relativeTarget = ".";
-                } else if (hasPathPrefix && !relativeTarget.matches("^\\.{0,2}/.*")) {
+                } else if (hasPathPrefix && !RELATIVE_PREFIX.matcher(relativeTarget).find()) {
                     relativeTarget = "./" + relativeTarget;
                 }
-                deps.put(name, prefix + relativeTarget);
+                ((Map<String, @Nullable Object>) dependencies).put(name, prefix + relativeTarget);
             }
         }
+    }
+
+    // a target that climbs out of the project keeps its `..`, as on disk wherever the project sits deeper than that
+    private static String deeperThanAnyClimb(String... relativePaths) {
+        StringBuilder project = new StringBuilder();
+        for (String path : relativePaths) {
+            for (String segment : path.split("/", -1)) {
+                if ("..".equals(segment)) {
+                    project.append("/\0");
+                }
+            }
+        }
+        return project.append("/\0").toString();
     }
 
     interface Warn {
@@ -232,17 +274,16 @@ final class NormalizeManifest {
      * A name listed in several dependency maps keeps the first non-trivial range found in the order
      * optionalDependencies, dependencies, devDependencies, and stays only in the first map that lists it.
      */
-    @SuppressWarnings("unchecked")
     static void cleanDependencies(Manifest info, boolean isRoot, Warn warn) {
         List<String> types = new ArrayList<>();
         List<Map<String, @Nullable Object>> depTypes = new ArrayList<>();
         for (String type : DEPENDENCY_KEYS) {
-            Object deps = info.get(type);
-            if (!Js.truthy(deps) || !(deps instanceof Map)) {
+            Map<String, @Nullable Object> deps = asObject(info, type);
+            if (deps == null) {
                 continue;
             }
             types.add(type);
-            depTypes.add((Map<String, @Nullable Object>) deps);
+            depTypes.add(deps);
         }
 
         Map<String, String[]> nonTrivialDeps = new LinkedHashMap<>();

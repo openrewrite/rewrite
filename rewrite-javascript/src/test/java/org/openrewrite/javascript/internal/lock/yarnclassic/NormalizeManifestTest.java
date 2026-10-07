@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
@@ -97,6 +99,107 @@ class NormalizeManifestTest {
         assertThatThrownBy(() -> NormalizeManifest.normalizeManifest(info, "", "", true, true, new ArrayList<>()))
                 .isInstanceOf(MessageError.class)
                 .hasMessage(error);
+    }
+
+    /**
+     * yarn's own normalize-manifest from its 1.22.22 bundle ({@code ycf-normalize.js}): only a non-empty name
+     * prefixes what yarn reports.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+            "empty name|{\"name\": \"\", \"version\": 1}|\"version\" is not a string",
+            "no name|{\"version\": 1}|\"version\" is not a string",
+            "name|{\"name\": \"x\", \"version\": 1}|x: \"version\" is not a string",
+    })
+    void prefixesTheNameWhenThereIsOne(String name, String actual, String error) {
+        Manifest info = new Manifest(object(actual));
+        assertThatThrownBy(() -> NormalizeManifest.normalizeManifest(info, "", "", true, true, new ArrayList<>()))
+                .isInstanceOf(MessageError.class)
+                .hasMessage(error);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+            "empty name||\"dependencies\" has dependency \"a\" with range \"1\" that collides with a dependency in " +
+            "\"devDependencies\" of the same name with version \"2\"",
+            "name|x|x@1.0.0: \"dependencies\" has dependency \"a\" with range \"1\" that collides with a dependency " +
+            "in \"devDependencies\" of the same name with version \"2\"",
+    })
+    void prefixesTheCollisionWarningWhenThereIsAName(String label, @Nullable String name, String warning) {
+        Manifest info = new Manifest(object("{\"name\": \"" + (name == null ? "" : name) + "\", " +
+                                            "\"version\": \"1.0.0\", \"dependencies\": {\"a\": \"1\"}, " +
+                                            "\"devDependencies\": {\"a\": \"2\"}}"));
+        List<String> warnings = new ArrayList<>();
+        NormalizeManifest.normalizeManifest(info, "", "", true, true, warnings);
+        assertThat(warnings).containsExactly(warning);
+    }
+
+    /**
+     * What yarn 1.22.22 printed for these dependency values ({@code open-manifest-dep-number}, and the same probe
+     * with the other values): {@code path.isAbsolute} rejects each, before anything resolves.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+            "number|1|type number (1)",
+            "fraction|1.5|type number (1.5)",
+            "boolean|true|type boolean (true)",
+            "object|{}|[Object: null prototype] {}",
+            "array|[\"x\"]|an instance of Array",
+    })
+    void rejectsADependencyValueThatIsNotAString(String label, String value, String received) {
+        Manifest info = new Manifest(object("{\"name\": \"r\", \"version\": \"1.0.0\", \"dependencies\": {\"ms\": " +
+                                            value + "}}"));
+        assertThatThrownBy(() -> NormalizeManifest.normalizeManifest(info, "", "", true, true, new ArrayList<>()))
+                .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.getName() + ": " + e.getMessage())
+                        .isEqualTo("TypeError [ERR_INVALID_ARG_TYPE]: The \"path\" argument must be of type " +
+                                   "string. Received " + received));
+    }
+
+    @Test
+    void readsADependencyArrayByItsIndices() {
+        Manifest info = new Manifest(object("{\"name\": \"r\", \"version\": \"1.0.0\", \"dependencies\": " +
+                                            "[\"ms\", null]}"));
+        NormalizeManifest.normalizeManifest(info, "", "", true, true, new ArrayList<>());
+        Object dependencies = info.get("dependencies");
+        assertThat(Js.keys(dependencies)).containsExactly("0", "1");
+        assertThat(Js.get(dependencies, "0")).isEqualTo("ms");
+        assertThat(Js.get(dependencies, "1")).isEqualTo("");
+    }
+
+    /**
+     * yarn's own resolve-relative.js from its 1.22.22 bundle ({@code ycf-resolve-relative.js}), the
+     * project at {@code /a/b/c/proj}: a target outside the project keeps its climb.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
+            "``|file:../x|file:../x",
+            "``|file:../../x|file:../../x",
+            "``|file:./x/|file:./x",
+            "``|file:.|file:.",
+            "packages/a|file:../b|file:packages/b",
+            "packages/a|link:./../b|link:./packages/b",
+            "packages/a|link:../../..|link:..",
+    })
+    void resolvesARelativeTarget(String moduleLoc, String value, String expected) {
+        Manifest info = new Manifest(object("{\"dependencies\": {\"x\": \"" + value + "\"}}"));
+        NormalizeManifest.resolveRelative(info, moduleLoc, "");
+        assertThat(Js.get(info.get("dependencies"), "x")).isEqualTo(expected);
+    }
+
+    @Test
+    void cannotKnowWhereTheProjectSitsForAnAbsoluteTarget() {
+        Manifest info = new Manifest(object("{\"dependencies\": {\"x\": \"/opt/lib\"}}"));
+        assertThatThrownBy(() -> NormalizeManifest.resolveRelative(info, "", ""))
+                .isInstanceOf(YarnClassicLockRegenerator.CannotKnow.class)
+                .hasMessageContaining("x@file:/opt/lib");
+    }
+
+    @Test
+    void cannotRewriteADependencyStringByIndex() {
+        Manifest info = new Manifest(object("{\"dependencies\": \"/x\"}"));
+        assertThatThrownBy(() -> NormalizeManifest.resolveRelative(info, "", ""))
+                .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.getName() + ": " + e.getMessage())
+                        .isEqualTo("TypeError: Cannot assign to read only property '0' of string '/x'"));
     }
 
     @SuppressWarnings("unchecked")

@@ -17,9 +17,6 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Port of yarn src/reporters/base-reporter.js {@code lang} and {@code stringifyLangArgs} (yarn 1.22.22): a message of
  * reporters/lang/en.js with its {@code $0}, {@code $1}, ... filled by each argument's {@code JSON.stringify}.
@@ -37,17 +34,9 @@ final class Lang {
         return out;
     }
 
+    // JSON.stringify(val) || val + ''
     private static String stringify(@Nullable Object val) {
-        if (val instanceof String) {
-            return Js.quote((String) val);
-        }
-        if (val instanceof List) {
-            List<String> items = new ArrayList<>();
-            for (Object item : (List<?>) val) {
-                items.add(item == null ? "null" : stringify(item));
-            }
-            return "[" + String.join(",", items) + "]";
-        }
-        return Js.string(val);
+        String json = val == null ? null : Js.jsonStringify(val);
+        return json == null ? Js.string(val) : json;
     }
 }

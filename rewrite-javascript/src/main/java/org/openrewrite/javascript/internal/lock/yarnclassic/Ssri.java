@@ -35,6 +35,7 @@ final class Ssri {
 
     private static final Pattern SRI_REGEX = Pattern.compile("^([^-]+)-([^?]+)([?\\S*]*)$");
     private static final Pattern WHITESPACE = Pattern.compile("[" + Js.WHITESPACE_CLASS + "]+");
+    private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 
     private Ssri() {
     }
@@ -118,8 +119,38 @@ final class Ssri {
         return obj.toString();
     }
 
-    static Integrity fromHex(String hexDigest, String algorithm) {
-        return parse(algorithm + "-" + Base64.getEncoder().encodeToString(hexToBytes(hexDigest)));
+    /**
+     * @throws JsError Node's {@code ERR_INVALID_ARG_TYPE} from {@code Buffer.from} on a digest that is neither a
+     *                 string nor an array, a missing {@code shasum} among them.
+     */
+    static Integrity fromHex(@Nullable Object hexDigest, String algorithm) {
+        byte[] bytes;
+        if (hexDigest instanceof String) {
+            bytes = hexToBytes((String) hexDigest);
+        } else if (hexDigest instanceof List) {
+            List<?> items = (List<?>) hexDigest;
+            bytes = new byte[items.size()];
+            for (int i = 0; i < bytes.length; i++) {
+                bytes[i] = (byte) toNumber(items.get(i));
+            }
+        } else {
+            throw JsError.invalidArgType("The first argument must be of type string or an instance of Buffer, " +
+                                         "ArrayBuffer, or Array or an Array-like Object", hexDigest);
+        }
+        return parse(algorithm + "-" + Base64.getEncoder().encodeToString(bytes));
+    }
+
+    // Number(item) & 255 as Buffer.from reads an array's elements
+    private static int toNumber(@Nullable Object item) {
+        double d = 0;
+        if (item instanceof Number) {
+            d = ((Number) item).doubleValue();
+        } else if (item instanceof Boolean) {
+            d = (Boolean) item ? 1 : 0;
+        } else if (item instanceof String && NUMBER.matcher(Js.trim((String) item)).matches()) {
+            d = Double.parseDouble(Js.trim((String) item));
+        }
+        return Double.isNaN(d) || Double.isInfinite(d) ? 0 : (int) (long) d;
     }
 
     // Buffer.from(hex, 'hex') stops at the first pair that is not hexadecimal

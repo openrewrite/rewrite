@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
  * Every yarn.lock {@link YarnClassicScenarios} finds, loaded into the model and written back: the cache parsed, each
@@ -63,9 +64,8 @@ class YarnClassicLockRoundTripTest {
             return;
         }
         String forced = lock.forced();
-        if (forced != null && loaded.resolvesAgain()) {
-            return;
-        }
+        assumeFalse(forced != null && loaded.resolvesAgain(),
+                "the resolver's: yarn --force resolves some pattern of this lock anew");
         assertThat(loaded.write()).isEqualTo(forced != null ? forced : lock.getText());
     }
 
@@ -80,15 +80,10 @@ class YarnClassicLockRoundTripTest {
         }
         String again = lock.again();
         String expect = lock.getScenario().expect();
-        if (again != null && expect != null &&
-            (expect.startsWith("cannot-know") || expect.startsWith("second-install-rejects"))) {
-            // yarn writes each package's own package.json, which differs from the entry the resolver reused
-            return;
-        }
-        if (loaded.resolvesAgain()) {
-            // the resolver's: what yarn writes follows from resolving those patterns anew
-            return;
-        }
+        assumeFalse(again != null && expect != null &&
+                    (expect.startsWith("cannot-know") || expect.startsWith("second-install-rejects")),
+                "yarn writes each package's own package.json, which differs from the entry the resolver reused");
+        assumeFalse(loaded.resolvesAgain(), "the resolver's: an install over this lock resolves some pattern anew");
         String saved = loaded.save();
         assertThat(saved == null ? lock.getText() : saved).isEqualTo(again != null ? again : lock.getText());
         if (again == null) {
