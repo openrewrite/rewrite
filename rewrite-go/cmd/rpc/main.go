@@ -1862,6 +1862,8 @@ func nonNil(s []string) []string {
 type prepareRecipeRequest struct {
 	ID      string         `json:"id"`
 	Options map[string]any `json:"options"`
+	// Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
+	AcceptsCausesAnotherCycle bool `json:"acceptsCausesAnotherCycle"`
 }
 
 // prepareRecipeResponse contains the prepared recipe info.
@@ -1876,7 +1878,8 @@ type prepareRecipeResponse struct {
 	// RecipeList carries the prepared child recipes of a composite so the host builds the tree
 	// locally instead of re-preparing each child by name. Always emitted (an empty list for a
 	// leaf; null only for a delegating recipe, whose children the host resolves itself).
-	RecipeList []prepareRecipeResponse `json:"recipeList"`
+	RecipeList         []prepareRecipeResponse `json:"recipeList"`
+	CausesAnotherCycle bool                    `json:"causesAnotherCycle,omitempty"`
 }
 
 type delegatesToResponse struct {
@@ -1938,7 +1941,7 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 		}, nil
 	}
 
-	resp, rerr := s.prepareInstance(instance, req.ID)
+	resp, rerr := s.prepareInstance(instance, req.ID, req.AcceptsCausesAnotherCycle)
 	if rerr != nil {
 		return nil, rerr
 	}
@@ -1954,7 +1957,7 @@ func (s *server) handlePrepareRecipe(params json.RawMessage) (any, *rpcError) {
 // values its parent set). A child that delegates to a Java recipe is emitted as delegatesTo for the
 // host to resolve; the rest are prepared and validated recursively. Delegating recipes forward
 // validation to the recipe they delegate to, so they are not validated here.
-func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRecipeResponse, *rpcError) {
+func (s *server) prepareInstance(instance recipe.Recipe, name string, acceptsCausesAnotherCycle bool) (prepareRecipeResponse, *rpcError) {
 	desc := recipe.Describe(instance)
 
 	_, isDelegating := instance.(recipe.DelegatesTo)
@@ -1979,6 +1982,9 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 		EditVisitor:       "edit:" + recipeID,
 		EditPreconditions: []any{},
 		ScanPreconditions: []any{},
+	}
+	if c, ok := instance.(recipe.CausesAnotherCycle); ok && acceptsCausesAnotherCycle {
+		resp.CausesAnotherCycle = c.CausesAnotherCycle()
 	}
 
 	// Introspect Editor() once: if it's wrapped in preconditions.Check(...), extract the
@@ -2028,7 +2034,7 @@ func (s *server) prepareInstance(instance recipe.Recipe, name string) (prepareRe
 				},
 			})
 		} else {
-			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name)
+			childResp, rerr := s.prepareInstance(child, recipe.Describe(child).Name, acceptsCausesAnotherCycle)
 			if rerr != nil {
 				return prepareRecipeResponse{}, rerr
 			}
