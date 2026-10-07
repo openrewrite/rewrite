@@ -33,32 +33,147 @@ final class QueryString {
     private QueryString() {
     }
 
+    /**
+     * {@code parse(qs)}: a key or value is decoded only when it holds a {@code %XX} escape (a {@code +} is a space
+     * either way), and at most 1000 pairs are read.
+     */
     static Map<String, Object> parse(String qs) {
         Map<String, Object> obj = new LinkedHashMap<>();
         if (qs.isEmpty()) {
             return obj;
         }
-        for (String piece : qs.split("&", -1)) {
-            if (piece.isEmpty()) {
+        int pairs = 1000;
+        int lastPos = 0;
+        boolean sawSep = false;
+        boolean sawEq = false;
+        StringBuilder key = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        boolean keyEncoded = false;
+        boolean valEncoded = false;
+        int encodeCheck = 0;
+        for (int i = 0; i < qs.length(); ++i) {
+            char code = qs.charAt(i);
+            if (code == '&') {
+                sawSep = true;
+                int end = i;
+                if (!sawEq) {
+                    if (lastPos < end) {
+                        key.append(qs, lastPos, end);
+                    } else if (key.length() == 0) {
+                        if (--pairs == 0) {
+                            return obj;
+                        }
+                        lastPos = i + 1;
+                        sawSep = sawEq = false;
+                        continue;
+                    }
+                } else if (lastPos < end) {
+                    value.append(qs, lastPos, end);
+                }
+                addKeyVal(obj, key.toString(), value.toString(), keyEncoded, valEncoded);
+                if (--pairs == 0) {
+                    return obj;
+                }
+                keyEncoded = valEncoded = false;
+                key.setLength(0);
+                value.setLength(0);
+                encodeCheck = 0;
+                lastPos = i + 1;
+                sawSep = sawEq = false;
                 continue;
             }
-            int eq = piece.indexOf('=');
-            String key = unescape(eq == -1 ? piece : piece.substring(0, eq));
-            String value = eq == -1 ? "" : unescape(piece.substring(eq + 1));
-            Object existing = obj.get(key);
-            if (existing == null) {
-                obj.put(key, value);
-            } else if (existing instanceof List) {
-                @SuppressWarnings("unchecked") List<String> list = (List<String>) existing;
-                list.add(value);
-            } else {
-                List<String> list = new ArrayList<>();
-                list.add((String) existing);
-                list.add(value);
-                obj.put(key, list);
+            sawSep = false;
+            if (!sawEq) {
+                if (code == '=') {
+                    sawEq = true;
+                    if (lastPos < i) {
+                        key.append(qs, lastPos, i);
+                    }
+                    encodeCheck = 0;
+                    lastPos = i + 1;
+                    continue;
+                }
+                if (!keyEncoded) {
+                    if (code == '%') {
+                        encodeCheck = 1;
+                        continue;
+                    } else if (encodeCheck > 0) {
+                        if (isHex(code)) {
+                            if (++encodeCheck == 3) {
+                                keyEncoded = true;
+                            }
+                            continue;
+                        } else {
+                            encodeCheck = 0;
+                        }
+                    }
+                }
+                if (code == '+') {
+                    if (lastPos < i) {
+                        key.append(qs, lastPos, i);
+                    }
+                    key.append(' ');
+                    lastPos = i + 1;
+                    continue;
+                }
+            }
+            if (code == '+') {
+                if (lastPos < i) {
+                    value.append(qs, lastPos, i);
+                }
+                value.append(' ');
+                lastPos = i + 1;
+            } else if (!valEncoded) {
+                if (code == '%') {
+                    encodeCheck = 1;
+                } else if (encodeCheck > 0) {
+                    if (isHex(code)) {
+                        if (++encodeCheck == 3) {
+                            valEncoded = true;
+                        }
+                    } else {
+                        encodeCheck = 0;
+                    }
+                }
             }
         }
+        if (lastPos < qs.length()) {
+            if (!sawEq) {
+                key.append(qs, lastPos, qs.length());
+            } else if (!sawSep) {
+                value.append(qs, lastPos, qs.length());
+            }
+        } else if (!sawEq && key.length() == 0) {
+            return obj;
+        }
+        addKeyVal(obj, key.toString(), value.toString(), keyEncoded, valEncoded);
         return obj;
+    }
+
+    private static boolean isHex(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+    }
+
+    private static void addKeyVal(Map<String, Object> obj, String key, String value, boolean keyEncoded,
+                                  boolean valEncoded) {
+        if (!key.isEmpty() && keyEncoded) {
+            key = unescape(key);
+        }
+        if (!value.isEmpty() && valEncoded) {
+            value = unescape(value);
+        }
+        Object existing = obj.get(key);
+        if (existing == null) {
+            obj.put(key, value);
+        } else if (existing instanceof List) {
+            @SuppressWarnings("unchecked") List<String> list = (List<String>) existing;
+            list.add(value);
+        } else {
+            List<String> list = new ArrayList<>();
+            list.add((String) existing);
+            list.add(value);
+            obj.put(key, list);
+        }
     }
 
     static String stringify(Map<String, ?> obj) {
@@ -93,27 +208,40 @@ final class QueryString {
         return "";
     }
 
-    // querystring.unescape: decodeURIComponent after `+` becomes a space, else the lenient unescapeBuffer
+    // qsUnescape: decodeURIComponent, else the lenient unescapeBuffer
     private static String unescape(String s) {
-        String plus = s.replace('+', ' ');
         try {
-            return UriComponent.decodeURIComponent(plus);
+            return UriComponent.decodeURIComponent(s);
         } catch (IllegalArgumentException e) {
-            return unescapeBuffer(plus);
+            return unescapeBuffer(s);
         }
     }
 
+    // unescapeBuffer(s).toString(): one byte per UTF-16 code unit (its low byte), %XX decoded, then read as UTF-8
     private static String unescapeBuffer(String s) {
-        byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        for (int i = 0; i < bytes.length; i++) {
-            if (bytes[i] == '%' && i + 2 < bytes.length && Character.digit(bytes[i + 1], 16) >= 0 &&
-                Character.digit(bytes[i + 2], 16) >= 0) {
-                out.write(Character.digit(bytes[i + 1], 16) * 16 + Character.digit(bytes[i + 2], 16));
-                i += 2;
-            } else {
-                out.write(bytes[i]);
+        int maxLength = s.length() - 2;
+        int index = 0;
+        while (index < s.length()) {
+            int currentChar = s.charAt(index);
+            if (currentChar == '%' && index < maxLength) {
+                currentChar = s.charAt(++index);
+                int hexHigh = Character.digit(currentChar, 16);
+                if (hexHigh < 0 || currentChar > 0x7F) {
+                    out.write('%');
+                    continue;
+                }
+                int nextChar = s.charAt(++index);
+                int hexLow = Character.digit(nextChar, 16);
+                if (hexLow < 0 || nextChar > 0x7F) {
+                    out.write('%');
+                    index--;
+                } else {
+                    currentChar = hexHigh * 16 + hexLow;
+                }
             }
+            out.write(currentChar & 0xFF);
+            index++;
         }
         return new String(out.toByteArray(), StandardCharsets.UTF_8);
     }

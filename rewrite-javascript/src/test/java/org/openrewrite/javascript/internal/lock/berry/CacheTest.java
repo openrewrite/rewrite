@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -44,6 +45,14 @@ class CacheTest {
         List<Arguments> out = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         for (BerryScenarios.Scenario scenario : BerryScenarios.discover()) {
+            // a crafted start's checksums were given to Yarn, not computed by it
+            Set<String> given = new LinkedHashSet<>();
+            for (String input : new String[]{"lock-seed", "before-given"}) {
+                String text = scenario.file(input);
+                if (text != null) {
+                    given.addAll(Arrays.asList(text.split("\n")));
+                }
+            }
             for (BerryScenarios.Lock lock : scenario.locks()) {
                 Map<String, Object> parsed;
                 try {
@@ -55,7 +64,8 @@ class CacheTest {
                     Object resolution = Js.get(entry, "resolution");
                     Object checksum = Js.get(entry, "checksum");
                     if (!(resolution instanceof String) || !(checksum instanceof String) ||
-                        !((String) checksum).matches("\\d+c0/[0-9a-f]+")) {
+                        !((String) checksum).matches("\\d+c0/[0-9a-f]+") ||
+                        given.contains("  checksum: " + checksum)) {
                         continue;
                     }
                     Locator locator = StructUtils.parseLocator((String) resolution, true);
