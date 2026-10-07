@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Collections.singletonMap;
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
@@ -103,6 +104,13 @@ public final class BunLockRegenerator {
          */
         @NonNull
         Instant now;
+
+        /**
+         * The package.json of each directory above the project that bun walks through from where it runs, nearest
+         * first, keyed by the project's location from that directory ({@code packages/a}).
+         */
+        @Singular
+        Map<String, String> parentManifests;
     }
 
     static final String BUN_REJECTS = "bun rejects this edit";
@@ -219,6 +227,7 @@ public final class BunLockRegenerator {
     public Result regenerate() {
         String written;
         try {
+            findWorkspaceRoot();
             written = install(inputs.getLock());
         } catch (RuntimeException e) {
             return Result.failure(failure(e, ""));
@@ -233,6 +242,42 @@ public final class BunLockRegenerator {
             return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
         }
         return Result.success(written);
+    }
+
+    /**
+     * PackageManager.init: the first package.json above with workspaces decides where bun installs; one that lists
+     * the project is a root above, whose bun.lock bun writes instead of this one.
+     */
+    private void findWorkspaceRoot() {
+        String manifest = inputs.getManifests().get("");
+        if (manifest == null) {
+            return;
+        }
+        for (Map.Entry<String, String> parent : inputs.getParentManifests().entrySet()) {
+            Json.Expr workspaces = Json.parse(parent.getValue()).get("workspaces");
+            if (workspaces == null) {
+                continue;
+            }
+            Json.Expr packages = workspaces.isObject() ? workspaces.get("packages") : workspaces;
+            if (packages == null || !packages.isArray()) {
+                return;
+            }
+            Workspaces names = new Workspaces();
+            try {
+                names.processNamesArray(new Log(), packages.items(), singletonMap(parent.getKey(), manifest));
+            } catch (IllegalArgumentException ignored) {
+                // whether bun errs here depends on the other members' manifests, which are not given
+            }
+            if (names.map.containsKey(parent.getKey())) {
+                StringBuilder up = new StringBuilder("..");
+                for (int i = parent.getKey().split("/").length; i > 1; i--) {
+                    up.append("/..");
+                }
+                throw new PackageManager.CannotKnow("the lock bun writes: it installs at the workspace root " + up +
+                                                    ", whose workspaces list this project, and writes that root's bun.lock");
+            }
+            return;
+        }
     }
 
     private String install(@Nullable String lock) {
