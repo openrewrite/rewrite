@@ -1,0 +1,1 @@
+frozenLockfile in the edit phase; the edit adds a root dependency ms ^2.1.3 on a package already hoisted at the root as debug@4.4.3's transitive: bun's Lockfile.eql sees the same placements, so does the frozen install write the lock with the new root literal?

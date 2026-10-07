@@ -1,0 +1,1 @@
+patchedDependencies spelled ./patches/ms@2.1.3.patch with the file present: does bun accept the ./ spelling and write it as given?

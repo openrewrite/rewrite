@@ -29,6 +29,7 @@ import org.openrewrite.javascript.internal.lock.npm.Host;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -237,11 +238,7 @@ public final class BunLockRegenerator {
                 throw new Rejected(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": " + (error == null ?
                         "the lock is empty" : error.error + ": " + error.getMessage().split("\n", 2)[0]));
             }
-            for (String patch : install.getLockfile().patchedDependencies.values()) {
-                if (!these.getFiles().contains(patch)) {
-                    throw new PackageManager.CannotKnow("patch file " + patch + " (not among the project's files)");
-                }
-            }
+            requirePatchFiles(these, install.getLockfile());
             install.getManager().resolve(install.getPackagesBefore());
         } catch (IllegalArgumentException e) {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
@@ -268,6 +265,19 @@ public final class BunLockRegenerator {
             throw new Rejected(Reason.RESOLUTION_REQUIRED, null, DELETES_LOCK);
         }
         return written;
+    }
+
+    // bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
+    private static void requirePatchFiles(Inputs inputs, Lockfile lockfile) {
+        Set<String> files = new HashSet<>();
+        for (String file : inputs.getFiles()) {
+            files.add(PosixPaths.normalize(file));
+        }
+        for (String patch : lockfile.patchedDependencies.values()) {
+            if (!files.contains(PosixPaths.normalize(patch))) {
+                throw new PackageManager.CannotKnow("patch file " + patch + " (not among the project's files)");
+            }
+        }
     }
 
     private static Reason reasonFor(List<String> errors) {

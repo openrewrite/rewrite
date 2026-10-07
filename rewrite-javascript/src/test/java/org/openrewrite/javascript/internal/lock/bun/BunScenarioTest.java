@@ -222,7 +222,7 @@ class BunScenarioTest {
                 break;
             case "cannot-know":
                 ok = failure.getDetail().startsWith(BunLockRegenerator.CANNOT_KNOW) &&
-                     failure.getDetail().contains(rest.split(":| of ", 2)[0]);
+                     failure.getDetail().contains(rest);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK;

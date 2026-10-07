@@ -1,0 +1,1 @@
+frozenLockfile in the edit phase; the edit removes the root dependency is-number: fewer hoisted placements, so bun refuses (lockfile had changes, but lockfile is frozen)?
