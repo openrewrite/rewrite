@@ -1706,5 +1706,61 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('a type parameter of the import\'s name is not a use of it', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "T"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {T} from 'm';
+
+                        function f<T>(x: T): T {
+                            return x;
+                        }
+                    `,
+                    `
+                        function f<T>(x: T): T {
+                            return x;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a value and a type of one name hide only the uses that read their own kind', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "X"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        function f() {
+                            interface X {}
+                            return X.go();
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        function f() {
+                            const X = 1;
+                            let y: X;
+                        }
+                    `
+                )
+            );
+        });
     });
 });

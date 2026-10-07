@@ -21,6 +21,7 @@ import {
     isValueReference,
     namesDeclaredIn,
     namesDeclaredWithin,
+    namesReferencedWithin,
     namesUsedWithin,
     Scope,
     scopeOf,
@@ -228,6 +229,37 @@ describe('scopeOf', () => {
         expect(reachable.declaringScope('B')?.kind).toBe(JS.Kind.CompilationUnit);
     });
 
+    test('a value reference is shadowed by a value, not by a type of the same name', async () => {
+        const scope = await scopeAtAnchor(`
+            import type {Imported} from 'm';
+            import {type Specified} from 'm';
+            interface Object {}
+            type Math = {};
+            interface Merged {}
+            const Merged = 1;
+            anchor();
+        `);
+        // A binding still collides with a type of the same name, so every kind counts unless asked otherwise.
+        expect(scope.declares('Object')).toBe(true);
+        expect(scope.declares('Object', 'type')).toBe(true);
+        expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, 'value')))
+            .toEqual([]);
+        expect(scope.declares('Merged', 'value')).toBe(true);
+        expect(scope.declaringScope('Object', 'value')).toBeUndefined();
+    });
+
+    test('an object or type literal binds none of its members, around it or inside it', async () => {
+        expect(await namesAtAnchor(`const o = { foo() { anchor(); }, get bar() { return 1; } };`))
+            .toEqual(['o']);
+        expect(await namesAtAnchor(`
+            function f() {
+                g({ method() {} });
+                type T = { property: string; signature(): void };
+                anchor();
+            }
+        `)).toEqual(['T', 'f']);
+    });
+
     test('a var belongs to the function it sits in, a let to the block', async () => {
         const hoisting = await scopeAtAnchor(`function f(p) { var p = 1; anchor(); }`);
         expect(hoisting.declaringScope('p')?.kind).toBe(J.Kind.MethodDeclaration);
@@ -279,12 +311,84 @@ describe('namesDeclaredIn', () => {
         `))].sort()).toEqual(['K', 'bound', 'local', 'param']);
     });
 
+    test('an object or type literal member is reached through a value, so its name is not the file\'s', async () => {
+        expect([...namesDeclaredIn(await parse(`
+            const o = {
+                undefined() { const local = 1; },
+                get getter() { return 1; }
+            };
+            let t: { undefined: string; signature(): void };
+        `))].sort()).toEqual(['local', 'o', 't']);
+    });
+
     test('a type parameter is a name that shadows, so the file declares it', async () => {
         expect([...namesDeclaredIn(await parse(`
             import {Node} from 'm';
             function sortKeys<Bound extends Node>(node: Bound) {}
             class Holder<Owned> {}
         `))].sort()).toEqual(['Bound', 'Holder', 'Node', 'Owned', 'node', 'sortKeys'].sort());
+    });
+});
+
+describe('namesReferencedWithin', () => {
+    test('a value hides only value reads of its name, a type only type reads', async () => {
+        // A name declared in the kind its use does not read reaches past it, one in the same kind does not.
+        const fn = (await parse(`
+            function f() {
+                const Cast = 1, Satisfied = 1, Argument = 1, Implemented = 1, Asserted = 1;
+                const Aliased = 1, Indexed = 1, ClassIndexed = 1, Bound = 1, Key = 1;
+                type Computed = 1;
+                const SameValue = 1;
+                interface SameType {}
+                interface Queried {}
+                x as Cast;
+                x satisfies Satisfied;
+                g<Argument>();
+                class K implements Implemented {}
+                <Asserted>x;
+                let q: typeof Queried;
+                type A = Aliased;
+                interface I { [key: number]: Indexed }
+                function h<P extends Bound>() {}
+                class C { [k: string]: ClassIndexed }
+                let m: { [Computed]: Key };
+                SameValue;
+                let s: SameType;
+                function isBound(subject: unknown): subject is Bound { return true; }
+            }
+        `)).statements[0].element;
+
+        const referenced = [...namesReferencedWithin(fn)];
+        expect(referenced).toEqual(expect.arrayContaining([
+            'Aliased', 'Argument', 'Asserted', 'Bound', 'Cast', 'ClassIndexed', 'Computed', 'Implemented',
+            'Indexed', 'Key', 'Queried', 'Satisfied'
+        ]));
+        expect(referenced).not.toContain('SameValue');
+        expect(referenced).not.toContain('SameType');
+        expect(referenced).not.toContain('subject');
+    });
+
+    test('a type parameter binds across the declaration carrying it, for type reads alone', async () => {
+        const statements = (await parse(`
+            function f<Fn>(x: Fn): Fn { let y: Fn; return x; }
+            class K<Cls> extends Base<Cls> implements I<Cls> { x: Cls; m(): Cls { return this.x; } }
+            type A<Alias> = Alias[];
+            const g = <Arrow,>(x: Arrow): Arrow => x;
+            type F = <FnType>(x: FnType) => FnType;
+            type M<Keys extends string> = {[Mapped in Keys as \`x\${Mapped}\`]: Mapped};
+            type U<T> = T extends Promise<infer Inferred> ? Inferred : never;
+            type V<T> = T extends Promise<infer Hidden> ? never : Hidden;
+            type W = Checked extends Promise<infer Checked> ? never : never;
+            function w<Value>() { return Value; }
+        `)).statements;
+
+        const referenced = [...namesReferencedWithin(statements)];
+        for (const name of ['Fn', 'Cls', 'Alias', 'Arrow', 'FnType', 'Keys', 'Mapped', 'Inferred']) {
+            expect(referenced).not.toContain(name);
+        }
+        // An `infer` name reaches neither the check type nor the false branch, and a type parameter
+        // binds no value.
+        expect(referenced).toEqual(expect.arrayContaining(['Hidden', 'Checked', 'Value']));
     });
 });
 
