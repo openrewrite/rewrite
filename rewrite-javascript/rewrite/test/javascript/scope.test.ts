@@ -353,6 +353,7 @@ describe('namesReferencedWithin', () => {
                 let m: { [Computed]: Key };
                 SameValue;
                 let s: SameType;
+                function isBound(subject: unknown): subject is Bound { return true; }
             }
         `)).statements[0].element;
 
@@ -363,6 +364,7 @@ describe('namesReferencedWithin', () => {
         ]));
         expect(referenced).not.toContain('SameValue');
         expect(referenced).not.toContain('SameType');
+        expect(referenced).not.toContain('subject');
     });
 });
 

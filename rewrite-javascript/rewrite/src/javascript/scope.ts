@@ -21,7 +21,7 @@ import type {JavaScriptVisitor} from "./visitor";
 
 const noNames: ReadonlySet<string> = new Set();
 
-/** The declarations a lookup counts: every one, or those binding a value or a type of the name. */
+/** Which declarations a lookup counts. */
 type Meaning = 'all' | 'value' | 'type';
 
 /** One scope: the names it binds itself, the scopes around it, and what they answer together. */
@@ -43,10 +43,9 @@ export interface Scope {
     declares(name: string, options?: { values?: boolean }): boolean;
 
     /**
-     * The node owning the innermost scope that binds `name` — the compilation unit for a
-     * module-scope binding, otherwise the function, block or loop holding it — or undefined where
-     * nothing in scope does. A caller holding a declaration asks whether this is the node it came
-     * from: anything nearer shadows it. `values` is as for `declares`.
+     * The node owning the innermost scope that binds `name`, or undefined. A caller holding a
+     * declaration compares this to the node it came from, since anything nearer shadows it.
+     * `values` is as for `declares`.
      */
     declaringScope(name: string, options?: { values?: boolean }): J | undefined;
 }
@@ -70,9 +69,13 @@ function scopeAt(cursor: Cursor): Scope {
                 }
             }
         },
-        declares: (name, options) => declaringScopeOf(cursor, name, options?.values ? 'value' : 'all') !== undefined,
-        declaringScope: (name, options) => declaringScopeOf(cursor, name, options?.values ? 'value' : 'all')
+        declares: (name, options) => declaringScopeOf(cursor, name, meaningAsked(options)) !== undefined,
+        declaringScope: (name, options) => declaringScopeOf(cursor, name, meaningAsked(options))
     };
+}
+
+function meaningAsked(options: { values?: boolean } | undefined): Meaning {
+    return options?.values ? 'value' : 'all';
 }
 
 function enclosingScopeCursor(from: Cursor | undefined): Cursor | undefined {
@@ -166,8 +169,8 @@ export function namesDeclaredWithin(node: unknown, cacheKey: object = node as ob
 /**
  * The names `node` reads and nothing within it binds, so each one reaches a binding further out.
  * A name its parent introduces rather than reads is not one, nor is a name an inner scope rebinds:
- * that reference reads the rebinding. A value position reads only a value and a type position only
- * a type, so only a rebinding of the kind read counts.
+ * that reference reads the rebinding. A value position is hidden only by a value binding, a type
+ * position only by a type.
  */
 export function namesReferencedWithin(node: unknown, cacheKey: object = node as object): ReadonlySet<string> {
     if (cacheKey === null || typeof cacheKey !== 'object') {
@@ -191,9 +194,9 @@ interface Frames {
 }
 
 /** Whether a scope between the name and where the walk began binds it. */
-function shadowed(scopes: Frames | undefined, name: string, position: Meaning): boolean {
+function shadowed(scopes: Frames | undefined, name: string, meaning: Meaning): boolean {
     for (let scope = scopes; scope; scope = scope.outer) {
-        if (frameBindings(scope.node, scope.parent, position).has(name)) {
+        if (frameBindings(scope.node, scope.parent, meaning).has(name)) {
             return true;
         }
     }
@@ -201,39 +204,36 @@ function shadowed(scopes: Frames | undefined, name: string, position: Meaning): 
 }
 
 function collectReferences(
-    node: unknown, parent: unknown, scopes: Frames | undefined, names: Set<string>, position: Meaning = 'value'
+    node: unknown, parent: unknown, scopes: Frames | undefined, names: Set<string>, meaning: Meaning = 'value'
 ): void {
     if (Array.isArray(node)) {
-        node.forEach(child => collectReferences(child, parent, scopes, names, position));
+        node.forEach(child => collectReferences(child, parent, scopes, names, meaning));
         return;
     }
     const kind = (node as { kind?: string } | undefined)?.kind;
     if (kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded) {
         // A naming position reads against the tree parent, so padding forwards the one it was handed.
-        collectReferences((node as J.RightPadded<any>).element, parent, scopes, names, position);
+        collectReferences((node as J.RightPadded<any>).element, parent, scopes, names, meaning);
         return;
     }
     if (kind === J.Kind.Container) {
-        collectReferences((node as J.Container<any>).elements, parent, scopes, names, position);
+        collectReferences((node as J.Container<any>).elements, parent, scopes, names, meaning);
         return;
     }
     if (!isTree(node)) {
         return;
     }
     const name = kind === J.Kind.Identifier ? (node as J.Identifier).simpleName : undefined;
-    if (name && reads(node as J.Identifier, parent) && !shadowed(scopes, name, position)) {
+    if (name && reads(node as J.Identifier, parent) && !shadowed(scopes, name, meaning)) {
         names.add(name);
     }
     const within = scopeKinds.has(kind!) ? {node, parent, outer: scopes} : scopes;
     Object.entries(node as object).forEach(([key, value]) =>
-        key !== 'markers' && collectReferences(value, node, within, names, positionOf(node, key, position)));
+        key !== 'markers' && collectReferences(value, node, within, names, meaningOf(node, key, meaning)));
 }
 
-/**
- * Whether the slot `key` of `node` holds a value or a type, `position` being where `node` sits.
- * A slot left unlisted keeps its parent's position.
- */
-function positionOf(node: any, key: string, position: Meaning): Meaning {
+/** What a reference in slot `key` of `node` reads, given what `node` itself reads. */
+function meaningOf(node: any, key: string, meaning: Meaning): Meaning {
     if (key === 'typeParameters' || key === 'typeArguments') {
         return 'type';
     }
@@ -244,25 +244,28 @@ function positionOf(node: any, key: string, position: Meaning): Meaning {
             return 'type';
         case JS.Kind.TypeQuery:
             // `typeof x` reads the value `x` from within a type.
-            return key === 'typeExpression' ? 'value' : position;
+            return key === 'typeExpression' ? 'value' : meaning;
+        case JS.Kind.TypePredicate:
+            // `x is Foo` names the parameter `x`, a value, from within a return type.
+            return key === 'parameterName' ? 'value' : meaning;
         case JS.Kind.ComputedPropertyName:
             // `[key]` reads the value `key`, in a type member as much as in an object literal.
             return 'value';
         case JS.Kind.IndexSignatureDeclaration:
-            return key === 'typeExpression' ? 'type' : position;
+            return key === 'typeExpression' ? 'type' : meaning;
         case JS.Kind.As:
-            return key === 'right' ? 'type' : position;
+            return key === 'right' ? 'type' : meaning;
         case JS.Kind.SatisfiesExpression:
-            return key === 'satisfiesType' ? 'type' : position;
+            return key === 'satisfiesType' ? 'type' : meaning;
         case J.Kind.TypeCast:
-            return key === 'class' ? 'type' : position;
+            return key === 'class' ? 'type' : meaning;
         case J.Kind.ClassDeclaration:
             if ((node as J.ClassDeclaration).classKind.type === J.ClassDeclaration.Kind.Type.Interface) {
                 return 'type';
             }
-            return key === 'implements' ? 'type' : position;
+            return key === 'implements' ? 'type' : meaning;
         default:
-            return position;
+            return meaning;
     }
 }
 
@@ -526,6 +529,7 @@ function byMeaning(): Record<Meaning, WeakMap<object, ReadonlySet<string>>> {
  * or `using` keyword says otherwise.
  */
 function hoistedNames(scope: any, meaning: Meaning): string[] {
+    // Only `var` and function declarations hoist, and both bind values, so one cache serves every meaning.
     if (meaning === 'type' || typeof scope !== 'object' || scope === null) {
         return [];
     }
