@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
- * Unit tests for the closure resolver pnpm, Yarn and Bun share, driven by an in-memory {@link Registry} (no network).
+ * Unit tests for the closure resolver pnpm and Yarn share, driven by an in-memory {@link Registry} (no network).
  */
 class GraphBuilderTest {
 

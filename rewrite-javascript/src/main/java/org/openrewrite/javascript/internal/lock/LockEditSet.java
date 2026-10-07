@@ -108,22 +108,14 @@ public class LockEditSet {
         @Builder.Default
         Kind kind = Kind.BUMP;
 
-        /** The dependent a nested copy sits under; set for an {@code ADD}'s nested variant and for {@code REVERSE_NEST}. */
-        @Nullable
-        String nestedUnder;
-
         /** The bump dropped one or more edges: drop them from this entry, then GC whatever they leave unreachable. */
         boolean prunesOrphans;
 
-        /** An add-during-bump: this bump's entry gains new dependency edges whose subtrees are placed as fresh ADDs. */
-        boolean addsDependencyEdges;
-
         /**
-         * ADD is a brand-new dependency; ADD with a {@link #nestedUnder} is a fresh nested add. FORCED_MOVE is a
-         * transitive a bump pushes to a new version; CONTENT_FORK is pnpm's non-nesting fork; PROMOTION reuses an
-         * already-installed transitive; REVERSE_NEST relocates a pre-edit entry under a dependent.
+         * ADD is a brand-new dependency. FORCED_MOVE is a transitive a bump pushes to a new version; CONTENT_FORK is
+         * pnpm's non-nesting fork; PROMOTION reuses an already-installed transitive.
          */
-        public enum Kind { BUMP, ADD, PROMOTION, FORCED_MOVE, CONTENT_FORK, REVERSE_NEST }
+        public enum Kind { BUMP, ADD, PROMOTION, FORCED_MOVE, CONTENT_FORK }
     }
 
     /**

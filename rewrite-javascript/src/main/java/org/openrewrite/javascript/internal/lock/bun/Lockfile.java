@@ -24,7 +24,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
-import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
  * Port of bun's src/install/lockfile.zig (bun 1.3.10): the packages, the dependency buffer and the resolution

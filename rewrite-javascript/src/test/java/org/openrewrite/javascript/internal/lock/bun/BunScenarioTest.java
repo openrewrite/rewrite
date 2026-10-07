@@ -202,7 +202,8 @@ class BunScenarioTest {
                 failed(label, http, "failed", thrown, " expected bun's lock but regeneration failed: " + thrown);
             }
             if (!after.equals(result.getLockFileContent())) {
-                failed(label, http, "mismatch", firstDifference(after, String.valueOf(result.getLockFileContent())), "");
+                String actual = String.valueOf(result.getLockFileContent());
+                failed(label, http, "mismatch", firstDifference(after, actual), "");
                 assertThat(result.getLockFileContent()).as(label + http.describe()).isEqualTo(after);
             }
             record(label, "exact", http.describe().trim());

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
@@ -22,7 +23,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.json.tree.Json;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -40,9 +43,36 @@ public final class NodeDependencyScan {
     private NodeDependencyScan() {
     }
 
+    private static final List<String> PACKAGE_MANAGER_FILES = Arrays.asList(
+            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml");
+
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
+        public final Map<Path, String> packageManagerFiles = new HashMap<>();
+    }
+
+    /**
+     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path.
+     */
+    @Value
+    public static class ProjectFiles {
+        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap());
+
+        Map<Path, String> manifests;
+        Map<Path, String> packageManagerFiles;
+    }
+
+    /**
+     * Keep a package manager's configuration file the scan visits; true when {@code sf} is one.
+     */
+    public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
+        Path name = sf.getSourcePath().getFileName();
+        if (name == null || !PACKAGE_MANAGER_FILES.contains(name.toString())) {
+            return false;
+        }
+        acc.packageManagerFiles.put(sf.getSourcePath(), sf.printAll());
+        return true;
     }
 
     public static final class ProjectState {
@@ -119,6 +149,30 @@ public final class NodeDependencyScan {
             }
         }
         return manifests;
+    }
+
+    /**
+     * {@link #projectManifests} and the package-manager files beside any of them.
+     */
+    public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
+        Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
+        Set<Path> directories = new LinkedHashSet<>();
+        for (Path manifest : manifests.keySet()) {
+            directories.add(directory(manifest));
+        }
+        directories.add(directory(packageJsonPath));
+        Map<Path, String> files = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : acc.packageManagerFiles.entrySet()) {
+            if (directories.contains(directory(file.getKey()))) {
+                files.put(file.getKey(), file.getValue());
+            }
+        }
+        return new ProjectFiles(manifests, files);
+    }
+
+    private static Path directory(Path file) {
+        Path parent = file.normalize().getParent();
+        return parent == null ? Paths.get("") : parent;
     }
 
     private static String print(ExecutionContext ctx, Path path, ProjectState ps) {

@@ -26,7 +26,7 @@ import java.util.Map;
  * The resolved dependency closure, a plain value model {@link GraphBuilder} produces and each package
  * manager's serializer consumes. It captures <em>what</em> was resolved — the workspace importers with their
  * declared and resolved edges, and every distinct {@code name@version} node with its own resolved edges — but
- * not <em>where</em> anything is placed. Layout (bun hoisting, pnpm content-addressing, yarn descriptors) is
+ * not <em>where</em> anything is placed. Layout (pnpm content-addressing, yarn descriptors) is
  * computed from this graph by each serializer.
  */
 @Value

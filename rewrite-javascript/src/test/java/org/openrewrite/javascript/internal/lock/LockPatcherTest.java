@@ -16,13 +16,9 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.LockEditSet.PackageEdit;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
-import org.openrewrite.json.JsonParser;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -37,8 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Byte-exact golden tests for the yarn-classic / bun / yarn-berry patchers. Each golden was recorded from the
- * real package manager (yarn 1.22.22, bun 1.3.10, corepack yarn@4) for a closure-unchanged edit; the patcher
+ * Byte-exact golden tests for the yarn-classic / yarn-berry patchers. Each golden was recorded from the
+ * real package manager (yarn 1.22.22, corepack yarn@4) for a closure-unchanged edit; the patcher
  * is invoked directly and its output asserted equal to the recorded {@code after} lock, byte for byte.
  */
 class LockPatcherTest {
@@ -139,85 +135,6 @@ class LockPatcherTest {
 
         assertThat(new YarnClassicLockPatcher().patch(edits))
                 .isEqualTo(resource("/lock/yarn-classic/remove/after"));
-    }
-
-    // --- bun -----------------------------------------------------------------
-
-    @Test
-    void bunLockRoundTripsByteExact() {
-        String before = resource("/lock/bun/inplace/before");
-        Parser.Input input = Parser.Input.fromString(Paths.get("bun.lock"), before);
-        SourceFile sf = JsonParser.builder().build()
-                .parseInputs(singletonList(input), null, new InMemoryExecutionContext())
-                .findFirst()
-                .orElseThrow(IllegalStateException::new);
-        assertThat(sf.printAll()).isEqualTo(before);
-    }
-
-    @Test
-    void bunInPlaceBump() {
-        PackageEdit edit = PackageEdit.builder()
-                .name("is-odd")
-                .oldVersion("3.0.0")
-                .newVersion("3.0.1")
-                .oldConstraint("3.0.0")
-                .newIntegrity("sha512-CQpnWPrDwmP1+SMHXZhtLtJv90yiyVfluGsX5iNCVkrhQtU3TQHsUWPG9wkdk9Lgd5yNpAg9jQEo90CBaXgWMA==")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/bun/inplace/before"),
-                Paths.get("bun.lock"),
-                PackageManager.Bun,
-                resource("/lock/bun/inplace/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new BunLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/bun/inplace/after"));
-    }
-
-    @Test
-    void bunRemoveLeaf() {
-        PackageEdit edit = PackageEdit.builder()
-                .name("left-pad")
-                .oldVersion("1.3.0")
-                .newVersion(null)
-                .oldConstraint("1.3.0")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/bun/remove/before"),
-                Paths.get("bun.lock"),
-                PackageManager.Bun,
-                resource("/lock/bun/remove/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new BunLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/bun/remove/after"));
-    }
-
-    @Test
-    void bunNonLeafRemovalGCsPrivateTransitiveByteExact() {
-        // Removing debug (non-leaf) must also drop its now-orphaned private transitive ms; golden recorded
-        // from a real `bun install --lockfile-only` (bun 1.3.10).
-        PackageEdit edit = PackageEdit.builder()
-                .name("debug")
-                .oldVersion("4.3.4")
-                .newVersion(null)
-                .oldConstraint("4.3.4")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/bun/remove-nonleaf/before"),
-                Paths.get("bun.lock"),
-                PackageManager.Bun,
-                resource("/lock/bun/remove-nonleaf/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new BunLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/bun/remove-nonleaf/after"));
     }
 
     // --- yarn berry (parse-only, fail loud) ----------------------------------

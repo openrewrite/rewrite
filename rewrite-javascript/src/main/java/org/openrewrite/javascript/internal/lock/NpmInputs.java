@@ -25,6 +25,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -38,9 +39,24 @@ final class NpmInputs {
     }
 
     static Inputs from(Request request, Host host, Instant now) {
-        Path packageJsonPath = request.getPackageJsonPath() == null ? Paths.get("package.json") :
-                request.getPackageJsonPath();
-        String dir = directory(packageJsonPath);
+        String rootDir = rootDirectory(request);
+        Path rootName = Paths.get(rootDir).getFileName();
+        return Inputs.builder()
+                .lock(request.getLock())
+                .npmrc(projectNpmrc(request.getMarker()))
+                .host(host)
+                .now(now)
+                .directoryName(rootDir.isEmpty() || rootName == null ? null : rootName.toString())
+                .manifests(manifests(request, rootDir))
+                .build();
+    }
+
+    /**
+     * The lock's directory: that of the topmost manifest given that contains the edited one, else the edited
+     * manifest's own.
+     */
+    static String rootDirectory(Request request) {
+        String dir = directory(packageJsonPath(request));
         String rootDir = dir;
         for (Path path : request.getManifests().keySet()) {
             String candidate = directory(path);
@@ -48,22 +64,27 @@ final class NpmInputs {
                 rootDir = candidate;
             }
         }
-        Path rootName = Paths.get(rootDir).getFileName();
-        Inputs.InputsBuilder inputs = Inputs.builder()
-                .lock(request.getLock())
-                .npmrc(projectNpmrc(request.getMarker()))
-                .host(host)
-                .now(now)
-                .directoryName(rootDir.isEmpty() || rootName == null ? null : rootName.toString());
-        for (Map.Entry<Path, String> manifest : request.getManifests().entrySet()) {
-            inputs.manifest(location(rootDir, directory(manifest.getKey())), manifest.getValue());
-        }
-        inputs.manifest(location(rootDir, dir), request.getPackageJson());
-        return inputs.build();
+        return rootDir;
     }
 
-    private static String directory(Path manifest) {
-        Path dir = manifest.normalize().getParent();
+    /**
+     * The manifests by location relative to the lock's directory, the edited one last.
+     */
+    static Map<String, String> manifests(Request request, String rootDir) {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> manifest : request.getManifests().entrySet()) {
+            manifests.put(location(rootDir, directory(manifest.getKey())), manifest.getValue());
+        }
+        manifests.put(location(rootDir, directory(packageJsonPath(request))), request.getPackageJson());
+        return manifests;
+    }
+
+    private static Path packageJsonPath(Request request) {
+        return request.getPackageJsonPath() == null ? Paths.get("package.json") : request.getPackageJsonPath();
+    }
+
+    static String directory(Path file) {
+        Path dir = file.normalize().getParent();
         return dir == null ? "" : dir.toString().replace('\\', '/');
     }
 
@@ -77,7 +98,7 @@ final class NpmInputs {
     }
 
     // only the project's own npmrc is an input
-    private static @Nullable String projectNpmrc(@Nullable NodeResolutionResult marker) {
+    static @Nullable String projectNpmrc(@Nullable NodeResolutionResult marker) {
         if (marker == null || marker.getNpmrcConfigs() == null) {
             return null;
         }

@@ -281,7 +281,8 @@ final class PackageManager {
     private static String resolveErrorMessage(ResolveError.Kind kind, String name, DependencyVersion version) {
         switch (kind) {
             case DIST_TAG_NOT_FOUND:
-                return "Package \"" + name + "\" with tag \"" + version.distTag().tag + "\" not found, but package exists";
+                return "Package \"" + name + "\" with tag \"" + version.distTag().tag +
+                       "\" not found, but package exists";
             case NO_MATCHING_VERSION:
                 return "No version matching \"" + version.literal + "\" found for specifier \"" + name +
                        "\" (but package exists)";
@@ -372,7 +373,8 @@ final class PackageManager {
                         resTag == Resolution.Tag.GIT && verTag == DependencyVersion.Tag.GIT ||
                         resTag == Resolution.Tag.GITHUB && verTag == DependencyVersion.Tag.GITHUB) {
                         Package existing = lockfile.packages.get(first);
-                        log.addWarning("incorrect peer dependency \"" + existing.name + "@" + existing.resolution + "\"");
+                        log.addWarning("incorrect peer dependency \"" + existing.name + "@" + existing.resolution +
+                                       "\"");
                         assignResolution(dependencyId, first);
                         return new ResolvedPackageResult(lockfile.packages.get(first), false);
                     }

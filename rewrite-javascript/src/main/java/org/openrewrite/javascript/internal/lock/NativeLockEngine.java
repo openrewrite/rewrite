@@ -29,6 +29,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
+import org.openrewrite.javascript.internal.lock.bun.ManifestSource;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
@@ -66,7 +68,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
  * Native lock regeneration, by package manager. npm goes through {@link NpmLockRegenerator}: the ported
- * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. pnpm, Yarn and Bun
+ * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. Bun goes through
+ * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model. pnpm and Yarn
  * take the per-dependency flow below until each follows its own resolver: diff the pre-edit and post-edit
  * {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
  * version against the registry, and hand a proven {@link LockEditSet} to the format's {@link LockPatcher};
@@ -78,7 +81,7 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  */
 public final class NativeLockEngine {
 
-    // Bun's lock is JSONC (trailing commas, // comments); package.json is strict JSON, so this mapper reads both.
+    // lenient: trailing commas and // comments are read too
     private static final ObjectMapper JSON = JsonMapper.builder()
             .enable(JsonReadFeature.ALLOW_TRAILING_COMMA)
             .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
@@ -124,6 +127,9 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Npm) {
                 return regenerateNpm(request, ctx);
             }
+            if (pm == PackageManager.Bun) {
+                return regenerateBun(request, ctx);
+            }
             return doRegenerate(pm, request.getPackageJson(), request.getOriginalPackageJson(), request.getLock(),
                     request.getMarker(), request.getPackageJsonPath(), ctx);
         } catch (EngineFailure ef) {
@@ -146,13 +152,23 @@ public final class NativeLockEngine {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         PackumentSource packuments = new RegistryPackuments(registries, view.getRegistryClient());
-        Host host = Host.builder()
+        return new NpmLockRegenerator(NpmInputs.from(request, host(view), Instant.now()), packuments).regenerate();
+    }
+
+    private static Result regenerateBun(Request request, ExecutionContext ctx) {
+        NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
+        ManifestSource manifests = new BunRegistryManifests(registries, view.getRegistryClient());
+        return new BunLockRegenerator(BunInputs.from(request, host(view), Instant.now()), manifests).regenerate();
+    }
+
+    private static Host host(NodeExecutionContextView view) {
+        return Host.builder()
                 .nodeVersion(view.getNodeVersion())
                 .os(view.getOs())
                 .cpu(view.getCpu())
                 .libc(view.getLibc())
                 .build();
-        return new NpmLockRegenerator(NpmInputs.from(request, host, Instant.now()), packuments).regenerate();
     }
 
     private static Result doRegenerate(PackageManager pm,
@@ -253,9 +269,6 @@ public final class NativeLockEngine {
             }
             if (pm == PackageManager.YarnBerry) {
                 return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
-            }
-            if (pm == PackageManager.Bun) {
-                return resolveAndPatchBun(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
             return resolveAndPatchYarnClassic(editedPackageJson, existingLock, packageJsonPath, registries, client);
         } catch (NodeRegistryException nre) {
@@ -374,53 +387,9 @@ public final class NativeLockEngine {
     }
 
     /**
-     * Resolve the closure seeded by the existing bun.lock (bun keeps a satisfying locked version but does not
-     * auto-install missing peers), diff the graph against the lock, and patch only the difference.
-     */
-    private static Result resolveAndPatchBun(String editedPackageJson, String existingLock,
-                                             @Nullable Path packageJsonPath, NodeRegistries registries,
-                                             NpmRegistryClient client) {
-        Registry registry = new RegistryAdapter(registries, client);
-        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsBun(existingLock))
-                .build(singletonMap("", editedPackageJson));
-        List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
-        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),
-                PackageManager.Bun, editedPackageJson, edits);
-        return Result.success(new BunLockPatcher().patch(editSet));
-    }
-
-    /** The versions the bun.lock already installs, keyed by tree-slot name (the key's last package segment). */
-    private static Map<String, Set<String>> lockedVersionsBun(String lock) {
-        Map<String, Set<String>> locked = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
-            List<?> tuple = tupleOf(e.getValue());
-            if (tuple != null && !tuple.isEmpty() && tuple.get(0) instanceof String) {
-                String locator = (String) tuple.get(0);
-                int at = locator.lastIndexOf('@');
-                if (at > 0) {
-                    locked.computeIfAbsent(bunSlotName(e.getKey()), k -> new LinkedHashSet<>())
-                            .add(locator.substring(at + 1));
-                }
-            }
-        }
-        return locked;
-    }
-
-    /** The package name a bun {@code packages} key addresses: its last path segment, {@code @scope/}-aware. */
-    private static String bunSlotName(String key) {
-        int lastSlash = key.lastIndexOf('/');
-        if (lastSlash < 0) {
-            return key;
-        }
-        int prevSlash = key.lastIndexOf('/', lastSlash - 1);
-        String tail = key.substring(prevSlash + 1);
-        return tail.startsWith("@") ? tail : key.substring(lastSlash + 1);
-    }
-
-    /**
      * Whether the project has more than the single root importer whole-closure resolution reproduces. A workspace root manifest
-     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}, bun
-     * workspace importer entries, berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
+     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers},
+     * berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
      * a manifest in a sub-directory is treated as a member conservatively.
      */
     private static boolean isMultiPackageProject(PackageManager pm, String editedManifest, String lock,
@@ -448,8 +417,6 @@ public final class NativeLockEngine {
 
     private static boolean multiImporterLock(PackageManager pm, String lock) {
         switch (pm) {
-            case Bun:
-                return bunImporterCount(lock) > 1;
             case Pnpm:
                 return pnpmImporterKeys(lock).size() > 1;
             case YarnBerry:
@@ -457,20 +424,6 @@ public final class NativeLockEngine {
             default:
                 return false; // yarn classic: flat lock, no importer sections to count
         }
-    }
-
-    private static int bunImporterCount(String lock) {
-        Object entries = parseJsonObject(lock, false).get("workspaces");
-        if (!(entries instanceof Map)) {
-            return 0;
-        }
-        int count = 0;
-        for (Object importer : ((Map<?, ?>) entries).values()) {
-            if (importer instanceof Map) {
-                count++;
-            }
-        }
-        return count;
     }
 
     private static int berryWorkspaceHeaderCount(String lock) {
@@ -561,8 +514,8 @@ public final class NativeLockEngine {
 
         // A member-declared bump must own its registry entry alone: if a sibling workspace importer declares the
         // same dependency at the same range, they share one lock entry, so re-heading it would break the sibling.
-        if ((pm == PackageManager.YarnBerry || pm == PackageManager.Bun) &&
-                importersDeclaring(pm, existingLock, name, change.oldConstraint) > 1) {
+        if (pm == PackageManager.YarnBerry &&
+                importersDeclaring(existingLock, name, change.oldConstraint) > 1) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " is declared by multiple workspace importers; a per-member bump would fork (deferred)");
         }
@@ -592,9 +545,7 @@ public final class NativeLockEngine {
         // A reverse-dependent whose recorded constraint excludes the new version keeps the old version nested
         // under itself; the safe single-leaf slice resolves it, everything else defers.
         List<LockEditSet.PackageEdit> nestEdits;
-        if (pm == PackageManager.Bun) {
-            nestEdits = planReverseDependentNestsBun(name, oldVersion, targetVersion, existingLock, registries, client);
-        } else if (pm == PackageManager.Pnpm) {
+        if (pm == PackageManager.Pnpm) {
             // pnpm never nests; a reverse-dependent that keeps the old version becomes a content-fork that
             // replaces the whole bump (add the new content, retain the old), so it returns early when it fires.
             List<LockEditSet.PackageEdit> fork =
@@ -620,7 +571,7 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, both yarns, bun).
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, both yarns).
         boolean prunesOrphans = dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
@@ -640,8 +591,6 @@ public final class NativeLockEngine {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
                 edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
-            } else if (pm == PackageManager.Bun) {
-                edits.addAll(cascadeForcedMovesBun(name, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -943,10 +892,6 @@ public final class NativeLockEngine {
                 // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
                 // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
                 return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
-            case Bun:
-                // bun hoists: one packages tuple per member, failing loud on any conflict/nest (bun's
-                // parent/name fork keys).
-                return resolveClosureAddBun(change, rootName, rootConstraint, existingLock, registries, client);
             case YarnClassic:
             case YarnBerry:
                 // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
@@ -956,45 +901,6 @@ public final class NativeLockEngine {
             default:
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
         }
-    }
-
-    /**
-     * A closure member an incompatible top-level pin excludes: nest it at {@code "<parent>/<name>"}. Safe slice
-     * only: the requirer is freshly placed, some requirer pins the top-level version exactly (so bun forks rather
-     * than cascades), and the nested version is a leaf.
-     */
-    private static void nestUnderParentBun(Requirement req, String existingVersion, Map<String, Placement> placed,
-                                           Map<String, NestedPlacement> nested, String existingLock,
-                                           NodeRegistries registries, NpmRegistryClient client) {
-        if (req.parent == null || !placed.containsKey(req.parent) ||
-                !topLevelPinnedBun(existingLock, req.name, existingVersion)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name + " is already placed at " +
-                    existingVersion + " which does not satisfy " + req.constraint + " (bun would nest/move it; deferred)");
-        }
-        String nestKey = req.parent + "/" + req.name;
-        NestedPlacement already = nested.get(nestKey);
-        if (already != null) {
-            if (existingSatisfies(already.version, req.constraint)) {
-                return;
-            }
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                    req.name + " is required at two incompatible versions under " + req.parent + "; deferred");
-        }
-
-        NodeRegistry registry = registries.registryFor(req.name);
-        String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-        VersionManifest manifest = client.getManifest(registry, req.name, version);
-        if (notEmpty(manifest.getDependencies()) || notEmpty(manifest.getOptionalDependencies())) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name,
-                    "nesting " + req.name + " under " + req.parent + " pulls its own transitives (non-leaf); deferred");
-        }
-        requireEmittableBunClosureMember(req.name, manifest);
-        VersionManifest.Dist dist = manifest.getDist();
-        if (dist == null || dist.getIntegrity() == null) {
-            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                    req.name + "@" + version + " has no registry integrity");
-        }
-        nested.put(nestKey, new NestedPlacement(req.parent, req.name, version, manifest, req.dev));
     }
 
     /**
@@ -1048,7 +954,7 @@ public final class NativeLockEngine {
             }
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -1072,146 +978,6 @@ public final class NativeLockEngine {
         return edits;
     }
 
-    /**
-     * A direct dependency the recipe added, plus its runtime closure, into a {@code bun.lock}. bun hoists like
-     * npm, so the closure resolution matches {@link #resolveClosureAdd}, failing loud on any placement that would
-     * move/nest/fork an existing entry. bun records only the integrity (no tarball URL), and the emittable gate is
-     * tighter than npm's: only a deps-or-empty tuple is byte-verified, so any bin/os/cpu/peer/optional metadata or
-     * scoped name defers.
-     */
-    private static List<LockEditSet.PackageEdit> resolveClosureAddBun(DepChange change, String rootName,
-                                                                      String rootConstraint, String existingLock,
-                                                                      NodeRegistries registries, NpmRegistryClient client) {
-        Map<String, String> existingTopLevel = topLevelVersionsBun(existingLock);
-        boolean dev = "devDependencies".equals(change.scope);
-
-        // Promoting a transitive to a direct dep: bun keys packages by name, so a satisfying locked version just
-        // gains the importer edge (its tuple is untouched). A non-satisfying version would fork/upgrade — defer.
-        String promoteVersion = existingTopLevel.get(rootName);
-        if (promoteVersion != null) {
-            if (!existingSatisfies(promoteVersion, rootConstraint)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
-                        promoteVersion + " which excludes " + rootConstraint + " (bun would fork); deferred");
-            }
-            return singletonList(LockEditSet.PackageEdit.builder()
-                    .name(rootName)
-                    .newConstraint(rootConstraint)
-                    .scope(change.scope)
-                    .kind(PROMOTION)
-                    .build());
-        }
-
-        Map<String, Placement> placed = new LinkedHashMap<>();
-        Map<String, NestedPlacement> nested = new LinkedHashMap<>();
-        Deque<Requirement> queue = new ArrayDeque<>();
-        queue.add(new Requirement(rootName, rootConstraint, dev));
-
-        while (!queue.isEmpty()) {
-            Requirement req = queue.poll();
-
-            String existingVersion = existingTopLevel.get(req.name);
-            if (existingVersion != null) {
-                if (existingSatisfies(existingVersion, req.constraint)) {
-                    continue;
-                }
-                nestUnderParentBun(req, existingVersion, placed, nested, existingLock, registries, client);
-                continue;
-            }
-            Placement already = placed.get(req.name);
-            if (already != null) {
-                if (existingSatisfies(already.version, req.constraint)) {
-                    continue;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
-                        " is required at two incompatible versions within the added closure (" +
-                        already.version + " vs " + req.constraint + "); deferred");
-            }
-
-            NodeRegistry registry = registries.registryFor(req.name);
-            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-            VersionManifest manifest = client.getManifest(registry, req.name, version);
-            requireEmittableBunClosureMember(req.name, manifest);
-
-            VersionManifest.Dist dist = manifest.getDist();
-            if (dist == null || dist.getIntegrity() == null) {
-                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                        req.name + "@" + version + " has no registry integrity");
-            }
-
-            // A stray reverse-dependent whose recorded constraint excludes the resolved version fails loud.
-            proveReverseDependentsAccept(PackageManager.Bun, req.name, version, version, existingLock);
-
-            placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
-        }
-
-        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
-        for (Map.Entry<String, Placement> e : placed.entrySet()) {
-            Placement p = e.getValue();
-            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
-            // Only the root (declared in package.json) writes a workspace constraint; the patcher no-ops the
-            // transitives because they are absent from the edited manifest. Scope carries the dev-ness.
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(e.getKey())
-                    .oldVersion("")
-                    .newVersion(p.version)
-                    .newIntegrity(dist.getIntegrity())
-                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
-                    .scope(p.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .build());
-        }
-        for (NestedPlacement np : nested.values()) {
-            VersionManifest.Dist dist = Objects.requireNonNull(np.manifest.getDist());
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(np.name)
-                    .oldVersion("")
-                    .newVersion(np.version)
-                    .newIntegrity(dist.getIntegrity())
-                    .scope(np.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .nestedUnder(np.parent)
-                    .build());
-        }
-        return edits;
-    }
-
-
-    /** Whether a bun workspace edge or installed tuple pins {@code name} at exactly {@code version}. */
-    private static boolean topLevelPinnedBun(String lock, String name, String version) {
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object workspaces = root.get("workspaces");
-        if (workspaces instanceof Map) {
-            for (Object importer : ((Map<?, ?>) workspaces).values()) {
-                if (importer instanceof Map && pinsExactly((Map<?, ?>) importer, name, version)) {
-                    return true;
-                }
-            }
-        }
-        for (Object value : packagesMap(lock).values()) {
-            List<?> tuple = tupleOf(value);
-            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map &&
-                    pinsExactly((Map<?, ?>) tuple.get(2), name, version)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static boolean pinsExactly(Map<?, ?> scopes, String name, String version) {
-        for (String scope : DECLARED_SCOPES) {
-            Object scopeMap = scopes.get(scope);
-            if (scopeMap instanceof Map) {
-                Object c = ((Map<?, ?>) scopeMap).get(name);
-                if (c instanceof String && version.equals(((String) c).trim())) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
     /**
      * A direct dependency the recipe added, plus its runtime closure, into a {@code yarn.lock} v1. yarn lists one
@@ -1265,7 +1031,7 @@ public final class NativeLockEngine {
             }
 
             placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev, req.name);
+            enqueueDeps(queue, manifest.getDependencies(), req.dev);
         }
 
         List<LockEditSet.PackageEdit> edits = new ArrayList<>();
@@ -1345,64 +1111,6 @@ public final class NativeLockEngine {
         return names;
     }
 
-    /** The single top-level version of each hoisted bun package ({@code packages["<name>"]} tuple, non-nested key). */
-    private static Map<String, String> topLevelVersionsBun(String lock) {
-        Map<String, String> versions = new LinkedHashMap<>();
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (packages instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if (isNestedBunKey(key)) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, null,
-                            "cannot add into a bun.lock with nested placements: " + key);
-                }
-                if (e.getValue() instanceof List && !((List<?>) e.getValue()).isEmpty()) {
-                    String locator = String.valueOf(((List<?>) e.getValue()).get(0));
-                    int at = locator.lastIndexOf('@');
-                    if (at > 0) {
-                        versions.put(key, locator.substring(at + 1));
-                    }
-                }
-            }
-        }
-        return versions;
-    }
-
-    /** A bun {@code packages} key nests a second copy under a dependent ({@code parent/name}); a leading {@code @scope/} is not a nest. */
-    private static boolean isNestedBunKey(String key) {
-        int scopeEnd = key.startsWith("@") ? key.indexOf('/') : -1;
-        return key.indexOf('/', scopeEnd + 1) >= 0;
-    }
-
-    /**
-     * A closure member whose bun tuple the patcher can insert byte-exactly: metadata of {@code {}} or
-     * {@code { "dependencies": {...} }} only. bun records optional/peer/bin/os/cpu/libc into that object and
-     * auto-installs non-optional peers, none of which the placement models, so any of them defers the add.
-     */
-    private static void requireEmittableBunClosureMember(String name, VersionManifest m) {
-        if (name.indexOf('/') >= 0 || name.startsWith("@")) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding scoped package " + name + " is not yet supported for bun adds");
-        }
-        requireNoOptionalOrPeer(name, m, "bun");
-        String metadata = unsupportedBunMetadata(m);
-        if (metadata != null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    "adding " + name + " carries " + metadata + " metadata not yet supported for bun adds");
-        }
-    }
-
-    private static @Nullable String unsupportedBunMetadata(VersionManifest m) {
-        if (m.getBin() != null) return "bin";
-        if (notEmpty(m.getOs())) return "os";
-        if (notEmpty(m.getCpu())) return "cpu";
-        if (notEmpty(m.getLibc())) return "libc";
-        if (notEmpty(m.getBundleDependencies())) return "bundleDependencies";
-        if (bool(m.getHasInstallScript())) return "hasInstallScript";
-        return null;
-    }
-
     /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
     private static LockEditSet.@Nullable EntryMetadata pnpmLeafMetadata(VersionManifest m) {
         if (!notEmpty(m.getEngines())) {
@@ -1472,13 +1180,12 @@ public final class NativeLockEngine {
         return 0;
     }
 
-    private static void enqueueDeps(Deque<Requirement> queue, @Nullable Map<String, String> deps, boolean dev,
-                                    String parent) {
+    private static void enqueueDeps(Deque<Requirement> queue, @Nullable Map<String, String> deps, boolean dev) {
         if (deps == null) {
             return;
         }
         for (Map.Entry<String, String> e : deps.entrySet()) {
-            queue.add(new Requirement(e.getKey(), e.getValue(), dev, parent));
+            queue.add(new Requirement(e.getKey(), e.getValue(), dev));
         }
     }
 
@@ -1599,113 +1306,7 @@ public final class NativeLockEngine {
 
     /** Whether some importer or installed entry pins {@code name} at exactly {@code version} (so its top slot cannot move). */
 
-    private static @Nullable String firstExcludingConstraint(Map<?, ?> entry, String name, String target) {
-        for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
-            Object scopeMap = entry.get(scope);
-            if (scopeMap instanceof Map) {
-                Object c = ((Map<?, ?>) scopeMap).get(name);
-                if (c instanceof String && Semver.validate((String) c, null, NODE).isValid() && !Semver.satisfies(target, (String) c, NODE)) {
-                    return (String) c;
-                }
-            }
-        }
-        return null;
-    }
-
     /** The moving package's existing entry must be a plain registry leaf to relocate byte-for-byte. */
-
-    @SuppressWarnings("unchecked")
-    private static Map<String, Object> packagesMap(String lock) {
-        Object packages = parseJsonObject(lock, false).get("packages");
-        return packages instanceof Map ? (Map<String, Object>) packages : emptyMap();
-    }
-
-    private static boolean notEmptyMapValue(@Nullable Object value) {
-        return value instanceof Map && !((Map<?, ?>) value).isEmpty();
-    }
-
-    /**
-     * A direct-dependency bump whose new version a reverse-dependent's recorded constraint excludes: bun keeps the
-     * new version at the top-level slot and nests the old version in a {@code "<dependent>/<name>"} tuple. Only the
-     * accuracy-safe slice is planned (a single top-level reverse-dependent, the constraint still resolving to the
-     * locked version, a leaf nested), so the patcher relocates the pre-edit tuple byte-for-byte; anything wider
-     * fails loud.
-     */
-    private static List<LockEditSet.PackageEdit> planReverseDependentNestsBun(String name, String oldVersion,
-                                                                              String targetVersion, String lock,
-                                                                              NodeRegistries registries,
-                                                                              NpmRegistryClient client) {
-        Map<String, String> conflicts = conflictingReverseDependentsBun(lock, name, targetVersion);
-        if (conflicts.isEmpty()) {
-            return emptyList();
-        }
-        if (conflicts.size() > 1) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " is required at excluding versions by " + conflicts.keySet() +
-                            "; nesting more than one reverse-dependent is not yet supported");
-        }
-        Map.Entry<String, String> only = conflicts.entrySet().iterator().next();
-        String dependent = only.getKey();
-        requireNestableBunLeaf(name, tupleOf(packagesMap(lock).get(name)));
-
-        NodeRegistry registry = registries.registryFor(name);
-        Set<String> published = client.getPackument(registry, name).getVersions();
-        String nested = maxSatisfyingAll(published, singleton(only.getValue()));
-        if (!oldVersion.equals(nested)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, dependent + " requires " + name + "@" +
-                    only.getValue() + " which resolves to " + nested + ", not the locked " + oldVersion +
-                    "; nesting a re-resolved version is not yet supported");
-        }
-
-        return singletonList(LockEditSet.PackageEdit.builder()
-                .name(name)
-                .oldVersion(oldVersion)
-                .newVersion(oldVersion)
-                .scope("dependencies")
-                .kind(REVERSE_NEST)
-                .nestedUnder(dependent)
-                .build());
-    }
-
-    /** Top-level bun tuples whose metadata records a constraint on {@code name} that excludes {@code target}. */
-    private static Map<String, String> conflictingReverseDependentsBun(String lock, String name, String target) {
-        Map<String, String> conflicts = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
-            if (isNestedBunKey(e.getKey())) {
-                continue; // only plain top-level dependents can gain a nested copy
-            }
-            List<?> tuple = tupleOf(e.getValue());
-            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map) {
-                String c = firstExcludingConstraint((Map<?, ?>) tuple.get(2), name, target);
-                if (c != null) {
-                    conflicts.put(e.getKey(), c);
-                }
-            }
-        }
-        return conflicts;
-    }
-
-    /** The moving bun package's tuple must be a plain registry leaf (empty metadata deps, an integrity) to relocate. */
-    private static void requireNestableBunLeaf(String name, @Nullable List<?> tuple) {
-        if (tuple == null || tuple.size() < 4) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, "no bun tuple to relocate for " + name);
-        }
-        if (tuple.get(2) instanceof Map) {
-            Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
-            if (notEmptyMapValue(meta.get("dependencies")) || notEmptyMapValue(meta.get("optionalDependencies")) ||
-                    notEmptyMapValue(meta.get("peerDependencies"))) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                        name + " has its own dependencies; nesting a non-leaf is not yet supported");
-            }
-        }
-        if (!(tuple.get(3) instanceof String)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " has no integrity to relocate");
-        }
-    }
-
-    private static @Nullable List<?> tupleOf(@Nullable Object value) {
-        return value instanceof List ? (List<?>) value : null;
-    }
 
     /**
      * A closure-unchanged proof only inspects the moving package's own manifest, not the other entries that depend
@@ -1715,9 +1316,6 @@ public final class NativeLockEngine {
     private static void proveReverseDependentsAccept(PackageManager pm, String name, String oldVersion,
                                                      String targetVersion, String lock) {
         switch (pm) {
-            case Bun:
-                proveReverseDependentsBun(name, targetVersion, lock);
-                break;
             case Pnpm:
                 proveReverseDependentsPnpm(name, oldVersion, targetVersion, lock);
                 break;
@@ -1762,40 +1360,6 @@ public final class NativeLockEngine {
         if (Semver.validate(range, null, NODE).isValid() && !Semver.satisfies(targetVersion, range, NODE)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     name + " is required by " + dependent + " at " + value + " which excludes " + targetVersion);
-        }
-    }
-
-    private static void proveReverseDependentsBun(String name, String targetVersion, String lock) {
-        Map<String, Object> root = parseJsonObject(lock, false);
-        Object packages = root.get("packages");
-        if (!(packages instanceof Map)) {
-            return;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) packages).entrySet()) {
-            if (!(e.getValue() instanceof List)) {
-                continue;
-            }
-            List<?> tuple = (List<?>) e.getValue();
-            if (tuple.size() >= 3 && tuple.get(2) instanceof Map) {
-                Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
-                String dependent = String.valueOf(e.getKey());
-                checkReverseConstraint(name, targetVersion, dependent, meta.get("dependencies"));
-                checkReverseConstraint(name, targetVersion, dependent, meta.get("optionalDependencies"));
-                checkReverseConstraint(name, targetVersion, dependent, meta.get("peerDependencies"));
-            }
-        }
-    }
-
-    private static void checkReverseConstraint(String name, String targetVersion, String dependent,
-                                               @Nullable Object constraintMap) {
-        if (!(constraintMap instanceof Map)) {
-            return;
-        }
-        Object constraint = ((Map<?, ?>) constraintMap).get(name);
-        if (constraint instanceof String && Semver.validate((String) constraint, null, NODE).isValid() &&
-                !Semver.satisfies(targetVersion, (String) constraint, NODE)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " is required by " + dependent + " at " + constraint + " which excludes " + targetVersion);
         }
     }
 
@@ -1923,8 +1487,6 @@ public final class NativeLockEngine {
     private static @Nullable String findImporterDir(PackageManager pm, String lock, String name,
                                                     @Nullable String oldConstraint) {
         switch (pm) {
-            case Bun:
-                return findImporterDirBun(lock, name, oldConstraint);
             case Pnpm:
                 return findImporterDirPnpm(lock, name, oldConstraint);
             case YarnBerry:
@@ -1977,70 +1539,21 @@ public final class NativeLockEngine {
         return null;
     }
 
-    /** How many workspace importers declare {@code name} at exactly {@code constraint} (a shared entry when {@code > 1}). */
-    private static int importersDeclaring(PackageManager pm, String lock, String name, @Nullable String constraint) {
+    /** How many berry workspace importers declare {@code name} at exactly {@code constraint} (a shared entry when {@code > 1}). */
+    private static int importersDeclaring(String lock, String name, @Nullable String constraint) {
         int count = 0;
-        if (pm == PackageManager.YarnBerry) {
-            Object loaded = new Yaml().load(lock);
-            if (loaded instanceof Map) {
-                for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-                    if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
-                        String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
-                        if (c != null && (constraint == null || constraint.equals(c))) {
-                            count++;
-                        }
-                    }
-                }
-            }
-        } else {
-            Object workspaces = parseJsonObject(lock, false).get("workspaces");
-            if (workspaces instanceof Map) {
-                for (Object importer : ((Map<?, ?>) workspaces).values()) {
-                    if (importer instanceof Map) {
-                        String c = declaredConstraintIn((Map<?, ?>) importer, name, DECLARED_SCOPES);
-                        if (c != null && (constraint == null || constraint.equals(c))) {
-                            count++;
-                        }
+        Object loaded = new Yaml().load(lock);
+        if (loaded instanceof Map) {
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
+                if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
+                    String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
+                    if (c != null && (constraint == null || constraint.equals(c))) {
+                        count++;
                     }
                 }
             }
         }
         return count;
-    }
-
-    /** The bun importer ({@code workspaces.<dir>.<scope>.<name>}) that declares the dependency, or {@code null} for the root. */
-    private static @Nullable String findImporterDirBun(String lock, String name, @Nullable String oldConstraint) {
-        String unique = null;
-        Object workspaces = parseJsonObject(lock, false).get("workspaces");
-        if (workspaces instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) workspaces).entrySet()) {
-                String key = String.valueOf(e.getKey());
-                if (!(e.getValue() instanceof Map)) {
-                    continue;
-                }
-                String c = declaredConstraintIn((Map<?, ?>) e.getValue(), name, DECLARED_SCOPES);
-                if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
-                    if (key.isEmpty()) {
-                        return null; // the root importer owns it
-                    }
-                    if (unique != null) {
-                        return null; // ambiguous, fall back to the root importer
-                    }
-                    unique = key;
-                }
-            }
-        }
-        return unique;
-    }
-
-    private static @Nullable String declaredConstraintIn(Map<?, ?> importer, String name, List<String> scopes) {
-        for (String scope : scopes) {
-            Object scopeMap = importer.get(scope);
-            if (scopeMap instanceof Map && ((Map<?, ?>) scopeMap).get(name) != null) {
-                return String.valueOf(((Map<?, ?>) scopeMap).get(name));
-            }
-        }
-        return null;
     }
 
     private static @Nullable String findImporterDirPnpm(String lock, String name, @Nullable String oldConstraint) {
@@ -2125,8 +1638,6 @@ public final class NativeLockEngine {
 
     private static Set<String> findLockedVersions(PackageManager pm, String lock, String name) {
         switch (pm) {
-            case Bun:
-                return findLockedVersionsBun(lock, name);
             case Pnpm:
                 return findLockedVersionsPnpm(lock, name);
             case YarnClassic:
@@ -2339,124 +1850,6 @@ public final class NativeLockEngine {
         return false;
     }
 
-    /**
-     * A direct-dependency bump whose new {@code dependencies} edges force a currently-locked transitive to move,
-     * for bun. Each kept edge that the locked version no longer satisfies re-resolves and emits a forced move; a
-     * shared or directly-declared transitive, an added transitive, or a mover whose own dependencies also change
-     * fails loud. A dropped edge is guarded upstream (orphan-prune is separate).
-     */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBun(String rootName, VersionManifest rootNew,
-                                                                       String lock, NodeRegistries registries,
-                                                                       NpmRegistryClient client) {
-        Map<String, String> newDeps = rootNew.getDependencies() == null ? emptyMap() : rootNew.getDependencies();
-        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
-        for (Map.Entry<String, String> e : newDeps.entrySet()) {
-            String dep = e.getKey();
-            String newConstraint = e.getValue();
-            Set<String> locked = findLockedVersionsBun(lock, dep);
-            if (locked.isEmpty()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
-            }
-            if (locked.size() > 1) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
-            }
-            if (isUnsupportedProtocol(newConstraint) || !Semver.validate(newConstraint, null, NODE).isValid()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
-            }
-            String cur = locked.iterator().next();
-            // Still satisfied: the bumped parent's own metadata records the new range, so no separate move.
-            if (Semver.satisfies(cur, newConstraint, NODE)) {
-                continue;
-            }
-            moves.add(resolveForcedMoveBun(rootName, dep, cur, newConstraint, lock, registries, client));
-        }
-        return moves;
-    }
-
-    /** Resolve and emit one bun forced move, failing loud on a shared/declared requirer or any deeper reshape. */
-    private static LockEditSet.PackageEdit resolveForcedMoveBun(String rootName, String dep, String oldVersion,
-                                                               String newConstraint, String lock,
-                                                               NodeRegistries registries, NpmRegistryClient client) {
-        if (bunHasOtherRequirer(lock, dep, rootName)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is required by more than the upgraded " + rootName + "; a shared move defers");
-        }
-        if (bunImporterDeclares(lock, dep)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is directly declared; moving it via cascade is not yet supported");
-        }
-        NodeRegistry registry = registries.registryFor(dep);
-        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), singleton(newConstraint));
-        if (target == null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
-        }
-        if (target.equals(oldVersion)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " resolves back to its locked version; deferred");
-        }
-        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
-        VersionManifest newManifest = client.getManifest(registry, dep, target);
-        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
-        if (!dependenciesEqual(oldManifest, newManifest)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    "moving " + dep + " to " + target + " changes its own dependencies (multi-level cascade) not yet supported");
-        }
-        VersionManifest.Dist dist = newManifest.getDist();
-        if (dist == null || dist.getIntegrity() == null) {
-            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep, dep + "@" + target + " has no registry integrity");
-        }
-        return LockEditSet.PackageEdit.builder()
-                .name(dep)
-                .oldVersion(oldVersion)
-                .newVersion(target)
-                .newIntegrity(dist.getIntegrity())
-                .newDependencies(newManifest.getDependencies())
-                .scope("dependencies")
-                .importerDir(null)
-                .kind(FORCED_MOVE)
-                .build();
-    }
-
-    /** True when a package other than {@code rootName} (or a nested placement) records a constraint on {@code dep}. */
-    private static boolean bunHasOtherRequirer(String lock, String dep, String rootName) {
-        for (Map.Entry<String, Object> e : packagesMap(lock).entrySet()) {
-            if (e.getKey().equals(rootName) || isNestedBunKey(e.getKey())) {
-                continue;
-            }
-            List<?> tuple = tupleOf(e.getValue());
-            if (tuple != null && tuple.size() >= 3 && tuple.get(2) instanceof Map) {
-                Map<?, ?> meta = (Map<?, ?>) tuple.get(2);
-                for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
-                    Object deps = meta.get(scope);
-                    if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    /** True when a bun workspace importer declares {@code dep} directly (so a cascade would touch its own range). */
-    private static boolean bunImporterDeclares(String lock, String dep) {
-        Object workspaces = parseJsonObject(lock, false).get("workspaces");
-        if (!(workspaces instanceof Map)) {
-            return false;
-        }
-        for (Object importer : ((Map<?, ?>) workspaces).values()) {
-            if (!(importer instanceof Map)) {
-                continue;
-            }
-            for (String scope : DECLARED_SCOPES) {
-                Object deps = ((Map<?, ?>) importer).get(scope);
-                if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
     /** Every registry package name that heads a berry entry (across merged descriptors); ignores importer/metadata. */
     private static Set<String> existingBerryNames(String lock) {
         Set<String> names = new LinkedHashSet<>();
@@ -2510,22 +1903,6 @@ public final class NativeLockEngine {
                     "yarn berry cacheKey " + cacheKey + " is not a validated checksum format (only 10c0 so far)");
         }
         return cacheKey;
-    }
-
-    /** bun keys its {@code packages} by name (or {@code parent/name} when nested), so read the version off each tuple's locator. */
-    private static Set<String> findLockedVersionsBun(String lock, String name) {
-        Set<String> versions = new LinkedHashSet<>();
-        for (Object value : packagesMap(lock).values()) {
-            List<?> tuple = tupleOf(value);
-            if (tuple != null && !tuple.isEmpty() && tuple.get(0) instanceof String) {
-                String locator = (String) tuple.get(0);
-                int at = locator.lastIndexOf('@');
-                if (at > 0 && locator.substring(0, at).equals(name)) {
-                    versions.add(locator.substring(at + 1));
-                }
-            }
-        }
-        return versions;
     }
 
     private static Set<String> findLockedVersionsPnpm(String lock, String name) {
@@ -2703,7 +2080,6 @@ public final class NativeLockEngine {
             case Pnpm:        return new PnpmLockPatcher();
             case YarnClassic: return new YarnClassicLockPatcher();
             case YarnBerry:   return new YarnBerryLockPatcher();
-            case Bun:         return new BunLockPatcher();
             default:          return null;
         }
     }
@@ -2807,38 +2183,15 @@ public final class NativeLockEngine {
         }
     }
 
-    /** A pending edge in the closure walk: a package name, the requiring constraint, dev-reachability, and requirer. */
+    /** A pending edge in the closure walk: a package name, the requiring constraint, and dev-reachability. */
     private static final class Requirement {
         final String name;
         final String constraint;
         final boolean dev;
-        final @Nullable String parent;
 
         Requirement(String name, String constraint, boolean dev) {
-            this(name, constraint, dev, null);
-        }
-
-        Requirement(String name, String constraint, boolean dev, @Nullable String parent) {
             this.name = name;
             this.constraint = constraint;
-            this.dev = dev;
-            this.parent = parent;
-        }
-    }
-
-    /** A closure member bun nests under a freshly-placed parent because an incompatible version holds the top slot. */
-    private static final class NestedPlacement {
-        final String parent;
-        final String name;
-        final String version;
-        final VersionManifest manifest;
-        final boolean dev;
-
-        NestedPlacement(String parent, String name, String version, VersionManifest manifest, boolean dev) {
-            this.parent = parent;
-            this.name = name;
-            this.version = version;
-            this.manifest = manifest;
             this.dev = dev;
         }
     }

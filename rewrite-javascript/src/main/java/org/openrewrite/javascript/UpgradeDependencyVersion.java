@@ -98,6 +98,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
 
+                if (NodeDependencyScan.capturePackageManagerFile(acc, sf)) return tree;
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
@@ -235,7 +236,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
-                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
+                        NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

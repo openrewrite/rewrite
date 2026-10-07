@@ -76,6 +76,51 @@ class NativeLockEngineTest {
         return NativeLockEngine.regenerate(pm, edited, original, lock, null, Paths.get("package.json"), ctx);
     }
 
+    @Test
+    void bunRegeneratesFromTheRegistryItsOwnNpmrcNames() {
+        String scenario = "lock/bun/small-registry-mirror/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Bun, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunReadsAFileDependencyFromTheProjectManifests() {
+        String scenario = "lock/bun/small-file-dep-add/";
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("package.json"));
+
+        Result withoutDirectory = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
+        Result result = NativeLockEngine.regenerate(PackageManager.Bun,
+                request.manifest(Paths.get("local/package.json"), resource(scenario + "tree/local/package.json")).build(),
+                ctx);
+
+        assertThat(withoutDirectory.getFailure()).isNotNull();
+        assertThat(withoutDirectory.getFailure().getDetail()).startsWith("the engine cannot know directory manifest of local");
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.Bun, "{\"dependencies\":{}}", "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
     private static String npmLock(String lockedVersion) {
         return "{\n" +
                 "  \"name\": \"x\",\n" +
@@ -146,35 +191,6 @@ class NativeLockEngineTest {
             assertThat(request.getUrl().toString()).startsWith(registry);
             assertThat(request.getRequestHeaders()).containsEntry("Authorization", "Bearer s3cret");
         });
-    }
-
-    @Test
-    void bunVisitorThrownFailureDefersGracefully() {
-        // A bun bump whose new version gains a dependencies map throws EngineFailure from INSIDE the rewrite-json
-        // visitor, so it arrives wrapped in a RecipeRunException; regenerate must unwrap it into a graceful Failure
-        // rather than let the wrapper escape and crash the recipe run.
-        routes.put("https://registry.npmjs.org/foo",
-                "{\"name\":\"foo\",\"dist-tags\":{},\"versions\":{\"1.0.0\":{},\"2.0.0\":{}}}");
-        routes.put("https://registry.npmjs.org/foo/1.0.0",
-                "{\"name\":\"foo\",\"version\":\"1.0.0\",\"dependencies\":{}}");
-        routes.put("https://registry.npmjs.org/foo/2.0.0",
-                "{\"name\":\"foo\",\"version\":\"2.0.0\",\"dependencies\":{\"tslib\":\"^2.0.0\"}," +
-                        "\"dist\":{\"tarball\":\"https://registry.npmjs.org/foo/-/foo-2.0.0.tgz\",\"integrity\":\"sha512-FOO2\"}}");
-
-        String lock = "{\n  \"lockfileVersion\": 1,\n  \"configVersion\": 1,\n  \"workspaces\": {\n" +
-                "    \"\": {\n      \"name\": \"crash-test\",\n      \"dependencies\": {\n" +
-                "        \"foo\": \"^1.0.0\",\n      },\n    },\n  },\n  \"packages\": {\n" +
-                "    \"foo\": [\"foo@1.0.0\", \"\", {}, \"sha512-FOO\"],\n\n" +
-                "    \"tslib\": [\"tslib@2.0.0\", \"\", {}, \"sha512-TSLIB\"],\n  }\n}\n";
-
-        Result result = regen(PackageManager.Bun,
-                "{\"dependencies\":{\"foo\":\"^1.0.0\"}}",
-                "{\"dependencies\":{\"foo\":\"^2.0.0\"}}",
-                lock);
-
-        assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).contains("gains a dependencies map");
     }
 
     @Test

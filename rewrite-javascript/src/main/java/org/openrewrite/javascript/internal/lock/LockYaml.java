@@ -34,7 +34,7 @@ import static java.util.Collections.singletonList;
 /**
  * Byte-exact keyed access and edit primitives over a YAML lockfile's LST, shared by the pnpm and yarn-berry
  * patchers (both formats round-trip byte-identical through rewrite-yaml). Each edit returns a new mapping,
- * rewriting only the named entry and leaving every other byte untouched. The JSON analogue is {@link LockJson}.
+ * rewriting only the named entry and leaving every other byte untouched.
  */
 final class LockYaml {
 

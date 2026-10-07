@@ -82,6 +82,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
 
+                if (NodeDependencyScan.capturePackageManagerFile(acc, sf)) return tree;
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
                         Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
@@ -176,7 +177,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
-                        NodeDependencyScan.projectManifests(acc, ctx, pkg.getSourcePath()), ctx);
+                        NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();

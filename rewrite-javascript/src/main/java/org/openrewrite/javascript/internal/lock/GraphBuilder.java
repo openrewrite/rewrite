@@ -29,7 +29,7 @@ import static org.openrewrite.javascript.internal.LockFileRegeneration.Reason.RE
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
- * Builds the {@link ResolutionGraph} of a closure for pnpm, Yarn and Bun, until each follows its own resolver:
+ * Builds the {@link ResolutionGraph} of a closure for pnpm and Yarn, until each follows its own resolver:
  * every package resolves to a single version (the highest satisfying every requirer). Regular, dev, and optional
  * dependencies (importer-declared or transitive) are all resolved and placed; each node is then classified
  * {@code dev}/{@code optional}/{@code devOptional} by npm's reachability rules for the serializers to mark. A
