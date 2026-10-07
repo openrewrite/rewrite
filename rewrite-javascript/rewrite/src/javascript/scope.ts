@@ -87,8 +87,9 @@ function enclosingScopeCursor(from: Cursor | undefined): Cursor | undefined {
 
 /** The nodes {@link readBindings} answers for; everything else binds nothing and is not a scope. */
 const scopeKinds = new Set<string>([
-    JS.Kind.CompilationUnit, J.Kind.Block, J.Kind.MethodDeclaration, J.Kind.Lambda,
-    J.Kind.ClassDeclaration, J.Kind.TryCatch, J.Kind.ForLoop, J.Kind.ForEachLoop, JS.Kind.ForInLoop
+    JS.Kind.CompilationUnit, J.Kind.Block, J.Kind.MethodDeclaration, J.Kind.Lambda, JS.Kind.ArrowFunction,
+    J.Kind.ClassDeclaration, J.Kind.TryCatch, J.Kind.ForLoop, J.Kind.ForEachLoop, JS.Kind.ForInLoop,
+    JS.Kind.TypeDeclaration, JS.Kind.FunctionType, JS.Kind.MappedType, JS.Kind.ConditionalType
 ]);
 
 /**
@@ -147,7 +148,7 @@ export function namesDeclaredWithin(node: unknown, cacheKey: object = node as ob
         }
         // The walk ends at this branch, so what else the node holds is read here.
         if (node.kind === J.Kind.ClassDeclaration) {
-            typeParameterNames(node).forEach(name => names.add(name));
+            typeParameterNames(node, 'all').forEach(name => names.add(name));
         } else if (node.kind === J.Kind.NewClass) {
             walk((node as J.NewClass).arguments, collect);
         }
@@ -227,7 +228,20 @@ function collectReferences(
     }
     const within = scopeKinds.has(kind!) ? {node, parent, outer: scopes} : scopes;
     Object.entries(node as object).forEach(([key, value]) =>
-        key !== 'markers' && collectReferences(value, node, within, names, meaningOf(node, key, meaning)));
+        key !== 'markers' &&
+        collectReferences(value, node, reachOf(node, parent, key, within), names, meaningOf(node, key, meaning)));
+}
+
+/**
+ * The scopes the slot `key` of `node` resolves against, `within` being those `node` sits in. A
+ * conditional type's `infer` names reach its extends clause and true branch alone, so its check
+ * type and false branch read past them.
+ */
+function reachOf(node: any, parent: any, key: string, within: Frames | undefined): Frames | undefined {
+    const pastInferred =
+        node.kind === JS.Kind.ConditionalType && key === 'checkType' ||
+        node.kind === J.Kind.Ternary && parent?.kind === JS.Kind.ConditionalType && key === 'falsePart';
+    return pastInferred ? within?.outer : within;
 }
 
 /** What a reference in slot `key` of `node` reads, given what `node` itself reads. */
@@ -380,14 +394,27 @@ function readBindings(node: any, meaning: Meaning): string[] {
             return blockScopedNames((node as J.Block).statements, meaning);
         case J.Kind.MethodDeclaration: {
             const method = node as J.MethodDeclaration;
-            return [...declaredNames(method.parameters.elements, meaning), ...hoistedNames(method.body, meaning)];
+            return [
+                ...typeParameterNames(method, meaning),
+                ...declaredNames(method.parameters.elements, meaning),
+                ...hoistedNames(method.body, meaning)
+            ];
         }
         case J.Kind.Lambda: {
             const lambda = node as J.Lambda;
             return [...declaredNames(lambda.parameters.parameters, meaning), ...hoistedNames(lambda.body, meaning)];
         }
         case J.Kind.ClassDeclaration:
-            return declarationNames(node, meaning);
+            return [...declarationNames(node, meaning), ...typeParameterNames(node, meaning)];
+        // An arrow's type parameters and return type sit around its lambda, outside the lambda's scope.
+        case JS.Kind.ArrowFunction:
+        case JS.Kind.FunctionType:
+        case JS.Kind.TypeDeclaration:
+            return typeParameterNames(node, meaning);
+        case JS.Kind.MappedType:
+            return declarationNames(unwrap((node as JS.MappedType).keysRemapping.typeParameter), meaning);
+        case JS.Kind.ConditionalType:
+            return inferredNames((node as JS.ConditionalType).condition.element.condition, meaning);
         case J.Kind.TryCatch:
             return declaredNames([(node as J.Try.Catch).parameter.tree], meaning);
         case J.Kind.ForLoop:
@@ -454,9 +481,11 @@ function declarationNames(statement: any, meaning: Meaning): string[] {
         case JS.Kind.TypeDeclaration:
             return meaning === 'value' ? [] : boundNames(unwrap((statement as JS.TypeDeclaration).name));
         case J.Kind.TypeParameter:
-            // Reached by namesDeclaredWithin's walk, never through a statement list: a type
-            // parameter binds across the declaration carrying it, not in the scope that one sits in.
+            // A type parameter binds across the declaration carrying it, not in the scope that one
+            // sits in, so no statement list leads here.
             return meaning === 'value' ? [] : boundNames((statement as J.TypeParameter).name);
+        case JS.Kind.MappedTypeParameter:
+            return meaning === 'value' ? [] : boundNames((statement as JS.MappedType.Parameter).name as J);
         case J.Kind.Case:
             // The cases of a switch share the block it opens, so each one's declarations bind in all.
             return declaredNames((statement as J.Case).statements.elements, meaning);
@@ -469,12 +498,27 @@ function declarationNames(statement: any, meaning: Meaning): string[] {
  * The names a declaration's type parameters bind. A class keeps them in a container and everything
  * else in a `J.TypeParameters`, and both hold the same right-padded list.
  */
-function typeParameterNames(node: any): string[] {
+function typeParameterNames(node: any, meaning: Meaning): string[] {
     const held = node?.typeParameters;
     const parameters = held?.kind === J.Kind.TypeParameters
         ? (held as J.TypeParameters).typeParameters
         : (held as J.Container<J.TypeParameter> | undefined)?.elements;
-    return (parameters ?? []).flatMap(parameter => declarationNames(unwrap(parameter), 'all'));
+    return (parameters ?? []).flatMap(parameter => declarationNames(unwrap(parameter), meaning));
+}
+
+/**
+ * The names the `infer` declarations in a conditional type's extends clause bind. A conditional
+ * type nested in the clause keeps its own `infer` names to itself.
+ */
+function inferredNames(extendsType: unknown, meaning: Meaning): string[] {
+    const names: string[] = [];
+    walk(extendsType, node => {
+        if (node.kind === JS.Kind.InferType) {
+            names.push(...declarationNames(unwrap((node as JS.InferType).typeParameter), meaning));
+        }
+        return node.kind !== JS.Kind.ConditionalType;
+    });
+    return names;
 }
 
 /** The names an import binds, which for an aliased or namespace specifier is the alias. */
