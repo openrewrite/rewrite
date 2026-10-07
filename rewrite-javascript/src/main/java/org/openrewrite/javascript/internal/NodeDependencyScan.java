@@ -141,16 +141,18 @@ public final class NodeDependencyScan {
     /**
      * The manifests of the project whose lock an edit of {@code packageJsonPath} regenerates, by path, as
      * edited so far in this run: the package.json beside the lock and every workspace member in the source set.
+     * A package.json with a lock of its own regenerates that lock, as {@link #linkWorkspaceMembers} leaves it.
      */
     public static Map<Path, String> projectManifests(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        Path root = null;
-        for (Path candidate : new LinkedHashSet<>(acc.lockToPackage.values())) {
-            ProjectState ps = acc.projects.get(candidate);
-            if (candidate.equals(packageJsonPath) || ps != null && ps.capturedPackageJson != null &&
-                                                     PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson)
-                                                             .contains(packageJsonPath)) {
-                root = candidate;
-                break;
+        Path root = acc.lockToPackage.containsValue(packageJsonPath) ? packageJsonPath : null;
+        if (root == null) {
+            for (Path candidate : new LinkedHashSet<>(acc.lockToPackage.values())) {
+                ProjectState ps = acc.projects.get(candidate);
+                if (ps != null && ps.capturedPackageJson != null &&
+                    PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson).contains(packageJsonPath)) {
+                    root = candidate;
+                    break;
+                }
             }
         }
         ProjectState rootPs = root == null ? null : acc.projects.get(root);
@@ -236,13 +238,17 @@ public final class NodeDependencyScan {
         return current.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
-    /** The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers. */
+    /**
+     * The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers
+     * that have no lock of their own.
+     */
     public static List<Path> lockImporters(Accumulator acc, Path packagePath, ProjectState rootPs) {
         List<Path> importers = new ArrayList<>();
         importers.add(packagePath);
         if (rootPs.capturedPackageJson != null) {
             for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
-                if (!member.equals(packagePath) && acc.projects.containsKey(member)) {
+                if (!member.equals(packagePath) && acc.projects.containsKey(member) &&
+                    !acc.lockToPackage.containsValue(member)) {
                     importers.add(member);
                 }
             }

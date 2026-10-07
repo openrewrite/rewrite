@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.text.PlainText;
@@ -25,7 +26,9 @@ import org.openrewrite.text.PlainText;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NodeDependencyScanTest {
 
@@ -103,6 +106,36 @@ class NodeDependencyScanTest {
         assertThat(files.getManifests()).containsOnlyKeys(manifest);
         assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parent, top);
         assertThat(files.getPackageManagerFiles().get(parent)).isEqualTo("{\"name\":\"repo\"}");
+    }
+
+    /**
+     * A workspace member with a lock of its own regenerates that lock, whichever lock the scan met first, and the
+     * root's lock does not take the member's result.
+     */
+    @Test
+    void aMemberWithItsOwnLockIsItsOwnProject() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path root = Paths.get("package.json");
+        Path member = Paths.get("packages/a/package.json");
+        NodeDependencyScan.ProjectState rootPs = new NodeDependencyScan.ProjectState();
+        rootPs.capturedPackageJson = PlainText.builder().sourcePath(root)
+          .text("{\"private\":true,\"workspaces\":[\"packages/*\"]}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.YarnClassic,
+            singletonList("packages/a/package.json")))))
+          .build();
+        NodeDependencyScan.ProjectState memberPs = new NodeDependencyScan.ProjectState();
+        memberPs.capturedPackageJson = PlainText.builder().sourcePath(member).text("{\"name\":\"a\"}").build();
+        acc.projects.put(root, rootPs);
+        acc.projects.put(member, memberPs);
+        acc.lockToPackage.put(Paths.get("yarn.lock"), root);
+        acc.lockToPackage.put(Paths.get("packages/a/yarn.lock"), member);
+
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          member);
+
+        assertThat(files.getManifests()).containsOnlyKeys(member);
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(root);
+        assertThat(NodeDependencyScan.lockImporters(acc, root, rootPs)).containsExactly(root);
     }
 
     @Test
