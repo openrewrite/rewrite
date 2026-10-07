@@ -20,7 +20,7 @@ import {maybeBind} from '../binding';
 import {ContextBinding, opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, LRUCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -382,11 +382,13 @@ export class Template {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();
+        let patternPrefixes: Map<string, J.Space> = new Map();
 
         if (values instanceof MatchResult) {
             // MatchResult - extract both bindings and wrappersMap
             normalizedValues = values;
             wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL]();
+            patternPrefixes = values[PATTERN_PREFIXES_SYMBOL]();
         } else if (values instanceof Map) {
             const normalized = new Map<string, J>();
             for (const [key, value] of values.entries()) {
@@ -447,7 +449,8 @@ export class Template {
             wrappersMap,
             options?.format ?? true,
             renames,
-            modules
+            modules,
+            patternPrefixes
         );
     }
 }

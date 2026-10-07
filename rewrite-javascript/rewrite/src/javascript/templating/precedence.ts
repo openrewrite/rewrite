@@ -603,7 +603,7 @@ function leftmostChild(expression: J): J | undefined {
 }
 
 /** Markers the printer emits *after* the node they sit on. */
-function isTrailingMarker(marker: Marker): boolean {
+export function isTrailingMarker(marker: Marker): boolean {
     return marker.kind === JS.Markers.NonNullAssertion || marker.kind === JS.Markers.Optional;
 }
 

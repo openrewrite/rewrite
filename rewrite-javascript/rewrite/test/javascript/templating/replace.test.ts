@@ -297,5 +297,57 @@ describe('markers on a spliced capture', () => {
             typescript('f(a + b);', '(a + b)!.m();')
         );
     });
+
+    test('the replaced node keeps the assertion and optional chain written after it, without doubling them', () => {
+        const rule = rewrite(() => ({before: pattern`o`, after: template`other`}))
+            .orElse(rewrite(() => ({before: pattern`n`, after: template`other!`})));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `
+                    o!.p;
+                    o?.p;
+                    n!.p;
+                `,
+                `
+                    other!.p;
+                    other?.p;
+                    other!.p;
+                `
+            )
+        );
+    });
+
+    test('the replaced node\'s assertion wraps the parentheses a lower-precedence result needs', () => {
+        const rule = rewrite(() => ({before: pattern`o`, after: template`a ?? b`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('foo(o!);', 'foo((a ?? b)!);')
+        );
+    });
+
+    test('a replaced node the template splices back in keeps its assertion once', () => {
+        const x = capture({constraint: (n: J) => n.kind === J.Kind.Identifier && (n as J.Identifier).simpleName === 'o'});
+        const rule = rewrite(() => ({before: pattern`${x}`, after: template`String(${x})`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('foo(o!);', 'foo(String(o!));')
+        );
+    });
 });
 
