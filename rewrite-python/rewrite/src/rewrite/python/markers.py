@@ -11,25 +11,25 @@ from rewrite.utils import lst_dataclass, replace_if_changed
 
 @lst_dataclass
 class KeywordArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'KeywordArguments':
+    def with_id(self, id_: int | UUID) -> 'KeywordArguments':
         return replace_if_changed(self, _id=id_)
 
 
 @lst_dataclass
 class KeywordOnlyArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'KeywordOnlyArguments':
+    def with_id(self, id_: int | UUID) -> 'KeywordOnlyArguments':
         return replace_if_changed(self, _id=id_)
 
 
 @lst_dataclass
 class Quoted(Marker):
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> Quoted:
+    def with_id(self, id_: int | UUID) -> Quoted:
         return replace_if_changed(self, _id=id_)
 
     _style: Style
@@ -67,9 +67,9 @@ class Quoted(Marker):
 @lst_dataclass
 class SuppressNewline(Marker):
     """Marker to suppress trailing newline in compilation units."""
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'SuppressNewline':
+    def with_id(self, id_: int | UUID) -> 'SuppressNewline':
         return replace_if_changed(self, _id=id_)
 
 
@@ -80,9 +80,9 @@ class LegacyNotEqual(Marker):
     The default printer renders ``Binary.Type.NotEqual`` as ``!=``; when
     this marker is present it emits the legacy ``<>`` spelling instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'LegacyNotEqual':
+    def with_id(self, id_: int | UUID) -> 'LegacyNotEqual':
         return replace_if_changed(self, _id=id_)
 
 
@@ -94,9 +94,9 @@ class RaiseTuple(Marker):
     when this marker is present the printer drops the parentheses and renders
     the legacy comma-separated form instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'RaiseTuple':
+    def with_id(self, id_: int | UUID) -> 'RaiseTuple':
         return replace_if_changed(self, _id=id_)
 
 
@@ -107,9 +107,9 @@ class TupleExceptClause(Marker):
     The default printer renders the catch as ``except E as e:``; when this
     marker is present it should emit the Py2 comma-based syntax instead.
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'TupleExceptClause':
+    def with_id(self, id_: int | UUID) -> 'TupleExceptClause':
         return replace_if_changed(self, _id=id_)
 
 
@@ -122,11 +122,11 @@ class PrintSyntax(Marker):
         print >> stderr, "err"  # print to file (has_destination=True)
         print x,                # trailing comma suppresses newline
     """
-    _id: UUID
+    _id: int | UUID
     _has_destination: bool
     _trailing_comma: bool
 
-    def with_id(self, id_: UUID) -> 'PrintSyntax':
+    def with_id(self, id_: int | UUID) -> 'PrintSyntax':
         return replace_if_changed(self, _id=id_)
 
     @property
@@ -153,9 +153,9 @@ class ExecSyntax(Marker):
         exec code in globals         # with globals dict
         exec code in globals, locals # with globals and locals dicts
     """
-    _id: UUID
+    _id: int | UUID
 
-    def with_id(self, id_: UUID) -> 'ExecSyntax':
+    def with_id(self, id_: int | UUID) -> 'ExecSyntax':
         return replace_if_changed(self, _id=id_)
 
 
@@ -275,7 +275,7 @@ class PythonResolutionResult(Marker):
         def with_resolved(self, resolved: Optional[PythonResolutionResult.ResolvedDependency]) -> PythonResolutionResult.Dependency:
             return self if resolved is self._resolved else replace(self, _resolved=resolved)
 
-    _id: UUID
+    _id: int | UUID
     _name: Optional[str]
     _version: Optional[str]
     _description: Optional[str]
@@ -293,7 +293,7 @@ class PythonResolutionResult(Marker):
     _package_manager: Optional[PackageManager]
     _source_indexes: Optional[List[SourceIndex]]
 
-    def with_id(self, id_: UUID) -> PythonResolutionResult:
+    def with_id(self, id_: int | UUID) -> PythonResolutionResult:
         return replace_if_changed(self, _id=id_)
 
     @property

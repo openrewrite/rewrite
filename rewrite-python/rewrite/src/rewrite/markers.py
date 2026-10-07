@@ -53,7 +53,7 @@ M = TypeVar('M', bound=Marker)
 
 @lst_dataclass
 class Markers:
-    _id: UUID
+    _id: int | UUID
 
     @property
     def id(self) -> UUID:
@@ -113,7 +113,7 @@ class Markers:
     _LAST_EMPTY: ClassVar[Optional[Markers]] = None
 
     @classmethod
-    def build(cls, id: UUID, markers: List[Marker]) -> Markers:
+    def build(cls, id: int | UUID, markers: List[Marker]) -> Markers:
         """Marker-free nodes share one instance, and so one id, on the sending
         side; the last empty Markers stands in whenever that id comes round."""
         if markers:
@@ -132,7 +132,7 @@ Markers.EMPTY = Markers(random_id(), [])
 
 @lst_dataclass
 class SearchResult(Marker):
-    _id: UUID
+    _id: int | UUID
 
     _description: Optional[str]
 
@@ -220,7 +220,7 @@ class Markup(Marker, ABC):
 @lst_dataclass
 class MarkupWarn(Markup):
     """Warning markup marker for deprecations and other warnings."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -236,7 +236,7 @@ class MarkupWarn(Markup):
 @lst_dataclass
 class MarkupError(Markup):
     """Error markup marker for errors and issues."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -252,7 +252,7 @@ class MarkupError(Markup):
 @lst_dataclass
 class MarkupInfo(Markup):
     """Info markup marker for informational messages."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -268,7 +268,7 @@ class MarkupInfo(Markup):
 @lst_dataclass
 class MarkupDebug(Markup):
     """Debug markup marker for debugging information."""
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = None
 
@@ -325,7 +325,7 @@ class RecipesThatMadeChanges(Marker):
     interpreting them, so a marker served to this peer returns to the host intact.
     """
 
-    _id: UUID
+    _id: int | UUID
 
     _recipes: Optional[List[List[RecipeThatMadeChanges]]]
 
@@ -336,7 +336,7 @@ class RecipesThatMadeChanges(Marker):
 
 @lst_dataclass
 class UnknownJavaMarker(Marker):
-    _id: UUID
+    _id: int | UUID
 
     _data: Dict[str, Any]
 
@@ -353,7 +353,7 @@ class ParseExceptionResult(Marker):
         return cls(random_id(), type(parser).__name__, exc_type.__name__,
                    ''.join(traceback.format_exception(exc_type, exc_value, exc_tb)))
 
-    _id: UUID
+    _id: int | UUID
 
     _parser_type: str
 
