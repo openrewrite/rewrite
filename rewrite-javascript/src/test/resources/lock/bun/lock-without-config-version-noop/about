@@ -1,0 +1,1 @@
+A bun.lock with no configVersion and no manifest change: whether --lockfile-only rewrites it.

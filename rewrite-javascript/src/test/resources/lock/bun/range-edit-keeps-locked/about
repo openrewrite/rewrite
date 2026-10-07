@@ -1,0 +1,1 @@
+Root range ^2.0.0 -> ~2.1.0 while ms@2.1.3 is locked: only the workspace literal changes.

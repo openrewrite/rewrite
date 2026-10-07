@@ -222,7 +222,7 @@ final class DependencyVersion {
             if (info == null) {
                 return withoutHost;
             }
-            return info.hostProvider == HostedGitInfo.Provider.GITHUB && info.shortcutRepresentation ? GITHUB : GIT;
+            return info.hostProvider == HostedGitInfo.Provider.GITHUB && info.defaultRepresentation == HostedGitInfo.Representation.SHORTCUT ? GITHUB : GIT;
         }
 
         private static boolean startsWithWindowsDriveLetter(String s) {

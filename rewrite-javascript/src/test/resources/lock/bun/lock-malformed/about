@@ -1,0 +1,1 @@
+A bun.lock that is not valid JSONC, then an add: bun reports the parse error, ignores the lock and resolves fresh.

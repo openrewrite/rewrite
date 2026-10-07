@@ -104,8 +104,25 @@ final class HostedGitInfo {
             return isShortcut() ? "" : "//";
         }
 
-        boolean shortcutRepresentation() {
-            return isShortcut();
+        Representation defaultRepresentation() {
+            switch (this) {
+                case GIT_PLUS_SSH:
+                case SSH:
+                case GIT_PLUS_HTTP:
+                    return Representation.SSHURL;
+                case GIT_PLUS_HTTPS:
+                case HTTPS:
+                    return Representation.HTTPS;
+                case GIT_PLUS_FILE:
+                case GIT_PLUS_FTP:
+                case GIT_PLUS_RSYNC:
+                case GIT:
+                    return Representation.GIT;
+                case HTTP:
+                    return Representation.HTTP;
+                default:
+                    return Representation.SHORTCUT;
+            }
         }
 
         @Nullable
@@ -150,6 +167,10 @@ final class HostedGitInfo {
             return wellFormed == null && custom == null;
         }
 
+        Representation defaultRepresentation() {
+            return wellFormed != null ? wellFormed.defaultRepresentation() : Representation.SSHURL;
+        }
+
         @Nullable
         WhatwgUrl toUrl() {
             if (wellFormed != null) {
@@ -162,16 +183,23 @@ final class HostedGitInfo {
         }
     }
 
+    /**
+     * How a url is reported when it is formatted as a string.
+     */
+    enum Representation {
+        SHORTCUT, SSHURL, SSH, HTTPS, GIT, HTTP
+    }
+
     final Provider hostProvider;
-    final boolean shortcutRepresentation;
+    final Representation defaultRepresentation;
     final @Nullable String user;
     final String project;
     final @Nullable String committish;
 
-    private HostedGitInfo(Provider hostProvider, boolean shortcutRepresentation, @Nullable String user, String project,
-                          @Nullable String committish) {
+    private HostedGitInfo(Provider hostProvider, Representation defaultRepresentation, @Nullable String user,
+                          String project, @Nullable String committish) {
         this.hostProvider = hostProvider;
-        this.shortcutRepresentation = shortcutRepresentation;
+        this.defaultRepresentation = defaultRepresentation;
         this.user = user;
         this.project = project;
         this.committish = committish;
@@ -248,7 +276,7 @@ final class HostedGitInfo {
         }
         boolean isShortcut = pair.wellFormed != null && pair.wellFormed.isShortcut();
         if (!isShortcut) {
-            return extract(hostProvider, url);
+            return extract(hostProvider, url, pair.defaultRepresentation());
         }
 
         String pathname = url.getPathname();
@@ -275,7 +303,7 @@ final class HostedGitInfo {
         String fragment = fragmentIdentifier(url);
         String committish = fragment.isEmpty() ? null : fragment;
         try {
-            return new HostedGitInfo(hostProvider, true, userPart == null ? null : decode(userPart), decode(projectTrimmed),
+            return new HostedGitInfo(hostProvider, Representation.SHORTCUT, userPart == null ? null : decode(userPart), decode(projectTrimmed),
                     committish == null ? null : decode(committish));
         } catch (IllegalArgumentException e) {
             return null;
@@ -331,7 +359,7 @@ final class HostedGitInfo {
         return pair;
     }
 
-    private static @Nullable HostedGitInfo extract(Provider provider, WhatwgUrl url) {
+    private static @Nullable HostedGitInfo extract(Provider provider, WhatwgUrl url, Representation representation) {
         String pathname = url.getPathname();
         if (pathname.startsWith("/")) {
             pathname = pathname.substring(1);
@@ -428,7 +456,7 @@ final class HostedGitInfo {
             }
         }
         try {
-            return new HostedGitInfo(provider, false, user == null ? null : decode(user), decode(project),
+            return new HostedGitInfo(provider, representation, user == null ? null : decode(user), decode(project),
                     committish == null ? null : decode(committish));
         } catch (IllegalArgumentException e) {
             return null;

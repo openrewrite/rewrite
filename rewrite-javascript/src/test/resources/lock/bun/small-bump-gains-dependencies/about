@@ -1,0 +1,1 @@
+Bump once 1.1.1 (no dependencies) -> 1.4.0 (wrappy 1): the moved tuple gains a dependencies map and its new dependency is added.

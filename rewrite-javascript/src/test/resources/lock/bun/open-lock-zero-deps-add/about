@@ -1,0 +1,1 @@
+Hand-made lock without configVersion whose root has no dependencies, then ms added: bun resolves from scratch (install_with_manager.zig:133); is configVersion written 0 (from the lock) or 1 (new)?

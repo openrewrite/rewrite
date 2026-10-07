@@ -1,0 +1,13 @@
+bun install v1.3.10 (30e609e0)
+1 | { "lockfileVersion": 1, "workspaces": { "": { "name": "p"
+                                                              ^
+error: Expected "," but found end of file
+    at bun.lock:1:59
+ParserError: failed to parse lockfile: 'bun.lock'
+
+warn: Ignoring lockfile
+Resolving dependencies
+Resolved, downloaded and extracted [4]
+Saved lockfile
+
+Saved bun.lock (3 packages) [64.00ms]

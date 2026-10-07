@@ -1,0 +1,1 @@
+trustedDependencies lists three installed names and six absent ones (count 9, capacity 16): the order follows the capacity of the whole list (ms, safe-buffer, camelcase), not of the names found (capacity 8 would give safe-buffer, ms, camelcase).

@@ -322,6 +322,81 @@ final class Package {
         }
     }
 
+    /**
+     * {@code fromNPM}: the package a registry version resolves to, its dependencies appended to the lockfile's
+     * buffers unresolved, in the groups' order (dependencies, optional, peer) with the optional peers first among
+     * the peers. A peer or optional name already listed is skipped, except that an optional one replaces the plain
+     * dependency of that name.
+     */
+    static Package fromNPM(Lockfile lockfile, PackageManifest manifest, SemverVersion version,
+                           PackageManifest.PackageVersion packageVersion, Features features) {
+        Package pkg = new Package();
+        List<Dependency> dependencies = new ArrayList<>();
+        Object[][] groups = {
+                {features.dependencies, packageVersion.dependencies, Behavior.PROD},
+                {features.devDependencies, Collections.<String>emptyList(), Behavior.DEV},
+                {features.optionalDependencies, packageVersion.optionalDependencies, Behavior.OPTIONAL},
+                {features.peerDependencies, packageVersion.peerDependencies, Behavior.PEER},
+        };
+        for (Object[] group : groups) {
+            if (!(Boolean) group[0]) {
+                continue;
+            }
+            @SuppressWarnings("unchecked") List<String> map = (List<String>) group[1];
+            int groupBit = (Integer) group[2];
+            boolean isPeer = groupBit == Behavior.PEER;
+            boolean isOptional = groupBit == Behavior.OPTIONAL;
+            list:
+            for (int i = 0; i < map.size() / 2; i++) {
+                String key = map.get(2 * i);
+                long keyHash = Wyhash11.stringHash(key);
+                Integer duplicateAt = null;
+                if (isPeer || groupBit == Behavior.DEV || isOptional) {
+                    for (int j = 0; j < dependencies.size(); j++) {
+                        if (dependencies.get(j).nameHash == keyHash) {
+                            if (isOptional) {
+                                duplicateAt = j;
+                                break;
+                            }
+                            continue list;
+                        }
+                    }
+                }
+                Behavior behavior = Behavior.of(groupBit);
+                if (isPeer) {
+                    behavior = behavior.set(Behavior.OPTIONAL, i < packageVersion.nonOptionalPeerDependenciesStart);
+                }
+                if (packageVersion.allDependenciesBundled() ||
+                    packageVersion.bundledDependencies != null && packageVersion.bundledDependencies.contains(keyHash)) {
+                    behavior = behavior.add(Behavior.BUNDLED);
+                }
+                DependencyVersion parsed = DependencyVersion.parse(key, keyHash, map.get(2 * i + 1));
+                Dependency dependency = new Dependency(keyHash, key, parsed == null ? DependencyVersion.ZEROED : parsed, behavior);
+                if (duplicateAt != null) {
+                    dependencies.remove((int) duplicateAt);
+                    dependencies.add(dependency);
+                    continue;
+                }
+                dependencies.add(dependency);
+            }
+        }
+        pkg.name = manifest.name;
+        pkg.nameHash = Wyhash11.stringHash(manifest.name);
+        pkg.resolution = Resolution.npm(version, packageVersion.tarballUrl);
+        pkg.bin = packageVersion.bin;
+        pkg.meta.arch = packageVersion.cpu;
+        pkg.meta.os = packageVersion.os;
+        pkg.meta.integrity = packageVersion.integrity;
+        pkg.meta.hasInstallScript = packageVersion.hasInstallScript;
+        pkg.dependenciesOff = lockfile.dependencies.size();
+        pkg.dependenciesLen = dependencies.size();
+        for (Dependency dep : dependencies) {
+            lockfile.dependencies.add(dep);
+            lockfile.resolutions.add(INVALID_PACKAGE_ID);
+        }
+        return pkg;
+    }
+
     // the manifests of the project by location relative to the package.json being read
     private static Map<String, String> relativeTo(String sourceDir, Map<String, String> manifests) {
         if (sourceDir.isEmpty()) {
