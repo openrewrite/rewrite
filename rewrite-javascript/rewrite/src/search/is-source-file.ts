@@ -5,13 +5,18 @@ import {foundSearchResult} from "../markers";
 import * as picomatch from "picomatch";
 
 export class IsSourceFile extends TreeVisitor<any, ExecutionContext> {
-    private readonly matcher: picomatch.Matcher;
+    private readonly matcher: (path: string) => boolean;
 
+    /** Reads `filePattern` the way Java's FindSourceFiles does, so the precondition agrees on both hosts. */
     constructor(filePattern: string) {
         super();
-        // Wildcards match dot-segments too, as Java's PathUtils.matchesGlob does for the same precondition.
+        const patterns = filePattern.split(";")
+            .map(p => p.trim().replace(/^\.?[/\\]/, ""))
+            .filter(p => p.length > 0);
+        // Wildcards match dot-segments too, as PathUtils.matchesGlob does.
         const options = {dot: true};
-        this.matcher = picomatch.default ? picomatch.default(filePattern, options) : (picomatch as any)(filePattern, options);
+        this.matcher = patterns.length === 0 ? () => true :
+            picomatch.default ? picomatch.default(patterns, options) : (picomatch as any)(patterns, options);
     }
 
     protected async preVisit(tree: any, _: ExecutionContext): Promise<any> {
