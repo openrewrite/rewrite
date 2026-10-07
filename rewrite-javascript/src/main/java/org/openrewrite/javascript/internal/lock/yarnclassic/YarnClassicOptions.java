@@ -23,6 +23,7 @@ import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -164,7 +165,7 @@ public final class YarnClassicOptions {
      */
     static Map<String, @Nullable Object> rc(Map<String, String> configFiles) {
         Map<String, @Nullable Object> rc = new LinkedHashMap<>();
-        for (int depth = depth(configFiles); depth >= 0; depth--) {
+        for (int depth = depth(configFiles.keySet()); depth >= 0; depth--) {
             for (String name : Arrays.asList(".yarnrc", ".yarnrc.yml")) {
                 String text = configFiles.get(up(depth) + name);
                 if (text != null) {
@@ -222,15 +223,18 @@ public final class YarnClassicOptions {
     static List<String> getPossibleConfigLocations(String filename, Map<String, String> configFiles) {
         List<String> locations = new ArrayList<>();
         locations.add("." + filename);
-        for (int depth = 0; depth <= depth(configFiles); depth++) {
+        for (int depth = 0; depth <= depth(configFiles.keySet()); depth++) {
             locations.add(up(depth) + "." + filename);
         }
         return locations;
     }
 
-    private static int depth(Map<String, String> configFiles) {
+    /**
+     * How many directories above the project's the deepest of these paths ({@code ../../.npmrc}) is.
+     */
+    static int depth(Collection<String> paths) {
         int depth = 0;
-        for (String path : configFiles.keySet()) {
+        for (String path : paths) {
             int d = 0;
             while (path.startsWith("../", 3 * d)) {
                 d++;
@@ -240,7 +244,7 @@ public final class YarnClassicOptions {
         return depth;
     }
 
-    private static String up(int depth) {
+    static String up(int depth) {
         StringBuilder up = new StringBuilder();
         for (int i = 0; i < depth; i++) {
             up.append("../");
@@ -316,6 +320,11 @@ public final class YarnClassicOptions {
     // config.js _init, before the registries are read
     static boolean looseSemver(Map<String, @Nullable Object> rc) {
         return !Js.truthy(commandLine(rc).get("strictSemver"));
+    }
+
+    // the --focus flag config.js init reads
+    static boolean focus(Map<String, @Nullable Object> rc) {
+        return Js.truthy(commandLine(rc).get("focus"));
     }
 
     // rc.js buildRcArgs: a `--<option> <value>` line passes the value; a flag passes itself when the value is true

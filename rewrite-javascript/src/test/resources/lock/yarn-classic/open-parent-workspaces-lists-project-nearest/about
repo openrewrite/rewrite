@@ -1,0 +1,1 @@
+The package.json of the directory just above the project lists app as a workspace: yarn installs there and writes that directory's yarn.lock, not the project's.

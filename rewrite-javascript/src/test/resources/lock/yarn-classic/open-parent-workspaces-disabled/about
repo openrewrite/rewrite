@@ -1,0 +1,1 @@
+The repository's workspaces list mid/* and the project's .yarnrc turns workspaces off: config.js init rejects the install before it reads any lock.

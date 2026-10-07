@@ -57,7 +57,7 @@ public class LockEditSet {
         @Nullable
         String newVersion;
 
-        /** Format-specific resolved locator (a tarball URL, yarn {@code url#sha1}, …); omitted for pnpm's default registry. */
+        /** The new version's tarball URL; omitted for pnpm's default registry. */
         @Nullable
         String newResolved;
 

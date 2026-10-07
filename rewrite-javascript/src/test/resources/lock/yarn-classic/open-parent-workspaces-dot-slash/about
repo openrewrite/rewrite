@@ -1,0 +1,1 @@
+The repository's workspaces say ./mid/*, which micromatch 2.3.11 does not match against mid/app (it keeps the ./): yarn installs the project on its own.

@@ -1,0 +1,3 @@
+yarn 1.22.22, node v24.19.0, 2026-10-07
+before exit=given, after exit=0, again exit=0
+layout repo/mid/app (parent/ = repo/mid, grandparent/ = repo)

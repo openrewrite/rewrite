@@ -1,0 +1,1 @@
+A .yarnrc --focus true in a project no workspace root lists: config.js init rejects the install.

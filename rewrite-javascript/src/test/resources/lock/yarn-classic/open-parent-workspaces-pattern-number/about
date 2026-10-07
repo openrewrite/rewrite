@@ -1,0 +1,1 @@
+The repository's workspaces hold a number: micromatch 2.3.11 throws its TypeError for a pattern that is not a string.

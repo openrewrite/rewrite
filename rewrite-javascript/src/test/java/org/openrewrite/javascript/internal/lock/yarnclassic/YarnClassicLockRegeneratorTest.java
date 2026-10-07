@@ -50,9 +50,11 @@ class YarnClassicLockRegeneratorTest {
 
     private static final Pattern PROJECT_DIR = Pattern.compile("\\S*/project/");
     private static final Pattern QUOTED_PROJECT_DIR = Pattern.compile("'[^\\s']*/project/");
+    private static final Pattern LAYOUT_DIR = Pattern.compile("\\S*/(?:repo|again)/(mid/(app/)?)?");
     private static final Pattern OVER = Pattern.compile("(?m)^over=(\\S+)$");
     private static final Pattern STEP = Pattern.compile("^\\[\\d+/\\d+] ");
-    private static final String MANIFEST_SYNTAX_ERROR = "error " + JsError.SYNTAX_ERROR + ": package.json: ";
+    private static final Pattern MANIFEST_SYNTAX_ERROR = Pattern.compile("^error " + JsError.SYNTAX_ERROR +
+                                                                         ": (\\.\\./)*package\\.json: ");
     private static final String CANNOT_KNOW = "cannot-know ";
 
     private static final String ROOT = "{\"name\":\"r\",\"version\":\"1.0.0\"}";
@@ -93,12 +95,13 @@ class YarnClassicLockRegeneratorTest {
                              @Nullable String lock, String log) {
         String outcome = untilTheFirstStep(new YarnClassicLockRegenerator(scenario.inputs(before, lock)));
         String expected = errorBeforeTheSteps(log);
+        Matcher syntaxError = expected == null ? null : MANIFEST_SYNTAX_ERROR.matcher(expected);
         if (outcome.startsWith(CANNOT_KNOW)) {
-            // yarn handed the install to another release, whose output the scenario does not expect
+            // yarn handed the install to another release or ran it at a workspace root above the project
             assertThat(scenario.expect()).startsWith("cannot-know");
-        } else if (expected != null && expected.startsWith(MANIFEST_SYNTAX_ERROR)) {
+        } else if (syntaxError != null && syntaxError.find()) {
             // V8's JSON.parse wording is not ported, only the error and the file it names
-            assertThat(outcome).startsWith(MANIFEST_SYNTAX_ERROR);
+            assertThat(outcome).startsWith(syntaxError.group());
         } else if (expected != null) {
             assertThat(outcome).isEqualTo(expected);
         } else {
@@ -242,6 +245,50 @@ class YarnClassicLockRegeneratorTest {
         assertThat(outside.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know whether " +
                                                         "a/../../b/package.json exists outside the project, which " +
                                                         "makes the range a/../../b a file: dependency");
+    }
+
+    /**
+     * A yarn-path release directly in a directory above the project is missing when the host's paths reach that far
+     * and do not hold it; further up it may sit above the repository.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "../yarn-1.22.22.js|-|error Error: Cannot find module '../yarn-1.22.22.js'",
+            "../../yarn-1.22.22.js|-|cannot-know what the release yarn-path names (../../yarn-1.22.22.js) writes",
+            "../../yarn-1.22.22.js|mid/app|error Error: Cannot find module '../../yarn-1.22.22.js'",
+            "../../../yarn-1.22.22.js|mid/app|cannot-know what the release yarn-path names (../../../yarn-1.22.22.js)",
+    })
+    void findsAReleaseMissingOnlyAsFarUpAsThePathsReach(String release, @Nullable String directory, String outcome) {
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", ROOT)
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile(".yarnrc", "yarn-path \"" + release + "\"\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc", "../README.md")))
+                .directory(directory)
+                .now(Instant.EPOCH)
+                .build();
+        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs))).startsWith(outcome);
+    }
+
+    /**
+     * Whether an ancestor's workspaces list the project depends on the project's path from it
+     * ({@code open-parent-workspaces-*}), which a host that does not say where the project sits leaves unknown.
+     */
+    @Test
+    void matchesAnAncestorsWorkspacesAgainstTheProjectsPath() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", ROOT)
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a*\"]}")
+                .now(Instant.EPOCH);
+        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.build()))).isEqualTo(CANNOT_KNOW +
+                "whether the workspaces of ../package.json list this project, whose directory in the repository the " +
+                "host did not give");
+        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.directory("app").build()))).isEqualTo(
+                CANNOT_KNOW + "the lock yarn writes for this edit: yarn installs at the workspace root ../, whose " +
+                "workspaces list app, and writes ../yarn.lock, not this project's");
+        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.directory("b").build())))
+                .isEqualTo("requests");
     }
 
     @ParameterizedTest(name = "{0}")
@@ -509,7 +556,7 @@ class YarnClassicLockRegeneratorTest {
 
     /**
      * The error line yarn printed before its first step, or node's when the release yarn-path names did not load,
-     * the recorder's project directory taken out of a path it names; {@code null} when yarn reached a step.
+     * a path it names made relative to the recorder's project directory; {@code null} when yarn reached a step.
      */
     private static @Nullable String errorBeforeTheSteps(String log) {
         for (String line : log.split("\r?\n")) {
@@ -517,7 +564,13 @@ class YarnClassicLockRegeneratorTest {
                 return null;
             }
             if (line.startsWith("error ")) {
-                return "error " + PROJECT_DIR.matcher(line.substring("error ".length())).replaceFirst("");
+                String message = PROJECT_DIR.matcher(line.substring("error ".length())).replaceFirst("");
+                Matcher layout = LAYOUT_DIR.matcher(message);
+                if (layout.find()) {
+                    String up = layout.group(2) != null ? "" : layout.group(1) != null ? "../" : "../../";
+                    message = message.substring(0, layout.start()) + up + message.substring(layout.end());
+                }
+                return "error " + message;
             }
             if (line.startsWith("Error: ")) {
                 return "error " + QUOTED_PROJECT_DIR.matcher(line).replaceFirst("'");

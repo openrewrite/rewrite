@@ -1,0 +1,1 @@
+The repository's workspaces (other/*) do not match mid/app: findWorkspaceRoot stops there with no root and yarn installs the project on its own.

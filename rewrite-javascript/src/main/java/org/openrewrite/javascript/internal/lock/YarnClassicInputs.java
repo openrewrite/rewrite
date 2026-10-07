@@ -54,6 +54,7 @@ final class YarnClassicInputs {
                 .manifests(NpmInputs.manifests(request, rootDir))
                 .configFiles(configFiles)
                 .paths(paths(request, rootDir))
+                .directory(rootDir)
                 .host(host)
                 .now(now)
                 .build();

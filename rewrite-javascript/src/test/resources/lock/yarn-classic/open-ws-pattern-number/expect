@@ -1,0 +1,1 @@
+pm-rejects TypeError: pattern.replace is not a function

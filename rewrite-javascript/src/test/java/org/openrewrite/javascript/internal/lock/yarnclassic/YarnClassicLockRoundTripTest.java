@@ -70,6 +70,9 @@ class YarnClassicLockRoundTripTest {
     void savesTheLockAsYarnDoes(String name, YarnClassicScenarios.Lock lock) {
         String log = lock.againLog();
         assertThat(log).contains("exit=0");
+        if (installsAbove(lock)) {
+            return;
+        }
         Loaded loaded = load(lock);
         if (loaded == null) {
             return;
@@ -85,6 +88,17 @@ class YarnClassicLockRoundTripTest {
         if (again == null) {
             assertThat(saved == null || saved.equals(lock.getText())).as("yarn leaves the file as it is").isTrue();
         }
+    }
+
+    // yarn runs the install at a workspace root above the project and leaves this lock as it is
+    private static boolean installsAbove(YarnClassicScenarios.Lock lock) {
+        YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
+        boolean looseSemver = YarnClassicOptions.looseSemver(YarnClassicOptions.rc(inputs.getConfigFiles()));
+        if (new YarnClassicLockRegenerator(inputs).findWorkspaceRoot(looseSemver, new ArrayList<>()) <= 0) {
+            return false;
+        }
+        assertThat(lock.getScenario().expect()).startsWith("cannot-know");
+        return true;
     }
 
     /**

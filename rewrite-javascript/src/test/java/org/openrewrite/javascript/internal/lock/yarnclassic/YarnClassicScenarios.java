@@ -56,6 +56,7 @@ final class YarnClassicScenarios {
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S*) cpu=(\\S*)");
+    private static final Pattern LAYOUT = Pattern.compile("(?m)^layout repo/(\\S+)");
     private static final String RECORDED_ON_OS = "darwin";
     private static final String RECORDED_ON_CPU = "arm64";
 
@@ -260,10 +261,25 @@ final class YarnClassicScenarios {
                     .manifests(manifests(before))
                     .configFiles(configFiles)
                     .paths(has("recorded-with") ? paths : null)
+                    .directory(directory())
                     .env(new LinkedHashMap<>())
                     .host(host())
                     .now(now())
                     .build();
+        }
+
+        /**
+         * The project's directory in the repository the recorder laid out ({@code mid/app} under {@code parent/} and
+         * {@code grandparent/}); a recording made elsewhere does not say.
+         */
+        @Nullable
+        String directory() {
+            String recorded = file("recorded-with");
+            if (recorded == null) {
+                return null;
+            }
+            Matcher m = LAYOUT.matcher(recorded);
+            return m.find() ? m.group(1) : "";
         }
 
         private void putIfPresent(Map<String, String> files, String path, @Nullable String text) {

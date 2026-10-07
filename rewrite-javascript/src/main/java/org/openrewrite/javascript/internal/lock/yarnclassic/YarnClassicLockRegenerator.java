@@ -39,6 +39,8 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.singletonList;
+
 /**
  * Port of yarn src/cli/commands/install.js (yarn 1.22.22) for {@code yarn install} without node_modules.
  */
@@ -81,6 +83,13 @@ public final class YarnClassicLockRegenerator {
          */
         @Nullable
         Set<String> paths;
+
+        /**
+         * The project's directory from the repository's root ({@code mid/app}, {@code ""} at the root), when the
+         * host says; yarn looks above it for a workspace root that lists the project.
+         */
+        @Nullable
+        String directory;
 
         /**
          * The environment yarn runs in; null when the host does not know it.
@@ -385,7 +394,8 @@ public final class YarnClassicLockRegenerator {
             return Reason.MALFORMED_LOCK;
         }
         if (message.startsWith("package.json: ") || message.contains("workspaces") ||
-            message.contains("Workspaces") || message.contains("nohoist")) {
+            message.contains("Workspaces") || message.contains("nohoist") ||
+            message.startsWith("There are more than one workspace with name")) {
             return Reason.MALFORMED_MANIFEST;
         }
         return Reason.RESOLUTION_REQUIRED;
@@ -405,25 +415,97 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * cli/index.js {@code start} and {@code main}, then config.js {@code init} at the project's root: the root
-     * manifest as {@code findWorkspaceRoot} reads it, the registries' config, the manifest again, the workspaces check.
+     * cli/index.js {@code start} and {@code main}, then config.js {@code init}: the workspace root from the project's
+     * directory up, the registries' config, the manifest of the lock's directory, the workspaces check.
      */
     YarnClassicOptions init(List<String> warnings) {
         Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
         requireRelease(rc);
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
         requirePackageManager();
-        String rootText = inputs.getManifests().get("");
-        Manifest root = rootText == null ? null : tryManifest("", rootText, looseSemver, true, null, warnings);
-        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getConfigFiles(), inputs.getEnv());
-        if (rootText != null) {
-            tryManifest("", rootText, looseSemver, false, "", warnings);
+        int workspaceRoot = findWorkspaceRoot(looseSemver, warnings);
+        if (YarnClassicOptions.focus(rc) && workspaceRoot <= 0) {
+            throw new MessageError("This command can only be run inside an individual workspace.");
         }
-        if (root != null && isWorkspaceRoot(root) && !config.isWorkspacesEnabled()) {
+        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getConfigFiles(), inputs.getEnv());
+        String up = YarnClassicOptions.up(Math.max(workspaceRoot, 0));
+        String lockfileFolder = up.isEmpty() ? "" : up.substring(0, up.length() - 1);
+        String manifest = up.isEmpty() ? inputs.getManifests().get("") :
+                inputs.getConfigFiles().get(up + "package.json");
+        if (manifest != null) {
+            tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, warnings);
+        }
+        if (workspaceRoot >= 0 && !config.isWorkspacesEnabled()) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
         }
+        if (workspaceRoot > 0) {
+            throw new CannotKnow("the lock yarn writes for this edit: yarn installs at the workspace root " + up +
+                                 ", whose workspaces list " + relativePath(workspaceRoot) + ", and writes " + up +
+                                 "yarn.lock, not this project's");
+        }
         return config;
+    }
+
+    /**
+     * config.js {@code findWorkspaceRoot}: how many directories above the project's the nearest manifest with a
+     * workspaces list is when that list matches the project's path from it, 0 for the project's own, else -1.
+     */
+    int findWorkspaceRoot(boolean looseSemver, List<String> warnings) {
+        for (int depth = 0; depth <= reach(); depth++) {
+            Manifest manifest = findManifest(depth, looseSemver, warnings);
+            Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
+            if (ws != null && Js.truthy(ws.get("packages"))) {
+                if (depth == 0) {
+                    return 0;
+                }
+                return Micromatch.micromatch(singletonList(relativePath(depth)), ws.get("packages")).isEmpty() ?
+                        -1 : depth;
+            }
+        }
+        return -1;
+    }
+
+    // config.js findManifest: the directory's package.json, else its yarn.json
+    private @Nullable Manifest findManifest(int depth, boolean looseSemver, List<String> warnings) {
+        String up = YarnClassicOptions.up(depth);
+        String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(up + "package.json");
+        if (text != null) {
+            return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null,
+                    warnings);
+        }
+        Set<String> paths = inputs.getPaths();
+        for (String name : depth == 0 ? singletonList("yarn.json") : Arrays.asList("package.json", "yarn.json")) {
+            if (paths != null && paths.contains(up + name)) {
+                throw new CannotKnow(up + name + " (its contents were not read)");
+            }
+        }
+        return null;
+    }
+
+    // path.relative from the directory depth levels above the project's to the project's
+    private String relativePath(int depth) {
+        String directory = inputs.getDirectory();
+        if (directory == null) {
+            throw new CannotKnow("whether the workspaces of " + YarnClassicOptions.up(depth) + "package.json list " +
+                                 "this project, whose directory in the repository the host did not give");
+        }
+        String[] segments = directory.split("/");
+        return String.join("/", Arrays.asList(segments).subList(segments.length - depth, segments.length));
+    }
+
+    // how many directories above the project's the inputs reach: the repository's root when the host says where the
+    // project sits in it, else the deepest file given
+    private int reach() {
+        String directory = inputs.getDirectory();
+        if (directory != null) {
+            return directory.isEmpty() ? 0 : directory.split("/").length;
+        }
+        Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
+        if (inputs.getPaths() != null) {
+            files.addAll(inputs.getPaths());
+        }
+        return YarnClassicOptions.depth(files);
     }
 
     private static final Pattern RELEASE = Pattern.compile("yarn-1\\.22\\.22\\.[cm]?js");
@@ -448,9 +530,10 @@ public final class YarnClassicLockRegenerator {
             if (paths == null || paths.contains(release)) {
                 return;
             }
-            // the host's paths cover the project and the files directly in each directory above it
-            if (!PosixPath.isAbsolute(release) &&
-                (!release.startsWith("../") || IN_A_DIRECTORY_ABOVE.matcher(release).matches())) {
+            // the host's paths cover the project and the files directly in each directory above it they reach
+            if (!PosixPath.isAbsolute(release) && (!release.startsWith("../") ||
+                IN_A_DIRECTORY_ABOVE.matcher(release).matches() &&
+                YarnClassicOptions.depth(singletonList(release)) <= reach())) {
                 throw new JsError(JsError.ERROR, "Cannot find module '" + release + "'");
             }
         }
@@ -480,7 +563,7 @@ public final class YarnClassicLockRegenerator {
     private @Nullable String findPackageManager() {
         Set<String> paths = inputs.getPaths();
         String up = "";
-        for (int depth = 0; depth <= depthAbove(); depth++, up += "../") {
+        for (int depth = 0; depth <= reach(); depth++, up += "../") {
             String file = up + "package.json";
             String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(file);
             if (text == null) {
@@ -501,23 +584,6 @@ public final class YarnClassicLockRegenerator {
             }
         }
         return null;
-    }
-
-    // how many directories above the project's the inputs reach
-    private int depthAbove() {
-        Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
-        if (inputs.getPaths() != null) {
-            files.addAll(inputs.getPaths());
-        }
-        int depth = 0;
-        for (String file : files) {
-            int d = 0;
-            while (file.startsWith("../", 3 * d)) {
-                d++;
-            }
-            depth = Math.max(depth, d);
-        }
-        return depth;
     }
 
     /**
@@ -698,8 +764,8 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * config.js {@code findWorkspaceRoot} for the project's own directory: a {@code workspaces} array, even an
-     * empty one, or an object with one, makes the project a workspace root.
+     * Whether a manifest makes its directory a workspace root, as config.js {@code findWorkspaceRoot} reads it: a
+     * {@code workspaces} array, even an empty one, or an object with one.
      */
     static boolean isWorkspaceRoot(Manifest manifest) {
         Map<String, @Nullable Object> ws = extractWorkspaces(manifest);
@@ -789,9 +855,15 @@ public final class YarnClassicLockRegenerator {
         if (!(patterns instanceof List)) {
             throw new MessageError("The workspaces field in package.json must be an array.");
         }
+        for (Object pattern : (List<?>) patterns) {
+            if (!(pattern instanceof String)) {
+                throw new JsError(JsError.TYPE_ERROR, pattern == null ?
+                        "Cannot read properties of null (reading 'replace')" : "pattern.replace is not a function");
+            }
+        }
         Set<String> files = new LinkedHashSet<>();
         for (Object pattern : (List<?>) patterns) {
-            files.addAll(glob(Js.templateString(pattern)));
+            files.addAll(glob((String) pattern));
         }
         for (String file : files) {
             String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));

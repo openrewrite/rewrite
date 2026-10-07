@@ -22,10 +22,12 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * The JavaScript semantics yarn's values follow: truthiness, {@code typeof}, the order {@code Object.keys} gives,
@@ -339,6 +341,62 @@ final class Js {
             end--;
         }
         return s.substring(start, end);
+    }
+
+    /**
+     * {@code String.prototype.split} by a string.
+     */
+    static String[] splitString(String s, String separator) {
+        if (separator.isEmpty()) {
+            String[] chars = new String[s.length()];
+            for (int i = 0; i < s.length(); i++) {
+                chars[i] = String.valueOf(s.charAt(i));
+            }
+            return chars;
+        }
+        return s.split(Pattern.quote(separator), -1);
+    }
+
+    /**
+     * {@code s.split(separator).join(with)}.
+     */
+    static String splitJoin(String s, String separator, String with) {
+        return String.join(with, splitString(s, separator));
+    }
+
+    /**
+     * {@code Number(s)} of a string.
+     */
+    static double toNumber(String s) {
+        String t = trim(s);
+        if (t.isEmpty()) {
+            return 0;
+        }
+        if (NON_DECIMAL.matcher(t).matches()) {
+            char radix = Character.toLowerCase(t.charAt(1));
+            return new BigInteger(t.substring(2), radix == 'x' ? 16 : radix == 'o' ? 8 : 2).doubleValue();
+        }
+        if (!DECIMAL.matcher(t).matches()) {
+            return Double.NaN;
+        }
+        if (t.endsWith("Infinity")) {
+            return t.startsWith("-") ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
+        }
+        return Double.parseDouble(t);
+    }
+
+    private static final Pattern NON_DECIMAL = Pattern.compile("0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
+    private static final Pattern DECIMAL = Pattern.compile("[+-]?(Infinity|([0-9]+\\.?[0-9]*|\\.[0-9]+)" +
+                                                           "([eE][+-]?[0-9]+)?)");
+
+    /**
+     * ToInt32, as {@code x >> 0} applies it.
+     */
+    static int toInt32(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return 0;
+        }
+        return (int) (new BigDecimal(d).toBigInteger().longValue() & 0xFFFFFFFFL);
     }
 
     /**

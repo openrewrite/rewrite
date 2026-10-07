@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -57,7 +58,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class YarnClassicScenarioTest {
 
     static final String RESULTS_ENV = "REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS";
-    private static final String SYNTAX_ERROR_HEAD = "SyntaxError: package.json:";
+    private static final Pattern SYNTAX_ERROR_HEAD = Pattern.compile("^SyntaxError: (\\.\\./)*package\\.json:");
     private static final Pattern JS_ERROR = Pattern.compile("([A-Z][A-Za-z]*)?Error( \\[[A-Z_]+])?: ");
 
     private static final List<String> results = Collections.synchronizedList(new ArrayList<>());
@@ -237,8 +238,9 @@ class YarnClassicScenarioTest {
     // the head of yarn's error line; V8's JSON.parse wording is not ported, only the error and the file it names
     private static boolean saysWhatYarnSaid(String detail, String message) {
         String head = message.endsWith(".") ? message.substring(0, message.length() - 1) : message;
-        if (head.startsWith(SYNTAX_ERROR_HEAD)) {
-            return detail.contains(SYNTAX_ERROR_HEAD);
+        Matcher syntaxError = SYNTAX_ERROR_HEAD.matcher(head);
+        if (syntaxError.find()) {
+            return detail.contains(syntaxError.group());
         }
         return detail.contains(head);
     }

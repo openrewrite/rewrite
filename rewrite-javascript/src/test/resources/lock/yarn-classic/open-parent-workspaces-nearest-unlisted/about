@@ -1,0 +1,1 @@
+The directory above the project has workspaces that do not list app and the repository's list mid/*: findWorkspaceRoot stops at the nearest list, so yarn installs the project on its own.

@@ -1,0 +1,1 @@
+The package.json of the directory above the project does not parse: findWorkspaceRoot reads it and yarn exits 1 with the SyntaxError.
