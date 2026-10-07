@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, Markers, Tree} from '../..';
+import {Cursor, Tree} from '../..';
 import {J, Type} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
@@ -192,11 +192,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
 
         // Continue with parent's visit which will push targetCursor and traverse
         return await super.visit(j, p, parent);
-    }
-
-    /** A capture in the receiver has to bind, so a matching `methodType` cannot stand in for it. */
-    protected override selectMustBeVisited(method: J.MethodInvocation): boolean {
-        return method.select !== undefined && containsCapture(method.select);
     }
 
     /**
@@ -1377,26 +1372,4 @@ export class DebugPatternMatchingComparator extends PatternMatchingComparator {
             );
         }
     }
-}
-
-/** Whether anything under `node`, the padding wrappers a marker moves onto included, is a capture. */
-function containsCapture(node: unknown): boolean {
-    if (node === null || typeof node !== 'object') {
-        return false;
-    }
-    if (Array.isArray(node)) {
-        return node.some(containsCapture);
-    }
-    const record = node as Record<string, unknown>;
-    if (typeof record.kind !== 'string') {
-        return false;
-    }
-    // Attribution is a cyclic graph, and a capture is never reachable through one
-    if (Type.isType(node)) {
-        return false;
-    }
-    if (record.markers && PlaceholderUtils.getCaptureMarker(node as { markers: Markers })) {
-        return true;
-    }
-    return Object.entries(record).some(([key, value]) => key !== 'markers' && containsCapture(value));
 }
