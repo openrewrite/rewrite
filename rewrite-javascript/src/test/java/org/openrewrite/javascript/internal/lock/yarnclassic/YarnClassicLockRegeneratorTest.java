@@ -293,6 +293,50 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
+     * Run in packages/a, yarn writes the lock of the root whose workspaces it matches, but reads the config files and
+     * the packageManager from packages/a up: with one below the root, the root's lock is not what an install at the
+     * root writes ({@code review/yc3/cfg-yarn-memberrc}, {@code cfg-yarn-membernpmrc}: the bumped entry's
+     * {@code resolved} follows packages/a/.yarnrc or .npmrc).
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "listed|packages/*||2",
+            "dot slash|./packages/*||0",
+            "not listed|libs/*||0",
+            "own .yarnrc|packages/*|.yarnrc|0",
+            "own .npmrc|packages/*|.npmrc|0",
+            "between .yarnrc.yml|packages/*|../.yarnrc.yml|0",
+            "root .yarnrc|packages/*|../../.yarnrc|2",
+            "above the root .npmrc|packages/*|../../../.npmrc|2"
+    })
+    void installsAtTheRootWhoseLockAnInstallThereWrites(String label, String pattern, @Nullable String configFile,
+                                                        int installRoot) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile("../../package.json", "{\"private\":true,\"workspaces\":[\"" + pattern + "\"]}")
+                .directory("x/packages/a")
+                .now(Instant.EPOCH);
+        if (configFile != null) {
+            inputs.configFile(configFile, "registry \"https://registry.npmjs.org\"\n");
+        }
+        assertThat(YarnClassicLockRegenerator.installRoot(inputs.build())).isEqualTo(installRoot);
+    }
+
+    @Test
+    void aPackageManagerBelowTheRootKeepsTheInstallOffIt() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a\"]}")
+                .directory("a")
+                .now(Instant.EPOCH);
+        assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("", "{\"name\":\"a\"}").build()))
+                .isEqualTo(1);
+        assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("",
+                "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build())).isEqualTo(0);
+    }
+
+    /**
      * At a workspace root above the project yarn reads that root's lock, then rejects the workspaces getWorkspaces
      * rejects before it globs them; a lock there that the inputs lack may stop it first.
      */

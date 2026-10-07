@@ -153,6 +153,30 @@ public final class NativeLockEngine {
         }
     }
 
+    /**
+     * How many directories above the edited manifest's the workspace root is whose lock the package manager writes
+     * when run in the manifest's directory, found by the package manager's own walk, when regenerating that root's
+     * lock reproduces it; else 0. Yarn Berry's project is the nearest directory with a yarn.lock, the manifest's own.
+     */
+    public static int installRoot(PackageManager pm, Request request) {
+        try {
+            switch (pm) {
+                case Npm:
+                    return NpmLockRegenerator.loadLocalPrefix(NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+                case Bun:
+                    return BunLockRegenerator.findWorkspaceRoot(BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+                case YarnClassic:
+                    return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
+                            Instant.EPOCH));
+                default:
+                    return 0;
+            }
+        } catch (RuntimeException e) {
+            // what stops the walk stops the regeneration of the manifest's own lock too, which reports it
+            return 0;
+        }
+    }
+
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);

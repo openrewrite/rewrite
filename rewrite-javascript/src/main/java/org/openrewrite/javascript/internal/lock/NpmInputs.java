@@ -56,8 +56,8 @@ final class NpmInputs {
 
     /**
      * The package.json of each directory above the lock's, nearest first, keyed by the lock's directory as seen from
-     * there. Only an edit of the lock's own manifest walks them: the host sends a member's edit to the workspace root
-     * that lists it, which is where the walk from the member stops.
+     * there. Only an edit of the lock's own manifest walks them: the host sends a member's edit to the lock of the
+     * workspace root the walk from the member stops at.
      */
     static Map<String, String> parentManifests(Request request, String rootDir) {
         Map<String, String> parents = new TreeMap<>(Comparator.comparingInt(String::length));

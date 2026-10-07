@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 
 /** Shared per-project scan-state for the Node dependency {@code ScanningRecipe}s. */
@@ -60,6 +61,8 @@ public final class NodeDependencyScan {
         public final Map<Path, String> packageManagerFiles = new HashMap<>();
         /** Every file the scan visited: what the host holds of the repository. */
         public final Set<Path> paths = new HashSet<>();
+        /** The package.json each {@link #lockFor} walk from a package.json with its own lock ended at. */
+        final Map<Path, Path> installRoots = new HashMap<>();
     }
 
     /**
@@ -118,6 +121,7 @@ public final class NodeDependencyScan {
 
     /** Give each package.json the content of the lock {@link #lockFor} says its edits regenerate. */
     public static void linkWorkspaceMembers(Accumulator acc) {
+        acc.installRoots.clear();
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             Path lock = lockFor(acc, project.getKey());
             project.getValue().capturedLockContent = lock == null ? null : acc.locks.get(lock);
@@ -125,27 +129,51 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. Yarn Berry's
-     * project is the nearest directory with a yarn.lock. npm, Yarn classic, pnpm and Bun install at the nearest
-     * workspace root that lists the package; that root's lock of the same package manager is the one written, and
-     * without one the package's own lock stands, for the engine to find the root itself.
+     * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. A package with a
+     * lock of its own: the lock of the workspace root the package manager's own walk installs at, when regenerating
+     * that lock reproduces the install, else its own, whose regeneration reports what the package manager does
+     * (pnpm's walk is not ported: the nearest root listing the package stands in). Without one: the lock of the
+     * nearest workspace root that lists the package.
      */
     public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);
-        PackageManager pm = null;
-        if (ps != null && ps.capturedPackageJson != null) {
-            NodeResolutionResult marker = ps.capturedPackageJson.getMarkers()
-                    .findFirst(NodeResolutionResult.class).orElse(null);
-            pm = marker == null ? null : marker.getPackageManager();
-        }
+        NodeResolutionResult marker = ps == null || ps.capturedPackageJson == null ? null :
+                ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        PackageManager pm = marker == null ? null : marker.getPackageManager();
         LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
         Path own = lockBeside(acc, packageJsonPath, regeneration);
-        if (own != null && pm == PackageManager.YarnBerry) {
-            return own;
+        Path root;
+        if (own == null || regeneration == null || pm == PackageManager.Pnpm) {
+            root = nearestListingRoot(acc, packageJsonPath);
+        } else {
+            Path walked = acc.installRoots.computeIfAbsent(packageJsonPath,
+                    k -> installRoot(acc, packageJsonPath, requireNonNull(ps), own, marker, regeneration));
+            root = walked.equals(packageJsonPath) ? null : walked;
         }
-        Path root = nearestListingRoot(acc, packageJsonPath);
         Path rootLock = root == null ? null : lockBeside(acc, root, regeneration);
         return rootLock == null ? own : rootLock;
+    }
+
+    // the package.json of the directory the package manager installs at when run beside packageJsonPath
+    private static Path installRoot(Accumulator acc, Path packageJsonPath, ProjectState ps, Path lock,
+                                    NodeResolutionResult marker, LockFileRegeneration regeneration) {
+        String manifest = print(null, packageJsonPath, ps);
+        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest));
+        int depth = regeneration.installRoot(LockFileRegeneration.Request.builder()
+                .packageJson(manifest)
+                .lock(acc.locks.get(lock))
+                .marker(marker)
+                .packageJsonPath(packageJsonPath)
+                .manifests(files.getManifests())
+                .packageManagerFiles(files.getPackageManagerFiles())
+                .projectPaths(files.getPaths())
+                .build());
+        Path dir = directory(packageJsonPath);
+        int segments = dir.toString().isEmpty() ? 0 : dir.getNameCount();
+        if (depth <= 0 || depth > segments) {
+            return packageJsonPath;
+        }
+        return (depth == segments ? Paths.get("") : dir.subpath(0, segments - depth)).resolve("package.json");
     }
 
     private static @Nullable Path lockBeside(Accumulator acc, Path packageJsonPath,
@@ -219,7 +247,11 @@ public final class NodeDependencyScan {
      * package.json of each directory above the project, and the paths under them or directly in a directory above.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
+        return projectFiles(acc, ctx, packageJsonPath, projectManifests(acc, ctx, packageJsonPath));
+    }
+
+    private static ProjectFiles projectFiles(Accumulator acc, @Nullable ExecutionContext ctx, Path packageJsonPath,
+                                             Map<Path, String> manifests) {
         Set<Path> directories = new LinkedHashSet<>();
         for (Path manifest : manifests.keySet()) {
             directories.add(directory(manifest));
@@ -274,8 +306,8 @@ public final class NodeDependencyScan {
         return false;
     }
 
-    private static String print(ExecutionContext ctx, Path path, ProjectState ps) {
-        SourceFile current = PackageJsonHelper.getLiveTree(ctx, path);
+    private static String print(@Nullable ExecutionContext ctx, Path path, ProjectState ps) {
+        SourceFile current = ctx == null ? null : PackageJsonHelper.getLiveTree(ctx, path);
         if (current == null) {
             current = ps.modifiedPackageJson != null ? ps.modifiedPackageJson : requireNonNull(ps.capturedPackageJson);
         }

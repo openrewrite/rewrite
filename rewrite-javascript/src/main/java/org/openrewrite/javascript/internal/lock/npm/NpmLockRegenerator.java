@@ -109,7 +109,15 @@ public final class NpmLockRegenerator {
         String path;
         String written;
         try {
-            loadLocalPrefix();
+            int localPrefix = loadLocalPrefix(inputs);
+            if (localPrefix > 0) {
+                StringBuilder up = new StringBuilder("..");
+                for (int i = localPrefix; i > 1; i--) {
+                    up.append("/..");
+                }
+                throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
+                                     ", whose workspaces list this project, and writes that root's lock");
+            }
             options = NpmOptions.fromNpmrc(inputs.getNpmrc());
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
@@ -144,13 +152,13 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * @npmcli/config {@code loadLocalPrefix}: npm installs at the nearest directory above whose workspaces map the
-     * project, and writes that directory's lock, not this one.
+     * @npmcli/config {@code loadLocalPrefix}: how many directories above the project npm installs, at the nearest
+     * whose workspaces map the project, writing that directory's lock; 0 when it installs here.
      */
-    private void loadLocalPrefix() {
+    public static int loadLocalPrefix(Inputs inputs) {
         String manifest = inputs.getManifests().get("");
         if (manifest == null) {
-            return;
+            return 0;
         }
         for (Map.Entry<String, String> parent : inputs.getParentManifests().entrySet()) {
             Map<String, Object> pkg;
@@ -168,14 +176,10 @@ public final class NpmLockRegenerator {
                     .manifest(parent.getKey(), manifest)
                     .build();
             if (MapWorkspaces.mapWorkspaces("/", pkg, project).containsValue("/" + parent.getKey())) {
-                StringBuilder up = new StringBuilder("..");
-                for (int i = parent.getKey().split("/").length; i > 1; i--) {
-                    up.append("/..");
-                }
-                throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
-                                     ", whose workspaces list this project, and writes that root's lock");
+                return parent.getKey().split("/").length;
             }
         }
+        return 0;
     }
 
     /**

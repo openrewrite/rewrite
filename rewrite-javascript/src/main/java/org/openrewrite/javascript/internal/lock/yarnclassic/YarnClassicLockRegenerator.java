@@ -445,6 +445,42 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
+     * How many directories above the project's the workspace root is whose lock yarn writes when run in the project's
+     * directory, when an install run at that root writes the same; else 0. Yarn reads the config files and the
+     * packageManager from where it runs up, so one in a directory below the root makes the two installs differ.
+     */
+    public static int installRoot(Inputs inputs) {
+        return new YarnClassicLockRegenerator(inputs).installRoot();
+    }
+
+    private int installRoot() {
+        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
+        requireRelease(rc);
+        requirePackageManager();
+        int workspaceRoot = findWorkspaceRoot(YarnClassicOptions.looseSemver(rc), new ArrayList<>());
+        if (workspaceRoot <= 0) {
+            return 0;
+        }
+        Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
+        if (inputs.getPaths() != null) {
+            files.addAll(inputs.getPaths());
+        }
+        for (String file : files) {
+            if (CONFIG_FILE.matcher(file).matches() && YarnClassicOptions.depth(singletonList(file)) < workspaceRoot) {
+                return 0;
+            }
+        }
+        for (int depth = 0; depth < workspaceRoot; depth++) {
+            String text = depth == 0 ? inputs.getManifests().get("") :
+                    inputs.getConfigFiles().get(YarnClassicOptions.up(depth) + "package.json");
+            if (text != null && packageManager(text) != null) {
+                return 0;
+            }
+        }
+        return workspaceRoot;
+    }
+
+    /**
      * install.js {@code run} and {@code fetchRequestFromCwd} at a workspace root above the project, as far as they go
      * without what the inputs lack: the root's lock when it has one, then its workspaces up to their glob.
      */
@@ -585,18 +621,23 @@ public final class YarnClassicLockRegenerator {
                 }
                 continue;
             }
-            Object data;
-            try {
-                data = Js.jsonParse(text);
-            } catch (JsError e) {
-                continue;
-            }
-            Object packageManager = Js.truthy(data) ? Js.get(data, "packageManager") : null;
-            if (packageManager instanceof String) {
-                return (String) packageManager;
+            String packageManager = packageManager(text);
+            if (packageManager != null) {
+                return packageManager;
             }
         }
         return null;
+    }
+
+    private static @Nullable String packageManager(String text) {
+        Object data;
+        try {
+            data = Js.jsonParse(text);
+        } catch (JsError e) {
+            return null;
+        }
+        Object packageManager = Js.truthy(data) ? Js.get(data, "packageManager") : null;
+        return packageManager instanceof String ? (String) packageManager : null;
     }
 
     /**

@@ -194,4 +194,12 @@ public final class LockFileRegeneration {
     public Result regenerate(Request request, ExecutionContext ctx) {
         return NativeLockEngine.regenerate(pm, request, ctx);
     }
+
+    /**
+     * How many directories above the edited manifest's the workspace root is whose lock an install run in the
+     * manifest's directory writes, when regenerating that lock reproduces it; else 0.
+     */
+    public int installRoot(Request request) {
+        return NativeLockEngine.installRoot(pm, request);
+    }
 }

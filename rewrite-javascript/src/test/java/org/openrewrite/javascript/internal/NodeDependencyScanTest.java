@@ -28,6 +28,7 @@ import org.openrewrite.text.PlainText;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -130,6 +131,63 @@ class NodeDependencyScanTest {
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
         assertThat(NodeDependencyScan.lockImporters(acc, rootLock)).containsExactly(ROOT, MEMBER);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+    }
+
+    /**
+     * Which lock yarn 1.22.22, bun 1.3.10 and npm 11.17.0 write when run in packages/a, both it and the root holding
+     * one: the root's (workspaces as given), with or without packages/package.json in between (workspaces
+     * {@code ["x/*"]}) and a config file in packages/a. Yarn classic's walk stops at the first workspaces list and
+     * matches it with micromatch 2.3.11, which keeps a leading {@code ./}; Bun's stops at the first parent with
+     * workspaces; npm's at the nearest that lists the project. Yarn reads the config files from where it runs, so its
+     * root lock then is not an install at the root's, and the member's own lock goes to the engine.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "YarnClassic | packages/*   | false |              | yarn.lock",
+      "YarnClassic | ./packages/* | false |              | packages/a/yarn.lock",
+      "YarnClassic | packages/*   | true  |              | packages/a/yarn.lock",
+      "YarnClassic | packages/*   | false | .yarnrc      | packages/a/yarn.lock",
+      "YarnClassic | packages/*   | false | .npmrc       | packages/a/yarn.lock",
+      "Bun         | packages/*   | true  |              | packages/a/bun.lock",
+      "Bun         | packages/*   | false | bunfig.toml  | bun.lock",
+      "Bun         | packages/*   | false | .npmrc       | bun.lock",
+      "Npm         | packages/*   | true  |              | package-lock.json"
+    })
+    void aMemberWithItsOwnLockGoesWhereThePackageManagersWalkInstalls(PackageManager pm, String pattern, boolean mid,
+                                                                     String configFile, String written) {
+        String lockName = Paths.get(written).getFileName().toString();
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(lockName)).text("root lock").build());
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + lockName))
+          .text("member lock").build());
+        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+          .text("{\"name\":\"root\",\"private\":true,\"workspaces\":[\"" + pattern + "\"]}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(pm, singletonList("packages/a/package.json")))))
+          .build();
+        acc.projects.get(MEMBER).capturedPackageJson = PlainText.builder().sourcePath(MEMBER)
+          .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
+        if (mid) {
+            Path packages = Paths.get("packages/package.json");
+            NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
+            ps.capturedPackageJson = PlainText.builder().sourcePath(packages)
+              .text("{\"name\":\"mid\",\"private\":true,\"workspaces\":[\"x/*\"]}")
+              .markers(Markers.build(singletonList(nodeResolutionResult(pm, emptyList())))).build();
+            acc.projects.put(packages, ps);
+        }
+        if (configFile != null) {
+            NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder()
+              .sourcePath(Paths.get("packages/a/" + configFile)).text("registry=https://registry.npmmirror.com/\n")
+              .build());
+        }
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        Path lock = Paths.get(written);
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(lock);
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo(lock.getNameCount() == 1 ? "root lock" :
+          "member lock");
+        assertThat(NodeDependencyScan.lockImporters(acc, lock)).contains(MEMBER);
     }
 
     /**
