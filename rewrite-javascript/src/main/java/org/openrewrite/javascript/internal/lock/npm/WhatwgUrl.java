@@ -31,7 +31,7 @@ import java.util.Map;
  * Port of the WHATWG URL Standard's basic URL parser and serializer, the {@code URL} class that
  * npm-package-arg and hosted-git-info parse specs with.
  */
-final class WhatwgUrl {
+public final class WhatwgUrl {
 
     private static final Map<String, Integer> SPECIAL = new HashMap<>();
 
@@ -85,11 +85,11 @@ final class WhatwgUrl {
         return url;
     }
 
-    static @Nullable WhatwgUrl tryParse(String input) {
+    public static @Nullable WhatwgUrl tryParse(String input) {
         return basicParse(input, null);
     }
 
-    String getProtocol() {
+    public String getProtocol() {
         return scheme + ":";
     }
 
@@ -101,7 +101,7 @@ final class WhatwgUrl {
         return password;
     }
 
-    String getHost() {
+    public String getHost() {
         if (host == null) {
             return "";
         }
@@ -116,7 +116,7 @@ final class WhatwgUrl {
         return port == null ? "" : Integer.toString(port);
     }
 
-    String getPathname() {
+    public String getPathname() {
         if (opaquePath != null) {
             return opaquePath;
         }
@@ -131,7 +131,7 @@ final class WhatwgUrl {
         return query == null || query.isEmpty() ? "" : "?" + query;
     }
 
-    String getHash() {
+    public String getHash() {
         return fragment == null || fragment.isEmpty() ? "" : "#" + fragment;
     }
 
