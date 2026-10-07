@@ -110,7 +110,9 @@ final class NpmInstallChecks {
         }
         String os = truthy(environment.getOs()) ? environment.getOs() : current.getOs();
         String cpu = truthy(environment.getCpu()) ? environment.getCpu() : current.getCpu();
-        String libc = truthy(environment.getLibc()) ? environment.getLibc() : current.getLibc();
+        // currentEnv.libc(os) detects a libc on linux only
+        String libc = truthy(environment.getLibc()) ? environment.getLibc() :
+                "linux".equals(os) ? current.getLibc() : null;
 
         boolean osOk = os == null || !truthy(target.get("os")) || checkList(os, target.get("os"));
         boolean cpuOk = cpu == null || !truthy(target.get("cpu")) || checkList(cpu, target.get("cpu"));

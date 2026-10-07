@@ -48,7 +48,7 @@ class PnpmLockDiffTest {
                 "\n  is-number@6.0.0: {}\n" +
                 "\n  is-odd@3.0.1:\n    dependencies:\n      is-number: 6.0.0\n";
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("",
                 "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"is-odd\":\"^3.0.1\"}}"));
         assertThat(PnpmLockDiff.diff(graph, lock)).isEmpty();
     }
@@ -70,7 +70,7 @@ class PnpmLockDiffTest {
                 "\n  is-number@6.0.0: {}\n" +
                 "\n  is-odd@3.0.1:\n    dependencies:\n      is-number: 6.0.0\n";
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("",
                 "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\",\"is-odd\":\"^3.0.1\"}}"));
         List<PackageEdit> edits = PnpmLockDiff.diff(graph, lock);
 
@@ -90,7 +90,7 @@ class PnpmLockDiffTest {
                 .add("wrapper", "1.0.0", singletonMap("has-peer", "^1.0.0"));
         registry.addWithPeers("has-peer", "1.0.0", emptyMap(), singletonMap("react", ">=17"));
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("",
                 "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"19.0.0\",\"wrapper\":\"^1.0.0\"}}"));
         assertThatExceptionOfType(EngineFailure.class)
                 .isThrownBy(() -> PnpmLockDiff.diff(graph, ROOT_ONLY_LOCK))
@@ -106,7 +106,7 @@ class PnpmLockDiffTest {
         meta.putObject("react").put("optional", true);
         registry.put("has-meta", "1.0.0", emptyMap(), singletonMap("react", ">=17"), meta);
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("",
                 "{\"name\":\"t\",\"version\":\"1.0.0\",\"dependencies\":{\"react\":\"19.0.0\",\"has-meta\":\"^1.0.0\"}}"));
         assertThatExceptionOfType(EngineFailure.class)
                 .isThrownBy(() -> PnpmLockDiff.diff(graph, ROOT_ONLY_LOCK))

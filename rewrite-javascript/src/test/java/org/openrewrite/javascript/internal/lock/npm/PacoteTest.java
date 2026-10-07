@@ -50,7 +50,11 @@ class PacoteTest {
     }
 
     private static Map<String, Object> manifest(String packument, String spec, Pacote.Options options) {
-        return Pacote.manifest(Spec.npa(spec, "/"), options, registry(packument));
+        return pacote(packument, VirtualTreeLoader.ProjectFiles.builder().build()).manifest(Spec.npa(spec, "/"), options);
+    }
+
+    private static Pacote pacote(String packument, VirtualTreeLoader.ProjectFiles files) {
+        return new Pacote(registry(packument), files, "/");
     }
 
     private static String versioned(String dist) {
@@ -99,5 +103,32 @@ class PacoteTest {
         assertThat(integrity("", "abc")).isNull();
         assertThat(integrity("", 5)).isEqualTo("5");
         assertThatThrownBy(() -> integrity(withA, 5)).hasMessage("this.integrity.match is not a function");
+    }
+
+    // dist.signatures is read under `if (this.integrity)` whether or not the manifest has a dist
+    @Test
+    void heldIntegrityWithoutDistReadsSignaturesOfUndefined() {
+        String noDist = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"x\",\"version\":\"1.0.0\"}}}";
+        assertThat(manifest(noDist, "x@1.0.0", Pacote.Options.builder().build())).doesNotContainKey("_integrity");
+        assertThatThrownBy(() -> manifest(noDist, "x@1.0.0", Pacote.Options.builder().integrity(S).build()))
+          .hasMessage("Cannot read properties of undefined (reading 'signatures')");
+        assertThatThrownBy(() -> manifest(noDist, "x@1.0.0", Pacote.Options.builder().integrity(5).build()))
+          .hasMessage("Cannot read properties of undefined (reading 'signatures')");
+    }
+
+    // DirFetcher.manifest(): the directory's package.json among the project's files, else nothing to read
+    @Test
+    void directorySpecReadsTheProjectsFiles() {
+        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
+          .manifest("vendor/x", "{\"name\":\"x\",\"version\":\"1.0.0\",\"dependencies\":{\"y\":\"1\"}}")
+          .build();
+        Map<String, Object> mani = pacote(LATEST_BELOW_HIGHEST, files)
+          .manifest(Spec.npa("file:vendor/x", "/"), Pacote.Options.builder().integrity(S).build());
+        assertThat(mani).containsEntry("_resolved", "/vendor/x").containsEntry("_from", "file:vendor/x")
+          .containsEntry("_integrity", S).containsKey("dependencies");
+        assertThatThrownBy(() -> pacote(LATEST_BELOW_HIGHEST, files)
+          .manifest(Spec.npa("file:vendor/z", "/"), Pacote.Options.builder().build()))
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("directory manifest file:vendor/z (vendor/z)");
     }
 }

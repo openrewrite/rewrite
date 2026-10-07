@@ -154,6 +154,16 @@ public final class PlaceDep {
     private final List<PeerConflict> warnings;
 
     /**
+     * A placement of a lock-only install: nothing was requested explicitly and nothing is being updated.
+     *
+     * @param dep a node in a virtual tree whose root holds its peer set as children.
+     * @throws CouldNotResolve for npm's {@code ERESOLVE}.
+     */
+    public PlaceDep(Edge edge, Node dep, NpmOptions options) {
+        this(edge, dep, options, false, Collections.emptyList(), null);
+    }
+
+    /**
      * @param dep         a node in a virtual tree whose root holds its peer set as children.
      * @param updateNames the names {@code npm update} was given.
      * @throws CouldNotResolve for npm's {@code ERESOLVE}.

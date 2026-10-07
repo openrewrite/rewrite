@@ -19,9 +19,9 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
@@ -85,13 +85,10 @@ public final class IdealTreeBuilder {
     private final VirtualTreeLoader.ProjectFiles files;
     private final NpmOptions options;
     private final PackumentSource registry;
+    private final Pacote pacote;
     private final Host host;
+    private final Instant now;
 
-    private final boolean complete = true;
-    private final boolean follow = false;
-    private final boolean prune = true;
-    private final List<String> updateNames = Collections.emptyList();
-    private final Set<Edge> explicitRequests = new LinkedHashSet<>();
     private final boolean preferDedupe;
     private final boolean strictPeerDeps;
 
@@ -133,14 +130,17 @@ public final class IdealTreeBuilder {
      * @param files    the lock and the manifests of the project
      * @param registry where manifests come from
      * @param host     what npm reads from the machine; {@link Host#UNKNOWN} satisfies every check
+     * @param now      the clock {@code min-release-age} counts from
      */
     public IdealTreeBuilder(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options,
-                            PackumentSource registry, Host host) {
+                            PackumentSource registry, Host host, Instant now) {
         this.path = PosixPath.resolve(path);
         this.files = files;
         this.options = options;
         this.registry = registry;
+        this.pacote = new Pacote(registry, files, this.path);
         this.host = host;
+        this.now = now;
         this.strictPeerDeps = options.isStrictPeerDeps();
         this.preferDedupe = options.isPreferDedupe();
     }
@@ -213,23 +213,17 @@ public final class IdealTreeBuilder {
     }
 
     private void initTree() {
-        Map<String, String> manifests = files.getManifests();
-        String rootText = manifests.get("");
         Node root;
-        if (rootText == null) {
-            root = rootNodeFromPackage(new LinkedHashMap<>());
-        } else {
-            try {
-                rootManifest = PackageJson.normalize(rootText);
-                root = rootNodeFromPackage(rootManifest.getContent());
-            } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles err) {
-                throw err;
-            } catch (RuntimeException err) {
-                // arborist starts over from an empty manifest here and writes an empty lock
-                throw new MalformedManifest(err.getMessage(), err);
-            }
+        try {
+            rootManifest = files.manifest("");
+            root = rootNodeFromPackage(rootManifest != null ? rootManifest.getContent() : new LinkedHashMap<>());
+        } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles err) {
+            throw err;
+        } catch (RuntimeException err) {
+            // arborist starts over from an empty manifest here and writes an empty lock
+            throw new MalformedManifest(err.getMessage(), err);
         }
-        VirtualTreeLoader.setWorkspaces(root, manifests);
+        NpmLockRegenerator.setWorkspaces(root, files);
 
         VirtualTreeLoader loader = new VirtualTreeLoader(path, options);
         Node tree = loader.loadVirtual(files, root);
@@ -323,8 +317,7 @@ public final class IdealTreeBuilder {
                         .npmVersion(NPM_VERSION)
                         .integrity(node.getIntegrity())
                         .build();
-                Map<String, Object> mani = spec.getType() == Spec.Type.DIRECTORY ?
-                        directoryFetch(spec, pacoteOptions) : Pacote.manifest(spec, pacoteOptions, registry);
+                Map<String, Object> mani = pacote.manifest(spec, pacoteOptions);
                 Map<String, Object> pkg = new LinkedHashMap<>(mani);
                 pkg.put("_id", Js.string(Js.get(mani, "name")) + "@" + Js.string(Js.get(mani, "version")));
                 node.setPackage(pkg);
@@ -367,17 +360,14 @@ public final class IdealTreeBuilder {
             boolean hasBundle = bd instanceof List && !((List<?>) bd).isEmpty();
             Object hasShrinkwrap = node.getHasShrinkwrap();
 
-            if (depsSeen.contains(node) ||
-                node.getRoot() != tree ||
-                truthy(hasShrinkwrap) && !complete) {
+            if (depsSeen.contains(node) || node.getRoot() != tree) {
                 continue;
             }
 
             depsSeen.add(node);
             currentDep = node;
 
-            boolean crackOpen = complete &&
-                                node != tree &&
+            boolean crackOpen = node != tree &&
                                 truthy(node.getResolved()) &&
                                 (hasBundle || truthy(hasShrinkwrap)) &&
                                 !node.isInert();
@@ -403,8 +393,7 @@ public final class IdealTreeBuilder {
                 Node parent = edge.isPeer() ? virtualRoot : null;
                 Node dep = vrDep != null && vrDep.satisfies(edge) ? vrDep : null;
 
-                boolean skipExistingShortcut = updateNames.contains(edge.getName()) || explicitRequests.contains(edge);
-                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL && !skipExistingShortcut) {
+                if (dep == null && edge.getType() == Edge.Type.PEER_OPTIONAL) {
                     Node from = Objects.requireNonNull(edge.getFrom());
                     dep = findHoistableNode(from.getResolveParent() != null ? from.getResolveParent() : from, edge);
                 }
@@ -419,10 +408,9 @@ public final class IdealTreeBuilder {
 
             List<Runnable> promises = new ArrayList<>();
             for (Task task : tasks) {
-                PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options,
-                        explicitRequests.contains(task.getEdge()), updateNames);
+                PlaceDep pd = new PlaceDep(task.getEdge(), task.getDep(), options);
                 warnings.addAll(pd.getWarnings());
-                visitPlacement(pd, promises);
+                visitPlacements(pd, promises);
             }
 
             for (Edge edge : node.getEdgesOut().values()) {
@@ -438,7 +426,19 @@ public final class IdealTreeBuilder {
         }
     }
 
-    // treeverse's depth over the placement and its peer placements
+    // treeverse's depth with a visit only: a stack, so the children of a placement are visited last first
+    private void visitPlacements(PlaceDep top, List<Runnable> promises) {
+        Deque<PlaceDep> stack = new ArrayDeque<>();
+        stack.push(top);
+        while (!stack.isEmpty()) {
+            PlaceDep pd = stack.pop();
+            visitPlacement(pd, promises);
+            for (PlaceDep child : pd.getChildren()) {
+                stack.push(child);
+            }
+        }
+    }
+
     private void visitPlacement(PlaceDep pd, List<Runnable> promises) {
         Node placed = pd.getPlaced();
         Edge edge = pd.getEdge();
@@ -491,9 +491,6 @@ public final class IdealTreeBuilder {
                     });
                 }
             }
-        }
-        for (PlaceDep child : pd.getChildren()) {
-            visitPlacement(child, promises);
         }
     }
 
@@ -590,29 +587,13 @@ public final class IdealTreeBuilder {
             }
 
             if (to == null) {
-                if (edge.getType() != Edge.Type.PEER_OPTIONAL || explicitRequests.contains(edge)) {
+                if (edge.getType() != Edge.Type.PEER_OPTIONAL) {
                     problems.add(edge);
                 }
                 continue;
             }
 
-            if (!edge.isValid()) {
-                if (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave()) {
-                    problems.add(edge);
-                }
-                continue;
-            }
-
-            if (to.isWorkspace()) {
-                continue;
-            }
-
-            if (updateNames.contains(edge.getName())) {
-                problems.add(edge);
-                continue;
-            }
-
-            if (explicitRequests.contains(edge)) {
+            if (!edge.isValid() && (edge.getType() != Edge.Type.PEER_OPTIONAL || options.isSave())) {
                 problems.add(edge);
             }
         }
@@ -620,7 +601,7 @@ public final class IdealTreeBuilder {
     }
 
     private @Nullable Double releaseAgeBefore(Spec spec) {
-        Object before = options.before(host.getNow());
+        Object before = options.before(now);
         if (before == null) {
             return null;
         }
@@ -649,8 +630,7 @@ public final class IdealTreeBuilder {
         if (cached != null) {
             return cached;
         }
-        Map<String, Object> mani = Pacote.manifest(spec, pacoteOptions.integrity(fetchOptions.get("integrity")).build(),
-                registry);
+        Map<String, Object> mani = pacote.manifest(spec, pacoteOptions.integrity(fetchOptions.get("integrity")).build());
         manifests.put(spec.getRaw(), mani);
         return mani;
     }
@@ -777,38 +757,21 @@ public final class IdealTreeBuilder {
                 .build());
     }
 
-    // PackageJson.normalize(realpath).catch(() => ({ content: {} })), from the manifests the project supplied
+    // PackageJson.normalize(realpath).catch(() => ({ content: {} })) over the project's files
     private Map<String, Object> directoryManifest(String realpath, Spec spec) {
-        String text = directoryManifestText(realpath, spec);
+        String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
+        PackageJson manifest;
         try {
-            return PackageJson.normalize(text).getContent();
+            manifest = files.manifest(location);
         } catch (PackageJson.NeedsPackageFiles e) {
             throw e;
         } catch (RuntimeException e) {
             return new LinkedHashMap<>();
         }
-    }
-
-    private String directoryManifestText(String realpath, Spec spec) {
-        String location = Relpath.relpath(Objects.requireNonNull(idealTree).getRealpath(), realpath);
-        String text = files.getManifests().get(location);
-        if (text == null) {
+        if (manifest == null) {
             throw new CannotKnow("directory manifest " + spec.getRawSpec() + " (" + location + ")");
         }
-        return text;
-    }
-
-    // pacote's DirFetcher.manifest() over the manifests the project supplied
-    private Map<String, Object> directoryFetch(Spec spec, Pacote.Options opts) {
-        Pacote.checkBefore(opts);
-        String realpath = Objects.requireNonNull(spec.getFetchSpec());
-        Map<String, Object> mani = new LinkedHashMap<>(
-                PackageJson.normalize(directoryManifestText(realpath, spec)).getContent());
-        Object integrity = opts.getIntegrity();
-        mani.put("_integrity", truthy(integrity) ? Js.string(integrity) : integrity);
-        mani.put("_resolved", realpath);
-        mani.put("_from", spec.getSaveSpec());
-        return mani;
+        return manifest.getContent();
     }
 
     private Node loadPeerSet(Node node, Set<Node> required) {
@@ -873,9 +836,12 @@ public final class IdealTreeBuilder {
     private PlaceDep.CouldNotResolve failPeerConflict(Edge edge, @Nullable Edge currentEdge) {
         Node node = Objects.requireNonNull(edge.getFrom());
         Node curNode = node.resolve(edge.getName());
+        if (curNode == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'explain')");
+        }
         Map<String, Object> expl = new LinkedHashMap<>();
         expl.put("code", "ERESOLVE");
-        expl.put("current", curNode == null ? null : curNode.explain());
+        expl.put("current", curNode.explain());
         expl.put("currentEdge", currentEdge != null ? currentEdge.explain() : null);
         expl.put("edge", edge.explain());
         expl.put("strictPeerDeps", strictPeerDeps);
@@ -896,14 +862,14 @@ public final class IdealTreeBuilder {
             Node target = Objects.requireNonNull(link.getTarget());
             boolean external = !target.isDescendantOf(Objects.requireNonNull(tree.getTarget()));
 
-            if (external && !follow) {
+            if (external) {
                 continue;
             }
 
             boolean unseenLink = (target.getParent() != null || target.getFsParent() != null) &&
                                  !depsSeen.contains(target);
 
-            if (follow && target.getParent() == null && target.getFsParent() == null || unseenLink) {
+            if (unseenLink) {
                 depsQueue.push(target);
             }
         }
@@ -923,7 +889,7 @@ public final class IdealTreeBuilder {
         }
 
         boolean needPrune = metaFromDisk && (mutateTree || flagsSuspect);
-        if (prune && needPrune) {
+        if (needPrune) {
             idealTreePrune();
         }
     }

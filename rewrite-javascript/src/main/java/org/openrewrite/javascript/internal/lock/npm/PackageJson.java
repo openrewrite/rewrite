@@ -98,6 +98,13 @@ public final class PackageJson {
         return new PackageJson(data, parsed.getIndent(), parsed.getNewline());
     }
 
+    /**
+     * A manifest already parsed, as the lock holds one: its content as it is, with no formatting of its own.
+     */
+    static PackageJson parsed(Map<String, Object> content) {
+        return new PackageJson(content, null, null);
+    }
+
     static Map<String, Object> syncNormalize(Map<String, Object> data) {
         List<String> steps = new ArrayList<>(NORMALIZE_STEPS);
         steps.remove("_attributes");

@@ -90,7 +90,7 @@ class VersionShapesTest {
         actual.put("matchesSame", attempt(() -> w.matches(same)));
         actual.put("matchesString", attempt(() -> w.matches(string)));
         actual.put("overridden", attempt(w::isOverridden));
-        actual.put("meta", attempt(() -> sortKeys(Shrinkwrap.metaFromNode(w, "/r"))));
+        actual.put("meta", attempt(() -> sortKeys(Shrinkwrap.metaFromNode(w, "/r", NpmOptions.DEFAULT))));
         assertThat(actual).isEqualTo(NpmTreeSupport.<Map<String, Object>>json(expected));
     }
 
@@ -121,7 +121,7 @@ class VersionShapesTest {
         actual.put("canReplaceWithSame", attempt(() -> w.canReplaceWith(same)));
         actual.put("isWorkspace", attempt(w::isWorkspace));
         actual.put("edgesOutGet", attempt(() -> root.getEdgesOut().get(w.getPackageName()) != null));
-        actual.put("meta", attempt(() -> sortKeys(Shrinkwrap.metaFromNode(w, "/r"))));
+        actual.put("meta", attempt(() -> sortKeys(Shrinkwrap.metaFromNode(w, "/r", NpmOptions.DEFAULT))));
         assertThat(actual).isEqualTo(NpmTreeSupport.<Map<String, Object>>json(expected));
     }
 
@@ -136,7 +136,7 @@ class VersionShapesTest {
     @ParameterizedTest(name = "lock entry version {0}, package version {1}")
     @MethodSource("locked")
     void lockEntryAppliesOnlyToTheSameVersion(String lockVersionJson, String versionJson, JsonNode expected) {
-        Shrinkwrap meta = new Shrinkwrap("/r");
+        Shrinkwrap meta = new Shrinkwrap("/r", NpmOptions.DEFAULT);
         meta.setData(obj("lockfileVersion", 3, "packages", obj("node_modules/w",
                 obj("version", json(lockVersionJson), "resolved", "https://r/w.tgz", "integrity", "sha512-w"))));
         Node root = node(opts().path("/r").meta(meta)

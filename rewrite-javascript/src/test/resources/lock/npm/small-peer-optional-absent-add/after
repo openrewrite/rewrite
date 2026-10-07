@@ -1,0 +1,35 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "@isaacs/testing-peer-optional-conflict-b-x": "1.0.0",
+        "abbrev": "1.1.1"
+      }
+    },
+    "node_modules/@isaacs/testing-peer-optional-conflict-b-x": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-peer-optional-conflict-b-x/-/testing-peer-optional-conflict-b-x-1.0.0.tgz",
+      "integrity": "sha512-19feHJAqq5HG2RrN2zHXiPXujXqHgJuGyZaKFolghgYKyncZYRpBwxboSDgMp8SxyrGx9EF74x6yarrVXRo9hw==",
+      "peerDependencies": {
+        "@isaacs/testing-peer-optional-conflict-b-y": "2"
+      },
+      "peerDependenciesMeta": {
+        "@isaacs/testing-peer-optional-conflict-b-y": {
+          "optional": true
+        }
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    }
+  }
+}

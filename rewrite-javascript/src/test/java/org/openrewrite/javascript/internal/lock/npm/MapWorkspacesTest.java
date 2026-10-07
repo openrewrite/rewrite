@@ -52,10 +52,10 @@ class MapWorkspacesTest {
         return out.stream();
     }
 
-    private static Map<String, String> manifests(JsonNode declared) {
+    private static VirtualTreeLoader.ProjectFiles manifests(JsonNode declared) {
         Map<String, String> manifests = new LinkedHashMap<>();
         declared.fields().forEachRemaining(e -> manifests.put(e.getKey(), e.getValue().asText()));
-        return manifests;
+        return VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
     }
 
     private static List<List<String>> relative(Map<String, String> members) {

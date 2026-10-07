@@ -23,29 +23,31 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.missing;
 
 /**
  * Replays every recorded edit {@link NpmScenarios} finds through {@link NpmLockRegenerator} against a stub
  * registry served from the scenario's {@code http/}, and asserts what the scenario's {@code expect} line says:
  * {@code exact} (the lock written equals npm's byte for byte; the default when {@code after} is present),
  * {@code peer-conflict}, {@code npm-rejects <code>}, {@code cannot-know}, {@code malformed} or {@code unstable}.
- * When {@code REWRITE_LOCK_SCENARIO_RESULTS} names a file, one line per edit is written there: the outcome and
- * the first difference.
+ * A fixture recorded elsewhere may lack registry responses: it is replayed when a cache fills them and
+ * skipped when it cannot be served. When {@code REWRITE_LOCK_SCENARIO_RESULTS} names a file, one line per
+ * edit is written there: the outcome and the first difference.
  */
 class NpmScenarioTest {
 
@@ -54,7 +56,7 @@ class NpmScenarioTest {
     private static final List<String> results = Collections.synchronizedList(new ArrayList<>());
 
     static Stream<Arguments> edits() {
-        return IdealTreeBuilderTest.edits();
+        return ScenarioReplay.edits();
     }
 
     @AfterAll
@@ -70,22 +72,6 @@ class NpmScenarioTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {
-        NpmScenarios.Scenario scenario = edit.getScenario();
-        String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        Instant recordedAt = scenario.recordedAt();
-        return NpmLockRegenerator.Inputs.builder()
-          .lock(edit.getStart().getText())
-          .yarnLock(edit.getInputs().getYarnLock())
-          .manifests(edit.manifests())
-          .npmrc(npmrc + scenario.argsAfter())
-          .host(IdealTreeBuilderTest.RECORDED_ON.toBuilder()
-            .nodeVersion(scenario.nodeVersion())
-            .now(recordedAt != null ? recordedAt : Instant.now())
-            .build())
-          .build();
     }
 
     /**
@@ -107,36 +93,35 @@ class NpmScenarioTest {
     void regeneratesWhatNpmWrote(String name, NpmScenarios.Edit edit) {
         NpmScenarios.Scenario scenario = edit.getScenario();
         String expect = scenario.expect();
-        String kind = IdealTreeBuilderTest.kind(expect);
+        String kind = ScenarioReplay.kind(expect);
         String[] words = expect == null ? new String[0] : expect.split("\\s+");
-        IdealTreeBuilderTest.ScenarioRegistry http = new IdealTreeBuilderTest.ScenarioRegistry(scenario);
+        ScenarioRegistry http = new ScenarioRegistry(scenario);
         String label = scenario.getLabel() + "/" + edit.getStart().getFileName();
 
         if (kind.equals("exact") && edit.getResult() == null) {
             record(label, "skipped", "no after and no expect");
             return;
         }
-        Result result = new NpmLockRegenerator(inputs(edit), IdealTreeBuilderTest.registry(http)).regenerate();
+        Result result = new NpmLockRegenerator(ScenarioReplay.inputs(edit), ScenarioReplay.registry(http)).regenerate();
         Failure failure = result.getFailure();
         String thrown = failure == null ? String.valueOf(result.getErrorMessage()) :
           failure.getReason() + ": " + failure.getDetail();
 
         if (kind.equals("exact")) {
             if (!result.isSuccess()) {
-                record(label, "failed", thrown + missing(http));
-                fail(label + " expected npm's lock but regeneration failed: " + thrown + missing(http));
+                failed(label, http, "failed", thrown, " expected npm's lock but regeneration failed: " + thrown);
             }
             String expected = expectedLock(edit, expect);
             if (!expected.equals(result.getLockFileContent())) {
-                record(label, "mismatch", firstDifference(expected, result.getLockFileContent()) + missing(http));
+                failed(label, http, "mismatch", firstDifference(expected, result.getLockFileContent()), "");
                 assertThat(result.getLockFileContent()).as(label + missing(http)).isEqualTo(expected);
             }
-            record(label, "exact", "");
+            record(label, "exact", missing(http).trim());
             return;
         }
         if (result.isSuccess()) {
-            record(label, "unexpected-success", "expected " + expect);
-            fail(label + " expected \"" + expect + "\" but regeneration succeeded" + missing(http));
+            failed(label, http, "unexpected-success", "expected " + expect,
+              " expected \"" + expect + "\" but regeneration succeeded");
         }
         boolean ok;
         switch (kind) {
@@ -146,17 +131,20 @@ class NpmScenarioTest {
                      failure.getDetail().contains(words[1]) && failure.getDetail().contains(words[2]);
                 break;
             case "npm-rejects":
-                // a crash is npm's own code failing (no error code): the port fails there too, not always the same way
-                ok = "crash".equals(words[1]) ? failure.getDetail().startsWith(NpmLockRegenerator.NPM_FAILS) ||
-                                                failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS) :
-                  failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS + " (" + words[1] + ")");
+                // a crash is npm's own code failing (no error code): the port fails there too, not always the same way;
+                // a route the stub lacked may be the failure's cause instead, unless npm's own answer was the 404
+                ok = ("crash".equals(words[1]) ? failure.getDetail().startsWith(NpmLockRegenerator.NPM_FAILS) ||
+                                                 failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS) :
+                  failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS + " (" + words[1] + ")")) &&
+                     (http.missing.isEmpty() || "E404".equals(words[1]));
                 break;
             case "cannot-know":
                 ok = failure.getDetail().startsWith(NpmLockRegenerator.CANNOT_KNOW);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK ||
-                     failure.getReason() == Reason.MALFORMED_MANIFEST && failure.getDetail().contains(malformedKey(expect));
+                     failure.getReason() == Reason.MALFORMED_MANIFEST &&
+                     failure.getDetail().contains(ScenarioReplay.malformedKey(expect));
                 break;
             case "unstable":
                 ok = failure.getDetail().startsWith(NpmLockRegenerator.SECOND_INSTALL);
@@ -166,16 +154,22 @@ class NpmScenarioTest {
                 break;
         }
         if (!ok) {
-            record(label, "wrong-failure", "expected " + expect + " got " + thrown + missing(http));
-            fail(label + " expected \"" + expect + "\" but got " + thrown + missing(http));
+            failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown,
+              " expected \"" + expect + "\" but got " + thrown);
         }
-        record(label, "expected-failure", thrown);
+        record(label, "expected-failure", thrown + missing(http));
     }
 
-    // "malformed override key <key>" or "malformed override reference <$ref> reached from <name>"
-    private static String malformedKey(String expect) {
-        String[] words = expect.split("\\s+");
-        return expect.startsWith("malformed override reference ") ? words[3] : words[words.length - 1];
+    // a replay the stub could not serve is skipped, every other departure from the recording fails
+    private static void failed(String label, ScenarioRegistry http, String outcome, String detail, String message) {
+        if (http.unservedElsewhereRecording()) {
+            record(label, "skipped", "not served offline:" + missing(http));
+            assumeTrue(false, label + " cannot be replayed offline" + missing(http));
+        }
+        record(label, outcome, detail + missing(http));
+        if (!message.isEmpty()) {
+            fail(label + message + missing(http));
+        }
     }
 
     private static String firstDifference(String expected, String actual) {
@@ -189,9 +183,5 @@ class NpmScenarioTest {
             }
         }
         return "differs";
-    }
-
-    private static String missing(IdealTreeBuilderTest.ScenarioRegistry http) {
-        return http.missing.isEmpty() ? "" : " [routes not recorded: " + String.join(", ", http.missing) + "]";
     }
 }

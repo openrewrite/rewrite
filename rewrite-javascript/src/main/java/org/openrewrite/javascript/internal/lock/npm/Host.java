@@ -19,12 +19,10 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.time.Instant;
-
 /**
  * What npm reads from the machine it runs on: {@code process.version}, {@code process.platform},
- * {@code process.arch}, the libc it detects, and the clock. A null member is unknown, and the checks
- * that read it count as satisfied.
+ * {@code process.arch} and the libc it detects. A null member is unknown, and the checks that read it
+ * count as satisfied.
  */
 @Value
 @Builder(toBuilder = true)
@@ -43,7 +41,4 @@ public class Host {
 
     @Nullable
     String libc;
-
-    @Builder.Default
-    Instant now = Instant.now();
 }

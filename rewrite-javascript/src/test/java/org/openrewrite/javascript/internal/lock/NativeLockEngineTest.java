@@ -40,6 +40,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -316,6 +317,25 @@ class NativeLockEngineTest {
     void npmrcGlobalFailsLoud() {
         NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
                 new Npmrc(NpmrcScope.Project, Map.of("global", "true"))));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
+                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
+                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getDetail())
+                .startsWith("npm rejects this edit (ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
+    }
+
+    // npm 11.17.0: location=global is global mode, even beside global=false written before it
+    @Test
+    void npmrcLocationGlobalFailsLoud() {
+        Map<String, String> npmrc = new LinkedHashMap<>();
+        npmrc.put("global", "false");
+        npmrc.put("location", "global");
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
+                new Npmrc(NpmrcScope.Project, npmrc)));
 
         Result result = NativeLockEngine.regenerate(PackageManager.Npm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",

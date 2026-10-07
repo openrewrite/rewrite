@@ -21,6 +21,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,11 @@ import java.util.regex.Pattern;
 final class Ssri {
 
     private static final Pattern SRI = Pattern.compile("^([a-z0-9]+)-([^?]+)([?\\S*]*)$");
+
+    // the names in Node 24's crypto.getHashes() that the algorithm pattern can match
+    private static final Set<String> NODE_HASHES = new HashSet<>(Arrays.asList("blake2b512", "blake2s256", "md5",
+            "ripemd", "ripemd160", "rmd160", "sha1", "sha224", "sha256", "sha384", "sha512", "shake128", "shake256",
+            "sm3"));
 
     // ssri's DEFAULT_PRIORITY after Node 24's crypto.getHashes() filter
     private static final List<String> PRIORITY = Arrays.asList("md5", "sha1", "sha224", "sha256", "sha384",
@@ -135,7 +141,7 @@ final class Ssri {
         Map<String, List<String>> byAlgorithm = new LinkedHashMap<>();
         for (String entry : Js.trim(sri).split("\\s+")) {
             Matcher m = SRI.matcher(entry);
-            if (m.matches()) {
+            if (m.matches() && NODE_HASHES.contains(m.group(1))) {
                 byAlgorithm.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add(entry);
             }
         }

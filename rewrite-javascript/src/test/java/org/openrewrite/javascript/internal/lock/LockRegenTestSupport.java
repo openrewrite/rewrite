@@ -98,7 +98,7 @@ abstract class LockRegenTestSupport {
         }
     }
 
-    /** Verify a two-phase incremental golden pair with real pnpm (see {@link #assertNpmReproducesIncremental}). */
+    /** Verify a two-phase incremental golden pair with real pnpm. */
     protected void assertPnpmReproducesIncremental(String dir) throws Exception {
         Path tmp = Files.createTempDirectory("pnpm-regen-record");
         try {

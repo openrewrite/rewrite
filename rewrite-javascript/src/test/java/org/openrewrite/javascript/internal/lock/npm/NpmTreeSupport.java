@@ -131,7 +131,7 @@ final class NpmTreeSupport {
     }
 
     static Shrinkwrap emptyLock(String path) {
-        Shrinkwrap meta = new Shrinkwrap(path);
+        Shrinkwrap meta = new Shrinkwrap(path, NpmOptions.DEFAULT);
         meta.setData(obj("lockfileVersion", 2, "packages", obj(), "dependencies", obj()));
         return meta;
     }

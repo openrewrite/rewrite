@@ -132,10 +132,10 @@ class LocaleCompareTest {
     }
 
     /**
-     * Node answers -1 for each of these against its normalized form: a contraction starter (Cyrillic \u0418,
-     * Tibetan U+0F71, Sinhala U+0DDC, whose decomposition is a contraction) followed by a mark from beyond
-     * the Basic Multilingual Plane and a mark of a lower class, or U+1138B before a vowel sign whose
-     * decomposition continues a contraction.
+     * Node orders each of these apart from its normalized form (-1 for the first, second and fourth, +1 for
+     * the third): a contraction starter (Cyrillic \u0418, Tibetan U+0F71, Sinhala U+0DDC, whose decomposition
+     * is a contraction) followed by a mark from beyond the Basic Multilingual Plane and a mark of a lower
+     * class, or U+1138B before a vowel sign whose decomposition continues a contraction.
      */
     @Test
     void contractionsMeetingSupplementaryCharactersAreRefused() {

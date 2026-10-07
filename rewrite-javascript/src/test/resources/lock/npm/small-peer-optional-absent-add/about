@@ -1,0 +1,1 @@
+Add testing-peer-optional-conflict-b-x@1.0.0, whose only peer (b-y 2) is optional in its peerDependenciesMeta and installed nowhere: the entry carries peerDependencies and peerDependenciesMeta, no b-y is placed.

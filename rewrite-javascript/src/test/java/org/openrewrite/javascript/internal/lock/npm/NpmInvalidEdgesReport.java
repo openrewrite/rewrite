@@ -40,19 +40,19 @@ class NpmInvalidEdgesReport {
         lines.add("scenario\tlock\tfrom\ttype\tname\tspec\tto\terror");
         for (NpmScenarios.Scenario scenario : NpmScenarios.discover()) {
             for (NpmScenarios.Lock lock : scenario.locks()) {
-                if (lock.isBefore() || lock.isInput() || NpmLockRoundTripTest.lockfileVersion(lock.getText()) < 2) {
+                if (lock.isBefore() || lock.isInput() || ScenarioReplay.lockfileVersion(lock.getText()) < 2) {
                     continue;
                 }
                 String row = scenario.getName() + "\t" + lock.getFileName() + "\t";
                 Node tree;
                 try {
-                    tree = NpmLockRoundTripTest.load(lock, NpmOptions.fromNpmrc(lock.getNpmrc()),
-                      NpmLockRoundTripTest.projectPath(lock.getText()));
+                    tree = ScenarioReplay.load(lock, NpmOptions.fromNpmrc(lock.getNpmrc()),
+                      ScenarioReplay.projectPath(lock.getText()));
                 } catch (RuntimeException e) {
                     lines.add(row + "\t\t\t\t\t" + "load failed: " + e.getMessage().replace('\n', ' '));
                     continue;
                 }
-                for (Edge edge : NpmLockRoundTripTest.problemEdges(tree)) {
+                for (Edge edge : ScenarioReplay.problemEdges(tree)) {
                     Node to = edge.getTo();
                     lines.add(row + edge.getFrom().getLocation() + "\t" + edge.getType() + "\t" + edge.getName() + "\t" +
                               edge.getSpec() + "\t" + (to == null ? "" : to.getLocation()) + "\t" +

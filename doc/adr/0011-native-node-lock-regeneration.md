@@ -58,8 +58,8 @@ is the Node analogue of the Python problem addressed by ADR 0009 / 0010.
 - Regeneration is centralized behind `LockFileRegeneration.forPackageManager` and
   `PackageJsonHelper.editAndRegenerate` / `regenerateLockContent`.
 - rewrite-javascript already depends on rewrite-json and rewrite-yaml; their LSTs round-trip
-  `package-lock.json`, `bun.lock`, and `pnpm-lock.yaml` byte-for-byte, so those formats are edited in
-  place. `yarn.lock` (classic) is not valid YAML and is edited as targeted text.
+  `bun.lock` and `pnpm-lock.yaml` byte-for-byte, so those formats are edited in place (npm's lock is
+  written whole, see ADR 0013). `yarn.lock` (classic) is not valid YAML and is edited as targeted text.
 - rewrite-core's `org.openrewrite.semver` was node-inspired but is Maven-flavored (no top-level `||`,
   Maven qualifier-ladder prereleases, a permitted 4th component) and cannot be reused for npm range
   matching directly.
@@ -125,7 +125,7 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
   runs the closure-safe proof over the raw lock (not the lossy adapters), resolves versions
   minimal-update (keep the locked version if it still satisfies, else max-satisfying), honors
   overrides/resolutions, builds a `LockEditSet`, and dispatches to the format's `LockPatcher`.
-- **Whole-closure resolution** — `NpmGraphBuilder` resolves the closure from the importer manifest
+- **Whole-closure resolution** — `GraphBuilder` resolves the closure from the importer manifest
   (regular/dev/optional scopes, satisfied peers, `npm:` aliases), preferring a locked version that
   still satisfies its range over the registry maximum; `ResolutionGraph` / `ResolvedNode` are the
   plain value model. A per-format graph-to-lock diff (`PnpmLockDiff`, `BunLockDiff`,
@@ -185,7 +185,7 @@ gated parity cross-check that keeps the goldens honest.
 - Semantics change from re-install to minimal update: diffs contain only what the recipe caused, which
   is more reviewable for fleet-scale change, but runs that previously also picked up unrelated newer
   versions no longer do.
-- We own a node-semver implementation and five format patchers that track the package managers. The
+- We own a node-semver implementation and four format patchers that track the package managers. The
   tracked surface is small and slow-moving, pinned per format by real-output golden fixtures, but it is
   a real maintenance commitment — the same one rewrite-maven made, at Node's scale.
 - The node-semver, registry-client, and `.npmrc` layers are Node-ecosystem infrastructure usable

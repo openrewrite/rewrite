@@ -36,10 +36,8 @@ import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.descri
 import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.plain;
 
 /**
- * Port of @npmcli/arborist test/place-dep.js: its runTest table, with the force and legacyPeerDeps variants
- * each ERESOLVE case adds and arborist's answers, is the place-dep-cases fixture; the cases' own assertions
- * follow. The case that marks y@1.2.0 vulnerable through an audit report names y in updateNames instead,
- * which the generator shows arborist places the same way.
+ * Port of @npmcli/arborist test/place-dep.js over the place-dep-cases fixture (the audit-report case names y in
+ * updateNames instead, which places the same way).
  */
 class PlaceDepTest {
 

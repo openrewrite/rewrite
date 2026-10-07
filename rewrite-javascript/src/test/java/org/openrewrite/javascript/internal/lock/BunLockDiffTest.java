@@ -114,7 +114,7 @@ class BunLockDiffTest {
                 "  }\n" +
                 "}\n";
 
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", manifest(deps)));
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("", manifest(deps)));
         assertThat(BunLockDiff.diff(graph, lock)).isEmpty();
     }
 
@@ -218,7 +218,7 @@ class BunLockDiffTest {
                 "    \"b\": [\"b@1.0.0\", \"\", {}, \"sha512-b\"],\n" +
                 "  }\n" +
                 "}\n";
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("",
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("",
                 "{\"name\":\"t\",\"version\":\"1.0.0\",\"devDependencies\":{\"b\":\"^1.0.0\"}}"));
 
         assertThatExceptionOfType(EngineFailure.class)
@@ -232,7 +232,7 @@ class BunLockDiffTest {
         Map<String, String> importers = new LinkedHashMap<>();
         importers.put("", "{\"name\":\"t\",\"version\":\"1.0.0\"}");
         importers.put("packages/m", "{\"name\":\"m\",\"version\":\"1.0.0\",\"dependencies\":{\"b\":\"^1.0.0\"}}");
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(importers);
+        ResolutionGraph graph = new GraphBuilder(registry).build(importers);
 
         assertThatExceptionOfType(EngineFailure.class)
                 .isThrownBy(() -> BunLockDiff.diff(graph, ROOT_ONLY_LOCK))
@@ -242,7 +242,7 @@ class BunLockDiffTest {
     // --- helpers ------------------------------------------------------------
 
     private static List<PackageEdit> diff(Registry registry, String manifest) {
-        ResolutionGraph graph = new NpmGraphBuilder(registry).build(singletonMap("", manifest));
+        ResolutionGraph graph = new GraphBuilder(registry).build(singletonMap("", manifest));
         return BunLockDiff.diff(graph, ROOT_ONLY_LOCK);
     }
 

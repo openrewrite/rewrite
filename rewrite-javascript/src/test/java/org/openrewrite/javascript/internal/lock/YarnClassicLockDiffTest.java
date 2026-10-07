@@ -275,7 +275,7 @@ class YarnClassicLockDiffTest {
     // --- in-memory registry + manifest builders ---------------------------
 
     private static List<PackageEdit> diff(Registry registry, String manifest, String lock) {
-        return YarnClassicLockDiff.diff(new NpmGraphBuilder(registry).build(singletonMap("", manifest)), lock);
+        return YarnClassicLockDiff.diff(new GraphBuilder(registry).build(singletonMap("", manifest)), lock);
     }
 
     private static String app(Map<String, String> dependencies) {

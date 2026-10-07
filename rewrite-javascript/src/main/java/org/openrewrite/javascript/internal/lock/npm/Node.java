@@ -409,13 +409,15 @@ public class Node {
     }
 
     public String getPkgid() {
-        Object name = pkg.get("name");
-        String pkgName = name == null ? "" : String.valueOf(name);
-        String pkgVersion = pkg.containsKey("version") ? String.valueOf(pkg.get("version")) : "";
+        Object name = Js.get(pkg, "name");
+        Object version = Js.get(pkg, "version");
+        Object pkgName = name == Js.UNDEFINED ? "" : name;
+        Object pkgVersion = version == Js.UNDEFINED ? "" : version;
         boolean isProjectRoot = isProjectRoot();
-        String myname = isProjectRoot ? (truthy(pkgName) ? pkgName : this.name) : this.name;
-        String alias = !isProjectRoot && truthy(pkgName) && !pkgName.equals(myname) ? "npm:" + pkgName + "@" : "";
-        return myname + "@" + alias + pkgVersion;
+        Object myname = isProjectRoot ? (truthy(pkgName) ? pkgName : this.name) : this.name;
+        String alias = !isProjectRoot && truthy(pkgName) && !Js.strictEquals(myname, pkgName) ?
+                "npm:" + Js.string(pkgName) + "@" : "";
+        return Js.string(myname) + "@" + alias + Js.string(pkgVersion);
     }
 
     public boolean isOverridden() {

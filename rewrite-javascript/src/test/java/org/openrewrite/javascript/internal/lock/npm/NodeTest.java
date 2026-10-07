@@ -873,6 +873,11 @@ class NodeTest {
         assertThat(n.getPkgid()).isEqualTo("foo@1.2.3");
         n.setPackage(obj("name", "bar", "version", "1.2.3"));
         assertThat(n.getPkgid()).isEqualTo("foo@npm:bar@1.2.3");
+        // `const { name = '', version = '' } = this.package` defaults undefined only: null renders as null
+        n.setPackage(obj("name", null, "version", null));
+        assertThat(n.getPkgid()).isEqualTo("foo@null");
+        n.setPackage(obj("name", 5, "version", 1e21));
+        assertThat(n.getPkgid()).isEqualTo("foo@npm:5@1e+21");
     }
 
     @Test

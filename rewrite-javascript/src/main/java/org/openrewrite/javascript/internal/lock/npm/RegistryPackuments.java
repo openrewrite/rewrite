@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -22,6 +23,7 @@ import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * The registry documents of a build, fetched through the run's {@link NpmRegistryClient} from the
@@ -63,11 +65,7 @@ public final class RegistryPackuments implements PackumentSource {
         return document;
     }
 
-    private interface Fetch {
-        String get();
-    }
-
-    private static String fetch(Fetch fetch, String name, String version) {
+    private static String fetch(Supplier<String> fetch, String name, @Nullable String version) {
         try {
             return fetch.get();
         } catch (NodeRegistryException e) {

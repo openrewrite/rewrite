@@ -232,6 +232,20 @@ class NpmInstallChecksTest {
           Host.builder().os("linux").build(), Host.UNKNOWN)).doesNotThrowAnyException();
     }
 
+    // currentEnv.libc(os) answers for the effective os: a configured os other than linux has no libc
+    @Test
+    void configuredOsDropsTheMachinesLibc() {
+        Host linuxGlibc = Host.builder().os("linux").cpu("x64").libc("glibc").build();
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN, linuxGlibc))
+          .doesNotThrowAnyException();
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
+          Host.builder().os("darwin").build(), linuxGlibc)).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
+          Host.builder().os("win32").build(), linuxGlibc)).matches(NpmInstallChecksTest::badPlatform);
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
+          Host.builder().os("linux").build(), linuxGlibc)).doesNotThrowAnyException();
+    }
+
     // node-semver's satisfies answers false where the Range constructor throws, so npm reports EBADENGINE;
     // the platform lists throw as JavaScript does (npm-install-checks 8.0.0 run on these values)
     @Test

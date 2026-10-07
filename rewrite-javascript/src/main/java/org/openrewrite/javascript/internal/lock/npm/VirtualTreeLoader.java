@@ -18,10 +18,10 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
-import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,19 +39,70 @@ public final class VirtualTreeLoader {
 
     /**
      * What a lock-only install reads from the project: the lock, a yarn.lock beside it, and the
-     * package.json of the root ({@code ""}) and of every directory a link resolves to, by location.
+     * package.json of the root ({@code ""}) and of every directory a link resolves to, by location, as
+     * text or already parsed. A manifest is read once.
      */
-    @Value
-    @Builder
-    public static class ProjectFiles {
-        @Nullable
-        LockFile lock;
+    public static final class ProjectFiles {
+        private static final Object NONE = new Object();
 
-        @Nullable
-        String yarnLock;
+        @Getter
+        private final @Nullable LockFile lock;
 
-        @Singular
-        Map<String, String> manifests;
+        @Getter
+        private final @Nullable String yarnLock;
+
+        /**
+         * The manifests the host supplied, by location.
+         */
+        @Getter
+        private final Map<String, String> manifests;
+
+        /**
+         * Manifests held parsed already: the lock's own entries, standing in for files the host did not supply.
+         */
+        private final Map<String, Map<String, Object>> parsedManifests;
+
+        private final Map<String, Object> read = new HashMap<>();
+
+        @Builder
+        ProjectFiles(@Nullable LockFile lock, @Nullable String yarnLock, @Singular Map<String, String> manifests,
+                     @Singular Map<String, Map<String, Object>> parsedManifests) {
+            this.lock = lock;
+            this.yarnLock = yarnLock;
+            this.manifests = manifests;
+            this.parsedManifests = parsedManifests;
+        }
+
+        /**
+         * The manifest at a location, normalized as arborist reads one from disk, or as it was given parsed;
+         * null where there is none. A text that does not normalize throws the same error on every read.
+         */
+        public @Nullable PackageJson manifest(String location) {
+            Object value = read.get(location);
+            if (value == null) {
+                String text = manifests.get(location);
+                Map<String, Object> parsed = parsedManifests.get(location);
+                try {
+                    value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) : NONE;
+                } catch (RuntimeException e) {
+                    value = e;
+                }
+                read.put(location, value);
+            }
+            if (value instanceof RuntimeException) {
+                throw (RuntimeException) value;
+            }
+            return value == NONE ? null : (PackageJson) value;
+        }
+
+        /**
+         * Every location that holds a package.json.
+         */
+        public Set<String> manifestLocations() {
+            Set<String> locations = new LinkedHashSet<>(manifests.keySet());
+            locations.addAll(parsedManifests.keySet());
+            return locations;
+        }
     }
 
     /**
@@ -96,7 +147,7 @@ public final class VirtualTreeLoader {
     private boolean flagsSuspect;
 
     private @Nullable Node rootOptionProvided;
-    private Map<String, String> manifests = new LinkedHashMap<>();
+    private ProjectFiles files = ProjectFiles.builder().build();
 
     public VirtualTreeLoader(String path, NpmOptions options) {
         this.path = PosixPath.resolve(path);
@@ -115,7 +166,7 @@ public final class VirtualTreeLoader {
         if (virtualTree != null) {
             return virtualTree;
         }
-        manifests = files.getManifests();
+        this.files = files;
 
         if (root != null && root.getMeta() != null) {
             loadFromShrinkwrap(root.getMeta(), root);
@@ -130,7 +181,7 @@ public final class VirtualTreeLoader {
         Object pkg = rootPackage(s);
         rootOptionProvided = root;
         if (root == null) {
-            root = setWorkspaces(loadNode("", pkg, true), manifests);
+            root = NpmLockRegenerator.setWorkspaces(loadNode("", pkg, true), files);
         }
 
         loadFromShrinkwrap(s, root);
@@ -140,29 +191,17 @@ public final class VirtualTreeLoader {
 
     // PackageJson.normalize(this.path).then(p => p.content).catch(() => s.data.packages[''] || {})
     private Object rootPackage(Shrinkwrap s) {
-        String text = manifests.get("");
-        if (text != null) {
-            try {
-                return PackageJson.normalize(text).getContent();
-            } catch (PackageJson.NeedsPackageFiles e) {
-                throw e;
-            } catch (RuntimeException ignored) {
+        try {
+            PackageJson manifest = files.manifest("");
+            if (manifest != null) {
+                return manifest.getContent();
             }
+        } catch (PackageJson.NeedsPackageFiles e) {
+            throw e;
+        } catch (RuntimeException ignored) {
         }
         Object fromLock = Js.get(Objects.requireNonNull(s.getData()).get("packages"), "");
         return truthy(fromLock) ? fromLock : new LinkedHashMap<>();
-    }
-
-    /**
-     * Arborist's {@code setWorkspaces}: the members the node's {@code workspaces} patterns name among the
-     * project's manifests become its workspace edges.
-     */
-    static Node setWorkspaces(Node node, Map<String, String> manifests) {
-        Map<String, String> workspaces = MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(), manifests);
-        if (!workspaces.isEmpty()) {
-            node.setWorkspaces(workspaces);
-        }
-        return node;
     }
 
     @SuppressWarnings("unchecked")
@@ -293,15 +332,15 @@ public final class VirtualTreeLoader {
             nodes.put(targetLoc, Objects.requireNonNull(link.getTarget()));
 
             if (link.getTarget().getParent() == null) {
-                String text = manifests.get(targetLoc);
-                if (text != null) {
-                    try {
-                        link.getTarget().setPackage(PackageJson.normalize(text).getContent());
-                    } catch (PackageJson.NeedsPackageFiles e) {
-                        throw e;
-                    } catch (RuntimeException ignored) {
-                        // arborist's .catch(() => null): the package stays assigned, its edges loaded up to the failure
+                try {
+                    PackageJson manifest = files.manifest(targetLoc);
+                    if (manifest != null) {
+                        link.getTarget().setPackage(manifest.getContent());
                     }
+                } catch (PackageJson.NeedsPackageFiles e) {
+                    throw e;
+                } catch (RuntimeException ignored) {
+                    // arborist's .catch(() => null): the package stays assigned, its edges loaded up to the failure
                 }
             }
         }

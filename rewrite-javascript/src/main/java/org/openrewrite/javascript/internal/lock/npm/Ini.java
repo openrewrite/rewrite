@@ -29,7 +29,7 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 /**
  * Port of ini 6.0.0 {@code decode}, which npm reads an npmrc with.
  */
-final class Ini {
+public final class Ini {
 
     /**
      * A section: {@code Object.create(null)}, an object with no prototype and so no string form.
@@ -183,7 +183,7 @@ final class Ini {
     /**
      * {@code ini.stringify} of a flat map: one {@code key=value} line per entry, the bare key for a null value.
      */
-    static String encode(Map<String, @Nullable String> properties) {
+    public static String encode(Map<String, @Nullable String> properties) {
         StringBuilder out = new StringBuilder();
         for (Map.Entry<String, @Nullable String> entry : properties.entrySet()) {
             out.append(safe(entry.getKey()));

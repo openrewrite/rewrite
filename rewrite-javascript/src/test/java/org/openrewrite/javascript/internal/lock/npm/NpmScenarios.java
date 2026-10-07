@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,22 +45,28 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded npm scenarios a test can replay: every scenario directory under {@code lock/npm/} on the
+ * The recorded npm scenarios a test can replay: every directory holding a lock under {@code lock/npm/} on the
  * test classpath (the in-repo fixtures and the downloaded ones merge there), and every one under the
  * directory the environment variable {@code REWRITE_LOCK_SCENARIOS} names. {@code REWRITE_LOCK_HTTP_CACHE}
- * names a directory of registry responses a scenario without its own {@code http/} falls back on.
+ * names a directory of registry responses a scenario's own {@code http/} falls back on. The layout is the
+ * one the recorder writes ({@code pkg-before}, {@code before}, {@code pkg}, {@code after}, {@code npmrc},
+ * {@code tree-before/}, {@code tree/}, {@code http/}), with a start of its own kind ({@code before-input}, a
+ * hand-shaped lock), a phase's own config and yarn.lock ({@code npmrc-before}, {@code before-yarn}), a
+ * variant edit by suffix ({@code before-v2}, {@code pkg-v2}, {@code after-v2}), and the second install's
+ * rewrite ({@code again} of {@code after}, {@code <lock>-again} of another lock). The read-only downloaded
+ * fixtures spell the edited manifest {@code pkg-after} and keep their rewrites under {@code lock/npm-again/}.
  */
 final class NpmScenarios {
 
     static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
     static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
 
-    private static final Set<String> MARKERS = new HashSet<>(Arrays.asList(
-            "before", "after", "before-input", "pkg", "pkg-after", "pkg-before", "fresh"));
+    private static final Pattern LOCK = Pattern.compile("^(?:before|after|fresh)(?:-(.+))?$");
     private static final Pattern LOCK_FILE = Pattern.compile("^(before|after|fresh|again)(?:-(.+))?$");
     private static final Set<String> NOT_LOCKS = new HashSet<>(Arrays.asList("yarn", "npm", "npmrc"));
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern RECORDED_AT = Pattern.compile("after exit=-?\\d+ at ([^,\\s]+)");
+    private static final Pattern PLATFORM = Pattern.compile("platform os=(\\S+) cpu=(\\S+) libc=(\\S*)");
 
     private NpmScenarios() {
     }
@@ -152,9 +159,9 @@ final class NpmScenarios {
 
         /**
          * What npm writes when it installs this lock's manifest over it again, when that differs from the
-         * lock: the corpus records {@code again} beside {@code after} (with {@code npm-again.log}), a scenario
-         * whose edit changes nothing records it as {@code after}, a committed scenario as {@code <lock>-again},
-         * and a read-only fixture has it under {@code lock/npm-again/<scenario>/<lock>}.
+         * lock: {@code again} beside {@code after} (with {@code npm-again.log}), {@code after} itself for a
+         * {@code before} whose edit changes nothing, {@code <lock>-again} for another lock, and for a read-only
+         * fixture {@code lock/npm-again/<scenario>/<lock>}.
          */
         @Nullable
         String rewritten() {
@@ -170,6 +177,26 @@ final class NpmScenarios {
                 return scenario.file(fileName + "-again");
             }
             return resource("lock/npm-again/" + scenario.getName() + "/" + fileName);
+        }
+
+        /**
+         * Whether the second install's rewrite adds a packages key the lock lacks: it placed a node, which is
+         * the ideal tree builder's to reproduce rather than the data's.
+         */
+        boolean rewritePlacesNode() {
+            String rewritten = rewritten();
+            if (rewritten == null) {
+                return false;
+            }
+            Set<String> added = packageKeys(rewritten);
+            added.removeAll(packageKeys(text));
+            return !added.isEmpty();
+        }
+
+        private static Set<String> packageKeys(String lock) {
+            Object value = parse(lock);
+            Object packages = value instanceof Map ? Js.get(value, "packages") : null;
+            return packages instanceof Map ? new LinkedHashSet<>(Js.keys(packages)) : new LinkedHashSet<>();
         }
 
         /**
@@ -296,8 +323,7 @@ final class NpmScenarios {
                 }
                 String suffix = input ? "" : start.substring("before".length());
                 String result = files.contains("after" + suffix) ? "after" + suffix : null;
-                String manifestFile = has("pkg-after" + suffix) ? "pkg-after" + suffix : has("pkg-after") ?
-                  "pkg-after" : "pkg";
+                String manifestFile = pkgFile(suffix);
                 if (result == null && !has(manifestFile)) {
                     // a lock with neither an edited manifest nor a recorded result is not an edit
                     continue;
@@ -438,6 +464,20 @@ final class NpmScenarios {
             return m.find() ? m.group(1) : null;
         }
 
+        /**
+         * The machine the scenario was recorded on, when {@code recorded-with} says ({@code platform os=darwin
+         * cpu=arm64 libc=}).
+         */
+        @Nullable
+        Host platform() {
+            String recordedWith = recordedWith();
+            Matcher m = recordedWith == null ? null : PLATFORM.matcher(recordedWith);
+            if (m == null || !m.find()) {
+                return null;
+            }
+            return Host.builder().os(m.group(1)).cpu(m.group(2)).libc(m.group(3).isEmpty() ? null : m.group(3)).build();
+        }
+
         @Nullable
         String npmrc() {
             return file("npmrc");
@@ -488,17 +528,23 @@ final class NpmScenarios {
                     String manifestFile = has("pkg-before" + suffix) ? "pkg-before" + suffix : "pkg-before";
                     locks.add(lock(file, manifestFile, "tree-before", treeYarn("tree-before"), beforeNpmrc()));
                 } else {
-                    String manifestFile = has("pkg-after" + suffix) ? "pkg-after" + suffix : has("pkg-after") ?
-                      "pkg-after" : "pkg";
                     String yarn = has("before-yarn") ? file("before-yarn") : treeYarn("tree");
-                    locks.add(lock(file, manifestFile, "tree", yarn, npmrc()));
+                    locks.add(lock(file, pkgFile(suffix), "tree", yarn, npmrc()));
                 }
             }
             return locks;
         }
 
+        // the manifest after the edit: its variant's own, else pkg, else the read-only fixtures' pkg-after
+        private String pkgFile(String suffix) {
+            if (!suffix.isEmpty() && has("pkg" + suffix)) {
+                return "pkg" + suffix;
+            }
+            return has("pkg") ? "pkg" : "pkg-after";
+        }
+
         private @Nullable String beforeNpmrc() {
-            return has("npmrc-before") ? file("npmrc-before") : has("before-npmrc") ? file("before-npmrc") : npmrc();
+            return has("npmrc-before") ? file("npmrc-before") : npmrc();
         }
 
         private @Nullable String treeYarn(String treeDir) {
@@ -573,14 +619,14 @@ final class NpmScenarios {
         } catch (IOException | URISyntaxException e) {
             throw new IllegalStateException(e);
         }
+        String cache = System.getenv(HTTP_CACHE_ENV);
+        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
+          Paths.get(cache) : null;
         for (Path root : classpathRoots) {
-            collect(root, null, classpathRoots, found);
+            collect(root, httpCache, classpathRoots, found);
         }
         String corpus = System.getenv(SCENARIOS_ENV);
         if (corpus != null && !corpus.isEmpty() && Files.isDirectory(Paths.get(corpus))) {
-            String cache = System.getenv(HTTP_CACHE_ENV);
-            Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
-              Paths.get(cache) : null;
             collect(Paths.get(corpus), httpCache, classpathRoots, found);
         }
         return new ArrayList<>(found.values());
@@ -601,13 +647,16 @@ final class NpmScenarios {
         }
     }
 
+    // a directory holding a lock: before, after, fresh, a variant of one, or a hand-shaped before-input
     private static boolean isScenario(Path dir) {
-        for (String marker : MARKERS) {
-            if (Files.isRegularFile(dir.resolve(marker))) {
-                return true;
-            }
+        try (Stream<Path> list = Files.list(dir)) {
+            return list.anyMatch(p -> {
+                Matcher m = LOCK.matcher(p.getFileName().toString());
+                return Files.isRegularFile(p) && m.matches() && (m.group(1) == null || !NOT_LOCKS.contains(m.group(1)));
+            });
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return false;
     }
 
     private static boolean inScenario(Path dir, Path root) {

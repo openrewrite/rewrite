@@ -29,7 +29,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
  * Port of @npmcli/arborist test/dep-valid.js, with the duck-typed children and requestors built as
- * nodes that carry the same fields.
+ * nodes that carry the same fields. Its "unsupported dependency type" case fakes a spec type npa has no
+ * name for, which {@link Spec.Type} cannot hold: not ported.
  */
 class DepValidTest {
 
@@ -150,7 +151,7 @@ class DepValidTest {
     // the requestor is a root whose lock metadata holds the recorded entry, attached as a loaded lock is
     private static Node requestor(String depType, String recordedSpec) {
         Node requestor = node(opts().path("/some/path"));
-        Shrinkwrap meta = new Shrinkwrap("/some/path");
+        Shrinkwrap meta = new Shrinkwrap("/some/path", NpmOptions.DEFAULT);
         meta.setData(obj("packages", obj("", obj(depType, obj("repo", recordedSpec)))));
         requestor.setMeta(meta);
         return requestor;

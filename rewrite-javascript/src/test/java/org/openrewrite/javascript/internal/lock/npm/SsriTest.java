@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * ssri 12.0.0 (npm 11.17.0) run on these values under Node 24.
+ * ssri 13.0.1 (npm 11.17.0) run on these values under Node 24.
  */
 class SsriTest {
 
@@ -43,6 +43,16 @@ class SsriTest {
         assertThat(Ssri.parse("  " + A + "\n" + S + "  ")).isEqualTo(A + " " + S);
         assertThat(Ssri.parse(A + " " + A)).isEqualTo(A + " " + A);
         assertThat(Ssri.parse(S + " " + A + " " + T)).isEqualTo(S + " " + T + " " + A);
+    }
+
+    // a hash whose algorithm crypto.getHashes() does not list is dropped by the Hash constructor
+    @Test
+    void parseDropsAlgorithmsNodeLacks() {
+        assertThat(Ssri.parse("foo-YWJj")).isNull();
+        assertThat(Ssri.parse("whirlpool-YWJj")).isNull();
+        assertThat(Ssri.parse("md4-YWJj")).isNull();
+        assertThat(Ssri.parse("sm3-YWJj")).isEqualTo("sm3-YWJj");
+        assertThat(Ssri.parse(A + " foo-YWJj")).isEqualTo(A);
     }
 
     @Test

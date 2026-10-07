@@ -26,10 +26,11 @@ import java.util.Objects;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of pacote's {@code manifest()} for a registry spec (npm 11.17.0, {@code lib/registry.js}): pick the
- * version, normalize it as {@code @npmcli/package-json} does for a manifest, and add {@code _resolved},
- * {@code _integrity} and {@code _from} from {@code dist}. A git, file, directory or remote spec is a
- * {@link CannotKnow}: its manifest is not in the registry.
+ * Port of pacote's {@code manifest()} (npm 11.17.0) for a registry spec ({@code lib/registry.js}: pick the
+ * version, normalize it as {@code @npmcli/package-json} does for a manifest, add {@code _resolved},
+ * {@code _integrity} and {@code _from} from {@code dist}) and for a directory spec ({@code lib/dir.js} over
+ * the project's files). A git, file or remote spec is a {@link CannotKnow}: its manifest is not in the
+ * registry.
  */
 final class Pacote {
 
@@ -60,7 +61,17 @@ final class Pacote {
         Object integrity;
     }
 
-    private Pacote() {
+    private final PackumentSource registry;
+    private final VirtualTreeLoader.ProjectFiles files;
+    private final String path;
+
+    /**
+     * @param path the project directory a directory spec's realpath is read relative to
+     */
+    Pacote(PackumentSource registry, VirtualTreeLoader.ProjectFiles files, String path) {
+        this.registry = registry;
+        this.files = files;
+        this.path = path;
     }
 
     // every fetcher renders --before in its constructor: an invalid date is a RangeError there
@@ -70,7 +81,7 @@ final class Pacote {
         }
     }
 
-    static Map<String, Object> manifest(Spec spec, Options opts, PackumentSource source) {
+    Map<String, Object> manifest(Spec spec, Options opts) {
         checkBefore(opts);
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {
@@ -79,7 +90,7 @@ final class Pacote {
             case FILE:
                 throw new CannotKnow("local tarball " + fetched.getRawSpec());
             case DIRECTORY:
-                throw new CannotKnow("directory manifest " + fetched.getRawSpec());
+                return directory(fetched, opts);
             case REMOTE:
                 throw new CannotKnow("remote tarball " + fetched.getFetchSpec());
             default:
@@ -87,7 +98,7 @@ final class Pacote {
         }
         String name = Objects.requireNonNull(fetched.getName());
         boolean full = opts.getBefore() != null;
-        Map<String, Object> packument = packument(source, name, full);
+        Map<String, Object> packument = packument(name, full);
         Map<String, Object> picked = PickManifest.pickManifest(packument, fetched.getFetchSpec(),
                 PickManifest.Options.builder()
                         .defaultTag(truthy(opts.getDefaultTag()) ? opts.getDefaultTag() : "latest")
@@ -96,7 +107,7 @@ final class Pacote {
                         .npmVersion(opts.getNpmVersion())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
-                withVersionDocument(picked, source.manifest(name, versionKey(packument, picked)));
+                withVersionDocument(picked, registry.manifest(name, versionKey(packument, picked)));
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani);
 
@@ -137,11 +148,29 @@ final class Pacote {
                 integrity = integrity == null ? parsed : Ssri.merge(integrity, parsed);
             }
         }
-        if (integrity != null) {
-            mani.put("_integrity", integrity);
-        } else if (heldRaw) {
-            mani.put("_integrity", Js.string(held));
+        if (integrity != null || heldRaw) {
+            mani.put("_integrity", integrity != null ? integrity : Js.string(held));
+            if (!truthy(dist)) {
+                // dist.signatures is read whether or not the manifest has a dist
+                throw new IllegalArgumentException("Cannot read properties of undefined (reading 'signatures')");
+            }
         }
+        return mani;
+    }
+
+    // DirFetcher.manifest(): the directory's package.json, with what the fetcher adds to it
+    private Map<String, Object> directory(Spec spec, Options opts) {
+        String realpath = Objects.requireNonNull(spec.getFetchSpec());
+        String location = Relpath.relpath(path, realpath);
+        PackageJson manifest = files.manifest(location);
+        if (manifest == null) {
+            throw new CannotKnow("directory manifest " + spec.getRawSpec() + " (" + location + ")");
+        }
+        Map<String, Object> mani = new LinkedHashMap<>(manifest.getContent());
+        Object integrity = opts.getIntegrity();
+        mani.put("_integrity", truthy(integrity) ? Js.string(integrity) : integrity);
+        mani.put("_resolved", realpath);
+        mani.put("_from", spec.getSaveSpec());
         return mani;
     }
 
@@ -168,14 +197,14 @@ final class Pacote {
     }
 
     // a registry that has no abbreviated packument is asked for the full one before the 404 counts
-    private static Map<String, Object> packument(PackumentSource source, String name, boolean full) {
+    private Map<String, Object> packument(String name, boolean full) {
         try {
-            return source.packument(name, full);
+            return registry.packument(name, full);
         } catch (NpmRejection e) {
             if (!"E404".equals(e.getCode()) || full) {
                 throw e;
             }
-            return source.packument(name, true);
+            return registry.packument(name, true);
         }
     }
 }

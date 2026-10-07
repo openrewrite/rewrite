@@ -113,12 +113,12 @@ final class MapWorkspaces {
     }
 
     /**
-     * {@code mapWorkspaces({cwd, pkg})} with the directories that hold a package.json standing in for
-     * the project tree: location (relative to {@code cwd}, {@code ""} for the root) to the manifest's text.
+     * {@code mapWorkspaces({cwd, pkg})} with the project's files standing in for its tree: every location
+     * (relative to {@code cwd}, {@code ""} for the root) that holds a package.json.
      *
      * @return package name to absolute path, in the order the patterns list them
      */
-    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg, Map<String, String> manifests) {
+    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg, VirtualTreeLoader.ProjectFiles files) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
         Patterns p = getPatterns(workspaces);
         Map<String, String> results = new LinkedHashMap<>();
@@ -130,7 +130,7 @@ final class MapWorkspaces {
         ignore.add("**/node_modules/**");
         ignore.addAll(p.negatedPatterns);
         List<String> matches = new ArrayList<>();
-        for (String location : manifests.keySet()) {
+        for (String location : files.manifestLocations()) {
             String dir = location.isEmpty() ? "." : location;
             if (ignored(dir, ignore)) {
                 continue;
@@ -156,11 +156,10 @@ final class MapWorkspaces {
         Map<Object, Set<String>> seen = new LinkedHashMap<>();
         for (String match : orderedMatches) {
             String location = ".".equals(match) ? "" : match;
-            String text = manifests.get(location);
-            if (text == null) {
+            PackageJson manifest = files.manifest(location);
+            if (manifest == null) {
                 continue;
             }
-            PackageJson manifest = PackageJson.normalize(text);
             String path = PosixPath.join(cwd, match);
             Object name = getPackageName(manifest.getContent(), path);
             seen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(path);

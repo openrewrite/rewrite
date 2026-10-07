@@ -35,9 +35,7 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * The cases of arborist's test/can-place-dep.js or test/place-dep.js as generate/placement-cases.js records
- * them: the declared trees, the order tap sets them up and runs them in, and arborist's answers. This is
- * the setup half of the upstream runTest; the test classes port the half that runs.
+ * The cases of arborist's test/can-place-dep.js or test/place-dep.js as generate/placement-cases.js records them.
  */
 final class PlacementCases {
 
@@ -215,8 +213,7 @@ final class PlacementCases {
     }
 
     /**
-     * The generator's {@code plain}: enum constants by name, errors by message, Maps as entry lists where
-     * arborist has a Map, object members that are null or undefined left out, keys sorted.
+     * The generator's {@code plain}: enums by name, errors by message, Maps as entry lists, null members left out.
      */
     static @Nullable Object plain(@Nullable Object v) {
         if (v == null || v == Js.UNDEFINED) {

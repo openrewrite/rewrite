@@ -121,18 +121,10 @@ public final class Shrinkwrap {
     @Setter
     private String newline = "\n";
 
-    public Shrinkwrap(String path) {
-        this(path, NpmOptions.DEFAULT);
-    }
-
     public Shrinkwrap(String path, NpmOptions options) {
         this.path = PosixPath.resolve(path);
         this.resolveOptions = options;
         this.lockfileVersion = options.getLockfileVersion();
-    }
-
-    public static Map<String, Object> metaFromNode(Node node, String path) {
-        return metaFromNode(node, path, NpmOptions.DEFAULT);
     }
 
     public static Map<String, Object> metaFromNode(Node node, String path, NpmOptions options) {
@@ -294,7 +286,6 @@ public final class Shrinkwrap {
     public Shrinkwrap load(VirtualTreeLoader.ProjectFiles files) {
         LockFile lock = files.getLock();
         String yarn = files.getYarnLock();
-        String packageJson = files.getManifests().get("");
         Object data;
         try {
             loadedFromDisk = lock != null && truthy(lock.getText());
@@ -354,13 +345,14 @@ public final class Shrinkwrap {
 
         if (truthy(dependencies) && !truthy(packages)) {
             Map<String, Object> pkg = new LinkedHashMap<>();
-            if (packageJson != null) {
-                try {
-                    pkg = PackageJson.normalize(packageJson).getContent();
-                } catch (PackageJson.NeedsPackageFiles e) {
-                    throw e;
-                } catch (RuntimeException ignored) {
+            try {
+                PackageJson manifest = files.manifest("");
+                if (manifest != null) {
+                    pkg = manifest.getContent();
                 }
+            } catch (PackageJson.NeedsPackageFiles e) {
+                throw e;
+            } catch (RuntimeException ignored) {
             }
             loadAll("", null, this.data);
             fixDependencies(pkg);

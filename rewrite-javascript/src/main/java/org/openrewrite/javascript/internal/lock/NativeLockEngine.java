@@ -47,6 +47,7 @@ import org.yaml.snakeyaml.Yaml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -151,7 +152,7 @@ public final class NativeLockEngine {
                 .cpu(view.getCpu())
                 .libc(view.getLibc())
                 .build();
-        return new NpmLockRegenerator(NpmLockRegenerator.Inputs.from(request, host), packuments).regenerate();
+        return new NpmLockRegenerator(NpmInputs.from(request, host, Instant.now()), packuments).regenerate();
     }
 
     private static Result doRegenerate(PackageManager pm,
@@ -272,8 +273,8 @@ public final class NativeLockEngine {
     private static Result resolveAndPatchYarnBerry(String editedPackageJson, String existingLock,
                                                    @Nullable Path packageJsonPath, NodeRegistries registries,
                                                    NpmRegistryClient client) {
-        Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsBerry(existingLock))
+        Registry registry = new RegistryAdapter(registries, client);
+        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsBerry(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
         for (LockEditSet.PackageEdit edit : edits) {
@@ -311,8 +312,8 @@ public final class NativeLockEngine {
     private static Result resolveAndPatchYarnClassic(String editedPackageJson, String existingLock,
                                                      @Nullable Path packageJsonPath, NodeRegistries registries,
                                                      NpmRegistryClient client) {
-        Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsYarnClassic(existingLock))
+        Registry registry = new RegistryAdapter(registries, client);
+        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsYarnClassic(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
@@ -346,8 +347,8 @@ public final class NativeLockEngine {
     private static Result resolveAndPatchPnpm(String editedPackageJson, String existingLock,
                                               @Nullable Path packageJsonPath, NodeRegistries registries,
                                               NpmRegistryClient client) {
-        Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsPnpm(existingLock))
+        Registry registry = new RegistryAdapter(registries, client);
+        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsPnpm(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = PnpmLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Pnpm, packageJsonPath),
@@ -379,8 +380,8 @@ public final class NativeLockEngine {
     private static Result resolveAndPatchBun(String editedPackageJson, String existingLock,
                                              @Nullable Path packageJsonPath, NodeRegistries registries,
                                              NpmRegistryClient client) {
-        Registry registry = new NpmRegistryAdapter(registries, client);
-        ResolutionGraph graph = new NpmGraphBuilder(registry,lockedVersionsBun(existingLock))
+        Registry registry = new RegistryAdapter(registries, client);
+        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsBun(existingLock))
                 .build(singletonMap("", editedPackageJson));
         List<LockEditSet.PackageEdit> edits = BunLockDiff.diff(graph, existingLock);
         LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.Bun, packageJsonPath),

@@ -64,6 +64,19 @@ class NpmOptionsTest {
         assertThat(NpmOptions.fromNpmrc("legacy-peer-deps").isLegacyPeerDeps()).isTrue();
     }
 
+    // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
+    // later global=false wins (npm 11.17.0: global=false then location=global is ESHRINKWRAPGLOBAL)
+    @Test
+    void locationGlobalIsGlobal() {
+        assertThat(NpmOptions.fromNpmrc("location=global").isGlobal()).isTrue();
+        assertThat(NpmOptions.fromNpmrc("location=\"global\"").isGlobal()).isTrue();
+        assertThat(NpmOptions.fromNpmrc("location=user").isGlobal()).isFalse();
+        assertThat(NpmOptions.fromNpmrc("global=false\nlocation=global").isGlobal()).isTrue();
+        assertThat(NpmOptions.fromNpmrc("location=global\nglobal=false").isGlobal()).isFalse();
+        assertThat(NpmOptions.fromNpmrc("global=1").isGlobal()).isTrue();
+        assertThat(NpmOptions.fromNpmrc("global=null").isGlobal()).isFalse();
+    }
+
     // each value installed with npm 11.17.0: the peer chain of arb-legacy-peer-deps-add stays out when legacy
     @ParameterizedTest
     @CsvSource({

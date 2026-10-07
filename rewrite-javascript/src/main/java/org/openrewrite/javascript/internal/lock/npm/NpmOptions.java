@@ -61,7 +61,13 @@ public class NpmOptions {
             "prefer-dedupe", "strict-peer-deps", "force", "install-strategy", "global-style", "legacy-bundling",
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
-            "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global");
+            "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global", "location");
+
+    // the definition's type, which npm's parseField reads from types[key]: Boolean, String, Number, or a
+    // list of literal values
+    private enum Type {
+        BOOLEAN, STRING, NUMBER, LITERAL
+    }
 
     /**
      * {@code lockfile-version}: the version to write, or null to keep the lock's own (v1 is upgraded).
@@ -281,89 +287,95 @@ public class NpmOptions {
             Object value = entry.getValue();
             switch (key) {
                 case "lockfile-version":
-                    options.lockfileVersion(lockfileVersion(parseField(value, false)));
+                    options.lockfileVersion(lockfileVersion(parseField(value, Type.LITERAL)));
                     break;
                 case "legacy-peer-deps":
-                    options.legacyPeerDeps(truthy(parseField(value, true)));
+                    options.legacyPeerDeps(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "install-links":
-                    options.installLinks(truthy(parseField(value, true)));
+                    options.installLinks(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "omit-lockfile-registry-resolved":
-                    options.omitLockfileRegistryResolved(truthy(parseField(value, true)));
+                    options.omitLockfileRegistryResolved(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "prefer-dedupe":
-                    options.preferDedupe(truthy(parseField(value, true)));
+                    options.preferDedupe(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "strict-peer-deps":
-                    options.strictPeerDeps(truthy(parseField(value, true)));
+                    options.strictPeerDeps(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "force":
-                    options.force(truthy(parseField(value, true)));
+                    options.force(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "engine-strict":
-                    options.engineStrict(truthy(parseField(value, true)));
+                    options.engineStrict(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "save":
-                    options.save(truthy(parseField(value, true)));
+                    options.save(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "format-package-lock":
-                    options.formatPackageLock(truthy(parseField(value, true)));
+                    options.formatPackageLock(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "dry-run":
-                    options.dryRun(truthy(parseField(value, true)));
+                    options.dryRun(truthy(parseField(value, Type.BOOLEAN)));
                     break;
                 case "global":
-                    options.global(truthy(parseField(value, true)));
+                    options.global(truthy(parseField(value, Type.BOOLEAN)));
+                    break;
+                case "location":
+                    // location's flatten turns global on, in the file's own order with global's
+                    if ("global".equals(parseField(value, Type.LITERAL))) {
+                        options.global(true);
+                    }
                     break;
                 case "install-strategy":
                     options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :
-                            parseField(value, false)));
+                            parseField(value, Type.LITERAL)));
                     break;
                 case "global-style":
-                    if (truthy(parseField(value, true))) {
+                    if (truthy(parseField(value, Type.BOOLEAN))) {
                         installStrategyWritten = "shallow";
                         options.installStrategy(InstallStrategy.SHALLOW);
                     }
                     break;
                 case "legacy-bundling":
-                    if (truthy(parseField(value, true))) {
+                    if (truthy(parseField(value, Type.BOOLEAN))) {
                         installStrategyWritten = "nested";
                         options.installStrategy(InstallStrategy.NESTED);
                     }
                     break;
                 case "before":
-                    Object before = parseField(value, false);
+                    Object before = parseField(value, Type.LITERAL);
                     options.beforeConfigured(true);
                     options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
                             before instanceof String ? dateField((String) before) : Double.NaN);
                     break;
                 case "min-release-age":
-                    options.minReleaseAge(parseNumberField(value));
+                    options.minReleaseAge(parseField(value, Type.NUMBER));
                     break;
                 case "min-release-age-exclude":
-                    options.minReleaseAgeExclude(parseListField(value));
+                    options.minReleaseAgeExclude(parseListField(value, Type.STRING));
                     break;
                 case "omit":
-                    omit = parseListField(value);
+                    omit = parseListField(value, Type.LITERAL);
                     break;
                 case "include":
-                    include = parseListField(value);
+                    include = parseListField(value, Type.LITERAL);
                     break;
                 case "only":
-                    only = parseField(value, false);
+                    only = parseField(value, Type.LITERAL);
                     break;
                 case "production":
-                    production = parseField(value, true);
+                    production = parseField(value, Type.BOOLEAN);
                     break;
                 case "dev":
-                    dev = parseField(value, true);
+                    dev = parseField(value, Type.BOOLEAN);
                     break;
                 case "optional":
-                    optional = parseField(value, true);
+                    optional = parseField(value, Type.BOOLEAN);
                     break;
                 case "also":
-                    also = parseField(value, false);
+                    also = parseField(value, Type.LITERAL);
                     break;
                 case "allow-git":
                     options.allowGit(allowField(value));
@@ -387,7 +399,7 @@ public class NpmOptions {
                     options.libc(platformField(value));
                     break;
                 case "tag":
-                    Object tag = stringField(value);
+                    Object tag = parseField(value, Type.STRING);
                     options.tag(truthy(tag) ? Js.string(tag) : null);
                     break;
                 default:
@@ -400,7 +412,7 @@ public class NpmOptions {
 
     // arborist reads the allow-* option as `?? 'all'`
     private static String allowField(@Nullable Object f) {
-        Object value = parseField(f, false);
+        Object value = parseField(f, Type.LITERAL);
         return value == null || value == Js.UNDEFINED ? "all" : Js.string(value);
     }
 
@@ -445,27 +457,34 @@ public class NpmOptions {
         return out;
     }
 
-    // npm's parseField for a Boolean definition or lockfile-version's literals: neither a list, string nor number type
-    private static @Nullable Object parseField(@Nullable Object f, boolean isBool) {
+    // npm's parseField for one value of the definition's type
+    private static @Nullable Object parseField(@Nullable Object f, Type type) {
         if (!(f instanceof String)) {
             return f;
         }
         String s = Js.trim((String) f);
-        if (isBool && s.isEmpty()) {
+        if (type == Type.BOOLEAN && s.isEmpty()) {
             return Boolean.TRUE;
         }
-        switch (s) {
-            case "true":
-                return Boolean.TRUE;
-            case "false":
-                return Boolean.FALSE;
-            case "null":
-                return null;
-            case "undefined":
-                return Js.UNDEFINED;
-            default:
-                return envReplace(s);
+        if (type != Type.STRING && type != Type.NUMBER) {
+            switch (s) {
+                case "true":
+                    return Boolean.TRUE;
+                case "false":
+                    return Boolean.FALSE;
+                case "null":
+                    return null;
+                case "undefined":
+                    return Js.UNDEFINED;
+                default:
+                    break;
+            }
         }
+        s = envReplace(s);
+        if (type == Type.NUMBER && (s.isEmpty() || NUMBER.matcher(s).matches())) {
+            return Js.toNumber(s);
+        }
+        return s;
     }
 
     // new Date(text): the date-time string format, else V8's legacy parser, which never reads a digit-less string
@@ -474,39 +493,22 @@ public class NpmOptions {
         return !Double.isNaN(time) || !DIGIT.matcher(text).find() ? (Object) time : text;
     }
 
-    // parseField for a String definition: the literals are not special
-    private static @Nullable Object stringField(@Nullable Object f) {
-        if (!(f instanceof String)) {
-            return f;
-        }
-        return envReplace(Js.trim((String) f));
-    }
-
     // a [null, String] definition read where only a truthy string means anything (`environment.os || current`)
     private static @Nullable String platformField(@Nullable Object f) {
-        Object value = stringField(f);
+        Object value = parseField(f, Type.STRING);
         return truthy(value) ? Js.string(value) : null;
     }
 
-    // parseField for a Number definition
-    private static @Nullable Object parseNumberField(@Nullable Object f) {
-        if (!(f instanceof String)) {
-            return f;
-        }
-        String s = envReplace(Js.trim((String) f));
-        return s.isEmpty() || NUMBER.matcher(s).matches() ? (Object) Js.toNumber(s) : s;
-    }
-
-    // parseField for an Array definition: a string splits on blank lines, each element parsed on its own
-    private static List<Object> parseListField(@Nullable Object f) {
+    // parseField for an Array definition: a string splits on blank lines, each element parsed as its own type
+    private static List<Object> parseListField(@Nullable Object f, Type elementType) {
         List<Object> out = new ArrayList<>();
         if (f instanceof List) {
             for (Object element : (List<?>) f) {
-                out.add(element instanceof String ? parseField(element, false) : element);
+                out.add(element instanceof String ? parseField(element, elementType) : element);
             }
         } else if (f instanceof String) {
             for (String element : Js.trim((String) f).split("\n\n")) {
-                out.add(parseField(element, false));
+                out.add(parseField(element, elementType));
             }
         } else if (f != null) {
             out.add(f);

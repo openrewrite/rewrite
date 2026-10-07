@@ -1,0 +1,1 @@
+Bump debug 3.2.7 -> 4.4.3: the new version declares peerDependenciesMeta (supports-color optional), written into its entry; ms 2.1.3 kept.

@@ -1,0 +1,33 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "": {
+      "name": "p",
+      "version": "1.0.0",
+      "dependencies": {
+        "abbrev": "1.1.1"
+      },
+      "optionalDependencies": {
+        "@isaacs/testing-prod-dep-metadata-missing": "*"
+      }
+    },
+    "node_modules/@isaacs/testing-prod-dep-metadata-missing": {
+      "version": "1.0.0",
+      "resolved": "https://registry.npmjs.org/@isaacs/testing-prod-dep-metadata-missing/-/testing-prod-dep-metadata-missing-1.0.0.tgz",
+      "integrity": "sha512-UYICOmLWG+Kcoynvqhh8UEKoUoFCnTCMdy8P45es8WsCDjW+E2iN2QjLYM9FlXOX0mqCIsXVLDWPxSdmRpFc1A==",
+      "optional": true,
+      "dependencies": {
+        "@isaacs/this-does-not-exist-at-all": "*"
+      }
+    },
+    "node_modules/abbrev": {
+      "version": "1.1.1",
+      "resolved": "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz",
+      "integrity": "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+      "license": "ISC"
+    }
+  }
+}

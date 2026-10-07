@@ -16,19 +16,16 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Builder;
+import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.LinkedHashMap;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
@@ -74,65 +71,17 @@ public final class NpmLockRegenerator {
         Host host = Host.UNKNOWN;
 
         /**
+         * The clock {@code min-release-age} counts from.
+         */
+        @NonNull
+        Instant now;
+
+        /**
          * The name of the directory the project is in, when the host knows it: a root manifest without a name
          * is named after it.
          */
         @Nullable
         String directoryName;
-
-        /**
-         * A recipe's request: the manifests by path, placed relative to the lock's directory, which is that of
-         * the topmost manifest given, else the edited manifest's own. At the repository root the directory's
-         * name is not known.
-         */
-        public static Inputs from(Request request, Host host) {
-            Path packageJsonPath = request.getPackageJsonPath() == null ? Paths.get("package.json") :
-                    request.getPackageJsonPath();
-            String dir = directory(packageJsonPath);
-            String rootDir = dir;
-            for (Path path : request.getManifests().keySet()) {
-                String candidate = directory(path);
-                if (contains(candidate, dir) && candidate.length() < rootDir.length()) {
-                    rootDir = candidate;
-                }
-            }
-            InputsBuilder inputs = builder()
-                    .lock(request.getLock())
-                    .npmrc(projectNpmrc(request.getMarker()))
-                    .host(host)
-                    .directoryName(rootDir.isEmpty() ? null : PosixPath.basename(rootDir));
-            for (Map.Entry<Path, String> manifest : request.getManifests().entrySet()) {
-                inputs.manifest(location(rootDir, directory(manifest.getKey())), manifest.getValue());
-            }
-            inputs.manifest(location(rootDir, dir), request.getPackageJson());
-            return inputs.build();
-        }
-
-        private static String directory(Path manifest) {
-            Path dir = manifest.normalize().getParent();
-            return dir == null ? "" : dir.toString().replace('\\', '/');
-        }
-
-        private static boolean contains(String dir, String other) {
-            return dir.isEmpty() || other.equals(dir) || other.startsWith(dir + "/");
-        }
-
-        private static String location(String rootDir, String dir) {
-            String location = Paths.get(rootDir).relativize(Paths.get(dir)).toString().replace('\\', '/');
-            return ".".equals(location) ? "" : location;
-        }
-
-        private static @Nullable String projectNpmrc(@Nullable NodeResolutionResult marker) {
-            if (marker == null || marker.getNpmrcConfigs() == null) {
-                return null;
-            }
-            for (NodeResolutionResult.Npmrc npmrc : marker.getNpmrcConfigs()) {
-                if (npmrc.getScope() == NodeResolutionResult.NpmrcScope.Project) {
-                    return Ini.encode(npmrc.getProperties());
-                }
-            }
-            return null;
-        }
     }
 
     static final String NPM_REJECTS = "npm rejects this edit";
@@ -150,7 +99,6 @@ public final class NpmLockRegenerator {
 
     public Result regenerate() {
         NpmOptions options;
-        Map<String, String> manifests;
         String path;
         String written;
         try {
@@ -158,11 +106,9 @@ public final class NpmLockRegenerator {
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }
-            LockFile lock = truthy(inputs.getLock()) ? new LockFile(inputs.getLock()) : null;
-            Object lockData = lockData(lock);
-            manifests = manifests(lockData);
-            path = projectPath(lockData, manifests.get(""));
-            IdealTreeBuilder arb = arborist(path, lock, manifests, options);
+            VirtualTreeLoader.ProjectFiles files = projectFiles(truthy(inputs.getLock()) ? new LockFile(inputs.getLock()) : null);
+            path = projectPath(files);
+            IdealTreeBuilder arb = arborist(path, files, options);
             arb.buildIdealTree();
             if (!options.isSave() || options.isDryRun()) {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
@@ -174,7 +120,7 @@ public final class NpmLockRegenerator {
             return Result.failure(failure(e, NPM_REJECTS, NPM_FAILS));
         }
         try {
-            IdealTreeBuilder again = arborist(path, new LockFile(written), manifests, options);
+            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(written)), options);
             again.buildIdealTree();
             String rewritten = saveIdealTree(again, options);
             if (!rewritten.equals(written)) {
@@ -189,22 +135,35 @@ public final class NpmLockRegenerator {
         return Result.success(written);
     }
 
-    private IdealTreeBuilder arborist(String path, @Nullable LockFile lock, Map<String, String> manifests,
-                                      NpmOptions options) {
-        VirtualTreeLoader.ProjectFiles files = VirtualTreeLoader.ProjectFiles.builder()
-                .lock(lock)
-                .yarnLock(inputs.getYarnLock())
-                .manifests(manifests)
-                .build();
-        return new IdealTreeBuilder(path, files, options, registry, inputs.getHost());
+    /**
+     * index.js {@code #setWorkspaces}: the members the node's {@code workspaces} patterns name among the
+     * project's directories become its workspace edges.
+     */
+    static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
+        Map<String, String> workspaces = MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(), files);
+        if (!workspaces.isEmpty()) {
+            node.setWorkspaces(workspaces);
+        }
+        return node;
+    }
+
+    private VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock) {
+        return projectFiles(lock, inputs.getYarnLock(), inputs.getManifests());
     }
 
     /**
-     * The manifests given, and for the root and the link targets outside node_modules the host did not
-     * supply, the lock's own entries, as arborist reads a project without a package.json from its lock.
+     * The project's files, with the lock's own entries standing in for the root and for the link targets
+     * outside node_modules that the host did not supply, as arborist reads a project without a package.json
+     * from its lock.
      */
-    private Map<String, String> manifests(@Nullable Object data) {
-        Map<String, String> manifests = new LinkedHashMap<>();
+    @SuppressWarnings("unchecked")
+    static VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock, @Nullable String yarnLock,
+                                                       Map<String, String> manifests) {
+        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .lock(lock)
+                .yarnLock(yarnLock)
+                .manifests(manifests);
+        Object data = lockData(lock);
         Object packages = data instanceof Map ? Js.get(data, "packages") : null;
         if (packages instanceof Map) {
             for (Map.Entry<String, @Nullable Object> entry : Js.entries(packages)) {
@@ -214,30 +173,23 @@ public final class NpmLockRegenerator {
                 }
                 Object resolved = Js.get(meta, "resolved");
                 if (entry.getKey().isEmpty()) {
-                    manifests.put("", JsonStringifyNice.stringify(meta));
+                    if (!manifests.containsKey("")) {
+                        files.parsedManifest("", (Map<String, Object>) meta);
+                    }
                 } else if (Js.strictEquals(Js.get(meta, "link"), true) && resolved instanceof String &&
-                           !((String) resolved).contains("node_modules/")) {
+                           !((String) resolved).contains("node_modules/") && !manifests.containsKey(resolved)) {
                     Object target = Js.get(packages, (String) resolved);
                     if (target instanceof Map) {
-                        manifests.put((String) resolved, JsonStringifyNice.stringify(target));
+                        files.parsedManifest((String) resolved, (Map<String, Object>) target);
                     }
                 }
             }
         }
-        manifests.putAll(inputs.getManifests());
-        return manifests;
+        return files.build();
     }
 
-    // a lock that does not parse is the builder's to refuse
-    private static @Nullable Object lockData(@Nullable LockFile lock) {
-        if (lock == null) {
-            return null;
-        }
-        try {
-            return lock.parsed().getValue();
-        } catch (RuntimeException e) {
-            return null;
-        }
+    private IdealTreeBuilder arborist(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options) {
+        return new IdealTreeBuilder(path, files, options, registry, inputs.getHost(), inputs.getNow());
     }
 
     // reify.js #saveIdealTree: the lock takes the indent of the root package.json, two spaces when it has none
@@ -253,13 +205,14 @@ public final class NpmLockRegenerator {
      * The root takes the directory's name when its manifest has none (node.js: nameFromFolder). Without the
      * host's word, the lock's own top-level name stands in: npm wrote it from that directory.
      */
-    private String projectPath(@Nullable Object data, @Nullable String rootText) {
+    private String projectPath(VirtualTreeLoader.ProjectFiles files) {
         String directoryName = inputs.getDirectoryName();
         if (directoryName == null) {
+            Object data = lockData(files.getLock());
             Object lockName = data instanceof Map ? Js.get(data, "name") : null;
             if (lockName instanceof String && !((String) lockName).isEmpty()) {
                 directoryName = (String) lockName;
-            } else if (data instanceof Map && !truthy(rootName(rootText))) {
+            } else if (data instanceof Map && !truthy(rootName(files))) {
                 throw new CannotKnow("the project directory name (package.json has no name; npm names the lock " +
                                      "after the directory it runs in)");
             } else {
@@ -270,14 +223,23 @@ public final class NpmLockRegenerator {
         return "/" + directoryName;
     }
 
-    // a manifest that does not parse is the builder's to reject
-    private static Object rootName(@Nullable String rootText) {
-        if (rootText == null) {
-            return Js.UNDEFINED;
+    // a lock that does not parse is the builder's to refuse
+    private static @Nullable Object lockData(@Nullable LockFile lock) {
+        if (lock == null) {
+            return null;
         }
         try {
-            Object value = JsonParseEvenBetterErrors.parse(rootText).getValue();
-            return value instanceof Map ? Js.get(value, "name") : Js.UNDEFINED;
+            return lock.parsed().getValue();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    // a manifest that does not parse is the builder's to reject
+    private static Object rootName(VirtualTreeLoader.ProjectFiles files) {
+        try {
+            PackageJson manifest = files.manifest("");
+            return manifest == null ? Js.UNDEFINED : Js.get(manifest.getContent(), "name");
         } catch (RuntimeException e) {
             return true;
         }
@@ -298,6 +260,9 @@ public final class NpmLockRegenerator {
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
             return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " the package's files: " + message);
+        }
+        if (e instanceof LocaleCompare.UnknownOrder) {
+            return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " the order npm writes the keys in: " + message);
         }
         if (e instanceof MalformedLock) {
             return new Failure(Reason.MALFORMED_LOCK, null,

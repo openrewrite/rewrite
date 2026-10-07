@@ -1,0 +1,1 @@
+Bump a root peer requirer whose new version widens its peer range while the provider stays: testing-peer-deps-b 1.2.4 (peer c 1) -> 2.0.0 (peer c *) beside the root-declared c@1.2.3; only b's entry changes, its peerDependencies with it.

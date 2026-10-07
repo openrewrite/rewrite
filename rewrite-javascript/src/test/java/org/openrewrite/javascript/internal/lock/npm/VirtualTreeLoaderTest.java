@@ -125,7 +125,7 @@ class VirtualTreeLoaderTest {
     void loadFromRootThatAlreadyHasShrinkwrap() {
         String name = "tap-and-flow";
         VirtualTreeLoader.ProjectFiles files = files(name);
-        Shrinkwrap meta = new Shrinkwrap(path(name)).load(files);
+        Shrinkwrap meta = new Shrinkwrap(path(name), NpmOptions.DEFAULT).load(files);
         Node root = node(opts().path(path(name)).pkg(json(files.getManifests().get(""))).meta(meta));
         VirtualTreeLoader loader = new VirtualTreeLoader(path(name), NpmOptions.DEFAULT);
         assertThat(loader.loadVirtual(files, root)).isSameAs(root);
