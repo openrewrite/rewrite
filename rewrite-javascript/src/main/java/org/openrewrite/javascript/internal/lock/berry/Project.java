@@ -28,9 +28,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/Project.ts (Yarn 4.10.3): the lockfile read into the stored maps
- * ({@code setupResolutions}), the workspaces read from the manifests ({@code setupWorkspaces}), and the lockfile
- * written back from the maps ({@code generateLockfile}, {@code persistLockfile}).
+ * Port of @yarnpkg/core sources/Project.ts (Yarn 4.10.3).
  */
 final class Project {
 

@@ -30,8 +30,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The JavaScript semantics Yarn's plain objects follow: {@code undefined} for a missing property, the order
- * {@code Object.keys} gives, truthiness and {@code JSON.parse}.
+ * The JavaScript semantics Yarn's plain objects, strings and numbers follow.
  */
 final class Js {
 

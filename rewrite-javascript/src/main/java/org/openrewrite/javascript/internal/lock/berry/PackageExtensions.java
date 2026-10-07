@@ -24,9 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/Configuration.ts {@code getPackageExtensions} and {@code normalizePackage}
- * (Yarn 4.10.3): the release's builtin package extensions (@yarnpkg/extensions, registered by the compat plugin)
- * and the {@code packageExtensions} setting, by ident and range, applied to a copy of each package.
+ * Port of @yarnpkg/core Configuration.ts {@code getPackageExtensions} and {@code normalizePackage} (Yarn 4.10.3).
  */
 final class PackageExtensions {
 

@@ -28,8 +28,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * A JavaScript regular expression source as V8 reads it without the {@code u} flag (the syntax of ECMAScript Annex
- * B), translated to a {@link Pattern} over the same strings.
+ * A JavaScript regular expression source as V8 reads it without the {@code u} flag, as a {@link Pattern}.
  */
 final class JsRegExp {
 

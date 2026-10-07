@@ -24,8 +24,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of picomatch 2.3.1 lib/picomatch.js, lib/utils.js and lib/constants.js on a POSIX host, under the options
- * micromatch 4.0.5 is given by fast-glob 3.3.2.
+ * Port of picomatch 2.3.1 lib/picomatch.js, lib/utils.js and lib/constants.js, as fast-glob 3.3.2 calls it.
  */
 final class Picomatch {
 

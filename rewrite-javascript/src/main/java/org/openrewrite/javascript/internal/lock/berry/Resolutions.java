@@ -16,9 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 /**
- * Port of @yarnpkg/core sources/CorePlugin.ts {@code reduceDependency} (Yarn 4.10.3): the top-level workspace's
- * {@code resolutions} replace the dependency they match, the parent part matched as a locator and the dependency
- * part as a descriptor.
+ * Port of @yarnpkg/core sources/CorePlugin.ts {@code reduceDependency} (Yarn 4.10.3).
  */
 final class Resolutions {
 

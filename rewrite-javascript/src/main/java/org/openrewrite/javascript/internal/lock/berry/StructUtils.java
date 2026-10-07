@@ -26,8 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/structUtils.ts (Yarn 4.10.3): making, parsing and printing idents,
- * descriptors, locators and ranges.
+ * Port of @yarnpkg/core sources/structUtils.ts (Yarn 4.10.3).
  */
 final class StructUtils {
 

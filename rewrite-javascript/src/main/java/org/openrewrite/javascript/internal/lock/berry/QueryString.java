@@ -25,8 +25,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Node.js lib/querystring.js {@code parse} and {@code stringify} with their default separators: a parsed
- * value is a string, or a list of strings for a repeated key.
+ * Node.js lib/querystring.js {@code parse} and {@code stringify} with their default separators.
  */
 final class QueryString {
 

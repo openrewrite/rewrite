@@ -26,8 +26,7 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/parsers sources/syml.ts and sources/grammars/syml.pegjs (Yarn 4.10.3): the lockfile and
- * {@code .yarnrc.yml} dialect.
+ * Port of @yarnpkg/parsers sources/syml.ts and sources/grammars/syml.pegjs (Yarn 4.10.3).
  */
 final class Syml {
 

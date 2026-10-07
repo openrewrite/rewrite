@@ -18,13 +18,12 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Getter;
 
 /**
- * Port of @yarnpkg/core sources/Report.ts {@code ReportError} (Yarn 4.10.3): an error Yarn prints under its
- * message code, {@code YN0082: <message>}. A plain JavaScript error thrown during resolution prints as
- * {@link #EXCEPTION}.
+ * Port of @yarnpkg/core sources/Report.ts {@code ReportError} (Yarn 4.10.3).
  */
 @Getter
 final class ReportError extends RuntimeException {
 
+    // a plain JavaScript error thrown during resolution
     static final int EXCEPTION = 1;
     static final int RESOLVER_NOT_FOUND = 10;
     static final int REMOTE_INVALID = 15;

@@ -19,8 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of glob-parent 5.1.2 with is-glob 4.0.3 and is-extglob 2.1.1, as fast-glob 3.3.2 calls it
- * ({@code flipBackslashes: false}) on a POSIX host.
+ * Port of glob-parent 5.1.2 with is-glob 4.0.3 and is-extglob 2.1.1, as fast-glob 3.3.2 calls it.
  */
 final class GlobParent {
 

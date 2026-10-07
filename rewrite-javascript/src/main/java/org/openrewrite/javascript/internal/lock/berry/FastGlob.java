@@ -34,9 +34,7 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * Port of fast-glob 3.3.2 for {@code fastGlob(patterns, {cwd, onlyDirectories: true, ignore})} as Workspace.ts calls
- * it on a POSIX host: the tasks (managers/tasks.js, utils/pattern.js) and the async provider's readers with their
- * deep and entry filters (providers/), over the project's directories.
+ * Port of fast-glob 3.3.2 as Workspace.ts calls it, over the project's directories on a POSIX host.
  */
 final class FastGlob {
 

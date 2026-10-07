@@ -26,9 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/Manifest.ts (Yarn 4.10.3) for the fields a lock-only install reads: a
- * package.json, a registry version document, a lockfile entry or a package extension. A field Yarn only
- * rewrites package.json with is left out.
+ * Port of @yarnpkg/core sources/Manifest.ts for the fields a lock-only install reads (Yarn 4.10.3).
  */
 final class Manifest {
 

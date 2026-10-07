@@ -25,8 +25,7 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmTagResolver.ts (Yarn 4.10.3): an {@code npm:<tag>} descriptor's one
- * candidate is the version the registry's dist-tag names; the locator is then the semver resolver's.
+ * Port of @yarnpkg/plugin-npm sources/NpmTagResolver.ts (Yarn 4.10.3).
  */
 final class NpmTagResolver implements Resolver {
 

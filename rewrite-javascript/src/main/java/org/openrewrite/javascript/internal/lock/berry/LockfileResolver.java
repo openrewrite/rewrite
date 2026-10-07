@@ -21,8 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/LockfileResolver.ts (Yarn 4.10.3): a descriptor the lock resolves, or whose range is
- * the reference of a locked package, keeps that package.
+ * Port of @yarnpkg/core sources/LockfileResolver.ts (Yarn 4.10.3).
  */
 final class LockfileResolver implements Resolver {
 

@@ -22,9 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/types.ts {@code Package} (Yarn 4.10.3): a locator with what its resolver read.
- * The dependency maps are keyed by ident hash; a meta map holds its fields as booleans or {@link Syml#UNDEFINED},
- * as the object Yarn assigns them to does.
+ * Port of @yarnpkg/core sources/types.ts {@code Package} (Yarn 4.10.3).
  */
 @Getter
 @Setter

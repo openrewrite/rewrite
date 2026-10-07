@@ -34,9 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/Configuration.ts {@code find} (Yarn 4.10.3) for the settings that reach the lock:
- * the {@code .yarnrc.yml} files from the project's directory up, merged by configUtils, under the {@code YARN_*}
- * environment, each parsed by its definition. A setting Yarn knows but the lock never reads is kept by name only.
+ * Port of @yarnpkg/core sources/Configuration.ts {@code find} for the settings a lock reads (Yarn 4.10.3).
  */
 @Getter
 public final class BerryOptions {

@@ -20,9 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-catalog sources/index.ts {@code reduceDependency} and sources/utils.ts (Yarn 4.10.3): a
- * {@code catalog:} or {@code catalog:<name>} range becomes the range the {@code .yarnrc.yml} catalog gives,
- * normalized and bound to the top-level workspace.
+ * Port of @yarnpkg/plugin-catalog sources/index.ts {@code reduceDependency} and sources/utils.ts (Yarn 4.10.3).
  */
 final class Catalogs {
 

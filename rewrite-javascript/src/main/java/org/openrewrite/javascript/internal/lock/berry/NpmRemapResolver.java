@@ -21,8 +21,7 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmRemapResolver.ts (Yarn 4.10.3): an alias {@code npm:<name>@<range>}
- * resolves as the normalized descriptor it names.
+ * Port of @yarnpkg/plugin-npm sources/NpmRemapResolver.ts (Yarn 4.10.3).
  */
 final class NpmRemapResolver implements Resolver {
 

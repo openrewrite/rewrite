@@ -24,9 +24,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/Configuration.ts (Yarn 4.10.3) past loading: the settings of {@link BerryOptions},
- * the data of the project's Yarn release, the dependency normalizers, the package extensions and the
- * {@code reduceDependency} hooks of the plugins that have one, in the CLI's plugin order (core, compat, catalog).
+ * Port of @yarnpkg/core sources/Configuration.ts past loading, with its plugins' hooks (Yarn 4.10.3).
  */
 @Getter
 final class Configuration {

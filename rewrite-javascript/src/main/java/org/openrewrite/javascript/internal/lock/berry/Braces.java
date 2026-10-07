@@ -24,9 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 /**
- * Port of braces 3.0.2 (index.js, lib/parse.js, lib/expand.js, lib/stringify.js, lib/utils.js) for
- * {@code braces(pattern, {expand: true, nodupes: true, keepEscaping: true})}, as micromatch 4.0.5 calls it for
- * fast-glob 3.3.2.
+ * Port of braces 3.0.2 for {@code braces(pattern, {expand: true, nodupes: true, keepEscaping: true})}.
  */
 final class Braces {
 

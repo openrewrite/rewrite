@@ -23,9 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/npmHttpUtils.ts {@code getPackageMetadata}, sources/npmConfigUtils.ts
- * (registries, the minimal age gate) and sources/NpmSemverFetcher.ts {@code isConventionalTarballUrl}
- * (Yarn 4.10.3): the full packument of a name from its scope's registry, cut to the fields Yarn caches.
+ * Port of @yarnpkg/plugin-npm npmHttpUtils.ts, npmConfigUtils.ts and NpmSemverFetcher.ts (Yarn 4.10.3).
  */
 final class NpmHttpUtils {
 

@@ -20,8 +20,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Port of fill-range 7.0.1 for {@code fill(...args, options)} as braces 3.0.2 expands a range: none of the
- * {@code toRegex}, {@code transform}, {@code stringify}, {@code strictRanges} or {@code step} options set.
+ * Port of fill-range 7.0.1 as braces 3.0.2 expands a range.
  */
 final class FillRange {
 

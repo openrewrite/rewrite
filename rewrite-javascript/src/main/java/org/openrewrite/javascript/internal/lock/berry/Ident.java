@@ -19,8 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of @yarnpkg/core sources/types.ts {@code Ident} (Yarn 4.10.3): a package name, its scope without the
- * {@code @}, and their hash.
+ * Port of @yarnpkg/core sources/types.ts {@code Ident} (Yarn 4.10.3).
  */
 @Getter
 class Ident {

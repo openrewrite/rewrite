@@ -22,8 +22,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/parsers sources/resolution.ts and sources/grammars/resolution.pegjs (Yarn 4.10.3): a
- * {@code resolutions} key, {@code [from/]descriptor}, each part a name with an optional {@code @description}.
+ * Port of @yarnpkg/parsers sources/resolution.ts and sources/grammars/resolution.pegjs (Yarn 4.10.3).
  */
 @Value
 class Resolution {

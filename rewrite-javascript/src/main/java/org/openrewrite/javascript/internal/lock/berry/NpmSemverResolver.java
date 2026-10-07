@@ -25,9 +25,7 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3): an {@code npm:<range>} descriptor's
- * candidates are the registry's satisfying versions, highest first, the deprecated ones only when nothing else
- * satisfies; a locator's package is its version document, with the release's node-gyp rule applied.
+ * Port of @yarnpkg/plugin-npm sources/NpmSemverResolver.ts (Yarn 4.10.3).
  */
 final class NpmSemverResolver implements Resolver {
 

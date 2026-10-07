@@ -16,9 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 /**
- * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and the checksum of a fetched npm package (Yarn 4.10.3):
- * the sha512 of the archive its tarball converts to, prefixed with the cache key. Only {@code compressionLevel: 0}
- * archives are reproduced; any other level deflates with the zlib-ng build Yarn ships.
+ * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and a fetched npm package's checksum (Yarn 4.10.3).
  */
 final class Cache {
 

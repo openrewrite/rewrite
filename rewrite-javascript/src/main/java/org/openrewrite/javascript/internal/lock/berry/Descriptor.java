@@ -19,8 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of @yarnpkg/core sources/types.ts {@code Descriptor} (Yarn 4.10.3): an ident with the range a dependent
- * asks for ({@code npm:^1.0.0}). Equal when their hashes are.
+ * Port of @yarnpkg/core sources/types.ts {@code Descriptor} (Yarn 4.10.3); equal when their hashes are.
  */
 @Getter
 final class Descriptor extends Ident {

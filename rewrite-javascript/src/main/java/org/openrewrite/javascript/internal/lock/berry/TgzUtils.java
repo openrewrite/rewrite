@@ -30,9 +30,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Port of @yarnpkg/core sources/tgzUtils.ts {@code extractArchiveTo} (Yarn 4.10.3) over the entries node-tar 6.1.11's
- * Parse emits: pax and GNU long names applied, only directories, files and symlinks kept, absolute paths, {@code ..}
- * and paths no deeper than the stripped components dropped.
+ * Port of @yarnpkg/core sources/tgzUtils.ts {@code extractArchiveTo} over node-tar 6.1.11's Parse (Yarn 4.10.3).
  */
 final class TgzUtils {
 

@@ -18,8 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Getter;
 
 /**
- * What Yarn would write depends on something the engine is not given: a tarball's contents, git, the filesystem, a
- * Yarn release whose data is unknown.
+ * What Yarn would write depends on something the engine is not given.
  */
 @Getter
 final class CannotKnow extends RuntimeException {

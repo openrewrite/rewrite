@@ -29,8 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/core sources/LegacyMigrationResolver.ts (Yarn 4.10.3): a Yarn 1 lockfile's entries pin the
- * descriptors they list to the versions their {@code resolved} URL names.
+ * Port of @yarnpkg/core sources/LegacyMigrationResolver.ts (Yarn 4.10.3).
  */
 final class LegacyMigrationResolver implements Resolver {
 

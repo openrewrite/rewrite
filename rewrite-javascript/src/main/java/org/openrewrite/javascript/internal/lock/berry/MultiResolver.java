@@ -23,8 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/MultiResolver.ts (Yarn 4.10.3): the first resolver that supports a descriptor or
- * locator answers for it.
+ * Port of @yarnpkg/core sources/MultiResolver.ts (Yarn 4.10.3).
  */
 final class MultiResolver implements Resolver {
 

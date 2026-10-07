@@ -24,8 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/configUtils.ts (Yarn 4.10.3): the rc files, farthest first, merged into one tree
- * whose every node remembers the file that gave it, with the {@code onConflict} directives applied.
+ * Port of @yarnpkg/core sources/configUtils.ts (Yarn 4.10.3).
  */
 final class ConfigUtils {
 

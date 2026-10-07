@@ -30,9 +30,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-essentials sources/commands/install.ts with {@code Project.install} for
- * {@code yarn install --mode=update-lockfile} (Yarn 4.10.3), as far as the resolution: the configuration and the
- * project's release, the project found (lockfile and workspaces), and the lockfile migration rules.
+ * Port of @yarnpkg/plugin-essentials sources/commands/install.ts, {@code --mode=update-lockfile} (Yarn 4.10.3).
  */
 public final class BerryLockRegenerator {
 
@@ -100,6 +98,11 @@ public final class BerryLockRegenerator {
 
     private final Inputs inputs;
 
+    private @Nullable BerryOptions options;
+
+    // each manifest parsed once, with the same throw on every read
+    private final Map<String, Object> manifests = new LinkedHashMap<>();
+
     public BerryLockRegenerator(Inputs inputs) {
         this.inputs = inputs;
     }
@@ -113,7 +116,7 @@ public final class BerryLockRegenerator {
      *                    after the one this package ports
      */
     YarnRelease release() {
-        BerryOptions options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+        BerryOptions options = options();
         Object yarnPath = options.get("yarnPath");
         String version;
         if (yarnPath != null && !options.getBoolean("ignorePath")) {
@@ -146,7 +149,7 @@ public final class BerryLockRegenerator {
      * @throws BerryOptions.UsageError where the configuration rejects a setting
      */
     Loaded load(YarnRelease release) {
-        BerryOptions options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+        BerryOptions options = options();
         options.restrictTo(release.getSettings());
 
         Project project = new Project(new Configuration(options, release));
@@ -191,8 +194,28 @@ public final class BerryLockRegenerator {
         return project.persistLockfile("win32".equals(os) ? "\r\n" : "\n");
     }
 
+    private BerryOptions options() {
+        if (options == null) {
+            options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+        }
+        return options;
+    }
+
     private @Nullable Manifest manifest(String location) {
         String text = inputs.getManifests().get(location);
-        return text == null ? null : Manifest.fromText(text);
+        if (text == null) {
+            return null;
+        }
+        Object parsed = manifests.computeIfAbsent(location, l -> {
+            try {
+                return Manifest.fromText(text);
+            } catch (RuntimeException e) {
+                return e;
+            }
+        });
+        if (parsed instanceof RuntimeException) {
+            throw (RuntimeException) parsed;
+        }
+        return (Manifest) parsed;
     }
 }

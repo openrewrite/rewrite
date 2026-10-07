@@ -22,9 +22,7 @@ import java.util.Map;
 import java.util.zip.CRC32;
 
 /**
- * The archive @yarnpkg/libzip's ZipFS (Yarn 4.10.3) writes under {@code compressionLevel: 0}, for the operations
- * the tarball extraction makes: entries in the order they were first added (a file written again keeps its place),
- * stored, every one at {@code SAFE_TIME}, unix attributes masked to {@code 0755}.
+ * The archive @yarnpkg/libzip's ZipFS writes under {@code compressionLevel: 0} (Yarn 4.10.3).
  */
 final class ZipArchive {
 

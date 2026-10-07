@@ -21,8 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/Resolver.ts (Yarn 4.10.3): turns descriptors into candidate locators and locators
- * into packages.
+ * Port of @yarnpkg/core sources/Resolver.ts (Yarn 4.10.3).
  */
 interface Resolver {
 

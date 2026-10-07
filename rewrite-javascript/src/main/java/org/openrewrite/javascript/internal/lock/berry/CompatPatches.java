@@ -16,9 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 /**
- * Port of @yarnpkg/plugin-compat sources/index.ts {@code reduceDependency} (Yarn 4.10.3): a dependency on a package
- * the release patches ({@code fsevents}, {@code resolve}, {@code typescript}) becomes the optional builtin patch of
- * its descriptor.
+ * Port of @yarnpkg/plugin-compat sources/index.ts {@code reduceDependency} (Yarn 4.10.3).
  */
 final class CompatPatches {
 

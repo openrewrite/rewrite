@@ -26,8 +26,7 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.berry.Picomatch.*;
 
 /**
- * Port of picomatch 2.3.1 lib/parse.js ({@code parse}, {@code parse.fastpaths}) under the options micromatch 4.0.5
- * is given by fast-glob 3.3.2: {@code posix}, no {@code strictSlashes}, everything else unset.
+ * Port of picomatch 2.3.1 lib/parse.js under the options fast-glob 3.3.2 gives micromatch 4.0.5.
  */
 final class PicomatchParse {
 

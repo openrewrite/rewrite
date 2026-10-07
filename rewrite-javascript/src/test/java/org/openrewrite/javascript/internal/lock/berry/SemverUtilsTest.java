@@ -17,7 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.semver.NodeSemver;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,8 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SemverUtilsTest {
 
-    @ParameterizedTest(name = "{0} with {1}: {2}")
-    @CsvSource(delimiter = '|', value = {
+    private static final String[] SPECS = {
             "^5.0.0|5.0.0-beta.13|true",
             "^1.0.0|1.0.0-rc1|true",
             "2.x|3.0.0-pre.0|false",
@@ -55,16 +54,30 @@ class SemverUtilsTest {
             "1.0.0-rc4|1.0.0-rc2|false",
             "1.0.0-beta.1|1.0.0-beta.2|false",
             "<=5.0.0-beta.0|5.0.0-alpha.7|true",
-    })
-    void satisfiesWithPrereleases(String range, String version, boolean satisfied) {
-        assertThat(SemverUtils.satisfiesWithPrereleases(version, range)).isEqualTo(satisfied);
+    };
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("specs")
+    void satisfiesWithPrereleases(String spec) {
+        String[] row = spec.split("\\|");
+        assertThat(SemverUtils.satisfiesWithPrereleases(row[1], row[0])).isEqualTo(Boolean.parseBoolean(row[2]));
+    }
+
+    static String[] specs() {
+        return SPECS;
     }
 
     @Test
     void shouldNotBeObsoleteWithIncludePrerelease() {
-        assertThat(SemverUtils.satisfiesWithPrereleases("5.0.0-alpha.7", "<=5.0.0-beta.0")).isTrue();
-        assertThat(NodeSemver.satisfies("1.0.0-alpha.39", "1.0.0-alpha.37", NodeSemver.Options.INCLUDE_PRERELEASE))
-                .isFalse();
+        int differentResults = 0;
+        for (String spec : SPECS) {
+            String[] row = spec.split("\\|");
+            if (SemverUtils.satisfiesWithPrereleases(row[1], row[0]) !=
+                NodeSemver.satisfies(row[1], row[0], NodeSemver.Options.INCLUDE_PRERELEASE)) {
+                differentResults++;
+            }
+        }
+        assertThat(differentResults).isGreaterThan(0);
     }
 
     @Test

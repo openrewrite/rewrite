@@ -17,22 +17,32 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The release a project runs, against {@code yarn --version} under corepack 0.35.0 with the 4.5.3 release file as
- * the {@code yarnPath} target, and the releases after the one the package ports
- * (Yarn 4.14.0 writes {@code __metadata.version: 9} and 4.18.1 version 10 for an empty project).
+ * The release a project runs and the lockfile migration rules, against Yarn's own runs: {@code yarn --version}
+ * under corepack 0.35.0 with the 4.5.3 release file as the {@code yarnPath} target, the locks Yarn 4.14.0 and 4.18.1
+ * write for an empty project, and the recorded migrations.
  */
 class BerryLockRegeneratorTest {
 
     private static final String YARN_PATH = "yarnPath: .yarn/releases/yarn-4.5.3.cjs\n";
+    private static final Pattern LOCKFILE_VERSION = Pattern.compile("^__metadata:\\n {2}version: (\\d+)$",
+            Pattern.MULTILINE);
 
     @Test
     void yarnPathWinsOverPackageManager() {
@@ -99,6 +109,53 @@ class BerryLockRegeneratorTest {
             assertThat(project.lockfileNeedsRefresh).isFalse();
             assertThat(regenerator.write(project)).isEqualTo(header + "8" + rest);
         }
+    }
+
+    /**
+     * install.ts's lockfile migration rules over every lock older than version 8 a recorded phase starts from, under
+     * the phase's environment and no rc file, as the recorder ran them: the settings they migrate are the
+     * {@code .yarnrc.yml} Yarn wrote at the end of that phase.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("migrations")
+    void migratesTheSettingsYarnWrote(BerryScenarios.Lock lock) {
+        BerryScenarios.Scenario scenario = lock.getScenario();
+        boolean seed = "lock-seed".equals(lock.getFileName());
+        BerryScenarios.Phase phase = seed ? BerryScenarios.Phase.BEFORE :
+                scenario.has("refresh") ? BerryScenarios.Phase.REFRESH : BerryScenarios.Phase.AFTER;
+        String written = scenario.file(seed ? "yarnrc-before.written" :
+                phase == BerryScenarios.Phase.REFRESH ? "yarnrc-refresh.written" : "yarnrc.written");
+        BerryLockRegenerator.Inputs recorded = scenario.inputs(phase, lock.getText());
+        BerryLockRegenerator regenerator = new BerryLockRegenerator(BerryLockRegenerator.Inputs.builder()
+                .lock(recorded.getLock())
+                .manifests(recorded.getManifests())
+                .env(recorded.getEnv())
+                .host(recorded.getHost())
+                .now(recorded.getNow())
+                .build());
+        Map<String, Object> migrated = regenerator.load(regenerator.release()).getMigratedSettings();
+        assertThat(migrated).isNotEmpty();
+        assertThat(Syml.stringifySyml(new LinkedHashMap<>(migrated))).isEqualTo(written);
+    }
+
+    static Stream<BerryScenarios.Lock> migrations() {
+        List<BerryScenarios.Lock> locks = new ArrayList<>();
+        for (BerryScenarios.Scenario scenario : BerryScenarios.discover()) {
+            if (scenario.has("yarnrc") || !scenario.has("recorded-with")) {
+                continue;
+            }
+            for (BerryScenarios.Lock lock : scenario.locks()) {
+                Matcher version = LOCKFILE_VERSION.matcher(lock.getText());
+                boolean older = lock.getText().contains("# yarn lockfile v1") ||
+                                version.find() && Integer.parseInt(version.group(1)) < 8;
+                if (older && ("lock-seed".equals(lock.getFileName()) ||
+                              "before".equals(lock.getFileName()) && !scenario.has("lock-seed"))) {
+                    locks.add(lock);
+                }
+            }
+        }
+        assertThat(locks).isNotEmpty();
+        return locks.stream();
     }
 
     private static String release(@Nullable String packageManager, @Nullable String yarnrc, Map<String, String> env) {

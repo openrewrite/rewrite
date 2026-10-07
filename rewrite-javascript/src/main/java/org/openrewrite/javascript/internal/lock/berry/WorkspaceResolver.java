@@ -22,8 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/core sources/WorkspaceResolver.ts (Yarn 4.10.3): {@code workspace:} descriptors, and ranges a
- * workspace accepts, resolve to the workspace; its package is read from its manifest on every install.
+ * Port of @yarnpkg/core sources/WorkspaceResolver.ts (Yarn 4.10.3).
  */
 final class WorkspaceResolver implements Resolver {
 

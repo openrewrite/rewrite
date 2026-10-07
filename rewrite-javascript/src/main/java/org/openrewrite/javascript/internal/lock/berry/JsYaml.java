@@ -26,8 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of js-yaml 3.14.1 lib/js-yaml/loader.js {@code safeLoad} under {@code FAILSAFE_SCHEMA} with
- * {@code json: true}, as @yarnpkg/parsers 3.0.3 calls it.
+ * Port of js-yaml 3.14.1 {@code safeLoad} under {@code FAILSAFE_SCHEMA}, as @yarnpkg/parsers 3.0.3 calls it.
  */
 final class JsYaml {
 

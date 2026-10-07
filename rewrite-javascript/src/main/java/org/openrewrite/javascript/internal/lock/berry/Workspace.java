@@ -25,9 +25,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Port of @yarnpkg/core sources/Workspace.ts (Yarn 4.10.3): a directory with a package.json in the project, its
- * anchored descriptor and locator ({@code <name>@workspace:<relative cwd>}), the member directories its
- * {@code workspaces} patterns match, and the ranges it accepts.
+ * Port of @yarnpkg/core sources/Workspace.ts (Yarn 4.10.3).
  */
 @Getter
 final class Workspace {
