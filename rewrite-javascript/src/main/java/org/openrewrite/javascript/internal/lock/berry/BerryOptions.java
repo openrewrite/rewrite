@@ -29,6 +29,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,10 +45,15 @@ public final class BerryOptions {
     private static final String ENVIRONMENT_PREFIX = "yarn_";
     private static final Pattern YARN_RELEASE = Pattern.compile("(?:^|/)yarn-(\\d+\\.\\d+\\.\\d+[^/]*?)\\.c?js$");
     private static final Pattern PACKAGE_MANAGER = Pattern.compile("^yarn@(\\d+\\.\\d+\\.\\d+(?:-[^+]*)?)(?:\\+.*)?$");
+    private static final Pattern LEADING_SEPARATORS = Pattern.compile("^[_.\\- ]+");
+    private static final Pattern SEPARATED_WORD = Pattern.compile("[_.\\- ]+(\\w|\\z)");
+    private static final Pattern DIGITS_WORD = Pattern.compile("\\d+(\\w|\\z)");
 
-    // Configuration.ts IGNORED_ENV_VARIABLES
-    private static final Set<String> IGNORED_ENV_VARIABLES = new LinkedHashSet<>(Arrays.asList("rcFilename",
-            "version", "command", "wrapOutput", "home", "confDir", "registry", "ignoreCwd"));
+    private static final Set<String> IGNORED_ENV_VARIABLES = new LinkedHashSet<>(Arrays.asList("isTestEnv",
+            "injectNpmUser", "injectNpmPassword", "injectNpm2FaToken", "zipDataEpilogue", "cacheCheckpointOverride",
+            "cacheVersionOverride", "lockfileVersionOverride", "osOverride", "cpuOverride", "libcOverride",
+            "binFolder", "version", "flags", "profile", "gpg", "ignoreNode", "wrapOutput", "home", "confDir",
+            "registry", "ignoreCwd"));
 
     private enum Type {
         ANY, BOOLEAN, ABSOLUTE_PATH, NUMBER, STRING, SECRET, SHAPE, MAP
@@ -251,19 +257,34 @@ public final class BerryOptions {
         return environmentSettings;
     }
 
-    // the camelcase package for the lower-cased snake keys an environment gives
-    private static String camelcase(String input) {
-        StringBuilder out = new StringBuilder();
-        boolean upper = false;
-        for (char c : input.toCharArray()) {
-            if (c == '_' || c == '-' || c == '.' || c == ' ') {
-                upper = out.length() > 0;
-                continue;
-            }
-            out.append(upper ? Character.toUpperCase(c) : c);
-            upper = false;
+    // camelcase 5.3.1 of a key already lower-cased, so preserveCamelCase never runs
+    static String camelcase(String key) {
+        int start = 0;
+        int end = key.length();
+        while (start < end && isStrWhiteSpace(key.charAt(start))) {
+            start++;
         }
-        return out.toString();
+        while (end > start && isStrWhiteSpace(key.charAt(end - 1))) {
+            end--;
+        }
+        String input = key.substring(start, end);
+        if (input.length() <= 1) {
+            return input.toLowerCase(Locale.ROOT);
+        }
+        input = LEADING_SEPARATORS.matcher(input).replaceFirst("").toLowerCase(Locale.ROOT);
+        input = replaceAll(input, SEPARATED_WORD, m -> m.group(1).toUpperCase(Locale.ROOT));
+        return replaceAll(input, DIGITS_WORD, m -> m.group().toUpperCase(Locale.ROOT));
+    }
+
+    private static String replaceAll(String s, Pattern pattern, Function<Matcher, String> replacer) {
+        Matcher m = pattern.matcher(s);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            out.append(s, last, m.start()).append(replacer.apply(m));
+            last = m.end();
+        }
+        return out.append(s.substring(last)).toString();
     }
 
     void use(String source, Map<String, @Nullable Object> data) {
@@ -292,7 +313,8 @@ public final class BerryOptions {
             if (definition == null) {
                 continue;
             }
-            if (sources.containsKey(key) && definition.type != Type.MAP && !definition.isArray) {
+            // only logFilters concatenates its sources' arrays, and it never reaches a lock
+            if (sources.containsKey(key) && definition.type != Type.MAP) {
                 continue;
             }
             Object parsed;
@@ -507,9 +529,9 @@ public final class BerryOptions {
         return value.bitLength() < 32 ? (Object) value.intValue() : (Object) value.doubleValue();
     }
 
-    private static boolean isStrWhiteSpace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == ' ' ||
-               c == '﻿' || Character.getType(c) == Character.SPACE_SEPARATOR;
+    static boolean isStrWhiteSpace(char c) {
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == '\u2028' || c == '\u2029' ||
+               c == '\uFEFF' || Character.getType(c) == Character.SPACE_SEPARATOR;
     }
 
     /**

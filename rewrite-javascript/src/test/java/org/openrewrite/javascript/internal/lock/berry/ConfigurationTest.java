@@ -29,8 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * Yarn's packages/yarnpkg-core/tests/Configuration.test.ts, the cases about settings that reach a lock: the tag
  * pattern, environment interpolation, map merging, multiple rc files and the ignored environment variables. The
  * multiple-rc-files case runs with settings of each type that reach a lock in place of its test plugin's (no
- * setting of type ANY does). Not ported: secrets hiding, mergeable arrays ({@code logFilters},
- * {@code unsafeHttpWhitelist}) and {@code overwrite} merging, none of which reaches a lock.
+ * setting of type ANY does). Not ported: secrets hiding and {@code overwrite} merging, neither of which reaches a
+ * lock.
  */
 class ConfigurationTest {
 
@@ -125,9 +125,64 @@ class ConfigurationTest {
     }
 
     /**
+     * Yarn 4.10.3 under corepack runs {@code yarn config get compressionLevel} with each of these set and rejects
+     * {@code YARN_COMMAND}, which only Yarn 1 read.
+     */
+    @Test
+    void ignoresTheEnvironmentVariablesConfigurationTsLists() {
+        for (String variable : new String[]{"YARN_IS_TEST_ENV", "YARN_INJECT_NPM_USER", "YARN_INJECT_NPM_PASSWORD",
+                "YARN_INJECT_NPM_2FA_TOKEN", "YARN_ZIP_DATA_EPILOGUE", "YARN_CACHE_CHECKPOINT_OVERRIDE",
+                "YARN_CACHE_VERSION_OVERRIDE", "YARN_LOCKFILE_VERSION_OVERRIDE", "YARN_OS_OVERRIDE",
+                "YARN_CPU_OVERRIDE", "YARN_LIBC_OVERRIDE", "YARN_BIN_FOLDER", "YARN_VERSION", "YARN_FLAGS",
+                "YARN_PROFILE", "YARN_GPG", "YARN_IGNORE_NODE", "YARN_WRAP_OUTPUT", "YARN_HOME", "YARN_CONF_DIR",
+                "YARN_REGISTRY", "YARN_IGNORE_CWD"}) {
+            BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"),
+                    Collections.singletonMap(variable, "1"));
+            options.restrictTo(YarnRelease.of("4.10.3").getSettings());
+            assertThat(options.get("compressionLevel")).as(variable).isEqualTo(3);
+        }
+        assertThatThrownBy(() -> BerryOptions.load(Collections.emptyMap(), Collections.singletonMap("YARN_COMMAND",
+                "x")).restrictTo(YarnRelease.of("4.10.3").getSettings()))
+                .isInstanceOf(BerryOptions.UsageError.class)
+                .hasMessageStartingWith("Unrecognized or legacy configuration settings found: command");
+    }
+
+    /**
+     * The key camelcase 5.3.1 gives a lower-cased variable name; every expectation is its own answer.
+     */
+    @Test
+    void namesAnEnvironmentVariableAsCamelcaseDoes() {
+        String[][] rows = {{"inject_npm_2fa_token", "injectNpm2FaToken"}, {"npm_registry_server", "npmRegistryServer"},
+                {"_foo", "foo"}, {"a__b", "aB"}, {"foo_", "foo"}, {"x", "x"}, {"foo_éx", "foo_éx"},
+                {"a.b-c d", "aBCD"}, {"12ab_3cd", "12Ab3Cd"}, {" a_b ", "aB"}, {"a_1", "a1"}};
+        for (String[] row : rows) {
+            assertThat(BerryOptions.camelcase(row[0])).as(row[0]).isEqualTo(row[1]);
+        }
+    }
+
+    /**
+     * "should merge mergeable array properties" for a string array that does not concatenate, which
+     * {@code npmPreapprovedPackages} is as {@code unsafeHttpWhitelist} is: the first source keeps its value. Yarn
+     * 4.10.3 keeps the environment's {@code ["env"]} over an rc file's {@code [rc]}. Not ported: {@code logFilters},
+     * the one array that concatenates, and the {@code overwrite} use, which no lock reads.
+     */
+    @Test
+    void doesNotMergeAnArrayThatDoesNotConcatenate() {
+        BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
+                "npmPreapprovedPackages:\n  - example.com\n"), Collections.emptyMap());
+        options.use("second file", Collections.singletonMap("npmPreapprovedPackages",
+                Collections.singletonList("evil.com")));
+        assertThat(options.get("npmPreapprovedPackages")).isEqualTo(Collections.singletonList("example.com"));
+
+        assertThat(BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "npmPreapprovedPackages: [rc]\n"),
+                Collections.singletonMap("YARN_NPM_PREAPPROVED_PACKAGES", "env")).get("npmPreapprovedPackages"))
+                .isEqualTo(Collections.singletonList("env"));
+    }
+
+    /**
      * "Multiple RC files": three nested rc files, the middle one with {@code onConflict} directives, read as
      * {@code Configuration.find} reads them from the nearest directory; Yarn 4.10.3 answers the same over these
-     * files ({@code ybf-rcfiles-probe.sh}).
+     * files.
      */
     @Test
     void resolvesTheStringsOfMultipleRcFiles() {

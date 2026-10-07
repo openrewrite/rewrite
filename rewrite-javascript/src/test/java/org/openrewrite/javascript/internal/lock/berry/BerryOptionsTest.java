@@ -102,7 +102,7 @@ class BerryOptionsTest {
     }
 
     /**
-     * Yarn 4.10.3 under corepack ({@code ybf-config-probe.sh}): an rc file's {@code enableStrictSettings} never
+     * Yarn 4.10.3 under corepack: an rc file's {@code enableStrictSettings} never
      * reaches the pass that reads unknown keys; the environment's does.
      */
     @Test
@@ -132,8 +132,7 @@ class BerryOptionsTest {
     }
 
     /**
-     * A number setting is JavaScript's {@code parseInt}, hexadecimal after {@code 0x}; Yarn 4.10.3's answers
-     * ({@code ybf-config-probe.sh}).
+     * A number setting is JavaScript's {@code parseInt}, hexadecimal after {@code 0x}; Yarn 4.10.3's answers.
      */
     @Test
     void readsANumberAsParseIntDoes() {
@@ -151,7 +150,7 @@ class BerryOptionsTest {
         }
         assertThat(BerryOptions.load(Collections.emptyMap(), Collections.singletonMap("YARN_COMPRESSION_LEVEL", "0x5"))
                 .get("compressionLevel")).isEqualTo(5);
-        assertThat(BerryOptions.parseInt("　 -12")).isEqualTo(-12);
+        assertThat(BerryOptions.parseInt("\u3000\u2028-12")).isEqualTo(-12);
         assertThat(BerryOptions.parseInt("99999999999")).isEqualTo(99999999999d);
     }
 

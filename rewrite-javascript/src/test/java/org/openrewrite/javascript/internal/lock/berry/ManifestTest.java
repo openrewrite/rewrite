@@ -33,7 +33,7 @@ class ManifestTest {
 
     @Test
     void shouldHandleByteOrderMarkCharacter() {
-        assertThat(Manifest.fromText("﻿{\"name\":\"foo\"}").name.name).isEqualTo("foo");
+        assertThat(Manifest.fromText("\uFEFF{\"name\":\"foo\"}").name.name).isEqualTo("foo");
     }
 
     @Test

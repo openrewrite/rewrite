@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * The release a project runs, against {@code yarn --version} under corepack 0.35.0 with the 4.5.3 release file as
- * the {@code yarnPath} target ({@code ybf-release-probe.sh}), and the releases after the one the package ports
+ * the {@code yarnPath} target, and the releases after the one the package ports
  * (Yarn 4.14.0 writes {@code __metadata.version: 9} and 4.18.1 version 10 for an empty project).
  */
 class BerryLockRegeneratorTest {
@@ -81,8 +81,7 @@ class BerryLockRegeneratorTest {
     }
 
     /**
-     * Yarn 4.10.3 and 4.5.3 over the locks 4.14.0 and 4.18.1 wrote for an empty project: version 8 again
-     * ({@code ybf-later-lock-probe.sh}).
+     * Yarn 4.10.3 and 4.5.3 over the locks 4.14.0 and 4.18.1 wrote for an empty project: version 8 again.
      */
     @Test
     void theRunningReleaseWritesItsOwnVersionOverALaterOnesLock() {

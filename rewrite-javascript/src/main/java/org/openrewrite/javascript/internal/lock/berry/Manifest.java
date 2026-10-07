@@ -533,7 +533,7 @@ final class Manifest {
     }
 
     private static String stripBOM(String content) {
-        return !content.isEmpty() && content.charAt(0) == '﻿' ? content.substring(1) : content;
+        return !content.isEmpty() && content.charAt(0) == '\uFEFF' ? content.substring(1) : content;
     }
 
     private static String normalizeSlashes(String str) {

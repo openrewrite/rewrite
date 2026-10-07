@@ -60,7 +60,7 @@ final class BerryScenarios {
 
     /**
      * A phase of a recording: the before install, the after install with the edit, and a Yarn 4 install that
-     * changes nothing over a {@code before} an older Yarn wrote ({@code record-yarn-berry-refresh.sh}).
+     * changes nothing over a {@code before} an older Yarn wrote.
      */
     enum Phase {
         BEFORE, REFRESH, AFTER
