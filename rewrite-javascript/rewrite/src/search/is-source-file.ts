@@ -9,8 +9,9 @@ export class IsSourceFile extends TreeVisitor<any, ExecutionContext> {
 
     constructor(filePattern: string) {
         super();
-        // Create a picomatch matcher for the pattern
-        this.matcher = picomatch.default ? picomatch.default(filePattern) : (picomatch as any)(filePattern);
+        // Wildcards match dot-segments too, as Java's PathUtils.matchesGlob does for the same precondition.
+        const options = {dot: true};
+        this.matcher = picomatch.default ? picomatch.default(filePattern, options) : (picomatch as any)(filePattern, options);
     }
 
     protected async preVisit(tree: any, _: ExecutionContext): Promise<any> {
