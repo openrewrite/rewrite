@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -877,7 +878,7 @@ final class PicomatchParse {
             List<String> sorted = new ArrayList<>(args);
             Collections.sort(sorted);
             String value = "[" + String.join("-", sorted) + "]";
-            if (JsRegExp.toJava(value) != null) {
+            if (V8RegExp.toJava(value) != null) {
                 return value;
             }
             List<String> escaped = new ArrayList<>();
