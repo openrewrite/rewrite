@@ -18,7 +18,9 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.npm.UriComponent;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
@@ -80,6 +82,10 @@ class BerryLockRoundTripTest {
         }
         if (project.lockfileNeedsRefresh) {
             assertThat(lock.getText()).doesNotContain("\n  version: 8\n");
+            String after = lock.getScenario().file("after");
+            if (lock.isBefore() && after != null && onlyTheReleaseChanges(lock.getScenario())) {
+                refreshesAsYarnDoes(lock, after);
+            }
             return;
         }
 
@@ -98,5 +104,40 @@ class BerryLockRoundTripTest {
         }
         String written = regenerator.write(project);
         assertThat(written == null ? lock.getText() : written).isEqualTo(lock.getText());
+    }
+
+    /**
+     * A lock older than version 8 under a Yarn 4 install that changes nothing else: every locked package is
+     * resolved again from the registry through the resolver chain (the lockfile resolver no longer answers for
+     * locators), the stored descriptors and checksums kept, the migration's {@code compressionLevel: mixed} in
+     * force; Yarn's recording of that install is the scenario's {@code after}.
+     */
+    private static void refreshesAsYarnDoes(BerryScenarios.Lock lock, String after) {
+        BerryScenarios.Scenario scenario = lock.getScenario();
+        BerryLockRegenerator regenerator = new BerryLockRegenerator(scenario.inputs(false, lock.getText()));
+        Project project = regenerator.load(regenerator.release()).getProject();
+        NpmHttpUtils.Registry registry = (url, identUrl) -> {
+            byte[] packument = scenario.http(UriComponent.decodeURIComponent(identUrl.substring(1)));
+            return packument == null ? null : Js.jsonParse(new String(packument, StandardCharsets.UTF_8));
+        };
+        Resolver chain = new MultiResolver(new WorkspaceResolver(), new NpmRemapResolver(), new NpmSemverResolver(),
+                new NpmTagResolver());
+        Resolver resolver = new MultiResolver(new LockfileResolver(chain), chain);
+        Resolver.ResolveOptions opts = new Resolver.ResolveOptions(project, resolver, registry);
+        for (Package pkg : new ArrayList<>(project.originalPackages.values())) {
+            project.originalPackages.put(pkg.locatorHash, resolver.resolve(pkg, opts));
+        }
+        assertThat(regenerator.write(project)).isEqualTo(after);
+    }
+
+    // the edit is only the packageManager field: the after phase is a second Yarn over the same project
+    private static boolean onlyTheReleaseChanges(BerryScenarios.Scenario scenario) {
+        String before = scenario.file("pkg-before");
+        String pkg = scenario.file("pkg");
+        if (before == null || pkg == null || scenario.has("tree") || scenario.has("yarnrc-after")) {
+            return false;
+        }
+        String field = "\"packageManager\": \"[^\"]*\"";
+        return before.replaceAll(field, "").equals(pkg.replaceAll(field, ""));
     }
 }

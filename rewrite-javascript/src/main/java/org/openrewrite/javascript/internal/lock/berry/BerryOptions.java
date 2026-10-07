@@ -277,7 +277,7 @@ public final class BerryOptions {
         return out.toString();
     }
 
-    private void use(String source, Map<String, @Nullable Object> data) {
+    void use(String source, Map<String, @Nullable Object> data) {
         boolean strict = Boolean.TRUE.equals(values.get("enableStrictSettings"));
         List<String> keys = new ArrayList<>();
         keys.add("enableStrictSettings");
