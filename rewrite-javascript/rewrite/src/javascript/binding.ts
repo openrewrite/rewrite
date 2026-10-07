@@ -275,9 +275,10 @@ export function maybeBind(
         }
     }
 
-    if (isWholeModule && options.preferredName === undefined && derivedBindingName(module) === undefined) {
-        // The module's last path segment is not a legal identifier, and the caller named no
-        // preference of its own — there is no name left to bind it to.
+    if (isWholeModule && options.alias === undefined && options.preferredName === undefined &&
+        derivedBindingName(module) === undefined) {
+        // The module's last path segment is not a legal identifier, and the caller named none
+        // of its own — there is no name left to bind it to.
         return undefined;
     }
 

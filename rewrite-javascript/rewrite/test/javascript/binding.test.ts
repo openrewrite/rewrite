@@ -528,6 +528,23 @@ describe("maybeBind", () => {
         expect(contextualKeywordBound.name).toBeUndefined();
     });
 
+    test("a pinned alias names a default or namespace import whose module derives no identifier", async () => {
+        const spec = new RecipeSpec();
+        const bound: {defaultName?: string, namespaceName?: string} = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.defaultName = maybeBind(this, {module: "react-dom", member: "default", alias: "ReactDOM", onlyIfReferenced: false});
+                bound.namespaceName = maybeBind(this, {module: "prop-types", member: "*", alias: "PropTypes", onlyIfReferenced: false});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `const x = 1;`,
+            `import ReactDOM from 'react-dom';\nimport * as PropTypes from 'prop-types';\n\nconst x = 1;`
+        ));
+        expect(bound).toEqual({defaultName: "ReactDOM", namespaceName: "PropTypes"});
+    });
+
     test("AMD refuses where the declared dependency's parameter is not a name to hand back", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
