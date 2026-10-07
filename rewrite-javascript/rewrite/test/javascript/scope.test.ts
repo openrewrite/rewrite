@@ -179,6 +179,16 @@ describe('scopeOf', () => {
         expect(outside.declares('f')).toBe(false);
     });
 
+    test('a computed-name method binds its parameters and hoists like a named one', async () => {
+        const scope = await scopeAtAnchor('class A { [k](p) { var v; anchor(); } }');
+        expect(scope.declaringScope('p')?.kind).toBe(JS.Kind.ComputedPropertyMethodDeclaration);
+        expect(scope.declaringScope('v')?.kind).toBe(JS.Kind.ComputedPropertyMethodDeclaration);
+    });
+
+    test('a global augmentation hoists to the file, as the whole file sees it', async () => {
+        expect((await scopeAtAnchor('declare global { var G: number; }\nanchor();')).declares('G')).toBe(true);
+    });
+
     test('a nested function keeps its declarations to itself', async () => {
         const names = await namesAtAnchor(`
             function outer() {
@@ -429,7 +439,8 @@ describe('namesReferencedWithin', () => {
                 const Value = 1;
                 class Klass {}
                 namespace Hidden { export type T = 1 }
-                namespace TypesOnly { export type T = 1; interface I {} const enum CE { A } namespace Inner { type U = 1 } }
+                namespace TypesOnly { export type T = 1; interface I {} namespace Inner { type U = 1 } }
+                namespace ConstOnly { export const enum CE { A } }
                 namespace Deep { namespace Inner { export const v = 1 } }
                 namespace Dotted.Inner { export const v = 1 }
                 namespace Qualified.Inner { export type T = 1 }
@@ -440,6 +451,7 @@ describe('namesReferencedWithin', () => {
                 let d: Klass.T;
                 let e: Hidden.T;
                 TypesOnly.go();
+                ConstOnly.go();
                 let g: Enum.A;
                 Deep.go();
                 Dotted.go();
@@ -449,6 +461,8 @@ describe('namesReferencedWithin', () => {
         const referenced = [...namesReferencedWithin(ns)];
         expect(referenced).toEqual(expect.arrayContaining(['Iface', 'Alias', 'Value', 'Klass', 'TypesOnly']));
         expect(referenced).not.toContain('Hidden');
+        // A const enum makes a namespace a value, as the binder has it, whatever the emitter drops.
+        expect(referenced).not.toContain('ConstOnly');
         expect(referenced).not.toContain('Enum');
         expect(referenced).not.toContain('Deep');
         expect(referenced).not.toContain('Dotted');
@@ -511,6 +525,9 @@ describe('resolve', () => {
             let i: import('other').Imported;
             import a = NS.Foo;
             export {NS};
+            const h = (P: unknown): P is string => P;
+            enum E { A = 1, B = A }
+            A;
         `;
         const cu = JS.Kind.CompilationUnit;
         // In order: the specifier, the interface, the shorthand, the property key, the receiver, the
@@ -524,6 +541,10 @@ describe('resolve', () => {
         expect((await resolvedAt(source, 'T')).sort()).toEqual([...Array(3).fill(J.Kind.MethodDeclaration), undefined]);
         // An `infer` name reaches the true branch alone, so the false branch reads past it to nothing.
         expect(await resolvedAt(source, 'I')).toEqual([undefined, JS.Kind.ConditionalType, undefined]);
+        // An arrow's parameter is one binding, read from the predicate and the body alike.
+        expect(await resolvedAt(source, 'P')).toEqual([undefined, JS.Kind.ArrowFunction, JS.Kind.ArrowFunction]);
+        // An enum's members are in scope in its body alone.
+        expect(await resolvedAt(source, 'A')).toEqual([undefined, J.Kind.Block, undefined]);
     });
 
     test('asked from a call, the callee\'s receiver resolves as it would from its own position', async () => {
@@ -552,7 +573,7 @@ describe('resolve', () => {
         const cursor = new Cursor(call, new Cursor(cu));
 
         expect(resolve(cursor, read)).toBe(cu);
-        // A copy keeps its id, so it still stands for the tree's identifier; a fresh id stands for nothing in it.
+        // A copy keeps its id and so stands for the tree's identifier. A fresh id stands for nothing in it.
         expect(resolve(cursor, {...read})).toBe(cu);
         expect(() => resolve(cursor, {...read, id: randomId()})).toThrow(/not in the tree/);
     });
@@ -573,37 +594,32 @@ describe('resolve', () => {
     });
 });
 
-/** The kind of the scope `resolve` answers for each occurrence of `name` in `source`, from the identifier's own cursor. */
-async function resolvedAt(source: string, name: string): Promise<(string | undefined)[]> {
-    const answers: (string | undefined)[] = [];
+/** What `ask` answers for each occurrence of `name` in `source`, from the identifier's own cursor. */
+async function answersAt<T>(
+    source: string, name: string, ask: (cursor: Cursor, identifier: J.Identifier) => T, sourcePath?: string
+): Promise<T[]> {
+    const answers: T[] = [];
     await new class extends JavaScriptVisitor<undefined> {
         override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
             if (identifier.simpleName === name) {
-                answers.push(resolve(this.cursor, identifier)?.kind);
+                answers.push(ask(this.cursor, identifier));
             }
             return identifier;
         }
         protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
             return await this.visit(nameTree, p) as N;
         }
-    }().visit(await parse(source), undefined);
+    }().visit(await parse(source, sourcePath), undefined);
     expect(answers.length).toBeGreaterThan(0);
     return answers;
 }
 
-/** What `isReference` answers for each occurrence of `target` in `source`. */
-async function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
-    const answers: boolean[] = [];
-    await new class extends JavaScriptVisitor<undefined> {
-        override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
-            if (identifier.simpleName === 'target') {
-                answers.push(isReference(this.cursor, identifier));
-            }
-            return identifier;
-        }
-    }().visit(await parse(source, sourcePath), undefined);
-    expect(answers.length).toBeGreaterThan(0);
-    return answers;
+function resolvedAt(source: string, name: string): Promise<(string | undefined)[]> {
+    return answersAt(source, name, (cursor, identifier) => resolve(cursor, identifier)?.kind);
+}
+
+function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
+    return answersAt(source, 'target', isReference, sourcePath);
 }
 
 describe('isReference', () => {

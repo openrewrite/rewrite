@@ -123,10 +123,10 @@ function enclosingScopeCursor(from: Cursor | undefined): Cursor | undefined {
 
 /** The nodes {@link readBindings} answers for; everything else binds nothing and is not a scope. */
 const scopeKinds = new Set<string>([
-    JS.Kind.CompilationUnit, J.Kind.Block, J.Kind.MethodDeclaration, J.Kind.Lambda, JS.Kind.ArrowFunction,
-    J.Kind.ClassDeclaration, J.Kind.TryCatch, J.Kind.ForLoop, J.Kind.ForEachLoop, JS.Kind.ForInLoop,
-    JS.Kind.NamespaceDeclaration, JS.Kind.TypeDeclaration, JS.Kind.FunctionType, JS.Kind.MappedType,
-    JS.Kind.ConditionalType
+    JS.Kind.CompilationUnit, J.Kind.Block, J.Kind.MethodDeclaration, JS.Kind.ComputedPropertyMethodDeclaration,
+    J.Kind.Lambda, JS.Kind.ArrowFunction, J.Kind.ClassDeclaration, J.Kind.TryCatch, J.Kind.ForLoop,
+    J.Kind.ForEachLoop, JS.Kind.ForInLoop, JS.Kind.NamespaceDeclaration, JS.Kind.TypeDeclaration,
+    JS.Kind.FunctionType, JS.Kind.MappedType, JS.Kind.ConditionalType
 ]);
 
 /**
@@ -299,9 +299,8 @@ function reachOf(node: any, parent: any, key: string, within: Frames | undefined
 
 /**
  * What a read in slot `key` of `node` reads with, given what `node` itself reads with. Undefined
- * is a slot that names rather than reads, as does everything under it: a `name` or `label`, a
- * destructured property, a JSX prop, an import, which declares what it spells, an alias's new
- * name, and a re-export's clause, which names another module's members.
+ * is a slot that names rather than reads, and so is everything under it. A whole import declares
+ * what it spells, and a re-export's clause names another module's members.
  */
 function meaningOf(node: any, key: string, reading: Reading): Reading {
     // A computed key and a binding's default value read from within a naming slot.
@@ -314,29 +313,18 @@ function meaningOf(node: any, key: string, reading: Reading): Reading {
     if (key === 'typeParameters' || key === 'typeArguments') {
         return 'type';
     }
-    if (key === 'label' || key === 'name' && !readsItsName(node)) {
+    if (key === 'label' || key === namingSlots[node.kind] || key === 'name' && !readsItsName(node)) {
         return undefined;
     }
     switch (node.kind) {
-        case JS.Kind.BindingElement:
-            return key === 'propertyName' ? undefined : reading;
-        case JS.Kind.JsxAttribute:
-            return key === 'key' ? undefined : reading;
         case JS.Kind.Import:
-            // `import a = NS.b` reads `NS` as whatever it is; the rest of an import declares.
+            // `import a = NS.b` reads `NS` as whatever it is. The rest of an import declares.
             return key === 'initializer' ? 'any' : undefined;
-        case JS.Kind.Alias:
-            return key === 'alias' ? undefined : reading;
         case JS.Kind.ExportDeclaration:
             if (key !== 'exportClause') {
                 return reading;
             }
             return (node as JS.ExportDeclaration).moduleSpecifier === undefined ? 'any' : undefined;
-        case JS.Kind.ImportType:
-            // `import('m').Foo` names a member of `m`.
-            return key === 'qualifier' ? undefined : reading;
-        case JS.Kind.NamespaceDeclaration:
-            return key === 'name' ? undefined : reading;
         case J.Kind.FieldAccess:
             // In a type, `NS.Foo` reads the namespace `NS`, as `A.B.C` reads `A`.
             return key === 'target' && reading === 'type' ? 'namespace' : reading;
@@ -374,9 +362,22 @@ function meaningOf(node: any, key: string, reading: Reading): Reading {
  * reads the `x` it also names.
  */
 function readsItsName(node: any): boolean {
-    return node.kind === J.Kind.MethodInvocation && !(node as J.MethodInvocation).select ||
-        node.kind === JS.Kind.PropertyAssignment && (node as JS.PropertyAssignment).initializer === undefined;
+    return node.kind === J.Kind.MethodInvocation && !(node as J.MethodInvocation).select || isShorthand(node);
 }
+
+/** A shorthand property `{x}` or `{x = 1}`, which reads the `x` it names. */
+function isShorthand(node: any): boolean {
+    return node?.kind === JS.Kind.PropertyAssignment &&
+        (node as JS.PropertyAssignment).assigmentToken === JS.PropertyAssignment.Token.Equals;
+}
+
+/** The slot, beside `name` and `label`, in which a node names rather than reads. */
+const namingSlots: Record<string, string> = {
+    [JS.Kind.Alias]: 'alias',
+    [JS.Kind.BindingElement]: 'propertyName',
+    [JS.Kind.ImportType]: 'qualifier',
+    [JS.Kind.JsxAttribute]: 'key'
+};
 
 /**
  * Every name a binding pattern introduces. `member` is the property a name takes its value from,
@@ -454,6 +455,11 @@ function declaringScopeOf(cursor: Cursor, name: string, meaning?: Meaning): J | 
  */
 function frameBindings(node: any, parent: any): Bindings {
     if (node?.kind === J.Kind.Block && membersOf(parent) === node) {
+        // An enum's members are in scope in its body, where an initializer may name an earlier one.
+        return isEnum(parent) ? toBindings(enumMemberNames(node)) : noBindings;
+    }
+    // An arrow binds its lambda's parameters itself, since its return type reads them.
+    if (node?.kind === J.Kind.Lambda && parent?.kind === JS.Kind.ArrowFunction) {
         return noBindings;
     }
     // A function expression is the only function whose own name its body reaches: a declaration's
@@ -488,8 +494,9 @@ function readBindings(node: any): Bound[] {
         }
         case J.Kind.Block:
             return blockScopedNames((node as J.Block).statements);
-        case J.Kind.MethodDeclaration: {
-            const method = node as J.MethodDeclaration;
+        case J.Kind.MethodDeclaration:
+        case JS.Kind.ComputedPropertyMethodDeclaration: {
+            const method = node as J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration;
             return [
                 ...typeParameterNames(method),
                 ...declaredNames(method.parameters.elements),
@@ -504,11 +511,9 @@ function readBindings(node: any): Bound[] {
             return [...declarationNames(node), ...typeParameterNames(node)];
         // A namespace is where the functions and `var`s in its body hoist to, its block binding the rest.
         case JS.Kind.NamespaceDeclaration:
-            return hoistedNames((node as JS.NamespaceDeclaration).body);
-        // An arrow's type parameters and return type sit around its lambda, so the arrow binds the
-        // parameters its return type reads, a predicate's among them.
+            return isGlobalAugmentation(node) ? [] : hoistedNames((node as JS.NamespaceDeclaration).body);
         case JS.Kind.ArrowFunction:
-            return [...typeParameterNames(node), ...declaredNames((node as JS.ArrowFunction).lambda.parameters.parameters)];
+            return [...typeParameterNames(node), ...readBindings((node as JS.ArrowFunction).lambda)];
         case JS.Kind.TypeDeclaration:
             return typeParameterNames(node);
         case JS.Kind.FunctionType:
@@ -586,6 +591,9 @@ function declarationNames(statement: any): Bound[] {
         }
         case JS.Kind.NamespaceDeclaration: {
             const declaration = statement as JS.NamespaceDeclaration;
+            if (isGlobalAugmentation(declaration)) {
+                return [];
+            }
             const names = boundNames(rootName(unwrap(declaration.name)));
             return isInstantiated(declaration) ? bound(names, 'namespace', 'value') : bound(names, 'namespace');
         }
@@ -606,9 +614,9 @@ function declarationNames(statement: any): Bound[] {
 }
 
 /**
- * Whether a namespace exists at runtime, which it does once its body holds something other than
- * interfaces, type aliases, const enums, unexported imports and namespaces that do not. That is
- * TypeScript's rule, and only such a namespace binds a value.
+ * Whether a namespace binds a value, which it does once its body holds something other than
+ * interfaces, type aliases, unexported imports and namespaces that do not. That is the binder's
+ * rule, under which a `const enum` counts, whatever the emitter later drops.
  */
 function isInstantiated(declaration: JS.NamespaceDeclaration): boolean {
     return (declaration.body?.statements ?? []).some(statement => {
@@ -616,11 +624,8 @@ function isInstantiated(declaration: JS.NamespaceDeclaration): boolean {
         switch (element?.kind) {
             case JS.Kind.TypeDeclaration:
                 return false;
-            case J.Kind.ClassDeclaration: {
-                const classKind = (element as J.ClassDeclaration).classKind.type;
-                return classKind !== J.ClassDeclaration.Kind.Type.Interface &&
-                    !(classKind === J.ClassDeclaration.Kind.Type.Enum && isConst(element));
-            }
+            case J.Kind.ClassDeclaration:
+                return (element as J.ClassDeclaration).classKind.type !== J.ClassDeclaration.Kind.Type.Interface;
             case JS.Kind.Import:
                 return (element as JS.Import).modifiers.some(modifier => modifier.keyword === 'export');
             case JS.Kind.NamespaceDeclaration:
@@ -631,8 +636,25 @@ function isInstantiated(declaration: JS.NamespaceDeclaration): boolean {
     });
 }
 
-function isConst(declaration: J.ClassDeclaration): boolean {
-    return declaration.modifiers.some(modifier => modifier.keyword === 'const');
+/** `declare global { … }`, whose declarations the whole file sees, as if written at its top. */
+function isGlobalAugmentation(declaration: JS.NamespaceDeclaration): boolean {
+    const name = unwrap(declaration.name);
+    return declaration.keywordType.element === JS.NamespaceDeclaration.KeywordType.Empty &&
+        name?.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === 'global';
+}
+
+function isEnum(node: any): boolean {
+    return node?.kind === J.Kind.ClassDeclaration &&
+        (node as J.ClassDeclaration).classKind.type === J.ClassDeclaration.Kind.Type.Enum;
+}
+
+function enumMemberNames(body: J.Block): Bound[] {
+    return body.statements.flatMap(statement => {
+        const element = unwrap(statement);
+        return element?.kind === J.Kind.EnumValueSet
+            ? bound((element as J.EnumValueSet).enums.map(value => value.element.name.simpleName), 'value')
+            : [];
+    });
 }
 
 /** The identifier a dotted name `A.B.C` declares, which is `A`: the rest are members of it. */
@@ -731,6 +753,8 @@ function hoistedNames(scope: any): Bound[] {
             case J.Kind.MethodDeclaration:
                 names.push(...declarationNames(node));
                 return false;
+            case JS.Kind.ComputedPropertyMethodDeclaration:
+                return false;
             case J.Kind.VariableDeclarations:
             case JS.Kind.ScopedVariableDeclarations:
                 if (!isBlockScoped(node)) {
@@ -744,12 +768,14 @@ function hoistedNames(scope: any): Bound[] {
             case JS.Kind.StatementExpression:
                 // A function or class used as an expression names itself for its own body alone.
                 return false;
+            case JS.Kind.NamespaceDeclaration:
+                // A namespace keeps its hoisting to itself, a global augmentation gives it to the file.
+                return isGlobalAugmentation(node);
             case J.Kind.Lambda:
             case J.Kind.ClassDeclaration:
             case J.Kind.NewClass:
             case JS.Kind.TypeLiteral:
-            case JS.Kind.NamespaceDeclaration:
-                // Nothing in an expression, a type or a namespace hoists past it.
+                // Nothing in an expression or a type hoists past it.
                 return false;
             default:
                 return true;
@@ -829,12 +855,10 @@ export function declarationsOf(statement: J | undefined): J.VariableDeclarations
 }
 
 /**
- * Whether the identifier may be renamed in place. A name its parent introduces may not — a
- * property, a method, a variable, a type parameter, an import's own name — nor one drawn from a
- * namespace of its own: a statement label, declaring (`x:`) or referencing (`break x`), and a JSX
- * attribute's prop. Position is all this reads, so a type position reads alike to a value. A
- * shorthand property `{x}` answers false though it also reads `x`, since a rename has to expand it
- * to `{x: y}`. What `x` reads is {@link resolve}'s question.
+ * Whether the identifier may be renamed in place, which is so where its slot reads rather than
+ * names. A shorthand property `{x}` answers false though it reads `x`, since a rename has to
+ * expand it to `{x: y}`. Position is all this reads, so a type position reads alike to a value,
+ * and what `x` reads is {@link resolve}'s question.
  */
 export function isReference(cursor: Cursor, identifier: J.Identifier): boolean {
     const ancestors: object[] = [];
@@ -843,8 +867,7 @@ export function isReference(cursor: Cursor, identifier: J.Identifier): boolean {
             ancestors.unshift(c.value);
         }
     }
-    const parent = ancestors[ancestors.length - 1] as { kind?: string; initializer?: unknown } | undefined;
-    if (parent?.kind === JS.Kind.PropertyAssignment && parent.initializer === undefined) {
+    if (isShorthand(ancestors[ancestors.length - 1])) {
         return false;
     }
     // A naming slot can hold a read deeper down, so the fold runs to the end.
@@ -875,16 +898,17 @@ function holds(slot: unknown, child: unknown): boolean {
     return kind === J.Kind.Container && holds((slot as J.Container<any>).elements, child);
 }
 
-/** @deprecated Use {@link isReference}, the same function under a name that does not suggest it answers for values alone. */
+/**
+ * @deprecated Use {@link isReference}. Unlike this function once did, it answers false for an
+ * import's own name, an alias and a re-export's specifier, which name rather than read.
+ */
 export const isValueReference = isReference;
 
 /**
  * The node owning the scope that binds what `identifier` reads, or undefined where it reads a
- * global or reads nothing: a name its parent introduces, an import's own name, a re-export's.
- * The first question about any identifier resolves every one in the cursor's tree by id, so an
- * identifier the tree does not hold, such as one a recipe built, is refused, as is one whose id
- * the tree holds at two positions. A value read is hidden only by a value of its name and a type
- * read only by a type, so a shorthand `{x}` resolves what `x` reads.
+ * global or reads nothing. The first question about any identifier resolves every one in the
+ * cursor's tree by id, so an identifier the tree does not hold, such as one a recipe built, is
+ * refused, as is an id the tree holds at two positions.
  */
 export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined {
     let root: Tree | undefined;
@@ -919,7 +943,8 @@ function resolutions(root: Tree): Resolutions {
             if (answers.has(identifier.id)) {
                 doubled.add(identifier.id);
             }
-            answers.set(identifier.id, reading && bindingFrame(scopes, identifier.simpleName, reading)?.node as J | undefined);
+            const frame = reading && bindingFrame(scopes, identifier.simpleName, reading);
+            answers.set(identifier.id, frame ? frame.node as J : undefined);
         });
         resolved.set(root, found = {answers, doubled});
     }

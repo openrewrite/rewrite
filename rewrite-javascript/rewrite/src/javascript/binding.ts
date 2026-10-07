@@ -437,7 +437,10 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
         }
     };
     const root = new Cursor(cu);
-    cu.statements.filter(s => s.element?.kind !== JS.Kind.Import).forEach(s => visit(s, root));
+    // An import or an `export {…}` binds nothing the name could collide with.
+    cu.statements
+        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration)
+        .forEach(s => visit(s, root));
     return references;
 }
 

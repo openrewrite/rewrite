@@ -1344,6 +1344,40 @@ describe("maybeRebind", () => {
         ));
     });
 
+    test("a shorthand with a default expands like a bare one", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\n({Old = 1} = o);`,
+            `import { New } from "m2";\n\n({Old: New = 1} = o);`
+        ));
+    });
+
+    test("a rebind after one that expanded a shorthand still finds the reads", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "m", member: "Old"}, to: {module: "m2", member: "New"}});
+                maybeRebind(this, {from: {module: "m2", member: "New"}, to: {module: "m3", member: "Newer"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        // The first rebind merges into the import the second one moves, and expands the shorthand on the way.
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\nimport { New } from "m2";\n\nconst o = {Old};\nNew();`,
+            `import { Newer } from "m3";\n\nconst o = {Old: Newer};\nNewer();`
+        ));
+    });
+
+    test("a re-export or an export alias of the target's name does not take it", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { New } from "m2";\nimport { Old } from "m";\n\nexport { New } from "./other";\nexport { other as New };\nOld();`,
+            `import { New } from "m2";\n\nexport { New } from "./other";\nexport { other as New };\nNew();`
+        ));
+    });
+
     test("a re-export from another module names that module's member, not the binding", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());
