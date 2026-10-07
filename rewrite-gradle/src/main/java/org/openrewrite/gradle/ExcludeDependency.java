@@ -58,39 +58,14 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @EqualsAndHashCode(callSuper = false)
 public class ExcludeDependency extends Recipe {
 
-    private static final class ExcludeTarget {
-        final @Nullable String group;
-        final @Nullable String module;
+    @Value
+    private static class ExcludeTarget {
+        @Nullable String group;
+        @Nullable String module;
 
-        ExcludeTarget(@Nullable String group, @Nullable String module) {
-            this.group = group;
-            this.module = module;
-        }
-
-        boolean coversAtLeast(ExcludeTarget desired) {
-            if (desired.group != null && desired.module != null) {
-                return (Objects.equals(group, desired.group) && module == null) ||
-                        (Objects.equals(module, desired.module) && group == null) ||
-                        (Objects.equals(group, desired.group) && Objects.equals(module, desired.module));
-            }
-            return Objects.equals(group, desired.group) && Objects.equals(module, desired.module);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof ExcludeTarget)) {
-                return false;
-            }
-            ExcludeTarget other = (ExcludeTarget) o;
-            return Objects.equals(group, other.group) && Objects.equals(module, other.module);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(group, module);
+        boolean covers(ExcludeTarget desired) {
+            return (group == null || Objects.equals(group, desired.group)) &&
+                    (module == null || Objects.equals(module, desired.module));
         }
     }
 
@@ -424,7 +399,7 @@ public class ExcludeDependency extends Recipe {
                 for (ExcludeTarget desired : targets) {
                     boolean covered = false;
                     for (ExcludeTarget e : existing) {
-                        if (e.coversAtLeast(desired)) {
+                        if (e.covers(desired)) {
                             covered = true;
                             break;
                         }
@@ -499,31 +474,24 @@ public class ExcludeDependency extends Recipe {
             }
 
             private String groovyExclude(ExcludeTarget t) {
-                StringBuilder sb = new StringBuilder("exclude ");
-                if (t.group != null) {
-                    sb.append("group: '").append(t.group).append("'");
-                }
-                if (t.module != null) {
-                    if (t.group != null) {
-                        sb.append(", ");
-                    }
-                    sb.append("module: '").append(t.module).append("'");
-                }
-                return sb.toString();
+                return "exclude " + excludeArgs(t, "group: '", "'", "module: '", "'");
             }
 
             private String kotlinExcludeInBlock(ExcludeTarget t) {
-                StringBuilder sb = new StringBuilder("exclude(");
-                if (t.group != null) {
-                    sb.append("group = \"").append(t.group).append("\"");
+                return "exclude(" + excludeArgs(t, "group = \"", "\"", "module = \"", "\"") + ")";
+            }
+
+            private String excludeArgs(ExcludeTarget t, String gPre, String gPost, String mPre, String mPost) {
+                StringBuilder sb = new StringBuilder();
+                if (t.getGroup() != null) {
+                    sb.append(gPre).append(t.getGroup()).append(gPost);
                 }
-                if (t.module != null) {
-                    if (t.group != null) {
+                if (t.getModule() != null) {
+                    if (sb.length() > 0) {
                         sb.append(", ");
                     }
-                    sb.append("module = \"").append(t.module).append("\"");
+                    sb.append(mPre).append(t.getModule()).append(mPost);
                 }
-                sb.append(")");
                 return sb.toString();
             }
         });
