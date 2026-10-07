@@ -24,7 +24,6 @@ import {
     J,
     rightPadded,
     space,
-    spaceContainsNewline,
     Statement,
     TrailingComma
 } from "../java";
@@ -193,16 +192,20 @@ export function parameterNames(block: AmdBlock): (string | undefined)[] {
 }
 
 export function identifierOf(parameter: J): J.Identifier | undefined {
-    if (parameter.kind === J.Kind.VariableDeclarations) {
-        const name = (parameter as J.VariableDeclarations).variables[0]?.element.name;
-        return name !== undefined && isIdentifier(name) ? name : undefined;
-    }
-    return isIdentifier(parameter) ? parameter : undefined;
+    const name = declaredNameOf(parameter);
+    return name !== undefined && isIdentifier(name) ? name : undefined;
+}
+
+/** The name a factory parameter binds, which may be a destructuring pattern. */
+function declaredNameOf(parameter: J): J | undefined {
+    return parameter.kind === J.Kind.VariableDeclarations ?
+        (parameter as J.VariableDeclarations).variables[0]?.element.name :
+        parameter;
 }
 
 /**
  * Where an entry's leading whitespace sits. A dependency string carries it directly, while
- * a factory parameter carries it on the identifier inside the declaration that wraps it.
+ * a factory parameter carries it on the name its declaration wraps, even a destructuring one.
  */
 interface Slot<T extends J> {
     prefixOf(element: T): J.Space;
@@ -216,7 +219,7 @@ const dependencySlot: Slot<Expression> = {
 };
 
 const parameterSlot: Slot<J> = {
-    prefixOf: element => identifierOf(element)?.prefix ?? element.prefix,
+    prefixOf: element => declaredNameOf(element)?.prefix ?? element.prefix,
     withPrefix: (element, prefix) => {
         if (element.kind !== J.Kind.VariableDeclarations) {
             return {...element, prefix};
@@ -257,14 +260,27 @@ function moveTrailingComma<T extends J>(
 
 /**
  * The whitespace that separates one entry from the next, taken from the entries already
- * there so that a block listing its dependencies one per line keeps doing so.
+ * there so that a block listing its dependencies one per line keeps doing so. Comments in an
+ * entry's prefix document that entry, so they stay behind.
  */
 function separator<T extends J>(entries: readonly J.RightPadded<T>[], slot: Slot<T>): J.Space {
     if (entries.length >= 2) {
-        return slot.prefixOf(entries[1].element);
+        return space(layoutOf(slot.prefixOf(entries[1].element)));
     }
-    const first = slot.prefixOf(entries[0].element);
-    return spaceContainsNewline(first) ? first : space(" ");
+    const first = layoutOf(slot.prefixOf(entries[0].element));
+    return space(first.includes("\n") ? first : " ");
+}
+
+/**
+ * The prefix without its comments. That is the segment holding the line break, preferring the
+ * last comment's suffix, else the whitespace before the entry.
+ */
+function layoutOf(prefix: J.Space): string {
+    const last = prefix.comments[prefix.comments.length - 1];
+    if (last === undefined || (!last.suffix.includes("\n") && prefix.whitespace.includes("\n"))) {
+        return prefix.whitespace;
+    }
+    return last.suffix;
 }
 
 /**
