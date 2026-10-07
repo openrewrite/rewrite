@@ -1,0 +1,1 @@
+yarn run in packages/a, whose .npmrc names registry.npmmirror.com: getPossibleConfigLocations starts at packages/a (config.cwd), so the root lock yarn writes resolves the bumped is-number there.

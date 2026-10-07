@@ -30,8 +30,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the Yarn classic regenerator takes it, with the config files of the lock's directory and of
- * each directory above it, and those directories' package.json; the marker's npmrc stands in for a missing .npmrc.
+ * A recipe's request as the Yarn classic regenerator takes it, with the config files of the lock's directory, of
+ * each directory above it and of those from the working directory up to it, and the package.json of the directories
+ * above it; the marker's npmrc stands in for a missing .npmrc.
  */
 final class YarnClassicInputs {
 
@@ -42,35 +43,46 @@ final class YarnClassicInputs {
 
     static Inputs from(Request request, Host host, Instant now) {
         String rootDir = NpmInputs.rootDirectory(request);
-        Map<String, String> configFiles = configFiles(request, rootDir);
+        Path workingDirectory = request.getWorkingDirectory();
+        String cwd = workingDirectory == null ? "" : NpmInputs.location(rootDir,
+                workingDirectory.normalize().toString().replace('\\', '/'));
+        Map<String, String> configFiles = configFiles(request, rootDir, cwd);
         if (!configFiles.containsKey(".npmrc")) {
             String npmrc = NpmInputs.projectNpmrc(request.getMarker());
             if (npmrc != null) {
                 configFiles.put(".npmrc", npmrc);
             }
         }
-        Path workingDirectory = request.getWorkingDirectory();
         return Inputs.builder()
                 .lock(request.getLock())
                 .manifests(NpmInputs.manifests(request, rootDir))
                 .configFiles(configFiles)
                 .paths(paths(request, rootDir))
                 .directory(rootDir)
-                .cwd(workingDirectory == null ? "" : NpmInputs.location(rootDir,
-                        workingDirectory.normalize().toString().replace('\\', '/')))
+                .cwd(cwd)
                 .host(host)
                 .now(now)
                 .build();
     }
 
-    private static Map<String, String> configFiles(Request request, String rootDir) {
+    private static Map<String, String> configFiles(Request request, String rootDir, String cwd) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
             Path fileName = file.getKey().getFileName();
-            String up = fileName == null ? null : up(rootDir, NpmInputs.directory(file.getKey()));
+            if (fileName == null) {
+                continue;
+            }
+            String dir = NpmInputs.directory(file.getKey());
+            String up = up(rootDir, dir);
             if (up != null && (CONFIG_FILES.contains(fileName.toString()) ||
                                !up.isEmpty() && "package.json".equals(fileName.toString()))) {
                 files.put(up + fileName, file.getValue());
+            } else if (up == null && CONFIG_FILES.contains(fileName.toString()) &&
+                       (rootDir.isEmpty() || dir.startsWith(rootDir + "/"))) {
+                String location = NpmInputs.location(rootDir, dir);
+                if (cwd.equals(location) || cwd.startsWith(location + "/")) {
+                    files.put(location + "/" + fileName, file.getValue());
+                }
             }
         }
         return files;

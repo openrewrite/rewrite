@@ -55,8 +55,10 @@ class YarnClassicInputsTest {
         assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
         assertThat(inputs.getCwd()).isEmpty();
-        assertThat(YarnClassicInputs.from(builder.workingDirectory(Paths.get("repo/packages/a")).build(), Host.UNKNOWN,
-          Instant.EPOCH).getCwd()).isEqualTo("packages/a");
+        Inputs fromMember = YarnClassicInputs.from(builder.workingDirectory(Paths.get("repo/packages/a")).build(),
+          Host.UNKNOWN, Instant.EPOCH);
+        assertThat(fromMember.getCwd()).isEqualTo("packages/a");
+        assertThat(fromMember.getConfigFiles()).containsOnlyKeys(".yarnrc", ".npmrc", "packages/a/.yarnrc");
     }
 
     @Test

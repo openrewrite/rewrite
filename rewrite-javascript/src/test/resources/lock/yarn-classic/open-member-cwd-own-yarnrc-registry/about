@@ -1,0 +1,1 @@
+yarn run in packages/a, whose .yarnrc names registry.npmjs.org: the rc chain is read from packages/a (config.cwd), so the root lock yarn writes resolves the bumped is-number there.

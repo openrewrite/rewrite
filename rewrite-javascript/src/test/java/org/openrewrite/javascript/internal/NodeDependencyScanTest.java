@@ -140,16 +140,16 @@ class NodeDependencyScanTest {
      * one: the root's (workspaces as given), with or without packages/package.json in between (workspaces
      * {@code ["x/*"]}) and a config file in packages/a. Yarn classic's walk stops at the first workspaces list and
      * matches it with micromatch 2.3.11, which keeps a leading {@code ./}; Bun's stops at the first parent with
-     * workspaces; npm's at the nearest that lists the project. Yarn reads the config files from where it runs, so its
-     * root lock then is not an install at the root's, and the member's own lock goes to the engine.
+     * workspaces; npm's at the nearest that lists the project. Yarn reads the config files from where it runs, which
+     * the root's regeneration is given as its working directory.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
       "YarnClassic | packages/*   | false |              | yarn.lock",
       "YarnClassic | ./packages/* | false |              | packages/a/yarn.lock",
       "YarnClassic | packages/*   | true  |              | packages/a/yarn.lock",
-      "YarnClassic | packages/*   | false | .yarnrc      | packages/a/yarn.lock",
-      "YarnClassic | packages/*   | false | .npmrc       | packages/a/yarn.lock",
+      "YarnClassic | packages/*   | false | .yarnrc      | yarn.lock",
+      "YarnClassic | packages/*   | false | .npmrc       | yarn.lock",
       "Bun         | packages/*   | true  |              | packages/a/bun.lock",
       "Bun         | packages/*   | false | bunfig.toml  | bun.lock",
       "Bun         | packages/*   | false | .npmrc       | bun.lock",

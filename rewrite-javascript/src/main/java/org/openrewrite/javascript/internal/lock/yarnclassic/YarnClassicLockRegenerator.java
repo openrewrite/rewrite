@@ -71,8 +71,9 @@ public final class YarnClassicLockRegenerator {
         Map<String, String> manifests;
 
         /**
-         * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory and of the directories above it in
-         * the repository, and those directories' package.json, by path relative to the root ({@code ../.npmrc}).
+         * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory, of the directories above it in the
+         * repository and of those from {@link #cwd} up to the root, and the package.json of the directories above it,
+         * by path relative to the root ({@code ../.npmrc}, {@code packages/a/.yarnrc}).
          */
         @Singular
         Map<String, String> configFiles;
@@ -247,20 +248,53 @@ public final class YarnClassicLockRegenerator {
         }
     }
 
-    // every install reads the config files of the project's directory and of each directory above it
+    // every install reads the config files of the directory it runs in and of each directory above it
     private void requireConfigFiles() {
         Set<String> paths = inputs.getPaths();
         if (paths == null) {
             return;
         }
+        Map<String, String> configFiles = configFilesFromCwd();
         for (String path : paths) {
-            if (CONFIG_FILE.matcher(path).matches() && !inputs.getConfigFiles().containsKey(path)) {
+            String fromCwd = fromCwd(path);
+            if (fromCwd != null && CONFIG_FILE.matcher(fromCwd).matches() && !configFiles.containsKey(fromCwd)) {
                 throw new CannotKnow(path + " (its contents were not read)");
             }
         }
     }
 
     private static final Pattern CONFIG_FILE = Pattern.compile("(\\.\\./)*\\.(yarnrc|yarnrc\\.yml|npmrc)");
+
+    // the config files by their path from the directory yarn runs in
+    private Map<String, String> configFilesFromCwd() {
+        if (inputs.getCwd().isEmpty()) {
+            return inputs.getConfigFiles();
+        }
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : inputs.getConfigFiles().entrySet()) {
+            String path = fromCwd(file.getKey());
+            if (path != null) {
+                files.put(path, file.getValue());
+            }
+        }
+        return files;
+    }
+
+    // a path from the root as a path from cwd, when it sits in cwd or a directory above it
+    private @Nullable String fromCwd(String path) {
+        String cwd = inputs.getCwd();
+        int slash = path.lastIndexOf('/');
+        String dir = slash < 0 || path.startsWith("../") ? "" : path.substring(0, slash);
+        if (!dir.isEmpty() && !cwd.equals(dir) && !cwd.startsWith(dir + "/")) {
+            return null;
+        }
+        return YarnClassicOptions.up(segments(cwd) - segments(dir)) + (dir.isEmpty() ? path :
+                path.substring(slash + 1));
+    }
+
+    private static int segments(String location) {
+        return location.isEmpty() ? 0 : location.split("/").length;
+    }
 
     /**
      * package-fetcher.js {@code fetchOneRemote}'s package.json: a pick from the registry stands for its tarball's,
@@ -427,7 +461,7 @@ public final class YarnClassicLockRegenerator {
      * directory up, the registries' config, the manifest of the lock's directory, the workspaces check.
      */
     YarnClassicOptions init(List<String> warnings) {
-        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
+        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(configFilesFromCwd());
         requireRelease(rc);
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
         requirePackageManager();
@@ -435,7 +469,7 @@ public final class YarnClassicLockRegenerator {
         if (YarnClassicOptions.focus(rc) && workspaceRoot <= 0) {
             throw new MessageError("This command can only be run inside an individual workspace.");
         }
-        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getConfigFiles(), inputs.getEnv());
+        YarnClassicOptions config = YarnClassicOptions.load(rc, configFilesFromCwd(), inputs.getEnv());
         String up = YarnClassicOptions.up(Math.max(workspaceRoot, 0));
         String lockfileFolder = up.isEmpty() ? "" : up.substring(0, up.length() - 1);
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
@@ -454,30 +488,20 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * How many directories above the project's the workspace root is whose lock yarn writes when run in the project's
-     * directory, when an install at that root with the project's directory as {@link Inputs#getCwd() cwd} writes the
-     * same; else 0. That install reads the config files from the root up, so one below the root makes the two differ,
-     * and {@code --focus} is a focused install in the project's directory.
+     * directory, which an install at that root with the project's directory as {@link Inputs#getCwd() cwd} writes;
+     * else 0. Under {@code --focus} yarn runs a focused install in the project's directory instead.
      */
     public static int installRoot(Inputs inputs) {
         return new YarnClassicLockRegenerator(inputs).installRoot();
     }
 
     private int installRoot() {
-        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
+        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(configFilesFromCwd());
         requireRelease(rc);
         requirePackageManager();
         int workspaceRoot = findWorkspaceRoot(YarnClassicOptions.looseSemver(rc), new ArrayList<>());
         if (workspaceRoot <= 0 || YarnClassicOptions.focus(rc)) {
             return 0;
-        }
-        Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
-        if (inputs.getPaths() != null) {
-            files.addAll(inputs.getPaths());
-        }
-        for (String file : files) {
-            if (CONFIG_FILE.matcher(file).matches() && YarnClassicOptions.depth(singletonList(file)) < workspaceRoot) {
-                return 0;
-            }
         }
         return workspaceRoot;
     }
@@ -576,6 +600,9 @@ public final class YarnClassicLockRegenerator {
             return;
         }
         String release = PosixPath.normalize(Js.string(yarnPath));
+        if (!PosixPath.isAbsolute(release)) {
+            release = PosixPath.normalize(PosixPath.join(inputs.getCwd(), release));
+        }
         Set<String> paths = inputs.getPaths();
         if (yarnPath instanceof String && RELEASE.matcher(PosixPath.basename(release)).matches()) {
             if (paths == null || paths.contains(release)) {

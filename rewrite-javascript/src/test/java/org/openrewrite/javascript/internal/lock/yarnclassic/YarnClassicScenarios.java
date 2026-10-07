@@ -230,7 +230,8 @@ final class YarnClassicScenarios {
          * What yarn had in a phase: the lock it started from, the phase's manifests, the config files the recorder
          * placed (the scenario's {@code yarnrc} and {@code npmrc}, the phase's tree over them, and the directories
          * above the project: {@code parent/} and {@code grandparent/}, their package.json too), every path of
-         * that layout when the recorder here made it, and the directory the {@code cwd} file says yarn ran in.
+         * that layout when the recorder here made it, and the directory the {@code cwd} file says yarn ran in with the
+         * config files of the tree from there up.
          */
         YarnClassicLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
@@ -257,6 +258,12 @@ final class YarnClassicScenarios {
                 }
             }
             String cwd = file("cwd");
+            for (String dir = cwd == null ? "" : cwd.trim(); !dir.isEmpty();
+                 dir = dir.substring(0, Math.max(dir.lastIndexOf('/'), 0))) {
+                for (String name : CONFIG_FILES) {
+                    putIfPresent(configFiles, dir + "/" + name, trees.get("").get(dir + "/" + name));
+                }
+            }
             return YarnClassicLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(before))

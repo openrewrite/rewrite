@@ -318,19 +318,18 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * Run in packages/a, yarn writes the lock of the root whose workspaces it matches, but reads the config files and
-     * the packageManager from packages/a up: with one below the root, the root's lock is not what an install at the
-     * root writes ({@code open-parent-workspaces-lists-project-own-yarnrc}: the root's lock names the project's
-     * .yarnrc registry).
+     * Run in packages/a, yarn writes the lock of the root whose workspaces it matches, whatever config files sit on
+     * the way: the root's regeneration reads them from packages/a as its cwd
+     * ({@code open-parent-workspaces-lists-project-own-yarnrc}, {@code open-member-cwd-own-yarnrc-registry}).
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "listed|packages/*||2",
             "dot slash|./packages/*||0",
             "not listed|libs/*||0",
-            "own .yarnrc|packages/*|.yarnrc|0",
-            "own .npmrc|packages/*|.npmrc|0",
-            "between .yarnrc.yml|packages/*|../.yarnrc.yml|0",
+            "own .yarnrc|packages/*|.yarnrc|2",
+            "own .npmrc|packages/*|.npmrc|2",
+            "between .yarnrc.yml|packages/*|../.yarnrc.yml|2",
             "root .yarnrc|packages/*|../../.yarnrc|2",
             "above the root .npmrc|packages/*|../../../.npmrc|2"
     })
