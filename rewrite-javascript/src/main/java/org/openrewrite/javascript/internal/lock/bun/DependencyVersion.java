@@ -222,7 +222,8 @@ final class DependencyVersion {
             if (info == null) {
                 return withoutHost;
             }
-            return info.hostProvider == HostedGitInfo.Provider.GITHUB && info.defaultRepresentation == HostedGitInfo.Representation.SHORTCUT ? GITHUB : GIT;
+            return info.hostProvider == HostedGitInfo.Provider.GITHUB &&
+                   info.defaultRepresentation == HostedGitInfo.Representation.SHORTCUT ? GITHUB : GIT;
         }
 
         private static boolean startsWithWindowsDriveLetter(String s) {
@@ -400,7 +401,8 @@ final class DependencyVersion {
                     tagToUse = i + 1 <= dependency.length() ? dependency.substring(Math.min(i + 1, dependency.length())) : "";
                     actual = dependency.substring("npm:".length(), i);
                 }
-                return new DependencyVersion(Tag.DIST_TAG, literal, new TagInfo(actual, tagToUse.isEmpty() ? "latest" : tagToUse));
+                return new DependencyVersion(Tag.DIST_TAG, literal,
+                        new TagInfo(actual, tagToUse.isEmpty() ? "latest" : tagToUse));
             }
             case GIT: {
                 String input = dependency;

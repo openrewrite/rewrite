@@ -205,6 +205,10 @@ final class SemverQuery {
         TokenTag tag = TokenTag.NONE;
         Wildcard wildcard = Wildcard.NONE;
 
+        private static SemverRange left(SemverRange.Op op, SemverVersion version) {
+            return new SemverRange(new SemverRange.Comparator(op, version));
+        }
+
         SemverRange toRange(SemverVersion.Partial version) {
             switch (tag) {
                 case CARET: {
@@ -281,24 +285,24 @@ final class SemverQuery {
                 case MINOR:
                     switch (tag) {
                         case LTE:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.LTE, SemverVersion.of(major, MAX, MAX)));
+                            return left(SemverRange.Op.LTE, SemverVersion.of(major, MAX, MAX));
                         case LT:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.LT, SemverVersion.of(major, 0, 0)));
+                            return left(SemverRange.Op.LT, SemverVersion.of(major, 0, 0));
                         case GT:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GT, SemverVersion.of(major, MAX, MAX)));
+                            return left(SemverRange.Op.GT, SemverVersion.of(major, MAX, MAX));
                         default:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, SemverVersion.of(major, 0, 0)));
+                            return left(SemverRange.Op.GTE, SemverVersion.of(major, 0, 0));
                     }
                 case PATCH:
                     switch (tag) {
                         case LTE:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.LTE, SemverVersion.of(major, minor, MAX)));
+                            return left(SemverRange.Op.LTE, SemverVersion.of(major, minor, MAX));
                         case LT:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.LT, SemverVersion.of(major, minor, 0)));
+                            return left(SemverRange.Op.LT, SemverVersion.of(major, minor, 0));
                         case GT:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GT, SemverVersion.of(major, minor, MAX)));
+                            return left(SemverRange.Op.GT, SemverVersion.of(major, minor, MAX));
                         default:
-                            return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, SemverVersion.of(major, minor, 0)));
+                            return left(SemverRange.Op.GTE, SemverVersion.of(major, minor, 0));
                     }
                 default: {
                     SemverRange.Op op;

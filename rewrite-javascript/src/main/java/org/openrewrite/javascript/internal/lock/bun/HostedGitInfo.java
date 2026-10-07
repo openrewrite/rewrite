@@ -299,12 +299,11 @@ final class HostedGitInfo {
         } else {
             projectPart = pathname;
         }
-        String projectTrimmed = projectPart.endsWith(".git") ? projectPart.substring(0, projectPart.length() - 4) : projectPart;
         String fragment = fragmentIdentifier(url);
         String committish = fragment.isEmpty() ? null : fragment;
         try {
-            return new HostedGitInfo(hostProvider, Representation.SHORTCUT, userPart == null ? null : decode(userPart), decode(projectTrimmed),
-                    committish == null ? null : decode(committish));
+            return new HostedGitInfo(hostProvider, Representation.SHORTCUT, userPart == null ? null : decode(userPart),
+                    decode(trimGit(projectPart)), committish == null ? null : decode(committish));
         } catch (IllegalArgumentException e) {
             return null;
         }
