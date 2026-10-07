@@ -57,6 +57,14 @@ final class BerryScenarios {
      */
     private static final List<String> AFTER_LOCKS = Arrays.asList("after", "fresh", "again");
     private static final List<String> BEFORE_LOCKS = Arrays.asList("before", "before-again");
+
+    /**
+     * A phase of a recording: the before install, the after install with the edit, and a Yarn 4 install that
+     * changes nothing over a {@code before} an older Yarn wrote ({@code record-yarn-berry-refresh.sh}).
+     */
+    enum Phase {
+        BEFORE, REFRESH, AFTER
+    }
     private static final Pattern PLATFORM = Pattern.compile("\\(node (\\w+)-(\\w+)\\)");
     private static final Pattern RECORDED_ON = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})\\s*$", Pattern.MULTILINE);
 
@@ -86,19 +94,23 @@ final class BerryScenarios {
         private final String text;
 
         /**
-         * Whether the lock belongs to the before phase (or is that phase's starting lock).
+         * The phase that wrote the lock, or that started from it.
          */
-        private final boolean before;
+        private final Phase phase;
 
-        Lock(Scenario scenario, String fileName, String text, boolean before) {
+        Lock(Scenario scenario, String fileName, String text, Phase phase) {
             this.scenario = scenario;
             this.fileName = fileName;
             this.text = text;
-            this.before = before;
+            this.phase = phase;
         }
 
         BerryLockRegenerator.Inputs inputs() {
-            return scenario.inputs(before, text);
+            return scenario.inputs(phase, text);
+        }
+
+        boolean isBefore() {
+            return phase == Phase.BEFORE;
         }
 
         /**
@@ -155,38 +167,42 @@ final class BerryScenarios {
         }
 
         /**
-         * Every lock Yarn wrote or was given: the phase-one seed, the crafted start, before and after, a fresh
-         * install's, and what a second install rewrote.
+         * Every lock Yarn wrote or was given: the phase-one seed, the crafted start, before and after, a refresh,
+         * a fresh install's, and what a second install rewrote.
          */
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();
             String seed = file("lock-seed");
             if (seed != null) {
-                locks.add(new Lock(this, "lock-seed", seed, true));
+                locks.add(new Lock(this, "lock-seed", seed, Phase.BEFORE));
             }
             String given = file("before-given");
             if (given != null && !given.equals(file("before"))) {
-                locks.add(new Lock(this, "before-given", given, true));
+                locks.add(new Lock(this, "before-given", given, Phase.BEFORE));
             }
             try (Stream<Path> files = Files.list(dir)) {
                 files.map(f -> f.getFileName().toString())
                         .filter(f -> f.startsWith("before-") && !f.equals("before-given") &&
                                      !f.equals("before-commands") && !f.equals("before-again"))
                         .sorted()
-                        .forEach(f -> locks.add(new Lock(this, f, read(dir.resolve(f)), true)));
+                        .forEach(f -> locks.add(new Lock(this, f, read(dir.resolve(f)), Phase.BEFORE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
             for (String lock : BEFORE_LOCKS) {
                 String text = file(lock);
                 if (text != null) {
-                    locks.add(new Lock(this, lock, text, true));
+                    locks.add(new Lock(this, lock, text, Phase.BEFORE));
                 }
+            }
+            String refresh = file("refresh");
+            if (refresh != null) {
+                locks.add(new Lock(this, "refresh", refresh, Phase.REFRESH));
             }
             for (String lock : AFTER_LOCKS) {
                 String text = file(lock);
                 if (text != null) {
-                    locks.add(new Lock(this, lock, text, false));
+                    locks.add(new Lock(this, lock, text, Phase.AFTER));
                 }
             }
             return locks;
@@ -196,15 +212,15 @@ final class BerryScenarios {
          * What Yarn had in a phase: the phase's manifests and {@code .yarnrc.yml}, the recorder's environment, the
          * machine and the day.
          */
-        BerryLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
+        BerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
-            String yarnrc = yarnrc(before);
+            String yarnrc = yarnrc(phase);
             if (yarnrc != null) {
                 configFiles.put(BerryOptions.DEFAULT_RC_FILENAME, yarnrc);
             }
             return BerryLockRegenerator.Inputs.builder()
                     .lock(lock)
-                    .manifests(manifests(before))
+                    .manifests(manifests(phase))
                     .configFiles(configFiles)
                     .env(has("recorded-with") ? RECORDER_ENV : new LinkedHashMap<>())
                     .host(host())
@@ -217,15 +233,16 @@ final class BerryScenarios {
          * the tree's; the downloaded fixtures name theirs {@code workspace-yarnrc}.
          */
         @Nullable
-        String yarnrc(boolean before) {
-            List<String> order = before ? Arrays.asList("yarnrc-before.written", "yarnrc") :
+        String yarnrc(Phase phase) {
+            List<String> order = phase == Phase.BEFORE ? Arrays.asList("yarnrc-before.written", "yarnrc") :
+                    phase == Phase.REFRESH ? Arrays.asList("yarnrc-refresh.written", "yarnrc-before.written", "yarnrc") :
                     Arrays.asList("yarnrc.written", "yarnrc-after", "yarnrc-before.written", "yarnrc");
             for (String f : order) {
                 if (has(f)) {
                     return file(f);
                 }
             }
-            String tree = tree(before).get(BerryOptions.DEFAULT_RC_FILENAME);
+            String tree = tree(phase).get(BerryOptions.DEFAULT_RC_FILENAME);
             return tree != null ? tree : file("workspace-yarnrc");
         }
 
@@ -233,13 +250,14 @@ final class BerryScenarios {
          * The project's manifests in a phase by directory: {@code ""} the root, then every package.json of the
          * phase's tree; a downloaded fixture's {@code pkg-<member>} sits at {@code packages/<member>}.
          */
-        Map<String, String> manifests(boolean before) {
+        Map<String, String> manifests(Phase phase) {
             Map<String, String> manifests = new LinkedHashMap<>();
-            String root = before ? first("pkg-before", "pkg-root") : first("pkg", "pkg-after", "pkg-root");
+            String root = phase == Phase.BEFORE ? first("pkg-before", "pkg-root") :
+                    phase == Phase.REFRESH ? first("pkg-refresh") : first("pkg", "pkg-after", "pkg-root");
             if (root != null) {
                 manifests.put("", root);
             }
-            for (Map.Entry<String, String> entry : tree(before).entrySet()) {
+            for (Map.Entry<String, String> entry : tree(phase).entrySet()) {
                 String path = entry.getKey();
                 if (path.endsWith("/package.json")) {
                     manifests.put(path.substring(0, path.length() - "/package.json".length()), entry.getValue());
@@ -249,7 +267,7 @@ final class BerryScenarios {
                 try (Stream<Path> files = Files.list(dir)) {
                     files.map(f -> f.getFileName().toString())
                             .filter(f -> f.startsWith("pkg-") && !f.equals("pkg-before") && !f.equals("pkg-after") &&
-                                         !f.equals("pkg-root") && !f.endsWith(before ? "-after" : "-before"))
+                                         !f.equals("pkg-root") && !f.endsWith(phase == Phase.AFTER ? "-before" : "-after"))
                             .sorted()
                             .forEach(f -> manifests.put("packages/" + f.substring(4).replaceAll("-(before|after)$", ""),
                                     read(dir.resolve(f))));
@@ -272,9 +290,9 @@ final class BerryScenarios {
         /**
          * The files of the project directory in a phase: {@code tree-before/}, then {@code tree/} over it after.
          */
-        Map<String, String> tree(boolean before) {
+        Map<String, String> tree(Phase phase) {
             Map<String, String> out = new TreeMap<>(tree("tree-before"));
-            if (!before) {
+            if (phase == Phase.AFTER) {
                 out.putAll(tree("tree"));
             }
             return out;
