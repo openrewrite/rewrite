@@ -4162,6 +4162,32 @@ class TestSymbolTheStubsDoNotDeclare:
         owner, _ = self._call_names('from lib import gone\ngone = None\ngone()\n', 2)
         assert owner is None, 'a name the file rebinds no longer names what it imported'
 
+    def _call_owners(self, source):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            return [getattr(c.method_type.declaring_type, 'fully_qualified_name', None)
+                    for c in _collect_method_invocations(cu)]
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_a_name_another_scope_binds_keeps_its_import_here(self):
+        assert self._call_owners(
+            'from lib import gone\ngone()\n'
+            'class C:\n    def gone(self):\n        pass\n    def m(self):\n        gone()\n'
+            'def f(gone=None):\n    pass\n') == ['lib', 'lib'], \
+            'a class body is not visible to its methods, and a parameter only to its function'
+        assert self._call_owners(
+            'from lib import gone as g\ng()\nclass C:\n    def g(self):\n        pass\n') == ['lib']
+
+    def test_a_name_an_enclosing_scope_binds_is_not_attributed(self):
+        assert self._call_owners(
+            'from lib import gone\n'
+            'def f(gone):\n    def inner():\n        gone()\n'
+            'class C:\n    gone = None\n    gone()\n') == [None, None]
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    gone = None\n') == [None], \
+            'a global declaration binds at module scope'
+
     def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
         owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')
         assert owner is None, 'a function-scope import binds only inside that function'
