@@ -29,14 +29,9 @@ import {randomId} from '../../uuid';
 import ts from "typescript";
 import {DependencyWorkspace} from "../dependency-workspace";
 import {ModuleScopeBinding, moduleScopeBindings} from '../add-import';
-import {walk} from '../scope';
-import {isIdentifier} from '../../java';
+import {namesReferencedWithin} from '../scope';
 import {findMarker, MarkersKind, ParseExceptionResult} from '../../markers';
 
-/** A module a template's context binds, and whether the parse resolved it well enough to attribute. */
-export interface ContextBinding extends ModuleScopeBinding {
-    attributed: boolean;
-}
 import {Parameter} from "./types";
 
 /**
@@ -263,9 +258,9 @@ export class TemplateEngine {
     }
 
     /**
-     * The modules the template's context binds, for the caller to bind in the file being edited.
-     * An `import` or `require` states one; anything else — a `declare`, a helper signature — types
-     * the template without asking for a binding.
+     * The modules the template's context binds and its code reads, for the caller to bind in the
+     * file being edited. An `import` or `require` states one; anything else — a `declare`, a helper
+     * signature — types the template without asking for a binding.
      */
     static async getContextBindings(
         templateParts: TemplateStringsArray,
@@ -273,24 +268,17 @@ export class TemplateEngine {
         contextStatements: string[] = [],
         dependencies: Record<string, string> = {},
         types?: string[]
-    ): Promise<ContextBinding[]> {
+    ): Promise<ModuleScopeBinding[]> {
         // The bindings are the context's alone, so either reading of code opening with `{` serves
         const cu = await TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types)
             .catch(e => opensWithBrace(templateParts) ?
                 TemplateEngine.parseWithContext(templateParts, parameters, contextStatements, dependencies, types, true) :
                 Promise.reject(e));
-        // The template's own code is the last statement, so everything ahead of it is context.
+        // The template's own code is the last statement, so everything ahead of it is context, and a
+        // name the code reads without binding it itself resolves to the context's module-scope binding.
         const context = {...cu, statements: cu.statements.slice(0, -1)};
-        const attributed = new Set<string>();
-        walk(context.statements, node => {
-            if (isIdentifier(node) && (node.type !== undefined || node.fieldType !== undefined)) {
-                attributed.add(node.simpleName);
-            }
-            return true;
-        });
-        return moduleScopeBindings(context)
-            .filter(b => b.module !== undefined)
-            .map(b => ({...b, attributed: attributed.has(b.name)}));
+        const referenced = namesReferencedWithin(cu.statements[cu.statements.length - 1]);
+        return moduleScopeBindings(context).filter(b => b.module !== undefined && referenced.has(b.name));
     }
 
     /**
@@ -337,7 +325,6 @@ export class TemplateEngine {
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
      * @param format Whether to fit the result to where it lands
      * @param renames Local names for the template's declared bindings, keyed as declared
-     * @param modules The module each declared binding names, keyed as declared
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
@@ -348,8 +335,7 @@ export class TemplateEngine {
         values: Pick<Map<string, J>, 'get'> = new Map(),
         wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
         format: boolean = true,
-        renames: Record<string, string> = {},
-        modules: Record<string, string> = {}
+        renames: Record<string, string> = {}
     ): Promise<J | undefined> {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -362,7 +348,7 @@ export class TemplateEngine {
         const fresh = await randomizeIds(ast);
 
         const bound = Object.keys(renames).length > 0
-            ? await renameBindings(fresh.tree as J, renames, modules)
+            ? await renameBindings(fresh.tree as J, renames)
             : fresh.tree;
 
         // Unsubstitute placeholders with actual parameter values and match results
