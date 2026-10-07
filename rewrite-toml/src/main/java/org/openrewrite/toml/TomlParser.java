@@ -74,6 +74,8 @@ public class TomlParser implements Parser {
                "uv.lock".equals(fileName) ||
                "poetry.lock".equals(fileName) ||
                "pdm.lock".equals(fileName) ||
+               // Not yet needed by any recipe, and would grow every Rust repository's LST
+               // "Cargo.lock".equals(fileName) ||
                "Pipfile".equals(fileName) ||
                ".xmake.cfg".equals(fileName);
     }
