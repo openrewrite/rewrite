@@ -27,6 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class WyhashTest {
 
+    private static final String DIGITS_80 =
+            "12345678901234567890123456789012345678901234567890123456789012345678901234567890";
+
     private static byte[] bytes(String s) {
         return s.getBytes(StandardCharsets.UTF_8);
     }
@@ -40,8 +43,7 @@ class WyhashTest {
         assertThat(Wyhash.hash(4, bytes("abcdefghijklmnopqrstuvwxyz"))).isEqualTo(0x7a43afb61d7f5f40L);
         assertThat(Wyhash.hash(5, bytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")))
           .isEqualTo(0xff42329b90e50d58L);
-        assertThat(Wyhash.hash(6, bytes("12345678901234567890123456789012345678901234567890123456789012345678901234567890")))
-          .isEqualTo(0xc39cab13b115aad3L);
+        assertThat(Wyhash.hash(6, bytes(DIGITS_80))).isEqualTo(0xc39cab13b115aad3L);
     }
 
     @Test
@@ -53,7 +55,6 @@ class WyhashTest {
         assertThat(Wyhash11.hash(4, bytes("abcdefghijklmnopqrstuvwxyz"))).isEqualTo(0xd0b270e1d8a7019cL);
         assertThat(Wyhash11.hash(5, bytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")))
           .isEqualTo(0x602a1894d3bbfe7fL);
-        assertThat(Wyhash11.hash(6, bytes("12345678901234567890123456789012345678901234567890123456789012345678901234567890")))
-          .isEqualTo(0x829e9c148b75970eL);
+        assertThat(Wyhash11.hash(6, bytes(DIGITS_80))).isEqualTo(0x829e9c148b75970eL);
     }
 }

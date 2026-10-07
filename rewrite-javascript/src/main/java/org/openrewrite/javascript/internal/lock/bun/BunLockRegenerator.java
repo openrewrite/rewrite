@@ -179,7 +179,8 @@ public final class BunLockRegenerator {
                 maybeRoot.parseWithJSON(lockfile, options, log, "", rootJson, Features.MAIN, manifests);
                 int[] mapping = new int[maybeRoot.dependenciesLen];
                 Arrays.fill(mapping, INVALID_PACKAGE_ID);
-                summary = PackageDiff.generate(options, log, managerLockfile, lockfile, root, maybeRoot, mapping, manifests);
+                summary = PackageDiff.generate(options, log, managerLockfile, lockfile, root, maybeRoot, mapping,
+                        manifests);
                 if (summary.hasDiffs()) {
                     replaceRoot(managerLockfile, lockfile, root, maybeRoot, mapping, summary, enqueued);
                 }
@@ -223,7 +224,8 @@ public final class BunLockRegenerator {
         List<Integer> oldResolutions = new ArrayList<>(manager.resolutions.subList(oldOff, oldOff + oldLen));
         for (int i = 0; i < len; i++) {
             manager.dependencies.add(newDependencies.get(i).cloneDependency());
-            manager.resolutions.add(mapping[i] != INVALID_PACKAGE_ID ? oldResolutions.get(mapping[i]) : INVALID_PACKAGE_ID);
+            manager.resolutions.add(mapping[i] != INVALID_PACKAGE_ID ? oldResolutions.get(mapping[i]) :
+                    INVALID_PACKAGE_ID);
         }
 
         manager.workspacePaths = new LinkedHashMap<>(lockfile.workspacePaths);

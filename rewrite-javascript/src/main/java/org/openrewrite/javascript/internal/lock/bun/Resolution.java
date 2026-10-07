@@ -56,7 +56,8 @@ final class Resolution {
     final String value;
     final @Nullable Repository repository;
 
-    private Resolution(Tag tag, @Nullable SemverVersion version, String url, String value, @Nullable Repository repository) {
+    private Resolution(Tag tag, @Nullable SemverVersion version, String url, String value,
+                       @Nullable Repository repository) {
         this.tag = tag;
         this.version = version;
         this.url = url;

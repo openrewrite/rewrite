@@ -157,7 +157,8 @@ final class Dependency {
         int atIndex = str.indexOf('@');
         if (atIndex >= 0) {
             if (atIndex != 0) {
-                return new String[]{str.substring(0, atIndex), atIndex + 1 < str.length() ? str.substring(atIndex + 1) : null};
+                String version = atIndex + 1 < str.length() ? str.substring(atIndex + 1) : null;
+                return new String[]{str.substring(0, atIndex), version};
             }
             int second = str.indexOf('@', 1);
             if (second < 0) {

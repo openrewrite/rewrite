@@ -70,7 +70,8 @@ final class SemverQuery {
 
         boolean satisfiesPre(SemverVersion version) {
             boolean[] preMatched = {false};
-            return head.satisfiesPre(version, preMatched) && preMatched[0] || next != null && next.satisfiesPre(version);
+            return head.satisfiesPre(version, preMatched) && preMatched[0] ||
+                   next != null && next.satisfiesPre(version);
         }
 
         boolean eql(List rhs) {
@@ -243,8 +244,9 @@ final class SemverQuery {
                     if (!done) {
                         rightMajor = saturatingIncrement(major);
                     }
+                    SemverVersion right = SemverVersion.of(rightMajor, rightMinor, rightPatch);
                     return new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, left),
-                            new SemverRange.Comparator(SemverRange.Op.LT, SemverVersion.of(rightMajor, rightMinor, rightPatch)));
+                            new SemverRange.Comparator(SemverRange.Op.LT, right));
                 }
                 case TILDA: {
                     if (version.major == null) {
@@ -480,11 +482,13 @@ final class SemverQuery {
                         break;
                     case MINOR:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                new SemverRange.Comparator(SemverRange.Op.LT, second.with(saturatingIncrement(second.major), 0, 0)));
+                                new SemverRange.Comparator(SemverRange.Op.LT,
+                                        second.with(saturatingIncrement(second.major), 0, 0)));
                         break;
                     case PATCH:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),
-                                new SemverRange.Comparator(SemverRange.Op.LT, second.with(second.major, saturatingIncrement(second.minor), 0)));
+                                new SemverRange.Comparator(SemverRange.Op.LT,
+                                        second.with(second.major, saturatingIncrement(second.minor), 0)));
                         break;
                     default:
                         range = new SemverRange(new SemverRange.Comparator(SemverRange.Op.GTE, version),

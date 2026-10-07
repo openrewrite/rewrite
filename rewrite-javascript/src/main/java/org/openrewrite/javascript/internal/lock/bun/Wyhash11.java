@@ -97,7 +97,8 @@ final class Wyhash11 {
                 s = mix0(swapped(b, o), (read(b, o + 8, 4) << 16) | read(b, o + 12, 2), seed);
                 break;
             case 15:
-                s = mix0(swapped(b, o), (read(b, o + 8, 4) << 24) | (read(b, o + 12, 2) << 8) | read(b, o + 14, 1), seed);
+                s = mix0(swapped(b, o), (read(b, o + 8, 4) << 24) | (read(b, o + 12, 2) << 8) | read(b, o + 14, 1),
+                        seed);
                 break;
             case 16:
                 s = mix0(swapped(b, o), swapped(b, o + 8), seed);
@@ -153,7 +154,8 @@ final class Wyhash11 {
                 break;
             default:
                 s = mix0(swapped(b, o), swapped(b, o + 8), seed) ^
-                    mix1(swapped(b, o + 16), (read(b, o + 24, 4) << 24) | (read(b, o + 28, 2) << 8) | read(b, o + 30, 1), seed);
+                    mix1(swapped(b, o + 16),
+                            (read(b, o + 24, 4) << 24) | (read(b, o + 28, 2) << 8) | read(b, o + 30, 1), seed);
                 break;
         }
         return mum(s ^ (msgLen + remLen), PRIMES[4]);

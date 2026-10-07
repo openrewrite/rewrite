@@ -387,7 +387,8 @@ final class SemverVersion {
                 break;
             } else if (ch == 'x' || ch == '*' || ch == 'X') {
                 i++;
-                while (i < input.length() && (input.charAt(i) == 'x' || input.charAt(i) == '*' || input.charAt(i) == 'X')) {
+                while (i < input.length() &&
+                       (input.charAt(i) == 'x' || input.charAt(i) == '*' || input.charAt(i) == 'X')) {
                     i++;
                 }
                 if (i < input.length() && input.charAt(i) == '.') {

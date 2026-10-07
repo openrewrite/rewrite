@@ -320,7 +320,8 @@ final class HostedGitInfo {
         WellDefinedProtocol urlProtocol = WellDefinedProtocol.fromStringWithColon(protoSlice);
         if (urlProtocol != null) {
             String postColon = npaStr.substring(firstColonIdx + 1);
-            return new UrlProtocolPair(postColon.startsWith("//") ? postColon.substring(2) : postColon, urlProtocol, null);
+            String rest = postColon.startsWith("//") ? postColon.substring(2) : postColon;
+            return new UrlProtocolPair(rest, urlProtocol, null);
         }
         int firstAtIdx = npaStr.indexOf('@');
         if (firstAtIdx >= 0) {
@@ -337,7 +338,8 @@ final class HostedGitInfo {
             return new UrlProtocolPair(npaStr.substring(dupSlashIdx + 2), null, npaStr.substring(0, dupSlashIdx));
         }
         if (firstColonIdx != -1) {
-            return new UrlProtocolPair(npaStr.substring(firstColonIdx + 1), null, npaStr.substring(0, firstColonIdx + 1));
+            return new UrlProtocolPair(npaStr.substring(firstColonIdx + 1), null,
+                    npaStr.substring(0, firstColonIdx + 1));
         }
         return new UrlProtocolPair(npaStr, null, null);
     }

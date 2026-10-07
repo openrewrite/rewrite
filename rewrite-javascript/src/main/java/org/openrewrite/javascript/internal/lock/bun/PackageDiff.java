@@ -121,8 +121,8 @@ final class PackageDiff {
                 if (idMapping != null) {
                     boolean updateMapping = true;
                     if (isRoot && fromDep.behavior.isWorkspace()) {
-                        updateMapping = workspaceUnchanged(options, log, fromLockfile, toLockfile, fromResolutions.get(i),
-                                fromDep, manifests);
+                        updateMapping = workspaceUnchanged(options, log, fromLockfile, toLockfile,
+                                fromResolutions.get(i), fromDep, manifests);
                         toDeps = toLockfile.dependenciesOf(to);
                     }
                     if (updateMapping) {

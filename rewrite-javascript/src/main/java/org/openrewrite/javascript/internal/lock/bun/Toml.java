@@ -170,7 +170,8 @@ final class Toml {
         int start = pos;
         while (pos < source.length()) {
             char k = source.charAt(pos);
-            if (k >= 'a' && k <= 'z' || k >= 'A' && k <= 'Z' || k >= '0' && k <= '9' || k == '_' || k == '-' || k == '@') {
+            if (k >= 'a' && k <= 'z' || k >= 'A' && k <= 'Z' || k >= '0' && k <= '9' || k == '_' || k == '-' ||
+                k == '@') {
                 pos++;
             } else {
                 break;

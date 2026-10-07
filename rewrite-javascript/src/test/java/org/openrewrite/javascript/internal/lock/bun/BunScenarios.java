@@ -18,9 +18,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -54,7 +52,7 @@ import java.util.stream.Stream;
  * What bun writes on an install that changes nothing over a lock, when it differs, is {@code <lock>-again}
  * ({@code again} for {@code after}) with {@code bun-<lock>-again.log}. The downloaded fixtures spell the edited
  * manifest {@code pkg-after}, a workspace's root {@code pkg-root} and its members {@code pkg-<name>},
- * {@code pkg-<name>-before} and {@code pkg-<name>-after}, and keep rewrites under {@code lock/bun-again/}.
+ * {@code pkg-<name>-before} and {@code pkg-<name>-after}.
  */
 final class BunScenarios {
 
@@ -87,13 +85,6 @@ final class BunScenarios {
             this.before = fileName.startsWith("before");
         }
 
-        /**
-         * A starting lock made by hand, not by bun.
-         */
-        boolean isInput() {
-            return before && scenario.has("lock-before");
-        }
-
         Map<String, String> manifests() {
             return scenario.manifests(before, text);
         }
@@ -113,11 +104,7 @@ final class BunScenarios {
          */
         @Nullable
         String rewritten() {
-            String again = scenario.file("after".equals(fileName) ? "again" : fileName + "-again");
-            if (again != null) {
-                return again;
-            }
-            return resource("lock/bun-again/" + scenario.getName() + "/" + fileName);
+            return scenario.file("after".equals(fileName) ? "again" : fileName + "-again");
         }
 
         @Nullable
@@ -232,7 +219,8 @@ final class BunScenarios {
                 return out;
             }
             try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile).forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
+                walk.filter(Files::isRegularFile)
+                        .forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -362,7 +350,8 @@ final class BunScenarios {
             throw new IllegalStateException(e);
         }
         String cache = System.getenv(HTTP_CACHE_ENV);
-        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ? Paths.get(cache) : null;
+        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
+                Paths.get(cache) : null;
         for (Path root : classpathRoots) {
             collect(root, httpCache, found);
         }
@@ -408,23 +397,6 @@ final class BunScenarios {
             }
         }
         return false;
-    }
-
-    private static @Nullable String resource(String path) {
-        try (InputStream in = BunScenarios.class.getClassLoader().getResourceAsStream(path)) {
-            if (in == null) {
-                return null;
-            }
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = in.read(buf)) >= 0) {
-                out.write(buf, 0, n);
-            }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     private static String read(Path path) {

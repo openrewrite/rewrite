@@ -98,7 +98,8 @@ final class SemverRange {
                         new Comparator(Op.GTE, SemverVersion.of(version.major, 0, 0)));
             default:
                 return new SemverRange(
-                        new Comparator(Op.LT, SemverVersion.of(version.major, SemverVersion.saturatingIncrement(version.minor), 0)),
+                        new Comparator(Op.LT,
+                                SemverVersion.of(version.major, SemverVersion.saturatingIncrement(version.minor), 0)),
                         new Comparator(Op.GTE, SemverVersion.of(version.major, version.minor, 0)));
         }
     }

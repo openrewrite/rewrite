@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Port of bun's test/js/bun/glob/match.test.ts (bun-v1.3.10): every {@code new Glob(pattern).match(path)} the test
- * makes, with Bun 1.3.10's answer ({@code glob-match.tsv}, recorded by {@code .lockwork/verify/bun-tests-data.sh}).
+ * makes, with Bun 1.3.10's answer ({@code glob-match.tsv}, recorded by {@code bun-tests-data.sh}).
  * The test's "braces" case reads fixture files outside the test and records nothing.
  */
 class GlobTest {

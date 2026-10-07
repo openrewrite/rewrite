@@ -46,7 +46,8 @@ final class TextLockfileReader {
         }
     }
 
-    private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"};
+    private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies",
+            "peerDependencies"};
     private static final int[] GROUP_BEHAVIORS = {Behavior.PROD, Behavior.DEV, Behavior.OPTIONAL, Behavior.PEER};
 
     private final Lockfile lockfile = new Lockfile();
@@ -223,7 +224,8 @@ final class TextLockfileReader {
                     throw error("InvalidWorkspaceObject", "Expected a string");
                 }
             }
-            int[] offLen = parseAppendDependencies(rootPkgExpr, false, null, Collections.<String>emptySet(), workspacesObj);
+            int[] offLen = parseAppendDependencies(rootPkgExpr, false, null, Collections.<String>emptySet(),
+                    workspacesObj);
             Package rootPkg = new Package();
             if (maybeName != null) {
                 rootPkg.name = maybeName;
@@ -363,7 +365,8 @@ final class TextLockfileReader {
                 if (pkgMap.containsKey(pkgPath)) {
                     continue;
                 }
-                for (int workspacePkgId = workspacePkgsOff; workspacePkgId < workspacePkgsOff + workspacePkgsLen; workspacePkgId++) {
+                int workspacePkgsEnd = workspacePkgsOff + workspacePkgsLen;
+                for (int workspacePkgId = workspacePkgsOff; workspacePkgId < workspacePkgsEnd; workspacePkgId++) {
                     if (res.eql(lockfile.packages.get(workspacePkgId).resolution)) {
                         pkgMap.put(pkgPath, workspacePkgId);
                         continue nextPkgKey;
@@ -752,8 +755,9 @@ final class TextLockfileReader {
                         continue;
                     }
                     String name = prop.value.get("name").asString();
-                    lockfile.dependencies.add(new Dependency(Wyhash11.stringHash(name), name,
-                            new DependencyVersion(DependencyVersion.Tag.WORKSPACE, "", path), Behavior.of(Behavior.WORKSPACE)));
+                    DependencyVersion version = new DependencyVersion(DependencyVersion.Tag.WORKSPACE, "", path);
+                    lockfile.dependencies.add(new Dependency(Wyhash11.stringHash(name), name, version,
+                            Behavior.of(Behavior.WORKSPACE)));
                     continue workspaces;
                 }
             }
@@ -780,8 +784,9 @@ final class TextLockfileReader {
                 name = name.substring(i + 1);
             }
         }
-        StringBuilder out = new StringBuilder(registry).append('/').append(fullName).append("/-/").append(name).append('-')
-                .append(Long.toUnsignedString(version.major)).append('.').append(Long.toUnsignedString(version.minor))
+        StringBuilder out = new StringBuilder(registry).append('/').append(fullName).append("/-/").append(name)
+                .append('-').append(Long.toUnsignedString(version.major))
+                .append('.').append(Long.toUnsignedString(version.minor))
                 .append('.').append(Long.toUnsignedString(version.patch));
         if (version.hasPre()) {
             out.append('-').append(version.pre);

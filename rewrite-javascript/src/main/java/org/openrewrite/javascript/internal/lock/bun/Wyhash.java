@@ -32,7 +32,8 @@ final class Wyhash {
     }
 
     /**
-     * {@code std.hash_map.getAutoHashFn(u64)}: a u64 has a unique representation, so its little-endian bytes are hashed.
+     * {@code std.hash_map.getAutoHashFn(u64)}: a u64 has a unique representation, so its little-endian bytes are
+     * hashed.
      */
     static long hashU64(long key) {
         byte[] bytes = new byte[8];
@@ -56,7 +57,8 @@ final class Wyhash {
                 a = (read(input, 0, 4) << 32) | read(input, quarter, 4);
                 b = (read(input, end, 4) << 32) | read(input, end - quarter, 4);
             } else if (input.length > 0) {
-                a = ((input[0] & 0xFFL) << 16) | ((input[input.length >> 1] & 0xFFL) << 8) | (input[input.length - 1] & 0xFFL);
+                a = ((input[0] & 0xFFL) << 16) | ((input[input.length >> 1] & 0xFFL) << 8) |
+                    (input[input.length - 1] & 0xFFL);
                 b = 0;
             } else {
                 a = 0;

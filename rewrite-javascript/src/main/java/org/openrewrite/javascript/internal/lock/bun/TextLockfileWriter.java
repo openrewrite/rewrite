@@ -30,7 +30,8 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
  */
 final class TextLockfileWriter {
 
-    private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"};
+    private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies",
+            "peerDependencies"};
     private static final Behavior[] GROUP_BEHAVIORS = {Behavior.of(Behavior.PROD), Behavior.of(Behavior.DEV),
             Behavior.of(Behavior.OPTIONAL), Behavior.of(Behavior.PEER)};
     private static final String DEFAULT_REGISTRY = Strings.withoutTrailingSlash(BunOptions.DEFAULT_REGISTRY);
@@ -314,7 +315,8 @@ final class TextLockfileWriter {
                         Repository repo = res.repository;
                         writer.append("[\"");
                         Strings.appendJsonString(writer, pkg.name, false);
-                        writer.append('@').append(repo.format(res.tag == Resolution.Tag.GIT ? "git+" : "github:")).append("\", ");
+                        writer.append('@').append(repo.format(res.tag == Resolution.Tag.GIT ? "git+" : "github:"))
+                                .append("\", ");
                         writePackageInfoObject(writer, dep.behavior, depsBuf, pkgDepsSortBuf, pkg);
                         writer.append(", ");
                         Strings.appendJsonString(writer, repo.resolved, true);
@@ -432,7 +434,8 @@ final class TextLockfileWriter {
         writer.append(any ? " }" : "}");
     }
 
-    private static void writeWorkspaceDeps(StringBuilder writer, int[] indent, Lockfile lockfile, int pkgId, String res) {
+    private static void writeWorkspaceDeps(StringBuilder writer, int[] indent, Lockfile lockfile, int pkgId,
+                                           String res) {
         List<String> optionalPeersBuf = new ArrayList<>();
         boolean any = false;
         Package pkg = lockfile.packages.get(pkgId);

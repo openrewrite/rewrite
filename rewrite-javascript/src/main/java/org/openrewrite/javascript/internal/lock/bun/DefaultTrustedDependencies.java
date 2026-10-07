@@ -37,9 +37,10 @@ final class DefaultTrustedDependencies {
     }
 
     private static Set<Integer> load() {
-        try (InputStream in = DefaultTrustedDependencies.class.getResourceAsStream("default-trusted-dependencies.txt")) {
+        String resource = "default-trusted-dependencies.txt";
+        try (InputStream in = DefaultTrustedDependencies.class.getResourceAsStream(resource)) {
             if (in == null) {
-                throw new IllegalStateException("default-trusted-dependencies.txt is missing");
+                throw new IllegalStateException(resource + " is missing");
             }
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];

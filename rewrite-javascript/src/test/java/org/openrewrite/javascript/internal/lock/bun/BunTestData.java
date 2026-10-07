@@ -25,9 +25,11 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Data tables of bun's own tests, extracted from bun-v1.3.10 by {@code .lockwork/verify}: the cases of
- * test/cli/install/semver.test.ts with Bun's answers, test/js/bun/glob/match.test.ts with Bun's answers,
- * test/cli/install/hosted-git-info/cases.ts, and the bun.lock snapshots of bun-lock.test.ts and catalogs.test.ts.
+ * Data tables of bun's own tests, extracted from bun-v1.3.10: the cases of test/cli/install/semver.test.ts with
+ * Bun's answers ({@code record-bun-semver.sh}), test/js/bun/glob/match.test.ts with Bun's answers and
+ * test/cli/install/hosted-git-info/cases.ts ({@code bun-tests-data.sh}), the bun.lock snapshots of
+ * bun-lock.test.ts and catalogs.test.ts ({@code bun-lock-snapshots.js}) and the pre-release sort of
+ * semver-fixture.js ({@code bun-prereleases.js}).
  */
 final class BunTestData {
 

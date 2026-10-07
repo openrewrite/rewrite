@@ -34,7 +34,8 @@ final class DependencyVersion {
             if (dependency.isEmpty()) {
                 return DIST_TAG;
             }
-            if (startsWithWindowsDriveLetter(dependency) && (dependency.charAt(2) == '/' || dependency.charAt(2) == '\\')) {
+            if (startsWithWindowsDriveLetter(dependency) &&
+                (dependency.charAt(2) == '/' || dependency.charAt(2) == '\\')) {
                 return Dependency.isTarball(dependency) ? TARBALL : FOLDER;
             }
             char first = dependency.charAt(0);
@@ -104,7 +105,8 @@ final class DependencyVersion {
                                     }
                                 }
                             } else if (c == 'h') {
-                                if (url.startsWith("hub:") && HostedGitInfo.isGitHubShorthand(url.substring("hub:".length()))) {
+                                if (url.startsWith("hub:") &&
+                                    HostedGitInfo.isGitHubShorthand(url.substring("hub:".length()))) {
                                     return GITHUB;
                                 }
                             }
@@ -398,7 +400,8 @@ final class DependencyVersion {
                     while (i < dependency.length() && dependency.charAt(i) != '@') {
                         i++;
                     }
-                    tagToUse = i + 1 <= dependency.length() ? dependency.substring(Math.min(i + 1, dependency.length())) : "";
+                    tagToUse = i + 1 <= dependency.length() ?
+                            dependency.substring(Math.min(i + 1, dependency.length())) : "";
                     actual = dependency.substring("npm:".length(), i);
                 }
                 return new DependencyVersion(Tag.DIST_TAG, literal,
@@ -410,8 +413,9 @@ final class DependencyVersion {
                     input = input.substring("git+".length());
                 }
                 int hash = input.lastIndexOf('#');
-                return new DependencyVersion(Tag.GIT, literal, new Repository("",
-                        hash >= 0 ? input.substring(0, hash) : input, hash >= 0 ? input.substring(hash + 1) : "", "", ""));
+                String repo = hash >= 0 ? input.substring(0, hash) : input;
+                String committish = hash >= 0 ? input.substring(hash + 1) : "";
+                return new DependencyVersion(Tag.GIT, literal, new Repository("", repo, committish, "", ""));
             }
             case GITHUB: {
                 HostedGitInfo info = HostedGitInfo.fromUrl(dependency);
@@ -429,9 +433,11 @@ final class DependencyVersion {
                 if (Dependency.isRemoteTarball(dependency)) {
                     return new DependencyVersion(Tag.TARBALL, literal, new TarballInfo(true, dependency, ""));
                 } else if (dependency.startsWith("file://")) {
-                    return new DependencyVersion(Tag.TARBALL, literal, new TarballInfo(false, dependency.substring(7), ""));
+                    String path = dependency.substring("file://".length());
+                    return new DependencyVersion(Tag.TARBALL, literal, new TarballInfo(false, path, ""));
                 } else if (dependency.startsWith("file:")) {
-                    return new DependencyVersion(Tag.TARBALL, literal, new TarballInfo(false, dependency.substring(5), ""));
+                    String path = dependency.substring("file:".length());
+                    return new DependencyVersion(Tag.TARBALL, literal, new TarballInfo(false, path, ""));
                 } else if (dependency.contains("://")) {
                     return null;
                 }
@@ -452,7 +458,8 @@ final class DependencyVersion {
                             } else {
                                 maybeDotDot = dependency.substring(protocol + 2);
                             }
-                            if (maybeDotDot.length() > 1 && maybeDotDot.charAt(0) == '.' && maybeDotDot.charAt(1) == '.') {
+                            if (maybeDotDot.length() > 1 && maybeDotDot.charAt(0) == '.' &&
+                                maybeDotDot.charAt(1) == '.') {
                                 return new DependencyVersion(Tag.FOLDER, literal, maybeDotDot);
                             }
                         }
@@ -467,7 +474,8 @@ final class DependencyVersion {
                 return null;
             case SYMLINK: {
                 int colon = dependency.indexOf(':');
-                return new DependencyVersion(Tag.SYMLINK, literal, colon >= 0 ? dependency.substring(colon + 1) : literal);
+                String target = colon >= 0 ? dependency.substring(colon + 1) : literal;
+                return new DependencyVersion(Tag.SYMLINK, literal, target);
             }
             case WORKSPACE: {
                 String input = dependency;

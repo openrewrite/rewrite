@@ -141,7 +141,8 @@ final class Glob {
                 boolean toElse = false;
                 switch (c) {
                     case '*': {
-                        boolean isGlobstar = state.globIndex + 1 < glob.length() && glob.charAt(state.globIndex + 1) == '*';
+                        boolean isGlobstar = state.globIndex + 1 < glob.length() &&
+                                             glob.charAt(state.globIndex + 1) == '*';
                         if (isGlobstar) {
                             state.globIndex = skipGlobstars(glob, state.globIndex);
                         }
@@ -152,11 +153,13 @@ final class Glob {
                         if (isGlobstar) {
                             state.globIndex += 2;
                             boolean isEndInvalid = state.globIndex < glob.length();
-                            if (isEndInvalid && state.pathIndex == path.length() && glob.length() - state.globIndex == 2 &&
-                                glob.charAt(state.globIndex) == '/' && glob.charAt(state.globIndex + 1) == '*') {
+                            if (isEndInvalid && state.pathIndex == path.length() &&
+                                glob.length() - state.globIndex == 2 && glob.charAt(state.globIndex) == '/' &&
+                                glob.charAt(state.globIndex + 1) == '*') {
                                 continue;
                             }
-                            if ((Math.max(0, state.globIndex - globStart) < 3 || glob.charAt(state.globIndex - 3) == '/') &&
+                            if ((Math.max(0, state.globIndex - globStart) < 3 ||
+                                 glob.charAt(state.globIndex - 3) == '/') &&
                                 (!isEndInvalid || glob.charAt(state.globIndex) == '/')) {
                                 if (isEndInvalid) {
                                     state.globIndex++;
@@ -266,7 +269,8 @@ final class Glob {
                         }
                         cc = unescaped(glob.charAt(state.globIndex));
                     }
-                    boolean isMatch = cc == '/' ? path.charAt(state.pathIndex) == '/' : path.charAt(state.pathIndex) == cc;
+                    char pc = path.charAt(state.pathIndex);
+                    boolean isMatch = cc == '/' ? pc == '/' : pc == cc;
                     if (isMatch) {
                         state.globIndex++;
                         state.pathIndex++;

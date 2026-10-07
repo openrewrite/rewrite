@@ -114,8 +114,8 @@ final class Package {
         return dependenciesOff + dependenciesLen;
     }
 
-    private static final String[] GROUP_PROPS = {"workspaces", "dependencies", "devDependencies", "optionalDependencies",
-            "peerDependencies"};
+    private static final String[] GROUP_PROPS = {"workspaces", "dependencies", "devDependencies",
+            "optionalDependencies", "peerDependencies"};
     private static final int[] GROUP_BEHAVIORS = {Behavior.WORKSPACE, Behavior.PROD, Behavior.DEV, Behavior.OPTIONAL,
             Behavior.PEER};
 
@@ -366,12 +366,13 @@ final class Package {
                 if (isPeer) {
                     behavior = behavior.set(Behavior.OPTIONAL, i < packageVersion.nonOptionalPeerDependenciesStart);
                 }
-                if (packageVersion.allDependenciesBundled() ||
-                    packageVersion.bundledDependencies != null && packageVersion.bundledDependencies.contains(keyHash)) {
+                List<Long> bundled = packageVersion.bundledDependencies;
+                if (packageVersion.allDependenciesBundled() || bundled != null && bundled.contains(keyHash)) {
                     behavior = behavior.add(Behavior.BUNDLED);
                 }
                 DependencyVersion parsed = DependencyVersion.parse(key, keyHash, map.get(2 * i + 1));
-                Dependency dependency = new Dependency(keyHash, key, parsed == null ? DependencyVersion.ZEROED : parsed, behavior);
+                Dependency dependency = new Dependency(keyHash, key, parsed == null ? DependencyVersion.ZEROED : parsed,
+                        behavior);
                 if (duplicateAt != null) {
                     dependencies.remove((int) duplicateAt);
                     dependencies.add(dependency);
@@ -448,15 +449,16 @@ final class Package {
         return Bin.NONE;
     }
 
-    private static @Nullable Dependency parseDependency(Lockfile lockfile, BunOptions options, Log log, String sourceDir,
-                                                        Behavior groupBehavior, Features features,
+    private static @Nullable Dependency parseDependency(Lockfile lockfile, BunOptions options, Log log,
+                                                        String sourceDir, Behavior groupBehavior, Features features,
                                                         List<Dependency> packageDependencies,
                                                         Map<Long, Boolean> duplicateCheckerMap,
                                                         DependencyVersion.@Nullable Tag tag,
                                                         @Nullable SemverVersion workspaceVer, String externalAlias,
                                                         String version) {
         long aliasHash = Wyhash11.stringHash(externalAlias);
-        DependencyVersion dependencyVersion = DependencyVersion.parseWithOptionalTag(externalAlias, aliasHash, version, tag);
+        DependencyVersion dependencyVersion = DependencyVersion.parseWithOptionalTag(externalAlias, aliasHash, version,
+                tag);
         if (dependencyVersion == null) {
             dependencyVersion = DependencyVersion.ZEROED;
         }
@@ -471,7 +473,8 @@ final class Package {
                 if (version.startsWith("workspace:")) {
                     String input = version.substring("workspace:".length());
                     String trimmed = Strings.trim(input, Strings.WHITESPACE_CHARS);
-                    if (trimmed.length() != 1 || trimmed.charAt(0) != '*' && trimmed.charAt(0) != '^' && trimmed.charAt(0) != '~') {
+                    if (trimmed.length() != 1 ||
+                        trimmed.charAt(0) != '*' && trimmed.charAt(0) != '^' && trimmed.charAt(0) != '~') {
                         int at = Math.max(input.lastIndexOf('@'), 0);
                         if (at > 0) {
                             workspaceRange = SemverQuery.parse(input.substring(at + 1));
@@ -515,7 +518,8 @@ final class Package {
                         for (int i = 0; i < packageDependencies.size(); i++) {
                             Dependency dep = packageDependencies.get(i);
                             if (dep.nameHash == nameHash && dep.behavior.isWorkspace()) {
-                                packageDependencies.set(i, new Dependency(aliasHash, externalAlias, dependencyVersion, groupBehavior));
+                                packageDependencies.set(i,
+                                        new Dependency(aliasHash, externalAlias, dependencyVersion, groupBehavior));
                                 return null;
                             }
                         }
@@ -557,7 +561,8 @@ final class Package {
                                 matches = Wyhash11.stringHash(packageDep.realname()) == nameHash &&
                                           packageDep.version.npm().version.satisfies(workspaceVersion);
                             } else if (packageDep.version.tag == DependencyVersion.Tag.WORKSPACE) {
-                                matches = foundMatchingWorkspace && Wyhash11.stringHash(packageDep.realname()) == nameHash;
+                                matches = foundMatchingWorkspace &&
+                                          Wyhash11.stringHash(packageDep.realname()) == nameHash;
                             } else {
                                 matches = false;
                             }

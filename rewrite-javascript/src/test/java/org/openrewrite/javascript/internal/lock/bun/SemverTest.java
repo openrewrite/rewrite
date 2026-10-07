@@ -31,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and {@link SemverRange}, through a port of src/semver/SemverObject.zig ({@code Bun.semver.satisfies} and
  * {@code Bun.semver.order}). The rows are every call the test makes, with Bun 1.3.10's answer, plus a sample of
  * the ranges and versions of the Bun scenario corpus against Bun's answers ({@code semver-cases.tsv}, recorded by
- * {@code .lockwork/verify/bun-semver/record.sh}). {@code BUN_SEMVER_CASES} names a further file of rows to check.
+ * {@code record-bun-semver.sh}). {@code BUN_SEMVER_CASES} names a further file of rows to check.
  * The test's "expected errors" case (argument count and symbol coercion of the JavaScript API) has no Java analog.
  */
 class SemverTest {

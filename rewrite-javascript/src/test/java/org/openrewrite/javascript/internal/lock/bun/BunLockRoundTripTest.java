@@ -61,7 +61,9 @@ class BunLockRoundTripTest {
         if (loadError != null) {
             TextLockfileReader.ParseError error = install.getLoadResult().getError();
             assertThat(error).as("bun ignores the lock: " + loadError).isNotNull();
-            assertThat(error.error + ": " + error.getMessage()).isEqualTo(loadError);
+            // bun prints a multi-line log entry under one "error:"; the recording keeps its first line
+            String firstLine = error.getMessage().split("\n", 2)[0];
+            assertThat(error.error + ": " + firstLine).isEqualTo(loadError);
             return;
         }
         assertThat(install.getLoadResult().getError()).isNull();

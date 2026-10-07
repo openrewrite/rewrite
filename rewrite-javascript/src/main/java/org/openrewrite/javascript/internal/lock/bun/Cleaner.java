@@ -45,8 +45,6 @@ final class Cleaner {
     static Lockfile clean(Lockfile old) {
         Cleaner cloner = new Cleaner(old);
         Lockfile lockfile = cloner.lockfile;
-        lockfile.textLockfileVersion = old.textLockfileVersion;
-        lockfile.savedConfigVersion = old.savedConfigVersion;
         lockfile.overrides = old.overrides.cloneMap();
         lockfile.catalogs = old.catalogs.cloneMap();
 

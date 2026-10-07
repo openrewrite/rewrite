@@ -108,7 +108,8 @@ final class Lockfile {
         if (entry == null) {
             return null;
         }
-        SemverQuery.Group npmVersion = version != null && version.tag == DependencyVersion.Tag.NPM ? version.npm().version : null;
+        SemverQuery.Group npmVersion = version != null && version.tag == DependencyVersion.Tag.NPM ?
+                version.npm().version : null;
         for (int id : entry) {
             Resolution existing = packages.get(id).resolution;
             if (existing.eql(resolution)) {

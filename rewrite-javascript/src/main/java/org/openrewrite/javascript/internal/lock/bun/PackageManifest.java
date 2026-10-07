@@ -203,10 +203,12 @@ final class PackageManifest {
      */
     FindVersionResult findBestVersionWithFilter(SemverQuery.Group group, @Nullable Double minimumReleaseAgeMs,
                                                 @Nullable List<String> exclusions, double nowMs) {
-        Double minAgeMs = minimumReleaseAgeMs != null && !shouldExcludeFromAgeFilter(exclusions) ? minimumReleaseAgeMs : null;
+        Double minAgeMs = minimumReleaseAgeMs != null && !shouldExcludeFromAgeFilter(exclusions) ?
+                minimumReleaseAgeMs : null;
         if (minAgeMs == null) {
             FindResult result = findBestVersion(group);
-            return result != null ? FindVersionResult.found(result) : FindVersionResult.error(FindVersionResult.Error.NOT_FOUND);
+            return result != null ? FindVersionResult.found(result) :
+                    FindVersionResult.error(FindVersionResult.Error.NOT_FOUND);
         }
         SemverRange.Comparator left = group.head.head.range.left;
         SemverVersion[] newestFiltered = {null};
@@ -235,7 +237,8 @@ final class PackageManifest {
                 }
             }
         }
-        FindVersionResult result = searchVersionList(releaseVersions, releasePackages, group, minAgeMs, newestFiltered, nowMs);
+        FindVersionResult result = searchVersionList(releaseVersions, releasePackages, group, minAgeMs, newestFiltered,
+                nowMs);
         if (result != null) {
             return result;
         }
@@ -251,8 +254,9 @@ final class PackageManifest {
         return FindVersionResult.error(FindVersionResult.Error.NOT_FOUND);
     }
 
-    private static @Nullable FindVersionResult searchVersionList(List<SemverVersion> versions, List<PackageVersion> packages,
-                                                                 SemverQuery.Group group, double minimumReleaseAgeMs,
+    private static @Nullable FindVersionResult searchVersionList(List<SemverVersion> versions,
+                                                                 List<PackageVersion> packages, SemverQuery.Group group,
+                                                                 double minimumReleaseAgeMs,
                                                                  SemverVersion[] newestFiltered, double nowMs) {
         PackageVersion prevPackageBlockedFromAge = null;
         FindResult bestVersion = null;
@@ -276,7 +280,8 @@ final class PackageManifest {
                     }
                     break;
                 }
-                boolean isStable = prevPackageBlockedFromAge.publishTimestampMs - pkg.publishTimestampMs >= stabilityWindowMs;
+                boolean isStable = prevPackageBlockedFromAge.publishTimestampMs - pkg.publishTimestampMs >=
+                                   stabilityWindowMs;
                 if (isStable) {
                     bestVersion = new FindResult(version, pkg);
                     break;
@@ -302,7 +307,8 @@ final class PackageManifest {
         if (distResult == null) {
             return FindVersionResult.error(FindVersionResult.Error.NOT_FOUND);
         }
-        Double minAgeMs = minimumReleaseAgeMs != null && !shouldExcludeFromAgeFilter(exclusions) ? minimumReleaseAgeMs : null;
+        Double minAgeMs = minimumReleaseAgeMs != null && !shouldExcludeFromAgeFilter(exclusions) ?
+                minimumReleaseAgeMs : null;
         if (minAgeMs == null) {
             return FindVersionResult.found(distResult);
         }
@@ -340,10 +346,11 @@ final class PackageManifest {
             }
             if (prevPackageBlockedFromAge != null) {
                 if (pkg.publishTimestampMs < nowMs - (minAgeMs + SEVEN_DAYS_MS)) {
-                    return FindVersionResult.foundWithFilter(bestVersion != null ? bestVersion : new FindResult(version, pkg),
-                            distResult.version);
+                    FindResult found = bestVersion != null ? bestVersion : new FindResult(version, pkg);
+                    return FindVersionResult.foundWithFilter(found, distResult.version);
                 }
-                boolean isStable = prevPackageBlockedFromAge.publishTimestampMs - pkg.publishTimestampMs >= stabilityWindowMs;
+                boolean isStable = prevPackageBlockedFromAge.publishTimestampMs - pkg.publishTimestampMs >=
+                                   stabilityWindowMs;
                 if (isStable) {
                     return FindVersionResult.foundWithFilter(new FindResult(version, pkg), distResult.version);
                 }
@@ -366,7 +373,8 @@ final class PackageManifest {
      * {@code parse}: an abbreviated packument (or a full one, for the minimum release age), named after the
      * dependency it was fetched for; null when it does not parse or reports an error.
      */
-    static @Nullable PackageManifest parse(Log log, String jsonBuffer, String expectedName, boolean isExtendedManifest) {
+    static @Nullable PackageManifest parse(Log log, String jsonBuffer, String expectedName,
+                                           boolean isExtendedManifest) {
         Json.Expr json;
         try {
             json = Json.parse(jsonBuffer);

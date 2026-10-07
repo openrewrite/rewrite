@@ -222,7 +222,8 @@ final class Tree {
                     break;
                 }
                 case RESOLVE_LATER:
-                    builder.pendingOptionalPeers.computeIfAbsent(dependency.nameHash, k -> new LinkedHashSet<>()).add(depId);
+                    builder.pendingOptionalPeers.computeIfAbsent(dependency.nameHash, k -> new LinkedHashSet<>())
+                            .add(depId);
                     break;
                 default: {
                     builder.dependencyLists.get(hoisted.id).add(depId);
@@ -268,7 +269,8 @@ final class Tree {
             if (dependency.behavior.isPeer()) {
                 if (dependency.version.tag == DependencyVersion.Tag.NPM) {
                     Resolution resolution = builder.lockfile.packages.get(resId).resolution;
-                    if (resolution.tag == Resolution.Tag.NPM && dependency.version.npm().version.satisfies(resolution.version)) {
+                    if (resolution.tag == Resolution.Tag.NPM &&
+                        dependency.version.npm().version.satisfies(resolution.version)) {
                         return HoistResult.HOISTED;
                     }
                 }
@@ -279,13 +281,15 @@ final class Tree {
             if (asDefined && !dep.behavior.isPeer()) {
                 throw new DependencyLoop("Package \"" + builder.describe(packageId) + "\" has a dependency loop\n" +
                                          "  Resolution: \"" + builder.describe(resId) + "\"\n" +
-                                         "  Dependency: \"" + dependency.name + "@" + dependency.version.literal + "\"");
+                                         "  Dependency: \"" + dependency.name + "@" + dependency.version.literal +
+                                         "\"");
             }
             return HoistResult.DEPENDENCY_LOOP;
         }
 
         if (this.parent != INVALID_ID && this.id != hoistRootId) {
-            HoistResult id = builder.trees.get(this.parent).hoistDependency(false, hoistRootId, packageId, dependency, builder);
+            HoistResult id = builder.trees.get(this.parent)
+                    .hoistDependency(false, hoistRootId, packageId, dependency, builder);
             if (!asDefined || id.kind != HoistResult.Kind.DEPENDENCY_LOOP) {
                 return id;
             }

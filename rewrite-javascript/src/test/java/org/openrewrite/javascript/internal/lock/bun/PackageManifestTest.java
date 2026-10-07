@@ -35,6 +35,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class PackageManifestTest {
 
+    private static final String[] GROUPS = {"dependencies", "devDependencies", "optionalDependencies",
+            "peerDependencies"};
+
     static Stream<Arguments> picks() {
         List<Arguments> out = new ArrayList<>();
         for (BunScenarios.Scenario scenario : BunScenarios.discover()) {
@@ -50,7 +53,7 @@ class PackageManifestTest {
             }
             Json.Expr deps = manifest.get("dependencies");
             int groups = 0;
-            for (String group : new String[]{"dependencies", "devDependencies", "optionalDependencies", "peerDependencies"}) {
+            for (String group : GROUPS) {
                 Json.Expr g = manifest.get(group);
                 groups += g == null ? 0 : g.properties().size();
             }
@@ -59,7 +62,8 @@ class PackageManifestTest {
             }
             Json.Property dep = deps.properties().get(0);
             DependencyVersion version = DependencyVersion.parse(dep.key.asString(), null, dep.value.asString());
-            if (version == null || version.tag != DependencyVersion.Tag.NPM && version.tag != DependencyVersion.Tag.DIST_TAG) {
+            if (version == null ||
+                version.tag != DependencyVersion.Tag.NPM && version.tag != DependencyVersion.Tag.DIST_TAG) {
                 continue;
             }
             String realName = version.tag == DependencyVersion.Tag.NPM ? version.npm().name : version.distTag().name;
@@ -67,7 +71,8 @@ class PackageManifestTest {
             if (packument == null) {
                 continue;
             }
-            out.add(Arguments.of(scenario.getLabel(), scenario, dep.key.asString(), version, realName, packument, fresh));
+            out.add(Arguments.of(scenario.getLabel(), scenario, dep.key.asString(), version, realName, packument,
+                    fresh));
         }
         return out.stream();
     }
@@ -124,7 +129,7 @@ class PackageManifestTest {
     private static List<String> describe(Lockfile lockfile, Package pkg) {
         List<String> out = new ArrayList<>();
         for (Dependency dep : lockfile.dependenciesOf(pkg)) {
-            out.add(dep.name + "@" + dep.version.literal + " " + (dep.behavior.bits & ~Behavior.BUNDLED));
+            out.add(dep.name + "@" + dep.version.literal + " " + dep.behavior.bits);
         }
         out.sort(String::compareTo);
         return out;
