@@ -220,7 +220,8 @@ class NativeLockEngineTest {
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("packages/a/package.json"))
                 .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
-                .manifest(Paths.get("packages/b/package.json"), resource(scenario + "tree-before/packages/b/package.json"))
+                .manifest(Paths.get("packages/b/package.json"),
+                        resource(scenario + "tree-before/packages/b/package.json"))
                 .build();
         routes.put("https://registry.yarnpkg.com/is-number", resource(scenario + "http/is-number"));
 

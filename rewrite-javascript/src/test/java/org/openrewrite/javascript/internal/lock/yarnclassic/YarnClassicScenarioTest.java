@@ -199,7 +199,8 @@ class YarnClassicScenarioTest {
                 // a package the registry does not have is the one route that is not recorded
                 ok = (detail.startsWith(YarnClassicLockRegenerator.YARN_REJECTS) ||
                       detail.startsWith(YarnClassicLockRegenerator.YARN_FAILS)) && saysWhatYarnSaid(detail, rest) &&
-                     (http.missing.isEmpty() || rest.startsWith("Couldn't find package"));
+                     (http.missing.isEmpty() || rest.startsWith("Couldn't find package") ||
+                      rest.endsWith(": Not found"));
                 break;
             case "second-install-rejects":
             case "unstable":

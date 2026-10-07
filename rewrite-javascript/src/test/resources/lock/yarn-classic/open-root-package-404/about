@@ -1,0 +1,1 @@
+A root dependency on a name the registry does not have: the registry answers 404 to the root request, which has no parent request to name.
