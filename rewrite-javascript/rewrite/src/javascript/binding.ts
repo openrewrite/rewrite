@@ -230,7 +230,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
  * never a type-only import for a value, which erases and would leave the reference unbound.
  */
 function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean, typeOnly: boolean): boolean {
-    return binding.typeOnly === typeOnly &&
+    return (typeOnly || !binding.typeOnly) &&
         (binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default"));
 }
 

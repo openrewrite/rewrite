@@ -98,7 +98,7 @@ export function bindImport(
             return v.boundName;
         }
         if (!(v instanceof AddImport) || v.module !== module ||
-            v.sideEffectOnly !== sideEffectOnly || v.typeOnly !== typeOnly) {
+            v.sideEffectOnly !== sideEffectOnly || !answersTypeOnly(v.typeOnly, typeOnly)) {
             continue;
         }
         // How a specifier prints, or what name would be nice, does not say which binding is wanted.
@@ -145,7 +145,11 @@ export function bindImport(
     const scope = scopeOf(cursor);
     for (const binding of moduleScopeBindings(cu)) {
         if (binding.module === module && binding.member === memberName(options.member) &&
-            binding.typeOnly === typeOnly && scope.declaringScope(binding.name) === cu) {
+            scope.declaringScope(binding.name) === cu) {
+            if (!answersTypeOnly(binding.typeOnly ?? false, typeOnly)) {
+                // The queued request finds this binding and drops its `type`, so the name stays
+                visitor.afterVisit.push(new AddImport(options, binding.name));
+            }
             return binding.name;
         }
     }
@@ -347,6 +351,56 @@ function requireBindings(pattern: J | undefined, module: string): ModuleScopeBin
         : {name: bound.name, module, member: bound.member, typeOnly: false});
 }
 
+/** Whether a binding answers a request, given which of the two is type-only. A value import binds the type too. */
+function answersTypeOnly(bindingTypeOnly: boolean, requestTypeOnly: boolean): boolean {
+    return requestTypeOnly || !bindingTypeOnly;
+}
+
+/**
+ * `jsImport` binding `member` as a value. A `type` on the member's specifier goes, and one on the
+ * clause moves onto the clause's other specifiers.
+ */
+function asValueImport(jsImport: JS.Import, member: string | undefined): JS.Import {
+    const clause = jsImport.importClause!;
+    const named = clause.namedBindings?.kind === JS.Kind.NamedImports ? clause.namedBindings as JS.NamedImports : undefined;
+    const imports = (specifier: J): boolean =>
+        specifier.kind === JS.Kind.ImportSpecifier && specifierBinding(specifier as JS.ImportSpecifier)?.member === member;
+
+    if (!clause.typeOnly) {
+        return !named ? jsImport : produce(jsImport, draft => {
+            for (const elem of (draft.importClause!.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+                const specifier = elem.element as Draft<JS.ImportSpecifier>;
+                if (member !== undefined && imports(elem.element as J) && specifier.importType.element) {
+                    specifier.specifier.prefix = specifier.importType.before;
+                    specifier.importType = {...specifier.importType, before: emptySpace, element: false};
+                }
+            }
+        });
+    }
+    return produce(jsImport, draft => {
+        const draftClause = draft.importClause!;
+        draftClause.typeOnly = false;
+        // The space after `type` separates nothing once it is gone
+        if (draftClause.name) {
+            draftClause.name.element.prefix = emptySpace;
+        } else if (draftClause.namedBindings) {
+            draftClause.namedBindings.prefix = emptySpace;
+            if (named) {
+                (draftClause.namedBindings as Draft<JS.NamedImports>).elements.before = emptySpace;
+            }
+        }
+        if (named) {
+            for (const elem of (draftClause.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+                const specifier = elem.element as Draft<JS.ImportSpecifier>;
+                if (!imports(elem.element as J) && specifier.kind === JS.Kind.ImportSpecifier) {
+                    specifier.importType = {...specifier.importType, before: emptySpace, element: true};
+                    specifier.specifier.prefix = singleSpace;
+                }
+            }
+        }
+    });
+}
+
 /** The member a specifier imports and the name it binds it under, which are the same absent an alias. */
 function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member: string } | undefined {
     if (specifier.specifier?.kind === J.Kind.Identifier) {
@@ -393,7 +447,8 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
                 ? specifierBinding(elem.element as JS.ImportSpecifier)
                 : undefined;
             if (bound) {
-                bindings.push({...bound, module, typeOnly});
+                const specifier = elem.element as JS.ImportSpecifier;
+                bindings.push({...bound, module, typeOnly: typeOnly || specifier.importType.element});
             }
         }
     }
@@ -877,6 +932,21 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             return compilationUnit;
         }
 
+        // A type-only binding of the member would leave a value use unbound, and a second binding
+        // of the same name would not compile, so the binding the file has loses its `type`
+        if (!this.typeOnly && !this.sideEffectOnly) {
+            const statements = compilationUnit.statements.map(stmt => {
+                const element = stmt.element;
+                return element?.kind === JS.Kind.Import &&
+                    importBindings(element as JS.Import).some(b => b.typeOnly && this.bindsSameName(b))
+                    ? {...stmt, element: asValueImport(element as JS.Import, memberName(this.member))}
+                    : stmt;
+            });
+            if (statements.some((stmt, i) => stmt !== compilationUnit.statements[i])) {
+                return {...compilationUnit, statements} as JS.CompilationUnit;
+            }
+        }
+
         // If onlyIfReferenced is true, check if the identifier is actually used
         // Skip this check for side-effect imports
         if (!this.sideEffectOnly && this.onlyIfReferenced) {
@@ -1195,9 +1265,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
     /** Whether a binding the file already has serves this request. */
     private answeredBy(binding: ModuleScopeBinding): boolean {
+        return this.bindsSameName(binding) && answersTypeOnly(binding.typeOnly ?? false, this.typeOnly);
+    }
+
+    /** Whether `binding` binds this request's member under its name, whether or not it is type-only. */
+    private bindsSameName(binding: ModuleScopeBinding): boolean {
         return binding.module === this.module &&
             binding.member === memberName(this.member) &&
-            binding.typeOnly === this.typeOnly &&
             (this.anyNameAnswers || binding.name === this.bindingName);
     }
 
