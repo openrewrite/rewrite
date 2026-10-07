@@ -13,17 +13,17 @@ from rewrite.utils import replace_if_changed
 
 @dataclass(frozen=True)
 class KeywordArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'KeywordArguments': ...
+    def with_id(self, id_: int | UUID) -> 'KeywordArguments': ...
 
 @dataclass(frozen=True)
 class KeywordOnlyArguments(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'KeywordOnlyArguments': ...
+    def with_id(self, id_: int | UUID) -> 'KeywordOnlyArguments': ...
 
 @dataclass(frozen=True)
 class Quoted(Marker):
@@ -36,47 +36,47 @@ class Quoted(Marker):
         @property
         def quote(self) -> str: ...
 
-    _id: UUID
+    _id: int | UUID
     _style: Style
 
 
     @property
     def style(self) -> Style: ...
 
-    def with_id(self, id_: UUID) -> Quoted: ...
+    def with_id(self, id_: int | UUID) -> Quoted: ...
     def with_style(self, style: Style) -> Quoted: ...
 
 @dataclass(frozen=True)
 class SuppressNewline(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'SuppressNewline': ...
+    def with_id(self, id_: int | UUID) -> 'SuppressNewline': ...
 
 @dataclass(frozen=True)
 class LegacyNotEqual(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'LegacyNotEqual': ...
+    def with_id(self, id_: int | UUID) -> 'LegacyNotEqual': ...
 
 @dataclass(frozen=True)
 class RaiseTuple(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'RaiseTuple': ...
+    def with_id(self, id_: int | UUID) -> 'RaiseTuple': ...
 
 @dataclass(frozen=True)
 class TupleExceptClause(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'TupleExceptClause': ...
+    def with_id(self, id_: int | UUID) -> 'TupleExceptClause': ...
 
 @dataclass(frozen=True)
 class PrintSyntax(Marker):
-    _id: UUID
+    _id: int | UUID
     _has_destination: bool
     _trailing_comma: bool
 
@@ -86,16 +86,16 @@ class PrintSyntax(Marker):
     @property
     def trailing_comma(self) -> bool: ...
 
-    def with_id(self, id_: UUID) -> 'PrintSyntax': ...
+    def with_id(self, id_: int | UUID) -> 'PrintSyntax': ...
     def with_has_destination(self, has_destination: bool) -> 'PrintSyntax': ...
     def with_trailing_comma(self, trailing_comma: bool) -> 'PrintSyntax': ...
 
 @dataclass(frozen=True)
 class ExecSyntax(Marker):
-    _id: UUID
+    _id: int | UUID
 
 
-    def with_id(self, id_: UUID) -> 'ExecSyntax': ...
+    def with_id(self, id_: int | UUID) -> 'ExecSyntax': ...
 
 @dataclass(frozen=True)
 class PythonResolutionResult(Marker):
@@ -172,7 +172,7 @@ class PythonResolutionResult(Marker):
         def with_marker(self, marker: Optional[str]) -> PythonResolutionResult.Dependency: ...
         def with_resolved(self, resolved: Optional[PythonResolutionResult.ResolvedDependency]) -> PythonResolutionResult.Dependency: ...
 
-    _id: UUID
+    _id: int | UUID
     _name: Optional[str]
     _version: Optional[str]
     _description: Optional[str]
@@ -224,7 +224,7 @@ class PythonResolutionResult(Marker):
     @property
     def source_indexes(self) -> Optional[List[SourceIndex]]: ...
 
-    def with_id(self, id_: UUID) -> PythonResolutionResult: ...
+    def with_id(self, id_: int | UUID) -> PythonResolutionResult: ...
     def with_name(self, name: Optional[str]) -> PythonResolutionResult: ...
     def with_version(self, version: Optional[str]) -> PythonResolutionResult: ...
     def with_description(self, description: Optional[str]) -> PythonResolutionResult: ...

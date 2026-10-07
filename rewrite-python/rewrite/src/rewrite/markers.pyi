@@ -42,13 +42,13 @@ class Markers:
     EMPTY: ClassVar[Markers]
     _LAST_EMPTY: ClassVar[Optional[Markers]]
 
-    _id: UUID
+    _id: int | UUID
     _markers: List[Marker]
 
     def replace(self, **kwargs: Any) -> 'Markers': ...
 
     @classmethod
-    def build(cls, id: UUID, markers: List[Marker]) -> Markers: ...
+    def build(cls, id: int | UUID, markers: List[Marker]) -> Markers: ...
 
     @property
     def id(self) -> UUID: ...
@@ -61,7 +61,7 @@ class Markers:
 
 @dataclass(frozen=True)
 class SearchResult(Marker):
-    _id: UUID
+    _id: int | UUID
     _description: Optional[str]
 
 
@@ -75,7 +75,7 @@ class SearchResult(Marker):
 
 @dataclass(frozen=True)
 class MarkupWarn(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
@@ -87,7 +87,7 @@ class MarkupWarn(Markup):
 
 @dataclass(frozen=True)
 class MarkupError(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
@@ -99,7 +99,7 @@ class MarkupError(Markup):
 
 @dataclass(frozen=True)
 class MarkupInfo(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
@@ -111,7 +111,7 @@ class MarkupInfo(Markup):
 
 @dataclass(frozen=True)
 class MarkupDebug(Markup):
-    _id: UUID
+    _id: int | UUID
     _message: str
     _detail: Optional[str] = ...
 
@@ -143,7 +143,7 @@ class RecipeThatMadeChanges:
 
 @dataclass(frozen=True)
 class RecipesThatMadeChanges(Marker):
-    _id: UUID
+    _id: int | UUID
     _recipes: Optional[List[List[RecipeThatMadeChanges]]]
 
 
@@ -152,7 +152,7 @@ class RecipesThatMadeChanges(Marker):
 
 @dataclass(frozen=True)
 class UnknownJavaMarker(Marker):
-    _id: UUID
+    _id: int | UUID
     _data: Dict[str, Any]
 
 
@@ -161,7 +161,7 @@ class UnknownJavaMarker(Marker):
 
 @dataclass(frozen=True)
 class ParseExceptionResult(Marker):
-    _id: UUID
+    _id: int | UUID
     _parser_type: str
     _exception_type: str
     _message: str
