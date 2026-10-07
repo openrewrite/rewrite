@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -81,7 +82,7 @@ final class Micromatch {
         }
     }
 
-    private static final String MATCH_NOTHING = "$^";
+    private static final Pattern MATCH_NOTHING = Objects.requireNonNull(JsRegExp.compile("$^"));
 
     private final ParseGlob parseGlob = new ParseGlob();
     private final Braces braces = new Braces();
@@ -138,15 +139,76 @@ final class Micromatch {
         }
         String source = makeRe(glob);
         Pattern re = JsRegExp.compile(source);
-        Pattern fallback = JsRegExp.compile(MATCH_NOTHING);
-        boolean randomId = braces.holdsPreservedId(source);
+        List<String> ids = braces.preservedIds(source);
         return fp -> {
-            if (randomId && fp.contains("__ID")) {
+            boolean matches = find(re, fp);
+            if (!ids.isEmpty() && !sameForEveryDraw(source, ids, fp, matches)) {
                 throw new CannotKnow("whether " + fp + " matches " + glob + ", whose regex holds an id " +
                                      "micromatch 2.3.11 draws at random");
             }
-            return (re == null ? fallback : re).matcher(fp).find();
+            return matches;
         };
+    }
+
+    private static boolean find(@Nullable Pattern re, String fp) {
+        return (re == null ? MATCH_NOTHING : re).matcher(fp).find();
+    }
+
+    /**
+     * Whether a path matches the same for every five digits preserve can draw for each id in the regex. A digit
+     * there is a literal or a class member, so it decides a match only by which of the path's digits it equals:
+     * drawing from those digits and one the path lacks covers every case.
+     */
+    private static boolean sameForEveryDraw(String source, List<String> ids, String fp, boolean matches) {
+        StringBuilder digits = new StringBuilder();
+        String lacked = null;
+        for (char c = '0'; c <= '9'; c++) {
+            if (fp.indexOf(c) >= 0) {
+                digits.append(c);
+            } else if (lacked == null) {
+                lacked = String.valueOf(c);
+            }
+        }
+        if (digits.length() == 0) {
+            return true;
+        }
+        if (lacked != null) {
+            digits.append(lacked);
+        }
+        int[] draw = new int[5 * ids.size()];
+        if (Math.pow(digits.length(), draw.length) > MAX_DRAWS) {
+            return false;
+        }
+        Pattern id = Pattern.compile("ID(" + String.join("|", ids) + ")_");
+        do {
+            Matcher m = id.matcher(source);
+            StringBuffer drawn = new StringBuffer();
+            while (m.find()) {
+                int at = 5 * ids.indexOf(m.group(1));
+                StringBuilder replacement = new StringBuilder("ID");
+                for (int i = at; i < at + 5; i++) {
+                    replacement.append(digits.charAt(draw[i]));
+                }
+                m.appendReplacement(drawn, replacement.append('_').toString());
+            }
+            m.appendTail(drawn);
+            if (find(JsRegExp.compile(drawn.toString()), fp) != matches) {
+                return false;
+            }
+        } while (next(draw, digits.length()));
+        return true;
+    }
+
+    private static final int MAX_DRAWS = 100_000;
+
+    private static boolean next(int[] draw, int base) {
+        for (int i = draw.length - 1; i >= 0; i--) {
+            if (++draw[i] < base) {
+                return true;
+            }
+            draw[i] = 0;
+        }
+        return false;
     }
 
     /**

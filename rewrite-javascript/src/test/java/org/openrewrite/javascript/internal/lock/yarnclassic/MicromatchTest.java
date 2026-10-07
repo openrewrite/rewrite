@@ -29,6 +29,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -71,6 +72,18 @@ class MicromatchTest {
     void cannotKnowWhetherAPathMatchesTheRandomIdBracesLeavesInTheRegex() {
         assertThat(Micromatch.micromatch(singletonList("1b"), "1${a}{b,c}")).isEmpty();
         assertThatThrownBy(() -> Micromatch.micromatch(singletonList("1__ID00000__b"), "1${a}{b,c}"))
+                .isInstanceOf(CannotKnow.class);
+    }
+
+    /**
+     * Inside a bracket expression the id's digits are members of the class, so whether a digit matches follows the
+     * draw ({@code mm-random.js}: 400 runs of the bundle answer {@code 1} and {@code 2} each way).
+     */
+    @Test
+    void cannotKnowWhetherADigitMatchesAClassHoldingTheRandomId() {
+        String pattern = "![:alpha:]]|${x}/mid{a,b}{c,d}{a..c..2}";
+        assertThat(Micromatch.micromatch(Arrays.asList("a", "_", "x", "mid"), pattern)).containsExactly("mid");
+        assertThatThrownBy(() -> Micromatch.micromatch(singletonList("1"), pattern))
                 .isInstanceOf(CannotKnow.class);
     }
 

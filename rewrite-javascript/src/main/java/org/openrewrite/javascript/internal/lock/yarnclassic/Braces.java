@@ -174,15 +174,16 @@ final class Braces {
     }
 
     /**
-     * Whether a regex source still holds one of preserve's ids, which yarn draws from {@code Math.random()}.
+     * The ids of preserve's that a regex source still holds, which yarn draws from {@code Math.random()}.
      */
-    boolean holdsPreservedId(String source) {
+    List<String> preservedIds(String source) {
+        List<String> ids = new ArrayList<>();
         for (String id : preserved.keySet()) {
             if (source.contains("__ID" + id + "__")) {
-                return true;
+                ids.add(id);
             }
         }
-        return false;
+        return ids;
     }
 
     private String after(String str) {
