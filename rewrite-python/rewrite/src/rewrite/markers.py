@@ -94,6 +94,12 @@ class Markers:
         """
         return self.replace(markers=list_map(lambda m: remap_fn(m) if isinstance(m, cls) else m, self.markers))
 
+    def add(self, marker: Marker) -> Markers:
+        """Append ``marker``, or return this instance if an equal marker is already present."""
+        if marker in self.markers:
+            return self
+        return self.replace(markers=self.markers + [marker])
+
     EMPTY: ClassVar[Markers]
 
     def __eq__(self, other: object) -> bool:
@@ -134,6 +140,13 @@ class SearchResult(Marker):
     def description(self) -> Optional[str]:
         return self._description
 
+    # As in Java, equality ignores the id, so `Markers.add` keeps one SearchResult per description.
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, SearchResult) and self._description == other._description
+
+    def __hash__(self) -> int:
+        return hash(self._description)
+
     def print(self, cursor: 'Cursor', comment_wrapper: Callable[[str], str], verbose: bool) -> str:
         return comment_wrapper("" if self._description is None else f"({self._description})")
 
@@ -143,7 +156,8 @@ class SearchResult(Marker):
 
         Mirrors Java's ``org.openrewrite.marker.SearchResult.found(tree)``:
         returns a new tree (different identity from the input) carrying a
-        fresh :class:`SearchResult` marker. Returns ``None`` unchanged so
+        fresh :class:`SearchResult` marker, or ``tree`` itself when it already
+        carries one with this description. Returns ``None`` unchanged so
         callers can safely chain through nullable trees.
 
         Used by search recipes and search-as-precondition visitors to
@@ -152,11 +166,7 @@ class SearchResult(Marker):
         """
         if tree is None:
             return None
-        current = tree.markers
-        new_markers = Markers(
-            current.id, list(current.markers) + [SearchResult(random_id(), description)]
-        )
-        return tree.replace(_markers=new_markers)
+        return tree.replace(_markers=tree.markers.add(SearchResult(random_id(), description)))
 
 
 class Markup(Marker, ABC):
