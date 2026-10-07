@@ -775,6 +775,19 @@ describe('referencesOf', () => {
             ]);
     });
 
+    test('a class static block is a var scope, so its var shadows an outer one without hoisting out', async () => {
+        const source = `
+            function f() {
+                var v = 0;
+                class C { static { { var v = 1; } use(v); anchor(); } }
+                use(v);
+            }
+        `;
+        expect(await referencesAtAnchor(source, 'v')).toEqual(['NamedVariable:declares', 'MethodInvocation:reads']);
+        expect(await resolvedAt(source, 'v'))
+            .toEqual([undefined, undefined, J.Kind.Block, J.Kind.MethodDeclaration]);
+    });
+
     test('each reference comes with a cursor on the caller\'s chain, which resolves it back to the binding', async () => {
         const cursor = await cursorAtAnchor('const x = 1; function f() { x(); anchor(); } use(x);');
         const references = referencesOf(cursor, 'x');

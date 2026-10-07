@@ -585,8 +585,13 @@ function readBindings(node: Tree): Bound[] {
             const statements = (node as JS.CompilationUnit).statements;
             return [...declaredNames(statements), ...hoistedNames(statements)];
         }
-        case J.Kind.Block:
-            return blockScopedNames((node as J.Block).statements);
+        case J.Kind.Block: {
+            const block = node as J.Block;
+            // A class static block is a var scope, as a function body is.
+            return block.static.element
+                ? [...blockScopedNames(block.statements), ...hoistedNames(block.statements)]
+                : blockScopedNames(block.statements);
+        }
         case J.Kind.MethodDeclaration:
         case JS.Kind.ComputedPropertyMethodDeclaration: {
             const method = node as J.MethodDeclaration | JS.ComputedPropertyMethodDeclaration;
