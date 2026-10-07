@@ -1308,6 +1308,67 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addUnconditionallyLandsOnlyOnRootBuildGradle() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("org.apache.logging.log4j:log4j-core:2.22.1")),
+          mavenProject("root",
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "org.apache.logging.log4j:log4j-core:2.22.1"
+                }
+                """
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  repositories {
+                      mavenCentral()
+                  }
+                  """
+              )
+            )
+          )
+        );
+    }
+
+    @Test
     void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec

@@ -221,6 +221,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         if (!maybeGp.isPresent()) {
                             return s;
                         }
+                        if (onlyIfUsing == null && !":".equals(maybeGp.get().getPath())) {
+                            return s;
+                        }
                         if (onlyIfUsing != null) {
                             // When onlyIfUsing is set, skip projects that don't use the specified type
                             if (!maybeJp.isPresent() || !acc.usingType.getOrDefault(maybeJp.get(), false)) {

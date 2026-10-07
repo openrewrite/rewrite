@@ -20,6 +20,9 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.properties.Assertions.properties;
 import static org.openrewrite.test.SourceSpecs.dir;
 
@@ -141,6 +144,72 @@ class AddPropertyTest implements RewriteTest {
             properties(
               "project2.prop=true",
               spec -> spec.path("gradle.properties")
+            )
+          )
+        );
+    }
+
+    @Test
+    void addsOnlyToRootGradlePropertiesInMultiModule() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          mavenProject("root",
+            buildGradle("plugins { id 'java' }"),
+            settingsGradle("""
+              include "project1"
+              include "project2"
+              """),
+            properties(
+              //language=properties
+              "project.name=helloworld",
+              //language=properties
+              """
+                org.gradle.caching=true
+                project.name=helloworld
+                """,
+              spec -> spec.path("gradle.properties")
+            ),
+            mavenProject("project1",
+              buildGradle("plugins { id 'java' }"),
+              properties(
+                "project1.prop=true",
+                spec -> spec.path("gradle.properties")
+              )
+            ),
+            mavenProject("project2",
+              buildGradle("plugins { id 'java' }"),
+              properties(
+                "project2.prop=true",
+                spec -> spec.path("gradle.properties")
+              )
+            )
+          )
+        );
+    }
+
+    @Test
+    void generatesRootGradlePropertiesWhenMissingInMultiModule() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(withToolingApi()),
+          mavenProject("root",
+            buildGradle("plugins { id 'java' }"),
+            settingsGradle("""
+              include "project1"
+              """),
+            properties(
+              doesNotExist(),
+              //language=properties
+              """
+                org.gradle.caching=true
+                """,
+              spec -> spec.path("gradle.properties")
+            ),
+            mavenProject("project1",
+              buildGradle("plugins { id 'java' }"),
+              properties(
+                "project1.prop=true",
+                spec -> spec.path("gradle.properties")
+              )
             )
           )
         );
