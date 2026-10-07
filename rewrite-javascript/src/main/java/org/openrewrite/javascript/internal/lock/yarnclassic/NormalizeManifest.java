@@ -176,7 +176,7 @@ final class NormalizeManifest {
                 }
                 String unprefixed = value.substring(prefix.length());
                 if (unprefixed.startsWith("/")) {
-                    throw new YarnClassicLockRegenerator.CannotKnow("where the project sits on disk, which the " +
+                    throw new CannotKnow("where the project sits on disk, which the " +
                             dependencyType + " entry " + name + "@" + value + " is written relative to");
                 }
                 boolean hasPathPrefix = PATH_PREFIX.matcher(unprefixed).find();

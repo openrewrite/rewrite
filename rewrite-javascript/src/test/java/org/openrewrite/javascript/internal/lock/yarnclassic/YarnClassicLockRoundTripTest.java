@@ -139,16 +139,20 @@ class YarnClassicLockRoundTripTest {
         String write() {
             return YarnClassicLockRegenerator.writeFilePreservingEol(lock.getText(), LockfileStringifier.stringify(
                     lockfile.getLockfile(resolver.patterns), false, options.isEnableLockfileVersions(),
-                    lock.getScenario().nodeVersion()));
+                    lock.getScenario().nodeVersion()), lock.getScenario().host().getOs());
         }
 
         @Nullable
         String save() {
             YarnClassicOptions options = regenerator.init(warnings);
+            YarnClassicOptions.Flags flags = options.getFlags();
+            if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
+                return null;
+            }
             YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(lockfile, options,
                     new ResolutionMap(options), warnings);
             return YarnClassicLockRegenerator.saveLockfileAndIntegrity(resolver, request.getPatterns(),
-                    request.getWorkspaceLayout(), options, lock.getText(), lock.getScenario().nodeVersion());
+                    request.getWorkspaceLayout(), options, lockfile, lock.getText(), lock.getScenario().host());
         }
 
         /**

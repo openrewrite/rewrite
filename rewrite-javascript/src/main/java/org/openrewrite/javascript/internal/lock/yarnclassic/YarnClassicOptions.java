@@ -338,7 +338,11 @@ public final class YarnClassicOptions {
         if (REGISTRY_PREFIX.matcher(packageIdent).find()) {
             for (Object registry : getAvailableRegistries()) {
                 if (packageIdent.startsWith(Js.string(registry))) {
-                    return Js.string(registry);
+                    // find's first match, which an empty registry is as well, and only a truthy one is taken
+                    if (Js.truthy(registry)) {
+                        return Js.string(registry);
+                    }
+                    break;
                 }
             }
         }

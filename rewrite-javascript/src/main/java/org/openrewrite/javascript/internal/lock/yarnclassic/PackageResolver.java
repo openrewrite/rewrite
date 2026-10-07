@@ -17,9 +17,11 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,13 +31,17 @@ import java.util.Set;
 
 /**
  * Port of yarn src/package-resolver.js (yarn 1.22.22): the resolver's state, a map from every pattern of the run to
- * its manifest and from each package name to its patterns, and the lookups a request makes in it.
+ * its manifest and from each package name to its patterns, and the find loop over the root requests.
  */
 final class PackageResolver {
 
     final YarnClassicOptions config;
     final Lockfile lockfile;
     final ResolutionMap resolutionMap;
+    final EventLoop loop;
+    final NpmRegistry npmRegistry;
+    final ProjectFiles files;
+    final List<String> warnings;
 
     final Map<String, List<String>> patternsByPackage = new LinkedHashMap<>();
     final Set<String> fetchingPatterns = new LinkedHashSet<>();
@@ -47,6 +53,16 @@ final class PackageResolver {
     @Nullable
     WorkspaceLayout workspaceLayout;
 
+    int rootIndex;
+    int rootMark;
+    int nextCopyHash;
+
+    /**
+     * Patterns that joined an entry another pattern of the same version created first, where the other could have
+     * come first and the entries differ: the bytes follow network timing.
+     */
+    final List<String> races = new ArrayList<>();
+
     @Value
     static class DelayedResolve {
         PackageRequest req;
@@ -54,13 +70,19 @@ final class PackageResolver {
     }
 
     PackageResolver(YarnClassicOptions config, Lockfile lockfile) {
-        this(config, lockfile, new ResolutionMap(config));
+        this(config, lockfile, new ResolutionMap(config), (registry, name) -> null,
+                new ProjectFiles(Collections.emptyMap()), new ArrayList<>());
     }
 
-    PackageResolver(YarnClassicOptions config, Lockfile lockfile, ResolutionMap resolutionMap) {
+    PackageResolver(YarnClassicOptions config, Lockfile lockfile, ResolutionMap resolutionMap,
+                    PackumentSource registry, ProjectFiles files, List<String> warnings) {
         this.config = config;
         this.lockfile = lockfile;
         this.resolutionMap = resolutionMap;
+        this.loop = new EventLoop();
+        this.npmRegistry = new NpmRegistry(config, loop, registry);
+        this.files = files;
+        this.warnings = warnings;
     }
 
     boolean isNewPattern(String pattern) {
@@ -104,6 +126,46 @@ final class PackageResolver {
         return deduped;
     }
 
+    Set<Manifest> getLevelOrderManifests(List<String> seedPatterns) {
+        Set<Manifest> pkgs = new LinkedHashSet<>();
+        Set<Manifest> skip = new HashSet<>();
+        addLevel(seedPatterns, pkgs, skip);
+        return pkgs;
+    }
+
+    private void addLevel(List<String> seedPatterns, Set<Manifest> pkgs, Set<Manifest> skip) {
+        List<PackageReference> refs = new ArrayList<>();
+        for (String pattern : seedPatterns) {
+            Manifest pkg = getStrictResolvedPattern(pattern);
+            if (skip.contains(pkg)) {
+                continue;
+            }
+            PackageReference ref = pkg.reference;
+            if (ref == null) {
+                throw new JsError(JsError.INVARIANT_VIOLATION, "expected reference");
+            }
+            refs.add(ref);
+            skip.add(pkg);
+            pkgs.add(pkg);
+        }
+        for (PackageReference ref : refs) {
+            addLevel(ref.dependencies, pkgs, skip);
+        }
+    }
+
+    Set<String> getAllDependencyNamesByLevelOrder(List<String> seedPatterns) {
+        Set<String> names = new LinkedHashSet<>();
+        for (Manifest manifest : getLevelOrderManifests(seedPatterns)) {
+            names.add(Js.string(manifest.getName()));
+        }
+        return names;
+    }
+
+    List<Manifest> getAllInfoForPackageName(String name) {
+        List<String> byName = patternsByPackage.get(name);
+        return getAllInfoForPatterns(byName == null ? Collections.emptyList() : byName);
+    }
+
     List<Manifest> getAllInfoForPatterns(List<String> patterns) {
         List<Manifest> infos = new ArrayList<>();
         Set<Manifest> seen = new HashSet<>();
@@ -126,6 +188,46 @@ final class PackageResolver {
             }
         }
         return infos;
+    }
+
+    String collapseAllVersionsOfPackage(String name, String version) {
+        List<String> byName = patternsByPackage.get(name);
+        return collapsePackageVersions(name, version, dedupePatterns(byName == null ?
+                Collections.emptyList() : byName));
+    }
+
+    String collapsePackageVersions(String name, String version, List<String> patterns) {
+        PackageReference collapseToReference = null;
+        Manifest collapseToManifest = null;
+        String collapseToPattern = null;
+        for (String pattern : patterns) {
+            Manifest manifest = this.patterns.get(pattern);
+            if (version.equals(manifest.getVersion())) {
+                collapseToReference = manifest.reference;
+                collapseToManifest = manifest;
+                collapseToPattern = pattern;
+                break;
+            }
+        }
+        if (collapseToReference == null || collapseToManifest == null) {
+            throw new JsError(JsError.INVARIANT_VIOLATION, "Couldn't find package manifest for " + name + "@" +
+                                                           version);
+        }
+        for (String pattern : patterns) {
+            if (pattern.equals(collapseToPattern)) {
+                continue;
+            }
+            PackageReference ref = getStrictResolvedPattern(pattern).reference;
+            if (ref == null) {
+                throw new JsError(JsError.INVARIANT_VIOLATION, "expected package reference");
+            }
+            List<String> refPatterns = new ArrayList<>(ref.patterns);
+            ref.prune();
+            for (String refPattern : refPatterns) {
+                collapseToReference.addPattern(refPattern, collapseToManifest);
+            }
+        }
+        return collapseToPattern;
     }
 
     void addPattern(String pattern, Manifest info) {
@@ -189,7 +291,8 @@ final class PackageResolver {
     }
 
     /**
-     * The manifest of the highest version already resolved for the name that satisfies the range.
+     * The manifest of the highest version already resolved for the name that satisfies the range, as node-semver
+     * 5.5.0's {@code maxSatisfying} over the versions as the manifests hold them.
      */
     @Nullable
     Manifest getHighestRangeVersionMatch(String name, String range, @Nullable Manifest manifest) {
@@ -197,19 +300,34 @@ final class PackageResolver {
         if (patterns == null) {
             return null;
         }
-        List<String> versionNumbers = new ArrayList<>();
+        List<@Nullable Object> versionNumbers = new ArrayList<>();
         List<Manifest> resolvedPatterns = new ArrayList<>();
         for (String pattern : patterns) {
             Manifest info = getStrictResolvedPattern(pattern);
-            versionNumbers.add(Js.string(info.getVersion()));
+            versionNumbers.add(info.getVersion());
             resolvedPatterns.add(info);
         }
-        String maxValidRange = NodeSemver.maxSatisfying(versionNumbers, range, YarnClassicOptions.SEMVER);
+        Object maxValidRange = maxSatisfying(versionNumbers, range);
         if (maxValidRange == null) {
             return manifest != null && ExoticResolvers.getExoticResolver(range) != null ?
                     exoticRangeMatch(resolvedPatterns, manifest) : null;
         }
         return resolvedPatterns.get(versionNumbers.indexOf(maxValidRange));
+    }
+
+    private static @Nullable Object maxSatisfying(List<@Nullable Object> versions, String range) {
+        try {
+            Object max = null;
+            for (Object v : versions) {
+                if (NodeSemver.satisfies(v, range, YarnClassicOptions.SEMVER) &&
+                    (max == null || NodeSemver.compare(max, v, YarnClassicOptions.SEMVER) < 0)) {
+                    max = v;
+                }
+            }
+            return max;
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+        }
     }
 
     @Nullable
@@ -240,7 +358,182 @@ final class PackageResolver {
                !NodeSemver.satisfies((String) version, range, YarnClassicOptions.SEMVER);
     }
 
+    Promise<Void> find(DependencyRequestPattern initialReq) {
+        return Promise.async(loop, () -> {
+            DependencyRequestPattern req = resolveToResolution(initialReq);
+            if (req == null) {
+                return Promise.resolved(loop, null);
+            }
+            PackageRequest request = new PackageRequest(req, this);
+            String fetchKey = req.getRegistry() + ":" + req.getPattern() + ":" + req.isOptional();
+            boolean initialFetch = !fetchingPatterns.contains(fetchKey);
+            boolean fresh = false;
+            if (initialFetch) {
+                fetchingPatterns.add(fetchKey);
+                Map<String, @Nullable Object> lockfileEntry = lockfile.getLocked(req.getPattern());
+                if (lockfileEntry != null) {
+                    NormalizedPattern normalized = NormalizedPattern.normalizePattern(req.getPattern());
+                    if (isLockfileEntryOutdated(lockfileEntry.get("version"), normalized.getRange(),
+                            normalized.isHasVersion())) {
+                        warnings.add(Lang.format("Lockfile has incorrect entry for $0. Ignoring it.",
+                                req.getPattern()));
+                        removePattern(req.getPattern());
+                        lockfile.removePattern(req.getPattern());
+                        fresh = true;
+                    }
+                } else {
+                    fresh = true;
+                }
+                request.init();
+            }
+            return request.find(fresh, frozen);
+        });
+    }
+
+    /**
+     * {@code init}: the root requests one after another, each with everything it requests, then the requests that
+     * matched a version already resolved, then the resolutions that waited for their target.
+     */
+    void init(List<DependencyRequestPattern> deps, boolean isFlat, boolean isFrozen,
+              @Nullable WorkspaceLayout workspaceLayout) {
+        this.flat = isFlat;
+        this.frozen = isFrozen;
+        this.workspaceLayout = workspaceLayout;
+        for (DependencyRequestPattern req : deps) {
+            rootMark = loop.mark();
+            Promise<Void> found = find(req);
+            loop.run();
+            rootIndex++;
+            if (found.getError() != null) {
+                throw found.getError();
+            }
+        }
+
+        resolvePackagesWithExistingVersions();
+
+        for (DependencyRequestPattern req : new ArrayList<>(resolutionMap.delayQueue)) {
+            resolveToResolution(req);
+        }
+
+        if (isFlat) {
+            for (DependencyRequestPattern dep : deps) {
+                optimizeResolutions(NormalizedPattern.normalizePattern(dep.getPattern()).getName());
+            }
+        }
+    }
+
+    void optimizeResolutions(String name) {
+        List<String> byName = patternsByPackage.get(name);
+        List<String> patterns = dedupePatterns(byName == null ? Collections.emptyList() : byName);
+        List<String> collapsablePatterns = new ArrayList<>();
+        for (String pattern : patterns) {
+            PackageRemote remote = this.patterns.get(pattern).remote;
+            if (lockfile.getLocked(pattern) == null && (remote == null || !"workspace".equals(remote.type))) {
+                collapsablePatterns.add(pattern);
+            }
+        }
+        if (collapsablePatterns.size() < 2) {
+            return;
+        }
+        List<Object> availableVersions = new ArrayList<>();
+        for (Manifest manifest : getAllInfoForPatterns(collapsablePatterns)) {
+            availableVersions.add(manifest.getVersion());
+        }
+        try {
+            availableVersions.sort((a, b) -> NodeSemver.compare(b, a, YarnClassicOptions.SEMVER));
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+        }
+        List<String> ranges = new ArrayList<>();
+        for (String pattern : collapsablePatterns) {
+            ranges.add(NormalizedPattern.normalizePattern(pattern).getRange());
+        }
+        for (Object version : availableVersions) {
+            boolean all = true;
+            for (String range : ranges) {
+                all &= NodeSemver.satisfies(version, range, YarnClassicOptions.SEMVER);
+            }
+            if (all) {
+                collapsePackageVersions(name, Js.string(version), collapsablePatterns);
+                return;
+            }
+        }
+    }
+
     void reportPackageWithExistingVersion(PackageRequest req, Manifest info) {
         delayedResolveQueue.add(new DelayedResolve(req, info));
+    }
+
+    void resolvePackagesWithExistingVersions() {
+        for (DelayedResolve delayed : delayedResolveQueue) {
+            delayed.getReq().resolveToExistingVersion(delayed.getInfo());
+        }
+    }
+
+    @Nullable
+    DependencyRequestPattern resolveToResolution(DependencyRequestPattern req) {
+        List<String> parentNames = req.getParentNames();
+        String pattern = req.getPattern();
+        if (parentNames == null || flat) {
+            return req;
+        }
+        String resolution = resolutionMap.find(pattern, parentNames);
+        if (Js.truthy(resolution)) {
+            Manifest resolutionManifest = getResolvedPattern(resolution);
+            if (resolutionManifest != null) {
+                PackageReference reference = resolutionManifest.reference;
+                if (reference == null) {
+                    throw new JsError(JsError.INVARIANT_VIOLATION, "resolutions should have a resolved reference");
+                }
+                reference.patterns.add(pattern);
+                addPattern(pattern, resolutionManifest);
+                Map<String, @Nullable Object> lockManifest = lockfile.getLocked(pattern);
+                if (ResolutionMap.shouldUpdateLockfile(lockManifest, reference)) {
+                    lockfile.removePattern(pattern);
+                }
+            } else {
+                resolutionMap.addToDelayQueue(req);
+            }
+            return null;
+        }
+        return req;
+    }
+
+    /**
+     * A request whose version a manifest already resolved holds joins that manifest's entry. When the entry differs
+     * from what the request found, and nothing the request waited on made it come second, yarn may have taken this
+     * request's instead.
+     */
+    void joined(PackageRequest request, Manifest info, Manifest resolved) {
+        PackageReference ref = resolved.reference;
+        if (ref == null || ref.requests.isEmpty()) {
+            return;
+        }
+        PackageRequest creator = ref.requests.get(0);
+        if (creator == request || creator.root != request.root || request.io.containsAll(creator.io) ||
+            fingerprint(info.remote).equals(fingerprint(resolved.remote))) {
+            return;
+        }
+        races.add(creator.pattern + " (" + describe(creator, resolved) + ") and " + request.pattern + " (" +
+                  describe(request, info) + ")");
+    }
+
+    private static String describe(PackageRequest request, Manifest manifest) {
+        String version = Js.templateString(manifest.getVersion());
+        return (manifest.locked != null ? "locked at " : "resolved anew to ") + version +
+               (request.parentRequest == null ? "" : ", under " + request.parentRequest.pattern);
+    }
+
+    private static String fingerprint(@Nullable PackageRemote remote) {
+        if (remote == null) {
+            return "";
+        }
+        String integrity;
+        try {
+            integrity = Js.truthy(remote.integrity) ? Lockfile.serializeIntegrity(remote.integrity) : "";
+        } catch (JsError e) {
+            integrity = Js.string(remote.integrity);
+        }
+        return Lockfile.keyForRemote(remote) + " " + integrity;
     }
 }

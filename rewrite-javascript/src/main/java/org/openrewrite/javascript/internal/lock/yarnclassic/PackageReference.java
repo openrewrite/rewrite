@@ -45,6 +45,7 @@ final class PackageReference {
     Boolean optional;
     double level = Double.POSITIVE_INFINITY;
     boolean fresh;
+    boolean ignore;
 
     PackageReference(PackageRequest request, Manifest info, PackageRemote remote) {
         this.resolver = request.resolver;
@@ -90,11 +91,10 @@ final class PackageReference {
 
         Map<String, @Nullable Object> shrunk = lockfile.getLocked(pattern);
         if (shrunk != null && Js.truthy(shrunk.get("permissions"))) {
+            // misc.js entries: for..in, which walks a string's or an array's indices too
             Object permissions = shrunk.get("permissions");
-            if (permissions instanceof Map) {
-                for (Map.Entry<?, ?> entry : ((Map<?, ?>) permissions).entrySet()) {
-                    setPermission((String) entry.getKey(), entry.getValue());
-                }
+            for (String key : Js.keys(permissions)) {
+                setPermission(key, Js.get(permissions, key));
             }
         }
     }

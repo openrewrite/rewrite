@@ -20,10 +20,12 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -136,12 +138,25 @@ class NpmResolverTest {
     })
     void resolvesUnderTheRegistryTheEnvironmentNames(String variable, String value, String registry) {
         Map<String, String> env = value == null ? Collections.emptyMap() : Collections.singletonMap(variable, value);
-        Manifest manifest = NpmResolver.fromRegistry(YarnClassicOptions.load((String) null, null, env),
-                packument("{\"name\": \"left-pad\", \"version\": \"1.3.0\", \"dist\": {\"tarball\": " +
-                          "\"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz\", " +
-                          "\"shasum\": \"5b8a3a7765dfe001261dde915589e782f8c94d1e\"}}"));
-        assertThat(manifest.remote.resolved).isEqualTo(registry + "/left-pad/-/left-pad-1.3.0.tgz" +
-                                                       "#5b8a3a7765dfe001261dde915589e782f8c94d1e");
+        Manifest manifest = resolve(YarnClassicOptions.load((String) null, null, env), "left-pad@1.3.0",
+                "{\"name\": \"left-pad\", \"dist-tags\": {\"latest\": \"1.3.0\"}, \"versions\": {\"1.3.0\": " +
+                "{\"name\": \"left-pad\", \"version\": \"1.3.0\", \"dist\": {\"tarball\": " +
+                "\"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz\", " +
+                "\"shasum\": \"5b8a3a7765dfe001261dde915589e782f8c94d1e\"}}}}");
+        assertThat(requireNonNull(manifest.remote).resolved).isEqualTo(registry + "/left-pad/-/left-pad-1.3.0.tgz" +
+                                                                       "#5b8a3a7765dfe001261dde915589e782f8c94d1e");
+    }
+
+    private static Manifest resolve(YarnClassicOptions options, String pattern, String packument) {
+        PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
+                (registry, name) -> packument, new ProjectFiles(Collections.emptyMap()), new ArrayList<>());
+        PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
+                .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
+        NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
+        EventLoop.Promise<Manifest> found = new NpmResolver(request, normalized.getName(), normalized.getRange())
+                .resolve();
+        resolver.loop.run();
+        return requireNonNull(found.getValue());
     }
 
     @SuppressWarnings("unchecked")

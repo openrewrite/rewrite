@@ -368,7 +368,9 @@ final class Js {
      * {@code `${value}`} of a value read from a lock, whose objects from yarn's parser have no prototype to convert.
      */
     static String templateString(@Nullable Object value) {
-        if (value instanceof Map && !(value instanceof PlainObject)) {
+        // without a callable toString or valueOf of its own (an own key holds a string, not a function) or
+        // inherited, an object has no primitive value
+        if (value instanceof Map && (!(value instanceof PlainObject) || ((Map<?, ?>) value).containsKey("toString"))) {
             throw new JsError(JsError.TYPE_ERROR, "Cannot convert object to primitive value");
         }
         if (value instanceof List) {

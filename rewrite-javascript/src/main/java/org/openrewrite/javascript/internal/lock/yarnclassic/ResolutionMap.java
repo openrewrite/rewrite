@@ -99,6 +99,36 @@ final class ResolutionMap {
         return new Resolution(Js.string(name), r, globPattern, Js.string(name) + "@" + r);
     }
 
+    /**
+     * The pattern of the first resolution whose glob matches the request's path from the root's dependency down,
+     * {@code ""} when no resolution names the package, null when none matches.
+     */
+    @Nullable
+    String find(String reqPattern, List<String> parentNames) {
+        NormalizedPattern normalized = NormalizedPattern.normalizePattern(reqPattern);
+        List<Resolution> resolutions = resolutionsByPackage.get(normalized.getName());
+        if (resolutions == null) {
+            return "";
+        }
+        List<String> path = new ArrayList<>(parentNames);
+        path.add(normalized.getName());
+        String modulePath = String.join("/", path);
+        for (Resolution resolution : resolutions) {
+            if (Minimatch.minimatch(modulePath, resolution.getGlobPattern())) {
+                String range = resolution.getRange();
+                String reqRange = normalized.getRange();
+                if (NodeSemver.validRange(reqRange, YarnClassicOptions.SEMVER) != null &&
+                    NodeSemver.valid(range, YarnClassicOptions.SEMVER) != null &&
+                    !NodeSemver.satisfies(range, reqRange, YarnClassicOptions.SEMVER)) {
+                    warnings.add(Lang.format("Resolution field $0 is incompatible with requested version $1",
+                            resolution.getPattern(), reqPattern));
+                }
+                return resolution.getPattern();
+            }
+        }
+        return null;
+    }
+
     static List<String> parsePackagePath(String input) {
         List<String> parts = new ArrayList<>();
         Matcher m = PACKAGE_PATH.matcher(input);

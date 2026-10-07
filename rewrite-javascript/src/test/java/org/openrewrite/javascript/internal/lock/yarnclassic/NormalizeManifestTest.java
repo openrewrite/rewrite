@@ -186,7 +186,7 @@ class NormalizeManifestTest {
     void cannotKnowWhereTheProjectSitsForAnAbsoluteTarget() {
         Manifest info = new Manifest(object("{\"dependencies\": {\"x\": \"/opt/lib\"}}"));
         assertThatThrownBy(() -> NormalizeManifest.resolveRelative(info, "", ""))
-                .isInstanceOf(YarnClassicLockRegenerator.CannotKnow.class)
+                .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("x@file:/opt/lib");
     }
 

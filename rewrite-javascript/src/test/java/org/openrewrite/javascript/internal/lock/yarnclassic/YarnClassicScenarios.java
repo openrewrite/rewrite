@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -51,6 +52,9 @@ final class YarnClassicScenarios {
     private static final List<String> LOCKS = Arrays.asList("before", "after", "again");
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
+    private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S*) cpu=(\\S*)");
+    private static final String RECORDED_ON_OS = "darwin";
+    private static final String RECORDED_ON_CPU = "arm64";
 
     private YarnClassicScenarios() {
     }
@@ -130,6 +134,13 @@ final class YarnClassicScenarios {
             return Files.isRegularFile(dir.resolve(file));
         }
 
+        /**
+         * Whether the scenario records an edit: a lock to start from and the edited manifest.
+         */
+        boolean isEdit() {
+            return has("before") && (has("pkg") || has("pkg-after"));
+        }
+
         @Nullable
         String file(String file) {
             return has(file) ? read(dir.resolve(file)) : null;
@@ -154,6 +165,24 @@ final class YarnClassicScenarios {
                 }
             }
             return null;
+        }
+
+        /**
+         * The machine yarn ran on: the {@code platform} line of {@code recorded-with}, else the machine every
+         * recording here was made on.
+         */
+        Host host() {
+            String os = RECORDED_ON_OS;
+            String cpu = RECORDED_ON_CPU;
+            String recorded = file("recorded-with");
+            if (recorded != null) {
+                Matcher m = PLATFORM.matcher(recorded);
+                if (m.find()) {
+                    os = m.group(1);
+                    cpu = m.group(2);
+                }
+            }
+            return Host.builder().nodeVersion(nodeVersion()).os(os).cpu(cpu).build();
         }
 
         Instant now() {
@@ -205,6 +234,7 @@ final class YarnClassicScenarios {
                     .yarnrc(tree.containsKey(".yarnrc") ? tree.get(".yarnrc") : file("yarnrc"))
                     .npmrc(tree.containsKey(".npmrc") ? tree.get(".npmrc") : file("npmrc"))
                     .env(new LinkedHashMap<>())
+                    .host(host())
                     .now(now())
                     .build();
         }

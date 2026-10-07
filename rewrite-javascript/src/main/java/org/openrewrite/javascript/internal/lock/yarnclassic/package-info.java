@@ -16,8 +16,9 @@
 /**
  * Yarn classic's lockfile and resolver model, ported from yarn 1.22.22 (yarnpkg/yarn, tag v1.22.22): src/lockfile,
  * src/package-resolver.js, src/package-request.js, src/package-reference.js, src/resolution-map.js,
- * src/workspace-layout.js, src/resolvers, src/util/normalize-manifest, src/util/normalize-pattern.js, the config that
- * reaches a lock (src/config.js, src/rc.js, src/registries) and src/cli/commands/install.js. It is distributed under
+ * src/workspace-layout.js, src/package-compatibility.js, src/package-fetcher.js, src/resolvers,
+ * src/util/normalize-manifest, src/util/normalize-pattern.js, the config that reaches a lock (src/config.js, src/rc.js,
+ * src/registries) and src/cli/commands/install.js. It is distributed under
  * the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors. All rights reserved.
@@ -43,11 +44,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code Ssri} ports ssri 5.3.0 and {@code Ini} ports ini 1.3.5, as yarn 1.22.22 bundles them, both distributed under
- * the ISC License:
+ * {@code Ssri} ports ssri 5.3.0, {@code Ini} ports ini 1.3.5 and {@code Minimatch} ports minimatch 3.0.4, as yarn
+ * 1.22.22 bundles them, all distributed under the ISC License:
  * <ul>
  *     <li>ssri: Copyright (c) npm, Inc.</li>
  *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>
+ *     <li>minimatch: Copyright (c) Isaac Z. Schlueter and Contributors</li>
  * </ul>
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -62,11 +64,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
- * {@code DeepEqual} ports deep-equal 1.0.1, {@code JsYaml} the loader of js-yaml 3.13.1 and {@code ObjectPath}
- * object-path 0.11.4, as yarn 1.22.22 bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js
- * {@code lib/url.js}, all distributed under the MIT License:
+ * {@code DeepEqual} ports deep-equal 1.0.1, {@code JsYaml} the loader of js-yaml 3.13.1, {@code ObjectPath}
+ * object-path 0.11.4 and {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0, as yarn 1.22.22
+ * bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the
+ * MIT License:
  * <ul>
  *     <li>deep-equal: James Halliday</li>
+ *     <li>brace-expansion, balanced-match: Copyright (c) 2013 Julian Gruber</li>
  *     <li>js-yaml: Copyright (C) 2011-2015 by Vitaly Puzrin</li>
  *     <li>object-path: Copyright (c) 2015 Mario Casciaro</li>
  *     <li>Node.js: Copyright Joyent, Inc. and other Node contributors</li>

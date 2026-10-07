@@ -35,13 +35,13 @@ import java.util.zip.GZIPInputStream;
  * a character from beyond the Basic Multilingual Plane; rather than order such a string differently,
  * this refuses it.
  */
-final class LocaleCompare {
+public final class LocaleCompare {
 
     /**
      * A string whose order under ICU is not known: not in normalization form D, with a contraction
      * matched through combining marks or across a composite from beyond the Basic Multilingual Plane.
      */
-    static final class UnknownOrder extends IllegalArgumentException {
+    public static final class UnknownOrder extends IllegalArgumentException {
         private final String string;
 
         UnknownOrder(String string) {
@@ -68,7 +68,7 @@ final class LocaleCompare {
     private LocaleCompare() {
     }
 
-    static int en(String a, String b) {
+    public static int en(String a, String b) {
         long[] x = Data.INSTANCE.elements(a);
         long[] y = Data.INSTANCE.elements(b);
         for (int level = 0; level < 3; level++) {

@@ -16,15 +16,18 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/resolvers/registries/npm-resolver.js (yarn 1.22.22).
+ * Port of yarn src/resolvers/registries/npm-resolver.js (yarn 1.22.22), and yarn-resolver.js, its subclass for the
+ * {@code yarn:} protocol.
  */
 final class NpmResolver {
 
@@ -33,19 +36,28 @@ final class NpmResolver {
     private static final Pattern NPM_REGISTRY_RE = Pattern.compile("https?://registry\\.npmjs\\.org");
     private static final Object NOT_A_TAG = new Object();
 
-    private NpmResolver() {
+    private final PackageRequest request;
+    private final YarnClassicOptions config;
+    final String name;
+    final String range;
+
+    NpmResolver(PackageRequest request, String name, String range) {
+        this.request = request;
+        this.config = request.config;
+        this.name = name;
+        this.range = range;
     }
 
     /**
      * @throws MessageError when no version matches, as yarn fails a non-interactive install.
      */
     static @Nullable Object findVersionInRegistryResponse(YarnClassicOptions config, String name, String range,
-                                                          Map<String, @Nullable Object> body) {
-        Object versions = body.get("versions");
-        Object distTags = body.get("dist-tags");
+                                                          @Nullable Object body) {
+        Object versions = Js.get(body, "versions");
+        Object distTags = Js.get(body, "dist-tags");
         if (Js.truthy(versions) && Js.keys(versions).isEmpty()) {
             throw new MessageError(Lang.format("No valid versions found for $0. The package may be unpublished.",
-                    body.get("name")));
+                    Js.get(body, "name")));
         }
         if (!Js.truthy(distTags) || !Js.truthy(versions)) {
             throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
@@ -67,8 +79,8 @@ final class NpmResolver {
         if (satisfied != null) {
             return Js.get(versions, satisfied);
         }
-        throw new MessageError(Lang.format("Couldn't find any versions for $0 that matches $1", body.get("name"),
-                wanted));
+        throw new MessageError(Lang.format("Couldn't find any versions for $0 that matches $1",
+                Js.get(body, "name"), wanted));
     }
 
     private static boolean satisfies(Object version, String range) {
@@ -112,30 +124,63 @@ final class NpmResolver {
         return url;
     }
 
-    /**
-     * The remote and uid a version manifest picked from the registry carries: its tarball, on the yarn registry
-     * while that is the configured one, with the integrity the registry gives or one from the shasum.
-     */
+    Promise<@Nullable Object> resolveRequest(@Nullable Object desiredVersion) {
+        String escapedName = NpmRegistry.escapeName(name);
+        String desiredRange = Js.truthy(desiredVersion) ? Js.string(desiredVersion) : range;
+        EventLoop.Io<Object> io = request.resolver.npmRegistry.request(escapedName, request.io);
+        request.awaited(io);
+        return io.promise.then(body -> Promise.resolved(request.resolver.loop, Js.truthy(body) ?
+                findVersionInRegistryResponse(config, escapedName, desiredRange, body) : null));
+    }
+
     @SuppressWarnings("unchecked")
-    static Manifest fromRegistry(YarnClassicOptions config, Map<String, @Nullable Object> info) {
-        Manifest manifest = new Manifest(info);
-        Object dist = info.get("dist");
-        if (dist instanceof Map && Js.truthy(((Map<String, Object>) dist).get("tarball"))) {
-            Map<String, @Nullable Object> d = (Map<String, @Nullable Object>) dist;
-            String tarball = Js.string(d.get("tarball"));
-            Object shasum = d.get("shasum");
-            PackageRemote remote = new PackageRemote();
-            remote.resolved = cleanRegistry(config, tarball) + "#" + Js.string(shasum);
-            remote.type = "tarball";
-            remote.reference = cleanRegistry(config, tarball);
-            remote.hash = shasum instanceof String ? (String) shasum : null;
-            remote.integrity = Js.truthy(d.get("integrity")) ? Ssri.parse(Js.string(d.get("integrity"))) :
-                    Ssri.fromHex(shasum, "sha1");
-            remote.registry = NPM_REGISTRY_ID;
-            remote.packageName = info.get("name");
-            manifest.remote = remote;
+    Promise<Manifest> resolve() {
+        EventLoop loop = request.resolver.loop;
+        Manifest shrunk = request.getLocked("tarball");
+        if (shrunk != null && config.isPackBuiltPackages() && Js.truthy(shrunk.get("prebuiltVariants")) &&
+            shrunk.remote != null && config.getOption("yarn-offline-mirror") != null) {
+            throw new CannotKnow("the offline mirror's prebuilt packages for " + request.pattern);
         }
-        manifest.put("_uid", info.get("version"));
-        return manifest;
+        if (shrunk != null && shrunk.remote != null &&
+            (Js.truthy(shrunk.remote.integrity) || !config.isAutoAddIntegrity())) {
+            return Promise.resolved(loop, shrunk);
+        }
+
+        Object desiredVersion = shrunk != null && Js.truthy(shrunk.getVersion()) ? shrunk.getVersion() : null;
+        return resolveRequest(desiredVersion).then(found -> {
+            if (found == null) {
+                throw new MessageError(Lang.format("Couldn't find package $0 on the $1 registry.", name,
+                        NPM_REGISTRY_ID));
+            }
+            Map<String, @Nullable Object> data = found instanceof Map ? (Map<String, @Nullable Object>) found :
+                    new LinkedHashMap<>();
+            Object dist = data.get("dist");
+            if (shrunk != null && shrunk.remote != null) {
+                Object integrity = Js.get(dist, "integrity");
+                shrunk.remote.integrity = Js.truthy(dist) && Js.truthy(integrity) ? Ssri.parse(integrity) :
+                        Ssri.fromHex(Js.truthy(dist) && Js.truthy(Js.get(dist, "shasum")) ?
+                                Js.get(dist, "shasum") : "", "sha1");
+                return Promise.resolved(loop, shrunk);
+            }
+
+            Manifest info = new Manifest(data);
+            info.packageJson = new LinkedHashMap<>(data);
+            if (dist != null && Js.truthy(Js.get(dist, "tarball"))) {
+                String tarball = cleanRegistry(config, Js.templateString(Js.get(dist, "tarball")));
+                Object shasum = Js.get(dist, "shasum");
+                Object integrity = Js.get(dist, "integrity");
+                PackageRemote remote = new PackageRemote();
+                remote.resolved = tarball + "#" + Js.templateString(shasum);
+                remote.type = "tarball";
+                remote.reference = tarball;
+                remote.hash = shasum instanceof String ? (String) shasum : null;
+                remote.integrity = Js.truthy(integrity) ? Ssri.parse(integrity) : Ssri.fromHex(shasum, "sha1");
+                remote.registry = NPM_REGISTRY_ID;
+                remote.packageName = data.get("name");
+                info.remote = remote;
+            }
+            info.put("_uid", data.get("version"));
+            return Promise.resolved(loop, info);
+        });
     }
 }

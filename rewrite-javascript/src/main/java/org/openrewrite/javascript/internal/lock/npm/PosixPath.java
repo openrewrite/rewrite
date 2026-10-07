@@ -111,7 +111,7 @@ public final class PosixPath {
         return !normalized.isEmpty() ? normalized : ".";
     }
 
-    static String normalize(String path) {
+    public static String normalize(String path) {
         if (path.isEmpty()) {
             return ".";
         }
@@ -130,11 +130,11 @@ public final class PosixPath {
         return isAbsolute ? "/" + normalized : normalized;
     }
 
-    static boolean isAbsolute(String path) {
+    public static boolean isAbsolute(String path) {
         return !path.isEmpty() && path.charAt(0) == '/';
     }
 
-    static String join(String... args) {
+    public static String join(String... args) {
         String joined = null;
         for (String arg : args) {
             if (!arg.isEmpty()) {
@@ -194,7 +194,7 @@ public final class PosixPath {
         return out + to.substring(toStart + lastCommonSep);
     }
 
-    static String dirname(String path) {
+    public static String dirname(String path) {
         if (path.isEmpty()) {
             return ".";
         }
@@ -220,7 +220,7 @@ public final class PosixPath {
         return path.substring(0, end);
     }
 
-    static String basename(String path) {
+    public static String basename(String path) {
         int start = 0;
         int end = -1;
         boolean matchedSlash = true;

@@ -112,7 +112,8 @@ final class Lockfile {
     }
 
     static String serializeIntegrity(Object integrity) {
-        if (integrity instanceof Map && !(integrity instanceof PlainObject)) {
+        if (integrity instanceof Map && (!(integrity instanceof PlainObject) ||
+                                         ((Map<?, ?>) integrity).containsKey("toString"))) {
             throw new JsError(JsError.TYPE_ERROR, "integrity.toString is not a function");
         }
         List<String> parts = new ArrayList<>(Arrays.asList(Js.templateString(integrity).split(" ", -1)));
@@ -205,6 +206,17 @@ final class Lockfile {
             }
         }
         return null;
+    }
+
+    /**
+     * {@code cache[pattern]}, as the integrity check reads the parsed lock.
+     */
+    @Nullable
+    Object cached(String pattern) {
+        if (cache instanceof Map || cache instanceof List) {
+            return lookup(pattern);
+        }
+        return Js.get(cache, pattern);
     }
 
     // `pattern in cache && cache[pattern]`

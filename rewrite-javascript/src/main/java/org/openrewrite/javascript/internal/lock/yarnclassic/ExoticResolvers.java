@@ -69,6 +69,32 @@ final class ExoticResolvers {
         return null;
     }
 
+    /**
+     * The resolver {@code getExoticResolver} names, constructed over the request and its fragment, resolved.
+     */
+    static EventLoop.Promise<Manifest> resolve(Kind kind, PackageRequest request, String fragment) {
+        switch (kind) {
+            case GIT:
+                return GitResolver.git(request, fragment).resolve();
+            case TARBALL:
+                return new TarballResolver(request, fragment).resolve();
+            case GITHUB:
+            case GITLAB:
+            case BITBUCKET:
+                return GitResolver.hosted(request, fragment).resolve();
+            case GIST:
+                return GitResolver.gist(request, fragment).resolve();
+            case FILE:
+                return new FileResolver(request, fragment).resolve();
+            case LINK:
+                return new LinkResolver(request, fragment).resolve();
+            case NPM:
+            case YARN:
+            default:
+                return new RegistryResolver(request, fragment).resolve();
+        }
+    }
+
     static boolean isVersion(Kind kind, String pattern) {
         switch (kind) {
             case GIT:

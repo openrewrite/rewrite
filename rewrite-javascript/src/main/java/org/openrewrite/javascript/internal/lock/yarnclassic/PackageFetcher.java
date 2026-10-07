@@ -89,16 +89,19 @@ final class PackageFetcher {
     }
 
     static String generateUniquePackageSlug(PackageReference pkg) {
-        String slug = Js.string(pkg.name);
+        if (!(pkg.name instanceof String)) {
+            throw new JsError(JsError.TYPE_ERROR, "slug.replace is not a function");
+        }
+        String slug = (String) pkg.name;
         slug = SLUG_CHARS.matcher(slug).replaceAll("-");
         slug = SLUG_EDGES.matcher(slug).replaceAll("");
-        slug = (Js.truthy(pkg.registry) ? Js.string(pkg.registry) : "unknown") + "-" + slug;
+        slug = (Js.truthy(pkg.registry) ? Js.templateString(pkg.registry) : "unknown") + "-" + slug;
         String hash = pkg.remote.hash;
         if (Js.truthy(pkg.version)) {
-            slug += "-" + Js.string(pkg.version);
+            slug += "-" + Js.templateString(pkg.version);
         }
         if (Js.truthy(pkg.uid) && !equal(pkg.version, pkg.uid)) {
-            slug += "-" + Js.string(pkg.uid);
+            slug += "-" + Js.templateString(pkg.uid);
         } else if (Js.truthy(hash)) {
             slug += "-" + hash;
         }

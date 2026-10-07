@@ -41,12 +41,37 @@ final class Manifest {
 
     boolean fresh;
 
+    /**
+     * The lock entry a reused pattern's manifest stands for.
+     */
+    @Nullable
+    Map<String, @Nullable Object> locked;
+
+    /**
+     * The registry's document of a version picked anew, which stands for the package.json of its tarball.
+     */
+    @Nullable
+    Map<String, @Nullable Object> packageJson;
+
     Manifest() {
         this(new LinkedHashMap<>());
     }
 
     Manifest(Map<String, @Nullable Object> data) {
         this.data = data;
+    }
+
+    /**
+     * {@code Object.assign({}, manifest)}.
+     */
+    Manifest copy() {
+        Manifest copy = new Manifest(new LinkedHashMap<>(data));
+        copy.remote = remote;
+        copy.reference = reference;
+        copy.fresh = fresh;
+        copy.locked = locked;
+        copy.packageJson = packageJson;
+        return copy;
     }
 
     @Nullable

@@ -17,9 +17,11 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * An object literal yarn builds ({@code {}}, js-yaml's mappings): a lookup on it finds Object.prototype's members,
@@ -54,6 +56,46 @@ final class PlainObject extends LinkedHashMap<String, @Nullable Object> {
             return new BuiltinFunction("constructor".equals(key) ? "Array" : key);
         }
         return objectFunction(key);
+    }
+
+    /**
+     * A value of {@code JSON.parse}, whose objects inherit Object.prototype.
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Object fromJson(@Nullable Object value) {
+        if (value instanceof Map) {
+            PlainObject object = new PlainObject();
+            for (Map.Entry<String, @Nullable Object> entry : ((Map<String, @Nullable Object>) value).entrySet()) {
+                object.put(entry.getKey(), fromJson(entry.getValue()));
+            }
+            return object;
+        }
+        if (value instanceof List) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                list.add(fromJson(item));
+            }
+            return list;
+        }
+        return value;
+    }
+
+    /**
+     * A copy of the object and of every object and array in it, each kept as the kind of object it is.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> copyOf(Map<String, @Nullable Object> object) {
+        Map<String, @Nullable Object> copy = object instanceof PlainObject ? new PlainObject() : new LinkedHashMap<>();
+        for (Map.Entry<String, @Nullable Object> entry : object.entrySet()) {
+            Object value = entry.getValue();
+            if (value instanceof Map) {
+                value = copyOf((Map<String, @Nullable Object>) value);
+            } else if (value instanceof List) {
+                value = new ArrayList<>((List<?>) value);
+            }
+            copy.put(entry.getKey(), value);
+        }
+        return copy;
     }
 
     static final class BuiltinFunction {
