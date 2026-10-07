@@ -21,8 +21,11 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
@@ -100,6 +103,12 @@ final class PackageManager {
      */
     final List<ManifestArrivalOrder.Resolved> firstPass = new ArrayList<>();
     private boolean peersStarted;
+
+    /**
+     * The names that had a package when the peers began, and the required peers of the other names the peers ran.
+     */
+    private @Nullable Set<Long> namesBeforePeers;
+    private final Map<Integer, DependencyVersion> peersOfNewNames = new LinkedHashMap<>();
 
     /**
      * The packuments requested, in order.
@@ -197,6 +206,10 @@ final class PackageManager {
         }
         if (version == null) {
             version = dependency.version;
+        }
+        if (installPeer && dependency.behavior.isPeer() && version.tag == DependencyVersion.Tag.NPM &&
+            namesBeforePeers != null && !namesBeforePeers.contains(nameHash)) {
+            peersOfNewNames.putIfAbsent(id, version);
         }
 
         switch (version.tag) {
@@ -650,6 +663,7 @@ final class PackageManager {
             throw new CannotKnow(String.join("; ", arrivalOrder));
         }
         peersStarted = true;
+        namesBeforePeers = new HashSet<>(lockfile.packageIndex.keySet());
         if (!peerDependencies.isEmpty()) {
             processPeerDependencyList();
             drainDependencyList();
@@ -661,6 +675,25 @@ final class PackageManager {
                 runTasks(true);
             } while (!peerDependencies.isEmpty() || pendingTaskCount() > 0);
         }
+        List<String> peerOrder = ManifestArrivalOrder.detectPeers(lockfile, peerPicks());
+        if (!peerOrder.isEmpty()) {
+            throw new CannotKnow(String.join("; ", peerOrder));
+        }
+    }
+
+    private List<ManifestArrivalOrder.Resolved> peerPicks() {
+        List<ManifestArrivalOrder.Resolved> picks = new ArrayList<>();
+        for (Map.Entry<Integer, DependencyVersion> peer : peersOfNewNames.entrySet()) {
+            DependencyVersion version = peer.getValue();
+            PackageManifest manifest = manifests.get(Wyhash11.stringHash(version.npm().name));
+            PackageManifest.FindResult pick = manifest == null ? null :
+                    manifest.findBestVersionWithFilter(version.npm().version, options.getMinimumReleaseAgeMs(),
+                            options.getMinimumReleaseAgeExcludes(), nowMs).result;
+            if (pick != null) {
+                picks.add(new ManifestArrivalOrder.Resolved(peer.getKey(), version, manifest, pick));
+            }
+        }
+        return picks;
     }
 
     /**

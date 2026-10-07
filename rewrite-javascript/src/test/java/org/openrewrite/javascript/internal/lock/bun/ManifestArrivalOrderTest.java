@@ -111,6 +111,26 @@ class ManifestArrivalOrderTest {
         assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
     }
 
+    @Test
+    void peersOfANewNameWithDifferentPicks() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
+        lockfile.dependencies.get(debugMs).behavior = Behavior.of(Behavior.PEER);
+        lockfile.dependencies.get(debugMs + 1).behavior = Behavior.of(Behavior.PEER);
+        List<ManifestArrivalOrder.Resolved> peers = resolved(lockfile, debugMs, debugMs + 1);
+        assertThat(ManifestArrivalOrder.detectPeers(lockfile, peers)).containsExactly(
+          "manifest arrival order: peer ms for debug@2.6.9 (2.0.0) and humanize-ms@1.2.1 (^2.0.0) " +
+          "installed in one install");
+    }
+
+    @Test
+    void peersOfANewNameWithOnePick() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "^2.1.0", "^2.0.0");
+        List<ManifestArrivalOrder.Resolved> peers = resolved(lockfile, debugMs, debugMs + 1);
+        assertThat(ManifestArrivalOrder.detectPeers(lockfile, peers)).isEmpty();
+    }
+
     private static int requirers(Lockfile lockfile, String debugRange, String humanizeRange) {
         Package root = new Package();
         root.name = "p";

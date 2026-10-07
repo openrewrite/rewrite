@@ -82,6 +82,33 @@ final class ManifestArrivalOrder {
         return out;
     }
 
+    /**
+     * One line per name whose required peers no package satisfied when the peers began and whose picks differ: the
+     * peer that runs first installs its pick and every later one takes that package, so the order the requirers'
+     * manifests arrived in decides which.
+     */
+    static List<String> detectPeers(Lockfile lockfile, List<Resolved> peers) {
+        Map<String, List<Resolved>> byName = new LinkedHashMap<>();
+        for (Resolved edge : peers) {
+            byName.computeIfAbsent(edge.manifest.name, k -> new ArrayList<>()).add(edge);
+        }
+        List<String> out = new ArrayList<>();
+        for (Map.Entry<String, List<Resolved>> entry : byName.entrySet()) {
+            List<Resolved> edges = entry.getValue();
+            for (int i = 1; i < edges.size(); i++) {
+                if (!edges.get(i).resolution.eql(edges.get(0).resolution)) {
+                    Resolved a = edges.get(0);
+                    Resolved b = edges.get(i);
+                    out.add("manifest arrival order: peer " + entry.getKey() + " for " + requirer(lockfile, a) + " (" +
+                            a.version.literal + ") and " + requirer(lockfile, b) + " (" + b.version.literal +
+                            ") installed in one install");
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
     // run first, `edge` takes the first pre-existing package it accepts (getPackageID walks highest first) or appends
     // its pick; run after `other` appended its pick, it takes that pick when it accepts it and it walks earlier
     private static boolean dependsOnOrder(Lockfile lockfile, int packagesBefore, Resolved edge, Resolved other) {
