@@ -306,6 +306,21 @@ describe('match extraction', () => {
         expect(await matched(`type Counts = Array<number>;\nf(c as Counts);`, asNames)).toEqual([false]);
     });
 
+    test('an aliased default import of a callable module is the receiver the pattern writes out', async () => {
+        const strictEqual = pattern`assert.strictEqual(${capture('a')}, ${capture('b')})`
+            .configure({context: [`import assert from 'node:assert';`]});
+
+        expect(await matched(`import a from 'node:assert';\na.strictEqual(x, y);`, strictEqual)).toEqual([true]);
+    });
+
+    test('untyped imports from one module are not one declaration', async () => {
+        const renderArg = pattern`foo(render)`
+            .configure({context: [`import {render} from 'react-dom';`, `declare function foo(x: any): void;`]});
+
+        expect(await matched(`import {render, hydrate} from 'react-dom';\ndeclare function foo(x: any): void;\nfoo(render);`, renderArg)).toEqual([true]);
+        expect(await matched(`import {render, hydrate} from 'react-dom';\ndeclare function foo(x: any): void;\nfoo(hydrate);`, renderArg)).toEqual([false]);
+    });
+
     test('two members of one function type are not one declaration', async () => {
         const promisified = pattern`promisify(fs.readFile)`
             .configure({context: [`import {promisify} from 'util';`, `import * as fs from 'fs';`]});

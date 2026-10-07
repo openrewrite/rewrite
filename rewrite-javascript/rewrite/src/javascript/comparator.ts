@@ -2414,7 +2414,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
 
         // A written-out receiver still has to match. The method type proves which function
         // is called, not that the code reads the same.
-        if (!canSkipNameCheck || method.select) {
+        if (!canSkipNameCheck || method.select && !this.functionReceivers(method, otherMethod)) {
             if ((method.select === undefined) !== (otherMethod.select === undefined)) {
                 return this.structuralMismatch('select');
             }
@@ -2515,11 +2515,25 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return super.visitIdentifier(identifier, other);
     }
 
+    /**
+     * Whether both calls have a bare function-valued receiver, such as a default import of a
+     * callable module. The function type shell names no declaration, so the receivers are told
+     * apart by the call alone.
+     */
+    private functionReceivers(method: J.MethodInvocation, other: J.MethodInvocation): boolean {
+        const isFunctionName = (select?: J.RightPadded<Expression>) =>
+            select?.element.kind === J.Kind.Identifier &&
+            !(select.element as J.Identifier).fieldType &&
+            Type.isFunctionType((select.element as J.Identifier).type);
+        return isFunctionName(method.select) && isFunctionName(other.select);
+    }
+
     /** An import alias and its export denote one declaration, where a variable holding the same value does not. */
     private denoteOneDeclaration(identifier: J.Identifier, other: J.Identifier): boolean {
         if (identifier.fieldType || other.fieldType) {
+            // An unresolved import has the placeholder name `unknown`, which identifies nothing
             return !!identifier.fieldType && !!other.fieldType &&
-                identifier.fieldType.name === other.fieldType.name &&
+                identifier.fieldType.name === other.fieldType.name && identifier.fieldType.name !== 'unknown' &&
                 this.sameFullyQualifiedName(identifier.fieldType.owner, other.fieldType.owner);
         }
         // Only a nominal type names a declaration. The function and object type shells are shared,
