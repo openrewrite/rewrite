@@ -545,12 +545,14 @@ public class PythonRewriteRpc extends RewriteRpc {
             Stream<SourceFile> result = new PyProjectTomlParser(commandEnv, dependencyPath).parseInputs(
                     singletonList(pyprojectInput), effectiveRelativeTo, ctx);
 
-            Path uvLockPath = projectPath.resolve("uv.lock");
-            if (Files.exists(uvLockPath)) {
-                Parser.Input uvLockInput = Parser.Input.fromFile(uvLockPath);
-                Stream<SourceFile> uvLockStream = new TomlParser().parseInputs(
-                        singletonList(uvLockInput), effectiveRelativeTo, ctx);
-                result = Stream.concat(result, uvLockStream);
+            for (String lockFileName : Arrays.asList("uv.lock", "poetry.lock", "pdm.lock")) {
+                Path lockPath = projectPath.resolve(lockFileName);
+                if (Files.exists(lockPath)) {
+                    Parser.Input lockInput = Parser.Input.fromFile(lockPath);
+                    Stream<SourceFile> lockStream = new TomlParser().parseInputs(
+                            singletonList(lockInput), effectiveRelativeTo, ctx);
+                    result = Stream.concat(result, lockStream);
+                }
             }
             return result;
         }
