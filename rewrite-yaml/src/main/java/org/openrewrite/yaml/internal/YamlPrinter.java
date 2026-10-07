@@ -67,7 +67,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, PrintOutputCapture<P> p) {
-        p.append(entry.getPrefix());
+        beforeSyntax(entry, p);
         if (entry.isDash()) {
             p.append('-');
         }
@@ -81,7 +81,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence, PrintOutputCapture<P> p) {
-        visitMarkers(sequence.getMarkers(), p);
+        beforeSyntax(sequence, p);
         if (sequence.getAnchor() != null) {
             visit(sequence.getAnchor(), p);
         }
@@ -112,7 +112,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
-        visitMarkers(mapping.getMarkers(), p);
+        beforeSyntax(mapping, p);
         if (mapping.getAnchor() != null) {
             visit(mapping.getAnchor(), p);
         }
