@@ -21,8 +21,11 @@ import type {JavaScriptVisitor} from "./visitor";
 
 const noNames: ReadonlySet<string> = new Set();
 
-/** Which declarations a lookup counts. */
-type Meaning = 'all' | 'value' | 'type';
+/**
+ * Which declarations a lookup counts. TypeScript binds values and types in separate spaces, so a
+ * value reference is hidden by a `const` of its name but not by an `interface`.
+ */
+export type Meaning = 'all' | 'value' | 'type';
 
 /** One scope: the names it binds itself, the scopes around it, and what they answer together. */
 export interface Scope {
@@ -37,17 +40,16 @@ export interface Scope {
     walk(visit: (scope: Scope) => boolean): void;
 
     /**
-     * Whether this scope or one enclosing it binds `name`. A type counts unless `values` is set,
-     * since a new binding collides with a type of its name while a value reference never reads one.
+     * Whether this scope or one enclosing it binds `name`. Every kind counts by default, since a
+     * new binding collides with a type of its name as much as with a value.
      */
-    declares(name: string, options?: { values?: boolean }): boolean;
+    declares(name: string, meaning?: Meaning): boolean;
 
     /**
      * The node owning the innermost scope that binds `name`, or undefined. A caller holding a
      * declaration compares this to the node it came from, since anything nearer shadows it.
-     * `values` is as for `declares`.
      */
-    declaringScope(name: string, options?: { values?: boolean }): J | undefined;
+    declaringScope(name: string, meaning?: Meaning): J | undefined;
 }
 
 /**
@@ -69,13 +71,9 @@ function scopeAt(cursor: Cursor): Scope {
                 }
             }
         },
-        declares: (name, options) => declaringScopeOf(cursor, name, meaningAsked(options)) !== undefined,
-        declaringScope: (name, options) => declaringScopeOf(cursor, name, meaningAsked(options))
+        declares: (name, meaning = 'all') => declaringScopeOf(cursor, name, meaning) !== undefined,
+        declaringScope: (name, meaning = 'all') => declaringScopeOf(cursor, name, meaning)
     };
-}
-
-function meaningAsked(options: { values?: boolean } | undefined): Meaning {
-    return options?.values ? 'value' : 'all';
 }
 
 function enclosingScopeCursor(from: Cursor | undefined): Cursor | undefined {

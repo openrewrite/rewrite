@@ -239,12 +239,13 @@ describe('scopeOf', () => {
             const Merged = 1;
             anchor();
         `);
-        // A binding still collides with a type of the same name, so a type counts unless asked for values.
+        // A binding still collides with a type of the same name, so every kind counts unless asked otherwise.
         expect(scope.declares('Object')).toBe(true);
-        expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, {values: true})))
+        expect(scope.declares('Object', 'type')).toBe(true);
+        expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, 'value')))
             .toEqual([]);
-        expect(scope.declares('Merged', {values: true})).toBe(true);
-        expect(scope.declaringScope('Object', {values: true})).toBeUndefined();
+        expect(scope.declares('Merged', 'value')).toBe(true);
+        expect(scope.declaringScope('Object', 'value')).toBeUndefined();
     });
 
     test('an object or type literal binds none of its members, around it or inside it', async () => {
