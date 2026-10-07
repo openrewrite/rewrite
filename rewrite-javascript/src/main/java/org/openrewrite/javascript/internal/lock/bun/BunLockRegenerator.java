@@ -29,7 +29,7 @@ import org.openrewrite.javascript.internal.lock.npm.Host;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -75,11 +75,11 @@ public final class BunLockRegenerator {
         String bunfig;
 
         /**
-         * The project's other files bun reads on install, by path relative to the root: the patch files
-         * {@code patchedDependencies} names.
+         * The project's package-manager files under the root, by path relative to it, with their contents: the
+         * patch files {@code patchedDependencies} names are read from here.
          */
         @Singular
-        Set<String> files;
+        Map<String, String> files;
 
         @Singular("env")
         Map<String, String> env;
@@ -267,15 +267,21 @@ public final class BunLockRegenerator {
         return written;
     }
 
-    // bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
+    // calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
     private static void requirePatchFiles(Inputs inputs, Lockfile lockfile) {
-        Set<String> files = new HashSet<>();
-        for (String file : inputs.getFiles()) {
-            files.add(PosixPaths.normalize(file));
+        Map<String, String> files = new HashMap<>();
+        for (Map.Entry<String, String> file : inputs.getFiles().entrySet()) {
+            files.put(PosixPaths.normalize(file.getKey()), file.getValue());
         }
         for (String patch : lockfile.patchedDependencies.values()) {
-            if (!files.contains(PosixPaths.normalize(patch))) {
+            String path = PosixPaths.normalize(patch);
+            String contents = files.get(path);
+            if (contents == null) {
                 throw new PackageManager.CannotKnow("patch file " + patch + " (not among the project's files)");
+            }
+            if (contents.isEmpty()) {
+                throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
+                        BUN_REJECTS + ": patchfile " + path + " is empty, please restore or delete it.");
             }
         }
     }

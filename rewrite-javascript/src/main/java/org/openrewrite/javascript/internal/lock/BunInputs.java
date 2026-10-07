@@ -22,14 +22,13 @@ import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * A recipe's request as the Bun regenerator takes it: the manifests placed as {@link NpmInputs} places them, the
- * .npmrc and bunfig.toml of the lock's directory, and the paths of the package-manager files under it (the patch
- * files). Without the .npmrc file itself, the project's npmrc the marker read stands in for it.
+ * .npmrc and bunfig.toml of the lock's directory, and the package-manager files under it (the patch files) by
+ * path. Without the .npmrc file itself, the project's npmrc the marker read stands in for it.
  */
 final class BunInputs {
 
@@ -51,14 +50,14 @@ final class BunInputs {
     }
 
     // every package-manager file under the root, by path relative to it
-    private static Set<String> files(Request request, String rootDir) {
-        Set<String> files = new LinkedHashSet<>();
-        for (Path file : request.getPackageManagerFiles().keySet()) {
-            String path = file.normalize().toString().replace('\\', '/');
+    private static Map<String, String> files(Request request, String rootDir) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
+            String path = file.getKey().normalize().toString().replace('\\', '/');
             if (rootDir.isEmpty()) {
-                files.add(path);
+                files.put(path, file.getValue());
             } else if (path.startsWith(rootDir + "/")) {
-                files.add(path.substring(rootDir.length() + 1));
+                files.put(path.substring(rootDir.length() + 1), file.getValue());
             }
         }
         return files;

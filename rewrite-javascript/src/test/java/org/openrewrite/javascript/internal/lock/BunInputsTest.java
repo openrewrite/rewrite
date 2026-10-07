@@ -68,7 +68,8 @@ class BunInputsTest {
 
         Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getFiles()).containsExactlyInAnyOrder("patches/ms@2.1.3.patch", "bunfig.toml");
+        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", "bunfig.toml");
+        assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
     }
 
     @Test

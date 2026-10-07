@@ -1,0 +1,1 @@
+patchedDependencies names a patch file that exists but is empty: does bun refuse (patch_install.zig calcHash: size 0 is an error) or write the lock?
