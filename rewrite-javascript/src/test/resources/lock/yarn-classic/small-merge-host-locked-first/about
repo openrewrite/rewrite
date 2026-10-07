@@ -1,0 +1,1 @@
+npmjs-host lock; root adds is-number@~6.0.0 after is-odd in manifest order: the locked is-number@^6.0.0 is resolved first and the merged entry keeps registry.npmjs.org.

@@ -1,0 +1,1 @@
+resolutions {"**/is-odd/is-number": "6.0.0"} reaches is-number under is-even/is-odd; kind-of and is-buffer drop out.

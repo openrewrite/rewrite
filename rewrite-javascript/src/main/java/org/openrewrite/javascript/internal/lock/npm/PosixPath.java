@@ -22,7 +22,7 @@ import java.util.List;
  * Port of Node.js {@code path.posix} (resolve, normalize, join, relative, dirname, basename) and
  * {@code walk-up-path}, over a virtual filesystem whose working directory is {@code /}.
  */
-final class PosixPath {
+public final class PosixPath {
 
     static final String CWD = "/";
 
@@ -93,7 +93,7 @@ final class PosixPath {
         return res.toString();
     }
 
-    static String resolve(String... args) {
+    public static String resolve(String... args) {
         StringBuilder resolvedPath = new StringBuilder();
         boolean resolvedAbsolute = false;
         for (int i = args.length - 1; i >= -1 && !resolvedAbsolute; i--) {
@@ -144,7 +144,7 @@ final class PosixPath {
         return joined == null ? "." : normalize(joined);
     }
 
-    static String relative(String from, String to) {
+    public static String relative(String from, String to) {
         if (from.equals(to)) {
             return "";
         }

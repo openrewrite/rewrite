@@ -1,0 +1,1 @@
+Workspaces: resolutions {"which-module": "2.0.0"} on the root dependency which-module@^2.0.0 (the workspace aggregator requests root deps with a parent path): applied.

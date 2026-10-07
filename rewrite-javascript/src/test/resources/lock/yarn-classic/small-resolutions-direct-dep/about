@@ -1,0 +1,1 @@
+resolutions {"which-module": "2.0.0"} on a root dependency which-module@^2.0.0 (no workspaces): the root pattern keeps 2.0.1; the resolution adds its own entry.

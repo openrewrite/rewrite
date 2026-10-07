@@ -1,0 +1,1 @@
+A crafted lock whose is-number 6.0.0 block also claims is-number@^7.0.0: yarn warns, drops the pattern and re-resolves it.

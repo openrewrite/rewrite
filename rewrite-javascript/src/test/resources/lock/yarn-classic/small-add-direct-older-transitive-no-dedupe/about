@@ -1,0 +1,1 @@
+Adding is-number@>=6.0.0 while the lock holds is-number@^6.0.0 at 6.0.0 (via is-odd): the fresh pattern takes dist-tags.latest (7.0.0), it does not dedupe to the locked 6.0.0.

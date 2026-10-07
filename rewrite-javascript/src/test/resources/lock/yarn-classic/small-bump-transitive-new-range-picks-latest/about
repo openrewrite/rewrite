@@ -1,0 +1,1 @@
+emitter-listener 1.0.1 -> 1.0.0 changes its shimmer range from 1.0.0 to ~1: the new transitive pattern resolves fresh to 1.2.1 although the locked 1.0.0 satisfies it.

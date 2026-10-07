@@ -1,0 +1,1 @@
+A file: dependency on a local directory: version and dependencies from its package.json, no resolved or integrity; its dependency is locked.

@@ -1,0 +1,1 @@
+resolutions with an npm-style nested object value ({"is-odd": {"is-number": "7.0.0"}}): yarn crashes.

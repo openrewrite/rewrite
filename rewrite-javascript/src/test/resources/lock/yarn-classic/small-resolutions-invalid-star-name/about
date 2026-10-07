@@ -1,0 +1,1 @@
+resolutions {"*": "7.0.0"}: an invalid resolution name is warned about and ignored; the lock is not rewritten.

@@ -1,0 +1,1 @@
+Workspaces: member a bumps is-number 6.0.0 -> 7.0.0; member b depends on a by version (no lock entry) and on is-odd (is-number ^6.0.0 keeps 6.0.0).

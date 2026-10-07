@@ -1,0 +1,1 @@
+A lock without the two header comment lines, then an edit: yarn parses it and writes the header back.

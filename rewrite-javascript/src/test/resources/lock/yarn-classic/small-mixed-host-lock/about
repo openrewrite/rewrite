@@ -1,0 +1,1 @@
+A lock whose entries use registry.npmjs.org (default config): reused entries keep their host, the new is-number@7.0.0 entry gets registry.yarnpkg.com.

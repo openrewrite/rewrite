@@ -1,0 +1,1 @@
+Workspaces: member b changes "own-or": "1.0.0" (the member own-or) to "workspace:*", which yarn 1 does not understand; own-or is also a registry name.

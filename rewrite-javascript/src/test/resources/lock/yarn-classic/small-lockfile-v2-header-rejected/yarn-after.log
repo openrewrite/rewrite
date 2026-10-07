@@ -1,0 +1,4 @@
+yarn install v1.22.22
+warning package.json: No license field
+error Can't install from a lockfile of version 2 as you're on an old yarn version that only supports versions up to 1. Run `$ yarn self-update` to upgrade to the latest version.
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

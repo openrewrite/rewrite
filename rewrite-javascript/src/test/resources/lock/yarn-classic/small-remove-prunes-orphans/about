@@ -1,0 +1,1 @@
+Removing is-odd prunes its private is-number@^6.0.0 entry; is-number@^7.0.0 stays.

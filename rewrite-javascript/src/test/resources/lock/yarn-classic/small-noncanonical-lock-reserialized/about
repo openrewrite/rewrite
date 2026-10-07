@@ -1,0 +1,1 @@
+A lock with a hand comment and blocks out of order, then an edit: yarn re-serializes the whole file.

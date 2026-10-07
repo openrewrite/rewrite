@@ -1,0 +1,1 @@
+resolutions {"is-odd/is-number": "7.0.0"} where is-odd is a root dependency: applies.

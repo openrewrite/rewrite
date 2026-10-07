@@ -1,0 +1,1 @@
+YarnClassicAddLockRegenTest.conflictingTransitiveAddFailsLoud as yarn runs it: adding is-odd (is-number ^6) beside is-number@^7.0.0 adds a second is-number entry.

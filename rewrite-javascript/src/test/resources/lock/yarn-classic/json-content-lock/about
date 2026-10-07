@@ -1,0 +1,1 @@
+LockPatcherTest.malformedYarnFailsLoud as yarn runs it: a yarn.lock holding JSON parses through the YAML fallback; yarn resolves fresh and replaces it.

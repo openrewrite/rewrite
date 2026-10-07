@@ -1,0 +1,1 @@
+malformed package.json is an array, not an object: yarn 1 exits 0 and writes a lock with no entries

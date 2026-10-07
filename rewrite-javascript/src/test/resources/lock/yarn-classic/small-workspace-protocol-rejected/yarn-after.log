@@ -1,0 +1,4 @@
+yarn install v1.22.22
+[1/4] Resolving packages...
+error Couldn't find any versions for "own-or" that matches "workspace:*"
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

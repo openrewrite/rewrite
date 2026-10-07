@@ -1,0 +1,1 @@
+The same edit with is-number listed before is-odd: the fresh is-number@~6.0.0 is resolved first, so the merged entry takes registry.yarnpkg.com.

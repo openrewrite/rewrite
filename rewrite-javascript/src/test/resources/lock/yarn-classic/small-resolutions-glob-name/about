@@ -1,0 +1,1 @@
+resolutions {"**/is-number": "7.0.0"}: same as the plain name (a plain name is read as **/name).

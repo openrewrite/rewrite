@@ -31,6 +31,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Stream;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -226,6 +228,32 @@ class NodeSemverTest {
                 .hasMessage(length);
         assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, ">=1 || x", Options.DEFAULT)).hasMessage(length);
         assertThatThrownBy(() -> NodeSemver.satisfies((Object) 2, "x || 1", Options.DEFAULT)).hasMessage(length);
+    }
+
+    // test/functions/clean.js
+    @Test
+    void clean() {
+        String[][] rows = {
+                {"1.2.3", "1.2.3"}, {" 1.2.3 ", "1.2.3"}, {" 1.2.3-4 ", "1.2.3-4"}, {" 1.2.3-pre ", "1.2.3-pre"},
+                {"  =v1.2.3   ", "1.2.3"}, {"v1.2.3", "1.2.3"}, {" v1.2.3 ", "1.2.3"}, {"\t1.2.3", "1.2.3"},
+                {">1.2.3", null}, {"~1.2.3", null}, {"<=1.2.3", null}, {"1.2.x", null},
+                {"0.12.0-dev.1150+3c22cecee", "0.12.0-dev.1150"},
+        };
+        for (String[] row : rows) {
+            assertThat(NodeSemver.clean(row[0], Options.DEFAULT)).as("clean(%s)", row[0]).isEqualTo(row[1]);
+        }
+    }
+
+    // test/ranges/max-satisfying.js
+    @Test
+    void maxSatisfying() {
+        assertThat(NodeSemver.maxSatisfying(asList("1.2.3", "1.2.4"), "1.2", Options.DEFAULT)).isEqualTo("1.2.4");
+        assertThat(NodeSemver.maxSatisfying(asList("1.2.4", "1.2.3"), "1.2", Options.DEFAULT)).isEqualTo("1.2.4");
+        assertThat(NodeSemver.maxSatisfying(asList("1.2.3", "1.2.4", "1.2.5", "1.2.6"), "~1.2.3", Options.DEFAULT))
+                .isEqualTo("1.2.6");
+        assertThat(NodeSemver.maxSatisfying(asList("1.1.0", "1.2.0", "1.2.1", "1.3.0", "2.0.0b1", "2.0.0b2", "2.0.0b3",
+                "2.0.0", "2.1.0"), "~2.0.0", Options.LOOSE)).isEqualTo("2.0.0");
+        assertThat(NodeSemver.maxSatisfying(emptyList(), "some frogs and sneks-v2.5.6", Options.DEFAULT)).isNull();
     }
 
     // satisfies catches what the Range constructor throws: `range.trim is not a function` for these

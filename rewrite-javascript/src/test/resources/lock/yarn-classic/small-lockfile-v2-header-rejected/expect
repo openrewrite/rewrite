@@ -1,0 +1,1 @@
+pm-rejects Can't install from a lockfile of version 2 as you're on an old yarn version that only supports versions up to 1

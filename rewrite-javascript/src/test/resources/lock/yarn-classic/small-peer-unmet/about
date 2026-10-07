@@ -1,0 +1,1 @@
+Adding @isaacs/testing-peer-deps-a 1.2.4 (peer -b@1) as a devDependency with no -b: yarn warns about the unmet peer, installs and locks no peer.

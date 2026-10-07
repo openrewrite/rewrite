@@ -1,0 +1,1 @@
+pm-rejects platform-specifying-test-package@1.0.0: The platform "darwin" is incompatible with this module

@@ -1,0 +1,1 @@
+resolutions {"kind-of": "3.2.0"} over is-number 3.0.0 (kind-of ^3.0.2 locked at 3.2.2): a compatible target below the locked version, no warning; the transitive pattern joins it.

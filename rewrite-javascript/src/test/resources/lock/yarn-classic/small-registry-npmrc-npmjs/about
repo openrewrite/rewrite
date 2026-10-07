@@ -1,0 +1,1 @@
+.npmrc registry=https://registry.npmjs.org/: requests go there, but resolved URLs are still written with registry.yarnpkg.com.

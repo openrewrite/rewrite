@@ -1,0 +1,1 @@
+A lock without integrity lines (yarn < 1.10) and an edit: old entries stay without integrity, the new one gets it.

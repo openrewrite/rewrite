@@ -20,6 +20,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collection;
+
 /**
  * node-semver's functions with its {@code loose} and {@code includePrerelease} options, exactly as
  * npm evaluates them. Unlike {@link Semver#validate(String, String, Semver.Ecosystem)} with
@@ -92,6 +94,53 @@ public class NodeSemver {
         // Range.test reads version.prerelease once every comparator passed, which only `*` does without a SemVer
         throw new IllegalArgumentException(r.isAny() ?
                 "Cannot read properties of undefined (reading 'length')" : notAString(version));
+    }
+
+    /**
+     * @return the version with surrounding whitespace and leading {@code =} and {@code v} removed, normalized, or
+     * {@code null} when it does not parse.
+     */
+    public static @Nullable String clean(String version, Options options) {
+        int start = 0;
+        int end = version.length();
+        while (start < end && isJsWhitespace(version.charAt(start))) {
+            start++;
+        }
+        while (end > start && isJsWhitespace(version.charAt(end - 1))) {
+            end--;
+        }
+        String trimmed = version.substring(start, end);
+        int i = 0;
+        while (i < trimmed.length() && (trimmed.charAt(i) == '=' || trimmed.charAt(i) == 'v')) {
+            i++;
+        }
+        return valid(trimmed.substring(i), options);
+    }
+
+    private static boolean isJsWhitespace(char c) {
+        return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '﻿';
+    }
+
+    /**
+     * @return the highest of the versions the range allows, the first of equal ones, or {@code null}.
+     */
+    public static @Nullable String maxSatisfying(Collection<String> versions, String range, Options options) {
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
+        if (r == null) {
+            return null;
+        }
+        String max = null;
+        ParsedVersion maxVersion = null;
+        for (String version : versions) {
+            if (r.test(version, options.loose)) {
+                ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+                if (maxVersion == null || maxVersion.comparePrecedence(v) < 0) {
+                    max = version;
+                    maxVersion = v;
+                }
+            }
+        }
+        return max;
     }
 
     /**

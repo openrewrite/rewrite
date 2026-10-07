@@ -1,0 +1,1 @@
+.yarnrc yarn-enable-lockfile-versions true adds # yarn and # node header lines.

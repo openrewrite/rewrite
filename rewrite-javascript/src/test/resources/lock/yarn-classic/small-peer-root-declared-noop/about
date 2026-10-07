@@ -1,0 +1,1 @@
+Adding a root peerDependencies entry: yarn 1 installs nothing for it and does not rewrite the lock.

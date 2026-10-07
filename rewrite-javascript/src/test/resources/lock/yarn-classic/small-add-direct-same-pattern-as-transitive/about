@@ -1,0 +1,1 @@
+Adding is-number@^6.0.0, a pattern the lock already holds for is-odd: the pattern is reused and yarn does not rewrite the lock.

@@ -1,0 +1,1 @@
+@isaacs/testing-bundledeps 1.0.0 bundles @isaacs/testing-bundledeps-a: yarn 1 resolves and locks the bundled dependency and its children from the registry like ordinary dependencies.

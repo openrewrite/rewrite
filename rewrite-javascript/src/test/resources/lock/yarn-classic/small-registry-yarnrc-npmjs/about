@@ -1,0 +1,1 @@
+.yarnrc registry "https://registry.npmjs.org/": resolved URLs keep registry.npmjs.org.

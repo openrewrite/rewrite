@@ -1,0 +1,1 @@
+A hand-written Yarn berry lock (__metadata) under yarn 1: treated as no lock at all; which-module@^2.0.0 resolves fresh and a v1 lock replaces it.

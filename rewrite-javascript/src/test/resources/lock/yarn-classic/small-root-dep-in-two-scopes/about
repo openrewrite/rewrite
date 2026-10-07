@@ -1,0 +1,1 @@
+which-module in dependencies (^2.0.0) and devDependencies (2.0.0): normalize-manifest keeps dependencies and drops the dev range.

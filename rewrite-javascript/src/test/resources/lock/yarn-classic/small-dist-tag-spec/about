@@ -1,0 +1,1 @@
+A dist-tag spec (which-module@rc) is its own pattern and resolves through dist-tags (2.0.1-rc1).
