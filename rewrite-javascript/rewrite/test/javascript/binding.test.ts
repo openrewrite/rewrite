@@ -1335,6 +1335,15 @@ describe("maybeRebind", () => {
         ));
     });
 
+    test("a type-only import is renamed where `typeof` reads it as a value", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import type { Old } from "m";\n\nlet y: typeof Old;\nlet z: Old;`,
+            `import type { New } from "m2";\n\nlet y: typeof New;\nlet z: New;`
+        ));
+    });
+
     test("a re-export from another module names that module's member, not the binding", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());

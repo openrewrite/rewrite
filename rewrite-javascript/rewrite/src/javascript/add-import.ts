@@ -2280,7 +2280,12 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private referencesBinding(identifier: J.Identifier): boolean {
         return identifier.simpleName === this.localName &&
             isReference(this.cursor, identifier) &&
-            resolve(this.cursor, identifier) === this.cu;
+            this.readsModuleBinding(identifier);
+    }
+
+    /** Whether the identifier reads the module-scope binding, which only a visit from the module can tell. */
+    private readsModuleBinding(identifier: J.Identifier): boolean {
+        return this.cu !== undefined && resolve(this.cursor, identifier) === this.cu;
     }
 
     /** A shorthand property's name slot is also the reference to the binding. */
@@ -2288,7 +2293,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const name = propertyAssignment.name.element;
         if (this.renaming && propertyAssignment.initializer === undefined &&
             name.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === this.localName &&
-            resolve(this.cursor, name as J.Identifier) === this.cu) {
+            this.readsModuleBinding(name as J.Identifier)) {
             // The key names a property rather than the binding, so it carries no attribution,
             // the same way `aliasing` builds a property name that stands for nothing.
             return {
