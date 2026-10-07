@@ -157,7 +157,7 @@ public class RemoveUnusedImports extends Recipe {
 
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(target, emptySet())) {
-                        if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
+                        if (maybeStatic.getOwningClass() != null && toFullyQualifiedName(outerType).startsWith(toFullyQualifiedName(maybeStatic.getOwningClass().getFullyQualifiedName()))) {
                             if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
                             }
@@ -169,17 +169,18 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
+                        SortedSet<String> unfoldedMethodsAndFields = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
-                        } else if (((methodsAndFields == null ? 0 : methodsAndFields.size()) +
+                        } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
                                 (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
                             // add each unfolded import
-                            if (methodsAndFields != null) {
-                                for (String method : methodsAndFields) {
+                            if (unfoldedMethodsAndFields != null) {
+                                for (String method : unfoldedMethodsAndFields) {
                                     anImport.imports.add(new JRightPadded<>(elem
                                             .withId(randomId())
                                             .withQualid(qualid.withName(name.withSimpleName(method)))
@@ -207,7 +208,7 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedStaticWildcardImports.add(elem.getTypeName());
                         }
-                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> fullyQualifiedNamesAreEqual(elem.getTypeName(), c.getFullyQualifiedName())) ||
                             (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
                             (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;
