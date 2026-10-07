@@ -1,0 +1,1 @@
+The repository's package.json lists mid/* as workspaces and mid/app holds a .yarnrc naming registry.npmjs.org: yarn 1.22.22 run in mid/app writes the root's yarn.lock with that registry, which an install run at the root does not read.

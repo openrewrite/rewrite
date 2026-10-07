@@ -295,8 +295,8 @@ class YarnClassicLockRegeneratorTest {
     /**
      * Run in packages/a, yarn writes the lock of the root whose workspaces it matches, but reads the config files and
      * the packageManager from packages/a up: with one below the root, the root's lock is not what an install at the
-     * root writes ({@code review/yc3/cfg-yarn-memberrc}, {@code cfg-yarn-membernpmrc}: the bumped entry's
-     * {@code resolved} follows packages/a/.yarnrc or .npmrc).
+     * root writes ({@code open-parent-workspaces-lists-project-own-yarnrc}: the root's lock names the project's
+     * .yarnrc registry).
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
