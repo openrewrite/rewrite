@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
+import {Cursor, isTree, Markers, markers, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type, TypedTree} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
 import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
-import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
+import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {autoIndent, maybeAutoFormat} from '../format';
 import {renameBindings} from './bindings';
@@ -325,6 +325,7 @@ export class TemplateEngine {
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
      * @param format Whether to fit the result to where it lands
      * @param renames Local names for the template's declared bindings, keyed as declared
+     * @param patternPrefixes The matched pattern's capture prefixes, given only under `format: false`
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
@@ -335,7 +336,8 @@ export class TemplateEngine {
         values: Pick<Map<string, J>, 'get'> = new Map(),
         wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
         format: boolean = true,
-        renames: Record<string, string> = {}
+        renames: Record<string, string> = {},
+        patternPrefixes?: Pick<Map<string, J.Space>, 'get'>
     ): Promise<J | undefined> {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -352,7 +354,7 @@ export class TemplateEngine {
             : fresh.tree;
 
         // Unsubstitute placeholders with actual parameter values and match results
-        const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap);
+        const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap, patternPrefixes);
         const unsubstitutedAst = (await visitor.visit(bound, null))!;
 
         // An id may only be kept where the node answering to it is leaving the tree, which is the
@@ -828,11 +830,16 @@ export class TemplateApplier {
 
         const originalTree = tree as J;
         let resultToUse = this.wrapTree(originalTree, this.ast);
-        const slot = this.replacedSlot(originalTree);
-        if (slot) {
-            // `format` substitutes the target's prefix, so decide against the prefix that will print
-            resultToUse = maybeParenthesize(slot[0], slot[1], {...resultToUse, prefix: originalTree.prefix});
+        // A replaced node spliced back in as a capture carries its own trailing markers
+        const trailing = trailingMarkers(originalTree);
+        const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
+        if (slotMarkers) {
+            resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
         }
+        const slot = this.replacedSlot(originalTree);
+        // `format` substitutes the target's prefix, so decide against the prefix that will print
+        resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
+            {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
         return this.format(resultToUse, originalTree);
     }
 
@@ -941,6 +948,21 @@ export class TemplateApplier {
         }
         return resultToUse;
     }
+}
+
+/**
+ * The trailing markers of the node a template replaces. Each prints after whatever node fills the slot,
+ * so a pattern does not match on it and the replacement keeps it.
+ */
+function trailingMarkers(replaced: J): Markers | undefined {
+    const trailing = replaced.markers.markers.filter(isTrailingMarker);
+    return trailing.length === 0 ? undefined : markers(...trailing);
+}
+
+/** `own`, plus each marker of `added` whose kind `own` does not already hold. */
+function withMarkers(own: Markers, added: Markers): Markers {
+    const missing = added.markers.filter(m => !own.markers.some(o => o.kind === m.kind));
+    return missing.length === 0 ? own : {...own, markers: [...own.markers, ...missing]};
 }
 
 /** The markers of a node wrapping `wrapped`, less the {@link SubstitutedValue} that belongs to `wrapped` alone. */

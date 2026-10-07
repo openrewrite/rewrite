@@ -51,7 +51,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     constructor(
         private readonly substitutions: Map<string, Parameter>,
         private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map(),
-        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
+        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
+        private readonly patternPrefixes: Pick<Map<string, J.Space>, 'get'> = new Map()
     ) {
         super();
     }
@@ -257,6 +258,15 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
     private readonly elementPrefix: MergePrefix = (source, template) =>
         source.whitespace.includes('\n') && !template.whitespace.includes('\n') ?
             [source, true] : this.templatePrefix(source, template);
+
+    private readonly sourcePrefix: MergePrefix = source => [source, true];
+
+    /** Whether the template writes the same prefix before capture `name` as the pattern it matched with. */
+    private spacedAsInPattern(name: string, placeholder: J): boolean {
+        const pattern = this.patternPrefixes.get(name);
+        return pattern !== undefined && pattern.comments.length === 0 && placeholder.prefix.comments.length === 0 &&
+            pattern.whitespace === placeholder.prefix.whitespace;
+    }
 
     /** `value` substituted for `placeholder` under the prefix `merge` chooses, marked as a {@link SubstitutedValue}. */
     private substitute(value: J, placeholder: J, merge: MergePrefix): J {
@@ -519,7 +529,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
             const matchedNode = this.values.get(name);
             if (matchedNode && !Array.isArray(matchedNode)) {
-                return this.substitute(matchedNode, placeholder, merge);
+                return this.substitute(matchedNode, placeholder,
+                    this.spacedAsInPattern(name, placeholder) ? this.sourcePrefix : merge);
             }
 
             // If no match found, return placeholder unchanged

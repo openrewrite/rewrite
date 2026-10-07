@@ -21,7 +21,7 @@ import {ModuleScopeBinding} from '../add-import';
 import {opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, LRUCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -443,7 +443,9 @@ export class Template {
             normalizedValues,
             wrappersMap,
             options?.format ?? true,
-            renames
+            renames,
+            // Unformatted, a capture the template spaces as the pattern did keeps the source's spacing
+            options?.format === false && values instanceof MatchResult ? values[PATTERN_PREFIXES_SYMBOL]() : undefined
         );
     }
 }
