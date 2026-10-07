@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -289,6 +290,38 @@ class YarnClassicLockRegeneratorTest {
                 "workspaces list app, and writes ../yarn.lock, not this project's");
         assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.directory("b").build())))
                 .isEqualTo("requests");
+    }
+
+    /**
+     * At a workspace root above the project yarn reads that root's lock, then rejects the workspaces getWorkspaces
+     * rejects before it globs them; a lock there that the inputs lack may stop it first.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "not private|{\"name\":\"top\",\"workspaces\":[\"mid/*\"]}|false|error Workspaces can only be enabled " +
+            "in private projects.",
+            "packages a string|{\"private\":true,\"workspaces\":{\"packages\":\"mid/*\",\"nohoist\":[]}}|false|" +
+            "error The workspaces field in package.json must be an array.",
+            "not private, its lock unread|{\"name\":\"top\",\"workspaces\":[\"mid/*\"]}|true|cannot-know the lock " +
+            "yarn writes for this edit: yarn installs at the workspace root ../../",
+            "eligible|{\"private\":true,\"workspaces\":[\"mid/*\"]}|false|cannot-know the lock yarn writes for this " +
+            "edit: yarn installs at the workspace root ../../, whose workspaces list mid/app",
+    })
+    void rejectsAtAWorkspaceRootAboveWhatGetWorkspacesRejects(String label, String root, boolean rootLock,
+                                                               String outcome) {
+        Set<String> paths = new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "../../package.json"));
+        if (rootLock) {
+            paths.add("../../yarn.lock");
+        }
+        YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"app\",\"version\":\"1.0.0\"}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .configFile("../../package.json", root)
+                .paths(paths)
+                .directory("mid/app")
+                .now(Instant.EPOCH)
+                .build();
+        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs))).startsWith(outcome);
     }
 
     @ParameterizedTest(name = "{0}")

@@ -1,0 +1,1 @@
+The repository's workspaces object names packages as the string mid/* beside an empty nohoist list: findWorkspaceRoot matches mid/app, and resolveWorkspaces at the root rejects a packages that is not an array.

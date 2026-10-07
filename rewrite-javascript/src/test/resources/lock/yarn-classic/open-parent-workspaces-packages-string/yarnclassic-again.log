@@ -1,0 +1,8 @@
+yarn install v1.22.22
+warning package.json: No license field
+info No lockfile found.
+error The workspaces field in package.json must be an array.
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
+over=before
+exit=1
+no lock written

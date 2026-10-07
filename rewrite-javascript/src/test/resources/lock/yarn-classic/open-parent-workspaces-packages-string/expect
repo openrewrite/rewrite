@@ -1,0 +1,1 @@
+pm-rejects The workspaces field in package.json must be an array.

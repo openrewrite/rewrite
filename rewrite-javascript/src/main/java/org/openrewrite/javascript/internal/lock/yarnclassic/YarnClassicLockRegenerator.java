@@ -432,19 +432,32 @@ public final class YarnClassicLockRegenerator {
         String lockfileFolder = up.isEmpty() ? "" : up.substring(0, up.length() - 1);
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
                 inputs.getConfigFiles().get(up + "package.json");
-        if (manifest != null) {
-            tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, warnings);
-        }
+        Manifest root = manifest == null ? null :
+                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, warnings);
         if (workspaceRoot >= 0 && !config.isWorkspacesEnabled()) {
             throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
         }
         if (workspaceRoot > 0) {
-            throw new CannotKnow("the lock yarn writes for this edit: yarn installs at the workspace root " + up +
-                                 ", whose workspaces list " + relativePath(workspaceRoot) + ", and writes " + up +
-                                 "yarn.lock, not this project's");
+            installAtWorkspaceRoot(workspaceRoot, Objects.requireNonNull(root), config, warnings);
         }
         return config;
+    }
+
+    /**
+     * install.js {@code run} and {@code fetchRequestFromCwd} at a workspace root above the project, as far as they go
+     * without what the inputs lack: the root's lock when it has one, then its workspaces up to their glob.
+     */
+    private void installAtWorkspaceRoot(int workspaceRoot, Manifest root, YarnClassicOptions config,
+                                        List<String> warnings) {
+        String up = YarnClassicOptions.up(workspaceRoot);
+        Set<String> paths = inputs.getPaths();
+        if (!config.getFlags().isLockfile() || paths != null && !paths.contains(up + "yarn.lock")) {
+            workspacePatterns(root, config, warnings);
+        }
+        throw new CannotKnow("the lock yarn writes for this edit: yarn installs at the workspace root " + up +
+                             ", whose workspaces list " + relativePath(workspaceRoot) + ", and writes " + up +
+                             "yarn.lock, not this project's");
     }
 
     /**
@@ -850,19 +863,8 @@ public final class YarnClassicLockRegenerator {
         if (!config.isWorkspacesEnabled()) {
             return workspaces;
         }
-        Map<String, @Nullable Object> ws = getWorkspaces(root, true, config, warnings);
-        Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
-        if (!(patterns instanceof List)) {
-            throw new MessageError("The workspaces field in package.json must be an array.");
-        }
-        for (Object pattern : (List<?>) patterns) {
-            if (!(pattern instanceof String)) {
-                throw new JsError(JsError.TYPE_ERROR, pattern == null ?
-                        "Cannot read properties of null (reading 'replace')" : "pattern.replace is not a function");
-            }
-        }
         Set<String> files = new LinkedHashSet<>();
-        for (Object pattern : (List<?>) patterns) {
+        for (Object pattern : workspacePatterns(root, config, warnings)) {
             files.addAll(glob((String) pattern));
         }
         for (String file : files) {
@@ -884,6 +886,22 @@ public final class YarnClassicLockRegenerator {
             workspaces.put(name, new WorkspaceLayout.Workspace(loc, manifest));
         }
         return workspaces;
+    }
+
+    // resolveWorkspaces up to its glob, which calls replace on every pattern before the first glob starts
+    private static List<?> workspacePatterns(Manifest root, YarnClassicOptions config, List<String> warnings) {
+        Map<String, @Nullable Object> ws = getWorkspaces(root, true, config, warnings);
+        Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
+        if (!(patterns instanceof List)) {
+            throw new MessageError("The workspaces field in package.json must be an array.");
+        }
+        for (Object pattern : (List<?>) patterns) {
+            if (!(pattern instanceof String)) {
+                throw new JsError(JsError.TYPE_ERROR, pattern == null ?
+                        "Cannot read properties of null (reading 'replace')" : "pattern.replace is not a function");
+            }
+        }
+        return (List<?>) patterns;
     }
 
     /**
