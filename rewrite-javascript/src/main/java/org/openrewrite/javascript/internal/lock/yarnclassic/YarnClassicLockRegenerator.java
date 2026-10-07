@@ -249,7 +249,8 @@ public final class YarnClassicLockRegenerator {
     private @Nullable Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, YarnClassicOptions config,
                                                                                 List<String> warnings) {
         Object ws = root.get("workspaces");
-        Object packages = ws instanceof List ? ws : ws instanceof Map ? ((Map<String, Object>) ws).get("packages") : null;
+        Object packages = ws instanceof List ? ws :
+                ws instanceof Map ? ((Map<String, Object>) ws).get("packages") : null;
         if (!(packages instanceof List) || ((List<?>) packages).isEmpty() || !Js.truthy(root.get("private"))) {
             return null;
         }

@@ -197,7 +197,7 @@ final class NormalizeManifest {
         for (String key : STRINGS) {
             Object val = info.get(key);
             if (Js.truthy(val) && !(val instanceof String)) {
-                throw new MessageError(key + " is not a string");
+                throw new MessageError(Lang.format("$0 is not a string", key));
             }
         }
         cleanDependencies(info, isRoot, warn);

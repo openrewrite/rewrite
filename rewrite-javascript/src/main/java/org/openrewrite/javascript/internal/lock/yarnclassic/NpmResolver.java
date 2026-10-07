@@ -44,7 +44,8 @@ final class NpmResolver {
      */
     @SuppressWarnings("unchecked")
     static Map<String, @Nullable Object> findVersionInRegistryResponse(YarnClassicOptions config, String name,
-                                                                       String range, Map<String, @Nullable Object> body) {
+                                                                       String range,
+                                                                       Map<String, @Nullable Object> body) {
         Object versions = body.get("versions");
         Object distTags = body.get("dist-tags");
         if (versions instanceof Map && ((Map<?, ?>) versions).isEmpty()) {
@@ -52,8 +53,8 @@ final class NpmResolver {
                     body.get("name")));
         }
         if (!Js.truthy(distTags) || !Js.truthy(versions)) {
-            throw new MessageError(Lang.format("Received malformed response from registry for $0. The registry may be " +
-                                               "down.", name));
+            throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
+                                               "The registry may be down.", name));
         }
         Map<String, @Nullable Object> tags = (Map<String, @Nullable Object>) distTags;
         Map<String, @Nullable Object> byVersion = (Map<String, @Nullable Object>) versions;

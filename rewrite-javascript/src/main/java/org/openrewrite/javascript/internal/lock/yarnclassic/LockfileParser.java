@@ -254,7 +254,8 @@ final class LockfileParser {
         }
 
         private JsError unexpected(String msg) {
-            return new JsError(JsError.SYNTAX_ERROR, msg + " " + token.getLine() + ":" + token.getCol() + " in " + fileLoc);
+            return new JsError(JsError.SYNTAX_ERROR,
+                    msg + " " + token.getLine() + ":" + token.getCol() + " in " + fileLoc);
         }
 
         Map<String, @Nullable Object> parse(int indent) {
@@ -369,7 +370,8 @@ final class LockfileParser {
     }
 
     static boolean hasMergeConflicts(String str) {
-        return str.contains(MERGE_CONFLICT_START) && str.contains(MERGE_CONFLICT_SEP) && str.contains(MERGE_CONFLICT_END);
+        return str.contains(MERGE_CONFLICT_START) && str.contains(MERGE_CONFLICT_SEP) &&
+               str.contains(MERGE_CONFLICT_END);
     }
 
     static @Nullable Object parse(String str, String fileLoc) {

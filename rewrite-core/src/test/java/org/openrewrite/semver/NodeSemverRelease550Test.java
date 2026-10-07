@@ -91,7 +91,8 @@ class NodeSemverRelease550Test {
     // Range.test parses a string version and throws on one that does not parse (7.x answers false); run on 5.5.0
     @Test
     void testThrowsOnAVersionThatDoesNotParse() {
-        assertThatThrownBy(() -> NodeSemver.satisfies("1.0", "^1.0.0", Options.V5_5_0)).hasMessage("Invalid Version: 1.0");
+        assertThatThrownBy(() -> NodeSemver.satisfies("1.0", "^1.0.0", Options.V5_5_0))
+                .hasMessage("Invalid Version: 1.0");
         assertThatThrownBy(() -> NodeSemver.satisfies("1.0", "x", Options.V5_5_0)).hasMessage("Invalid Version: 1.0");
         assertThat(NodeSemver.satisfies("", "^1.0.0", Options.V5_5_0)).isFalse();
         assertThat(NodeSemver.satisfies("1.2.3", "not a range", Options.V5_5_0)).isFalse();
