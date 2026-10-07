@@ -44,12 +44,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code Ssri} ports ssri 5.3.0, {@code Ini} ports ini 1.3.5 and {@code Minimatch} ports minimatch 3.0.4, as yarn
- * 1.22.22 bundles them, all distributed under the ISC License:
+ * {@code Ssri} ports ssri 5.3.0, {@code Ini} ports ini 1.3.5, {@code Minimatch} ports minimatch 3.0.4 and
+ * {@code ParseGlob} glob-parent 2.0.0, as yarn 1.22.22 bundles them, all distributed under the ISC License:
  * <ul>
  *     <li>ssri: Copyright (c) npm, Inc.</li>
  *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>
  *     <li>minimatch: Copyright (c) Isaac Z. Schlueter and Contributors</li>
+ *     <li>glob-parent: Copyright (c) 2015 Elan Shanker</li>
  * </ul>
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
@@ -65,15 +66,26 @@
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
  * {@code DeepEqual} ports deep-equal 1.0.1, {@code JsYaml} the loader of js-yaml 3.13.1, {@code ObjectPath}
- * object-path 0.11.4 and {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0, as yarn 1.22.22
- * bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the
- * MIT License:
+ * object-path 0.11.4, {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0, {@code Micromatch}
+ * micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff 2.0.0, {@code Braces} braces 1.8.5 with
+ * expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and randomatic
+ * 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob 0.3.2 and
+ * {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles them, and
+ * {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the MIT License:
  * <ul>
  *     <li>deep-equal: James Halliday</li>
  *     <li>brace-expansion, balanced-match: Copyright (c) 2013 Julian Gruber</li>
  *     <li>js-yaml: Copyright (C) 2011-2015 by Vitaly Puzrin</li>
  *     <li>object-path: Copyright (c) 2015 Mario Casciaro</li>
  *     <li>Node.js: Copyright Joyent, Inc. and other Node contributors</li>
+ *     <li>micromatch, is-glob, is-extglob, preserve, arr-diff: Copyright (c) 2014-2015, Jon Schlinkert</li>
+ *     <li>braces, expand-range, repeat-string: Copyright (c) 2014-2016, Jon Schlinkert</li>
+ *     <li>fill-range: Copyright (c) 2014-2018, Jon Schlinkert</li>
+ *     <li>expand-brackets, is-posix-bracket: Copyright (c) 2015-2016, Jon Schlinkert</li>
+ *     <li>extglob, parse-glob, glob-base: Copyright (c) 2015, Jon Schlinkert</li>
+ *     <li>is-dotfile: Copyright (c) 2015-2017, Jon Schlinkert</li>
+ *     <li>repeat-element: Copyright (c) 2015 Jon Schlinkert</li>
+ *     <li>randomatic: Copyright (c) 2013-2017, Jon Schlinkert</li>
  * </ul>
  * <pre>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of

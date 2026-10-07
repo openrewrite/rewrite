@@ -29,8 +29,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of braces 1.8.5 with expand-range 1.8.2, fill-range 2.2.4 and preserve 0.2.0, as yarn 1.22.22 bundles them
- * for micromatch 2.3.11.
+ * Port of braces 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2 and the
+ * determinism of randomatic 3.0.0, as yarn 1.22.22 bundles them for micromatch 2.3.11.
  */
 final class Braces {
 

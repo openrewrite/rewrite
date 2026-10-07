@@ -27,8 +27,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) on POSIX paths, as
- * yarn 1.22.22 bundles it, for the calls yarn makes, which pass no options.
+ * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) with is-glob 2.0.1,
+ * is-extglob 1.0.0 and arr-diff 2.0.0 on POSIX paths, as yarn 1.22.22 bundles them, for calls with no options.
  */
 final class Micromatch {
 
