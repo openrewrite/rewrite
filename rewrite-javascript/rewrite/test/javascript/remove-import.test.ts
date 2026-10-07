@@ -1762,5 +1762,63 @@ describe('RemoveImport visitor', () => {
                 )
             );
         });
+
+        test('a qualified type name reads a namespace, which an interface does not bind', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "NS"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import * as NS from 'm';
+
+                        namespace Outer {
+                            interface NS {}
+                            let x: NS.Foo;
+                        }
+                    `
+                )
+            );
+        });
+
+        test('a namespace binds a value only once it is instantiated', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("m", "X"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        namespace Outer {
+                            namespace X { export type T = 1 }
+                            X.go();
+                        }
+                    `
+                )
+            );
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        import {X} from 'm';
+
+                        namespace Outer {
+                            namespace X { export const go = () => 1 }
+                            X.go();
+                        }
+                    `,
+                    `
+                        namespace Outer {
+                            namespace X { export const go = () => 1 }
+                            X.go();
+                        }
+                    `
+                )
+            );
+        });
     });
 });

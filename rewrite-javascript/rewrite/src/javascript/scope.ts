@@ -22,10 +22,16 @@ import type {JavaScriptVisitor} from "./visitor";
 const noNames: ReadonlySet<string> = new Set();
 
 /**
- * Which declarations a lookup counts. TypeScript binds values and types in separate spaces, so a
- * value reference is hidden by a `const` of its name but not by an `interface`.
+ * Which declarations a lookup counts. TypeScript binds values, types and namespaces in separate
+ * spaces, so a value reference is hidden by a `const` of its name but not by an `interface`. The
+ * qualifier before a dot in a type reads a namespace, which an interface does not declare.
  */
-export type Meaning = 'all' | 'value' | 'type';
+export type Meaning = 'all' | 'value' | 'type' | 'namespace';
+
+/** Whether a lookup for `meaning` counts a declaration that binds `bound`. */
+function counts(meaning: Meaning, ...bound: Meaning[]): boolean {
+    return meaning === 'all' || bound.includes(meaning);
+}
 
 /** One scope: the names it binds itself, the scopes around it, and what they answer together. */
 export interface Scope {
@@ -250,6 +256,9 @@ function meaningOf(node: any, key: string, meaning: Meaning): Meaning {
         return 'type';
     }
     switch (node.kind) {
+        case J.Kind.FieldAccess:
+            // In a type, `NS.Foo` reads the namespace `NS`, as `A.B.C` reads `A`.
+            return key === 'target' && meaning === 'type' ? 'namespace' : meaning;
         case JS.Kind.TypeInfo:
         case JS.Kind.TypeDeclaration:
         case J.Kind.TypeParameter:
@@ -364,7 +373,7 @@ function frameBindings(node: any, parent: any, meaning: Meaning): ReadonlySet<st
     if (node?.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
         let names = selfNamed[meaning].get(node);
         if (!names) {
-            const self = meaning === 'type' ? [] : boundNames((node as J.MethodDeclaration).name);
+            const self = counts(meaning, 'value') ? boundNames((node as J.MethodDeclaration).name) : [];
             selfNamed[meaning].set(node, names = new Set([...self, ...ownBindings(node, meaning)]));
         }
         return names;
@@ -464,34 +473,72 @@ function declarationNames(statement: any, meaning: Meaning): string[] {
         case JS.Kind.Import:
             return importNames(statement as JS.Import, meaning);
         case J.Kind.VariableDeclarations:
-            return meaning === 'type' ? [] : (statement as J.VariableDeclarations).variables
-                .flatMap(variable => boundNames(unwrap(variable)?.name));
+            return counts(meaning, 'value') ? (statement as J.VariableDeclarations).variables
+                .flatMap(variable => boundNames(unwrap(variable)?.name)) : [];
         case JS.Kind.ScopedVariableDeclarations:
             return declaredNames((statement as JS.ScopedVariableDeclarations).variables, meaning);
         case J.Kind.MethodDeclaration:
-            return meaning === 'type' ? [] : boundNames((statement as J.MethodDeclaration).name);
+            return counts(meaning, 'value') ? boundNames((statement as J.MethodDeclaration).name) : [];
         case J.Kind.ClassDeclaration: {
             const declaration = statement as J.ClassDeclaration;
-            return meaning === 'value' && declaration.classKind.type === J.ClassDeclaration.Kind.Type.Interface
-                ? []
-                : boundNames(declaration.name);
+            switch (declaration.classKind.type) {
+                case J.ClassDeclaration.Kind.Type.Interface:
+                    return counts(meaning, 'type') ? boundNames(declaration.name) : [];
+                case J.ClassDeclaration.Kind.Type.Enum:
+                    // An enum's members are read as `E.A` in a type, so it is a namespace too.
+                    return boundNames(declaration.name);
+                default:
+                    return counts(meaning, 'value', 'type') ? boundNames(declaration.name) : [];
+            }
         }
-        case JS.Kind.NamespaceDeclaration:
-            return boundNames(unwrap((statement as JS.NamespaceDeclaration).name));
+        case JS.Kind.NamespaceDeclaration: {
+            const declaration = statement as JS.NamespaceDeclaration;
+            return counts(meaning, 'namespace') || meaning === 'value' && isInstantiated(declaration)
+                ? boundNames(rootName(unwrap(declaration.name)))
+                : [];
+        }
         case JS.Kind.TypeDeclaration:
-            return meaning === 'value' ? [] : boundNames(unwrap((statement as JS.TypeDeclaration).name));
+            return counts(meaning, 'type') ? boundNames(unwrap((statement as JS.TypeDeclaration).name)) : [];
         case J.Kind.TypeParameter:
             // A type parameter binds across the declaration carrying it, not in the scope that one
             // sits in, so no statement list leads here.
-            return meaning === 'value' ? [] : boundNames((statement as J.TypeParameter).name);
+            return counts(meaning, 'type') ? boundNames((statement as J.TypeParameter).name) : [];
         case JS.Kind.MappedTypeParameter:
-            return meaning === 'value' ? [] : boundNames((statement as JS.MappedType.Parameter).name as J);
+            return counts(meaning, 'type') ? boundNames((statement as JS.MappedType.Parameter).name as J) : [];
         case J.Kind.Case:
             // The cases of a switch share the block it opens, so each one's declarations bind in all.
             return declaredNames((statement as J.Case).statements.elements, meaning);
         default:
             return [];
     }
+}
+
+/**
+ * Whether a namespace exists at runtime, which it does once its body holds something other than
+ * interfaces, type aliases, unexported imports and namespaces that do not. That is TypeScript's
+ * rule, and only such a namespace binds a value.
+ */
+function isInstantiated(declaration: JS.NamespaceDeclaration): boolean {
+    return (declaration.body?.statements ?? []).some(statement => {
+        const element = unwrap(statement);
+        switch (element?.kind) {
+            case JS.Kind.TypeDeclaration:
+                return false;
+            case J.Kind.ClassDeclaration:
+                return (element as J.ClassDeclaration).classKind.type !== J.ClassDeclaration.Kind.Type.Interface;
+            case JS.Kind.Import:
+                return (element as JS.Import).modifiers.some(modifier => modifier.keyword === 'export');
+            case JS.Kind.NamespaceDeclaration:
+                return isInstantiated(element as JS.NamespaceDeclaration);
+            default:
+                return true;
+        }
+    });
+}
+
+/** The identifier a dotted name `A.B.C` declares, which is `A`: the rest are members of it. */
+function rootName(name: J | undefined): J | undefined {
+    return name?.kind === J.Kind.FieldAccess ? rootName((name as J.FieldAccess).target) : name;
 }
 
 /**
@@ -562,7 +609,7 @@ const frames = byMeaning();
 const selfNamed = byMeaning();
 
 function byMeaning(): Record<Meaning, WeakMap<object, ReadonlySet<string>>> {
-    return {all: new WeakMap(), value: new WeakMap(), type: new WeakMap()};
+    return {all: new WeakMap(), value: new WeakMap(), type: new WeakMap(), namespace: new WeakMap()};
 }
 
 /**
@@ -572,7 +619,7 @@ function byMeaning(): Record<Meaning, WeakMap<object, ReadonlySet<string>>> {
  */
 function hoistedNames(scope: any, meaning: Meaning): string[] {
     // Only `var` and function declarations hoist, and both bind values, so one cache serves every meaning.
-    if (meaning === 'type' || typeof scope !== 'object' || scope === null) {
+    if (!counts(meaning, 'value') || typeof scope !== 'object' || scope === null) {
         return [];
     }
     const cached = hoisted.get(scope);
