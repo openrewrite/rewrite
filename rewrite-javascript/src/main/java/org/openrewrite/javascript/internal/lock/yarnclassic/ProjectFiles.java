@@ -22,17 +22,28 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The project's manifests by location relative to its root ({@code ""} the root, {@code packages/a} a member) and the
- * paths it holds when the host says: what yarn reads from the filesystem during an install.
+ * The project's manifests by location relative to its root ({@code ""} the root, {@code packages/a} a member), the
+ * paths it holds when the host says, and the location yarn runs in: what yarn reads from the filesystem during an
+ * install.
  */
 final class ProjectFiles {
 
     private final Map<String, String> manifests;
     private final @Nullable Set<String> paths;
+    private final String cwd;
 
     ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths) {
+        this(manifests, paths, "");
+    }
+
+    ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths, String cwd) {
         this.manifests = manifests;
         this.paths = paths;
+        this.cwd = cwd;
+    }
+
+    String cwd() {
+        return cwd;
     }
 
     /**

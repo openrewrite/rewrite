@@ -49,12 +49,15 @@ final class YarnClassicInputs {
                 configFiles.put(".npmrc", npmrc);
             }
         }
+        Path workingDirectory = request.getWorkingDirectory();
         return Inputs.builder()
                 .lock(request.getLock())
                 .manifests(NpmInputs.manifests(request, rootDir))
                 .configFiles(configFiles)
                 .paths(paths(request, rootDir))
                 .directory(rootDir)
+                .cwd(workingDirectory == null ? "" : NpmInputs.location(rootDir,
+                        workingDirectory.normalize().toString().replace('\\', '/')))
                 .host(host)
                 .now(now)
                 .build();

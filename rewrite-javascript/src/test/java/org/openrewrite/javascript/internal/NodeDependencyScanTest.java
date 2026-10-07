@@ -113,7 +113,8 @@ class NodeDependencyScanTest {
 
     /**
      * Run in a workspace member that has a lock of its own, npm, Yarn classic, pnpm and Bun install at the workspace
-     * root and write its lock, leaving the member's as it was.
+     * root and write its lock, leaving the member's as it was; where the package manager's own walk says so, the
+     * regeneration runs it in the member.
      */
     @ParameterizedTest
     @CsvSource({"Npm, package-lock.json", "YarnClassic, yarn.lock", "Pnpm, pnpm-lock.yaml", "Bun, bun.lock"})
@@ -128,6 +129,7 @@ class NodeDependencyScanTest {
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(rootLock);
         assertThat(files.getManifests()).containsOnlyKeys(ROOT, MEMBER);
+        assertThat(files.getWorkingDirectory()).isEqualTo(pm == PackageManager.Pnpm ? null : Paths.get("packages/a"));
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
         assertThat(NodeDependencyScan.lockImporters(acc, rootLock)).containsExactly(ROOT, MEMBER);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
@@ -206,6 +208,7 @@ class NodeDependencyScanTest {
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
         assertThat(files.getManifests()).containsOnlyKeys(MEMBER);
         assertThat(files.getPackageManagerFiles()).containsOnlyKeys(ROOT);
+        assertThat(files.getWorkingDirectory()).isNull();
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("member lock");
         assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).containsExactly(MEMBER);

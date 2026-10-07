@@ -92,6 +92,13 @@ public final class YarnClassicLockRegenerator {
         String directory;
 
         /**
+         * The directory yarn runs in relative to the root ({@code packages/a}), {@code ""} the root's: a workspace
+         * member whose own lock yarn passes over for the root's.
+         */
+        @Builder.Default
+        String cwd = "";
+
+        /**
          * The environment yarn runs in; null when the host does not know it.
          */
         @Nullable
@@ -213,7 +220,8 @@ public final class YarnClassicLockRegenerator {
             }
 
             PackageResolver resolver = new PackageResolver(config, lockfile, resolutionMap, registry,
-                    new ProjectFiles(inputs.getManifests(), inputs.getPaths()), inputs.getHost(), warnings);
+                    new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost(),
+                    warnings);
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
             if (!resolver.races.isEmpty()) {
@@ -446,8 +454,9 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * How many directories above the project's the workspace root is whose lock yarn writes when run in the project's
-     * directory, when an install run at that root writes the same; else 0. Yarn reads the config files and the
-     * packageManager from where it runs up, so one in a directory below the root makes the two installs differ.
+     * directory, when an install at that root with the project's directory as {@link Inputs#getCwd() cwd} writes the
+     * same; else 0. That install reads the config files from the root up, so one below the root makes the two differ,
+     * and {@code --focus} is a focused install in the project's directory.
      */
     public static int installRoot(Inputs inputs) {
         return new YarnClassicLockRegenerator(inputs).installRoot();
@@ -458,7 +467,7 @@ public final class YarnClassicLockRegenerator {
         requireRelease(rc);
         requirePackageManager();
         int workspaceRoot = findWorkspaceRoot(YarnClassicOptions.looseSemver(rc), new ArrayList<>());
-        if (workspaceRoot <= 0) {
+        if (workspaceRoot <= 0 || YarnClassicOptions.focus(rc)) {
             return 0;
         }
         Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
@@ -467,13 +476,6 @@ public final class YarnClassicLockRegenerator {
         }
         for (String file : files) {
             if (CONFIG_FILE.matcher(file).matches() && YarnClassicOptions.depth(singletonList(file)) < workspaceRoot) {
-                return 0;
-            }
-        }
-        for (int depth = 0; depth < workspaceRoot; depth++) {
-            String text = depth == 0 ? inputs.getManifests().get("") :
-                    inputs.getConfigFiles().get(YarnClassicOptions.up(depth) + "package.json");
-            if (text != null && packageManager(text) != null) {
                 return 0;
             }
         }
@@ -608,9 +610,19 @@ public final class YarnClassicLockRegenerator {
         }
     }
 
-    // cli/index.js findPackageManager, which passes over a package.json JSON.parse rejects
+    // cli/index.js findPackageManager from where yarn runs, which passes over a package.json JSON.parse rejects
     private @Nullable String findPackageManager() {
         Set<String> paths = inputs.getPaths();
+        for (String dir = inputs.getCwd(); !dir.isEmpty(); dir = dir.substring(0, Math.max(dir.lastIndexOf('/'), 0))) {
+            String text = inputs.getManifests().get(dir);
+            if (text == null && paths != null && paths.contains(dir + "/package.json")) {
+                throw new CannotKnow(dir + "/package.json (its contents were not read)");
+            }
+            String packageManager = text == null ? null : packageManager(text);
+            if (packageManager != null) {
+                return packageManager;
+            }
+        }
         String up = "";
         for (int depth = 0; depth <= reach(); depth++, up += "../") {
             String file = up + "package.json";

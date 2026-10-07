@@ -1,0 +1,5 @@
+yarn 1.22.22, node v24.19.0, 2026-10-07
+before exit=0, after exit=1, again exit=1 (no lock written)
+run in packages/a
+edit started 2026-10-07T18:23:33Z
+platform os=darwin cpu=arm64 libc=

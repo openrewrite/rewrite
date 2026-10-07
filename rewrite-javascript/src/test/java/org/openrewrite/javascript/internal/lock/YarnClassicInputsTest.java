@@ -32,7 +32,7 @@ class YarnClassicInputsTest {
 
     @Test
     void memberEditPlacesManifestsAndReadsTheRootConfig() {
-        Request request = Request.builder()
+        Request.RequestBuilder builder = Request.builder()
           .packageJson("{\"name\":\"a\",\"version\":\"2.0.0\"}")
           .lock("# yarn lockfile v1\n")
           .packageJsonPath(Paths.get("repo/packages/a/package.json"))
@@ -41,10 +41,9 @@ class YarnClassicInputsTest {
           .manifest(Paths.get("repo/local/package.json"), "{\"name\":\"local\",\"version\":\"1.0.0\"}")
           .packageManagerFile(Paths.get("repo/.yarnrc"), "registry \"https://registry.npmjs.org\"\n")
           .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://registry.npmmirror.com/\n")
-          .packageManagerFile(Paths.get("repo/packages/a/.yarnrc"), "registry \"https://example.com\"\n")
-          .build();
+          .packageManagerFile(Paths.get("repo/packages/a/.yarnrc"), "registry \"https://example.com\"\n");
 
-        Inputs inputs = YarnClassicInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnClassicInputs.from(builder.build(), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLock()).isEqualTo("# yarn lockfile v1\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "local");
@@ -55,6 +54,9 @@ class YarnClassicInputsTest {
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
+        assertThat(inputs.getCwd()).isEmpty();
+        assertThat(YarnClassicInputs.from(builder.workingDirectory(Paths.get("repo/packages/a")).build(), Host.UNKNOWN,
+          Instant.EPOCH).getCwd()).isEqualTo("packages/a");
     }
 
     @Test

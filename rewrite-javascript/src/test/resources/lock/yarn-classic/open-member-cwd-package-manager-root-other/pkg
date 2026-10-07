@@ -1,0 +1,1 @@
+{"name":"root","private":true,"workspaces":["packages/*"],"packageManager":"pnpm@9.15.0"}

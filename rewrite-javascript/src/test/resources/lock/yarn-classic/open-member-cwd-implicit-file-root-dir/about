@@ -1,0 +1,1 @@
+yarn run in packages/a adds zz-openrewrite-absent-local-dep@lib where the root holds lib/package.json: normalizeRange tests packages/a/lib/package.json (config.cwd), finds none, and asks the registry, which has no such package.

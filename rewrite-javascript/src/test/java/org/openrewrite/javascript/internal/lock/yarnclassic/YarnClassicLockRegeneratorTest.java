@@ -323,8 +323,12 @@ class YarnClassicLockRegeneratorTest {
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.build())).isEqualTo(installRoot);
     }
 
+    /**
+     * A packageManager yarn 1 accepts leaves the install at the root, which walks from the project's directory as
+     * {@code cwd}; {@code --focus} makes it a focused install there instead.
+     */
     @Test
-    void aPackageManagerBelowTheRootKeepsTheInstallOffIt() {
+    void installsAtTheRootWithAPackageManagerBelowItAndNotUnderFocus() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a\"]}")
@@ -333,7 +337,51 @@ class YarnClassicLockRegeneratorTest {
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("", "{\"name\":\"a\"}").build()))
                 .isEqualTo(1);
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("",
-                "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build())).isEqualTo(0);
+                "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build())).isEqualTo(1);
+        assertThat(YarnClassicLockRegenerator.installRoot(inputs.configFile("../.yarnrc", "--focus true\n").build()))
+                .isEqualTo(0);
+    }
+
+    /**
+     * Run in packages/a, yarn walks to the packageManager from there and tests a range's directory there
+     * (package-request.js {@code normalizeRange} reads {@code config.cwd}), while it writes the root's lock
+     * ({@code open-member-cwd-package-manager-root-other}, {@code open-member-cwd-implicit-file-root-dir}).
+     */
+    @ParameterizedTest(name = "{0} in {1}")
+    @CsvSource(delimiter = '|', value = {
+            "packageManager||error This project's package.json defines \"packageManager\": \"yarn@pnpm@9.15.0\". " +
+            "However the current global version of Yarn is 1.22.22.",
+            "packageManager|packages/a|requests workspace-aggregator-",
+            "implicit file range||file:lib",
+            "implicit file range|packages/a|lib",
+    })
+    void readsWhereYarnRuns(String label, @Nullable String cwd, String outcome) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "packages/a/package.json",
+                        "lib/package.json")))
+                .cwd(cwd == null ? "" : cwd)
+                .now(Instant.EPOCH);
+        if ("packageManager".equals(label)) {
+            inputs.manifest("", "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]," +
+                                "\"packageManager\":\"pnpm@9.15.0\"}")
+                    .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"," +
+                                            "\"packageManager\":\"yarn@1.22.22\"}");
+            assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.build())))
+                    .startsWith(outcome);
+            return;
+        }
+        YarnClassicLockRegenerator.Inputs built = inputs.manifest("", WORKSPACE_ROOT)
+                .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}").build();
+        YarnClassicOptions options = YarnClassicOptions.defaults();
+        PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
+                (url, name) -> null, new ProjectFiles(built.getManifests(), built.getPaths(), built.getCwd()),
+                Host.UNKNOWN, new ArrayList<>());
+        PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("x@lib")
+                .registry("npm").optional(false).parentNames(new ArrayList<>()).build(), resolver);
+        EventLoop.Promise<String> range = request.normalizeRange("lib");
+        resolver.loop.run();
+        assertThat(range.getValue()).isEqualTo(outcome);
     }
 
     /**

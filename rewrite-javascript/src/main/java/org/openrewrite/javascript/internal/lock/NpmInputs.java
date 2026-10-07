@@ -115,7 +115,7 @@ final class NpmInputs {
         return dir.isEmpty() || other.equals(dir) || other.startsWith(dir + "/");
     }
 
-    private static String location(String rootDir, String dir) {
+    static String location(String rootDir, String dir) {
         String location = Paths.get(rootDir).relativize(Paths.get(dir)).toString().replace('\\', '/');
         return ".".equals(location) ? "" : location;
     }

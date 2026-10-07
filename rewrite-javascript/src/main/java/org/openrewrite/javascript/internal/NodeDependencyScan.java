@@ -66,16 +66,18 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path, and
-     * which paths the project holds at all (null when the host has not said).
+     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path, which
+     * paths the project holds at all (null when the host has not said), and the directory the package manager
+     * runs in when it is not the lock's.
      */
     @Value
     public static class ProjectFiles {
-        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap(), null);
+        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap(), null, null);
 
         Map<Path, String> manifests;
         Map<Path, String> packageManagerFiles;
         @Nullable Set<Path> paths;
+        @Nullable Path workingDirectory;
     }
 
     /**
@@ -158,7 +160,7 @@ public final class NodeDependencyScan {
     private static Path installRoot(Accumulator acc, Path packageJsonPath, ProjectState ps, Path lock,
                                     NodeResolutionResult marker, LockFileRegeneration regeneration) {
         String manifest = print(null, packageJsonPath, ps);
-        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest));
+        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest), null);
         int depth = regeneration.installRoot(LockFileRegeneration.Request.builder()
                 .packageJson(manifest)
                 .lock(acc.locks.get(lock))
@@ -244,14 +246,19 @@ public final class NodeDependencyScan {
 
     /**
      * {@link #projectManifests}, the package-manager files beside any of them or in a directory above them, the
-     * package.json of each directory above the project, and the paths under them or directly in a directory above.
+     * package.json of each directory above the project, and the paths under them or directly in a directory above;
+     * the edited package's directory when the package manager run there installs at a workspace root's lock.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        return projectFiles(acc, ctx, packageJsonPath, projectManifests(acc, ctx, packageJsonPath));
+        Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
+        Path lock = lockFor(acc, packageJsonPath);
+        boolean walkedToRoot = acc.installRoots.containsKey(packageJsonPath) && lock != null &&
+                               !packageJsonPath.equals(acc.lockToPackage.get(lock));
+        return projectFiles(acc, ctx, packageJsonPath, manifests, walkedToRoot ? directory(packageJsonPath) : null);
     }
 
     private static ProjectFiles projectFiles(Accumulator acc, @Nullable ExecutionContext ctx, Path packageJsonPath,
-                                             Map<Path, String> manifests) {
+                                             Map<Path, String> manifests, @Nullable Path workingDirectory) {
         Set<Path> directories = new LinkedHashSet<>();
         for (Path manifest : manifests.keySet()) {
             directories.add(directory(manifest));
@@ -280,7 +287,7 @@ public final class NodeDependencyScan {
                 paths.add(path);
             }
         }
-        return new ProjectFiles(manifests, files, paths);
+        return new ProjectFiles(manifests, files, paths, workingDirectory);
     }
 
     private static Path directory(Path file) {

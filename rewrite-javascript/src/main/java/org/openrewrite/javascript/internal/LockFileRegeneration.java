@@ -82,7 +82,8 @@ public final class LockFileRegeneration {
      * {@code .yarnrc.yml}, {@code pnpm-workspace.yaml}, and the {@code .patch} files
      * {@code patchedDependencies} names), those of the repository's directories above the project too with their
      * {@code package.json}, and every path the project holds and the directories above it hold directly, when the
-     * host says.
+     * host says. The working directory is where the package manager runs when that is not the lock's directory: a
+     * workspace member with a lock of its own that the package manager passes over for the root's.
      */
     @Value
     @Builder
@@ -97,6 +98,7 @@ public final class LockFileRegeneration {
         @Singular("packageManagerFile")
         Map<Path, String> packageManagerFiles;
         @Nullable Set<Path> projectPaths;
+        @Nullable Path workingDirectory;
     }
 
     @Value

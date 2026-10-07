@@ -229,8 +229,8 @@ final class YarnClassicScenarios {
         /**
          * What yarn had in a phase: the lock it started from, the phase's manifests, the config files the recorder
          * placed (the scenario's {@code yarnrc} and {@code npmrc}, the phase's tree over them, and the directories
-         * above the project: {@code parent/} and {@code grandparent/}, their package.json too), and every path of
-         * that layout when the recorder here made it.
+         * above the project: {@code parent/} and {@code grandparent/}, their package.json too), every path of
+         * that layout when the recorder here made it, and the directory the {@code cwd} file says yarn ran in.
          */
         YarnClassicLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
@@ -256,12 +256,14 @@ final class YarnClassicScenarios {
                     paths.add(tree.getKey() + path);
                 }
             }
+            String cwd = file("cwd");
             return YarnClassicLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(before))
                     .configFiles(configFiles)
                     .paths(has("recorded-with") ? paths : null)
                     .directory(directory())
+                    .cwd(cwd == null ? "" : cwd.trim())
                     .env(new LinkedHashMap<>())
                     .host(host())
                     .now(now())

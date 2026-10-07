@@ -1,0 +1,1 @@
+pm-rejects Couldn't find package "zz-openrewrite-absent-local-dep@lib" required by "a@1.0.0" on the "npm" registry.

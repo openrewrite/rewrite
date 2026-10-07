@@ -1,0 +1,1 @@
+yarn run in packages/a, whose packageManager is yarn@1.22.22, under a root whose packageManager is pnpm: findPackageManager walks from packages/a, so the run passes and writes the root lock (an install at the root is rejected).

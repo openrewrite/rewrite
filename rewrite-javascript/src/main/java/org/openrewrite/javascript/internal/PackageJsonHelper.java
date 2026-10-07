@@ -786,6 +786,7 @@ public class PackageJsonHelper {
                 .manifests(projectFiles.getManifests())
                 .packageManagerFiles(projectFiles.getPackageManagerFiles())
                 .projectPaths(projectFiles.getPaths())
+                .workingDirectory(projectFiles.getWorkingDirectory())
                 .build(), ctx);
     }
 }

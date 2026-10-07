@@ -166,7 +166,7 @@ final class PackageRequest {
             return Promise.resolved(loop, pattern);
         }
         if (NodeSemver.validRange(pattern, YarnClassicOptions.SEMVER) == null) {
-            String location = ProjectFiles.location(".", pattern);
+            String location = ProjectFiles.location(resolver.files.cwd(), pattern);
             if (location == null) {
                 throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
                                      "the range " + pattern + " a file: dependency");
