@@ -361,7 +361,9 @@ public class ChangePackage extends Recipe {
             for (JavaType type : sf.getTypesInUse().getTypesInUse()) {
                 if (type instanceof JavaType.FullyQualified) {
                     JavaType.FullyQualified fq = (JavaType.FullyQualified) type;
-                    if (fq.getPackageName().equals(changedPackage)) {
+                    // A package wildcard imports only top-level types. Nested types are
+                    // referenced through their enclosing type or a separate explicit import.
+                    if (fq.getOwningClass() == null && fq.getPackageName().equals(changedPackage)) {
                         usedFromChangedPackage.add(fq.getClassName());
                     }
                 }

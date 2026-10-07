@@ -419,6 +419,35 @@ public static class NuGetResolver
         properties["EnableWindowsTargeting"] = "true";
     }
 
+    /// <summary>
+    /// Sets <c>AndroidUseManagedDesignTimeResourceGenerator=true</c> on non-Windows hosts, as the
+    /// Android SDK already does on Windows. Otherwise design-time builds of <c>net*-android</c>
+    /// projects compile resources with <c>aapt2</c> and fail against any JDK newer than the
+    /// workload supports (JDK 25 against a workload that accepts up to 21, say), leaving the
+    /// project without references. Skipped when the variable is set in the environment, so an
+    /// explicit choice wins.
+    /// </summary>
+    public static void ApplyAndroidDesignTimeDefault(IDictionary<string, string> properties)
+    {
+        if (OperatingSystem.IsWindows() ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AndroidUseManagedDesignTimeResourceGenerator")))
+            return;
+        properties["AndroidUseManagedDesignTimeResourceGenerator"] = "true";
+    }
+
+    /// <summary>
+    /// Sets <c>CheckEolWorkloads=false</c>, so projects on an out-of-support workload
+    /// (<c>net8.0-android</c> on a .NET 10 SDK, say) still evaluate instead of failing with
+    /// <c>NETSDK1202</c>. Those are the codebases most in need of an upgrade, and they have to
+    /// parse first. Skipped when the variable is set in the environment, so an explicit choice wins.
+    /// </summary>
+    public static void ApplyOutOfSupportWorkloadsDefault(IDictionary<string, string> properties)
+    {
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("CheckEolWorkloads")))
+            return;
+        properties["CheckEolWorkloads"] = "false";
+    }
+
     private static readonly object BuildGate = new();
 
     private const int RootFailureThreshold = 3;
@@ -518,6 +547,8 @@ public static class NuGetResolver
                 ["ExcludeRestorePackageImports"] = "true",
             };
             ApplyWindowsTargetingDefault(globalProps);
+            ApplyAndroidDesignTimeDefault(globalProps);
+            ApplyOutOfSupportWorkloadsDefault(globalProps);
             if (extraGlobalProperties != null)
             {
                 foreach (var (k, v) in extraGlobalProperties)

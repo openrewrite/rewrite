@@ -114,6 +114,10 @@ class RpcSendQueue:
         value_type = self._get_value_type(after)
         codec = self._get_rpc_codec(after)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
+        if self._has_no_wire_form(value_type, value, on_change, codec):
+            # a CHANGE that carries nothing leaves the peer holding the value it had
+            self.put({'state': RpcObjectState.DELETE})
+            return
         self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
         self._do_change(after, before, on_change, codec)
 
@@ -194,7 +198,11 @@ class RpcSendQueue:
                         # Without an on_change callback or codec, no property messages follow, so the
                         # value must travel inline (as in send()) or the receiver keeps the stale element
                         value = None if wrapped is not None or codec is not None else self._get_primitive_value(item)
-                        self.put({'state': RpcObjectState.CHANGE, 'valueType': self._get_value_type(item), 'value': value})
+                        value_type = self._get_value_type(item)
+                        if self._has_no_wire_form(value_type, value, wrapped, codec):
+                            self.put({'state': RpcObjectState.DELETE})
+                            continue
+                        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
                         self._do_change(item, a_before, wrapped, codec)
 
         if before is None:
@@ -215,6 +223,12 @@ class RpcSendQueue:
         value_type = self._get_value_type(obj)
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
+        if value is None and on_change is None and codec is None:
+            self._require_wire_form(obj)
+        if self._has_no_wire_form(value_type, value, on_change, codec):
+            # an ADD that carries nothing is a broken message to the peer, where DELETE is null
+            self.put({'state': RpcObjectState.DELETE})
+            return
         self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
         self._do_change(obj, None, on_change, codec)
 
@@ -236,8 +250,22 @@ class RpcSendQueue:
         value_type = self._get_value_type(obj)
         codec = self._get_rpc_codec(obj)
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
+        if value is None and on_change is None and codec is None:
+            self._require_wire_form(obj)
         self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': ref})
         self._do_change(obj, None, on_change, codec)
+
+    @staticmethod
+    def _has_no_wire_form(value_type: Optional[str], value: Any, on_change: Any, codec: Any) -> bool:
+        """True of a value nothing carries, a complex number for one: null is all the peer can be told."""
+        return value is None and value_type is None and on_change is None and codec is None
+
+    @staticmethod
+    def _require_wire_form(obj: Any) -> None:
+        from rewrite.markers import Marker
+        # with nothing to send for it, a marker reaches the peer as null and is lost for good
+        if isinstance(obj, Marker):
+            raise TypeError(f"No RPC codec is registered for the marker {type(obj).__qualname__}")
 
     def _do_change(self, after: Any, before: Any,
                    on_change: Optional[Callable[[], None]] = None,
@@ -331,6 +359,9 @@ class RpcSendQueue:
             # A plain mapping is JSON-native and travels as itself, as it does on every other
             # peer. Sequences take the send_list protocol instead.
             return obj
+        if isinstance(obj, list):
+            # Sent as one value rather than through send_list, a list of scalars is JSON-native too.
+            return obj if all(type(item) in (str, int, float, bool) for item in obj) else None
         if isinstance(obj, bool):
             return obj
         if isinstance(obj, int):
@@ -355,5 +386,7 @@ class RpcSendQueue:
             return str(obj)
         if isinstance(obj, Enum):
             return obj.name
-        # Complex objects are serialized via visitor, not as values
-        return None
+        # Complex objects are serialized via visitor, not as values, but for the few sent whole
+        from rewrite.rpc.receive_queue import get_value_writer
+        writer = get_value_writer(obj)
+        return writer(obj) if writer is not None else None

@@ -116,6 +116,7 @@ public class RpcReceiveQueue
     public T? Receive<T>(T? before, Func<T, T>? onChange)
     {
         var message = Take();
+        var held = before;
         int? @ref = null;
         switch (message.State)
         {
@@ -149,7 +150,7 @@ public class RpcReceiveQueue
                     before = ExtractValue<T>(message.Value);
                 }
                 if (@ref != null && before != null)
-                    _refs[@ref.Value] = before;
+                    Record(@ref.Value, before);
                 goto case CHANGE; // Intentional fall-through
             case CHANGE:
                 T? after;
@@ -185,8 +186,9 @@ public class RpcReceiveQueue
                 {
                     after = before;
                 }
+                after = KeepHeldMarkers(held, after);
                 if (@ref != null && after != null)
-                    _refs[@ref.Value] = after;
+                    Record(@ref.Value, after);
                 return after;
             default:
                 throw new InvalidOperationException($"Unknown state: {message.State}");
@@ -417,6 +419,53 @@ public class RpcReceiveQueue
     /// Deserializes a non-codec object that was sent inline in the ADD message.
     /// The value is typically a JsonElement from System.Text.Json deserialization.
     /// </summary>
+    private readonly List<(int Ref, bool Known, object? Previous)> _recorded = [];
+
+    private void Record(int @ref, object value)
+    {
+        var known = _refs.TryGetValue(@ref, out var previous);
+        _recorded.Add((@ref, known, previous));
+        _refs[@ref] = value;
+    }
+
+    /// <summary>
+    /// Forgets the refs this queue recorded, when the transfer it was reading failed part way.
+    /// </summary>
+    public void RollBackRefs()
+    {
+        for (var i = _recorded.Count - 1; i >= 0; i--)
+        {
+            var (@ref, known, previous) = _recorded[i];
+            if (known)
+            {
+                _refs[@ref] = previous!;
+            }
+            else
+            {
+                _refs.Remove(@ref);
+            }
+        }
+        _recorded.Clear();
+    }
+
+    /// <summary>
+    /// Java sends a marker it has no type for back as a generic one, which names no type for
+    /// this side to rebuild. Where the marker it stands for is still held here, that one is kept.
+    /// </summary>
+    private static T? KeepHeldMarkers<T>(T? held, T? received)
+    {
+        if (held is not Markers before || received is not Markers after ||
+            !after.MarkerList.Any(m => m is UnknownMarker))
+        {
+            return received;
+        }
+        return (T)(object)after.WithMarkerList(after.MarkerList
+            .Select(m => m is UnknownMarker
+                ? before.MarkerList.FirstOrDefault(kept => kept.Id == m.Id && kept is not UnknownMarker) ?? m
+                : m)
+            .ToList());
+    }
+
     internal static T DeserializeInline<T>(string javaTypeName, object value)
     {
         var type = FromJavaTypeName(javaTypeName) ?? typeof(T);
@@ -438,7 +487,16 @@ public class RpcReceiveQueue
                 var id = je.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.String
                     ? Guid.Parse(idProp.GetString()!)
                     : Tree.RandomId();
-                return (T)(object)new UnknownMarker(id);
+                var unknown = new UnknownMarker(id, javaTypeName);
+                foreach (var property in je.EnumerateObject())
+                {
+                    // what begins with @ is Jackson's own, not the marker's
+                    if (property.Name != "id" && !property.Name.StartsWith('@'))
+                    {
+                        unknown.Data[property.Name] = property.Value.Clone();
+                    }
+                }
+                return (T)(object)unknown;
             }
             return (T)(object)new UnknownMarker(Tree.RandomId());
         }

@@ -87,7 +87,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 		ident := *pkg.Element
 		ident.Name = newName
 		pkg.Element = &ident
-		cu.PackageDecl = &pkg
+		cu = cu.WithPackageDecl(&pkg)
 	}
 
 	// Rewrite import paths. Match `OldPackagePath` exactly OR as a
@@ -96,6 +96,7 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 	if cu.Imports != nil {
 		imps := *cu.Imports
 		out := make([]java.RightPadded[*java.Import], len(imps.Elements))
+		changed := false
 		for i, rp := range imps.Elements {
 			imp := rp.Element
 			oldPath := internal.ImportPath(imp)
@@ -107,9 +108,12 @@ func (v *renamePackageVisitor) VisitCompilationUnit(cu *golang.CompilationUnit, 
 			imp = withImportPath(imp, newPath)
 			rp.Element = imp
 			out[i] = rp
+			changed = true
 		}
-		imps.Elements = out
-		cu.Imports = &imps
+		if changed {
+			imps.Elements = out
+			cu = cu.WithImports(&imps)
+		}
 	}
 
 	return cu
@@ -153,19 +157,24 @@ func rewritePath(p, oldPath, newPath string) string {
 	return p
 }
 
-// withImportPath returns a copy of imp with its Qualid Literal source +
-// value updated to the new import path. Preserves Prefix and Markers
-// so the printer keeps the surrounding whitespace.
+// withImportPath returns a copy of imp whose Qualid names the new import
+// path. Preserves Prefix and Markers so the printer keeps the surrounding
+// whitespace.
 func withImportPath(imp *java.Import, newPath string) *java.Import {
 	if imp == nil {
 		return imp
 	}
 	c := *imp
-	if lit, ok := imp.Qualid.(*java.Literal); ok {
-		ln := *lit
-		ln.Value = newPath
-		ln.Source = `"` + newPath + `"`
-		c.Qualid = &ln
+	if qualid := imp.Qualid; qualid != nil && qualid.Name.Element != nil {
+		name := *qualid.Name.Element
+		name.Name = newPath
+		renamed := *qualid
+		if qualid.Type != nil {
+			pkg := &java.JavaTypeClass{Kind: "Class", FullyQualifiedName: newPath}
+			name.Type, renamed.Type = pkg, pkg
+		}
+		renamed.Name.Element = &name
+		c.Qualid = &renamed
 	}
 	return &c
 }

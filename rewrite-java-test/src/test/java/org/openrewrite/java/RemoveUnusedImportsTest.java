@@ -2580,6 +2580,38 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void unfoldStaticStarImportOfLowercaseClass() {
+        rewriteRun(
+          java(
+            """
+              package org.foo;
+              public class functions {
+                  public static Object avg(String s) { return null; }
+                  public static Object col(String s) { return null; }
+              }
+              """
+          ),
+          java(
+            """
+              import static org.foo.functions.*;
+              class Test {
+                  Object a = avg("key");
+                  Object c = col("value");
+              }
+              """,
+            """
+              import static org.foo.functions.avg;
+              import static org.foo.functions.col;
+              class Test {
+                  Object a = avg("key");
+                  Object c = col("value");
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/8654")
     @Test
     void unfoldStaticWildcardFromPackageWithCapitalizedSegment() {

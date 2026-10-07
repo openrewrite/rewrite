@@ -22,6 +22,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.marker.OmitBraces;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
@@ -263,6 +264,16 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             return null;
         }
 
+        TrailingComma trailingComma = right.getMarkers().findFirst(TrailingComma.class).orElse(null);
+        if (trailingComma != null && !right.getAfter().getLastWhitespace().contains("\n")) {
+            // After a trailing comma the closing delimiter's whitespace lives in the marker; indent it as the after space
+            JRightPadded<T> r = visitRightPadded(right.withAfter(trailingComma.getSuffix()).withMarkers(right.getMarkers().removeByType(TrailingComma.class)), loc, p);
+            if (r.getElement() == right.getElement() && r.getAfter() == trailingComma.getSuffix()) {
+                return right;
+            }
+            return right.withElement(r.getElement()).withMarkers(right.getMarkers().setByType(trailingComma.withSuffix(r.getAfter())));
+        }
+
         setCursor(new Cursor(getCursor(), right));
 
         T t = right.getElement();
@@ -306,7 +317,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
+                                    // Nothing on the opening line to align to, so the parameters indent from the declaration
+                                    alignTo = indent + (wrappingStyle.getFunctionDeclarationParameters().getUseContinuationIndent() ?
+                                            style.getContinuationIndent() : style.getIndentSize());
                                 } else {
                                     String source = method.print(getCursor());
                                     int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
@@ -514,7 +527,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             String lastIndent = space.getWhitespace().substring(space.getWhitespace().lastIndexOf('\n') + 1);
             int indent = getLengthOfWhitespace(StringUtils.indent(lastIndent));
 
-            if (indent != finalColumn) {
+            if (hasFileLeadingComment || indent != finalColumn) {
                 if (hasFileLeadingComment || whitespace.contains("\n") &&
                         // Do not shift single line comments at col 0.
                         !(!s.getComments().isEmpty() && s.getComments().get(0) instanceof TextComment &&
@@ -523,38 +536,39 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                     s = s.withWhitespace(whitespace.substring(0, whitespace.lastIndexOf('\n') + 1) +
                             indent(lastIndent, shift));
                 }
-
-                Space finalSpace = s;
-                int lastCommentPos = s.getComments().size() - 1;
-                s = s.withComments(ListUtils.map(s.getComments(), (i, c) -> {
-                    if (c instanceof TextComment && !c.isMultiline()) {
-                        // Do not shift single line comments at col 0.
-                        if ((i != lastCommentPos) && getLengthOfWhitespace(c.getSuffix()) == 0) {
-                            return c;
-                        }
-                    }
-                    String priorSuffix = i == 0 ?
-                            space.getWhitespace() :
-                            finalSpace.getComments().get(i - 1).getSuffix();
-
-                    int toColumn = spaceLocation == Space.Location.BLOCK_END && i != finalSpace.getComments().size() - 1 ?
-                            column + style.getIndentSize() :
-                            column;
-
-                    Comment c2 = c;
-                    if (priorSuffix.contains("\n") || hasFileLeadingComment) {
-                        c2 = indentComment(c, priorSuffix, toColumn);
-                    }
-
-                    if (c2.getSuffix().contains("\n")) {
-                        int suffixIndent = getLengthOfWhitespace(c2.getSuffix());
-                        int shift = toColumn - suffixIndent;
-                        c2 = c2.withSuffix(indent(c2.getSuffix(), shift));
-                    }
-
-                    return c2;
-                }));
             }
+
+            // Comment bodies and suffixes are aligned independently of the leading whitespace.
+            Space finalSpace = s;
+            int lastCommentPos = s.getComments().size() - 1;
+            s = s.withComments(ListUtils.map(s.getComments(), (i, c) -> {
+                if (c instanceof TextComment && !c.isMultiline()) {
+                    // Do not shift single line comments at col 0.
+                    if ((i != lastCommentPos) && getLengthOfWhitespace(c.getSuffix()) == 0) {
+                        return c;
+                    }
+                }
+                String priorSuffix = i == 0 ?
+                        space.getWhitespace() :
+                        finalSpace.getComments().get(i - 1).getSuffix();
+
+                int toColumn = spaceLocation == Space.Location.BLOCK_END && (i == 0 || i != finalSpace.getComments().size() - 1) ?
+                        column + style.getIndentSize() :
+                        column;
+
+                Comment c2 = c;
+                if (priorSuffix.contains("\n") || hasFileLeadingComment) {
+                    c2 = indentComment(c, priorSuffix, toColumn);
+                }
+
+                if (c2.getSuffix().contains("\n")) {
+                    int suffixIndent = getLengthOfWhitespace(c2.getSuffix());
+                    int shift = (i == lastCommentPos ? column : toColumn) - suffixIndent;
+                    c2 = c2.withSuffix(indent(c2.getSuffix(), shift));
+                }
+
+                return c2;
+            }));
         }
 
         return s;
@@ -565,6 +579,13 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             TextComment textComment = (TextComment) comment;
             if (!textComment.getText().contains("\n")) {
                 return comment;
+            }
+
+            if (textComment.isMultiline()) {
+                String aligned = alignDocCommentLines(textComment.getText(), column);
+                if (aligned != null) {
+                    return textComment.withText(aligned);
+                }
             }
 
             // the margin is the baseline for how much we should shift left or right
@@ -627,6 +648,29 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         return comment;
+    }
+
+    /**
+     * Aligns every continuation line of a KDoc ({@code /**}) comment to the comment's column plus one,
+     * as the Java visitor does for Javadoc; blank lines stay empty. Returns null for any other comment.
+     */
+    private @Nullable String alignDocCommentLines(String text, int column) {
+        if (!text.startsWith("*")) {
+            return null;
+        }
+        String[] lines = text.split("\n", -1);
+        String margin = indent("", column + 1);
+        for (int i = 1; i < lines.length; i++) {
+            String line = lines[i];
+            int start = 0;
+            while (start < line.length() && (line.charAt(start) == ' ' || line.charAt(start) == '\t')) {
+                start++;
+            }
+            String body = line.substring(start);
+            boolean blank = body.isEmpty() || "\r".equals(body);
+            lines[i] = blank && i < lines.length - 1 ? body : margin + body;
+        }
+        return String.join("\n", lines);
     }
 
     private String indent(String whitespace, int shift) {

@@ -21,18 +21,20 @@ import os
 import textwrap
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from uuid import UUID
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.python.visitor import PythonVisitor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
     from rewrite.visitor import Cursor
 
 from .capture import Capture
-from .placeholder import substitute_placeholders
+from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
 
 # Wrapper function name used to make template code parseable
@@ -75,8 +77,8 @@ class TemplateEngine:
     - LRU caching for parsed templates
     """
 
-    # Global template cache (code -> parsed tree), LRU eviction
-    _cache: OrderedDict[str, J] = OrderedDict()
+    # Global template cache (code -> parsed tree and the context parsed ahead of it), LRU eviction
+    _cache: OrderedDict[str, Tuple[J, Tuple[Statement, ...]]] = OrderedDict()
     _cache_max_size: int = 100
 
     @classmethod
@@ -101,6 +103,25 @@ class TemplateEngine:
             SyntaxError: If the template code is invalid Python.
             ValueError: If placeholder validation fails.
         """
+        return cls._parse(code, captures, options)[0]
+
+    @classmethod
+    def get_context_statements(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[Statement, ...]:
+        """The statements parsed ahead of the template, which are what its context binds."""
+        return cls._parse(code, captures, options)[1]
+
+    @classmethod
+    def _parse(
+        cls,
+        code: str,
+        captures: Dict[str, Capture],
+        options: Optional[TemplateOptions] = None
+    ) -> Tuple[J, Tuple[Statement, ...]]:
         options = options or TemplateOptions()
 
         # Create cache key
@@ -119,18 +140,21 @@ class TemplateEngine:
         is_expression = cls._is_expression(dedented)
 
         # Generate wrapper and parse
-        wrapper_code = cls._generate_wrapper(substituted_code, options)
+        wrapper_code = cls._generate_wrapper(substituted_code, options, captures)
         compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
         extracted = cls._extract_from_wrapper(compilation_unit, is_expression)
 
+        # The template's own code is the last statement, so everything ahead of it is context.
+        parsed = (extracted, tuple(compilation_unit.statements[:-1]))
+
         # Cache with LRU eviction
-        cls._cache[cache_key] = extracted
+        cls._cache[cache_key] = parsed
         if len(cls._cache) > cls._cache_max_size:
             cls._cache.popitem(last=False)
 
-        return extracted
+        return parsed
 
     @classmethod
     def apply_substitutions(
@@ -156,6 +180,22 @@ class TemplateEngine:
         return visitor.visit(template_tree, None)
 
     @classmethod
+    def retain_ids(cls, result: J, replaced: Optional[J]) -> J:
+        """Copy of ``result`` in which an id survives only at the first node carrying it, and only
+        if that id names a node of ``replaced``, the subtree the result takes the place of. Every
+        other node is minted a fresh id. The parsed template is shared by every application, and a
+        value spliced into two slots, or from somewhere that stays in the file, would otherwise put
+        one id in two places."""
+        retainable: Set[UUID] = set()
+        if replaced is not None:
+            collector = _TreeIds()
+            collector.visit(replaced, None)
+            retainable = collector.ids
+        retained = _RetainIds(retainable).visit(result, None)
+        assert retained is not None
+        return retained
+
+    @classmethod
     def _make_cache_key(
         cls,
         code: str,
@@ -163,7 +203,8 @@ class TemplateEngine:
         options: TemplateOptions
     ) -> str:
         """Generate a cache key from template components."""
-        capture_names = ",".join(sorted(captures.keys()))
+        capture_names = ",".join(
+            f"{name}:{cap.type_hint}" for name, cap in sorted(captures.items()))
         imports_key = ",".join(sorted(options.imports))
         context_key = ",".join(options.context)  # preserve order: context is order-dependent
         deps_key = ",".join(
@@ -172,13 +213,19 @@ class TemplateEngine:
         return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
-    def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
+    def _generate_wrapper(
+        cls,
+        code: str,
+        options: TemplateOptions,
+        captures: Dict[str, Capture],
+    ) -> str:
         """
         Generate a parseable Python wrapper for the template code.
 
         Args:
             code: Template code (with placeholders already substituted).
             options: Template options including imports.
+            captures: Captures whose ``type_hint`` declares their placeholder's type.
 
         Returns:
             Complete Python source that can be parsed.
@@ -192,6 +239,9 @@ class TemplateEngine:
         # Add context statements (general-purpose, may include imports or other code)
         for ctx in options.context:
             lines.append(ctx)
+
+        # After the context, so that a hint can name what the context imports.
+        lines.extend(cls._capture_preamble(captures))
 
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
@@ -213,6 +263,11 @@ class TemplateEngine:
                 lines.append(f"    {line}")
 
         return '\n'.join(lines)
+
+    @classmethod
+    def _capture_preamble(cls, captures: Dict[str, Capture]) -> List[str]:
+        return [f"{to_placeholder(name)}: {cap.type_hint}"
+                for name, cap in captures.items() if cap.is_typed]
 
     @classmethod
     def _is_expression(cls, code: str) -> bool:
@@ -416,3 +471,26 @@ class TemplateEngine:
     def clear_cache(cls) -> None:
         """Clear the template cache."""
         cls._cache.clear()
+
+
+class _TreeIds(PythonVisitor[None]):
+    def __init__(self):
+        super().__init__()
+        self.ids: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        self.ids.add(tree.id)
+        return tree
+
+
+class _RetainIds(PythonVisitor[None]):
+    def __init__(self, retainable: Set[UUID]):
+        super().__init__()
+        self._retainable = retainable
+        self._seen: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        if tree.id in self._retainable and tree.id not in self._seen:
+            self._seen.add(tree.id)
+            return tree
+        return tree.replace(_id=random_id())

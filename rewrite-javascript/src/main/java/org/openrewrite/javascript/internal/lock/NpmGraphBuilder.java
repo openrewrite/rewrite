@@ -116,6 +116,22 @@ public final class NpmGraphBuilder {
                 }
             }
         }
+        // Without peer-fork placement, an already-selected incompatible peer cannot be
+        // repaired by traversing more dependencies: a second version would itself defer.
+        // Reject these direct conflicts before fetching a potentially very large closure.
+        // Missing peers are left alone here; the ordinary closure may still provide them.
+        if (!placedPeerForks) {
+            for (Map.Entry<String, VersionManifest> entry : manifests.entrySet()) {
+                VersionManifest manifest = entry.getValue();
+                if (manifest.getPeerDependencies() == null) continue;
+                for (Map.Entry<String, String> peer : manifest.getPeerDependencies().entrySet()) {
+                    if (chosen.containsKey(peer.getKey())) {
+                        resolvePeer(manifest.getName(), entry.getKey(), peer.getKey(), peer.getValue(),
+                                manifest.getPeerDependenciesMeta(), chosen, new ArrayList<>(), new ArrayList<>());
+                    }
+                }
+            }
+        }
         // Phase 2: BFS every resolved node's regular and optional edges (dedup to an already-chosen satisfying
         // version, else fork). Optional dependencies are resolved and placed like regular ones; only their flag
         // classification (below) differs.

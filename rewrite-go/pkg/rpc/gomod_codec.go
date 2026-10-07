@@ -245,9 +245,6 @@ func recvGoModMarkers(q *ReceiveQueue, before java.Markers) java.Markers {
 }
 
 func goModStmtSlice(s []java.RightPadded[golang.GoModStatement]) []any {
-	if s == nil {
-		return nil
-	}
 	out := make([]any, len(s))
 	for i, v := range s {
 		out[i] = v
@@ -256,9 +253,6 @@ func goModStmtSlice(s []java.RightPadded[golang.GoModStatement]) []any {
 }
 
 func goModValueSlice(s []*golang.GoModValue) []any {
-	if s == nil {
-		return nil
-	}
 	out := make([]any, len(s))
 	for i, v := range s {
 		out[i] = v

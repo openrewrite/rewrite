@@ -112,7 +112,24 @@ public class PythonRewriteRpc extends RewriteRpc {
     public InstallRecipesResponse installRecipes(File recipes) {
         return send(
                 "InstallRecipes",
-                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath()),
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), null),
+                InstallRecipesResponse.class
+        );
+    }
+
+    /**
+     * Run a local package's recipes from a venv the caller built, installing nothing. Each call restarts
+     * the bundle on that venv, and its recipes take precedence over a published namesake's. Requires a
+     * {@link Builder#recipeInstallDir(Path)}.
+     *
+     * @param recipes Path to the local package directory, which names the distribution and keys the bundle
+     * @param venv    A venv with that package installed
+     * @return Response with installation details
+     */
+    public InstallRecipesResponse installRecipes(File recipes, Path venv) {
+        return send(
+                "InstallRecipes",
+                new InstallRecipesByFile(recipes.getAbsoluteFile().toPath(), venv.toAbsolutePath().normalize()),
                 InstallRecipesResponse.class
         );
     }
@@ -872,17 +889,10 @@ public class PythonRewriteRpc extends RewriteRpc {
             );
 
             String[] cmdArr = cmd.filter(Objects::nonNull).toArray(String[]::new);
-            RewriteRpcProcess process = new RewriteRpcProcess(cmdArr);
-
-            if (workingDirectory != null) {
-                process.setWorkingDirectory(workingDirectory);
-            }
-            process.setStderrRedirect(log);
-
-            process.environment().putAll(environment);
+            Map<String, String> env = new LinkedHashMap<>(environment);
 
             // Set the Python version for the parser
-            process.environment().put("REWRITE_PYTHON_VERSION", pythonVersion);
+            env.put("REWRITE_PYTHON_VERSION", pythonVersion);
 
             // Set up PYTHONPATH for the rewrite package
             List<String> pythonPathParts = new ArrayList<>();
@@ -927,9 +937,15 @@ public class PythonRewriteRpc extends RewriteRpc {
             }
 
             if (!pythonPathParts.isEmpty()) {
-                process.environment().put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
+                env.put("PYTHONPATH", String.join(File.pathSeparator, pythonPathParts));
             }
 
+            RewriteRpcProcess process = RewriteRpcProcess.forLanguage("python")
+                    .command(cmdArr)
+                    .workingDirectory(workingDirectory)
+                    .stderrRedirect(log)
+                    .environment(env)
+                    .build();
             process.start();
 
             try {

@@ -10,18 +10,18 @@ import weakref
 from rewrite.utils import replace_if_changed, T
 from enum import Enum
 from pathlib import Path
+from .visitor import PythonVisitor
 from rewrite import Checksum, FileAttributes, SourceFile, TreeVisitor, Markers, Cursor, PrinterFactory
 from rewrite.java import J, JavaType, JContainer, JLeftPadded, JRightPadded, Space, JavaSourceFile, TypeTree, TypedTree, NameTree, Expression, Statement, Block, Identifier, Import, TypeParameter
 from rewrite.python.support_types import Py as Py, P as P
 
 @dataclass(frozen=True)
 class Async(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _statement: Statement
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -34,12 +34,11 @@ class Async(Py, Statement):
 
 @dataclass(frozen=True)
 class Shebang(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _text: str
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -52,13 +51,12 @@ class Shebang(Py, Statement):
 
 @dataclass(frozen=True)
 class Await(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -74,16 +72,16 @@ class Await(Py, Expression):
 @dataclass(frozen=True)
 class Binary(Py, Expression, TypedTree):
     class Type(Enum):
-        In: Type
-        Is: Type
-        IsNot: Type
-        NotIn: Type
-        FloorDivision: Type
-        MatrixMultiplication: Type
-        Power: Type
-        StringConcatenation: Type
+        In = ...
+        Is = ...
+        IsNot = ...
+        NotIn = ...
+        FloorDivision = ...
+        MatrixMultiplication = ...
+        Power = ...
+        StringConcatenation = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Binary
 
@@ -92,7 +90,7 @@ class Binary(Py, Expression, TypedTree):
         @property
         def operator(self) -> JLeftPadded[Binary.Type]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _left: Expression
@@ -102,7 +100,6 @@ class Binary(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -125,7 +122,7 @@ class Binary(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class ChainedAssignment(Py, Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ChainedAssignment
 
@@ -134,7 +131,7 @@ class ChainedAssignment(Py, Statement, TypedTree):
         @property
         def variables(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _variables: List[JRightPadded[Expression]]
@@ -142,7 +139,6 @@ class ChainedAssignment(Py, Statement, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -161,14 +157,13 @@ class ChainedAssignment(Py, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class ExceptionType(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type: Optional[JavaType]
     _exception_group: bool
     _expression: Expression
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -185,13 +180,12 @@ class ExceptionType(Py, TypeTree):
 
 @dataclass(frozen=True)
 class LiteralType(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _literal: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -206,13 +200,12 @@ class LiteralType(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class TypeHint(Py, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _type_tree: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -227,7 +220,7 @@ class TypeHint(Py, TypeTree):
 
 @dataclass(frozen=True)
 class CompilationUnit(Py, JavaSourceFile, SourceFile):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: CompilationUnit
 
@@ -238,7 +231,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
         @property
         def statements(self) -> List[JRightPadded[Statement]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _source_path: Path
@@ -251,7 +244,6 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
     _eof: Space
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -281,7 +273,7 @@ class CompilationUnit(Py, JavaSourceFile, SourceFile):
 
 @dataclass(frozen=True)
 class ExpressionStatement(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
     _expression: Expression
 
     def replace(self, **kwargs: Any) -> 'ExpressionStatement': ...
@@ -299,7 +291,7 @@ class ExpressionStatement(Py, Expression, Statement):
 
 @dataclass(frozen=True)
 class ExpressionTypeTree(Py, Expression, TypeTree):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _reference: J
@@ -319,7 +311,7 @@ class ExpressionTypeTree(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class StatementExpression(Py, Expression, Statement):
-    _id: UUID
+    _id: int | UUID
     _statement: Statement
 
     def replace(self, **kwargs: Any) -> 'StatementExpression': ...
@@ -335,7 +327,7 @@ class StatementExpression(Py, Expression, Statement):
 
 @dataclass(frozen=True)
 class MultiImport(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MultiImport
 
@@ -346,7 +338,7 @@ class MultiImport(Py, Statement):
         @property
         def names(self) -> JContainer[Import]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _from: Optional[JRightPadded[NameTree]]
@@ -354,7 +346,6 @@ class MultiImport(Py, Statement):
     _names: JContainer[Import]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -373,7 +364,7 @@ class MultiImport(Py, Statement):
 
 @dataclass(frozen=True)
 class KeyValue(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: KeyValue
 
@@ -382,7 +373,7 @@ class KeyValue(Py, Expression, TypedTree):
         @property
         def key(self) -> JRightPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _key: JRightPadded[Expression]
@@ -390,7 +381,6 @@ class KeyValue(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -409,7 +399,7 @@ class KeyValue(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class DictLiteral(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: DictLiteral
 
@@ -418,14 +408,13 @@ class DictLiteral(Py, Expression, TypedTree):
         @property
         def elements(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _elements: JContainer[Expression]
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -443,11 +432,11 @@ class DictLiteral(Py, Expression, TypedTree):
 @dataclass(frozen=True)
 class CollectionLiteral(Py, Expression, TypedTree):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        TUPLE: Kind
+        LIST = ...
+        SET = ...
+        TUPLE = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: CollectionLiteral
 
@@ -456,7 +445,7 @@ class CollectionLiteral(Py, Expression, TypedTree):
         @property
         def elements(self) -> JContainer[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -464,7 +453,6 @@ class CollectionLiteral(Py, Expression, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -486,11 +474,11 @@ class FormattedString(Py, Expression, TypedTree):
     @dataclass(frozen=True)
     class Value(Py, Expression, TypedTree):
         class Conversion(Enum):
-            STR: Conversion
-            REPR: Conversion
-            ASCII: Conversion
+            STR = ...
+            REPR = ...
+            ASCII = ...
 
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: FormattedString.Value
 
@@ -500,17 +488,18 @@ class FormattedString(Py, Expression, TypedTree):
             def expression(self) -> JRightPadded[Expression]: ...
             @property
             def debug(self) -> Optional[JRightPadded[bool]]: ...
+            @property
+            def conversion(self) -> Optional[JRightPadded[FormattedString.Value.Conversion]]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _expression: JRightPadded[Expression]
         _debug: Optional[JRightPadded[bool]]
-        _conversion: Optional[Conversion]
+        _conversion: Optional[JRightPadded[Conversion]]
         _format: Optional[Expression]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -527,7 +516,7 @@ class FormattedString(Py, Expression, TypedTree):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> FormattedString.Value: ...
+        def with_id(self, id: int | UUID) -> FormattedString.Value: ...
         def with_prefix(self, prefix: Space) -> FormattedString.Value: ...
         def with_markers(self, markers: Markers) -> FormattedString.Value: ...
         def with_expression(self, expression: Expression) -> FormattedString.Value: ...
@@ -536,14 +525,13 @@ class FormattedString(Py, Expression, TypedTree):
         def with_format(self, format: Optional[Expression]) -> FormattedString.Value: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _delimiter: str
     _parts: List[Expression]
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -560,11 +548,10 @@ class FormattedString(Py, Expression, TypedTree):
 
 @dataclass(frozen=True)
 class Pass(Py, Statement):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -575,7 +562,7 @@ class Pass(Py, Statement):
 
 @dataclass(frozen=True)
 class TrailingElseWrapper(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TrailingElseWrapper
 
@@ -584,14 +571,13 @@ class TrailingElseWrapper(Py, Statement):
         @property
         def else_block(self) -> JLeftPadded[Block]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _statement: Statement
     _else_block: JLeftPadded[Block]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -609,19 +595,18 @@ class TrailingElseWrapper(Py, Statement):
 @dataclass(frozen=True)
 class ComprehensionExpression(Py, Expression):
     class Kind(Enum):
-        LIST: Kind
-        SET: Kind
-        DICT: Kind
-        GENERATOR: Kind
+        LIST = ...
+        SET = ...
+        DICT = ...
+        GENERATOR = ...
 
     @dataclass(frozen=True)
     class Condition(Py):
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _expression: Expression
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -630,7 +615,7 @@ class ComprehensionExpression(Py, Expression):
         @property
         def expression(self) -> Expression: ...
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Condition: ...
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Condition: ...
         def with_prefix(self, prefix: Space) -> ComprehensionExpression.Condition: ...
         def with_markers(self, markers: Markers) -> ComprehensionExpression.Condition: ...
         def with_expression(self, expression: Expression) -> ComprehensionExpression.Condition: ...
@@ -638,7 +623,7 @@ class ComprehensionExpression(Py, Expression):
 
     @dataclass(frozen=True)
     class Clause(Py):
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: ComprehensionExpression.Clause
 
@@ -649,7 +634,7 @@ class ComprehensionExpression(Py, Expression):
             @property
             def iterated_list(self) -> JLeftPadded[Expression]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _async: Optional[JRightPadded[bool]]
@@ -658,7 +643,6 @@ class ComprehensionExpression(Py, Expression):
         _conditions: Optional[List[ComprehensionExpression.Condition]]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -675,7 +659,7 @@ class ComprehensionExpression(Py, Expression):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> ComprehensionExpression.Clause: ...
+        def with_id(self, id: int | UUID) -> ComprehensionExpression.Clause: ...
         def with_prefix(self, prefix: Space) -> ComprehensionExpression.Clause: ...
         def with_markers(self, markers: Markers) -> ComprehensionExpression.Clause: ...
         def with_async(self, async_: Optional[bool]) -> ComprehensionExpression.Clause: ...
@@ -684,7 +668,7 @@ class ComprehensionExpression(Py, Expression):
         def with_conditions(self, conditions: Optional[List[ComprehensionExpression.Condition]]) -> ComprehensionExpression.Clause: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
@@ -693,7 +677,6 @@ class ComprehensionExpression(Py, Expression):
     _suffix: Space
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -714,7 +697,7 @@ class ComprehensionExpression(Py, Expression):
 
 @dataclass(frozen=True)
 class TypeAlias(Py, Statement, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: TypeAlias
 
@@ -725,7 +708,7 @@ class TypeAlias(Py, Statement, TypedTree):
         @property
         def value(self) -> JLeftPadded[J]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _name: Identifier
@@ -734,7 +717,6 @@ class TypeAlias(Py, Statement, TypedTree):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -755,13 +737,12 @@ class TypeAlias(Py, Statement, TypedTree):
 
 @dataclass(frozen=True)
 class YieldFrom(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -776,7 +757,7 @@ class YieldFrom(Py, Expression):
 
 @dataclass(frozen=True)
 class UnionType(Py, Expression, TypeTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: UnionType
 
@@ -785,14 +766,13 @@ class UnionType(Py, Expression, TypeTree):
         @property
         def types(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _types: List[JRightPadded[Expression]]
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -810,10 +790,10 @@ class UnionType(Py, Expression, TypeTree):
 @dataclass(frozen=True)
 class VariableScope(Py, Statement):
     class Kind(Enum):
-        GLOBAL: Kind
-        NONLOCAL: Kind
+        GLOBAL = ...
+        NONLOCAL = ...
 
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: VariableScope
 
@@ -822,14 +802,13 @@ class VariableScope(Py, Statement):
         @property
         def names(self) -> List[JRightPadded[Identifier]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
     _names: List[JRightPadded[Identifier]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -846,7 +825,7 @@ class VariableScope(Py, Statement):
 
 @dataclass(frozen=True)
 class Del(Py, Statement):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Del
 
@@ -855,13 +834,12 @@ class Del(Py, Statement):
         @property
         def targets(self) -> List[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _targets: List[JRightPadded[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -877,17 +855,16 @@ class Del(Py, Statement):
 @dataclass(frozen=True)
 class SpecialParameter(Py, TypeTree):
     class Kind(Enum):
-        KWARGS: Kind
-        ARGS: Kind
+        KWARGS = ...
+        ARGS = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
     _type_hint: Optional[TypeHint]
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -905,17 +882,16 @@ class SpecialParameter(Py, TypeTree):
 @dataclass(frozen=True)
 class Star(Py, Expression, TypeTree):
     class Kind(Enum):
-        LIST: Kind
-        DICT: Kind
+        LIST = ...
+        DICT = ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _kind: Kind
     _expression: Expression
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -932,7 +908,7 @@ class Star(Py, Expression, TypeTree):
 
 @dataclass(frozen=True)
 class NamedArgument(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: NamedArgument
 
@@ -941,7 +917,7 @@ class NamedArgument(Py, Expression):
         @property
         def value(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _name: Identifier
@@ -949,7 +925,6 @@ class NamedArgument(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -968,14 +943,13 @@ class NamedArgument(Py, Expression):
 
 @dataclass(frozen=True)
 class TypeHintedExpression(Py, Expression):
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _expression: Expression
     _type_hint: TypeHint
     _type: Optional[JavaType]
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -992,7 +966,7 @@ class TypeHintedExpression(Py, Expression):
 
 @dataclass(frozen=True)
 class ErrorFrom(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: ErrorFrom
 
@@ -1001,7 +975,7 @@ class ErrorFrom(Py, Expression):
         @property
         def from_(self) -> JLeftPadded[Expression]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _error: Expression
@@ -1009,7 +983,6 @@ class ErrorFrom(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -1028,7 +1001,7 @@ class ErrorFrom(Py, Expression):
 
 @dataclass(frozen=True)
 class MatchCase(Py, Expression):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: MatchCase
 
@@ -1040,24 +1013,24 @@ class MatchCase(Py, Expression):
     @dataclass(frozen=True)
     class Pattern(Py, Expression):
         class Kind(Enum):
-            AS: Kind
-            CAPTURE: Kind
-            CLASS: Kind
-            DOUBLE_STAR: Kind
-            GROUP: Kind
-            KEY_VALUE: Kind
-            KEYWORD: Kind
-            LITERAL: Kind
-            MAPPING: Kind
-            OR: Kind
-            SEQUENCE: Kind
-            SEQUENCE_LIST: Kind
-            SEQUENCE_TUPLE: Kind
-            STAR: Kind
-            VALUE: Kind
-            WILDCARD: Kind
+            AS = ...
+            CAPTURE = ...
+            CLASS = ...
+            DOUBLE_STAR = ...
+            GROUP = ...
+            KEY_VALUE = ...
+            KEYWORD = ...
+            LITERAL = ...
+            MAPPING = ...
+            OR = ...
+            SEQUENCE = ...
+            SEQUENCE_LIST = ...
+            SEQUENCE_TUPLE = ...
+            STAR = ...
+            VALUE = ...
+            WILDCARD = ...
 
-        @dataclass(frozen=True)
+        @dataclass
         class PaddingHelper:
             _t: MatchCase.Pattern
 
@@ -1066,7 +1039,7 @@ class MatchCase(Py, Expression):
             @property
             def children(self) -> JContainer[J]: ...
 
-        _id: UUID
+        _id: int | UUID
         _prefix: Space
         _markers: Markers
         _kind: Kind
@@ -1074,7 +1047,6 @@ class MatchCase(Py, Expression):
         _type: Optional[JavaType]
         _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-        def replace(self, **kwargs: Any) -> Self: ...
 
         @property
         def prefix(self) -> Space: ...
@@ -1089,7 +1061,7 @@ class MatchCase(Py, Expression):
         @property
         def padding(self) -> PaddingHelper: ...
 
-        def with_id(self, id: UUID) -> MatchCase.Pattern: ...
+        def with_id(self, id: int | UUID) -> MatchCase.Pattern: ...
         def with_prefix(self, prefix: Space) -> MatchCase.Pattern: ...
         def with_markers(self, markers: Markers) -> MatchCase.Pattern: ...
         def with_kind(self, kind: Kind) -> MatchCase.Pattern: ...
@@ -1097,7 +1069,7 @@ class MatchCase(Py, Expression):
         def with_type(self, type: Optional[JavaType]) -> MatchCase.Pattern: ...
         def accept_python(self, v: PythonVisitor[P], p: P) -> J: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _pattern: Pattern
@@ -1105,7 +1077,6 @@ class MatchCase(Py, Expression):
     _type: Optional[JavaType]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...
@@ -1124,7 +1095,7 @@ class MatchCase(Py, Expression):
 
 @dataclass(frozen=True)
 class Slice(Py, Expression, TypedTree):
-    @dataclass(frozen=True)
+    @dataclass
     class PaddingHelper:
         _t: Slice
 
@@ -1137,7 +1108,7 @@ class Slice(Py, Expression, TypedTree):
         @property
         def step(self) -> Optional[JRightPadded[Expression]]: ...
 
-    _id: UUID
+    _id: int | UUID
     _prefix: Space
     _markers: Markers
     _start: Optional[JRightPadded[Expression]]
@@ -1145,7 +1116,6 @@ class Slice(Py, Expression, TypedTree):
     _step: Optional[JRightPadded[Expression]]
     _padding: Optional[weakref.ReferenceType[PaddingHelper]] = ...
 
-    def replace(self, **kwargs: Any) -> Self: ...
 
     @property
     def prefix(self) -> Space: ...

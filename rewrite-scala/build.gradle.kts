@@ -14,7 +14,8 @@ dependencies {
     compileOnly(project(":rewrite-test"))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
 
-    api("io.micrometer:micrometer-core:1.9.+")
+    // Nothing here uses Micrometer, but the Scala compiler fails to load rewrite's classes without it.
+    implementation("io.micrometer:micrometer-core:latest.release")
 
     api("org.jetbrains:annotations:latest.release")
 
@@ -28,6 +29,22 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
     testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.antlr:antlr4-runtime:4.13.2")
+
+    // Not latest.release: log4j publishes 3.0.0 betas as releases
+    constraints {
+        zinc("org.apache.logging.log4j:log4j-api:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-49844")
+        }
+        zinc("org.apache.logging.log4j:log4j-core:2.+") {
+            because("CVE-2026-34477, CVE-2026-34479, CVE-2026-34480, CVE-2025-68161, CVE-2026-49844")
+        }
+    }
+}
+
+// Zinc never opens the terminal or REPL these back; CVE-2023-50572, CVE-2026-56740, CVE-2026-56741
+configurations.named("zinc") {
+    exclude(group = "org.scala-sbt.jline", module = "jline")
+    exclude(group = "org.jline", module = "jline")
 }
 
 // Scala publishes release candidates as full Maven Central releases (3.10.0-RC1 today), with a

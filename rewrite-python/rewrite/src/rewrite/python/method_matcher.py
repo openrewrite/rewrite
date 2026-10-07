@@ -135,8 +135,8 @@ class MethodMatcher:
                 it is off by default. Java reads the spelling against a resolved
                 declaring type too; this stops at the guard below.
             cursor: standing on ``method``, which resolves the receiver against
-                the file's imports where its declaring type is ``Unknown``. One
-                binding of a name in any scope leaves every call in the file with
+                the file's imports where its declaring type is ``Unknown``. A name
+                the file rebinds at module scope leaves every call spelling it with
                 that type, so a pattern naming a module needs this to reach them.
 
         Returns:

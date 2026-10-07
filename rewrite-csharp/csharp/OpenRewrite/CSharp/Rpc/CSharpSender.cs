@@ -82,6 +82,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
             IsPattern ip => VisitIsPattern(ip, q),
             StatementExpression se => VisitStatementExpression(se, q),
             SizeOf sof => VisitSizeOf(sof, q),
+            TypeOf tof => VisitTypeOf(tof, q),
             UnsafeStatement us => VisitUnsafeStatement(us, q),
             FixedStatement fs => VisitFixedStatement(fs, q),
             PointerType pt => VisitPointerType(pt, q),
@@ -213,13 +214,11 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     }
 
     // ---- UsingDirective ----
-    // Java protocol: Global (RP<Keyword>?), Static (LP<Keyword>?), Unsafe (LP<Keyword>?),
-    //   Alias (RP<Identifier>?), NamespaceOrType
-    // Nagoya model: Global (RP<bool>), Static (LP<bool>), Alias (RP<Identifier>?), NamespaceOrType
     public override J VisitUsingDirective(UsingDirective ud, RpcSendQueue q)
     {
         q.GetAndSend(ud, u => u.Global, rp => VisitRightPadded(rp, q));
         q.GetAndSend(ud, u => u.Static, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ud, u => u.Unsafe, lp => VisitLeftPadded(lp!, q));
         q.GetAndSend(ud, u => u.Alias, rp => VisitRightPadded(rp!, q));
         q.GetAndSend(ud, u => (J)u.NamespaceOrType, el => Visit(el, q));
         return ud;
@@ -315,9 +314,16 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitSizeOf(SizeOf sizeOf, RpcSendQueue q)
     {
-        q.GetAndSend(sizeOf, s => (J)s.Expression, el => Visit(el, q));
+        q.GetAndSend(sizeOf, s => (J)s.Clazz, el => Visit(el, q));
         q.GetAndSend(sizeOf, s => AsRef(s.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
         return sizeOf;
+    }
+
+    public override J VisitTypeOf(TypeOf typeOf, RpcSendQueue q)
+    {
+        q.GetAndSend(typeOf, t => (J)t.Clazz, el => Visit(el, q));
+        q.GetAndSend(typeOf, t => AsRef(t.Type), t => VisitType(GetValueNonNull<JavaType>(t), q));
+        return typeOf;
     }
 
     public override J VisitUnsafeStatement(UnsafeStatement unsafeStatement, RpcSendQueue q)
@@ -410,17 +416,19 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
     // ---- Interpolation ----
     public override J VisitInterpolation(Interpolation interp, RpcSendQueue q)
     {
-        // Java sends Expression (RP), Alignment (RP), Format (RP)
+        // Java sends Expression (RP), AlignmentBefore (Space), Alignment (RP), FormatBefore (Space), Format (RP)
         // Nagoya has Expression, Alignment (LP?), Format (LP?), After (Space)
         q.GetAndSend(interp,
             i => new JRightPadded<Expression>(i.Expression, i.After, Markers.Empty),
             rp => VisitRightPadded(rp, q));
+        q.GetAndSend(interp, i => i.Alignment?.Before ?? Space.Empty, space => VisitSpace(space, q));
         q.GetAndSend(interp,
             i => i.Alignment != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
                     i.Alignment.Element, Space.Empty, Markers.Empty)
                 : null,
             rp => VisitRightPadded(rp!, q));
+        q.GetAndSend(interp, i => i.Format?.Before ?? Space.Empty, space => VisitSpace(space, q));
         q.GetAndSend(interp,
             i => i.Format != null
                 ? (JRightPadded<Expression>?)new JRightPadded<Expression>(
@@ -760,7 +768,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
 
     public override J VisitUsingStatement(UsingStatement ust, RpcSendQueue q)
     {
-        q.GetAndSend(ust, u => u.ExpressionPadded, lp => VisitLeftPadded(lp, q));
+        q.GetAndSend(ust, u => (J)u.Expression, el => Visit(el, q));
         q.GetAndSend(ust, u => (J)u.Statement, el => Visit(el, q));
         return ust;
     }
@@ -1107,8 +1115,7 @@ public class CSharpSender : CSharpVisitor<RpcSendQueue>
                         q.GetAndSend(c, cm => cm.Multiline);
                         q.GetAndSend(c, cm => cm.Text);
                         q.GetAndSend(c, cm => cm.Suffix);
-                        // C# Comment has no Markers; send empty Markers for protocol compatibility.
-                        q.GetAndSend(c, _ => Reference.AsRef(Markers.Empty));
+                        q.GetAndSend(c, cm => Reference.AsRef(cm is TextComment text ? text.Markers : Markers.Empty));
                     }
                 });
             q.GetAndSend(space, s => s.Whitespace);

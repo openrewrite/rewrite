@@ -15,12 +15,22 @@
  */
 package org.openrewrite.rpc;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.moderne.jsonrpc.JsonRpcSuccess;
+import io.moderne.jsonrpc.RawJson;
+import io.moderne.jsonrpc.formatter.JsonMessageFormatter;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.style.GeneralFormatStyle;
+import org.openrewrite.style.NamedStyles;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.nio.file.AccessMode;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
@@ -239,12 +249,88 @@ class RpcSendQueueTest {
         assertThat(roundTripList(after, before)).isEqualTo(after);
     }
 
+    @Test
+    void nullElementsRoundTrip() {
+        List<@Nullable String> after = Arrays.asList(null, "A", null);
+
+        assertThat(roundTripList(after, List.of())).isEqualTo(after);
+        assertThat(roundTripList(after, List.of("B", "A"))).isEqualTo(after);
+    }
+
+    @Test
+    void elementReplacedByNullRoundTrips() {
+        List<@Nullable String> before = List.of("A");
+        List<@Nullable String> after = Collections.singletonList(null);
+
+        assertThat(roundTripList(after, before, s -> "same")).isEqualTo(after);
+    }
+
+    @Test
+    void markerWithoutAClassIsWrittenAsItArrived() throws Exception {
+        Map<String, Object> arrived = new HashMap<>();
+        arrived.put("id", Tree.randomId().toString());
+        arrived.put("tool", "example");
+        RpcMarker held = new RpcObjectData(ADD, RpcMarker.class.getName(), new HashMap<>(arrived), null, false).getValue();
+
+        Map<String, Object> written = onTheWire(held).get(0);
+        assertThat(written).containsAllEntriesOf(arrived).doesNotContainKey("data");
+        assertThat(new RpcObjectData(ADD, RpcMarker.class.getName(), written, null, false).<RpcMarker>getValue())
+          .isEqualTo(held);
+    }
+
+    @Test
+    void markerWithoutAClassIsReadFromTheShapeItWasOnceStoredIn() {
+        Map<String, Object> stored = new HashMap<>();
+        stored.put("id", Tree.randomId().toString());
+        stored.put("data", new HashMap<>(Map.of("tool", "example")));
+
+        RpcMarker held = new RpcObjectData(ADD, RpcMarker.class.getName(), stored, null, false).getValue();
+        assertThat(held.getData()).isEqualTo(Map.of("tool", "example"));
+    }
+
+    @Test
+    void markersInOneBatchEachCarryTheStyleTheyShare() throws Exception {
+        GeneralFormatStyle shared = new GeneralFormatStyle(false);
+        List<Map<String, Object>> written = onTheWire(
+          new NamedStyles(Tree.randomId(), "a", "a", "a", Set.of(), List.of(shared)),
+          new NamedStyles(Tree.randomId(), "b", "b", "b", Set.of(), List.of(shared)));
+
+        for (Map<String, Object> value : written) {
+            NamedStyles read = new RpcObjectData(ADD, NamedStyles.class.getName(), value, null, false).getValue();
+            assertThat(read.getStyles()).containsExactly(shared);
+        }
+    }
+
+    /**
+     * The values of one {@code GetObject} response, as its JSON holds them.
+     */
+    private static List<Map<String, Object>> onTheWire(Object... values) throws IOException {
+        List<RpcObjectData> batch = new ArrayList<>();
+        for (Object value : values) {
+            batch.add(new RpcObjectData(ADD, value.getClass().getName(), value, null, false));
+        }
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        new JsonMessageFormatter().serialize(new JsonRpcSuccess(1, RawJson.of(batch)), out);
+
+        ObjectMapper mapper = new ObjectMapper();
+        List<Map<String, Object>> written = new ArrayList<>();
+        for (JsonNode data : mapper.readTree(out.toByteArray()).get("result")) {
+            written.add(mapper.convertValue(data.get("value"), new TypeReference<Map<String, Object>>() {
+            }));
+        }
+        return written;
+    }
+
     private List<String> roundTripList(List<String> after, List<String> before) {
+        return roundTripList(after, before, Function.identity());
+    }
+
+    private List<String> roundTripList(List<String> after, List<String> before, Function<String, ?> id) {
         Deque<List<RpcObjectData>> batches = new ArrayDeque<>();
         RpcSendQueue sq = new RpcSendQueue(1, batches::addLast, new IdentityHashMap<>(), null, false);
         RpcReceiveQueue rq = new RpcReceiveQueue(new HashMap<>(), batches::removeFirst, null, null);
 
-        sq.sendList(after, before, Function.identity(), null, false);
+        sq.sendList(after, before, id, null, false);
         sq.flush();
         return rq.receiveList(before, null);
     }

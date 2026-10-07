@@ -180,6 +180,7 @@ func (r *JavaTypeReceiver) VisitMethod(m *java.JavaTypeMethod, p any) java.JavaT
 // VisitVariable mirrors JavaTypeReceiver.visitVariable
 func (r *JavaTypeReceiver) VisitVariable(v *java.JavaTypeVariable, p any) java.JavaType {
 	q := p.(*ReceiveQueue)
+	v.FlagsBitMap = receiveScalar[int64](q, v.FlagsBitMap)
 	v.Name = receiveScalar[string](q, v.Name)
 	v.Owner = receiveAsType[java.JavaType](r, q, v.Owner)
 	v.Type = receiveAsType[java.JavaType](r, q, v.Type)

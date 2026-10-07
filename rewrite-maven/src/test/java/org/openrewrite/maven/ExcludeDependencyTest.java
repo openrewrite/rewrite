@@ -18,9 +18,11 @@ package org.openrewrite.maven;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ExcludeDependencyTest implements RewriteTest {
@@ -368,5 +370,16 @@ class ExcludeDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void invalidScopeFailsValidation() {
+        Validated<Object> validated = new ExcludeDependency("org.junit.vintage", "junit-vintage-engine", "nonsense").validate();
+        assertThat(validated.failures()).anyMatch(v -> "scope".equals(v.getProperty()));
+    }
+
+    @Test
+    void validScopePassesValidation() {
+        assertThat(new ExcludeDependency("org.junit.vintage", "junit-vintage-engine", "test").validate().isValid()).isTrue();
     }
 }

@@ -349,4 +349,36 @@ describe('variadic pattern matching in containers', () => {
             )
         );
     });
+
+    test.each([
+        ['', 'function myFunc(props: Props, extra) {\n    return null;\n}', J.Kind.Identifier],
+        ['...', 'function myFunc(...props: Props) {\n    return null;\n}', JS.Kind.Spread],
+    ])('a parameter substituted for a parameter placeholder %s is the parameter itself', (spread, after, name) => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodDeclaration(method: J.MethodDeclaration, p: any): Promise<J | undefined> {
+                const parameter = method.parameters.elements[0];
+                const afterTemplate = spread ?
+                    template`function ${method.name}(...${parameter}) {${method.body!.statements}}` :
+                    template`function ${method.name}(${parameter}, extra) {${method.body!.statements}}`;
+                return await afterTemplate.apply(method, this.cursor);
+            }
+        });
+
+        return spec.rewriteRun({
+            //language=typescript
+            ...typescript(
+                `
+                function myFunc(props: Props) {
+                    return null;
+                }`,
+                after
+            ),
+            afterRecipe: (cu: JS.CompilationUnit) => {
+                const parameter = (cu.statements[0].element as J.MethodDeclaration).parameters.elements[0].element as J.VariableDeclarations;
+                expect(parameter.typeExpression?.kind).toBe(JS.Kind.TypeInfo);
+                expect(parameter.variables[0].element.name.kind).toBe(name);
+            }
+        });
+    });
 });

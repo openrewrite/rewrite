@@ -58,6 +58,16 @@ func TestGoSumRPCRoundTrip(t *testing.T) {
 	}
 }
 
+func TestGoSumLineRoundTripsOnItsOwn(t *testing.T) {
+	gs, err := parser.ParseGoSumFile("go.sum", "github.com/a/b v1.0.0/go.mod h1:bbbb=\n")
+	require.NoError(t, err)
+
+	got, ok := roundTripNode(t, gs.Lines[0].Element, &golang.GoSumLine{}).(*golang.GoSumLine)
+
+	require.True(t, ok)
+	require.Equal(t, "github.com/a/b v1.0.0/go.mod h1:bbbb=", printer.PrintWithCursor(got, nil, nil))
+}
+
 func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	content := "github.com/x/y v1.2.3 h1:aaaa=\n" +
 		"github.com/x/y v1.2.3/go.mod h1:bbbb=\n"
@@ -78,4 +88,17 @@ func TestGoSumRPCPreservesResolutionMarker(t *testing.T) {
 	}
 	require.NotNilf(t, found, "GoResolutionResult marker lost in round-trip; markers=%#v", got.Markers.Entries())
 	require.False(t, found.ModulePath != "example.com/foo" || len(found.Requires) != 1, "marker fields not preserved")
+}
+
+func TestEmptyGoSumSendsAnEmptyLinesList(t *testing.T) {
+	// given
+	gs, err := parser.ParseGoSumFile("go.sum", "")
+	require.NoError(t, err)
+
+	// when
+	got := roundTripNode(t, gs, &golang.GoSum{Ident: gs.Ident}).(*golang.GoSum)
+
+	// then
+	require.NotNil(t, got.Lines)
+	require.Empty(t, got.Lines)
 }

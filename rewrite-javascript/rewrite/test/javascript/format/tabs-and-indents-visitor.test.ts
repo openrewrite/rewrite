@@ -1604,4 +1604,30 @@ m() {}
             // @formatter:on
         );
     });
+    test('preserves indentation of multiline template interpolation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(typescript(
+`function render(config) {
+    const value = \`\${
+        config.enabled ? "yes" : "no"
+    }\`;
+    return value;
+}`
+        ));
+    });
+
+    test('preserves continuation indentation in an inline template interpolation', () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new TabsAndIndentsVisitor(tabsAndIndents()));
+        return spec.rewriteRun(typescript(
+`function render(config) {
+    const value = \`\${format(
+        config.value
+    )}\`;
+    return value;
+}`
+        ));
+    });
+
 });

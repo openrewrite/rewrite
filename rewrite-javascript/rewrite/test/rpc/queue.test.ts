@@ -1,8 +1,11 @@
 import {Json} from "../../src/json";
 import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
-import {JavaScriptParser, JS, sourceFileCache} from "../../src/javascript";
+import {IntelliJ, JavaScriptParser, JS, sourceFileCache, SpacesStyleDetailKind, StyleKind} from "../../src/javascript";
+import {MarkersKind} from "../../src/markers";
+import {NamedStyles} from "../../src/style";
 import {TreePrinters} from "../../src/print";
+import {ExecutionContext} from "../../src/execution";
 
 describe("RPC queues", () => {
 
@@ -45,6 +48,85 @@ describe("RPC queues", () => {
             RpcObjectState.END_OF_OBJECT,
         ]);
         expect(batch[1].value).toEqual([0, -1, -1, 2]);
+    });
+
+    test("null is sent as an absent value, never as an ADD that carries nothing", async () => {
+        const send = (after: any, before: any) =>
+            new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(after, before);
+
+        expect(await send(null, undefined)).toEqual([
+            {state: RpcObjectState.NO_CHANGE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect(await send(null, "before")).toEqual([
+            {state: RpcObjectState.DELETE}, {state: RpcObjectState.END_OF_OBJECT}]);
+        expect((await send("after", null))[0].state).toEqual(RpcObjectState.ADD);
+    });
+
+    test("the execution context is sent under the name Java knows it by", async () => {
+        const batch = await new RpcSendQueue(new ReferenceMap(), Json.Kind.Document, false).generate(new ExecutionContext(), undefined);
+        expect(batch[0]).toEqual({state: RpcObjectState.ADD, valueType: "org.openrewrite.InMemoryExecutionContext"});
+    });
+
+    test("an inline value from Java loses the keys its serializer added", async () => {
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: "org.openrewrite.rpc.RpcMarker", value: {"@c": "org.openrewrite.rpc.RpcMarker", "@ref": 1, id: "1", tool: "example"}},
+            {state: RpcObjectState.ADD, value: null},
+        ];
+        const queue = new RpcReceiveQueue(new Map(), undefined, async () => batch.splice(0), undefined, false);
+
+        expect(await queue.receive(undefined)).toEqual({kind: "org.openrewrite.rpc.RpcMarker", id: "1", tool: "example"});
+        expect(await queue.receive(undefined)).toBeNull();
+    });
+
+    test("a set of styles changed here travels with its type, in the shape Java decodes", async () => {
+        const before: NamedStyles = {
+            kind: MarkersKind.NamedStyles,
+            id: "1",
+            name: "example",
+            displayName: "Example",
+            tags: [],
+            styles: [IntelliJ.TypeScript.tabsAndIndents()]
+        };
+        const after: NamedStyles = {...before, styles: [{...IntelliJ.TypeScript.tabsAndIndents(), indentSize: 2} as any]};
+
+        const batch = await new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false).generate(after, before);
+
+        expect(batch[0]).toEqual({
+            state: RpcObjectState.CHANGE,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                ...before, styles: [{
+                    "@c": StyleKind.TabsAndIndentsStyle,
+                    "@ref": 2,
+                    useTabCharacter: false,
+                    tabSize: 4,
+                    indentSize: 2,
+                    continuationIndent: 4,
+                    keepIndentsOnEmptyLines: false,
+                    indentChainedMethods: true,
+                    indentAllChainedCallsInAGroup: false
+                }]
+            }
+        });
+    });
+
+    test("a set of styles from Java has the kinds the styles here are found by", async () => {
+        const batch: RpcObjectData[] = [{
+            state: RpcObjectState.ADD,
+            valueType: MarkersKind.NamedStyles,
+            value: {
+                "@c": MarkersKind.NamedStyles, "@ref": 1, id: "1", name: "example", displayName: "Example", tags: [],
+                styles: [
+                    {"@c": StyleKind.SpacesStyle, "@ref": 2, within: {es6ImportExportBraces: true}},
+                    {"@c": "org.openrewrite.style.GeneralFormatStyle", "@ref": 3, useCRLFNewLines: false}
+                ]
+            }
+        }];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+
+        expect((await q.receive<NamedStyles>(undefined)).styles).toEqual([
+            {kind: StyleKind.SpacesStyle, within: {kind: SpacesStyleDetailKind.SpacesStyleWithin, es6ImportExportBraces: true}},
+            {kind: "org.openrewrite.style.GeneralFormatStyle", useCRLFNewLines: false}
+        ]);
     });
 
     test("an unchanged list is a single NO_CHANGE", async () => {

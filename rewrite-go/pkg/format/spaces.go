@@ -58,16 +58,28 @@ func (v *SpacesVisitor) Visit(t java.Tree, p any) java.Tree {
 
 func (v *SpacesVisitor) VisitAssignment(a *java.Assignment, p any) java.J {
 	a = v.GoVisitor.VisitAssignment(a, p).(*java.Assignment)
-	a.Value.Before = ensureSingleSpace(a.Value.Before)
-	a.Value.Element = ensureLeadingSingleSpace(a.Value.Element)
-	return a
+	before := ensureSingleSpace(a.Value.Before)
+	value := ensureLeadingSingleSpace(a.Value.Element)
+	if java.SpaceEqual(before, a.Value.Before) && value == a.Value.Element {
+		return a
+	}
+	c := *a
+	c.Value.Before = before
+	c.Value.Element = value
+	return &c
 }
 
 func (v *SpacesVisitor) VisitAssignmentOperation(ao *java.AssignmentOperation, p any) java.J {
 	ao = v.GoVisitor.VisitAssignmentOperation(ao, p).(*java.AssignmentOperation)
-	ao.Operator.Before = ensureSingleSpace(ao.Operator.Before)
-	ao.Assignment = ensureLeadingSingleSpace(ao.Assignment)
-	return ao
+	before := ensureSingleSpace(ao.Operator.Before)
+	assignment := ensureLeadingSingleSpace(ao.Assignment)
+	if java.SpaceEqual(before, ao.Operator.Before) && assignment == ao.Assignment {
+		return ao
+	}
+	c := *ao
+	c.Operator.Before = before
+	c.Assignment = assignment
+	return &c
 }
 
 // VisitUnary writes the operand straight after the operator, except where the
@@ -77,7 +89,7 @@ func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
 	tightened := clearExpressionLeadingSpace(u.Operand)
 	op, ahead := prefixOperator(u.Operator.Element)
 	if !ahead || !fusesWith(op, printer.Print(tightened)) {
-		u.Operand = tightened
+		u = u.WithOperand(tightened)
 	}
 	return u
 }
@@ -87,7 +99,7 @@ func (v *SpacesVisitor) VisitUnary(u *java.Unary, p any) java.J {
 // side of the operand and never meets its leading space.
 func prefixOperator(op java.UnaryOperator) (string, bool) {
 	switch op {
-	case java.PostIncrement, java.PostDecrement, java.SpreadPostfix:
+	case java.PostIncrement, java.PostDecrement:
 		return "", false
 	}
 	return printer.UnaryOperatorString(op), true

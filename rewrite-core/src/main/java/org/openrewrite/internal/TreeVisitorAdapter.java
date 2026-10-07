@@ -109,15 +109,17 @@ public class TreeVisitorAdapter {
                         FieldCreator delegateField = creator.getFieldCreator("delegate", delegateType);
                         delegateField.setModifiers(Modifier.PRIVATE);
 
-                        MethodCreator setDelegate = creator.getMethodCreator("setDelegate", void.class, delegateType);
+                        // Typed as TreeVisitor so the handle lookup below doesn't tie a recipe class loader's copy of
+                        // the delegate type to rewrite-core's (a loader constraint violation)
+                        MethodCreator setDelegate = creator.getMethodCreator("setDelegate", void.class, TreeVisitor.class);
                         setDelegate.setModifiers(Modifier.PUBLIC);
-                        setDelegate.writeInstanceField(delegateField.getFieldDescriptor(), setDelegate.getThis(),
-                                setDelegate.getMethodParam(0));
+                        ResultHandle typedDelegate = setDelegate.checkCast(setDelegate.getMethodParam(0), delegateType);
+                        setDelegate.writeInstanceField(delegateField.getFieldDescriptor(), setDelegate.getThis(), typedDelegate);
                         setDelegate.invokeSpecialMethod(
                                 MethodDescriptor.ofMethod(proxySuper, "setCursor", void.class, Cursor.class),
                                 setDelegate.getThis(),
                                 setDelegate.invokeVirtualMethod(MethodDescriptor.ofMethod(delegateType, "getCursor", Cursor.class),
-                                        setDelegate.getMethodParam(0))
+                                        typedDelegate)
                         );
                         setDelegate.returnValue(null);
 
@@ -222,7 +224,7 @@ public class TreeVisitorAdapter {
             MethodHandles.Lookup lookup = MethodHandles.lookup();
             return new Adapter(
                     lookup.findConstructor(a, methodType(void.class)).asType(methodType(Object.class)),
-                    lookup.findVirtual(a, "setDelegate", methodType(void.class, delegateType))
+                    lookup.findVirtual(a, "setDelegate", methodType(void.class, TreeVisitor.class))
                             .asType(methodType(void.class, Object.class, TreeVisitor.class)),
                     registeredMixinClass == null ? null :
                             lookup.findConstructor(registeredMixinClass, methodType(void.class))

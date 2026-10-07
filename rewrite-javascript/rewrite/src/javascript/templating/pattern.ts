@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {isIdentifier, J} from '../../java';
 import {
     Any,
     Capture,
@@ -28,10 +28,20 @@ import {
 } from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
-import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
-import {TemplateEngine} from './engine';
+import {
+    CaptureMarker,
+    CaptureStorageValue,
+    generateCacheKey,
+    globalAstCache,
+    PATTERN_PREFIXES_SYMBOL,
+    PlaceholderUtils,
+    WRAPPERS_MAP_SYMBOL
+} from './utils';
+import {walk} from '../scope';
+import {opensWithBrace, TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
+import {JavaScriptSemanticComparatorVisitor} from '../comparator';
 
 
 /**
@@ -130,7 +140,8 @@ export class PatternBuilder {
  */
 export class Pattern {
     private _options: PatternOptions = {};
-    private _cachedAstPattern?: J;
+    /** The pattern tree, keyed by whether its code was parsed as an expression. */
+    private _cachedAstPatterns = new Map<boolean, J>();
     private static nextPatternId = 1;
     private readonly patternId: number;
     private readonly unnamedCaptureMapping = new Map<string, string>();
@@ -202,23 +213,25 @@ export class Pattern {
     configure(options: PatternOptions): Pattern {
         this._options = { ...this._options, ...options };
         // Invalidate cache when configuration changes
-        this._cachedAstPattern = undefined;
+        this._cachedAstPatterns.clear();
         return this;
     }
 
     /**
-     * Gets the AST pattern for this pattern, using two-level caching:
+     * Gets the AST pattern for this pattern, using three-level caching:
      * 1. Instance-level cache (fastest - this pattern instance)
      * 2. Global LRU cache (fast - shared across pattern instances with same code)
      * 3. Compute via TemplateProcessor (slow - parse and process)
      *
+     * @param expression Whether to parse the code as an expression, with statements as the fallback
      * @returns The cached or newly computed pattern AST
      * @internal
      */
-    async getAstPattern(): Promise<J> {
+    async getAstPattern(expression: boolean = false): Promise<J> {
         // Level 1: Instance cache (fastest path)
-        if (this._cachedAstPattern) {
-            return this._cachedAstPattern;
+        const instanceCached = this._cachedAstPatterns.get(expression);
+        if (instanceCached) {
+            return instanceCached;
         }
 
         // Generate cache key for global lookup
@@ -229,7 +242,7 @@ export class Pattern {
                 return `raw:${(c as RawCode).code}`;
             }
             return c.getName();
-        }).join(',');
+        }).join(',') + (expression ? '::expression' : '');
         const cacheKey = generateCacheKey(
             this.templateParts,
             capturesKey,
@@ -244,20 +257,31 @@ export class Pattern {
         let tree = globalAstCache.get(cacheKey);
         if (!tree) {
             // Level 3: Compute via TemplateEngine (slow path)
-            tree = await TemplateEngine.getPatternTree(
-                this.templateParts,
-                this.captures,
-                contextStatements,
-                this._options.dependencies || {},
-                this._options.types
-            );
+            try {
+                tree = await TemplateEngine.getPatternTree(
+                    this.templateParts,
+                    this.captures,
+                    contextStatements,
+                    this._options.dependencies || {},
+                    this._options.types,
+                    expression
+                );
+            } catch (e) {
+                // A block matches only a block, which the statement parse is for
+                if (!expression) {
+                    throw e;
+                }
+                const statementPattern = await this.getAstPattern(false);
+                this._cachedAstPatterns.set(expression, statementPattern);
+                return statementPattern;
+            }
             globalAstCache.set(cacheKey, tree);
         }
 
         // The key names captures but says nothing about their constraints, so two patterns of the
         // same shape share an entry; markers are attached per instance to keep them apart.
         const result = await TemplateEngine.attachCaptureMarkers(tree, this.captures);
-        this._cachedAstPattern = result;
+        this._cachedAstPatterns.set(expression, result);
 
         return result;
     }
@@ -310,7 +334,7 @@ export class Pattern {
         }
         // Create MatchResult with unified storage
         const storage = (matcher as any).storage;
-        return new MatchResult(new Map(storage));
+        return new MatchResult(new Map(storage), () => matcher.patternPrefixes());
     }
 
     /**
@@ -556,7 +580,7 @@ export class Pattern {
         if (success) {
             // Match succeeded - return MatchResult with debug info
             const storage = (matcher as any).storage;
-            const matchResult = new MatchResult(new Map(storage));
+            const matchResult = new MatchResult(new Map(storage), () => matcher.patternPrefixes());
             return {
                 matched: true,
                 result: matchResult,
@@ -600,9 +624,12 @@ export class Pattern {
  */
 export class MatchResult implements IMatchResult {
     constructor(
-        private readonly storage: Map<string, CaptureStorageValue> = new Map()
+        private readonly storage: Map<string, CaptureStorageValue> = new Map(),
+        private readonly computePatternPrefixes: () => Map<string, J.Space> = () => new Map()
     ) {
     }
+
+    private patternPrefixes?: Map<string, J.Space>;
 
     // Overload: get with Capture returns value
     get<T>(capture: Capture<T>): T | undefined;
@@ -655,6 +682,11 @@ export class MatchResult implements IMatchResult {
         return value as J;
     }
 
+    /** @internal */
+    [PATTERN_PREFIXES_SYMBOL](): Map<string, J.Space> {
+        return this.patternPrefixes ??= this.computePatternPrefixes();
+    }
+
     /**
      * Internal method to get wrappers (used by template expansion).
      * Returns both scalar and variadic wrappers.
@@ -705,9 +737,13 @@ class Matcher {
     ) {
         this.cursor = cursor;
         this.debugOptions = debugOptions ?? {};
+        this.lenientTypeMatching = pattern.options.lenientTypeMatching ?? true;
+        this.sameCodeComparator = new JavaScriptSemanticComparatorVisitor(this.lenientTypeMatching);
     }
 
     private readonly cursor: Cursor;
+    private readonly lenientTypeMatching: boolean;
+    private readonly sameCodeComparator: JavaScriptSemanticComparatorVisitor;
 
     /**
      * Checks if the pattern matches the AST node.
@@ -716,10 +752,32 @@ class Matcher {
      */
     async matches(): Promise<boolean> {
         if (!this.patternAst) {
-            this.patternAst = await this.pattern.getAstPattern();
+            this.patternAst = await this.pattern.getAstPattern(
+                opensWithBrace(this.pattern.templateParts) && this.ast.kind !== J.Kind.Block);
         }
 
         return this.matchNode(this.patternAst, this.ast);
+    }
+
+    /**
+     * The prefix the pattern writes before each capture, by capture name. A capture of the whole
+     * match has none, since the prefix of what it holds lies outside the match.
+     */
+    patternPrefixes(): Map<string, J.Space> {
+        const prefixes = new Map<string, J.Space>();
+        walk(this.patternAst, node => {
+            const capture = isIdentifier(node) ? PlaceholderUtils.parseCapture(node.simpleName) : null;
+            if (capture && !prefixes.has(capture.name) && !this.capturesWholeMatch(capture.name)) {
+                prefixes.set(capture.name, (node as J.Identifier).prefix);
+            }
+            return true;
+        });
+        return prefixes;
+    }
+
+    private capturesWholeMatch(name: string): boolean {
+        const bound = this.storage.get(name);
+        return bound !== undefined && !Array.isArray(bound) && this.extractElements(bound) === this.ast;
     }
 
     /**
@@ -850,8 +908,6 @@ class Matcher {
         // - Kind checking
         // - Deep structural comparison
         // This centralizes all matching logic in one place
-        const lenientTypeMatching = this.pattern.options.lenientTypeMatching ?? true;
-
         // Factory pattern: instantiate debug or production comparator
         // Zero cost in production - DebugPatternMatchingComparator is never instantiated
         const matcherCallbacks: MatcherCallbacks = {
@@ -872,8 +928,8 @@ class Matcher {
         };
 
         const comparator = this.debugOptions.enabled
-            ? new DebugPatternMatchingComparator(matcherCallbacks, lenientTypeMatching)
-            : new PatternMatchingComparator(matcherCallbacks, lenientTypeMatching);
+            ? new DebugPatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching)
+            : new PatternMatchingComparator(matcherCallbacks, this.lenientTypeMatching);
         // Pass cursors to allow constraints to navigate to root
         // Pattern cursor is undefined (pattern is the root), target cursor is provided by user
         const result = await comparator.compare(pattern, target, undefined, this.cursor);
@@ -942,7 +998,7 @@ class Matcher {
      * @param wrapper Optional wrapper containing the target (for preserving markers)
      * @returns true if the capture is successful, false otherwise
      */
-    private handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): boolean {
+    private async handleCapture(capture: CaptureMarker, target: J, wrapper?: J.RightPadded<J>): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -960,10 +1016,29 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, [target]);
+            }
             // Store wrapper if available (preserves markers), otherwise store element
             this.storage.set(captureName, wrapper ?? target);
         }
 
+        return true;
+    }
+
+    /** A capture named twice in a pattern binds the same code at both places. */
+    private async bindsSameCode(bound: CaptureStorageValue, targets: J[]): Promise<boolean> {
+        const boundElements = (Array.isArray(bound) ? bound : [bound]).map(b =>
+            b.kind === J.Kind.RightPadded ? (b as J.RightPadded<J>).element : b as J);
+        if (boundElements.length !== targets.length) {
+            return false;
+        }
+        for (let i = 0; i < targets.length; i++) {
+            if (!await this.sameCodeComparator.compare(boundElements[i], targets[i])) {
+                return false;
+            }
+        }
         return true;
     }
 
@@ -975,7 +1050,7 @@ class Matcher {
      * @param wrappers Optional wrappers to preserve markers
      * @returns true if the capture is successful, false otherwise
      */
-    private handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): boolean {
+    private async handleVariadicCapture(capture: CaptureMarker, targets: J[], wrappers?: J.RightPadded<J>[]): Promise<boolean> {
         const captureName = capture.captureName;
 
         if (!captureName) {
@@ -993,6 +1068,10 @@ class Matcher {
         // Only store the binding if this is a capturing placeholder
         const capturing = (captureObj as any)?.[CAPTURE_CAPTURING_SYMBOL] ?? true;
         if (capturing) {
+            const bound = this.storage.get(captureName);
+            if (bound !== undefined) {
+                return this.bindsSameCode(bound, targets);
+            }
             // Store the richest representation: wrappers if available, otherwise elements
             if (wrappers && wrappers.length > 0) {
                 this.storage.set(captureName, wrappers);

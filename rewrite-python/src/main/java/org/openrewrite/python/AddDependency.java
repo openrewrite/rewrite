@@ -23,13 +23,17 @@ import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.python.internal.LockFileRegeneration;
 import org.openrewrite.python.internal.PyProjectHelper;
+import org.openrewrite.python.search.UsesImport;
 import org.openrewrite.python.table.PythonLockRegenerationFailures;
 import org.openrewrite.python.trait.PythonDependencyFile;
 import org.openrewrite.toml.tree.Toml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 import static java.util.Collections.singletonMap;
@@ -74,6 +78,17 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     @Nullable
     String groupName;
 
+    @Option(displayName = "Only if using",
+            description = "Only add the dependency to a project when one of its Python source files imports " +
+                    "this module, matched the way `org.openrewrite.python.search.UsesImport` matches it. " +
+                    "A file belongs to the project of its nearest enclosing dependency file. " +
+                    "Imports are read as they stand at the start of the recipe run, so in a migration name the " +
+                    "module being migrated away from. Leave unset to add the dependency unconditionally.",
+            example = "tenacity",
+            required = false)
+    @Nullable
+    String onlyIfUsing;
+
     @Override
     public Validated<Object> validate() {
         Validated<Object> v = super.validate();
@@ -97,6 +112,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     public String getDescription() {
         return "Add a dependency to a Python project. Supports `pyproject.toml` " +
                 "(with scope/group targeting), `requirements.txt`, and `Pipfile`. " +
+                "When `onlyIfUsing` is set, the dependency is added only to projects with a Python file " +
+                "that imports that module. " +
                 "For `pyproject.toml`, `uv.lock`, `poetry.lock`, and `pdm.lock` are regenerated natively without executing the package manager. " +
                 "For `Pipfile`, `Pipfile.lock` is regenerated natively by consulting the project's " +
                 "package index over the network. " +
@@ -107,6 +124,41 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     static class Accumulator {
         final Map<Path, ProjectState> projects = new HashMap<>();
         final Map<Path, Path> lockToDeps = new HashMap<>();
+        final Set<Path> filesUsing = new HashSet<>();
+        @Nullable Set<Path> projectDirsUsing;
+
+        /**
+         * Directories of the dependency files whose projects import {@link AddDependency#onlyIfUsing}.
+         * Resolved after scanning, since dependency files and sources arrive in no particular order.
+         */
+        Set<Path> projectDirsUsing() {
+            if (projectDirsUsing == null) {
+                Set<Path> projectDirs = new HashSet<>();
+                for (Map.Entry<Path, ProjectState> e : projects.entrySet()) {
+                    if (e.getValue().capturedDepsFile != null) {
+                        projectDirs.add(dirOf(e.getKey()));
+                    }
+                }
+                projectDirsUsing = new HashSet<>();
+                for (Path file : filesUsing) {
+                    for (Path dir = dirOf(file); ; dir = dirOf(dir)) {
+                        if (projectDirs.contains(dir)) {
+                            projectDirsUsing.add(dir);
+                            break;
+                        }
+                        if (dir.toString().isEmpty()) {
+                            break;
+                        }
+                    }
+                }
+            }
+            return projectDirsUsing;
+        }
+    }
+
+    private static Path dirOf(Path file) {
+        Path parent = file.getParent();
+        return parent == null ? Paths.get("") : parent;
     }
 
     static class ProjectState {
@@ -126,6 +178,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
     public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             final PythonDependencyFile.Matcher matcher = new PythonDependencyFile.Matcher();
+            final TreeVisitor<?, ExecutionContext> usesImport =
+                    onlyIfUsing == null ? null : new UsesImport(onlyIfUsing).getVisitor();
 
             @Override
             public Tree preVisit(Tree tree, ExecutionContext ctx) {
@@ -135,6 +189,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
                 SourceFile sourceFile = (SourceFile) tree;
                 Path sourcePath = sourceFile.getSourcePath();
+
+                // `UsesImport` marks the file it matches, so a returned copy is the sighting.
+                if (usesImport != null && usesImport.isAcceptable(sourceFile, ctx) && usesImport.visit(tree, ctx) != tree) {
+                    acc.filesUsing.add(sourcePath);
+                }
 
                 if (tree instanceof Toml.Document && sourcePath.endsWith("uv.lock")) {
                     Path depsPath = PyProjectHelper.correspondingPyprojectPath(sourcePath);
@@ -175,6 +234,10 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
         };
     }
 
+    private boolean isUsing(Accumulator acc, Path depsPath) {
+        return onlyIfUsing == null || acc.projectDirsUsing().contains(dirOf(depsPath));
+    }
+
     private boolean matchesAddDependency(PythonDependencyFile trait) {
         return PyProjectHelper.findDependencyInScope(
                 trait.getMarker(), packageName, scope, groupName) == null;
@@ -195,7 +258,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 Path sourcePath = sourceFile.getSourcePath();
 
                 ProjectState ps = acc.projects.get(sourcePath);
-                if (ps != null) {
+                if (ps != null && isUsing(acc, sourcePath)) {
                     PythonDependencyFile trait = matcher.get(getCursor()).orElse(null);
                     if (trait != null && matchesAddDependency(trait)) {
                         ensureComputed(ps, trait, ctx);
@@ -213,7 +276,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Accumulator> {
                 }
 
                 Path depsPath = acc.lockToDeps.get(sourcePath);
-                if (depsPath == null) {
+                if (depsPath == null || !isUsing(acc, depsPath)) {
                     return tree;
                 }
                 ProjectState lockPs = acc.projects.get(depsPath);

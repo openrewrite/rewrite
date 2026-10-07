@@ -76,6 +76,7 @@ rewrite-javascript/rewrite/
 │   │   ├── parser.ts                    # JS/TS parser
 │   │   ├── rpc.ts                       # RPC sender/receiver for JS
 │   │   ├── assertions.ts               # Test helpers: typescript(), javascript(), jsx(), tsx(), packageJson()
+│   │   ├── type-report.ts, type-report-cli.ts  # Type attribution listing (rewrite-javascript-types)
 │   │   ├── add-import.ts, remove-import.ts  # Import manipulation
 │   │   ├── recipes/                     # Built-in recipes (order-imports, change-import, add-dependency, etc.)
 │   │   ├── format/                      # Formatting visitors
@@ -182,6 +183,9 @@ export class MyRecipe extends Recipe {
 
 ## Test Pattern
 
+`RecipeSpec` takes no constructor arguments. Vitest does not typecheck, so an argument passed to
+it is dropped silently and the test runs the no-op recipe. `npm run typecheck` catches it.
+
 Tests use relative imports. Source spec factories (`typescript()`, `javascript()`, `jsx()`, `tsx()`, `packageJson()`) are in `src/javascript/assertions.ts`.
 
 ```typescript
@@ -190,8 +194,11 @@ import { typescript } from "../../../src/javascript";
 import { OrderImports } from "../../../src/javascript/recipes/order-imports";
 
 describe('OrderImports', () => {
+    const spec = new RecipeSpec();
+    spec.recipe = new OrderImports();
+
     test('sorts imports', () =>
-        new RecipeSpec({ recipe: new OrderImports() }).rewriteRun(
+        spec.rewriteRun(
             typescript(
                 `import {z} from 'zebra';\nimport {a} from 'alpha';`,
                 `import {a} from 'alpha';\nimport {z} from 'zebra';`
@@ -227,7 +234,7 @@ with the name its binding carries after the move, whether or not the cursor reac
 
 ### Which name a rebind binds
 
-`to.alias` settles it when given, or refuses the move where the file already spells that name.
+`to.alias` settles it when given, or refuses the move where that name is taken.
 Otherwise a binding the source named itself — an aliased specifier,
 or a default, namespace or AMD binding, whose name never came from a member — keeps that name; an
 unaliased named specifier follows its member to the new name, since that is what the source would
@@ -235,10 +242,18 @@ have written had it imported the member all along — but only where the file sp
 else, since a rename onto a name already in use would capture its references or be captured by them.
 Where it is taken the binding keeps the name it has, as an alias, and the move is otherwise the same.
 
+A name the file spells is still not taken when it is a value import of `to`'s named member, and the
+moved binding is a value too. Outside the imports and `export {…}` clauses the file may spell it only
+as a reference, and no queued edit may claim it. Every reference to it then reads the target, so the move binds that name,
+alias or not, and `RebindImport` merges into that import. A `type` import on either side, or a
+default or namespace target, would get a second declaration of the name instead, so the name stays
+taken there.
+
 Where the name changes, the file's references to the binding change with it — the occurrences that
-resolve to the binding, so a name a nearer scope binds and a property that merely reads alike both
-stay put. The rename belongs here rather than in the caller: from the returned name alone a caller
-cannot find those occurrences, since the binding it would resolve them against is already gone.
+resolve to the binding, so a name a nearer scope binds with the same meaning, a value over a value or
+a type over a type, and a property that merely reads alike both stay put. The rename belongs here
+rather than in the caller: from the returned name alone a caller cannot find those occurrences, since
+the binding it would resolve them against is already gone.
 
 Two positions spell a name and a reference with one identifier, and the rename splits them: `{a}`
 becomes `{a: renamed}`, keeping the property its object publishes, and `export {a}` becomes
@@ -251,19 +266,33 @@ pass rather than run it alongside.
 
 ### What a rebind's attribution follows
 
-The move carries the attribution of what it moved, so `UsesType` and any recipe matching on types
-read the new module rather than the old one. It reaches the references of the moved binding and
-nothing else: a member's `Type.Method`/`Type.Variable` name is the module's name for it, never the
-local alias, so it follows the member rather than the binding, while a sibling named under that
-same module stays behind.
+Moving an ES import renames every type in the file that names what moved, following each type's
+signature but not a class's members. An AMD dependency swap rewrites no attribution. Names follow
+the type mapper. A class takes the name of its package (`@acme/common.HttpClient`), and a
+function, constant or constructor is declared on the specifier (`@acme/common/http`). A sibling
+declared beside a moved member keeps the old name.
 
-A name the move does not reach keeps the attribution it had — a variable whose type is inferred
-from the moved binding, say. That boundary is deliberate: reaching those means rewriting by
-qualified name across the file, and a qualified name cannot tell a sibling's type from the moved
-one, nor a type another module re-exports from one the move applies to.
+The rewrite renames, it does not re-resolve. A moved member keeps its old declaration's parameter,
+return and member types under the new names, which is wrong where the target's API differs.
 
-Moving a whole module carries the types named after the module itself. A type attributed to a
-binding's own declared shape rather than to the module name stays where it is.
+A name another binding in the file shares stays as it is:
+
+- a module object, on a whole-module move, while the file binds that module some other way too
+- a class name, while another subpath of the same package exports a class of that name
+
+A type that reaches the moved name through another import follows the move too. Where the result
+differs from a fresh parse:
+
+- the specifier is relative, since the mapper names those types after the file path
+- the target re-exports the class from another package, whose name a fresh parse gives it
+- the target is a default binding, where a fresh parse uses the name the class declares
+
+### Several rebinds in one file
+
+Each rebind decides between rewriting its statement in place and replacing it when it runs, so it
+sees what the rebinds before it left: a statement another rebind emptied, or an import of the
+target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
+renames only the types naming its own member, so a later rebind still finds its own.
 
 ### When `maybeBind` returns `undefined`
 
@@ -279,13 +308,15 @@ binding's own declared shape rather than to the module name stays where it is.
 
 ### When `maybeRebind` returns `undefined`
 
-The four above that still apply, plus: nothing binds `from`; `from` or `to` names a member on the
-AMD lane, or `to` an alias there other than the parameter's own name; `to.alias` is not a legal
-identifier, or is a name the file already spells; or the two differ in default/namespace/named
-shape while `from`'s statement binds nothing else. That last one is a layering boundary rather than an oversight — the only edit
-available in place is a rewrite of the existing clause, and changing shape needs whole-statement
-replacement with the header-preserving prefix transfer that `RemoveImport` does over the statement
-list.
+The four above that still apply, plus these:
+
+- nothing binds `from`
+- `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
+  parameter's own name
+- `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
+  rebind binds"
+- the file binds its modules with `require` and the move would need a new import, because `from`'s
+  statement binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.
@@ -295,6 +326,12 @@ it is left as it stands: the name read from the first would bind twice if it wer
 Each language module has `rpc.ts` with a Sender (visit tree → serialize to queue) and Receiver (read queue → reconstruct tree). These must stay aligned with each other AND with the Java equivalents. Any mismatch causes deadlocks or corrupted trees.
 
 ## Debugging Tips
+
+### Type Attribution
+`REWRITE_JAVASCRIPT_DUMP_TYPES=1 npm run testhelper -- <test file>` prints each parsed file's type
+attribution, which is what a `MethodMatcher` pattern written for that test has to match. `missing`,
+`all` and `supertypes` are the other accepted values. `npx rewrite-javascript-types <file>` reports
+a file on disk. See the README section "Inspecting type attribution".
 
 ### RPC Hangs
 1. Check that both Java and TypeScript RPC methods are implemented

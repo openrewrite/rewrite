@@ -415,7 +415,7 @@ def _print_python(cu) -> str:
 def _isolated_hub(monkeypatch, server):
     """Fresh hub state so this test neither sees nor leaves module-global tables."""
     for name in ("_hub_tree", "_hub_served", "_hub_send_refs", "_hub_recv_refs",
-                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "local_objects",
+                 "_hub_send_checkpoint", "_hub_recv_checkpoint", "_hub_last_served", "local_objects",
                  "_ref_checkpoints", "_local_ref_checkpoints"):
         monkeypatch.setattr(server, name, {})
 

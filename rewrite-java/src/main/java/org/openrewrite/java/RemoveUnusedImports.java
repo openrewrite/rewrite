@@ -157,7 +157,7 @@ public class RemoveUnusedImports extends Recipe {
 
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(target, emptySet())) {
-                        if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
+                        if (maybeStatic.getOwningClass() != null && toFullyQualifiedName(outerType).startsWith(toFullyQualifiedName(maybeStatic.getOwningClass().getFullyQualifiedName()))) {
                             if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
                             }
@@ -169,56 +169,46 @@ public class RemoveUnusedImports extends Recipe {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(qualid.getSimpleName())) {
+                        SortedSet<String> unfoldedMethodsAndFields = methodsAndFields != null ? methodsAndFields : targetMethodsAndFields;
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedStaticWildcardImports.add(elem.getTypeName());
-                        } else {
-                            // getTypeName() can mangle packages with a capitalized segment
-                            // (e.g. com.example.api.Impl.utils). Fall back to the fuzzy match
-                            // already computed for #1698 so unfolding uses the same members.
-                            SortedSet<String> membersToUnfold = methodsAndFields != null ?
-                                    methodsAndFields : targetMethodsAndFields;
-                            int memberCount = membersToUnfold == null ? 0 : membersToUnfold.size();
-                            int staticClassCount = staticClasses == null ? 0 : staticClasses.size();
-                            if (memberCount + staticClassCount < layoutStyle.getNameCountToUseStarImport()) {
-                                // replacing the star with a series of unfolded imports
-                                anImport.imports.clear();
+                        } else if (((unfoldedMethodsAndFields == null ? 0 : unfoldedMethodsAndFields.size()) +
+                                (staticClasses == null ? 0 : staticClasses.size())) < layoutStyle.getNameCountToUseStarImport()) {
+                            // replacing the star with a series of unfolded imports
+                            anImport.imports.clear();
 
-                                // add each unfolded import
-                                if (membersToUnfold != null) {
-                                    for (String method : membersToUnfold) {
-                                        anImport.imports.add(new JRightPadded<>(elem
-                                                .withId(randomId())
-                                                .withQualid(qualid.withName(name.withSimpleName(method)))
-                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
-                                    }
+                            // add each unfolded import
+                            if (unfoldedMethodsAndFields != null) {
+                                for (String method : unfoldedMethodsAndFields) {
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
+                                            .withQualid(qualid.withName(name.withSimpleName(method)))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
-
-                                if (staticClasses != null) {
-                                    for (JavaType.FullyQualified fqn : staticClasses) {
-                                        anImport.imports.add(new JRightPadded<>(elem
-                                                .withId(randomId())
-                                                .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
-                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
-                                    }
-                                }
-
-                                if (!anImport.imports.isEmpty()) {
-                                    // move whatever the original prefix of the star import was to the first unfolded import
-                                    anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
-                                            .getElement().withPrefix(elem.getPrefix())));
-                                    anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
-                                    ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
-                                    changed = true;
-                                } else {
-                                    anImport.used = false;
-                                    changed = true;
-                                }
-                            } else {
-                                usedStaticWildcardImports.add(elem.getTypeName());
                             }
+
+                            if (staticClasses != null) {
+                                for (JavaType.FullyQualified fqn : staticClasses) {
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withId(randomId())
+                                            .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
+                                }
+                            }
+
+                            // move whatever the original prefix of the star import was to the first unfolded import
+                            anImport.imports.set(0, anImport.imports.get(0).withElement(anImport.imports.get(0)
+                                    .getElement().withPrefix(elem.getPrefix())));
+
+                            anImport.imports.forEach(i -> checkedImports.add(i.getElement().toString()));
+                            ImportComments.unfoldComments(getCursor(), elem, anImport.imports);
+
+                            changed = true;
+                        } else {
+                            usedStaticWildcardImports.add(elem.getTypeName());
                         }
-                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> elem.getTypeName().equals(c.getFullyQualifiedName())) ||
+                    } else if (staticClasses != null && staticClasses.stream().anyMatch(c -> fullyQualifiedNamesAreEqual(elem.getTypeName(), c.getFullyQualifiedName())) ||
                             (methodsAndFields != null && methodsAndFields.contains(qualid.getSimpleName())) ||
                             (targetMethodsAndFields != null && targetMethodsAndFields.contains(qualid.getSimpleName()))) {
                         anImport.used = true;

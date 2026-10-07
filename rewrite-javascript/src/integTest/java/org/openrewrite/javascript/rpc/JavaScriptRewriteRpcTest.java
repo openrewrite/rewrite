@@ -205,6 +205,28 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
+    @ParameterizedTest
+    @SuppressWarnings("JSUnusedLocalSymbols")
+    @ValueSource(booleans = {true, false})
+    void runSearchRecipeWithNegatedJavaRecipeActingAsPrecondition(boolean vendored) {
+        installRecipes();
+        rewriteRun(
+          spec -> spec
+            .recipe(client().prepareRecipe("org.openrewrite.example.javascript.find-identifier-outside-vendored-or-bundled",
+              Map.of("identifier", "hello"))),
+          vendored ?
+            javascript(
+              "const hello = 'world'",
+              spec -> spec.path("vendor/hello.js")
+            ) :
+            javascript(
+              "const hello = 'world'",
+              "const /*~~>*/hello = 'world'",
+              spec -> spec.path("src/hello.js")
+            )
+        );
+    }
+
     @Test
     void printJava() {
         assertThat(client().installRecipes(new File("rewrite/dist-fixtures/modify-all-trees.js")).getRecipesInstalled())
@@ -243,9 +265,12 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
 
     @Test
     void getRecipes() {
-        installRecipes();
-        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+        // recipes installed from a file belong to the bundle named by that file's absolute path
+        File recipes = installRecipes();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", recipes.getPath(), null, null, null))
           .getAllRecipes()).isNotEmpty();
+        assertThat(client().getMarketplace(new RecipeBundle("npm", "@openrewrite/recipes-npm", null, null, null))
+          .getAllRecipes()).isEmpty();
     }
 
     @Test
@@ -787,10 +812,11 @@ class JavaScriptRewriteRpcTest implements RewriteTest {
         );
     }
 
-    private void installRecipes() {
-        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js");
+    private File installRecipes() {
+        var exampleRecipes = new File("rewrite/dist-fixtures/example-recipe.js").getAbsoluteFile();
         assertThat(exampleRecipes).exists();
         assertThat(client().installRecipes(exampleRecipes).getRecipesInstalled()).isGreaterThan(0);
+        return exampleRecipes;
     }
 
     private JavaScriptRewriteRpc client() {

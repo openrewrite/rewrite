@@ -1,13 +1,20 @@
 import {Type} from "../java";
 import FullyQualified = Type.FullyQualified;
 
+/**
+ * Matches a method type against a `<declaring type> <name>(<args>)` pattern.
+ * `REWRITE_JAVASCRIPT_DUMP_TYPES=1` in a test run prints the pattern each call would match.
+ *
+ * With `matchOverrides`, the pattern's type may also be a supertype or interface of the declaring
+ * type, as in Java. A pattern naming a subtype of the declaring type never matches.
+ */
 export class MethodMatcher {
     private readonly packagePattern: string;
     private readonly typePattern: string;
     private readonly methodPattern: string;
     private readonly argumentPatterns: string[];
 
-    constructor(pattern: string) {
+    constructor(pattern: string, private readonly matchOverrides: boolean = false) {
         // Find the last space before the method spec (which contains parentheses)
         const firstParenIndex = pattern.indexOf('(');
         if (firstParenIndex === -1) {
@@ -31,7 +38,9 @@ export class MethodMatcher {
         } else {
             const lastDotIndex = typeSpec.lastIndexOf('.');
             if (lastDotIndex === -1) {
-                this.packagePattern = '*';
+                // As in Java, a type without a package matches only the type in no package, such as
+                // the global `Array` or the module `fs-extra`. `*.Array` matches any package.
+                this.packagePattern = '';
                 this.typePattern = typeSpec;
             } else {
                 // Check if we're splitting a *.. pattern incorrectly
@@ -71,23 +80,7 @@ export class MethodMatcher {
             return false;
         }
 
-        // Extract fully qualified name from declaringType
-        const fullyQualifiedName = FullyQualified.getFullyQualifiedName(method.declaringType);
-
-        // Split fully qualified name into package and type
-        const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
-        const packageName = lastDotIndex === -1 ? '' : fullyQualifiedName.substring(0, lastDotIndex);
-        const typeName = lastDotIndex === -1 ? fullyQualifiedName : fullyQualifiedName.substring(lastDotIndex + 1);
-
-        // Match package
-        if (!this.matchesPackage(packageName)) {
-            return false;
-        }
-
-        // Match type (normalize primitives for matching)
-        const normalizedTypePattern = this.normalizePrimitiveType(this.typePattern);
-        const normalizedTypeName = this.normalizePrimitiveType(typeName);
-        if (!this.matchesPattern(normalizedTypePattern, normalizedTypeName)) {
+        if (!this.matchesTargetType(method.declaringType)) {
             return false;
         }
 
@@ -97,11 +90,30 @@ export class MethodMatcher {
         }
 
         // Match arguments - convert Type[] to string representations
-        const argStrings = method.parameterTypes.map(type => this.typeToString(type));
+        const argStrings = method.parameterTypes.map(type => MethodMatcher.typeName(type));
         return this.matchesArguments(argStrings);
     }
 
-    private typeToString(type: Type): string {
+    private matchesTargetType(type: Type | undefined): boolean {
+        const matches = (name: string) => this.matchesTypeName(name);
+        // A call on an untyped receiver declares on the unknown type, which a wildcard pattern
+        // matches by name. Java's matcher has no such case because Java calls are always typed.
+        return type?.kind === Type.Kind.Unknown
+            ? matches(FullyQualified.getFullyQualifiedName(type))
+            : Type.isOfTypeWithName(type, this.matchOverrides, matches);
+    }
+
+    private matchesTypeName(fullyQualifiedName: string): boolean {
+        const lastDotIndex = fullyQualifiedName.lastIndexOf('.');
+        const packageName = lastDotIndex === -1 ? '' : fullyQualifiedName.substring(0, lastDotIndex);
+        const typeName = lastDotIndex === -1 ? fullyQualifiedName : fullyQualifiedName.substring(lastDotIndex + 1);
+
+        return this.matchesPackage(packageName) &&
+            this.matchesPattern(this.normalizePrimitiveType(this.typePattern), this.normalizePrimitiveType(typeName));
+    }
+
+    /** The name an argument pattern compares against a parameter of this type. */
+    static typeName(type: Type): string {
         switch (type.kind) {
             case Type.Kind.Primitive:
                 return (type as Type.Primitive).keyword;
@@ -111,7 +123,7 @@ export class MethodMatcher {
                 return FullyQualified.getFullyQualifiedName((type as Type.Parameterized).type);
             case Type.Kind.Array:
                 const arrayType = type as Type.Array;
-                return this.typeToString(arrayType.elemType) + '[]';
+                return MethodMatcher.typeName(arrayType.elemType) + '[]';
             case Type.Kind.GenericTypeVariable:
                 return (type as Type.GenericTypeVariable).name;
             default:

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Marker} from "../markers";
+import {Marker, MarkersKind} from "../markers";
 import {J} from "../java";
 import {JS} from "./tree";
 import {RpcCodecs, RpcReceiveQueue, RpcSendQueue} from "../rpc";
@@ -24,10 +24,12 @@ import {
     StyleKind,
     TabsAndIndentsStyle,
     WrappingAndBracesStyle,
-    WrappingAndBracesStyleDetailKind
+    WrappingAndBracesStyleDetailKind,
+    prettierStyle
 } from "./style";
-import {Autodetect} from "./autodetect";
+import {Autodetect, autodetect} from "./autodetect";
 import {updateIfChanged} from "../util";
+import {NamedStyles, Style} from "../style";
 
 declare module "./tree" {
     namespace JS {
@@ -37,6 +39,7 @@ declare module "./tree" {
             readonly NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion";
             readonly DelegatedYield: "org.openrewrite.javascript.marker.DelegatedYield";
             readonly FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration";
+            readonly Computed: "org.openrewrite.javascript.marker.Computed";
         };
     }
 }
@@ -48,6 +51,7 @@ declare module "./tree" {
     Optional: "org.openrewrite.javascript.marker.Optional",
     NonNullAssertion: "org.openrewrite.javascript.marker.NonNullAssertion",
     FunctionDeclaration: "org.openrewrite.javascript.marker.FunctionDeclaration",
+    Computed: "org.openrewrite.javascript.marker.Computed",
 } as const;
 
 /**
@@ -81,6 +85,18 @@ export interface FunctionDeclaration extends Marker {
 }
 
 /**
+ * A name written in brackets where the model has room for an identifier only, as the
+ * member of `enum A { ['b'] }` is. The identifier holds the bracketed literal.
+ */
+export interface Computed extends Marker {
+    readonly kind: typeof JS.Markers.Computed;
+    /**
+     * The space before the closing bracket.
+     */
+    readonly suffix: J.Space;
+}
+
+/**
  * Registers an RPC codec for any marker that has a `prefix: J.Space` field.
  */
 function registerPrefixedMarkerCodec<M extends Marker & { prefix: J.Space }>(
@@ -107,11 +123,26 @@ registerPrefixedMarkerCodec<Generator>(JS.Markers.Generator);
 registerPrefixedMarkerCodec<NonNullAssertion>(JS.Markers.NonNullAssertion);
 registerPrefixedMarkerCodec<FunctionDeclaration>(JS.Markers.FunctionDeclaration);
 
+RpcCodecs.registerCodec(JS.Markers.Computed, {
+    async rpcReceive(before: Computed, q: RpcReceiveQueue): Promise<Computed> {
+        return updateIfChanged(before, {
+            id: await q.receive(before.id),
+            suffix: await q.receive(before.suffix),
+        });
+    },
+
+    async rpcSend(after: Computed, q: RpcSendQueue): Promise<void> {
+        await q.getAndSend(after, a => a.id);
+        await q.getAndSend(after, a => a.suffix);
+    }
+});
+
 // Register codec for PrettierStyle (a NamedStyles that contains Prettier configuration)
 // Only serialize the variable fields; constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
     async rpcReceive(before: PrettierStyle, q: RpcReceiveQueue): Promise<PrettierStyle> {
-        return updateIfChanged(before, {
+        // the fields that never vary are not sent, so a marker first met here does not have them yet
+        return updateIfChanged(before.name ? before : {...prettierStyle(before.id, {}), ...before}, {
             id: await q.receive(before.id),
             config: await q.receive(before.config),
             prettierVersion: await q.receive(before.prettierVersion),
@@ -131,7 +162,7 @@ RpcCodecs.registerCodec(StyleKind.PrettierStyle, {
 // Only serialize the variable fields (id, styles); constant fields are defined in the interface
 RpcCodecs.registerCodec(StyleKind.Autodetect, {
     async rpcReceive(before: Autodetect, q: RpcReceiveQueue): Promise<Autodetect> {
-        return updateIfChanged(before, {
+        return updateIfChanged(before.name ? before : {...autodetect(before.id, []), ...before}, {
             id: await q.receive(before.id),
             styles: (await q.receiveList(before.styles))!,
         });
@@ -265,4 +296,45 @@ RpcCodecs.registerCodec(StyleKind.WrappingAndBracesStyle, {
         await q.getAndSend(after, a => a.ifStatement);
         await q.getAndSend(after, a => a.keepWhenReformatting);
     }
+});
+
+const styleDetailKinds = new Set<string>([
+    ...Object.values(SpacesStyleDetailKind),
+    ...Object.values(WrappingAndBracesStyleDetailKind)
+]);
+
+function detailKind(styleKind: string, field: string): string | undefined {
+    const kind = `${styleKind}$${field.charAt(0).toUpperCase()}${field.slice(1)}`;
+    return styleDetailKinds.has(kind) ? kind : undefined;
+}
+
+function styleFromValue(value: any): Style {
+    if (value === null || typeof value !== "object") {
+        return value;
+    }
+    const {"@c": kind, "@ref": _ref, ...fields} = value;
+    for (const [field, detail] of Object.entries(fields)) {
+        const kindOfDetail = detailKind(kind, field);
+        if (kindOfDetail && detail !== null && typeof detail === "object") {
+            fields[field] = {kind: kindOfDetail, ...detail};
+        }
+    }
+    return {kind, ...fields};
+}
+
+function styleToValue({kind, ...fields}: Style & Record<string, any>, ref: number): any {
+    for (const [field, detail] of Object.entries(fields)) {
+        if (detailKind(kind, field) && detail !== null && typeof detail === "object") {
+            const {kind: _kind, ...detailFields} = detail;
+            fields[field] = detailFields;
+        }
+    }
+    return {"@c": kind, "@ref": ref, ...fields};
+}
+
+// A plain NamedStyles has no codec on either side, so it travels in the shape Java's serializer gives it
+RpcCodecs.registerValueCodec(MarkersKind.NamedStyles, {
+    fromValue: (value: NamedStyles): NamedStyles => ({...value, styles: (value.styles ?? []).map(styleFromValue)}),
+    // Java's deserializer wants an object id on each style, and gives the first to the set itself
+    toValue: (after: NamedStyles) => ({...after, styles: after.styles.map((style, i) => styleToValue(style, i + 2))})
 });

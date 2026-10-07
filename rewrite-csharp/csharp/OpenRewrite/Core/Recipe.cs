@@ -48,6 +48,14 @@ public abstract class Recipe
 
     public virtual ITreeVisitor<ExecutionContext> GetVisitor() => ITreeVisitor<ExecutionContext>.Noop();
 
+    /// <summary>
+    /// Checks option values that the per-option <c>Required</c> flag cannot express, such as a
+    /// constraint spanning several options ("at least one of A or B"). Return one message per
+    /// problem, phrased for the person configuring the recipe. A non-empty result fails recipe
+    /// preparation, so the problem is reported once instead of on every source file.
+    /// </summary>
+    public virtual IEnumerable<string> Validate() => [];
+
     public RecipeDescriptor GetDescriptor()
     {
         return _descriptor ??= CreateRecipeDescriptor();

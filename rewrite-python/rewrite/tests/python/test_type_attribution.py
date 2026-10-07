@@ -2442,19 +2442,42 @@ class TestDeclarationDeclaringType:
         assert result._declaring_type is None
 
     @requires_ty_types_cli
-    def test_declaration_declaring_type_with_ty_types(self):
-        """With ty-types, a function declaration should get a declaring type from the descriptor."""
-        source = 'def greet(name: str) -> str:\n    return name\n'
+    def test_declaring_type_is_the_enclosing_class_else_the_module(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(x): ...
+                @classmethod
+                def c(cls, x): ...
+                class Inner:
+                    def i(self): ...
+
+            def top(x): ...
+
+            def outer():
+                class Local:
+                    def m(self): ...
+
+            Mine().warn("x")
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            func_node = tree.body[0]
-            result = mapping.method_declaration_type(func_node)
-            assert result is not None
-            assert isinstance(result, JavaType.Method)
-            assert result._declaring_type is not None, \
-                "Declaration should have a declaring type, not None"
-            assert isinstance(result._declaring_type, JavaType.Class)
-            assert result._declaring_type._fully_qualified_name != "<unknown>"
+            declaring = {
+                node.name: mapping.method_declaration_type(node)._declaring_type.fully_qualified_name
+                for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+            }
+            assert declaring == {
+                'warn': 'test.Mine',
+                's': 'test.Mine',
+                'c': 'test.Mine',
+                'i': 'test.Mine.Inner',
+                'top': 'test',
+                'outer': 'test',
+                'm': "test.<locals of function 'outer'>.Local",
+            }
+            call = mapping.method_invocation_type(tree.body[-1].value)
+            assert call._declaring_type.fully_qualified_name == declaring['warn']
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2655,6 +2678,7 @@ def test_field_specifier_assignment_takes_declared_type():
             q: int = field(default=1)
             r: "int" = field(default=2)
             s: Final = field(default=3)
+            t: Missing = field(default=4)
     '''
     cu, tmpdir, client = _parse_with_types({'m.py': src})
     try:
@@ -2679,6 +2703,10 @@ def test_field_specifier_assignment_takes_declared_type():
         bare_final = found[2]
         assert isinstance(bare_final.type, JavaType.Unknown)
         assert isinstance(bare_final.variable.expression.type, JavaType.Unknown)
+
+        # a name that resolves to nothing is unknown too, and has no qualified name to compare
+        unresolved = found[3]
+        assert isinstance(unresolved.type, JavaType.Unknown)
     finally:
         _cleanup_parse(tmpdir, client)
 
@@ -3763,6 +3791,45 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_each_class_attribute_is_one_method_or_member_under_its_own_name(self):
+        src = '''
+            from typing import Any, Callable, ParamSpec, TypeVar
+
+            P = ParamSpec('P')
+            R = TypeVar('R')
+
+            def deco(f: Callable[P, R]) -> Callable[P, R]:
+                return f
+
+            def helper(self) -> int:
+                return 1
+
+            class V:
+                def __mul__(self, o: int) -> int:
+                    return o
+                __rmul__ = __mul__
+
+                @deco
+                def wrapped(self) -> int:
+                    return 1
+
+                hook: Any
+                hook = helper
+
+                def go(self) -> None: ...
+
+            V().go()
+        '''
+        cls, mapping, tmpdir, client = self._class_type(src)
+        try:
+            # `@deco` gives `wrapped` a nameless callable descriptor.
+            assert sorted(m._name for m in cls._methods or []) == \
+                ['__mul__', '__rmul__', 'go', 'wrapped']
+            # The `Any` declaration claims the name before the function binding.
+            assert [v._name for v in cls._members or []] == ['hook']
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
     def test_self_typed_member_does_not_hang(self):
         # A member whose declared type is the owning class must resolve without
         # infinitely recursing (the cycle guard already covers methods; members
@@ -3785,6 +3852,65 @@ class TestClassMembers:
             next_type = by_name['next']._type
             assert isinstance(next_type, JavaType.Class)
             assert next_type.fully_qualified_name.endswith('Node')
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    _HOOK = '''
+        class Hook:
+            count: int = 0
+            def __init__(self) -> None:
+                self.x = 1
+            def __setattr__(self, k: str, v: object) -> None: ...
+            @property
+            def y(self) -> int: return 1
+            def m(self) -> None:
+                self
+        h = Hook(); h.x; h.y
+    '''
+
+    @staticmethod
+    def _assert_hook_fields(cls):
+        by_name = {v._name: v for v in cls._members or []}
+        assert sorted(by_name) == ['count', 'x', 'y']
+        assert by_name['x']._type == JavaType.Primitive.Int
+        assert by_name['y']._type == JavaType.Primitive.Int
+
+    def test_properties_and_self_assigned_attributes_are_fields(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self._assert_hook_fields(mapping.type(tree.body[1].targets[0]))
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_self_assigned_attribute_is_a_field_whatever_its_value(self):
+        src = '''
+            import os
+            def f() -> int: return 1
+            class K: ...
+            class C:
+                def __init__(self) -> None:
+                    self.g = f
+                    self.k = K
+                    self.mod = os
+            c = C()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(src)
+        try:
+            cls = mapping.type(tree.body[-1].targets[0])
+            assert [m._name for m in cls._methods or []] == ['__init__']
+            by_name = {v._name: v._type for v in cls._members or []}
+            assert by_name['g'] == JavaType.Primitive.Int
+            assert by_name['k'].fully_qualified_name == 'test.K'
+            assert by_name['mod'].fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_fields_are_reachable_through_self(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self_type = mapping.type(tree.body[0].body[-1].body[-1].value)
+            assert isinstance(self_type, JavaType.GenericTypeVariable)
+            self._assert_hook_fields(self_type._bounds[0])
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -4035,6 +4161,43 @@ class TestSymbolTheStubsDoNotDeclare:
     def test_a_rebound_name_is_not_attributed_from_its_import(self):
         owner, _ = self._call_names('from lib import gone\ngone = None\ngone()\n', 2)
         assert owner is None, 'a name the file rebinds no longer names what it imported'
+
+    def _call_owners(self, source):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            return [getattr(c.method_type.declaring_type, 'fully_qualified_name', None)
+                    for c in _collect_method_invocations(cu)]
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_a_name_another_scope_binds_keeps_its_import_here(self):
+        assert self._call_owners(
+            'from lib import gone\ngone()\n'
+            'class C:\n    def gone(self):\n        pass\n    def m(self):\n        gone()\n'
+            'def f(gone=None):\n    pass\n') == ['lib', 'lib'], \
+            'a class body is not visible to its methods, and a parameter only to its function'
+        assert self._call_owners(
+            'from lib import gone as g\ng()\nclass C:\n    def g(self):\n        pass\n') == ['lib']
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    return gone\n') == ['lib'], \
+            'a global declaration binds nothing until something assigns it'
+
+    def test_a_name_an_enclosing_scope_binds_is_not_attributed(self):
+        assert self._call_owners(
+            'from lib import gone\n'
+            'def f(gone):\n    def inner():\n        gone()\n'
+            'class C:\n    gone = None\n    gone()\n') == [None, None]
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    gone = None\n') == [None], \
+            'a global declaration binds at module scope'
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f(a=(gone := 1)):\n    pass\n') == [None], \
+            'a default is evaluated in the scope around its function'
+        assert self._call_owners(
+            'from lib import gone\nclass C[gone]:\n    def m(self):\n        gone()\n') == [None], \
+            "a class's type parameters reach its methods"
 
     def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
         owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')

@@ -83,6 +83,14 @@ func (m *ReferenceMap) RollbackTo(checkpoint int) {
 	m.nextID = checkpoint
 }
 
+// Clear forgets every reference, for when which of them the remote holds is no
+// longer known. Ids are not reused.
+func (m *ReferenceMap) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.refs = make(map[any]int)
+}
+
 func (m *ReferenceMap) deleteIfMatches(obj any, ref int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -105,8 +113,10 @@ func assertReferenceIdentity(v any) {
 	}
 }
 
-// Returns nil if the value is nil (including typed nil pointers/interfaces).
+// Returns nil if the value is nil (including typed nil pointers/interfaces), except that a
+// nil Space or Markers becomes a ref to its empty sentinel, as Send would coerce it.
 func AsRef(v any) any {
+	v = nonNilEmpty(v)
 	if isNilValue(v) {
 		return nil
 	}

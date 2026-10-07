@@ -4,7 +4,7 @@ import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, Union, cast
+from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
 from rewrite import Markers
@@ -74,7 +74,7 @@ class Comment(ABC):
     def markers(self) -> Markers:
         return self._markers
 
-    def replace(self, **kwargs) -> 'Comment':
+    def replace(self, **kwargs) -> Self:
         """Replace fields on this Comment, returning self if nothing changed."""
         return replace_if_changed(self, **kwargs)
 
@@ -225,8 +225,20 @@ def _fully_qualified_repr(self) -> str:
     return f"{type(self).__qualname__}({self.fully_qualified_name!r})"
 
 
-class JavaType(ABC):
-    class FullyQualified:
+# Mirrors Java, where every kind of type implements the `JavaType` interface. A nested class
+# cannot name the class that encloses it, so at runtime the nested bases resolve to this
+# placeholder and are rebased onto the real `JavaType` once its body has run.
+if not TYPE_CHECKING:
+    class JavaType:
+        __slots__ = ()
+
+    _JavaTypePlaceholder = JavaType
+
+
+class JavaType:
+    __slots__ = ()
+
+    class FullyQualified(JavaType):
         __slots__ = ()
 
         class Kind(Enum):
@@ -396,22 +408,22 @@ class JavaType(ABC):
                 return self._reference_values
 
     @dataclass(slots=True)
-    class GenericTypeVariable:
-        _name: str = field(default="")
-        _variance: GenericTypeVariable.Variance = field(default=None)
-        _bounds: Optional[List[JavaType]] = field(default=None)
-
+    class GenericTypeVariable(JavaType):
         class Variance(Enum):
             Invariant = 0
             Covariant = 1
             Contravariant = 2
+
+        _name: str = field(default="")
+        _variance: JavaType.GenericTypeVariable.Variance = field(default=Variance.Invariant)
+        _bounds: Optional[List[JavaType]] = field(default=None)
 
         @property
         def name(self) -> str:
             return self._name
 
         @property
-        def variance(self) -> GenericTypeVariable.Variance:
+        def variance(self) -> JavaType.GenericTypeVariable.Variance:
             return self._variance
 
         @property
@@ -419,7 +431,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Union:
+    class Union(JavaType):
         """Union type (e.g. str | int). Maps to JavaType$MultiCatch over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -428,7 +440,7 @@ class JavaType(ABC):
             return self._bounds if self._bounds is not None else []
 
     @dataclass(slots=True)
-    class Intersection:
+    class Intersection(JavaType):
         """Intersection type (e.g. A & B). Maps to JavaType$Intersection over RPC."""
         _bounds: Optional[List[JavaType]] = field(default=None)
 
@@ -436,7 +448,7 @@ class JavaType(ABC):
         def bounds(self) -> List[JavaType]:
             return self._bounds if self._bounds is not None else []
 
-    class Primitive(Enum):
+    class Primitive(JavaType, Enum):
         Boolean = 0
         Byte = 1
         Char = 2
@@ -457,7 +469,7 @@ class JavaType(ABC):
             return super()._missing_(value)
 
     @dataclass(slots=True)
-    class Method:
+    class Method(JavaType):
         _flags_bit_map: int = field(default=0)
         _declaring_type: Optional[JavaType.FullyQualified] = field(default=None)
         _name: str = field(default="")
@@ -516,7 +528,7 @@ class JavaType(ABC):
             return self._declared_formal_type_names
 
     @dataclass(slots=True)
-    class Variable:
+    class Variable(JavaType):
         _flags_bit_map: int = field(default=0)
         _name: str = field(default="")
         _owner: Optional[JavaType] = field(default=None)
@@ -544,7 +556,7 @@ class JavaType(ABC):
             return self._annotations
 
     @dataclass(slots=True)
-    class Array:
+    class Array(JavaType):
         _elem_type: Optional[JavaType] = field(default=None)
         _annotations: Optional[List[JavaType.FullyQualified]] = field(default=None)
 
@@ -555,6 +567,13 @@ class JavaType(ABC):
         @property
         def annotations(self) -> Optional[List[JavaType.FullyQualified]]:
             return self._annotations
+
+
+if not TYPE_CHECKING:
+    for _nested in vars(JavaType).values():
+        if isinstance(_nested, type) and _JavaTypePlaceholder in _nested.__bases__:
+            _nested.__bases__ = tuple(JavaType if b is _JavaTypePlaceholder else b for b in _nested.__bases__)
+    del _nested, _JavaTypePlaceholder
 
 
 T = TypeVar('T')
@@ -599,7 +618,7 @@ class JRightPadded(Generic[T]):
         return [x.element for x in padded_list]
 
     @classmethod
-    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[Union[J2, JRightPadded[J2]]]) -> List[JRightPadded[J2]]:
+    def merge_elements(cls, before: List[JRightPadded[J2]], elements: List[J2 | JRightPadded[J2]]) -> List[JRightPadded[J2]]:
         # Helper to extract element - handles both wrapped JRightPadded and unwrapped elements
         def get_element(t):
             return t.element if isinstance(t, JRightPadded) else t

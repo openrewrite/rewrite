@@ -29,7 +29,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 from ..java import JavaType
 
@@ -134,6 +134,118 @@ def _module_scope_statements(body: Sequence[ast.stmt]) -> Iterator[ast.stmt]:
             yield from _module_scope_statements(stmt.body)
 
 
+_Position = Tuple[int, int]
+# A source range a name is bound in, less the ranges inside it that cannot see that binding
+_Region = Tuple[_Position, _Position, List[Tuple[_Position, _Position]]]
+
+_FUNCTION_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+_COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+_Scope = Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
+               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp]
+
+
+def _start(node: Union[ast.stmt, ast.expr]) -> _Position:
+    return node.lineno, node.col_offset
+
+
+def _end(node: Union[ast.stmt, ast.expr]) -> _Position:
+    # `ast.parse` sets the end position typeshed leaves optional for hand-built nodes
+    assert node.end_lineno is not None and node.end_col_offset is not None
+    return node.end_lineno, node.end_col_offset
+
+
+def _split_scope(node: _Scope) -> Tuple[List[ast.AST], List[ast.AST]]:
+    """The parts of a function, class or comprehension evaluated in the scope around it, and
+    the parts evaluated in its own."""
+    if isinstance(node, _COMPREHENSIONS):
+        first = node.generators[0]
+        nested = [c for c in ast.iter_child_nodes(node) if c is not first]
+        return [first.iter], nested + [first.target, *first.ifs]
+    if isinstance(node, ast.ClassDef):
+        return [*node.decorator_list, *node.bases, *node.keywords], list(node.body)
+    args = node.args
+    outer: List[ast.AST] = [*args.defaults, *(d for d in args.kw_defaults if d)]
+    if isinstance(node, ast.Lambda):
+        return outer, [node.body]
+    annotations = [a.annotation for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                          args.vararg, args.kwarg) if a and a.annotation]
+    return [*node.decorator_list, *outer, *annotations, *([node.returns] if node.returns else [])], \
+        list(node.body)
+
+
+def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
+                    ) -> Tuple[Set[str], Dict[str, List[_Region]]]:
+    """The names this file binds other than by its own module-level imports. A module-scope
+    or ``global`` binding reaches the whole file, and any other the scope it is bound in.
+
+    Coarse where scoping is subtle, as with a comprehension in a class body, which counts as
+    seeing the class's bindings.
+    Declining to attribute a reference costs less than attributing it wrong.
+    """
+    file_wide: Set[str] = set()
+    regions: Dict[str, List[_Region]] = {}
+
+    def scan(scope: Union[ast.Module, _Scope], inner: List[ast.AST], walrus_names: Set[str]) -> None:
+        names: Set[str] = set()
+        declared_global: Set[str] = set()
+        hidden: List[Tuple[_Position, _Position]] = []
+        if isinstance(scope, _FUNCTION_SCOPES):
+            args = scope.args
+            names.update(a.arg for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                         args.vararg, args.kwarg) if a)
+        comprehension = isinstance(scope, _COMPREHENSIONS)
+        todo = list(inner)
+        while todo:
+            node = todo.pop()
+            if isinstance(node, (*_FUNCTION_SCOPES, ast.ClassDef, *_COMPREHENSIONS)):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    names.add(node.name)
+                outer, nested = _split_scope(node)
+                todo.extend(outer)
+                # Type parameters reach everything inside, a class's methods included
+                for param in getattr(node, 'type_params', ()):
+                    regions.setdefault(param.name, []).append((_start(node), _end(node), []))
+                body = getattr(node, 'body', None)
+                if isinstance(body, list):
+                    hidden.append((_start(body[0]), _end(node)))
+                elif isinstance(body, ast.AST):
+                    hidden.append((_start(body), _end(body)))
+                # An assignment expression in a comprehension binds in the scope around it
+                scan(node, nested, walrus_names if comprehension and isinstance(node, _COMPREHENSIONS)
+                     else names)
+                continue
+            if isinstance(node, ast.NamedExpr) and comprehension:
+                walrus_names.add(node.target.id)
+                todo.append(node.value)
+                continue
+            if isinstance(node, ast.Name):
+                if isinstance(node.ctx, (ast.Store, ast.Del)):
+                    names.add(node.id)
+            elif isinstance(node, ast.alias):
+                if id(node) not in module_level_aliases:
+                    names.add(node.asname or node.name.split('.')[0])
+            elif isinstance(node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)):
+                if node.name:
+                    names.add(node.name)
+            elif isinstance(node, ast.MatchMapping) and node.rest:
+                names.add(node.rest)
+            elif isinstance(node, ast.Global):
+                declared_global.update(node.names)
+            todo.extend(ast.iter_child_nodes(node))
+        # A `global` declaration alone binds nothing. What the scope binds under it is module-scope.
+        file_wide.update(names & declared_global)
+        if scope is tree:
+            file_wide.update(names)
+            return
+        # A class body's bindings do not reach the bodies of the functions and classes it nests
+        region = (_start(scope), _end(scope), hidden if isinstance(scope, ast.ClassDef) else [])
+        for name in names:
+            regions.setdefault(name, []).append(region)
+
+    scan(tree, tree.body, set())
+    return file_wide, regions
+
+
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
     """The names ``__all__`` declares via top-level literal list/tuple assignments
     (plain, annotated, or augmented), or None when the module has no such ``__all__``.
@@ -234,7 +346,8 @@ class PythonTypeMapping:
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
-        self._shadowed_names: Optional[Set[str]] = None
+        self._shadowed_names: Set[str] = set()
+        self._shadow_regions: Dict[str, List[_Region]] = {}
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
@@ -718,51 +831,50 @@ class PythonTypeMapping:
                 if resolved_type_params:
                     class_type._type_parameters = resolved_type_params
 
-            # Populate methods from function/boundMethod members
-            members = descriptor.get('members', [])
-            if members and getattr(class_type, '_methods', None) is None:
-                methods = []
-                for member in members:
-                    member_type_id = member.get('typeId') if isinstance(member, dict) else member
-                    if member_type_id is None:
+            # ty lists each class-body name for both its declaration and its
+            # binding. The first entry that maps to a method or a member claims
+            # the name, so the declaration wins and a name lands in one list.
+            # A method takes the attribute's name because an alias such as
+            # `__rmul__ = __mul__` shares its function's descriptor.
+            # An attribute assigned through `self` is a member even when its value
+            # is callable, because Python binds no instance attribute as a method.
+            methods = []
+            variables = []
+            seen_names = set()
+            for member in descriptor.get('members', []):
+                member_name = member.get('name')
+                member_type_id = member.get('typeId')
+                if not member_name or member_type_id is None or member_name in seen_names:
+                    continue
+                member_desc = self._type_registry.get(member_type_id)
+                if member_desc is None:
+                    continue
+                kind = member_desc.get('kind')
+                instance_attribute = member.get('instanceAttribute', False)
+                if kind in _FUNCTION_KINDS and not instance_attribute:
+                    method = self._create_method_from_descriptor(
+                        member_desc, class_type, name=member_name)
+                    if method is None:
                         continue
-                    member_desc = self._type_registry.get(member_type_id)
-                    if member_desc and member_desc.get('kind') in _FUNCTION_KINDS:
-                        method = self._create_method_from_descriptor(member_desc, class_type)
-                        if method:
-                            methods.append(method)
-                class_type._methods = methods if methods else None
-
-            # Populate members (attributes / class & instance variables) from the
-            # non-function members. ty emits a member's *name* on the entry itself
-            # and its *type* via `typeId`; for a field with a default it emits both
-            # the declared type and the default-value literal under the same name,
-            # so de-duplicate by name keeping the first (declared) occurrence. A
-            # member typed as the owning class resolves through the same cycle
-            # guard `_resolve_type` uses for methods, so self-references don't
-            # recurse infinitely.
-            if members and getattr(class_type, '_members', None) is None:
-                variables = []
-                seen_names = set()
-                for member in members:
-                    if not isinstance(member, dict):
+                    methods.append(method)
+                else:
+                    if kind == 'property':
+                        # A property is a field typed by what its getter returns.
+                        field_type_id = member_desc.get('getter')
+                    elif instance_attribute or self._is_variable_descriptor(member_desc):
+                        field_type_id = member_type_id
+                    else:
                         continue
-                    member_name = member.get('name')
-                    member_type_id = member.get('typeId')
-                    if not member_name or member_type_id is None or member_name in seen_names:
-                        continue
-                    member_desc = self._type_registry.get(member_type_id)
-                    # Skip function-kinds (handled as methods above) and nested
-                    # classes/modules — only true variables become members.
-                    if member_desc is None or not self._is_variable_descriptor(member_desc):
-                        continue
-                    member_type = self._resolve_type(member_type_id)
+                    # A member typed as the owning class resolves through
+                    # `_resolve_type`'s cycle guard.
+                    member_type = self._resolve_type(field_type_id) if field_type_id is not None else None
                     if member_type is None:
                         continue
-                    seen_names.add(member_name)
                     variables.append(JavaType.Variable(
                         _name=member_name, _type=member_type, _owner=class_type))
-                class_type._members = variables if variables else None
+                seen_names.add(member_name)
+            class_type._methods = methods or None
+            class_type._members = variables or None
 
             return class_type
 
@@ -1076,11 +1188,10 @@ class PythonTypeMapping:
         return (module, symbol) if '.' not in symbol else None
 
     def _writes_a_rebound_name(self, node: ast.expr) -> bool:
-        """Whether the name ``node`` is written under is one the file binds a second time."""
+        """Whether the name ``node`` is written under is bound a second time in reach of it."""
         while isinstance(node, ast.Attribute):
             node = node.value
-        self._import_bindings()
-        return isinstance(node, ast.Name) and node.id in (self._shadowed_names or ())
+        return isinstance(node, ast.Name) and self._shadowed(node)
 
     def _lookup_binding(self, node: ast.expr) -> Optional[Dict[str, str]]:
         """The BindingInfo ty attached to ``node``, by byte range."""
@@ -1100,12 +1211,15 @@ class PythonTypeMapping:
         if not isinstance(node, ast.Name):
             return None
         bound = self._import_bindings().get(node.id)
+        if bound and self._shadowed(node):
+            return None
         return '.'.join([bound, *reversed(suffix)]) if bound else None
 
     def _import_bindings(self) -> Dict[str, str]:
         """The FQN each of this file's absolute module-level imports names, keyed by the
-        name it binds, minus every name :meth:`_rebound_names` reports. The same scan
-        yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
+        name it binds, minus every name another binding reaches the whole file with. A
+        binding that reaches only some references is :meth:`_shadowed`'s to report. The same
+        scan yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
 
         Python binds a name once per scope, so an import nothing else rebinds says what a
         reference to that name means whether or not ty could type it.
@@ -1118,7 +1232,10 @@ class PythonTypeMapping:
             module_level_aliases = {id(alias) for stmt in module_scope
                                     if isinstance(stmt, (ast.Import, ast.ImportFrom))
                                     for alias in stmt.names}
-            shadowed = self._rebound_names(tree, module_level_aliases)
+            if tree is not None:
+                self._shadowed_names, self._shadow_regions = \
+                    _scope_bindings(tree, module_level_aliases)
+            shadowed = set(self._shadowed_names)
 
             def bind(name: str, fqn: Optional[str]) -> None:
                 # `import a.b` after `import a` re-binds the root to the same FQN
@@ -1153,30 +1270,15 @@ class PythonTypeMapping:
                                               if name not in shadowed}
         return self._import_binding_index
 
-    def _rebound_names(self, tree: Optional[ast.Module],
-                       module_level_aliases: Set[int]) -> Set[str]:
-        """Every name this file binds somewhere other than one of its own module-level
-        imports. Coarse on purpose: a name bound twice is one whose references cannot be
-        read off an import, and declining to attribute costs less than attributing wrong.
-        """
-        if self._shadowed_names is None:
-            names: Set[str] = set()
-            for node in ast.walk(tree) if tree else ():
-                if isinstance(node, ast.Name):
-                    if isinstance(node.ctx, (ast.Store, ast.Del)):
-                        names.add(node.id)
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    names.add(node.name)
-                elif isinstance(node, ast.arg):
-                    names.add(node.arg)
-                elif isinstance(node, ast.ExceptHandler) and node.name:
-                    names.add(node.name)
-                elif isinstance(node, (ast.Global, ast.Nonlocal)):
-                    names.update(node.names)
-                elif isinstance(node, ast.alias) and id(node) not in module_level_aliases:
-                    names.add(node.asname or node.name.split('.')[0])
-            self._shadowed_names = names
-        return set(self._shadowed_names)
+    def _shadowed(self, node: ast.Name) -> bool:
+        """Whether a binding other than this file's module-level imports reaches ``node``."""
+        self._import_bindings()
+        if node.id in self._shadowed_names:
+            return True
+        position = _start(node)
+        return any(start <= position <= end
+                   and not any(h_start <= position <= h_end for h_start, h_end in hidden)
+                   for start, end, hidden in self._shadow_regions.get(node.id, ()))
 
     def _bound_from_import_member(self, node: ast.expr) -> Optional[Tuple[str, str]]:
         """The ``(module, member)`` an unshadowed module-level ``from M import f`` binds
@@ -1186,7 +1288,8 @@ class PythonTypeMapping:
         if not isinstance(node, ast.Name):
             return None
         self._import_bindings()
-        return (self._from_import_member_index or {}).get(node.id)
+        member = (self._from_import_member_index or {}).get(node.id)
+        return None if member is None or self._shadowed(node) else member
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
         """The type of the symbol an import name binds, named under the module defining
@@ -2019,6 +2122,11 @@ class PythonTypeMapping:
         Mirrors the invocation-side logic from _get_declaring_type() to ensure
         declarations and invocations produce matching FQNs.
         """
+        declaring_id = descriptor.get('declaringClassId')
+        if declaring_id is not None:
+            declaring = self._resolve_declaring_type(declaring_id)
+            if declaring is not None:
+                return declaring
         if descriptor.get('className'):
             return self._class_reference(descriptor)
         module_name = descriptor.get('moduleName')

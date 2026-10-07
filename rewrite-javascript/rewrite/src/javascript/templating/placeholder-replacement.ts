@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, isTree, Markers} from '../..';
-import {J} from '../../java';
+import {Cursor, isTree, Marker, Markers} from '../..';
+import {Expression, J} from '../../java';
 import {JS} from '..';
 import {JavaScriptVisitor} from '../visitor';
 import {create as produce} from 'mutative';
@@ -22,15 +22,37 @@ import {PlaceholderUtils} from './utils';
 import {CaptureImpl, TemplateParamImpl, CaptureValue, CAPTURE_NAME_SYMBOL} from './capture';
 import {enclosingTree, maybeParenthesize} from './precedence';
 import {Parameter} from './types';
+import {isExpression} from '../parser-utils';
+import {randomId} from '../../uuid';
+
+/**
+ * Marks a value the template substituted, whose layout is the source's rather than the template's.
+ * `ownPrefix` says whether the whitespace before it is the source's too.
+ */
+export class SubstitutedValue implements Marker {
+    static readonly KIND = 'org.openrewrite.javascript.templating.SubstitutedValue';
+    readonly kind = SubstitutedValue.KIND;
+    readonly id = randomId();
+
+    constructor(readonly ownPrefix: boolean) {
+    }
+}
+
+/** Chooses a substituted value's prefix, and says whether it is the source's own. */
+type MergePrefix = (sourcePrefix: J.Space, templatePrefix: J.Space) => [J.Space, boolean];
 
 /**
  * Visitor that replaces placeholder nodes with actual parameter values.
  */
 export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
+    /** Whether any value was substituted, and so marked as a {@link SubstitutedValue}. */
+    substituted = false;
+
     constructor(
         private readonly substitutions: Map<string, Parameter>,
         private readonly values: Pick<Map<string, J | J[]>, 'get'> = new Map(),
-        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map()
+        private readonly wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
+        private readonly patternPrefixes: Pick<Map<string, J.Space>, 'get'> = new Map()
     ) {
         super();
     }
@@ -70,6 +92,71 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         return bindingElement;
     }
 
+    /** A statement substituted into an expression statement's placeholder is the statement itself. */
+    override async visitExpressionStatement(expressionStatement: JS.ExpressionStatement, p: any): Promise<J | undefined> {
+        const visited = await super.visitExpressionStatement(expressionStatement, p);
+        if (visited?.kind !== JS.Kind.ExpressionStatement) {
+            return visited;
+        }
+        const statement = visited as JS.ExpressionStatement;
+        const expression: J = statement.expression;
+        if (isExpression(expression)) {
+            return statement;
+        }
+        return {...expression, prefix: this.concatPrefix(statement.prefix, expression.prefix)};
+    }
+
+    /**
+     * A declaration substituted for the name of a declaration is the declaration itself: `(${p})` and
+     * `(...${p})` with `p` bound to the parameter `props: Props` give `(props: Props)` and `(...props: Props)`.
+     */
+    override async visitVariableDeclarations(variableDeclarations: J.VariableDeclarations, p: any): Promise<J | undefined> {
+        const visited = await super.visitVariableDeclarations(variableDeclarations, p);
+        if (visited?.kind !== J.Kind.VariableDeclarations) {
+            return visited;
+        }
+        const outer = visited as J.VariableDeclarations;
+        if (outer.variables.length !== 1) {
+            return outer;
+        }
+        const variable = outer.variables[0].element;
+        const spread = variable.name.kind === JS.Kind.Spread ? variable.name as JS.Spread : undefined;
+        const declared: J = spread ? spread.expression : variable.name;
+        if (declared.kind !== J.Kind.VariableDeclarations) {
+            return outer;
+        }
+        const inner = declared as J.VariableDeclarations;
+        const prefix = this.concatPrefix(this.concatPrefix(outer.prefix, variable.prefix), inner.prefix);
+        if (!spread) {
+            return {...inner, prefix};
+        } else if (inner.variables.length !== 1) {
+            return outer;
+        }
+        const innerVariable = inner.variables[0];
+        const spreadDeclaration: J.VariableDeclarations = {
+            ...inner,
+            prefix,
+            variables: [{
+                ...innerVariable,
+                element: {...innerVariable.element, name: {...spread, expression: innerVariable.element.name as Expression} as JS.Spread}
+            }]
+        };
+        return spreadDeclaration;
+    }
+
+    private concatPrefix(outer: J.Space, inner: J.Space): J.Space {
+        if (outer.whitespace === '' && outer.comments.length === 0) {
+            return inner;
+        } else if (outer.comments.length === 0) {
+            return {...inner, whitespace: outer.whitespace + inner.whitespace};
+        }
+        const last = outer.comments[outer.comments.length - 1];
+        return {
+            ...outer,
+            comments: [...outer.comments.slice(0, -1), {...last, suffix: last.suffix + inner.whitespace}, ...inner.comments]
+        };
+    }
+
     /**
      * Override visitContainer to handle variadic expansion for containers.
      * This handles J.Container instances anywhere in the AST (method arguments, etc.).
@@ -105,27 +192,17 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * array-level access for variadic expansion.
      */
     override async visitBlock(block: J.Block, p: any): Promise<J | undefined> {
-        const hasPlaceholder = block.statements.some(stmt => {
-            const stmtElement = stmt.element;
-            // Check if it's an ExpressionStatement containing a placeholder
-            if (stmtElement.kind === JS.Kind.ExpressionStatement) {
-                const exprStmt = stmtElement as JS.ExpressionStatement;
-                return this.isPlaceholder(exprStmt.expression);
-            }
-            return this.isPlaceholder(stmtElement);
-        });
-
-        if (!hasPlaceholder) {
-            return super.visitBlock(block, p);
-        }
-
-        // Unwrap function to extract placeholder from ExpressionStatement
+        // An object literal's body is a block too, whose placeholders are shorthand properties
         const unwrapStatement = (element: J): J => {
             if (element.kind === JS.Kind.ExpressionStatement) {
                 return (element as JS.ExpressionStatement).expression;
             }
-            return element;
+            return PlaceholderUtils.shorthandPropertyName(element) ?? element;
         };
+
+        if (!block.statements.some(stmt => this.isPlaceholder(unwrapStatement(stmt.element)))) {
+            return super.visitBlock(block, p);
+        }
 
         const newStatements = await this.expandVariadicElements(block.statements, unwrapStatement, p);
 
@@ -175,10 +252,31 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         };
     }
 
+    private readonly templatePrefix: MergePrefix = (source, template) => [this.mergePrefix(source, template), false];
+
     /** As `mergePrefix`, but a line break the source wrote and the template did not is the source's layout. */
-    private mergeElementPrefix(sourcePrefix: J.Space, templatePrefix: J.Space): J.Space {
-        return sourcePrefix.whitespace.includes('\n') && !templatePrefix.whitespace.includes('\n') ?
-            sourcePrefix : this.mergePrefix(sourcePrefix, templatePrefix);
+    private readonly elementPrefix: MergePrefix = (source, template) =>
+        source.whitespace.includes('\n') && !template.whitespace.includes('\n') ?
+            [source, true] : this.templatePrefix(source, template);
+
+    private readonly sourcePrefix: MergePrefix = source => [source, true];
+
+    /** Whether the template writes the same prefix before capture `name` as the pattern it matched with. */
+    private spacedAsInPattern(name: string, placeholder: J): boolean {
+        const pattern = this.patternPrefixes.get(name);
+        return pattern !== undefined && pattern.comments.length === 0 && placeholder.prefix.comments.length === 0 &&
+            pattern.whitespace === placeholder.prefix.whitespace;
+    }
+
+    /** `value` substituted for `placeholder` under the prefix `merge` chooses, marked as a {@link SubstitutedValue}. */
+    private substitute(value: J, placeholder: J, merge: MergePrefix): J {
+        this.substituted = true;
+        const [prefix, ownPrefix] = merge(value.prefix, placeholder.prefix);
+        const markers = this.mergeMarkers(value.markers, placeholder.markers);
+        return produce(value, draft => {
+            draft.prefix = prefix;
+            draft.markers = {...markers, markers: [...markers.markers, new SubstitutedValue(ownPrefix)]};
+        });
     }
 
     /** As `mergePrefix`, for markers: everything the value was matched with, plus the kinds only the slot wrote. */
@@ -206,6 +304,9 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         ownLayout: boolean = false
     ): Promise<J.RightPadded<J>[]> {
         const newElements: J.RightPadded<J>[] = [];
+        const merge = ownLayout ? this.elementPrefix : this.templatePrefix;
+        // Past the first item, an item's prefix is the source's separator from the one before it
+        const keep: MergePrefix = source => [source, ownLayout];
 
         for (const wrapped of elements) {
             const element = wrapped.element;
@@ -276,29 +377,18 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
 
                                     if (isWrapper) {
                                         // Item is a JRightPadded wrapper - use it directly to preserve markers
-                                        newElements.push(produce(item, draft => {
-                                            if (i === 0 && draft.element) {
-                                                // Merge the placeholder's prefix with the first item's prefix
-                                                // Modify prefix directly within the draft
-                                                draft.element.prefix = ownLayout ?
-                                                    this.mergeElementPrefix(draft.element.prefix, element.prefix) :
-                                                    this.mergePrefix(draft.element.prefix, element.prefix);
-                                            }
-                                            // Keep all other wrapper properties (including markers with Semicolon)
-                                        }));
+                                        const wrapper = item as J.RightPadded<J>;
+                                        // Keep all other wrapper properties (including markers with Semicolon)
+                                        newElements.push({
+                                            ...wrapper,
+                                            element: this.substitute(wrapper.element, element, i > 0 ? keep : merge)
+                                        });
                                     } else if (item) {
                                         // Item is just an element (not a wrapper) - wrap it (backward compatibility)
-                                        const elem = item as J;
-                                        newElements.push(produce(wrapped, draft => {
-                                            draft.element = produce(elem, itemDraft => {
-                                                if (i === 0) {
-                                                    itemDraft.prefix = ownLayout ?
-                                                        this.mergeElementPrefix(elem.prefix, element.prefix) :
-                                                        this.mergePrefix(elem.prefix, element.prefix);
-                                                }
-                                                // For i > 0, prefix is already correct, no changes needed
-                                            });
-                                        }));
+                                        newElements.push({
+                                            ...wrapped,
+                                            element: this.substitute(item as J, element, i > 0 ? keep : merge)
+                                        });
                                     }
                                 }
                                 continue; // Skip adding the placeholder itself
@@ -312,14 +402,18 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
             }
 
             // Not a placeholder (or expansion failed) - process normally
-            const replacedElement = await this.visit(element, p);
+            const slot = ownLayout && element.kind !== JS.Kind.BindingElement && this.isPlaceholder(element);
+            const replacedElement = slot ?
+                this.replaceElement(element, merge) :
+                await this.visit(element, p);
             if (replacedElement) {
                 // Check if the replacement came from a capture with a wrapper (to preserve markers)
                 const placeholderNode = unwrapElement(element);
                 const placeholderText = this.getPlaceholderText(placeholderNode);
                 let wrapperToUse = wrapped;
 
-                if (placeholderText && this.isPlaceholder(placeholderNode)) {
+                // A shorthand property keeps its own wrapper, since a captured one belongs to the name alone
+                if (placeholderText && this.isPlaceholder(placeholderNode) && element.kind !== JS.Kind.PropertyAssignment) {
                     const param = this.substitutions.get(placeholderText);
                     if (param) {
                         const isCapture = param.value instanceof CaptureImpl ||
@@ -342,6 +436,13 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         }
 
         return newElements;
+    }
+
+    /** As `visit` on a placeholder, with `merge` choosing the replacement's prefix. */
+    private replaceElement(placeholder: J, merge: MergePrefix): J {
+        const replacement = this.replacePlaceholder(placeholder, merge);
+        return replacement === placeholder ? placeholder :
+            maybeParenthesize(enclosingTree(this.cursor), placeholder.id, replacement, placeholder.markers);
     }
 
     /**
@@ -369,9 +470,10 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
      * Replaces a placeholder node with the actual parameter value.
      *
      * @param placeholder The placeholder node
+     * @param merge Chooses the replacement's prefix from its own and the placeholder's
      * @returns The replacement node or the original if not a placeholder
      */
-    private replacePlaceholder(placeholder: J): J {
+    private replacePlaceholder(placeholder: J, merge: MergePrefix = this.templatePrefix): J {
         const placeholderText = this.getPlaceholderText(placeholder);
 
         if (!placeholderText || !placeholderText.startsWith(PlaceholderUtils.PLACEHOLDER_PREFIX)) {
@@ -395,10 +497,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 // If the property value is already a J node, use it
                 if (isTree(propertyValue)) {
                     const propValueAsJ = propertyValue as J;
-                    return produce(propValueAsJ, draft => {
-                        draft.markers = this.mergeMarkers(propValueAsJ.markers, placeholder.markers);
-                        draft.prefix = this.mergePrefix(propValueAsJ.prefix, placeholder.prefix);
-                    });
+                    return this.substitute(propValueAsJ, placeholder, merge);
                 }
                 // If it's a primitive value and placeholder is an identifier, update the simpleName
                 if (typeof propertyValue === 'string' && placeholder.kind === J.Kind.Identifier) {
@@ -430,10 +529,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
                 (param.value[CAPTURE_NAME_SYMBOL] || param.value.name);
             const matchedNode = this.values.get(name);
             if (matchedNode && !Array.isArray(matchedNode)) {
-                return produce(matchedNode, draft => {
-                    draft.markers = this.mergeMarkers(matchedNode.markers, placeholder.markers);
-                    draft.prefix = this.mergePrefix(matchedNode.prefix, placeholder.prefix);
-                });
+                return this.substitute(matchedNode, placeholder,
+                    this.spacedAsInPattern(name, placeholder) ? this.sourcePrefix : merge);
             }
 
             // If no match found, return placeholder unchanged
@@ -447,10 +544,7 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         if (isRightPadded) {
             // Extract the element from the J.RightPadded wrapper
             const element = param.value.element as J;
-            return produce(element, draft => {
-                draft.markers = this.mergeMarkers(element.markers, placeholder.markers);
-                draft.prefix = this.mergePrefix(element.prefix, placeholder.prefix);
-            });
+            return this.substitute(element, placeholder, merge);
         }
 
         // Check if the parameter value is a J.Container
@@ -467,10 +561,8 @@ export class PlaceholderReplacementVisitor extends JavaScriptVisitor<any> {
         // If the parameter value is an AST node, use it directly
         if (isTree(param.value)) {
             // Return the AST node, preserving comments from the source
-            return produce(param.value as J, draft => {
-                draft.markers = this.mergeMarkers(param.value.markers, placeholder.markers);
-                draft.prefix = this.mergePrefix(param.value.prefix, placeholder.prefix);
-            });
+            const value = param.value as J;
+            return this.substitute(value, placeholder, merge);
         }
 
         return placeholder;

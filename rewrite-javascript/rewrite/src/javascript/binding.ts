@@ -16,10 +16,11 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
+import {Cursor, isTree} from "../tree";
 import {
-    AddImportOptions, bindImport, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs, memberName,
-    moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
+    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
+    memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {
@@ -164,7 +165,7 @@ function dynamicallyImportedModule(declaration: J.VariableDeclarations): string 
     }
     const argument = call.arguments.elements[0]?.element;
     return argument?.kind === J.Kind.Literal && typeof (argument as J.Literal).value === "string"
-        ? (argument as J.Literal).value as string
+        ? moduleNameOf(argument as J.Literal)
         : undefined;
 }
 
@@ -200,10 +201,10 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
         if (specifier?.kind !== J.Kind.Literal) {
             continue;
         }
-        const module = (specifier as J.Literal).value;
-        if (typeof module !== "string") {
+        if (typeof (specifier as J.Literal).value !== "string") {
             continue;
         }
+        const module = moduleNameOf(specifier as J.Literal);
         const clause = jsImport.importClause;
         const typeOnly = clause?.typeOnly ?? false;
         if (clause?.name?.element?.kind === J.Kind.Identifier) {
@@ -229,7 +230,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
  * never a type-only import for a value, which erases and would leave the reference unbound.
  */
 function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean, typeOnly: boolean): boolean {
-    return binding.typeOnly === typeOnly &&
+    return (typeOnly || !binding.typeOnly) &&
         (binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default"));
 }
 
@@ -274,9 +275,10 @@ export function maybeBind(
         }
     }
 
-    if (isWholeModule && options.preferredName === undefined && derivedBindingName(module) === undefined) {
-        // The module's last path segment is not a legal identifier, and the caller named no
-        // preference of its own — there is no name left to bind it to.
+    if (isWholeModule && options.alias === undefined && options.preferredName === undefined &&
+        derivedBindingName(module) === undefined) {
+        // The module's last path segment is not a legal identifier, and the caller named none
+        // of its own — there is no name left to bind it to.
         return undefined;
     }
 
@@ -318,17 +320,13 @@ function sameCallees(a: readonly string[], b: readonly string[]): boolean {
     return a.length === b.length && a.every((callee, i) => callee === b[i]);
 }
 
-/** Which of an import clause's three slots `member` binds — `import`, `import *`, or `import {}`. */
-function bindingShape(member: string | undefined): "default" | "namespace" | "named" {
-    const key = memberName(member);
-    return key === undefined ? "default" : key === "*" ? "namespace" : "named";
-}
-
 /**
- * Moves the binding for `from` to `to` and answers with the name it now carries — the primitive
- * behind a member rename or a module move. Returns `undefined`, changing nothing, where the move
- * is not safely expressible; the refusals and the choice of name are listed in CLAUDE.md:
- * JavaScript module bindings.
+ * Moves the binding for `from` to `to` and answers with the name it now carries, or `undefined`,
+ * changing nothing, where the move cannot be expressed safely. One call moves one binding.
+ * Named members of one import moved to one module, a call each, end up in one import of it,
+ * whether the calls share a visit or come from separate recipes.
+ * On an ES import, every type in the file naming what moved is renamed the way a parse of the result names it.
+ * It is renamed, not re-resolved, so a moved member keeps its old declaration's signature.
  */
 export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebindOptions): string | undefined {
     const amd = enclosingAmdBlock(visitor, options);
@@ -361,10 +359,9 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (existing === undefined) {
         return undefined;
     }
-    if (existing.onlyMemberOfStatement && bindingShape(options.from.member) !== bindingShape(options.to.member)) {
-        return undefined;
-    }
-    if (!existing.onlyMemberOfStatement && isCommonJs(cu)) {
+    // `RebindImport` replaces a statement it cannot rewrite in place, and a CommonJS file can gain no import.
+    if (isCommonJs(cu) &&
+        (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
     const boundName = rebindingName(visitor, cu, options, existing);
@@ -390,7 +387,8 @@ function rebindingName(
     options: MaybeRebindOptions,
     existing: ExistingImportBinding
 ): string | undefined {
-    const taken = (name: string) => nameTaken(name, namesUsedIn(cu), visitor);
+    const taken = (name: string) => nameTaken(name, noNames, visitor) ||
+        (namesUsedIn(cu).has(name) && !reusesTargetImport(cu, name, options.to, existing));
     const alias = options.to.alias;
     if (alias !== undefined) {
         return isBindableName(alias) && (alias === existing.localName || !taken(alias)) ? alias : undefined;
@@ -400,6 +398,50 @@ function rebindingName(
         return existing.localName;
     }
     return taken(member) ? existing.localName : member;
+}
+
+const noNames: ReadonlySet<string> = new Set();
+
+/** Whether the moved binding can merge into a value import of `to`'s named member that `name` binds. */
+function reusesTargetImport(
+    cu: JS.CompilationUnit,
+    name: string,
+    to: MaybeRebindOptions["to"],
+    moved: ExistingImportBinding
+): boolean {
+    const target = existingImportBinding(cu, to.module, to.member);
+    return target?.localName === name && bindingShape(to.member) === "named" && !target.typeOnly &&
+        !moved.typeOnly && onlyReferences(cu, name);
+}
+
+/**
+ * Whether every spelling of `name` outside the imports is a reference. Any binder spells its name
+ * in a declaring position, so each reference then reads the import, whatever kind of scope it is in.
+ */
+function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
+    let references = true;
+    const visit = (node: any, parent: Cursor): void => {
+        if (!references) {
+            return;
+        }
+        if (Array.isArray(node)) {
+            node.forEach(child => visit(child, parent));
+            return;
+        }
+        const cursor = new Cursor(node, parent);
+        if (node?.kind === J.Kind.Identifier && node.simpleName === name) {
+            references = isReference(cursor, node);
+        } else if (isTree(node) || node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ||
+            node?.kind === J.Kind.Container) {
+            Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));
+        }
+    };
+    const root = new Cursor(cu);
+    // An import or an `export {…}` binds nothing the name could collide with.
+    cu.statements
+        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration)
+        .forEach(s => visit(s, root));
+    return references;
 }
 
 /**
