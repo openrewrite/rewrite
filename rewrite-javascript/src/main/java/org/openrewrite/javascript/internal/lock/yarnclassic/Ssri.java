@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  */
 final class Ssri {
 
-    private static final Pattern SRI_REGEX = Pattern.compile("^([^-]+)-([^?]+)([?\\S*]*)$");
+    private static final Pattern SRI_REGEX = Pattern.compile("^([^-]+)-([^?]+)([^" + Js.WHITESPACE_CLASS + "]*)\\z");
     private static final Pattern WHITESPACE = Pattern.compile("[" + Js.WHITESPACE_CLASS + "]+");
     private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 

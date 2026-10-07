@@ -29,7 +29,7 @@ import java.util.regex.Pattern;
  */
 final class Ini {
 
-    private static final Pattern LINE = Pattern.compile("^\\[([^\\]]*)\\]$|^([^=]+)(=(.*))?$",
+    private static final Pattern LINE = Pattern.compile("^\\[([^\\]]*)\\]\\z|^([^=]+)(=(" + Js.DOT + "*))?\\z",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern COMMENT = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*[;#]");
 

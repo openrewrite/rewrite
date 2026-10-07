@@ -16,39 +16,33 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Builder;
-import lombok.Value;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
 /**
- * Port of yarn src/types.js {@code DependencyRequestPattern} (yarn 1.22.22): one request the install or a package
- * makes for a pattern. A root request has no parent names.
+ * Port of yarn src/types.js {@code DependencyRequestPattern} (yarn 1.22.22), equal only to itself as in yarn's sets.
  */
-@Value
+@Getter
 @Builder(toBuilder = true)
-class DependencyRequestPattern {
-    String pattern;
+final class DependencyRequestPattern {
+    private final String pattern;
 
-    String registry;
+    private final String registry;
 
-    boolean optional;
+    private final boolean optional;
 
     /**
      * {@code dev}, {@code optional}, {@code resolution}, {@code workspaces} or none.
      */
-    @Nullable
-    String hint;
+    private final @Nullable String hint;
 
-    @Nullable
-    List<String> parentNames;
+    private final @Nullable List<String> parentNames;
 
-    @Nullable
-    PackageRequest parentRequest;
+    private final @Nullable PackageRequest parentRequest;
 
-    @Nullable
-    String workspaceName;
+    private final @Nullable String workspaceName;
 
-    @Nullable
-    String workspaceLoc;
+    private final @Nullable String workspaceLoc;
 }

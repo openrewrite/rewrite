@@ -40,7 +40,7 @@ final class LockfileParser {
     static final String SUCCESS = "success";
     static final String CONFLICT = "conflict";
 
-    private static final Pattern VERSION_REGEX = Pattern.compile("^yarn lockfile v(\\d+)$");
+    private static final Pattern VERSION_REGEX = Pattern.compile("^yarn lockfile v(\\d+)\\z");
     private static final Pattern DIGITS = Pattern.compile("^[0-9]+");
 
     private static final String MERGE_CONFLICT_ANCESTOR = "|||||||";
@@ -389,14 +389,13 @@ final class LockfileParser {
             }
         }
         Object result = JsYaml.safeLoadFailsafe(str);
-        return result == null || result instanceof Map || result instanceof List ? result :
-                new LinkedHashMap<String, Object>();
+        return result == null || result instanceof Map || result instanceof List ? result : new PlainObject();
     }
 
     static ParseResult parseWithConflict(String str, String fileLoc) {
         String[] variants = extractConflictVariants(str);
         try {
-            Map<String, @Nullable Object> merged = new LinkedHashMap<>();
+            Map<String, @Nullable Object> merged = new PlainObject();
             Object first = parse(variants[0], fileLoc);
             Object second = parse(variants[1], fileLoc);
             Js.assign(merged, first);
@@ -404,7 +403,7 @@ final class LockfileParser {
             return new ParseResult(MERGE, merged);
         } catch (JsError err) {
             if (err.isSyntaxError()) {
-                return new ParseResult(CONFLICT, new LinkedHashMap<String, Object>());
+                return new ParseResult(CONFLICT, new PlainObject());
             }
             throw err;
         }

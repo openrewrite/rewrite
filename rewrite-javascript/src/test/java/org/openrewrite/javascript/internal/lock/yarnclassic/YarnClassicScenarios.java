@@ -39,20 +39,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded Yarn classic scenarios a test can replay: every directory holding a lock under
- * {@code lock/yarn-classic/} on the test classpath (the in-repo fixtures and the downloaded ones merge there), and,
- * when the environment variable {@code REWRITE_LOCK_SCENARIOS} names a directory, every one under its
- * {@code yarn-classic} sibling, or under the directory itself when it holds Yarn classic scenarios.
- * {@code REWRITE_LOCK_HTTP_CACHE} names a directory of registry responses a scenario's own {@code http/} falls back
- * on.
- * <p>
- * The layout is the one {@code record-yarn-classic.sh} writes: {@code pkg-before}, {@code before}, {@code pkg},
- * {@code after}, a hand-made starting lock {@code before-given} (copied to {@code before}), the project config
- * {@code yarnrc} and {@code npmrc}, the project files {@code tree-before/} and {@code tree/} copied over it before
- * each phase, and {@code http/}. An install that changes nothing over a lock is logged as
- * {@code yarnclassic-again.log} (over {@code after}) or {@code yarnclassic-<lock>-again.log}; when it changed the lock
- * yarn's rewrite is {@code again} or {@code <lock>-again}, and {@code <lock>-forced} is the lock yarn writes for it
- * under {@code --force}. The downloaded fixtures spell the edited manifest {@code pkg-after}.
+ * The recorded Yarn classic scenarios under {@code lock/yarn-classic/} on the test classpath and, when
+ * {@code REWRITE_LOCK_SCENARIOS} names a directory, under its {@code yarn-classic} sibling or itself.
  */
 final class YarnClassicScenarios {
 

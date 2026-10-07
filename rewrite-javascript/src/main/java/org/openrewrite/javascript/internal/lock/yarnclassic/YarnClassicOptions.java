@@ -31,11 +31,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The yarn config that changes what a lock-only install writes or whether it succeeds, read as yarn 1.22.22 reads it
- * (src/config.js, registries/yarn-registry.js, registries/npm-registry.js, rc.js, and install.js
- * {@code normalizeFlags}): the project's .yarnrc in the lockfile syntax, its {@code --flag} lines, and the project's
- * .npmrc, which yarn consults for every key its own config leaves unset. The user's and the global rc files are not
- * an input.
+ * Port of yarn src/config.js, rc.js, registries/ and install.js {@code normalizeFlags} (yarn 1.22.22): the config.
  */
 @Getter
 public final class YarnClassicOptions {
@@ -48,9 +44,10 @@ public final class YarnClassicOptions {
 
     private static final Map<String, Object> DEFAULTS = new LinkedHashMap<>();
     private static final Map<String, String> NPM_MAP = new HashMap<>();
-    private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(.*)$");
+    private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(" + Js.DOT + "*)\\z");
     private static final Pattern ENV_EXPR = Pattern.compile("(\\\\*)\\$\\{([^}]+)}");
     private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
+    private static final Pattern UNDERSCORE = Pattern.compile("([^_])_");
     private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
 
     static {
@@ -97,7 +94,7 @@ public final class YarnClassicOptions {
     private final Map<String, @Nullable Object> npmConfig;
     private final Flags flags;
 
-    private final boolean looseSemver = true;
+    private final boolean looseSemver;
     private final boolean production;
     private final boolean workspacesEnabled;
     private final boolean workspacesNohoistEnabled;
@@ -123,6 +120,7 @@ public final class YarnClassicOptions {
                                Map<String, @Nullable Object> commandLine, @Nullable Map<String, String> env) {
         this.yarnConfig = yarnConfig;
         this.npmConfig = npmConfig;
+        this.looseSemver = !Js.truthy(commandLine.get("strictSemver"));
         Object production = commandLine.get("production");
         // an environment the host does not know counts as one without these variables
         boolean productionEnv = env != null && "production".equals(env.get("NODE_ENV")) &&
@@ -146,7 +144,7 @@ public final class YarnClassicOptions {
     }
 
     public static YarnClassicOptions defaults() {
-        return load(null, null, Collections.emptyMap());
+        return load((String) null, null, Collections.emptyMap());
     }
 
     /**
@@ -154,9 +152,31 @@ public final class YarnClassicOptions {
      * @param npmrc  the project's .npmrc.
      * @param env    the environment yarn runs in, {@code null} when the host does not know it.
      */
-    @SuppressWarnings("unchecked")
     public static YarnClassicOptions load(@Nullable String yarnrc, @Nullable String npmrc,
                                           @Nullable Map<String, String> env) {
+        return load(rc(yarnrc), npmrc, env);
+    }
+
+    /**
+     * rc.js {@code getRcConfigForCwd} for the project's .yarnrc, read before anything else yarn reads.
+     */
+    static Map<String, @Nullable Object> rc(@Nullable String yarnrc) {
+        Map<String, @Nullable Object> rc = new LinkedHashMap<>();
+        if (yarnrc != null) {
+            Js.assign(rc, LockfileParser.parseLockfile(yarnrc.replace("\r\n", "\n"), ".yarnrc").getObject());
+        }
+        return rc;
+    }
+
+    /**
+     * The registries' {@code init}: npm's config from the environment's {@code yarn_} and {@code npm_config_}
+     * keys over the .npmrc, yarn's from its {@code yarn_} keys over the .yarnrc over yarn's defaults.
+     */
+    static YarnClassicOptions load(Map<String, @Nullable Object> rc, @Nullable String npmrc,
+                                   @Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> npmEnv = new LinkedHashMap<>();
+        mergeEnv(npmEnv, "yarn_", env);
+        mergeEnv(npmEnv, "npm_config_", env);
         Map<String, @Nullable Object> npmConfig = new LinkedHashMap<>();
         if (npmrc != null) {
             Map<String, @Nullable Object> config = Ini.decode(npmrc.replace("\r\n", "\n"));
@@ -164,26 +184,44 @@ public final class YarnClassicOptions {
                 npmConfig.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
             }
         }
+        npmConfig.putAll(npmEnv);
 
-        Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>();
-        Map<String, @Nullable Object> rc = new LinkedHashMap<>();
-        if (yarnrc != null) {
-            Object parsed = LockfileParser.parseLockfile(yarnrc.replace("\r\n", "\n"), ".yarnrc").getObject();
-            if (parsed instanceof Map) {
-                rc = (Map<String, @Nullable Object>) parsed;
-                yarnConfig.putAll(rc);
-            }
-        }
-        Map<String, @Nullable Object> withDefaults = new LinkedHashMap<>(DEFAULTS);
-        withDefaults.putAll(yarnConfig);
+        Map<String, @Nullable Object> yarnEnv = new LinkedHashMap<>();
+        mergeEnv(yarnEnv, "yarn_", env);
+        Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>(DEFAULTS);
+        yarnConfig.putAll(rc);
+        yarnConfig.putAll(yarnEnv);
 
         Map<String, @Nullable Object> commandLine = commandLine(rc);
         Object registry = commandLine.get("registry");
         if (registry != null) {
-            withDefaults.put("registry", registry);
+            yarnConfig.put("registry", registry);
             npmConfig.put("registry", registry);
         }
-        return new YarnClassicOptions(withDefaults, npmConfig, commandLine, env);
+        return new YarnClassicOptions(yarnConfig, npmConfig, commandLine, env);
+    }
+
+    // base-registry.js mergeEnv
+    private static void mergeEnv(Map<String, @Nullable Object> config, String prefix,
+                                 @Nullable Map<String, String> env) {
+        if (env == null) {
+            return;
+        }
+        for (Map.Entry<String, String> envEntry : env.entrySet()) {
+            String key = envEntry.getKey().toLowerCase(Locale.ROOT);
+            if (!key.startsWith(prefix)) {
+                continue;
+            }
+            Object val = normalizeConfigOption(envEntry.getValue());
+            key = key.substring(prefix.length()).replace("__", ".");
+            key = UNDERSCORE.matcher(key).replaceAll("$1-");
+            ObjectPath.set(config, key, val);
+        }
+    }
+
+    // config.js _init, before the registries are read
+    static boolean looseSemver(Map<String, @Nullable Object> rc) {
+        return !Js.truthy(commandLine(rc).get("strictSemver"));
     }
 
     // rc.js buildRcArgs: a `--<option> <value>` line passes the value; a flag passes itself when the value is true
@@ -277,18 +315,18 @@ public final class YarnClassicOptions {
      */
     @Nullable
     Object getOption(String key) {
-        Object val = yarnConfig.get(key);
-        if (val == null && !yarnConfig.containsKey(key)) {
-            String npmKey = NPM_MAP.get(key);
-            val = npmKey == null ? null : npmConfig.get(npmKey);
+        if (yarnConfig.containsKey(key)) {
+            return yarnConfig.get(key);
         }
-        if (val == null) {
-            val = npmConfig.get(key);
+        // npmMap[key] of a key npm has no name for is undefined, which reads the npm config's key "undefined"
+        String npmKey = NPM_MAP.containsKey(key) ? NPM_MAP.get(key) : "undefined";
+        if (npmConfig.containsKey(npmKey)) {
+            return npmConfig.get(npmKey);
         }
-        if (val == null) {
-            val = DEFAULTS.get(key);
+        if (npmConfig.containsKey(key)) {
+            return npmConfig.get(key);
         }
-        return val;
+        return DEFAULTS.get(key);
     }
 
     /**
@@ -301,7 +339,7 @@ public final class YarnClassicOptions {
             String key = s + (s.isEmpty() ? "" : ":") + "registry";
             Object registry = npmConfig.get(key);
             if (!Js.truthy(registry)) {
-                registry = yarnConfig.get(key);
+                registry = getOption(key);
             }
             if (Js.truthy(registry)) {
                 return Js.string(registry);

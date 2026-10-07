@@ -21,15 +21,16 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/lockfile/index.js (yarn 1.22.22): the lock as yarn reads it, a cache from each pattern to its
- * entry (the patterns of one header share one object), and the entries yarn writes from the resolver's patterns,
- * grouped by remote and name.
+ * Port of yarn src/lockfile/index.js (yarn 1.22.22).
  */
 @Getter
 final class Lockfile {
@@ -50,6 +51,13 @@ final class Lockfile {
      * everything from scratch.
      */
     private final @Nullable Object lockfilev2;
+
+    /**
+     * The prototype of an object-literal cache, once yarn took it for the entry of {@code __proto__}.
+     */
+    private @Nullable Map<String, @Nullable Object> prototype;
+
+    private final Map<Object, Map<String, @Nullable Object>> arrayEntries = new IdentityHashMap<>();
 
     Lockfile(@Nullable Object cache, @Nullable String source, @Nullable String parseResultType) {
         this(cache, source, parseResultType, null);
@@ -83,7 +91,7 @@ final class Lockfile {
         Object lockfilev2 = null;
         if (lockfile instanceof Map && Js.truthy(((Map<?, ?>) lockfile).get("__metadata"))) {
             lockfilev2 = lockfile;
-            lockfile = new LinkedHashMap<String, Object>();
+            lockfile = new PlainObject();
         }
         return new Lockfile(lockfile, raw, parseResult == null ? null : parseResult.getType(), lockfilev2);
     }
@@ -184,30 +192,75 @@ final class Lockfile {
     @SuppressWarnings("unchecked")
     @Nullable
     Map<String, @Nullable Object> getLocked(String pattern) {
-        Object cache = this.cache;
-        if (!Js.truthy(cache)) {
-            return null;
-        }
-        Object shrunk;
-        if (cache instanceof Map) {
-            shrunk = ((Map<String, Object>) cache).get(pattern);
-        } else if (cache instanceof List) {
-            long index = Js.arrayIndex(pattern);
-            List<?> list = (List<?>) cache;
-            shrunk = index >= 0 && index < list.size() ? list.get((int) index) : null;
-        } else {
-            throw new JsError(JsError.TYPE_ERROR, "Cannot use 'in' operator to search for '" + pattern + "' in " +
-                                                  Js.string(cache));
-        }
-        if (shrunk instanceof String) {
-            return getLocked((String) shrunk);
-        } else if (shrunk instanceof Map) {
-            return explodeEntry(pattern, (Map<String, @Nullable Object>) shrunk);
-        } else if (Js.truthy(shrunk)) {
-            throw new JsError(JsError.TYPE_ERROR, "Cannot create property 'optionalDependencies' on " +
-                                                  Js.typeOf(shrunk) + " '" + Js.string(shrunk) + "'");
+        Set<String> aliases = new HashSet<>();
+        while (Js.truthy(cache)) {
+            Object shrunk = lookup(pattern);
+            if (shrunk instanceof String) {
+                if (!aliases.add(pattern)) {
+                    throw new JsError("RangeError", "Maximum call stack size exceeded");
+                }
+                pattern = (String) shrunk;
+            } else if (shrunk instanceof Map) {
+                return explodeEntry(pattern, (Map<String, @Nullable Object>) shrunk);
+            } else if (shrunk instanceof List) {
+                return explodeEntry(pattern, arrayEntry((List<?>) shrunk));
+            } else if (shrunk instanceof PlainObject.BuiltinFunction) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot assign to read only property 'name' of function '" +
+                                                      shrunk + "'");
+            } else if (Js.truthy(shrunk)) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot create property 'optionalDependencies' on " +
+                                                      Js.typeOf(shrunk) + " '" + Js.string(shrunk) + "'");
+            } else {
+                return null;
+            }
         }
         return null;
+    }
+
+    // `pattern in cache && cache[pattern]`
+    private @Nullable Object lookup(String pattern) {
+        if (cache instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) cache;
+            return map.containsKey(pattern) ? map.get(pattern) : inherited(pattern);
+        }
+        if (cache instanceof List) {
+            List<?> list = (List<?>) cache;
+            long index = Js.arrayIndex(pattern);
+            if (index >= 0 && index < list.size()) {
+                return list.get((int) index);
+            }
+            return "length".equals(pattern) ? (double) list.size() : inherited(pattern);
+        }
+        throw new JsError(JsError.TYPE_ERROR, "Cannot use 'in' operator to search for '" + pattern + "' in " +
+                                              Js.string(cache));
+    }
+
+    // what an object literal or an array inherits, the entry yarn wrote onto the prototype included
+    private @Nullable Object inherited(String pattern) {
+        if (!(cache instanceof PlainObject) && !(cache instanceof List)) {
+            return null;
+        }
+        PlainObject.BuiltinFunction function = cache instanceof List ? PlainObject.arrayFunction(pattern) :
+                PlainObject.objectFunction(pattern);
+        if (function != null) {
+            return function;
+        }
+        if (PlainObject.PROTO.equals(pattern)) {
+            if (prototype == null) {
+                prototype = new LinkedHashMap<>();
+            }
+            return prototype;
+        }
+        return prototype == null ? null : prototype.get(pattern);
+    }
+
+    // explodeEntry sets its fields on the array itself; an object holding its indices stands for it
+    private Map<String, @Nullable Object> arrayEntry(List<?> array) {
+        return arrayEntries.computeIfAbsent(array, a -> {
+            Map<String, @Nullable Object> entry = new LinkedHashMap<>();
+            Js.assign(entry, a);
+            return entry;
+        });
     }
 
     void removePattern(String pattern) {

@@ -24,14 +24,12 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/package-fetcher.js {@code fetch} and config.js {@code generateUniquePackageSlug} (yarn 1.22.22):
- * each reference's manifest replaced by the package the fetch reads, with the reference, remote and name the
- * resolver gave it; a link by yarn's mock. Two references that would unpack into one cache directory fetch once.
+ * Port of yarn src/package-fetcher.js {@code fetch} and config.js {@code generateUniquePackageSlug} (yarn 1.22.22).
  */
 final class PackageFetcher {
 
     private static final Pattern SLUG_CHARS = Pattern.compile("[^@a-z0-9]+");
-    private static final Pattern SLUG_EDGES = Pattern.compile("^-+|-+$");
+    private static final Pattern SLUG_EDGES = Pattern.compile("^-+|-+\\z");
 
     /**
      * The package.json a fetch reads for a reference, normalized: from the tarball, the git checkout or the

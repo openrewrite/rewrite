@@ -32,11 +32,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/util/normalize-manifest (index.js, validate.js, resolve-relative.js, and the parts of fix.js
- * that reach a lock or decide an install: the version cleaned, the name and version defaulted, an engines array
- * expanded, {@code bundledDependencies} renamed, each dependency map's {@code //} key dropped and empty values made
- * {@code ""}). The rest of fix.js (people, readme, license, bin, man, scripts) reads package files and never reaches
- * a lock. A dependency field that is an array is read by its indices, as yarn does; a string one by its characters.
+ * Port of yarn src/util/normalize-manifest (yarn 1.22.22), fix.js only where it reaches a lock or an install.
  */
 final class NormalizeManifest {
 
@@ -59,12 +55,12 @@ final class NormalizeManifest {
      * Normalizes a manifest in place.
      *
      * @param moduleLoc      the package's directory, relative to the project's ({@code ""} the project itself)
-     * @param lockfileFolder the directory of the lock, relative to the project's
+     * @param lockfileFolder the directory of the lock, relative to the project's; null before yarn knows it
      * @param warnings       where the warnings yarn prints are collected
      * @throws MessageError a name yarn rejects, or a name or version that is not a string.
      */
-    static Manifest normalizeManifest(Manifest info, String moduleLoc, String lockfileFolder, boolean isRoot,
-                                      boolean looseSemver, List<String> warnings) {
+    static Manifest normalizeManifest(Manifest info, String moduleLoc, @Nullable String lockfileFolder,
+                                      boolean isRoot, boolean looseSemver, List<String> warnings) {
         Object name = info.getName();
         Object version = info.getVersion();
         String human = null;
@@ -73,6 +69,9 @@ final class NormalizeManifest {
         }
         if (Js.truthy(human) && version instanceof String && !((String) version).isEmpty()) {
             human += "@" + version;
+        }
+        if (isRoot && Js.truthy(info.get("_loc"))) {
+            human = Js.string(info.get("_loc"));
         }
         String prefix = Js.truthy(human) ? human + ": " : "";
 

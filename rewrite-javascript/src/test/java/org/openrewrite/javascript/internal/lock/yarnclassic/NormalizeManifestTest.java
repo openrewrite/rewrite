@@ -28,11 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * yarn 1.22.22's __tests__/normalize-manifest.js over the fixtures (__tests__/fixtures/normalize-manifest) whose
- * fields the port normalizes: name, version, the dependency maps, engines and bundleDependencies. The rest (people,
- * readme, license, bin, man, scripts, repository, homepage, keywords, and the util.* cases) concern fields that
- * never reach a lock. A fixture without {@code _root: false} is a root manifest; of its warnings the dependency
- * collision is ported, not the license one.
+ * yarn 1.22.22's __tests__/normalize-manifest.js over the fixtures whose fields the port normalizes.
  */
 class NormalizeManifestTest {
 

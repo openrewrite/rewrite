@@ -19,19 +19,19 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/resolvers/registries/npm-resolver.js (yarn 1.22.22): the version a range picks from a registry
- * response, and the manifest and remote a picked version becomes. A pattern with a lock entry that has an integrity
- * reuses the entry ({@link PackageRequest#getLocked}).
+ * Port of yarn src/resolvers/registries/npm-resolver.js (yarn 1.22.22).
  */
 final class NpmResolver {
 
     static final String NPM_REGISTRY_ID = "npm";
 
     private static final Pattern NPM_REGISTRY_RE = Pattern.compile("https?://registry\\.npmjs\\.org");
+    private static final Object NOT_A_TAG = new Object();
 
     private NpmResolver() {
     }
@@ -41,14 +41,13 @@ final class NpmResolver {
      * (strictly), else what {@link PackageConstraintResolver} reduces the versions to.
      *
      * @throws MessageError when no version matches, as yarn fails a non-interactive install.
+     * @throws JsError      the {@code TypeError} of looking the range up in dist-tags that are not an object.
      */
-    @SuppressWarnings("unchecked")
-    static Map<String, @Nullable Object> findVersionInRegistryResponse(YarnClassicOptions config, String name,
-                                                                       String range,
-                                                                       Map<String, @Nullable Object> body) {
+    static @Nullable Object findVersionInRegistryResponse(YarnClassicOptions config, String name, String range,
+                                                          Map<String, @Nullable Object> body) {
         Object versions = body.get("versions");
         Object distTags = body.get("dist-tags");
-        if (versions instanceof Map && ((Map<?, ?>) versions).isEmpty()) {
+        if (Js.truthy(versions) && Js.keys(versions).isEmpty()) {
             throw new MessageError(Lang.format("No valid versions found for $0. The package may be unpublished.",
                     body.get("name")));
         }
@@ -56,23 +55,51 @@ final class NpmResolver {
             throw new MessageError(Lang.format("Received malformed response from registry for $0. " +
                                                "The registry may be down.", name));
         }
-        Map<String, @Nullable Object> tags = (Map<String, @Nullable Object>) distTags;
-        Map<String, @Nullable Object> byVersion = (Map<String, @Nullable Object>) versions;
-        if (tags.containsKey(range)) {
-            range = Js.string(tags.get(range));
+        Object wanted = range;
+        Object tag = distTag(distTags, range);
+        if (tag != NOT_A_TAG) {
+            wanted = tag;
         }
 
-        Object latestVersion = tags.get("latest");
-        if (Js.truthy(latestVersion) && NodeSemver.satisfies(latestVersion, range, YarnClassicOptions.SEMVER)) {
-            return (Map<String, @Nullable Object>) byVersion.get(Js.string(latestVersion));
+        Object latestVersion = Js.get(distTags, "latest");
+        if (Js.truthy(latestVersion) && wanted instanceof String &&
+            NodeSemver.satisfies(latestVersion, (String) wanted, YarnClassicOptions.SEMVER)) {
+            return Js.get(versions, Js.string(latestVersion));
         }
 
-        String satisfied = config.resolveConstraints(new ArrayList<>(Js.keys(byVersion)), range);
+        String satisfied = wanted instanceof String ?
+                config.resolveConstraints(new ArrayList<>(Js.keys(versions)), (String) wanted) : null;
         if (satisfied != null) {
-            return (Map<String, @Nullable Object>) byVersion.get(satisfied);
+            return Js.get(versions, satisfied);
         }
         throw new MessageError(Lang.format("Couldn't find any versions for $0 that matches $1", body.get("name"),
-                range));
+                wanted));
+    }
+
+    // `range in tags` and `tags[range]` over the registry's JSON, whose objects inherit Object.prototype
+    private static @Nullable Object distTag(Object tags, String range) {
+        if (tags instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) tags;
+            if (map.containsKey(range)) {
+                return map.get(range);
+            }
+            Object function = PlainObject.objectFunction(range);
+            return function != null ? function : PlainObject.PROTO.equals(range) ? new PlainObject() : NOT_A_TAG;
+        }
+        if (tags instanceof List) {
+            List<?> list = (List<?>) tags;
+            long index = Js.arrayIndex(range);
+            if (index >= 0 && index < list.size()) {
+                return list.get((int) index);
+            }
+            if ("length".equals(range)) {
+                return (double) list.size();
+            }
+            Object function = PlainObject.arrayFunction(range);
+            return function != null ? function : PlainObject.PROTO.equals(range) ? new ArrayList<>() : NOT_A_TAG;
+        }
+        throw new JsError(JsError.TYPE_ERROR, "Cannot use 'in' operator to search for '" + range + "' in " +
+                                              Js.string(tags));
     }
 
     static String cleanRegistry(YarnClassicOptions config, String url) {

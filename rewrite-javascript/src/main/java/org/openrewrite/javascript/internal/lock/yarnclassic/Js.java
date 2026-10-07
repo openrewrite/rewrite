@@ -39,6 +39,11 @@ final class Js {
     static final String WHITESPACE_CLASS = "\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029" +
                                            "\\u202F\\u205F\\u3000\\uFEFF";
 
+    /**
+     * The characters JavaScript's {@code .} matches; Java's also leaves out {@code \u0085}.
+     */
+    static final String DOT = "[^\\n\\r\\u2028\\u2029]";
+
     private static final long MAX_ARRAY_INDEX = 4294967294L;
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()

@@ -62,7 +62,7 @@ final class JsYaml {
             for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
                 object.put(Js.string(failsafe(entry.getKey())), failsafe(entry.getValue()));
             }
-            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
+            Map<String, @Nullable Object> ordered = new PlainObject();
             for (String key : Js.keys(object)) {
                 ordered.put(key, object.get(key));
             }

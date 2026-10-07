@@ -25,9 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * yarn 1.22.22's __tests__/lockfile.js. Its "getLockfile (sorting)" case expects {@code name: 'foobar'}, which
- * 1.22.22's own getLockfile does not write (the name it passes is the pattern's, {@code foobar1}); run against the
- * bundled yarn, it gives the entry without a name, as here.
+ * yarn 1.22.22's __tests__/lockfile.js.
  */
 class LockfileTest {
 
@@ -132,6 +130,7 @@ class LockfileTest {
 
         Map<String, @Nullable Object> actual = lockfile.getLockfile(patterns);
 
+        // upstream expects name 'foobar', which 1.22.22's own getLockfile (run from its bundle) does not write
         assertThat(defined(actual.get("foobar1"))).isEqualTo(entry("0.0.0", null, "http://example.com/foobar", null));
         assertThat(defined(actual.get("foobar2"))).isEqualTo(entry("0.0.0", null, "http://example.com/foobar", null));
     }
@@ -212,6 +211,21 @@ class LockfileTest {
                                                    "  version: 2.1.3\n");
         assertThat(lockfile.getLockfilev2()).isNotNull();
         assertThat((Map<?, ?>) lockfile.getCache()).isEmpty();
+    }
+
+    /**
+     * An array js-yaml read is an entry yarn's own {@code getLocked} explodes, its indices kept, the same each time.
+     */
+    @Test
+    void getLockedExplodesAnArrayEntry() {
+        Lockfile lockfile = Lockfile.fromDirectory("ms@^2.0.0: [a, b]\nx@1: [a, b]\n");
+        Map<String, @Nullable Object> entry = lockfile.getLocked("ms@^2.0.0");
+        assertThat(entry).isNotNull();
+        assertThat(entry.keySet()).containsExactly("0", "1", "optionalDependencies", "dependencies", "uid",
+                "permissions", "registry", "name");
+        assertThat(entry.get("1")).isEqualTo("b");
+        assertThat(entry.get("name")).isEqualTo("ms");
+        assertThat(lockfile.getLocked("ms@^2.0.0")).isSameAs(entry);
     }
 
     private static Map<String, @Nullable Object> abcd() {

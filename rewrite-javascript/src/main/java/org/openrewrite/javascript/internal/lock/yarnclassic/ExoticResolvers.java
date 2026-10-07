@@ -26,9 +26,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/resolvers/index.js {@code getExoticResolver} with each exotic resolver's {@code isVersion}
- * (resolvers/exotics, yarn 1.22.22), and of exotics/registry-resolver.js's fragment parsing for {@code npm:} and
- * {@code yarn:} aliases.
+ * Port of yarn src/resolvers/index.js {@code getExoticResolver} and the exotic resolvers' {@code isVersion} and
+ * registry-resolver.js fragment (yarn 1.22.22).
  */
 final class ExoticResolvers {
 
@@ -42,14 +41,15 @@ final class ExoticResolvers {
     private static final List<String> GIT_HOSTS = Arrays.asList("github.com", "gitlab.com", "bitbucket.com",
             "bitbucket.org");
     private static final List<Pattern> GIT_PATTERN_MATCHERS = Arrays.asList(
-            Pattern.compile("^git:"), Pattern.compile("^git\\+.+:"), Pattern.compile("^ssh:"),
-            Pattern.compile("^https?:.+\\.git$"), Pattern.compile("^https?:.+\\.git#.+"));
+            Pattern.compile("^git:"), Pattern.compile("^git\\+" + Js.DOT + "+:"), Pattern.compile("^ssh:"),
+            Pattern.compile("^https?:" + Js.DOT + "+\\.git\\z"),
+            Pattern.compile("^https?:" + Js.DOT + "+\\.git#" + Js.DOT + "+"));
     private static final Pattern GITHUB_SHORTHAND = Pattern.compile(
             "^[^:@%/" + Js.WHITESPACE_CLASS + ".-][^:@%/" + Js.WHITESPACE_CLASS + "]*[/][^:@" + Js.WHITESPACE_CLASS +
-            "/%]+(?:#.*)?$");
+            "/%]+(?:#" + Js.DOT + "*)?\\z");
     private static final Pattern FILE_PREFIX = Pattern.compile("^\\.{1,2}/");
-    private static final Pattern REGISTRY_FRAGMENT = Pattern.compile("^([^" + Js.WHITESPACE_CLASS +
-                                                                     "]+):(@?.*?)(@(.*?)|)$");
+    private static final Pattern REGISTRY_FRAGMENT = Pattern.compile("^([^" + Js.WHITESPACE_CLASS + "]+):(@?" +
+                                                                     Js.DOT + "*?)(@(" + Js.DOT + "*?)|)\\z");
 
     private ExoticResolvers() {
     }

@@ -21,9 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Port of yarn src/types.js {@code Manifest} (yarn 1.22.22): a package's manifest as yarn holds it, the
- * package.json, registry version or lock entry fields ({@code name}, {@code version}, {@code _uid},
- * {@code dependencies}, ...) with the remote and the reference the resolver attaches.
+ * Port of yarn src/types.js {@code Manifest} (yarn 1.22.22).
  */
 final class Manifest {
 

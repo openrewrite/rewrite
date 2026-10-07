@@ -29,9 +29,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/resolution-map.js and util/parse-package-path.js (yarn 1.22.22): the root manifest's
- * {@code resolutions}, each a glob over the path of package names from a root dependency down and the pattern it
- * substitutes.
+ * Port of yarn src/resolution-map.js and util/parse-package-path.js (yarn 1.22.22).
  */
 final class ResolutionMap {
 

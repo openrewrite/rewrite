@@ -33,12 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
- * Every yarn.lock {@link YarnClassicScenarios} finds, loaded into the model and written back: the cache parsed, each
- * pattern's manifest taken from its entry as a request that reuses it does, the packages fetched (the entry standing
- * for the package.json the fetch reads, a link by yarn's mock), the entries grouped again by remote and name, and
- * the whole file serialized. The bytes are the lock's own, or what yarn writes for it under {@code --force} when the
- * lock is not in yarn's own form ({@code <lock>-forced}). Where a scenario records an install that changes nothing
- * over a lock, the no-write rule leaves it as yarn left it or writes what yarn wrote.
+ * Every yarn.lock {@link YarnClassicScenarios} finds, loaded, every entry reused and written back: the lock's bytes,
+ * what yarn {@code --force} wrote ({@code <lock>-forced}), or what a no-change install saved.
  */
 class YarnClassicLockRoundTripTest {
 
@@ -95,11 +91,12 @@ class YarnClassicLockRoundTripTest {
      * The lock loaded, or {@code null} when yarn rejects or sets it aside, as the scenario recorded.
      */
     private static @Nullable Loaded load(YarnClassicScenarios.Lock lock) {
-        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(lock.inputs());
-        YarnClassicOptions options = regenerator.options();
+        YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
+        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(inputs);
+        YarnClassicOptions options = YarnClassicOptions.load(inputs.getYarnrc(), inputs.getNpmrc(), inputs.getEnv());
         Lockfile lockfile;
         try {
-            lockfile = regenerator.lockfile();
+            lockfile = Lockfile.fromDirectory(inputs.getLock());
         } catch (MessageError e) {
             assertThat(logs(lock.getScenario())).as("yarn rejects the lock").contains("error " + e.getMessage());
             return null;
@@ -147,6 +144,7 @@ class YarnClassicLockRoundTripTest {
 
         @Nullable
         String save() {
+            YarnClassicOptions options = regenerator.init(warnings);
             YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(lockfile, options,
                     new ResolutionMap(options), warnings);
             return YarnClassicLockRegenerator.saveLockfileAndIntegrity(resolver, request.getPatterns(),
@@ -158,6 +156,7 @@ class YarnClassicLockRoundTripTest {
          * entry's version no longer satisfies its pattern's range (a name the resolutions cover aside).
          */
         boolean resolvesAgain() {
+            YarnClassicOptions options = regenerator.init(warnings);
             ResolutionMap resolutionMap = new ResolutionMap(options);
             YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(lockfile, options,
                     resolutionMap, warnings);

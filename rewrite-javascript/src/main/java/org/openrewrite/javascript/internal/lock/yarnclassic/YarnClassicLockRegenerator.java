@@ -31,9 +31,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Port of yarn src/cli/commands/install.js (yarn 1.22.22) for {@code yarn install} over a project without
- * node_modules: the lock and the manifests read, and the lock saved from the resolver's patterns, or left as it is
- * when nothing in it would change.
+ * Port of yarn src/cli/commands/install.js (yarn 1.22.22) for {@code yarn install} without node_modules.
  */
 public final class YarnClassicLockRegenerator {
 
@@ -80,36 +78,81 @@ public final class YarnClassicLockRegenerator {
         this.inputs = inputs;
     }
 
-    YarnClassicOptions options() {
-        return YarnClassicOptions.load(inputs.getYarnrc(), inputs.getNpmrc(), inputs.getEnv());
+    /**
+     * config.js {@code init} at the project's root, after rc.js read the .yarnrc: the root manifest as
+     * {@code findWorkspaceRoot} reads it, the registries' config, the manifest again, the workspaces check.
+     */
+    YarnClassicOptions init(List<String> warnings) {
+        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getYarnrc());
+        boolean looseSemver = YarnClassicOptions.looseSemver(rc);
+        String rootText = inputs.getManifests().get("");
+        Manifest root = rootText == null ? null : tryManifest("", rootText, looseSemver, true, null, warnings);
+        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getNpmrc(), inputs.getEnv());
+        if (rootText != null) {
+            tryManifest("", rootText, looseSemver, false, "", warnings);
+        }
+        if (root != null && isWorkspaceRoot(root) && !config.isWorkspacesEnabled()) {
+            throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
+                                   "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
+        }
+        return config;
     }
 
     /**
-     * The lock as yarn reads it ({@code Lockfile.fromDirectory}).
+     * install.js {@code run}: the lock as yarn reads it ({@code Lockfile.fromDirectory}), none under
+     * {@code --no-lockfile}.
      *
      * @throws MessageError a lockfile version newer than yarn 1 reads.
      */
-    Lockfile lockfile() {
-        return Lockfile.fromDirectory(inputs.getLock());
+    Lockfile lockfile(YarnClassicOptions config) {
+        return config.getFlags().isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
     }
 
     /**
-     * A manifest as yarn reads and normalizes it: {@code fs.readJson}, then {@code normalizeManifest}.
+     * config.js {@code tryManifest}: the manifest read, its registry and location set, then normalized.
+     *
+     * @throws JsError the {@code SyntaxError} of JSON that does not parse, or the {@code TypeError} of JSON that
+     *                 cannot take the registry, a primitive or null.
+     */
+    static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
+                                @Nullable String lockfileFolder, List<String> warnings) {
+        String file = location.isEmpty() ? "package.json" : location + "/package.json";
+        Object json = readJson(file, text);
+        if (json == null) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot set properties of null (setting '_registry')");
+        }
+        Manifest manifest = manifest(json);
+        manifest.put("_registry", NpmResolver.NPM_REGISTRY_ID);
+        manifest.put("_loc", file);
+        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver, warnings);
+    }
+
+    /**
+     * util/fs.js {@code readJson}.
      *
      * @throws JsError the {@code SyntaxError} of JSON that does not parse, its message naming the file.
      */
-    @SuppressWarnings("unchecked")
-    static Manifest readManifest(String location, String text, YarnClassicOptions config, boolean isRoot,
-                                 List<String> warnings) {
-        Object json;
-        String file = location.isEmpty() ? "package.json" : location + "/package.json";
+    private static @Nullable Object readJson(String file, String text) {
         try {
-            json = Js.jsonParse(LockfileParser.stripBom(text));
+            return Js.jsonParse(LockfileParser.stripBom(text));
         } catch (JsError e) {
             throw new JsError(e.getName(), file + ": " + e.getMessage());
         }
-        Manifest manifest = new Manifest(json instanceof Map ? (Map<String, @Nullable Object>) json : listObject(json));
-        return NormalizeManifest.normalizeManifest(manifest, location, "", isRoot, config.isLooseSemver(), warnings);
+    }
+
+    // an object, or an array with its indices; properties set on any other value are a TypeError
+    @SuppressWarnings("unchecked")
+    private static Manifest manifest(@Nullable Object json) {
+        if (json instanceof Map) {
+            return new Manifest((Map<String, @Nullable Object>) json);
+        }
+        if (json instanceof List) {
+            Map<String, @Nullable Object> object = new LinkedHashMap<>();
+            Js.assign(object, json);
+            return new Manifest(object);
+        }
+        throw new JsError(JsError.TYPE_ERROR, "Cannot create property '_registry' on " + Js.typeOf(json) + " '" +
+                                              Js.string(json) + "'");
     }
 
     /**
@@ -142,19 +185,16 @@ public final class YarnClassicLockRegenerator {
             return new InstallCwdRequest(resolutionDeps, patterns, new Manifest(), null, config.getFlags().isFlat());
         }
         String registry = NpmResolver.NPM_REGISTRY_ID;
-        Manifest projectManifestJson = readManifest("", rootText, config, true, warnings);
+        Manifest projectManifestJson = NormalizeManifest.normalizeManifest(manifest(readJson("package.json",
+                rootText)), "", "", true, config.isLooseSemver(), warnings);
         Manifest manifest = projectManifestJson;
         boolean workspaceRootFolder = isWorkspaceRoot(projectManifestJson);
-        if (workspaceRootFolder && !config.isWorkspacesEnabled()) {
-            throw new MessageError("Your project root defines workspaces but the feature is disabled in your Yarn " +
-                                   "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
-        }
 
         Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
         Js.assign(resolutions, projectManifestJson.get("resolutions"));
         resolutionMap.init(resolutions);
         for (String packageName : Js.keys(resolutionMap.resolutionsByPackage)) {
-            boolean optional = objectPathHas(manifest.get("optionalDependencies"), packageName) &&
+            boolean optional = ObjectPath.has(manifest.get("optionalDependencies"), packageName) &&
                                config.getFlags().isIgnoreOptional();
             for (ResolutionMap.Resolution resolution : resolutionMap.resolutionsByPackage.get(packageName)) {
                 resolutionDeps.add(DependencyRequestPattern.builder().registry(registry)
@@ -242,17 +282,6 @@ public final class YarnClassicLockRegenerator {
 
     private interface PushDeps {
         void push(String depType, Manifest manifest, @Nullable String hint, boolean optional, boolean isUsed);
-    }
-
-    // object-path's has: a dotted name is a path, so `lodash.get` looks for `lodash` then `get` under it
-    private static boolean objectPathHas(@Nullable Object obj, String path) {
-        for (String key : path.split("\\.", -1)) {
-            if (!Js.hasOwnProperty(obj, key)) {
-                return false;
-            }
-            obj = Js.get(obj, key);
-        }
-        return true;
     }
 
     /**
@@ -356,7 +385,7 @@ public final class YarnClassicLockRegenerator {
             if (loc.isEmpty()) {
                 continue;
             }
-            Manifest manifest = readManifest(loc, member.getValue(), config, false, warnings);
+            Manifest manifest = tryManifest(loc, member.getValue(), config.isLooseSemver(), false, "", warnings);
             if (!Js.truthy(manifest.getName())) {
                 warnings.add(Lang.format("Missing name in workspace at $0, ignoring.", loc));
                 continue;
@@ -372,13 +401,6 @@ public final class YarnClassicLockRegenerator {
             workspaces.put(name, new WorkspaceLayout.Workspace(loc, manifest));
         }
         return workspaces;
-    }
-
-    // map(JSON.parse(text)) of an array or a primitive: an object holding its indices, or none
-    private static Map<String, @Nullable Object> listObject(@Nullable Object json) {
-        Map<String, @Nullable Object> object = new LinkedHashMap<>();
-        Js.assign(object, json instanceof List ? json : null);
-        return object;
     }
 
     /**

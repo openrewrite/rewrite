@@ -22,9 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An error JavaScript or Node itself raises inside yarn ({@code SyntaxError}, {@code TypeError}, a plain
- * {@code Error}, an invariant violation, {@code ERR_INVALID_ARG_TYPE}), which yarn prints as
- * {@code <name>: <message>}, the first line of its stack.
+ * An error JavaScript or Node raises inside yarn, which yarn prints as {@code <name>: <message>}.
  */
 @Getter
 class JsError extends RuntimeException {
