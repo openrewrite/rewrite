@@ -17,7 +17,7 @@ import {Cursor, isTree, produceAsync, Tree, updateIfChanged} from '../..';
 import {emptySpace, J, Statement, Type, TypedTree} from '../../java';
 import {Any, Capture, JavaScriptParser, JavaScriptVisitor, JS} from '..';
 import {create as produce} from 'mutative';
-import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, treeIds, wrapCode} from './utils';
+import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
 import {maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
@@ -177,7 +177,7 @@ class TemplateCache {
         // Parse and cache (workspace only needed during parsing)
         // Use templateSourceFileCache if configured for ~3.2x speedup on dependency file parsing
         const parser = templateParser(workspaceDir, types);
-        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: 'template.tsx'});
+        const parseGenerator = parser.parse({text: fullTemplateString, sourcePath: `${TEMPLATE_MODULE}.tsx`});
         cu = (await parseGenerator.next()).value as JS.CompilationUnit;
 
         this.cache.set(key, cu);

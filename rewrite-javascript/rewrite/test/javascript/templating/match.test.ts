@@ -24,9 +24,11 @@ import {
     rewrite,
     template,
     typescript,
+    npm,
     sourceFileCache} from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
 import { castDraft, create as produce } from "mutative";
+import { withDir } from "tmp-promise";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -198,5 +200,30 @@ describe('match extraction', () => {
                 }
             }).visit(cu, undefined);
         }).rejects.toThrow(/Failed to create dependency workspace/);
+    });
+
+    test('a context-declared function matches a same-named local or imported one, even under strict type matching', async () => {
+        const declaredFoo = pattern`foo(${capture('a')})`
+            .configure({context: ['declare function foo(a: any): void;'], lenientTypeMatching: false});
+        let matched = false;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                matched = !!await declaredFoo.match(method, this.cursor);
+                return method;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(`declare function foo(a: any): void;\nconst s = "x";\nfoo(s);`)
+        );
+        expect(matched).toBe(true);
+
+        matched = false;
+        const util = typescript(`export function foo(a: any): void {}`);
+        util.path = 'util.ts';
+        const main = typescript(`import {foo} from './util';\nfoo("x");`);
+        main.path = 'main.ts';
+        await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
+        expect(matched).toBe(true);
     });
 });
