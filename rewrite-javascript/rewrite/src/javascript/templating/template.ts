@@ -17,10 +17,11 @@ import {Cursor, Tree} from '../..';
 import {J} from '../../java';
 import {ApplyOptions, Parameter, TemplateOptions, TemplateParameter} from './types';
 import {maybeBind} from '../binding';
-import {ContextBinding, opensWithBrace, replacedByObjectLiteral} from './engine';
+import {ModuleScopeBinding} from '../add-import';
+import {opensWithBrace, replacedByObjectLiteral} from './engine';
 import {JavaScriptVisitor} from '../visitor';
 import {MatchResult} from './pattern';
-import {generateCacheKey, globalAstCache, LRUCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {generateCacheKey, globalAstCache, LRUCache, PATTERN_PREFIXES_SYMBOL, WRAPPERS_MAP_SYMBOL} from './utils';
 import {CAPTURE_NAME_SYMBOL, RAW_CODE_SYMBOL} from './capture';
 import {TemplateEngine} from './engine';
 import {JS} from '..';
@@ -178,7 +179,7 @@ export class Template {
     private options: TemplateOptions = {};
     /** The parsed code, keyed by whether it was parsed as an expression and by its parameters' declarations. */
     private _cachedTemplates = new LRUCache<string, J>(10);
-    private _contextBindings?: Promise<ContextBinding[]>;
+    private _contextBindings?: Promise<ModuleScopeBinding[]>;
 
     /**
      * Creates a new template.
@@ -307,22 +308,20 @@ export class Template {
 
     /**
      * Binds every module this template declares in the file `visitor` is traversing, and returns
-     * the local names to hand back through {@link ApplyOptions.bindings}. A module the dependencies
-     * cannot resolve is bound whether or not the template goes on to reference it, so call this
-     * where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern matched.
+     * the local names to hand back through {@link ApplyOptions.bindings}. Each is bound outright, so
+     * call this where the template is known to apply — {@link RewriteRule.tryOn} does, once a pattern
+     * matched.
      */
     async resolveBindings(visitor: JavaScriptVisitor<any>): Promise<Record<string, string>> {
         const resolved: Record<string, string> = {};
         for (const binding of await this.contextBindings()) {
-            // Recognising the reference the template splices in takes attribution, so a module the
-            // workspace could not resolve is bound whether or not the template turns out to use it.
-            const onlyIfReferenced = binding.attributed;
+            // The template's code reads every binding listed, which its attribution cannot always show
             const bound = maybeBind(visitor, {
                 module: binding.module!,
                 member: binding.member,
                 typeOnly: binding.typeOnly,
                 preferredName: binding.name,
-                onlyIfReferenced
+                onlyIfReferenced: false
             });
             // An unresolved binding is left out rather than recorded as `undefined`, so `apply()`'s
             // own "applied without a local name" check catches it, same as a caller-omitted one.
@@ -339,11 +338,11 @@ export class Template {
     }
 
     /** What this template's context statements bind, which is what it needs bound in the target file. */
-    private contextBindings(): Promise<ContextBinding[]> {
+    private contextBindings(): Promise<ModuleScopeBinding[]> {
         return this._contextBindings ??= this.deriveContextBindings();
     }
 
-    private deriveContextBindings(): Promise<ContextBinding[]> {
+    private deriveContextBindings(): Promise<ModuleScopeBinding[]> {
         return TemplateEngine.getContextBindings(
             this.templateParts, this.parameters,
             this.options.context || this.options.imports || [],
@@ -415,7 +414,6 @@ export class Template {
         }
 
         const renames: Record<string, string> = {};
-        const modules: Record<string, string> = {};
         // Supplying names is what asks for the context's modules to be bound in the file being
         // edited; without them a context import only types the template.
         if (options?.bindings !== undefined) {
@@ -427,7 +425,6 @@ export class Template {
                         `already did — binding was refused, which an AMD block or a file requiring its modules can do.`);
                 }
                 renames[binding.name] = bound;
-                modules[binding.name] = binding.module!;
             }
         }
 
@@ -447,7 +444,8 @@ export class Template {
             wrappersMap,
             options?.format ?? true,
             renames,
-            modules
+            // Unformatted, a capture the template spaces as the pattern did keeps the source's spacing
+            options?.format === false && values instanceof MatchResult ? values[PATTERN_PREFIXES_SYMBOL]() : undefined
         );
     }
 }

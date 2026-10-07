@@ -35,11 +35,17 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
+/** Symbol to access a match's pattern prefixes without exposing them as public API */
+export const PATTERN_PREFIXES_SYMBOL = Symbol('patternPrefixes');
+
 /**
  * Shared wrapper function name used by both patterns and templates.
  * Using the same name allows cache sharing when pattern and template code is identical.
  */
 export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
+
+/** The module of the file every template and pattern parses as. */
+export const TEMPLATE_MODULE = 'template';
 
 /** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
 export function wrapCode(code: string, expression: boolean): string {

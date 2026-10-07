@@ -138,7 +138,7 @@ export namespace Type {
         }
     }
 
-    export interface Array extends Type, FullyQualified {
+    export interface Array extends Type {
         readonly kind: typeof Kind.Array;
         elemType: Type;
         annotations: Type.Annotation[];
@@ -291,7 +291,6 @@ export namespace Type {
             type.kind === Type.Kind.Class ||
             type.kind === Type.Kind.Annotation ||
             type.kind === Type.Kind.Parameterized ||
-            type.kind === Type.Kind.Array ||
             type.kind === Type.Kind.ShallowClass
         );
     }
@@ -323,7 +322,7 @@ export namespace Type {
      */
     export function isOfTypeWithName(type: Type | undefined, matchOverride: boolean,
                                      matches: (fullyQualifiedName: string) => boolean): boolean {
-        if (!isFullyQualified(type) || isArray(type)) {
+        if (!isFullyQualified(type)) {
             return false;
         }
         if (matches(FullyQualified.getFullyQualifiedName(type))) {

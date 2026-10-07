@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isValueReference, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
@@ -230,7 +230,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
  * never a type-only import for a value, which erases and would leave the reference unbound.
  */
 function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean, typeOnly: boolean): boolean {
-    return binding.typeOnly === typeOnly &&
+    return (typeOnly || !binding.typeOnly) &&
         (binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default"));
 }
 
@@ -275,9 +275,10 @@ export function maybeBind(
         }
     }
 
-    if (isWholeModule && options.preferredName === undefined && derivedBindingName(module) === undefined) {
-        // The module's last path segment is not a legal identifier, and the caller named no
-        // preference of its own — there is no name left to bind it to.
+    if (isWholeModule && options.alias === undefined && options.preferredName === undefined &&
+        derivedBindingName(module) === undefined) {
+        // The module's last path segment is not a legal identifier, and the caller named none
+        // of its own — there is no name left to bind it to.
         return undefined;
     }
 
@@ -429,14 +430,17 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
         }
         const cursor = new Cursor(node, parent);
         if (node?.kind === J.Kind.Identifier && node.simpleName === name) {
-            references = isValueReference(cursor, node);
+            references = isReference(cursor, node);
         } else if (isTree(node) || node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ||
             node?.kind === J.Kind.Container) {
             Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));
         }
     };
     const root = new Cursor(cu);
-    cu.statements.filter(s => s.element?.kind !== JS.Kind.Import).forEach(s => visit(s, root));
+    // An import or an `export {…}` binds nothing the name could collide with.
+    cu.statements
+        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration)
+        .forEach(s => visit(s, root));
     return references;
 }
 

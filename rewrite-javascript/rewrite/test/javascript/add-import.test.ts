@@ -2253,7 +2253,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('should add value import even when type-only import exists for same member', async () => {
+        test('turns a type-only import of the same member into a value import', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
                 module: 'react',
@@ -2273,7 +2273,6 @@ describe('AddImport visitor', () => {
                         }
                     `,
                     `
-                        import type {useState} from 'react';
                         import {useState} from 'react';
 
                         function example() {
@@ -2284,7 +2283,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('should add type-only import even when value import exists for same member', async () => {
+        test('a value import of the same member answers a type-only request', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({
                 module: 'react',
@@ -2298,14 +2297,6 @@ describe('AddImport visitor', () => {
                 typescript(
                     `
                         import {useState} from 'react';
-
-                        function example() {
-                            useState(0);
-                        }
-                    `,
-                    `
-                        import {useState} from 'react';
-                        import type {useState} from 'react';
 
                         function example() {
                             useState(0);

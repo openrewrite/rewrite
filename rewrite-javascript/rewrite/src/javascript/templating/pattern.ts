@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {Cursor} from '../..';
-import {J} from '../../java';
+import {isIdentifier, J} from '../../java';
 import {
     Any,
     Capture,
@@ -28,7 +28,16 @@ import {
 } from './types';
 import {CAPTURE_CAPTURING_SYMBOL, CAPTURE_NAME_SYMBOL, CaptureImpl, RAW_CODE_SYMBOL, RawCode} from './capture';
 import {DebugPatternMatchingComparator, MatcherCallbacks, MatcherState, PatternMatchingComparator} from './comparator';
-import {CaptureMarker, CaptureStorageValue, generateCacheKey, globalAstCache, WRAPPERS_MAP_SYMBOL} from './utils';
+import {
+    CaptureMarker,
+    CaptureStorageValue,
+    generateCacheKey,
+    globalAstCache,
+    PATTERN_PREFIXES_SYMBOL,
+    PlaceholderUtils,
+    WRAPPERS_MAP_SYMBOL
+} from './utils';
+import {walk} from '../scope';
 import {opensWithBrace, TemplateEngine} from './engine';
 import {TreePrinters} from '../../print';
 import {JS} from '../index';
@@ -325,7 +334,7 @@ export class Pattern {
         }
         // Create MatchResult with unified storage
         const storage = (matcher as any).storage;
-        return new MatchResult(new Map(storage));
+        return new MatchResult(new Map(storage), () => matcher.patternPrefixes());
     }
 
     /**
@@ -571,7 +580,7 @@ export class Pattern {
         if (success) {
             // Match succeeded - return MatchResult with debug info
             const storage = (matcher as any).storage;
-            const matchResult = new MatchResult(new Map(storage));
+            const matchResult = new MatchResult(new Map(storage), () => matcher.patternPrefixes());
             return {
                 matched: true,
                 result: matchResult,
@@ -615,9 +624,12 @@ export class Pattern {
  */
 export class MatchResult implements IMatchResult {
     constructor(
-        private readonly storage: Map<string, CaptureStorageValue> = new Map()
+        private readonly storage: Map<string, CaptureStorageValue> = new Map(),
+        private readonly computePatternPrefixes: () => Map<string, J.Space> = () => new Map()
     ) {
     }
+
+    private patternPrefixes?: Map<string, J.Space>;
 
     // Overload: get with Capture returns value
     get<T>(capture: Capture<T>): T | undefined;
@@ -668,6 +680,11 @@ export class MatchResult implements IMatchResult {
         }
         // Scalar element
         return value as J;
+    }
+
+    /** @internal */
+    [PATTERN_PREFIXES_SYMBOL](): Map<string, J.Space> {
+        return this.patternPrefixes ??= this.computePatternPrefixes();
     }
 
     /**
@@ -740,6 +757,27 @@ class Matcher {
         }
 
         return this.matchNode(this.patternAst, this.ast);
+    }
+
+    /**
+     * The prefix the pattern writes before each capture, by capture name. A capture of the whole
+     * match has none, since the prefix of what it holds lies outside the match.
+     */
+    patternPrefixes(): Map<string, J.Space> {
+        const prefixes = new Map<string, J.Space>();
+        walk(this.patternAst, node => {
+            const capture = isIdentifier(node) ? PlaceholderUtils.parseCapture(node.simpleName) : null;
+            if (capture && !prefixes.has(capture.name) && !this.capturesWholeMatch(capture.name)) {
+                prefixes.set(capture.name, (node as J.Identifier).prefix);
+            }
+            return true;
+        });
+        return prefixes;
+    }
+
+    private capturesWholeMatch(name: string): boolean {
+        const bound = this.storage.get(name);
+        return bound !== undefined && !Array.isArray(bound) && this.extractElements(bound) === this.ast;
     }
 
     /**

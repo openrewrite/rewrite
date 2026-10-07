@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import {Type} from "../../src/java";
 
-export * from "./async-callback-in-sync-array-method";
-export * from "./auto-format";
-export * from "./order-imports";
-export * from "./change-import";
-export * from "./change-method-target-to-import";
-export * from "./dependencies";
+describe('Type.isFullyQualified', () => {
+    test('guards getFullyQualifiedName, so an array is not fully qualified', () => {
+        const array: Type.Array = {kind: Type.Kind.Array, elemType: Type.Primitive.String, annotations: []};
+        expect(Type.isFullyQualified(array)).toBe(false);
+    });
+});

@@ -109,6 +109,56 @@ describe('templates that declare module bindings', () => {
         );
     });
 
+    test('a type the template names binds its module, though the type is declared in another package', async () => {
+        const arg = capture('arg');
+        // `vitest` re-exports `Mocked` from `@vitest/spy`, so the reference's attribution names no `vitest`
+        spec.recipe = recipeApplying(template`${arg} as unknown as Mocked<typeof ${arg}>`.configure({
+            context: [`import {Mocked} from 'vitest';`],
+            dependencies: {vitest: '^3.0.0'}
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `applyTheme(svc);`,
+                `import {Mocked} from 'vitest';\n\nsvc as unknown as Mocked<typeof svc>;`
+            )
+        );
+    });
+
+    test('a deconflicted name follows into the class of a generic type', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`${arg} as unknown as Mocked<typeof ${arg}>`.configure({
+            context: [`import {Mocked} from 'vitest';`]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `const Mocked = 1;\napplyTheme(svc);`,
+                `import {Mocked as Mocked_1} from 'vitest';\n\nconst Mocked = 1;\nsvc as unknown as Mocked_1<typeof svc>;`
+            )
+        );
+    });
+
+    test('a context binding the template never reads is not bound', async () => {
+        const arg = capture('arg');
+        spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({
+            context: [
+                `import Theming from 'sap/ui/core/Theming';`,
+                `import Localization from 'sap/base/i18n/Localization';`
+            ]
+        }), arg);
+
+        await spec.rewriteRun(
+            //language=typescript
+            typescript(
+                `applyTheme('dark');`,
+                `import Theming from 'sap/ui/core/Theming';\n\nTheming.setTheme('dark');`
+            )
+        );
+    });
+
     test('a rule that does not fire leaves the file\'s imports alone', async () => {
         const arg = capture('arg');
         spec.recipe = recipeApplying(template`Theming.setTheme(${arg})`.configure({

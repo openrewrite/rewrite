@@ -21,12 +21,15 @@ import {
     JavaScriptVisitor,
     JS,
     pattern,
+    Pattern,
     rewrite,
     template,
     typescript,
+    npm,
     sourceFileCache} from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
 import { castDraft, create as produce } from "mutative";
+import { withDir } from "tmp-promise";
 
 describe('match extraction', () => {
     const spec = new RecipeSpec();
@@ -198,5 +201,131 @@ describe('match extraction', () => {
                 }
             }).visit(cu, undefined);
         }).rejects.toThrow(/Failed to create dependency workspace/);
+    });
+
+    test('a context-declared function matches a same-named local or imported one, even under strict type matching', async () => {
+        const declaredFoo = pattern`foo(${capture('a')})`
+            .configure({context: ['declare function foo(a: any): void;'], lenientTypeMatching: false});
+        let matched = false;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                matched = !!await declaredFoo.match(method, this.cursor);
+                return method;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(`declare function foo(a: any): void;\nconst s = "x";\nfoo(s);`)
+        );
+        expect(matched).toBe(true);
+
+        matched = false;
+        const util = typescript(`export function foo(a: any): void {}`);
+        util.path = 'util.ts';
+        const main = typescript(`import {foo} from './util';\nfoo("x");`);
+        main.path = 'main.ts';
+        await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
+        expect(matched).toBe(true);
+    });
+
+    test('a call pattern with a variadic capture matches the callee by symbol, not by name', async () => {
+        const args = capture({variadic: true});
+        const isDateCall = pattern`isDate(${args})`
+            .configure({context: [`import {isDate} from 'node:util/types';`]});
+        let calls = 0;
+        let capturedArgs: J[] | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                calls++;
+                const m = await isDateCall.match(method, this.cursor);
+                if (m) {
+                    capturedArgs = m.get(args) as J[];
+                }
+                return method;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(`function isDate(value: unknown): boolean { return false; }\nconst result = isDate(new Date());`)
+        );
+        expect(calls).toBe(1);
+        expect(capturedArgs).toBeUndefined();
+
+        await spec.rewriteRun(
+            typescript(`import {isDate as checkDate} from 'node:util/types';\nconst result = checkDate(new Date());`)
+        );
+        expect(capturedArgs).toHaveLength(1);
+    });
+
+    /** Whether each pattern matches the one call in `source`. */
+    async function matched(source: string, ...patterns: Pattern[]): Promise<boolean[]> {
+        let results: boolean[] | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                if (results) {
+                    throw new Error(`more than one call in: ${source}`);
+                }
+                results = [];
+                const subject = (method.name.simpleName === 'f' ? method.arguments.elements[0].element : method) as J;
+                for (const p of patterns) {
+                    results.push(!!await p.match(subject, this.cursor));
+                }
+                return method;
+            }
+        });
+        await spec.rewriteRun(typescript(source));
+        return results!;
+    }
+
+    test('a receiver the pattern writes out has to match the source receiver, even where the method types agree', async () => {
+        const fixed = pattern`Object.assign({}, ${capture('a')})`;
+        const variadic = pattern`Object.assign({}, ${capture({variadic: true})})`;
+
+        expect(await matched(`declare const a: object;\nObject.assign({}, a);`, fixed, variadic)).toEqual([true, true]);
+        expect(await matched(`declare const a: object;\nglobalThis.Object.assign({}, a);`, fixed, variadic)).toEqual([false, false]);
+    });
+
+    test('a written-out receiver matches an aliased import of its symbol, but not a variable holding it', async () => {
+        const bufferFrom = pattern`Buffer.from(${capture('bytes')})`
+            .configure({context: [`import {Buffer} from 'buffer';`]});
+
+        expect(await matched(`import {Buffer as B} from 'buffer';\nB.from('x');`, bufferFrom)).toEqual([true]);
+        expect(await matched(`const Buf = Buffer;\nBuf.from('x');`, bufferFrom)).toEqual([false]);
+
+        const stdoutWrite = pattern`stdout.write(${capture('s')})`
+            .configure({context: [`import {stdout} from 'process';`]});
+
+        expect(await matched(`import {stdout as out} from 'process';\nout.write('x');`, stdoutWrite)).toEqual([true]);
+    });
+
+    test('two aliases of one parameterized type are not one declaration', async () => {
+        const asNames = pattern`${capture('v')} as Names`
+            .configure({context: [`type Names = Array<string>;`]});
+
+        expect(await matched(`type Names = Array<string>;\nf(n as Names);`, asNames)).toEqual([true]);
+        expect(await matched(`type Counts = Array<number>;\nf(c as Counts);`, asNames)).toEqual([false]);
+    });
+
+    test('an aliased default import of a callable module is the receiver the pattern writes out', async () => {
+        const strictEqual = pattern`assert.strictEqual(${capture('a')}, ${capture('b')})`
+            .configure({context: [`import assert from 'node:assert';`]});
+
+        expect(await matched(`import a from 'node:assert';\na.strictEqual(x, y);`, strictEqual)).toEqual([true]);
+    });
+
+    test('untyped imports from one module are not one declaration', async () => {
+        const renderArg = pattern`foo(render)`
+            .configure({context: [`import {render} from 'react-dom';`, `declare function foo(x: any): void;`]});
+
+        expect(await matched(`import {render, hydrate} from 'react-dom';\ndeclare function foo(x: any): void;\nfoo(render);`, renderArg)).toEqual([true]);
+        expect(await matched(`import {render, hydrate} from 'react-dom';\ndeclare function foo(x: any): void;\nfoo(hydrate);`, renderArg)).toEqual([false]);
+    });
+
+    test('two members of one function type are not one declaration', async () => {
+        const promisified = pattern`promisify(fs.readFile)`
+            .configure({context: [`import {promisify} from 'util';`, `import * as fs from 'fs';`]});
+
+        expect(await matched(`import {promisify} from 'util';\nimport * as fs from 'fs';\npromisify(fs.readFile);`, promisified)).toEqual([true]);
+        expect(await matched(`import {promisify} from 'util';\nimport * as fs from 'fs';\npromisify(fs.writeFile);`, promisified)).toEqual([false]);
     });
 });
