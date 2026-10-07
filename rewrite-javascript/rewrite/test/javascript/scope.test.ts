@@ -21,6 +21,7 @@ import {
     isValueReference,
     namesDeclaredIn,
     namesDeclaredWithin,
+    namesReferencedWithin,
     Scope,
     scopeOf,
     sourceFileCache,
@@ -325,6 +326,31 @@ describe('namesDeclaredIn', () => {
             function sortKeys<Bound extends Node>(node: Bound) {}
             class Holder<Owned> {}
         `))].sort()).toEqual(['Bound', 'Holder', 'Node', 'Owned', 'node', 'sortKeys'].sort());
+    });
+});
+
+describe('namesReferencedWithin', () => {
+    test('a value hides only value reads of its name, a type only type reads', async () => {
+        // Each name is declared in the kind its one use does not read, so every use reaches past it.
+        const fn = (await parse(`
+            function f() {
+                const Cast = 1, Satisfied = 1, Argument = 1, Implemented = 1, Asserted = 1;
+                const Aliased = 1, Indexed = 1, Bound = 1;
+                interface Queried {}
+                x as Cast;
+                x satisfies Satisfied;
+                g<Argument>();
+                class K implements Implemented {}
+                <Asserted>x;
+                let q: typeof Queried;
+                type A = Aliased;
+                interface I { [key: number]: Indexed }
+                function h<P extends Bound>() {}
+            }
+        `)).statements[0].element;
+
+        expect([...namesReferencedWithin(fn)]).toEqual(expect.arrayContaining(
+            ['Aliased', 'Argument', 'Asserted', 'Bound', 'Cast', 'Implemented', 'Indexed', 'Queried', 'Satisfied']));
     });
 });
 
