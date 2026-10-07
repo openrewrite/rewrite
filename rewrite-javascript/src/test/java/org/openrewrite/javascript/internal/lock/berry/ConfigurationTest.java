@@ -153,7 +153,7 @@ class ConfigurationTest {
     @Test
     void namesAnEnvironmentVariableAsCamelcaseDoes() {
         String[][] rows = {{"inject_npm_2fa_token", "injectNpm2FaToken"}, {"npm_registry_server", "npmRegistryServer"},
-                {"_foo", "foo"}, {"a__b", "aB"}, {"foo_", "foo"}, {"x", "x"}, {"foo_éx", "foo_éx"},
+                {"_foo", "foo"}, {"a__b", "aB"}, {"foo_", "foo"}, {"x", "x"}, {"foo_\u00E9x", "foo_\u00E9x"},
                 {"a.b-c d", "aBCD"}, {"12ab_3cd", "12Ab3Cd"}, {" a_b ", "aB"}, {"a_1", "a1"}};
         for (String[] row : rows) {
             assertThat(BerryOptions.camelcase(row[0])).as(row[0]).isEqualTo(row[1]);

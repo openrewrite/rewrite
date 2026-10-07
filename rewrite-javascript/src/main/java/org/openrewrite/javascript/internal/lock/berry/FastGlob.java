@@ -222,7 +222,8 @@ final class FastGlob {
         if (pattern.contains("\\")) {
             return true;
         }
-        if (COMMON_GLOB_SYMBOLS_RE.matcher(pattern).find() || REGEX_CHARACTER_CLASS_SYMBOLS_RE.matcher(pattern).find() ||
+        if (COMMON_GLOB_SYMBOLS_RE.matcher(pattern).find() ||
+            REGEX_CHARACTER_CLASS_SYMBOLS_RE.matcher(pattern).find() ||
             REGEX_GROUP_SYMBOLS_RE.matcher(pattern).find() || GLOB_EXTENSION_SYMBOLS_RE.matcher(pattern).find()) {
             return true;
         }

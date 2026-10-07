@@ -65,13 +65,13 @@ const pick = a => a[Math.floor(random() * a.length)];
 const DIRECTORIES = ['packages/a', 'packages/b', 'packages/c-d', 'packages/a/nested', 'packages/.hidden',
   'packages/.hidden/y', 'apps/x', 'apps/y', 'apps/y/z', 'libs/one', 'libs/two', 'node_modules/foo',
   'packages/node_modules/q', '1/z', 'a/b', 'a/b/c', 'tools', 'packages-extra/p', 'x-y', '?/x', '[a]/b', 'a.b/c',
-  '(a)/b', '{a}/b', 'a,b/c', '!x/y', '@s/p', '+p/q', 'é/f', ' sp/x', 'v1', 'v2', 'v10', '.yarn/x', '.git/y',
+  '(a)/b', '{a}/b', 'a,b/c', '!x/y', '@s/p', '+p/q', '\u00E9/f', ' sp/x', 'v1', 'v2', 'v10', '.yarn/x', '.git/y',
   'packages/a/__fixtures__/proj', 'packages/legacy/sub'];
 const SEGMENTS = ['packages', 'apps', 'libs', 'a', 'b', '*', '*', '**', '**', '?', '??', '[ab]', '[!a]', '[^a]',
   '[a-c]', '{packages,apps}', '{a,b}', '{a,}', '{,a}', '{a}', 'pack*', '*-d', '*.b', 'x-y', 'tools', 'y', 'one',
   '1', '{1..3}', 'v{1..2}', 'v{01..2}', '{a..c}', '@(apps|libs)', '!(packages)', '+(a|b)', '?(a)', '*(a)', '.', '..',
   '__fixtures__', '.hidden', '.*', 'node_modules', '\\*', '[[:alpha:]]', '[[:digit:]]', '(a)', '{a', 'b}', '[a',
-  'a]', '!', '"a"', 'constructor', '$', '^a', 'a|b', 'é', '[ab]*', '*?', 'legacy', '{x}{(a)', '[]', '[-a]',
+  'a]', '!', '"a"', 'constructor', '$', '^a', 'a|b', '\u00E9', '[ab]*', '*?', 'legacy', '{x}{(a)', '[]', '[-a]',
   '\\.', 'a\\', '{{a,b}}', '{,}', '**/**', '***', '?*', '[a-]'];
 
 // segments the trees hold, for patterns that match some of them

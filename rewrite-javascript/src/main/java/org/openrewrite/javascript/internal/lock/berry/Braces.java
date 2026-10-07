@@ -101,7 +101,7 @@ final class Braces {
                 block = stack.get(stack.size() - 1);
                 String value = advance();
 
-                if ("﻿".equals(value) || " ".equals(value)) {
+                if ("\uFEFF".equals(value) || "\u00A0".equals(value)) {
                     continue;
                 }
 
@@ -410,7 +410,8 @@ final class Braces {
 
     // [].concat(value)
     private static List<Object> concat(Object value) {
-        return value instanceof List ? new ArrayList<>((List<?>) value) : new ArrayList<>(Collections.singletonList(value));
+        return value instanceof List ? new ArrayList<>((List<?>) value) :
+                new ArrayList<>(Collections.singletonList(value));
     }
 
     private static void flatten(@Nullable Object value, List<String> out) {

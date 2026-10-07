@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
 final class Js {
 
     private static final long MAX_ARRAY_INDEX = 4294967294L;
-    private static final Pattern DECIMAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
+    private static final Pattern DECIMAL =
+            Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
     private static final Pattern RADIX_INTEGER = Pattern.compile("0(?:[xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
@@ -205,8 +206,8 @@ final class Js {
      * {@code StrWhiteSpaceChar}: the white space and line terminators {@code trim} and {@code Number} skip.
      */
     static boolean isWhiteSpace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == ' ' ||
-               c == '﻿' || Character.getType(c) == Character.SPACE_SEPARATOR;
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == '\u2028' || c == '\u2029' ||
+               c == '\uFEFF' || Character.getType(c) == Character.SPACE_SEPARATOR;
     }
 
     static String trim(String s) {
