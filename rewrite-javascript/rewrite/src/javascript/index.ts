@@ -39,7 +39,7 @@ export type {Scope, Meaning} from "./scope";
 // the free functions that have no visitor to reach it through are already in this list.
 export {
     scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesUsedWithin, namesReferencedWithin, bindingNames,
-    deconflict, isValueReference, declarationsOf, compilationUnitOf, walk
+    deconflict, isReference, isValueReference, resolve, declarationsOf, compilationUnitOf, walk
 } from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
 export {ImportStyle, moduleNameOf, AddImport} from "./add-import";

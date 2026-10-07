@@ -730,15 +730,14 @@ export function declarationsOf(statement: J | undefined): J.VariableDeclarations
 }
 
 /**
- * Whether the identifier references a binding rather than naming one, which is what tells a rename
- * which occurrences to follow. A name its parent introduces does not — a property, a method, a
- * variable, a type parameter — nor one drawn from a namespace of its own: a statement label,
- * declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop. Position is all this
- * reads: an import specifier's own name answers true, and a type position reads alike to a value.
- * A shorthand property `{x}` answers false though it also reads `x`, since a rename has to expand
- * it to `{x: y}`.
+ * Whether the identifier may be renamed in place. A name its parent introduces may not — a
+ * property, a method, a variable, a type parameter — nor one drawn from a namespace of its own: a
+ * statement label, declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop.
+ * Position is all this reads: an import specifier's own name answers true, and a type position
+ * reads alike to a value. A shorthand property `{x}` answers false though it also reads `x`, since
+ * a rename has to expand it to `{x: y}`. What `x` reads is {@link resolve}'s question.
  */
-export function isValueReference(cursor: Cursor, identifier: J.Identifier): boolean {
+export function isReference(cursor: Cursor, identifier: J.Identifier): boolean {
     let c: Cursor | undefined = cursor.parent;
     while (c && isPadding(c.value)) {
         c = c.parent;
@@ -746,7 +745,129 @@ export function isValueReference(cursor: Cursor, identifier: J.Identifier): bool
     return references(identifier, c?.value);
 }
 
-/** The position half of {@link isValueReference}, against a parent already found. */
+/** @deprecated Renamed to {@link isReference}, which answers for a type position too. */
+export const isValueReference = isReference;
+
+/**
+ * The node owning the scope that binds what `identifier` reads at `cursor`, or undefined where it
+ * reads a global or reads nothing. A name its parent introduces reads nothing, and neither does an
+ * import's own name or a re-export's, which name what they bind or publish. A value read is hidden
+ * only by a value of its name and a type read only by a type, so a shorthand `{x}` resolves what
+ * `x` reads. The cursor stands on the identifier, or on a node holding it with no scope between.
+ */
+export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined {
+    const path = pathTo(cursor, identifier);
+    let meaning: Meaning = 'value';
+    let scopes: Frames | undefined;
+    let declares = false;
+    for (const {node, parent, key} of path) {
+        const within = scopeKinds.has(node.kind) ? {node, parent, outer: scopes} : scopes;
+        scopes = reachOf(node, parent, key, within);
+        meaning = meaningOf(node, key, meaning);
+        declares ||= node.kind === JS.Kind.Import ||
+            node.kind === JS.Kind.Alias && key === 'alias' ||
+            node.kind === JS.Kind.ExportDeclaration && (node as JS.ExportDeclaration).moduleSpecifier !== undefined;
+    }
+    if (declares || !reads(identifier, path[path.length - 1]?.node)) {
+        return undefined;
+    }
+    for (let scope = scopes; scope; scope = scope.outer) {
+        if (frameBindings(scope.node, scope.parent, meaning).has(identifier.simpleName)) {
+            return scope.node as J;
+        }
+    }
+    return undefined;
+}
+
+/** One step down the tree: the slot `key` of `node`, which hangs from `parent`. */
+interface Step {
+    node: any;
+    parent: any;
+    key: string;
+}
+
+/**
+ * The steps from the root of `cursor` down to `identifier`: along the cursor, then by identity
+ * under the node it stands on. A scope under the cursor would go uncounted, so it is refused.
+ */
+function pathTo(cursor: Cursor, identifier: J.Identifier): Step[] {
+    const chain: any[] = [];
+    for (let c: Cursor | undefined = cursor; c; c = c.parent) {
+        if (isTree(c.value)) {
+            chain.unshift(c.value);
+        }
+    }
+    const path: Step[] = [];
+    for (let i = 1; i < chain.length; i++) {
+        path.push({node: chain[i - 1], parent: chain[i - 2], key: slotOf(chain[i - 1], chain[i])});
+    }
+    const from = chain[chain.length - 1];
+    if (from === identifier) {
+        return path;
+    }
+    const below = stepsWithin(from, identifier);
+    if (!below) {
+        throw new Error(`\`${identifier.simpleName}\` is not under the cursor it is resolved from`);
+    }
+    const crossed = below.slice(1).find(step => scopeKinds.has(step.node.kind));
+    if (crossed) {
+        throw new Error(`\`${identifier.simpleName}\` sits in a ${crossed.node.kind} under the cursor; ` +
+            'resolve it from a cursor at or nearer the identifier');
+    }
+    below[0].parent = chain[chain.length - 2];
+    return [...path, ...below];
+}
+
+/** The slot of `parent` holding `child`, through padding, containers and lists. */
+function slotOf(parent: object, child: unknown): string {
+    const key = Object.entries(parent).find(([key, value]) => key !== 'markers' && holdsWithin(value, child))?.[0];
+    if (key === undefined) {
+        throw new Error(`a ${(child as J).kind} on the cursor is not held by the ${(parent as J).kind} above it`);
+    }
+    return key;
+}
+
+function holdsWithin(slot: unknown, child: unknown): boolean {
+    return slot === child || treesIn(slot).includes(child as object);
+}
+
+/** The steps from `node` down to `target` by identity, or undefined where `node` does not hold it. */
+function stepsWithin(node: any, target: unknown): Step[] | undefined {
+    for (const [key, value] of Object.entries(node)) {
+        if (key === 'markers') {
+            continue;
+        }
+        const trees = treesIn(value);
+        if (trees.includes(target as object)) {
+            return [{node, parent: undefined, key}];
+        }
+        for (const child of trees) {
+            const below = stepsWithin(child, target);
+            if (below) {
+                below[0].parent = node;
+                return [{node, parent: undefined, key}, ...below];
+            }
+        }
+    }
+    return undefined;
+}
+
+/** The tree nodes a slot holds directly, through padding, containers and lists. */
+function treesIn(slot: unknown): object[] {
+    if (Array.isArray(slot)) {
+        return slot.flatMap(treesIn);
+    }
+    const kind = (slot as { kind?: string } | undefined)?.kind;
+    if (kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded) {
+        return treesIn((slot as J.RightPadded<any>).element);
+    }
+    if (kind === J.Kind.Container) {
+        return treesIn((slot as J.Container<any>).elements);
+    }
+    return isTree(slot) ? [slot as object] : [];
+}
+
+/** The position half of {@link isReference}, against a parent already found. */
 function references(identifier: J.Identifier, parent: unknown): boolean {
     const owner = parent as {
         kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown;

@@ -1326,6 +1326,15 @@ describe("maybeRebind", () => {
         ));
     });
 
+    test("a nearer binding hides only the reads of its own kind: a type hides no value read, a value no type read", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(rebindOldToNew());
+        await spec.rewriteRun(typescript(
+            `import { Old } from "m";\n\nfunction f() { interface Old {} return Old.go(); }\nfunction g() { const Old = 1; let y: Old; return {Old}; }`,
+            `import { New } from "m2";\n\nfunction f() { interface Old {} return New.go(); }\nfunction g() { const Old = 1; let y: New; return {Old}; }`
+        ));
+    });
+
     test("a re-export from another module names that module's member, not the binding", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(rebindOldToNew());

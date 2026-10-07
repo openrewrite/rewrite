@@ -16,7 +16,7 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isValueReference, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
@@ -430,7 +430,7 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
         }
         const cursor = new Cursor(node, parent);
         if (node?.kind === J.Kind.Identifier && node.simpleName === name) {
-            references = isValueReference(cursor, node);
+            references = isReference(cursor, node);
         } else if (isTree(node) || node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ||
             node?.kind === J.Kind.Container) {
             Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));

@@ -8,7 +8,7 @@ import {packageNameOf} from "./package-name";
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isReference, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -2275,14 +2275,12 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     /**
      * Whether the identifier at the cursor stands for the moved binding: the right name, in a
-     * position that references rather than declares, reaching the module scope that binds it.
+     * position a rename may rewrite, resolving to the module scope that binds it.
      */
     private referencesBinding(identifier: J.Identifier): boolean {
         return identifier.simpleName === this.localName &&
-            // The specifier binding the name is the one edit that is not a reference to it.
-            !this.cursor.firstEnclosing((v): v is JS.Import => (v as J | undefined)?.kind === JS.Kind.Import) &&
-            isValueReference(this.cursor, identifier) &&
-            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit;
+            isReference(this.cursor, identifier) &&
+            resolve(this.cursor, identifier) === this.cu;
     }
 
     /** A shorthand property's name slot is also the reference to the binding. */
@@ -2290,7 +2288,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const name = propertyAssignment.name.element;
         if (this.renaming && propertyAssignment.initializer === undefined &&
             name.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === this.localName &&
-            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit) {
+            resolve(this.cursor, name as J.Identifier) === this.cu) {
             // The key names a property rather than the binding, so it carries no attribution,
             // the same way `aliasing` builds a property name that stands for nothing.
             return {

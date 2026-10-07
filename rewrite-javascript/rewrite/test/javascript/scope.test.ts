@@ -18,17 +18,18 @@ import {
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
-    isValueReference,
+    isReference,
     namesDeclaredIn,
     namesDeclaredWithin,
     namesReferencedWithin,
     namesUsedWithin,
+    resolve,
     Scope,
     scopeOf,
     sourceFileCache,
     walk
 } from "../../src/javascript";
-import {J} from "../../src/java";
+import {J, NameTree} from "../../src/java";
 import {Cursor} from "../../src/tree";
 
 const parser = new JavaScriptParser({sourceFileCache});
@@ -462,13 +463,118 @@ describe('walk', () => {
     });
 });
 
-/** What `isValueReference` answers for each occurrence of `target` in `source`. */
+describe('resolve', () => {
+    test('a read resolves to the scope binding what it reads, so a nearer binding of another kind hides nothing', async () => {
+        const source = `
+            import {Imported} from 'm';
+            namespace NS { export type Foo = 1 }
+            function f<T>(a: T): T {
+                interface Imported {}
+                let n: NS.Foo;
+                let t: T;
+                const o = {Imported};
+                return o.Imported ? Imported.go(a) : a;
+            }
+            function g() { const Imported = 1; let y: Imported; Imported: for (;;) { break Imported; } }
+            type U<X> = X extends Promise<infer I> ? I : I;
+        `;
+        const cu = JS.Kind.CompilationUnit;
+        // In order: the specifier, the interface, the shorthand, the property key, the receiver, the
+        // const, the type, the label and the break. Of those, four read a binding the file reaches.
+        expect(await resolvedAt(source, 'Imported'))
+            .toEqual([undefined, undefined, cu, undefined, cu, undefined, cu, undefined, undefined]);
+        expect(await resolvedAt(source, 'NS')).toEqual([undefined, cu]);
+        expect((await resolvedAt(source, 'T')).sort()).toEqual([...Array(3).fill(J.Kind.MethodDeclaration), undefined]);
+        // An `infer` name reaches the true branch alone, so the false branch reads past it to nothing.
+        expect(await resolvedAt(source, 'I')).toEqual([undefined, JS.Kind.ConditionalType, undefined]);
+    });
+
+    test('what resolves past a subtree is what namesReferencedWithin collects from it', async () => {
+        // Every name the function reads past itself is bound by the module, so the two agree exactly.
+        const cu = await parse(`
+            import {Imported} from 'm';
+            const Global = 1;
+            namespace NS { export type Foo<T> = T }
+            function fn<T>(a: T, {b}: {b: Imported}): a is T {
+                interface Imported { [k: typeof b]: Imported }
+                type Local = NS.Foo<T>;
+                const Local = {a, b, Imported} as Imported satisfies Local;
+                return <Imported>Local.Imported ?? Global;
+            }
+        `);
+        const fn = cu.statements[3].element as J.MethodDeclaration;
+
+        const resolvedPast = new Set<string>();
+        await new class extends JavaScriptVisitor<undefined> {
+            override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+                if (this.cursor.firstEnclosing((v): v is J => v === fn) && resolve(this.cursor, identifier) === cu) {
+                    resolvedPast.add(identifier.simpleName);
+                }
+                return identifier;
+            }
+            protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
+                return await this.visit(nameTree, p) as N;
+            }
+        }().visit(cu, undefined);
+
+        expect([...resolvedPast].sort()).toEqual(['Global', 'Imported', 'NS']);
+        expect([...namesReferencedWithin(fn)].sort()).toEqual([...resolvedPast].sort());
+    });
+
+    test('asked from a call, the callee\'s receiver resolves as it would from its own position', async () => {
+        const receiverAt = async (source: string) => {
+            const answers: (string | undefined)[] = [];
+            await new class extends JavaScriptVisitor<undefined> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
+                    const select = method.select?.element;
+                    if (select?.kind === J.Kind.Identifier) {
+                        answers.push(resolve(this.cursor, select as J.Identifier)?.kind);
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            }().visit(await parse(source), undefined);
+            return answers;
+        };
+        expect(await receiverAt('Object.assign({}, o);')).toEqual([undefined]);
+        expect(await receiverAt('function f() { const Object = {}; Object.assign({}, o); }')).toEqual([J.Kind.Block]);
+        expect(await receiverAt('interface Object {}\nObject.assign({}, o);')).toEqual([undefined]);
+    });
+
+    test('a scope between the cursor and the identifier is refused, not silently read past', async () => {
+        const cu = await parse('function f() { const x = 1; return x; }');
+        const fn = cu.statements[0].element as J.MethodDeclaration;
+        const read = ((fn.body!.statements[1].element as J.Return).expression) as J.Identifier;
+
+        expect(() => resolve(new Cursor(fn, new Cursor(cu)), read)).toThrow(/nearer/);
+        expect(resolve(new Cursor(fn.body, new Cursor(fn, new Cursor(cu))), read)).toBe(fn.body);
+    });
+});
+
+/** The kind of the scope `resolve` answers for each occurrence of `name` in `source`, from the identifier's own cursor. */
+async function resolvedAt(source: string, name: string): Promise<(string | undefined)[]> {
+    const answers: (string | undefined)[] = [];
+    await new class extends JavaScriptVisitor<undefined> {
+        override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+            if (identifier.simpleName === name) {
+                answers.push(resolve(this.cursor, identifier)?.kind);
+            }
+            return identifier;
+        }
+        protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
+            return await this.visit(nameTree, p) as N;
+        }
+    }().visit(await parse(source), undefined);
+    expect(answers.length).toBeGreaterThan(0);
+    return answers;
+}
+
+/** What `isReference` answers for each occurrence of `target` in `source`. */
 async function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
     const answers: boolean[] = [];
     await new class extends JavaScriptVisitor<undefined> {
         override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
             if (identifier.simpleName === 'target') {
-                answers.push(isValueReference(this.cursor, identifier));
+                answers.push(isReference(this.cursor, identifier));
             }
             return identifier;
         }
@@ -477,7 +583,7 @@ async function targetsReference(source: string, sourcePath?: string): Promise<bo
     return answers;
 }
 
-describe('isValueReference', () => {
+describe('isReference', () => {
     test('a name its parent introduces, or one from a namespace of its own, is not a reference', async () => {
         for (const source of ['const o = {target: 1};', 'o.target;', 'target: while (c) { break target; }']) {
             expect(await targetsReference(source)).not.toContain(true);
