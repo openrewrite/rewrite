@@ -55,9 +55,7 @@ final class ExoticResolvers {
     }
 
     /**
-     * @throws JsError what the git resolver's {@code isVersion} raises on a pattern that is not a string: the
-     *                 {@code TypeError} of a regex test on an object yarn read, else Node's
-     *                 {@code ERR_INVALID_ARG_TYPE} from {@code url.parse}.
+     * @throws JsError what the git resolver's {@code isVersion} raises on a pattern that is not a string.
      */
     static @Nullable Kind getExoticResolver(@Nullable Object pattern) {
         if (isGit(pattern)) {
@@ -220,7 +218,7 @@ final class ExoticResolvers {
         }
 
         private static boolean isUrlWhitespace(char c) {
-            return c < 33 || c == ' ' || c == '﻿';
+            return c < 33 || c == '\u00A0' || c == '\uFEFF';
         }
 
         private static int indexOfAny(String s, String chars) {

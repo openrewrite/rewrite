@@ -43,9 +43,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code Ssri} ports ssri 5.3.0 (Copyright (c) Kat Marchán), {@code Ini} ports ini 1.3.5 (Copyright (c) Isaac Z.
- * Schlueter and Contributors), both under the ISC License, and {@code DeepEqual} ports deep-equal 1.0.1 (Copyright
- * James Halliday), under the MIT License, as yarn 1.22.22 bundles them:
+ * {@code Ssri} ports ssri 5.3.0 and {@code Ini} ports ini 1.3.5, as yarn 1.22.22 bundles them, both distributed under
+ * the ISC License:
+ * <ul>
+ *     <li>ssri: Copyright (c) npm, Inc.</li>
+ *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>
+ * </ul>
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,6 +62,15 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
+ * {@code DeepEqual} ports deep-equal 1.0.1, {@code JsYaml} the loader of js-yaml 3.13.1 and {@code ObjectPath}
+ * object-path 0.11.4, as yarn 1.22.22 bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js
+ * {@code lib/url.js}, all distributed under the MIT License:
+ * <ul>
+ *     <li>deep-equal: James Halliday</li>
+ *     <li>js-yaml: Copyright (C) 2011-2015 by Vitaly Puzrin</li>
+ *     <li>object-path: Copyright (c) 2015 Mario Casciaro</li>
+ *     <li>Node.js: Copyright Joyent, Inc. and other Node contributors</li>
+ * </ul>
  * <pre>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in

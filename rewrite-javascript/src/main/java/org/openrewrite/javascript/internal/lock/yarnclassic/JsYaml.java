@@ -66,20 +66,16 @@ final class JsYaml {
         SIMPLE_ESCAPES['/'] = "/";
         SIMPLE_ESCAPES['\\'] = "\\";
         SIMPLE_ESCAPES['N'] = "\u0085";
-        SIMPLE_ESCAPES['_'] = " ";
-        SIMPLE_ESCAPES['L'] = " ";
-        SIMPLE_ESCAPES['P'] = " ";
+        SIMPLE_ESCAPES['_'] = "\u00A0";
+        SIMPLE_ESCAPES['L'] = "\u2028";
+        SIMPLE_ESCAPES['P'] = "\u2029";
     }
 
     private JsYaml() {
     }
 
     /**
-     * The stream's one document, mappings as {@link PlainObject}s and an alias the very object its anchor names; null
-     * for a stream without documents as for an empty one.
-     *
-     * @throws JsError a {@code YAMLException}, or the {@code TypeError} of an alias after an anchor named
-     *                 {@code hasOwnProperty}.
+     * The stream's one document, null for a stream without documents.
      */
     static @Nullable Object safeLoadFailsafe(String input) {
         List<@Nullable Object> documents = loadDocuments(input);
@@ -98,7 +94,7 @@ final class JsYaml {
             if (last != '\n' && last != '\r') {
                 input += "\n";
             }
-            if (input.charAt(0) == '﻿') {
+            if (input.charAt(0) == '\uFEFF') {
                 input = input.substring(1);
             }
         }

@@ -321,9 +321,9 @@ final class Js {
     }
 
     static boolean isWhitespace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == ' ' ||
-               c == ' ' || (c >= ' ' && c <= ' ') || c == ' ' || c == ' ' ||
-               c == ' ' || c == ' ' || c == '　' || c == '﻿';
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == '\u00A0' ||
+               c == '\u1680' || (c >= '\u2000' && c <= '\u200A') || c == '\u2028' || c == '\u2029' ||
+               c == '\u202F' || c == '\u205F' || c == '\u3000' || c == '\uFEFF';
     }
 
     /**
@@ -362,6 +362,23 @@ final class Js {
             return String.join(",", parts);
         }
         return value.toString();
+    }
+
+    /**
+     * {@code `${value}`} of a value read from a lock, whose objects from yarn's parser have no prototype to convert.
+     */
+    static String templateString(@Nullable Object value) {
+        if (value instanceof Map && !(value instanceof PlainObject)) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot convert object to primitive value");
+        }
+        if (value instanceof List) {
+            List<String> parts = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                parts.add(item == null ? "" : templateString(item));
+            }
+            return String.join(",", parts);
+        }
+        return string(value);
     }
 
     /**

@@ -32,7 +32,7 @@ final class PackageReference {
     final Lockfile lockfile;
     final List<PackageRequest> requests = new ArrayList<>();
     final @Nullable String hint;
-    final @Nullable String registry;
+    final @Nullable Object registry;
     final @Nullable Object version;
     final @Nullable Object name;
     final @Nullable Object uid;

@@ -92,7 +92,7 @@ final class PackageFetcher {
         String slug = Js.string(pkg.name);
         slug = SLUG_CHARS.matcher(slug).replaceAll("-");
         slug = SLUG_EDGES.matcher(slug).replaceAll("");
-        slug = (Js.truthy(pkg.registry) ? pkg.registry : "unknown") + "-" + slug;
+        slug = (Js.truthy(pkg.registry) ? Js.string(pkg.registry) : "unknown") + "-" + slug;
         String hash = pkg.remote.hash;
         if (Js.truthy(pkg.version)) {
             slug += "-" + Js.string(pkg.version);

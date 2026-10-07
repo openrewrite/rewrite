@@ -27,15 +27,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
  * Port of yarn src/lockfile/index.js (yarn 1.22.22).
  */
 @Getter
 final class Lockfile {
-
-    private static final Pattern FILE_OR_HTTP = Pattern.compile("^.*@(file:|http)");
 
     private final String source;
 
@@ -115,7 +112,10 @@ final class Lockfile {
     }
 
     static String serializeIntegrity(Object integrity) {
-        List<String> parts = new ArrayList<>(Arrays.asList(integrity.toString().split(" ", -1)));
+        if (integrity instanceof Map && !(integrity instanceof PlainObject)) {
+            throw new JsError(JsError.TYPE_ERROR, "integrity.toString is not a function");
+        }
+        List<String> parts = new ArrayList<>(Arrays.asList(Js.templateString(integrity).split(" ", -1)));
         parts.sort(String::compareTo);
         return String.join(" ", parts);
     }
@@ -153,6 +153,10 @@ final class Lockfile {
         or(obj, "permissions", new LinkedHashMap<String, Object>());
         or(obj, "registry", "npm");
         or(obj, "name", getName(pattern));
+        Object integrity = obj.get("integrity");
+        if (Js.truthy(integrity) && Js.truthy(Js.get(integrity, "isIntegrity"))) {
+            obj.put("integrity", Ssri.parse(integrity));
+        }
         return obj;
     }
 
@@ -169,20 +173,6 @@ final class Lockfile {
             return a == b;
         }
         return a.equals(b);
-    }
-
-    boolean hasEntriesExistWithoutIntegrity() {
-        if (!(cache instanceof Map)) {
-            return false;
-        }
-        for (Map.Entry<?, ?> entry : ((Map<?, ?>) cache).entrySet()) {
-            Object value = entry.getValue();
-            if (!FILE_OR_HTTP.matcher((String) entry.getKey()).find() && Js.truthy(value) &&
-                !(value instanceof Map && Js.truthy(((Map<?, ?>) value).get("integrity")))) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

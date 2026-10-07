@@ -60,16 +60,14 @@ final class PackageRequest {
         resolver.usedRegistries.add(registry);
     }
 
-    /**
-     * The manifest the pattern's lock entry stands for, when the entry has a {@code resolved}: a git URL makes
-     * the remote a git one whatever the caller asks for.
-     */
-    @SuppressWarnings("unchecked")
     @Nullable
     Manifest getLocked(String remoteType) {
         Map<String, @Nullable Object> shrunk = lockfile.getLocked(pattern);
         if (shrunk == null || !Js.truthy(shrunk.get("resolved"))) {
             return null;
+        }
+        if (!(shrunk.get("resolved") instanceof String)) {
+            throw new JsError(JsError.TYPE_ERROR, "url.split is not a function");
         }
         String resolved = (String) shrunk.get("resolved");
         String[] parts = resolved.split("#", -1);
@@ -88,8 +86,8 @@ final class PackageRequest {
         remote.reference = url;
         remote.hash = hash;
         remote.integrity = shrunk.get("integrity");
-        remote.registry = (String) shrunk.get("registry");
-        remote.packageName = shrunk.get("name") instanceof String ? (String) shrunk.get("name") : null;
+        remote.registry = shrunk.get("registry");
+        remote.packageName = shrunk.get("name");
         manifest.remote = remote;
         manifest.put("optionalDependencies", or(shrunk.get("optionalDependencies")));
         manifest.put("dependencies", or(shrunk.get("dependencies")));
@@ -101,9 +99,6 @@ final class PackageRequest {
         return Js.truthy(value) ? value : new LinkedHashMap<String, Object>();
     }
 
-    /**
-     * Fills a resolved manifest's version from its uid and requires the name, version and uid.
-     */
     static void validateVersionInfo(Manifest info) {
         String human = Js.string(info.getName()) + "@" + Js.string(info.getVersion());
         info.put("version", getPackageVersion(info));

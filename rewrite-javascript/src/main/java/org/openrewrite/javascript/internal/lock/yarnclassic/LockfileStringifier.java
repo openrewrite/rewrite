@@ -98,11 +98,7 @@ final class LockfileStringifier {
         return p != null ? p : OBJECT_PROTOTYPE.contains(key) ? Double.NaN : 0;
     }
 
-    /**
-     * {@code Array.prototype.sort} as V8 runs it on an array shorter than 64 elements: the leading run, then a
-     * binary insertion of each remaining element. Any order of distinct keys comes out the same under a consistent
-     * comparator; only an inherited member's name makes {@code priorityThenAlphaSort} inconsistent.
-     */
+    // V8's Array.prototype.sort under 64 elements; only an inherited member's name makes the comparator inconsistent
     static List<String> sortKeys(List<String> keys) {
         List<String> a = new ArrayList<>(keys);
         int n = a.size();

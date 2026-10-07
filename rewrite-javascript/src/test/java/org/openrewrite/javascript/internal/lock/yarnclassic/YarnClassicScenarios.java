@@ -168,9 +168,7 @@ final class YarnClassicScenarios {
         }
 
         /**
-         * Every lock yarn wrote or was given: {@code before}, {@code after}, {@code before-given}, and what yarn wrote
-         * over each on an install that changes nothing ({@code again}, {@code <lock>-again}) or under
-         * {@code --force} ({@code <lock>-forced}).
+         * Every lock yarn wrote or was given, and what it wrote over each with no change or under {@code --force}.
          */
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();

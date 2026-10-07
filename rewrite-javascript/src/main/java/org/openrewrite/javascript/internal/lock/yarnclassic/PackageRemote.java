@@ -30,7 +30,7 @@ final class PackageRemote {
     String type;
 
     @Nullable
-    String registry;
+    Object registry;
 
     @Nullable
     String reference;
@@ -49,5 +49,5 @@ final class PackageRemote {
     Object integrity;
 
     @Nullable
-    String packageName;
+    Object packageName;
 }

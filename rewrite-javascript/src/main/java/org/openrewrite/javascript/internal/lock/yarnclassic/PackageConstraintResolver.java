@@ -37,7 +37,11 @@ final class PackageConstraintResolver {
         if ("latest".equals(range)) {
             return versions.isEmpty() ? null : versions.get(versions.size() - 1);
         }
-        return NodeSemver.maxSatisfying(versions, range,
-                config.isLooseSemver() ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER);
+        try {
+            return NodeSemver.maxSatisfying(versions, range,
+                    config.isLooseSemver() ? YarnClassicOptions.LOOSE_SEMVER : YarnClassicOptions.SEMVER);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+        }
     }
 }

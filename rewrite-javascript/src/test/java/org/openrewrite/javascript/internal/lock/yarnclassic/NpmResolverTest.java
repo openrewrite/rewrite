@@ -77,7 +77,31 @@ class NpmResolverTest {
                 Arguments.of("versions a number", "{}", "5", "^1.0.0",
                         "No valid versions found for \"p\". The package may be unpublished."),
                 Arguments.of("versions an empty array", "{}", "[]", "^1.0.0",
-                        "No valid versions found for \"p\". The package may be unpublished.")
+                        "No valid versions found for \"p\". The package may be unpublished."),
+                Arguments.of("latest a number", "{\"latest\": 5}", VERSIONS, "^1.0.0",
+                        "TypeError: Invalid Version: 5"),
+                Arguments.of("latest a number, any range", "{\"latest\": 5}", VERSIONS, "*",
+                        "TypeError: Cannot read properties of undefined (reading 'length')"),
+                Arguments.of("latest a number, two sets", "{\"latest\": 5}", VERSIONS, "1.x || 2.x",
+                        "TypeError: Invalid Version: 5"),
+                Arguments.of("latest true", "{\"latest\": true}", VERSIONS, "^1.0.0",
+                        "TypeError: Invalid Version: true"),
+                Arguments.of("latest an object", "{\"latest\": {}}", VERSIONS, ">=1.0.0",
+                        "TypeError: Invalid Version: [object Object]"),
+                Arguments.of("latest an array", "{\"latest\": [1]}", VERSIONS, "~1",
+                        "TypeError: Invalid Version: 1"),
+                Arguments.of("latest an array, x", "{\"latest\": [1]}", VERSIONS, "x",
+                        "TypeError: Cannot read properties of undefined (reading 'length')"),
+                Arguments.of("latest not a version", "{\"latest\": \"garbage\"}", VERSIONS, "^1.0.0",
+                        "TypeError: Invalid Version: garbage"),
+                Arguments.of("latest a partial version", "{\"latest\": \"1.2\"}", VERSIONS, "*",
+                        "TypeError: Invalid Version: 1.2"),
+                Arguments.of("latest with =", "{\"latest\": \"=1.2.0\"}", VERSIONS, "1.2.0",
+                        "TypeError: Invalid Version: =1.2.0"),
+                Arguments.of("versions an array of one", "{}", "[\"1.0.0\"]", "^1.0.0",
+                        "TypeError: Invalid Version: 0"),
+                Arguments.of("a version key not a version", "{}", "{\"latest\": {\"version\": \"x\"}}", "^1.0.0",
+                        "TypeError: Invalid Version: latest")
         );
     }
 

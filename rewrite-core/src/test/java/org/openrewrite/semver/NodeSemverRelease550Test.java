@@ -103,6 +103,68 @@ class NodeSemverRelease550Test {
         assertThat(NodeSemver.satisfies("1.0", "^1.0.0", Options.DEFAULT)).isFalse();
     }
 
+    // new SemVer of a value that is not a string or of a string over 256 characters, run on 5.5.0 and 7.8.4
+    @Test
+    void compareThrowsAsEachRelease() {
+        String tooLong = "1.0.0-" + String.join("", Collections.nCopies(260, "a"));
+        assertThatThrownBy(() -> NodeSemver.compare(5.0, "1.0.0", Options.V5_5_0_LOOSE))
+                .hasMessage("Invalid Version: 5");
+        assertThatThrownBy(() -> NodeSemver.compare(5.0, "1.0.0", Options.LOOSE))
+                .hasMessage("Invalid version. Must be a string. Got type \"number\".");
+        assertThatThrownBy(() -> NodeSemver.compare("1.0.0", true, Options.V5_5_0_LOOSE))
+                .hasMessage("Invalid Version: true");
+        assertThatThrownBy(() -> NodeSemver.compare(Collections.singletonList(1.0), "1.0.0", Options.V5_5_0_LOOSE))
+                .hasMessage("Invalid Version: 1");
+        assertThatThrownBy(() -> NodeSemver.compare(tooLong, "1.0.0", Options.V5_5_0_LOOSE))
+                .hasMessage("version is longer than 256 characters");
+        assertThatThrownBy(() -> NodeSemver.compare(tooLong, "1.0.0", Options.LOOSE))
+                .hasMessage("version is longer than 256 characters");
+        assertThatThrownBy(() -> NodeSemver.maxSatisfying(Arrays.asList("1.0.0", tooLong), "^1.0.0",
+                Options.V5_5_0_LOOSE)).hasMessage("version is longer than 256 characters");
+    }
+
+    static Stream<Arguments> jsonValueRows() {
+        List<Arguments> rows = new ArrayList<>();
+        try (InputStream is = NodeSemverRelease550Test.class.getResourceAsStream(
+                "/node-semver/satisfies-json-values.tsv");
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.startsWith("#")) {
+                    continue;
+                }
+                String[] cells = line.split("\t", -1);
+                Object version = MAPPER.readValue(cells[0], Object.class);
+                String range = MAPPER.readValue(cells[1], String.class);
+                String call = cells[0].length() > 40 ? cells[0].substring(0, 40) + "..." : cells[0];
+                rows.add(Arguments.of(call + " " + cells[1], version, range, MAPPER.readTree(cells[2]),
+                        MAPPER.readTree(cells[3])));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return rows.stream();
+    }
+
+    // satisfies with a version as JSON package data holds it, recorded from both releases
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("jsonValueRows")
+    void satisfiesAJsonValueAsEachRelease(String call, Object version, String range, JsonNode answer550,
+                                          JsonNode answer784) {
+        assertAnswers(version, range, Options.V5_5_0_LOOSE, answer550);
+        assertAnswers(version, range, Options.LOOSE, answer784);
+    }
+
+    private static void assertAnswers(Object version, String range, Options options, JsonNode answer) {
+        if (answer.has("threw")) {
+            assertThatThrownBy(() -> NodeSemver.satisfies(version, range, options))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage(answer.get("threw").asText());
+        } else {
+            assertThat(NodeSemver.satisfies(version, range, options)).isEqualTo(answer.asBoolean());
+        }
+    }
+
     private static @Nullable Object call(String fn, List<JsonNode> args) {
         switch (fn) {
             case "valid":

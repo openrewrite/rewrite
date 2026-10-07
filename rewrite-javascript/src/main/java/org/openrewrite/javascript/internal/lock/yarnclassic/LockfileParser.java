@@ -422,6 +422,6 @@ final class LockfileParser {
     }
 
     static String stripBom(String str) {
-        return !str.isEmpty() && str.charAt(0) == '﻿' ? str.substring(1) : str;
+        return !str.isEmpty() && str.charAt(0) == '\uFEFF' ? str.substring(1) : str;
     }
 }

@@ -15,19 +15,35 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * yarn 1.22.22's __tests__/lockfile.js.
+ * yarn 1.22.22's __tests__/lockfile.js, and lock entries holding other types as yarn's own code wrote them back.
  */
 class LockfileTest {
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Test
     void parseStringify() {
@@ -226,6 +242,48 @@ class LockfileTest {
         assertThat(entry.get("1")).isEqualTo("b");
         assertThat(entry.get("name")).isEqualTo("ms");
         assertThat(lockfile.getLocked("ms@^2.0.0")).isSameAs(entry);
+    }
+
+    static Stream<Arguments> entries() throws IOException {
+        List<Arguments> rows = new ArrayList<>();
+        try (InputStream is = requireNonNull(LockfileTest.class.getResourceAsStream("lock-entries.tsv"));
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("#")) {
+                    String[] cells = line.split("\t", -1);
+                    String lock = MAPPER.readValue(cells[0], String.class);
+                    rows.add(Arguments.of(lock.substring(lock.indexOf("\n\n\n") + 3), MAPPER.readTree(cells[1])));
+                }
+            }
+        }
+        return rows.stream();
+    }
+
+    // entries whose fields hold other types, each pattern reused as the round trip does; yarn's answers recorded
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("entries")
+    void writesBackAnEntryAsYarnDoes(String entries, JsonNode outcome) {
+        String answer;
+        try {
+            Lockfile lockfile = Lockfile.fromDirectory("# yarn lockfile v1\n\n\n" + entries);
+            PackageResolver resolver = new PackageResolver(YarnClassicOptions.defaults(), lockfile);
+            Map<String, Manifest> patterns = new LinkedHashMap<>();
+            for (String pattern : Js.keys(lockfile.getCache())) {
+                PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
+                        .registry("npm").build(), resolver);
+                Manifest info = request.getLocked("tarball");
+                if (info != null) {
+                    info.reference = new PackageReference(request, info, requireNonNull(info.remote));
+                    patterns.put(pattern, info);
+                }
+            }
+            answer = LockfileStringifier.stringify(lockfile.getLockfile(patterns), false, false, null);
+        } catch (JsError e) {
+            answer = e.getName() + ": " + e.getMessage();
+        }
+        assertThat(answer).isEqualTo(outcome.has("wrote") ? outcome.get("wrote").asText() :
+                outcome.get("threw").asText());
     }
 
     private static Map<String, @Nullable Object> abcd() {

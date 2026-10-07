@@ -20,6 +20,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public final class YarnClassicOptions {
     private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(" + Js.DOT + "*)\\z");
     private static final Pattern ENV_EXPR = Pattern.compile("(\\\\*)\\$\\{([^}]+)}");
     private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
+    private static final Pattern REGISTRY_PREFIX = Pattern.compile("^(https?:)?//", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNDERSCORE = Pattern.compile("([^_])_");
     private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
 
@@ -330,10 +332,16 @@ public final class YarnClassicOptions {
     }
 
     /**
-     * npm-registry.js {@code getRegistry}: the registry a package's metadata is requested from, the scope's own when
-     * the npm or yarn config names one.
+     * npm-registry.js {@code getRegistry}: the registry a package's metadata is requested from.
      */
     String getRegistry(String packageIdent) {
+        if (REGISTRY_PREFIX.matcher(packageIdent).find()) {
+            for (Object registry : getAvailableRegistries()) {
+                if (packageIdent.startsWith(Js.string(registry))) {
+                    return Js.string(registry);
+                }
+            }
+        }
         String scope = getScope(packageIdent);
         for (String s : scope.isEmpty() ? Collections.singletonList("") : Arrays.asList(scope, "")) {
             String key = s + (s.isEmpty() ? "" : ":") + "registry";
@@ -346,6 +354,18 @@ public final class YarnClassicOptions {
             }
         }
         return DEFAULT_REGISTRY;
+    }
+
+    // base-registry.js getAvailableRegistries over npm's config
+    private List<@Nullable Object> getAvailableRegistries() {
+        List<@Nullable Object> registries = new ArrayList<>();
+        for (String option : Js.keys(npmConfig)) {
+            String[] parts = option.split(":", -1);
+            if ("registry".equals(option) || (parts.length > 1 && "registry".equals(parts[1]))) {
+                registries.add(npmConfig.get(option));
+            }
+        }
+        return registries;
     }
 
     static String getScope(String packageIdent) {

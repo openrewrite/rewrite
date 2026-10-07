@@ -20,7 +20,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.StringJoiner;
 
 /**
  * node-semver's functions with its {@code loose} and {@code includePrerelease} options, exactly as
@@ -29,6 +33,8 @@ import java.util.Collection;
  */
 @UtilityClass
 public class NodeSemver {
+
+    private static final int MAX_LENGTH = 256;
 
     /**
      * The node-semver release whose answers the functions give: 7.8.4, which npm bundles, or 5.5.0, which yarn
@@ -91,9 +97,13 @@ public class NodeSemver {
     }
 
     private static boolean test(UnionRange r, String version, Options options) {
-        if (options.release == Release.V5_5_0 && !version.isEmpty() &&
-            !ParsedVersion.parseNode(version, options.loose).isStrictSemver()) {
-            throw new IllegalArgumentException("Invalid Version: " + version);
+        if (options.release == Release.V5_5_0 && !version.isEmpty()) {
+            if (version.length() > MAX_LENGTH) {
+                throw new IllegalArgumentException(tooLong());
+            }
+            if (!ParsedVersion.parseNode(version, options.loose).isStrictSemver()) {
+                throw new IllegalArgumentException("Invalid Version: " + version);
+            }
         }
         return r.test(version, options.loose);
     }
@@ -118,9 +128,37 @@ public class NodeSemver {
         if (r == null || !truthy(version)) {
             return false;
         }
-        // Range.test reads version.prerelease once every comparator passed, which only `*` does without a SemVer
-        throw new IllegalArgumentException(r.isAny() ?
-                "Cannot read properties of undefined (reading 'length')" : notAString(version));
+        // Range.test hands the value to each set as it is: a comparator other than `*` makes a SemVer of it and
+        // throws, and a set of `*` alone reads version.prerelease.length
+        for (List<NodeComparand> set : r.sets()) {
+            for (NodeComparand comparator : set) {
+                if (!comparator.isAny()) {
+                    throw new IllegalArgumentException(notASemVer(version, options));
+                }
+            }
+            if (!truthy(prereleaseLength(version)) || options.includePrerelease) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // version.prerelease.length of a JSON value
+    private static @Nullable Object prereleaseLength(Object version) {
+        if (!(version instanceof Map) || !((Map<?, ?>) version).containsKey("prerelease")) {
+            throw new IllegalArgumentException("Cannot read properties of undefined (reading 'length')");
+        }
+        Object prerelease = ((Map<?, ?>) version).get("prerelease");
+        if (prerelease == null) {
+            throw new IllegalArgumentException("Cannot read properties of null (reading 'length')");
+        }
+        if (prerelease instanceof List) {
+            return (double) ((List<?>) prerelease).size();
+        }
+        if (prerelease instanceof String) {
+            return (double) ((String) prerelease).length();
+        }
+        return prerelease instanceof Map ? ((Map<?, ?>) prerelease).get("length") : null;
     }
 
     /**
@@ -145,7 +183,7 @@ public class NodeSemver {
     }
 
     private static boolean isJsWhitespace(char c) {
-        return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '﻿';
+        return Character.isWhitespace(c) || Character.isSpaceChar(c) || c == '\uFEFF';
     }
 
     /**
@@ -202,7 +240,10 @@ public class NodeSemver {
 
     private static ParsedVersion semver(@Nullable Object version, Options options) {
         if (!(version instanceof String)) {
-            throw new IllegalArgumentException(notAString(version));
+            throw new IllegalArgumentException(notASemVer(version, options));
+        }
+        if (((String) version).length() > MAX_LENGTH) {
+            throw new IllegalArgumentException(tooLong());
         }
         ParsedVersion v = ParsedVersion.parseNode((String) version, options.loose);
         if (!v.isStrictSemver()) {
@@ -211,9 +252,51 @@ public class NodeSemver {
         return v;
     }
 
-    private static String notAString(@Nullable Object version) {
+    private static String tooLong() {
+        return "version is longer than " + MAX_LENGTH + " characters";
+    }
+
+    // the TypeError of `new SemVer(version)` on a value that is not a string
+    private static String notASemVer(@Nullable Object version, Options options) {
+        if (options.release == Release.V5_5_0) {
+            return "Invalid Version: " + jsString(version);
+        }
         String type = version instanceof Number ? "number" : version instanceof Boolean ? "boolean" : "object";
         return "Invalid version. Must be a string. Got type \"" + type + "\".";
+    }
+
+    // String(value) of a JSON value
+    private static String jsString(@Nullable Object value) {
+        if (value instanceof Number) {
+            return numberToString(((Number) value).doubleValue());
+        }
+        if (value instanceof List) {
+            StringJoiner joined = new StringJoiner(",");
+            for (Object item : (List<?>) value) {
+                joined.add(item == null ? "" : jsString(item));
+            }
+            return joined.toString();
+        }
+        return value instanceof Map ? "[object Object]" : String.valueOf(value);
+    }
+
+    // Number.prototype.toString()
+    private static String numberToString(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return Double.isNaN(d) ? "NaN" : d > 0 ? "Infinity" : "-Infinity";
+        }
+        if (d == 0) {
+            return "0";
+        }
+        BigDecimal shortest = new BigDecimal(Double.toString(d)).stripTrailingZeros();
+        String digits = shortest.unscaledValue().abs().toString();
+        int n = digits.length() - shortest.scale();
+        String sign = d < 0 ? "-" : "";
+        if (n >= -5 && n <= 21) {
+            return sign + shortest.abs().toPlainString();
+        }
+        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
+        return sign + mantissa + "e" + (n - 1 >= 0 ? "+" : "-") + Math.abs(n - 1);
     }
 
     private static boolean truthy(@Nullable Object value) {

@@ -139,14 +139,8 @@ final class NormalizeManifest {
     }
 
     /**
-     * {@code file:} and {@code link:} dependencies made relative to the lock's directory.
-     *
-     * @param moduleLoc      the package's directory, relative to the project's
-     * @param lockfileFolder the lock's directory, relative to the project's
-     * @throws JsError                               Node's {@code ERR_INVALID_ARG_TYPE} from {@code path.isAbsolute}
-     *                                               on a value that is not a string.
-     * @throws YarnClassicLockRegenerator.CannotKnow an absolute target, which yarn writes relative to where the
-     *                                               project sits on disk.
+     * {@code file:} and {@code link:} dependencies made relative to the lock's directory; an absolute target is
+     * cannot-know, as yarn writes it relative to where the project sits on disk.
      */
     @SuppressWarnings("unchecked")
     static void resolveRelative(Manifest info, String moduleLoc, @Nullable String lockfileFolder) {

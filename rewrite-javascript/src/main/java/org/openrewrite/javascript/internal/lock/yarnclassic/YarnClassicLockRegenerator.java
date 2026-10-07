@@ -99,10 +99,7 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * install.js {@code run}: the lock as yarn reads it ({@code Lockfile.fromDirectory}), none under
-     * {@code --no-lockfile}.
-     *
-     * @throws MessageError a lockfile version newer than yarn 1 reads.
+     * install.js {@code run}: the lock as yarn reads it, none under {@code --no-lockfile}.
      */
     Lockfile lockfile(YarnClassicOptions config) {
         return config.getFlags().isLockfile() ? Lockfile.fromDirectory(inputs.getLock()) : new Lockfile();
@@ -110,9 +107,6 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * config.js {@code tryManifest}: the manifest read, its registry and location set, then normalized.
-     *
-     * @throws JsError the {@code SyntaxError} of JSON that does not parse, or the {@code TypeError} of JSON that
-     *                 cannot take the registry, a primitive or null.
      */
     static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
                                 @Nullable String lockfileFolder, List<String> warnings) {
@@ -156,9 +150,8 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * What {@code fetchRequestFromCwd} gathers from the project's manifests: the root requests in yarn's order
-     * (resolutions, then dependencies, devDependencies, optionalDependencies, then the workspaces), the top-level
-     * patterns, the root manifest and the workspace members.
+     * What {@code fetchRequestFromCwd} gathers: the root requests in yarn's order, the top-level patterns, the root
+     * manifest and the workspace members.
      */
     @Value
     static class InstallCwdRequest {
@@ -362,9 +355,7 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * config.js {@code resolveWorkspaces}: the members under the root's {@code workspaces} patterns. The host
-     * gives the members' manifests; matching them against the patterns is not ported yet, so every manifest given
-     * besides the root's is a member once there is a pattern at all.
+     * config.js {@code resolveWorkspaces} over the member manifests the host gives.
      */
     private Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, YarnClassicOptions config,
                                                                       List<String> warnings) {

@@ -95,7 +95,71 @@ final class Ssri {
         if (sri instanceof String) {
             return parseString((String) sri);
         }
-        return parseString(stringify(sri));
+        if (sri instanceof Hash || sri instanceof Integrity) {
+            return parseString(stringify(sri));
+        }
+        return parseString(Js.truthy(Js.get(sri, "algorithm")) && Js.truthy(Js.get(sri, "digest")) ?
+                hashString(sri) : integrityString(sri));
+    }
+
+    // Integrity.prototype.toString.call(obj)
+    private static String integrityString(Object obj) {
+        List<String> parts = new ArrayList<>();
+        for (String k : Js.keys(obj)) {
+            Object hashes = Js.get(obj, k);
+            if (hashes == null) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of null (reading 'map')");
+            }
+            if (!(hashes instanceof List)) {
+                throw new JsError(JsError.TYPE_ERROR, "this[k].map is not a function");
+            }
+            List<String> strings = new ArrayList<>();
+            for (Object hash : (List<?>) hashes) {
+                strings.add(hashString(hash));
+            }
+            strings.removeIf(String::isEmpty);
+            String joined = String.join(" ", strings);
+            if (!joined.isEmpty()) {
+                parts.add(joined);
+            }
+        }
+        return String.join(" ", parts);
+    }
+
+    // Hash.prototype.toString.call(hash)
+    private static String hashString(@Nullable Object hash) {
+        if (hash == null) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of null (reading 'options')");
+        }
+        Object options = hash instanceof Map ? ((Map<?, ?>) hash).get("options") : null;
+        String opts = "";
+        if (Js.truthy(options) && Js.truthy(lengthOf(options))) {
+            if (!(options instanceof List)) {
+                throw new JsError(JsError.TYPE_ERROR, "this.options.join is not a function");
+            }
+            List<String> joined = new ArrayList<>();
+            for (Object option : (List<?>) options) {
+                joined.add(option == null ? "" : Js.templateString(option));
+            }
+            opts = "?" + String.join("?", joined);
+        }
+        return field(hash, "algorithm") + "-" + field(hash, "digest") + opts;
+    }
+
+    private static @Nullable Object lengthOf(Object value) {
+        if (value instanceof Map) {
+            return ((Map<?, ?>) value).get("length");
+        }
+        return Js.length(value) < 0 ? null : (Object) (double) Js.length(value);
+    }
+
+    // `${hash[key]}`
+    private static String field(Object hash, String key) {
+        if (!(hash instanceof Map)) {
+            return "undefined";
+        }
+        Map<?, ?> map = (Map<?, ?>) hash;
+        return map.containsKey(key) && map.get(key) == null ? "null" : Js.templateString(map.get(key));
     }
 
     private static Integrity parseString(String integrity) {

@@ -183,9 +183,7 @@ class YarnClassicLockRoundTripTest {
     }
 
     /**
-     * The resolver's state after an install that reuses every entry of the lock: each pattern's request takes the
-     * manifest its entry stands for and a reference of its own, then the fetch replaces each manifest by the
-     * package's own, for which the entry stands as well.
+     * The resolver's state after an install that reuses every entry of the lock, the fetch's manifests included.
      */
     @SuppressWarnings("unchecked")
     static PackageResolver reuseEveryEntry(Lockfile lockfile, YarnClassicOptions options, List<String> warnings) {
