@@ -73,6 +73,13 @@ public final class BunLockRegenerator {
         @Nullable
         String bunfig;
 
+        /**
+         * The project's other files bun reads on install, by path relative to the root: the patch files
+         * {@code patchedDependencies} names.
+         */
+        @Singular
+        Set<String> files;
+
         @Singular("env")
         Map<String, String> env;
 
@@ -230,6 +237,11 @@ public final class BunLockRegenerator {
                 throw new Rejected(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": " + (error == null ?
                         "the lock is empty" : error.error + ": " + error.getMessage().split("\n", 2)[0]));
             }
+            for (String patch : install.getLockfile().patchedDependencies.values()) {
+                if (!these.getFiles().contains(patch)) {
+                    throw new PackageManager.CannotKnow("patch file " + patch + " (not among the project's files)");
+                }
+            }
             install.getManager().resolve(install.getPackagesBefore());
         } catch (IllegalArgumentException e) {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
@@ -239,20 +251,21 @@ public final class BunLockRegenerator {
         }
         PackageManager manager = install.getManager();
 
-        Lockfile cleaned = Cleaner.clean(manager.lockfile);
+        Lockfile beforeClean = manager.lockfile;
+        Lockfile cleaned = Cleaner.clean(beforeClean);
         List<String> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
             throw new Rejected(reasonFor(manager.log.errors), failed.get(0).replaceFirst("@[^@]*$", ""),
                     BUN_REJECTS + ": " + first + failed.get(0) + " failed to resolve");
         }
+        if (manager.options.isFrozenLockfile() && !cleaned.eql(beforeClean, cleaned.packages.size())) {
+            throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
+                    BUN_REJECTS + ": lockfile had changes, but lockfile is frozen");
+        }
         String written = install.write(cleaned);
         if (written == null) {
             throw new Rejected(Reason.RESOLUTION_REQUIRED, null, DELETES_LOCK);
-        }
-        if (manager.options.isFrozenLockfile() && !written.equals(lock)) {
-            throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
-                    BUN_REJECTS + ": lockfile had changes, but lockfile is frozen");
         }
         return written;
     }

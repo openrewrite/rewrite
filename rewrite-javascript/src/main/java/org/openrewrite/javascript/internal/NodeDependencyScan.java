@@ -64,15 +64,19 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * Keep a package manager's configuration file the scan visits; true when {@code sf} is one.
+     * Keep a package manager's configuration file or a patch file the scan visits; true when {@code sf} is one.
      */
     public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
         Path name = sf.getSourcePath().getFileName();
-        if (name == null || !PACKAGE_MANAGER_FILES.contains(name.toString())) {
+        if (name == null || !PACKAGE_MANAGER_FILES.contains(name.toString()) && !isPatch(sf.getSourcePath())) {
             return false;
         }
         acc.packageManagerFiles.put(sf.getSourcePath(), sf.printAll());
         return true;
+    }
+
+    private static boolean isPatch(Path path) {
+        return path.toString().endsWith(".patch");
     }
 
     public static final class ProjectState {
@@ -163,7 +167,8 @@ public final class NodeDependencyScan {
         directories.add(directory(packageJsonPath));
         Map<Path, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : acc.packageManagerFiles.entrySet()) {
-            if (directories.contains(directory(file.getKey()))) {
+            Path dir = directory(file.getKey());
+            if (directories.contains(dir) || isPatch(file.getKey()) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }
@@ -173,6 +178,15 @@ public final class NodeDependencyScan {
     private static Path directory(Path file) {
         Path parent = file.normalize().getParent();
         return parent == null ? Paths.get("") : parent;
+    }
+
+    private static boolean under(Path dir, Set<Path> directories) {
+        for (Path candidate : directories) {
+            if (candidate.toString().isEmpty() || dir.startsWith(candidate)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String print(ExecutionContext ctx, Path path, ProjectState ps) {

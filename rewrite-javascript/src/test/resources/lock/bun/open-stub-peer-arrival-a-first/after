@@ -1,0 +1,23 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "is-number": "7.0.0",
+        "zz-vb-peer-a": "1.0.0",
+        "zz-vb-peer-b": "1.0.0",
+      },
+    },
+  },
+  "packages": {
+    "is-number": ["is-number@7.0.0", "http://127.0.0.1:48731/is-number/-/is-number-7.0.0.tgz", {}, "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng=="],
+
+    "zz-vb-peer-a": ["zz-vb-peer-a@1.0.0", "http://127.0.0.1:48731/zz-vb-peer-a/-/zz-vb-peer-a-1.0.0.tgz", { "peerDependencies": { "zz-vb-peer-p": "^1.0.0" } }, "sha512-LB7mg3IhWxzgZEJrXNvU7yWBrODdOyH6K+J/NkgnJC6D9otovgP1s+JL5dG0MV+YoKltGXE/s6GdxFX7atw0MQ=="],
+
+    "zz-vb-peer-b": ["zz-vb-peer-b@1.0.0", "http://127.0.0.1:48731/zz-vb-peer-b/-/zz-vb-peer-b-1.0.0.tgz", { "peerDependencies": { "zz-vb-peer-p": "^2.0.0" } }, "sha512-LB7mg3IhWxzgZEJrXNvU7yWBrODdOyH6K+J/NkgnJC6D9otovgP1s+JL5dG0MV+YoKltGXE/s6GdxFX7atw0MQ=="],
+
+    "zz-vb-peer-p": ["zz-vb-peer-p@1.0.0", "http://127.0.0.1:48731/zz-vb-peer-p/-/zz-vb-peer-p-1.0.0.tgz", {}, "sha512-LB7mg3IhWxzgZEJrXNvU7yWBrODdOyH6K+J/NkgnJC6D9otovgP1s+JL5dG0MV+YoKltGXE/s6GdxFX7atw0MQ=="],
+  }
+}

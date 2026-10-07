@@ -168,6 +168,7 @@ class BunScenarioTest {
           .manifests(scenario.manifests(false, before == null ? "" : before))
           .npmrc(scenario.config(false, "npmrc", ".npmrc"))
           .bunfig(scenario.config(false, "bunfig", "bunfig.toml"))
+          .files(scenario.tree(false).keySet())
           .now(scenario.now())
           .build();
     }

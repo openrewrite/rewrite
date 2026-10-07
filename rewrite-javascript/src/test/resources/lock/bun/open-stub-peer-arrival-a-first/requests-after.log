@@ -1,0 +1,4 @@
+GET http://127.0.0.1:48731/zz-vb-peer-a accept=application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*
+GET http://127.0.0.1:48731/zz-vb-peer-b accept=application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*
+GET http://127.0.0.1:48731/zz-vb-peer-p accept=application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*
+exit=0, lock differs from after

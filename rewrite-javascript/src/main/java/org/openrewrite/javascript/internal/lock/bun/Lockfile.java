@@ -18,12 +18,14 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
+import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
  * Port of bun's src/install/lockfile.zig (bun 1.3.10): the packages, the dependency buffer and the resolution
@@ -199,5 +201,67 @@ final class Lockfile {
     void resolve() {
         Tree.Builder builder = new Tree.Builder(this);
         builder.hoist();
+    }
+
+    /**
+     * {@code eql}: whether the hoisted trees place the same packages (by name, resolution, bin and scripts) at
+     * the same paths, over the packages below {@code cutOffPkgId}.
+     */
+    boolean eql(Lockfile r, int cutOffPkgId) {
+        if (hoistedDependencies.size() != r.hoistedDependencies.size()) {
+            return false;
+        }
+        List<int[]> lBuf = placements(cutOffPkgId);
+        List<int[]> rBuf = r.placements(cutOffPkgId);
+        if (lBuf.size() != rBuf.size()) {
+            return false;
+        }
+        lBuf.sort(placementOrder());
+        rBuf.sort(r.placementOrder());
+        for (int i = 0; i < lBuf.size(); i++) {
+            Package l = packages.get(lBuf.get(i)[0]);
+            Package rPkg = r.packages.get(rBuf.get(i)[0]);
+            if (l.nameHash != rPkg.nameHash) {
+                return false;
+            }
+            boolean uninitialized = l.resolution.tag == Resolution.Tag.UNINITIALIZED ||
+                                    rPkg.resolution.tag == Resolution.Tag.UNINITIALIZED;
+            if (uninitialized ? l.resolution.tag != rPkg.resolution.tag : !l.resolution.eql(rPkg.resolution)) {
+                return false;
+            }
+            if (!l.bin.eql(rPkg.bin) || !l.scripts.eql(rPkg.scripts)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // [package id, tree id] of every placed dependency below the cut-off
+    private List<int[]> placements(int cutOffPkgId) {
+        List<int[]> out = new ArrayList<>();
+        for (Tree tree : trees) {
+            for (int depId : tree.dependencies) {
+                if (depId == Tree.INVALID_DEPENDENCY_ID) {
+                    continue;
+                }
+                int pkgId = resolutions.get(depId);
+                if (pkgId == INVALID_PACKAGE_ID || pkgId >= cutOffPkgId) {
+                    continue;
+                }
+                out.add(new int[]{pkgId, tree.id});
+            }
+        }
+        return out;
+    }
+
+    private Comparator<int[]> placementOrder() {
+        Map<Integer, String> paths = new HashMap<>();
+        for (Tree tree : trees) {
+            paths.put(tree.id, Tree.relativePathAndDepth(this, tree.id, tree.dependencies).relativePath);
+        }
+        return (l, r) -> {
+            int byPath = Strings.order(paths.get(l[1]), paths.get(r[1]));
+            return byPath != 0 ? byPath : Strings.order(packages.get(l[0]).name, packages.get(r[0]).name);
+        };
     }
 }

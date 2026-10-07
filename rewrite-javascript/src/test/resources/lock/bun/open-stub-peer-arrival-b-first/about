@@ -1,0 +1,1 @@
+the inputs of open-stub-peer-arrival-a-first (two new root packages whose required peer zz-vb-peer-p nothing provides, ranges ^1.0.0 and ^2.0.0), with the stub delaying zz-vb-peer-a's packument 1500 ms so zz-vb-peer-b's manifest arrives first: does the auto-installed peer follow the order the requirers' manifests arrive in (zz-vb-peer-p@2.0.0 here, @1.0.0 there)?

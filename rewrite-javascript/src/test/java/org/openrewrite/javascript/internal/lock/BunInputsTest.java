@@ -56,6 +56,22 @@ class BunInputsTest {
     }
 
     @Test
+    void patchFilesUnderTheRootAreTheProjectsFiles() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"patchedDependencies\":{\"ms@2.1.3\":\"patches/ms@2.1.3.patch\"}}")
+          .lock("{}")
+          .packageJsonPath(Paths.get("repo/package.json"))
+          .packageManagerFile(Paths.get("repo/patches/ms@2.1.3.patch"), "--- a/index.js\n+++ b/index.js\n")
+          .packageManagerFile(Paths.get("repo/bunfig.toml"), "[install]\n")
+          .packageManagerFile(Paths.get("other/patches/x.patch"), "")
+          .build();
+
+        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(inputs.getFiles()).containsExactlyInAnyOrder("patches/ms@2.1.3.patch", "bunfig.toml");
+    }
+
+    @Test
     void withoutTheNpmrcFileTheMarkersProjectNpmrcStandsIn() {
         Request request = Request.builder()
           .packageJson("{}")

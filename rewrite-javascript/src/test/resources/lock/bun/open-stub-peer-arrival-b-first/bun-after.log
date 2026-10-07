@@ -1,0 +1,7 @@
+bun install v1.3.10 (30e609e0)
+Resolving dependencies
+Resolved, downloaded and extracted [6]
+warn: incorrect peer dependency "zz-vb-peer-p@2.0.0"
+Saved lockfile
+
+Saved bun.lock (5 packages) [1.51s]

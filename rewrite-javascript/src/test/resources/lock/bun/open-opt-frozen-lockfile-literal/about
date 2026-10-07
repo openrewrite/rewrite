@@ -1,0 +1,1 @@
+frozenLockfile with a root range literal change (^7.0.0 -> 7.0.0) whose resolution stays is-number@7.0.0: does bun's lockfile.eql let the frozen install write the new literal, which the port's text comparison would refuse?
