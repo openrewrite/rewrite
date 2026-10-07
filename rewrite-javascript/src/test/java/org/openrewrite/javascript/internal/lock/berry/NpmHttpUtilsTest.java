@@ -22,8 +22,8 @@ import java.util.Collections;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Yarn's packages/plugin-npm/tests/NpmSemverFetcher.test.js, every {@code isConventionalTarballUrl} case, and the
- * registry a scope resolves to.
+ * Yarn's packages/plugin-npm/tests/NpmSemverFetcher.test.js, every {@code isConventionalTarballUrl} case,
+ * npmHttpUtils.test.ts, and the registry a scope resolves to.
  */
 class NpmHttpUtilsTest {
 
@@ -81,5 +81,18 @@ class NpmHttpUtilsTest {
         assertThat(NpmHttpUtils.getScopeRegistry("corp", options)).isEqualTo("https://registry.yarnpkg.com");
         assertThat(NpmHttpUtils.getScopeRegistry("jsr", options)).isEqualTo("https://npm.jsr.io");
         assertThat(NpmHttpUtils.getIdentUrl(StructUtils.makeIdent("types", "node"))).isEqualTo("/@types%2fnode");
+    }
+
+    /**
+     * packages/plugin-npm/tests/npmHttpUtils.test.ts: {@code get} requests the normalized registry followed by the
+     * path, which is what {@link NpmHttpUtils.Registry} is handed.
+     */
+    @Test
+    void craftsTheFinalPathCorrectly() {
+        for (String registry : new String[]{"https://example.org", "https://example.org/", "https://example.org/foo",
+                "https://example.org/foo/"}) {
+            assertThat(NpmHttpUtils.normalizeRegistry(registry) + "/bar").as(registry)
+                    .isEqualTo(registry.replaceAll("/+$", "") + "/bar");
+        }
     }
 }
