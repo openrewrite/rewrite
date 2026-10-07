@@ -76,9 +76,8 @@ describe('JavaScriptSemanticComparatorVisitor', () => {
                     )
                 );
 
-                // Both import styles should match the pattern
-                expect(matches).toContain('named');
-                expect(matches).toContain('namespace');
+                // The pattern writes out the `util` receiver, which the named-import call lacks
+                expect(matches).toEqual(['namespace']);
             }, {unsafeCleanup: true});
         }, 60000);
 
