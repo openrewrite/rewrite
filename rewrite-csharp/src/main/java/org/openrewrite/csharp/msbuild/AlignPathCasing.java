@@ -47,6 +47,14 @@ import static java.util.Collections.unmodifiableSet;
 public class AlignPathCasing extends ScanningRecipe<AlignPathCasing.PathIndex> {
 
     /**
+     * Must stay a subset of what {@code XmlParser} accepts; a file it doesn't accept never reaches
+     * this recipe as XML.
+     */
+    static final Set<String> MSBUILD_XML_EXTENSIONS = unmodifiableSet(new LinkedHashSet<>(Arrays.asList(
+            "csproj", "vbproj", "fsproj", "props", "targets", "slnx",
+            "projitems", "shproj", "vcxproj", "sqlproj", "njsproj", "pyproj", "wapproj")));
+
+    /**
      * Attributes whose value is one or more paths. Compared case-insensitively, because MSBuild
      * treats element and attribute names case-insensitively.
      */
@@ -97,8 +105,10 @@ public class AlignPathCasing extends ScanningRecipe<AlignPathCasing.PathIndex> {
         return "MSBuild resolves paths case-insensitively on Windows, so a solution can reference " +
                "`assemblies/WPFToolkit/WPFToolkit.csproj` while the directory committed to git is actually " +
                "named `assemblies/Wpftoolkit`. The same reference fails with `MSB3202` or `Project file not " +
-               "found` on a case-sensitive file system. This recipe rewrites path references in `.sln`, " +
-               "`.slnx`, `.csproj`, `.props`, and `.targets` files so that every segment matches the casing of " +
+               "found` on a case-sensitive file system. This recipe rewrites path references in `.sln` and " +
+               "`.slnx` solutions, in `.props` and `.targets` files, and in MSBuild project files such as " +
+               "`.csproj`, `.vbproj`, `.fsproj`, `.vcxproj`, `.sqlproj`, `.shproj`, and `.projitems`, so that " +
+               "every segment matches the casing of " +
                "the file or directory that is actually in the repository. References that already resolve " +
                "exactly, that cannot be resolved at all, or whose casing is ambiguous — because two files or " +
                "directories differ only by case — are left untouched.";
@@ -149,11 +159,8 @@ public class AlignPathCasing extends ScanningRecipe<AlignPathCasing.PathIndex> {
     }
 
     private static boolean isMsBuildProjectFile(String lowerCaseFileName) {
-        return lowerCaseFileName.endsWith("proj") ||
-               lowerCaseFileName.endsWith(".props") ||
-               lowerCaseFileName.endsWith(".targets") ||
-               lowerCaseFileName.endsWith(".projitems") ||
-               lowerCaseFileName.endsWith(".slnx");
+        int dot = lowerCaseFileName.lastIndexOf('.');
+        return dot >= 0 && MSBUILD_XML_EXTENSIONS.contains(lowerCaseFileName.substring(dot + 1));
     }
 
     private class AlignXmlPathCasing extends XmlVisitor<ExecutionContext> {

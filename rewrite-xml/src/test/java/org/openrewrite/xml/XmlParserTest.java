@@ -911,6 +911,13 @@ class XmlParserTest implements RewriteTest {
       "Directory.Build.targets",
       "Some.TARGETS",
       "MySolution.slnx",
+      "Shared.projitems",
+      "Shared.shproj",
+      "Native.vcxproj",
+      "Database.sqlproj",
+      "Web.njsproj",
+      "Tool.pyproj",
+      "Package.wapproj",
       "rules.ruleset",
       "Project.DotSettings",
       "App.config",
@@ -932,7 +939,9 @@ class XmlParserTest implements RewriteTest {
       "/foo/bar/baz.xml.txt",
       "log4net.config",
       "appsettings.config",
-      "webhook.config"
+      "webhook.config",
+      "build.proj",
+      "docker-compose.dcproj"
     })
     void acceptWithInvalidPaths(String path) {
         assertThat(new XmlParser().accept(Path.of(path))).isFalse();
