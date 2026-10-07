@@ -1,0 +1,1 @@
+ms@2.0.0 locked as a root dependency; debug@4.4.3 (ms ^2.1.3) and humanize-ms@1.2.1 (ms ^2.0.0) added in one install: humanize-ms takes ms@2.1.3 when debug's edge appended it first (10 cold runs: 9 on the locked ms@2.0.0, 1 with humanize-ms/ms@2.1.3, the fresh shape)

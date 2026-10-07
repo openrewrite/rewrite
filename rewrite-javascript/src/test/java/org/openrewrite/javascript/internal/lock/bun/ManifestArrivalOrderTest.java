@@ -24,11 +24,10 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The recorded case {@code dedupe-arrival-order}: debug@2.6.9 wants ms 2.0.0 and humanize-ms@1.2.1 wants ms
- * ^2.0.0, both added in one install. Eight runs of bun 1.3.10 wrote ms@2.0.0 alone four times (humanize-ms
- * deduped to it) and ms@2.0.0 beside humanize-ms/ms@2.1.3 four times. With the same ranges and picks the engine
- * names the case; with equal picks, picks neither range accepts, or a lock that already satisfies both, bun's
- * result does not depend on arrival order.
+ * The recorded cases {@code dedupe-arrival-order} (no ms in the lock: debug@2.6.9 wants ms 2.0.0, humanize-ms@1.2.1
+ * wants ^2.0.0; bun 1.3.10 wrote two different locks over eight runs) and {@code small-dedupe-arrival-existing}
+ * (ms@2.0.0 locked: debug wants ^2.1.3, humanize-ms ^2.0.0; two locks over ten cold runs), and the shapes whose
+ * result bun's {@code getPackageID} settles whatever the order.
  */
 class ManifestArrivalOrderTest {
 
@@ -75,6 +74,35 @@ class ManifestArrivalOrderTest {
     }
 
     @Test
+    void samePickAboveAnExistingPackageOneRangeAccepts() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "^2.1.3", "^2.0.0");
+        append(lockfile, pkg("ms", "2.0.0"));
+        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
+        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).containsExactly(
+          "manifest arrival order: ms for debug@2.6.9 (^2.1.3) and humanize-ms@1.2.1 (^2.0.0) resolved in one install");
+    }
+
+    @Test
+    void existingPackageAboveTheOtherPick() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
+        append(lockfile, pkg("ms", "2.1.3"));
+        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
+        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+    }
+
+    @Test
+    void packagesAppendedByTheInstallDoNotSettle() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "^2.1.3", "^2.0.0");
+        int packagesBefore = lockfile.packages.size();
+        append(lockfile, pkg("ms", "2.0.0"));
+        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
+        assertThat(ManifestArrivalOrder.detect(lockfile, packagesBefore, resolved)).isEmpty();
+    }
+
+    @Test
     void peersAreNotCounted() {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
@@ -83,8 +111,6 @@ class ManifestArrivalOrderTest {
         assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
     }
 
-    // the root, debug@2.6.9 wanting ms as debugRange and humanize-ms@1.2.1 wanting it as humanizeRange; the id of
-    // debug's ms dependency, humanize-ms's is the next
     private static int requirers(Lockfile lockfile, String debugRange, String humanizeRange) {
         Package root = new Package();
         root.name = "p";

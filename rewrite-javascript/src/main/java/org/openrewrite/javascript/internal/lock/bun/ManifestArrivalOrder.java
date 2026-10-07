@@ -15,29 +15,28 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * What bun's {@code getOrPutResolvedPackageWithFindResult} (PackageManagerEnqueue.zig, bun 1.3.10) leaves to
- * network timing: it reuses any package of the name the edge's range accepts, and {@code runTasks} resolves edges
- * as their requirers' manifests arrive. Two edges of one name resolved from the packument in one install, whose
- * picks differ while one pick satisfies the other's range, end as one package or two depending on which arrives
- * first. The engine reports such a name instead of choosing an order.
+ * The dedupe in bun's {@code getOrPutResolvedPackageWithFindResult} (PackageManagerEnqueue.zig, bun 1.3.10) that
+ * network timing decides: which of a name's edges, resolved from the packument in one install, ran first.
  */
 final class ManifestArrivalOrder {
 
     /**
-     * An edge resolved from its packument in this install: its spec after overrides, catalogs and aliases, and the
-     * version {@code findBestVersion} picked for it before the dedupe against existing packages.
+     * An edge resolved from its packument: its spec and the version {@code findBestVersion} picked before the dedupe.
      */
     static final class Resolved {
         final int dependencyId;
         final DependencyVersion version;
         final PackageManifest manifest;
         final PackageManifest.FindResult pick;
+        final Resolution resolution;
 
         Resolved(int dependencyId, DependencyVersion version, PackageManifest manifest,
                  PackageManifest.FindResult pick) {
@@ -45,6 +44,7 @@ final class ManifestArrivalOrder {
             this.version = version;
             this.manifest = manifest;
             this.pick = pick;
+            this.resolution = Resolution.npm(pick.version, pick.packageVersion.tarballUrl);
         }
     }
 
@@ -52,31 +52,25 @@ final class ManifestArrivalOrder {
     }
 
     /**
-     * One line per name whose result depends on arrival order, over the edges resolved in the install's first pass
-     * (peers are resolved after it, in their own queue). {@code packagesBefore} is how many packages the lockfile
-     * held when the install began: an edge one of those is or satisfies is deduped to it whatever the order.
+     * One line per name whose result depends on the order its edges ran, over the edges resolved in the install's
+     * first pass; {@code packagesBefore} is the lockfile's package count when the install began.
      */
     static List<String> detect(Lockfile lockfile, int packagesBefore, List<Resolved> resolved) {
         Map<String, List<Resolved>> byName = new LinkedHashMap<>();
         for (Resolved edge : resolved) {
-            if (lockfile.dependencies.get(edge.dependencyId).behavior.isPeer() ||
-                settled(lockfile, packagesBefore, edge)) {
-                continue;
+            if (!lockfile.dependencies.get(edge.dependencyId).behavior.isPeer()) {
+                byName.computeIfAbsent(edge.manifest.name, k -> new ArrayList<>()).add(edge);
             }
-            byName.computeIfAbsent(edge.manifest.name, k -> new ArrayList<>()).add(edge);
         }
         List<String> out = new ArrayList<>();
         for (Map.Entry<String, List<Resolved>> entry : byName.entrySet()) {
             List<Resolved> edges = entry.getValue();
             pairs:
             for (int i = 0; i < edges.size(); i++) {
-                for (int j = i + 1; j < edges.size(); j++) {
-                    Resolved a = edges.get(i);
-                    Resolved b = edges.get(j);
-                    if (a.pick.version.eql(b.pick.version)) {
-                        continue;
-                    }
-                    if (accepts(a, b.pick.version) || accepts(b, a.pick.version)) {
+                for (int j = 0; j < edges.size(); j++) {
+                    if (i != j && dependsOnOrder(lockfile, packagesBefore, edges.get(i), edges.get(j))) {
+                        Resolved a = edges.get(Math.min(i, j));
+                        Resolved b = edges.get(Math.max(i, j));
                         out.add("manifest arrival order: " + entry.getKey() + " for " + requirer(lockfile, a) + " (" +
                                 a.version.literal + ") and " + requirer(lockfile, b) + " (" + b.version.literal +
                                 ") resolved in one install");
@@ -88,27 +82,33 @@ final class ManifestArrivalOrder {
         return out;
     }
 
-    // getPackageID over the packages that predate the install: the pick itself, or an npm version the range accepts
-    private static boolean settled(Lockfile lockfile, int packagesBefore, Resolved edge) {
-        List<Integer> ids = lockfile.packageIndex.get(Wyhash11.stringHash(edge.manifest.name));
-        if (ids == null) {
+    // run first, `edge` takes the first pre-existing package it accepts (getPackageID walks highest first) or appends
+    // its pick; run after `other` appended its pick, it takes that pick when it accepts it and it walks earlier
+    private static boolean dependsOnOrder(Lockfile lockfile, int packagesBefore, Resolved edge, Resolved other) {
+        if (existing(lockfile, packagesBefore, other) != null || !accepts(edge, other.resolution)) {
             return false;
         }
-        Resolution resolution = Resolution.npm(edge.pick.version, edge.pick.packageVersion.tarballUrl);
-        for (int id : ids) {
-            if (id >= packagesBefore) {
-                continue;
-            }
-            Resolution existing = lockfile.packages.get(id).resolution;
-            if (existing.eql(resolution) || existing.tag == Resolution.Tag.NPM && accepts(edge, existing.version)) {
-                return true;
-            }
-        }
-        return false;
+        Resolution first = existing(lockfile, packagesBefore, edge);
+        return first == null ? !other.resolution.eql(edge.resolution) : other.resolution.order(first) > 0;
     }
 
-    private static boolean accepts(Resolved edge, SemverVersion version) {
-        return edge.version.tag == DependencyVersion.Tag.NPM && edge.version.npm().version.satisfies(version);
+    @Nullable
+    private static Resolution existing(Lockfile lockfile, int packagesBefore, Resolved edge) {
+        List<Integer> ids = lockfile.packageIndex.get(Wyhash11.stringHash(edge.manifest.name));
+        if (ids != null) {
+            for (int id : ids) {
+                if (id < packagesBefore && accepts(edge, lockfile.packages.get(id).resolution)) {
+                    return lockfile.packages.get(id).resolution;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean accepts(Resolved edge, Resolution candidate) {
+        return candidate.eql(edge.resolution) ||
+               candidate.tag == Resolution.Tag.NPM && edge.version.tag == DependencyVersion.Tag.NPM &&
+               edge.version.npm().version.satisfies(candidate.version);
     }
 
     private static String requirer(Lockfile lockfile, Resolved edge) {

@@ -33,10 +33,7 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
 
 /**
  * Port of bun's src/install/PackageManager/install_with_manager.zig (bun 1.3.10) for {@code bun install
- * --lockfile-only}, up to the resolver: the lock loaded ({@code loadFromCwd}), the config version chosen, the root
- * package.json diffed against the lock's root and swapped in, and the edges the install enqueues collected in
- * the order bun enqueues them. When nothing is enqueued, {@link PendingInstall#save()} cleans the lockfile and
- * writes it, as bun does after its resolver has nothing to do.
+ * --lockfile-only}, up to the resolver.
  */
 public final class BunLockRegenerator {
 

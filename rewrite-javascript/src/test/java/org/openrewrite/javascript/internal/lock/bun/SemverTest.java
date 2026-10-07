@@ -82,10 +82,12 @@ class SemverTest {
     private static List<String> check(List<String[]> rows) {
         List<String> failures = new ArrayList<>();
         for (String[] row : rows) {
+            String left = decode(row[1]);
+            String right = decode(row[2]);
             String actual;
             try {
-                actual = "satisfies".equals(row[0]) ? String.valueOf(satisfies(row[1], row[2])) :
-                        String.valueOf(order(row[1], row[2]));
+                actual = "satisfies".equals(row[0]) ? String.valueOf(satisfies(left, right)) :
+                        String.valueOf(order(left, right));
             } catch (IllegalArgumentException e) {
                 actual = e.getMessage();
             }
@@ -94,6 +96,21 @@ class SemverTest {
             }
         }
         return failures;
+    }
+
+    // the recorder writes a tab, newline, carriage return or backslash in an argument as \t, \n, \r, \\
+    private static String decode(String s) {
+        StringBuilder out = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(++i);
+                out.append(next == 't' ? '\t' : next == 'n' ? '\n' : next == 'r' ? '\r' : next);
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     @Test

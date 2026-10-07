@@ -188,7 +188,8 @@ final class BunScenarios {
         }
 
         /**
-         * Every lock bun wrote or was given: {@code before}, {@code after}, {@code fresh}.
+         * Every lock bun wrote or was given: {@code before}, {@code after}, {@code fresh}, and what bun rewrote each
+         * to on an install that changes nothing ({@code <lock>-again}, {@code again}).
          */
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();
@@ -196,6 +197,11 @@ final class BunScenarios {
                 String text = file(file);
                 if (text != null) {
                     locks.add(new Lock(this, file, text));
+                }
+                String again = "after".equals(file) ? "again" : file + "-again";
+                String rewritten = file(again);
+                if (rewritten != null) {
+                    locks.add(new Lock(this, again, rewritten));
                 }
             }
             return locks;
