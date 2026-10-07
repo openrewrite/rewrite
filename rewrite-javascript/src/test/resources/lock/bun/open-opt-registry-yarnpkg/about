@@ -1,0 +1,1 @@
+npmrc registry=https://registry.yarnpkg.com/ in both phases (its packuments carry registry.npmjs.org tarball URLs): bun writes "" for every entry; does the second install re-expand "" to yarnpkg URLs and rewrite the lock?

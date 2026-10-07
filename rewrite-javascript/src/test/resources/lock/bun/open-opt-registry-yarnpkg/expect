@@ -1,0 +1,1 @@
+second-install-rejects rewrites is-number's "" registry field to https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz (bun's after is not a fixpoint, again is)
