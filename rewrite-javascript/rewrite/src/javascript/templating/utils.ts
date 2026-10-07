@@ -41,6 +41,9 @@ export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
  */
 export const WRAPPER_FUNCTION_NAME = '__WRAPPER__';
 
+/** The module of the file every template and pattern parses as. */
+export const TEMPLATE_MODULE = 'template';
+
 /** Template or pattern code as the body of the wrapper function, parenthesized to parse as an expression. */
 export function wrapCode(code: string, expression: boolean): string {
     return `function ${WRAPPER_FUNCTION_NAME}() { ${expression ? `(${code})` : code} }`;

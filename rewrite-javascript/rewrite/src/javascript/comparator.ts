@@ -2347,6 +2347,11 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return true;
     }
 
+    /** Whether a call declared on `declaringType` matches a call of the same name declared on any type. */
+    protected declaresAnyCallee(_declaringType: Type.FullyQualified): boolean {
+        return false;
+    }
+
     /** Whether the receiver has to be walked even where attribution alone settles the call. */
     protected selectMustBeVisited(_method: J.MethodInvocation): boolean {
         return false;
@@ -2428,7 +2433,7 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
                     const otherFQN = Type.FullyQualified.getFullyQualifiedName(otherDeclaringType as Type.FullyQualified);
 
                     // Different declaring types = different methods, even with same name
-                    if (methodFQN !== otherFQN) {
+                    if (methodFQN !== otherFQN && !this.declaresAnyCallee(methodDeclaringType as Type.FullyQualified)) {
                         return this.valueMismatch('methodType.declaringType');
                     }
                 }

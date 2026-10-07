@@ -17,7 +17,7 @@ import {Cursor, Markers, Tree} from '../..';
 import {J, Type} from '../../java';
 import {JS} from '../index';
 import {JavaScriptSemanticComparatorVisitor} from '../comparator';
-import {CaptureMarker, CaptureStorageValue, PlaceholderUtils} from './utils';
+import {CaptureMarker, CaptureStorageValue, PlaceholderUtils, TEMPLATE_MODULE} from './utils';
 import {Capture, CaptureConstraintContext, CaptureMap, DebugLogEntry, MatchExplanation} from './types';
 import {CAPTURE_NAME_SYMBOL} from './capture';
 
@@ -197,6 +197,14 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
     /** A capture in the receiver has to bind, so a matching `methodType` cannot stand in for it. */
     protected override selectMustBeVisited(method: J.MethodInvocation): boolean {
         return method.select !== undefined && containsCapture(method.select);
+    }
+
+    /**
+     * A function the pattern's `context` declares lives in no module of the source,
+     * so it stands in for any function of its name.
+     */
+    protected override declaresAnyCallee(declaringType: Type.FullyQualified): boolean {
+        return Type.FullyQualified.getFullyQualifiedName(declaringType) === TEMPLATE_MODULE;
     }
 
     protected hasSameKind(j: J, other: J): boolean {
