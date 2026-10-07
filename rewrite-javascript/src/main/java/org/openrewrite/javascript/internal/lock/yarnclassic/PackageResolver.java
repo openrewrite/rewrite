@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
@@ -41,6 +42,7 @@ final class PackageResolver {
     final EventLoop loop;
     final NpmRegistry npmRegistry;
     final ProjectFiles files;
+    final Host host;
     final List<String> warnings;
 
     final Map<String, List<String>> patternsByPackage = new LinkedHashMap<>();
@@ -71,17 +73,18 @@ final class PackageResolver {
 
     PackageResolver(YarnClassicOptions config, Lockfile lockfile) {
         this(config, lockfile, new ResolutionMap(config), (registry, name) -> null,
-                new ProjectFiles(Collections.emptyMap()), new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
     }
 
     PackageResolver(YarnClassicOptions config, Lockfile lockfile, ResolutionMap resolutionMap,
-                    PackumentSource registry, ProjectFiles files, List<String> warnings) {
+                    PackumentSource registry, ProjectFiles files, Host host, List<String> warnings) {
         this.config = config;
         this.lockfile = lockfile;
         this.resolutionMap = resolutionMap;
         this.loop = new EventLoop();
         this.npmRegistry = new NpmRegistry(config, loop, registry);
         this.files = files;
+        this.host = host;
         this.warnings = warnings;
     }
 
@@ -499,11 +502,7 @@ final class PackageResolver {
         return req;
     }
 
-    /**
-     * A request whose version a manifest already resolved holds joins that manifest's entry. When the entry differs
-     * from what the request found, and nothing the request waited on made it come second, yarn may have taken this
-     * request's instead.
-     */
+    // an entry the request joins that differs from its own is a race unless what it waited on made it come second
     void joined(PackageRequest request, Manifest info, Manifest resolved) {
         PackageReference ref = resolved.reference;
         if (ref == null || ref.requests.isEmpty()) {

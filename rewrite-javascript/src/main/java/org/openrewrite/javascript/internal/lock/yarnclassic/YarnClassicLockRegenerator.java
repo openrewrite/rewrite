@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Port of yarn src/cli/commands/install.js (yarn 1.22.22) for {@code yarn install} without node_modules.
@@ -66,15 +67,16 @@ public final class YarnClassicLockRegenerator {
         @Singular
         Map<String, String> manifests;
 
-        @Nullable
-        String yarnrc;
-
-        @Nullable
-        String npmrc;
+        /**
+         * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory and of the directories above it in
+         * the repository, by path relative to the project's root ({@code .yarnrc}, {@code ../.npmrc}).
+         */
+        @Singular
+        Map<String, String> configFiles;
 
         /**
-         * The paths the project holds relative to its root, when the host says; a {@code .yarnrc} or {@code .npmrc}
-         * among them that the host did not read is unknown.
+         * The paths the project holds relative to its root, and the files of the directories above it
+         * ({@code ../.npmrc}), when the host says; a config file among them the host did not read is unknown.
          */
         @Nullable
         Set<String> paths;
@@ -180,6 +182,9 @@ public final class YarnClassicLockRegenerator {
             throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": the lock is a Yarn Berry lock (" +
                                                       "__metadata)");
         }
+        if (config.getFlags().isLockfile() && LockfileParser.CONFLICT.equals(lockfile.getParseResultType())) {
+            throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": the lock's merge conflict does not merge");
+        }
         YarnClassicOptions.Flags flags = config.getFlags();
         ResolutionMap resolutionMap = new ResolutionMap(config);
         InstallCwdRequest request = fetchRequestFromCwd(lockfile, config, resolutionMap, warnings);
@@ -198,7 +203,7 @@ public final class YarnClassicLockRegenerator {
             }
 
             PackageResolver resolver = new PackageResolver(config, lockfile, resolutionMap, registry,
-                    new ProjectFiles(inputs.getManifests()), warnings);
+                    new ProjectFiles(inputs.getManifests(), inputs.getPaths()), inputs.getHost(), warnings);
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
             if (!resolver.races.isEmpty()) {
@@ -224,19 +229,20 @@ public final class YarnClassicLockRegenerator {
         }
     }
 
-    // a .yarnrc or .npmrc the project holds is read by every install
+    // every install reads the config files of the project's directory and of each directory above it
     private void requireConfigFiles() {
         Set<String> paths = inputs.getPaths();
         if (paths == null) {
             return;
         }
-        if (inputs.getYarnrc() == null && paths.contains(".yarnrc")) {
-            throw new CannotKnow(".yarnrc (its contents were not read)");
-        }
-        if (inputs.getNpmrc() == null && paths.contains(".npmrc")) {
-            throw new CannotKnow(".npmrc (its contents were not read)");
+        for (String path : paths) {
+            if (CONFIG_FILE.matcher(path).matches() && !inputs.getConfigFiles().containsKey(path)) {
+                throw new CannotKnow(path + " (its contents were not read)");
+            }
         }
     }
+
+    private static final Pattern CONFIG_FILE = Pattern.compile("(\\.\\./)*\\.(yarnrc|yarnrc\\.yml|npmrc)");
 
     /**
      * package-fetcher.js {@code fetchOneRemote}'s package.json: a pick from the registry stands for its tarball's,
@@ -352,6 +358,10 @@ public final class YarnClassicLockRegenerator {
             String message = e.getMessage();
             return new Failure(reasonFor(message), null, prefix + YARN_REJECTS + ": " + message);
         }
+        if (e instanceof NpmRegistry.NotFound) {
+            return new Failure(Reason.PACKAGE_NOT_FOUND, ((NpmRegistry.NotFound) e).getPackageName(),
+                    prefix + YARN_REJECTS + ": " + e);
+        }
         if (e instanceof JsError) {
             JsError error = (JsError) e;
             Reason reason = error.isSyntaxError() ? Reason.MALFORMED_MANIFEST : Reason.RESOLUTION_REQUIRED;
@@ -398,11 +408,11 @@ public final class YarnClassicLockRegenerator {
      * {@code findWorkspaceRoot} reads it, the registries' config, the manifest again, the workspaces check.
      */
     YarnClassicOptions init(List<String> warnings) {
-        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getYarnrc());
+        Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
         String rootText = inputs.getManifests().get("");
         Manifest root = rootText == null ? null : tryManifest("", rootText, looseSemver, true, null, warnings);
-        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getNpmrc(), inputs.getEnv());
+        YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getConfigFiles(), inputs.getEnv());
         if (rootText != null) {
             tryManifest("", rootText, looseSemver, false, "", warnings);
         }
@@ -707,7 +717,7 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * glob 7.1.2 of {@code <pattern>/+(package.json)} over the project's manifests, without those under the
+     * glob 7.1.2 of {@code <pattern>/+(package.json|yarn.json)} over the project's files, without those under the
      * pattern's node_modules, sorted as glob sorts: the members' locations.
      */
     private List<String> glob(String pattern) {
@@ -715,15 +725,28 @@ public final class YarnClassicLockRegenerator {
         while (base.startsWith("./")) {
             base = base.substring(2);
         }
-        String include = base + "/+(package.json)";
-        String ignore = base + "/node_modules/**/+(package.json)";
-        List<String> found = new ArrayList<>();
+        String include = base + "/+(package.json|yarn.json)";
+        String ignore = base + "/node_modules/**/+(package.json|yarn.json)";
+        Set<String> files = new LinkedHashSet<>();
         for (String loc : inputs.getManifests().keySet()) {
-            if (loc.isEmpty()) {
-                continue;
+            if (!loc.isEmpty()) {
+                files.add(loc + "/package.json");
             }
-            String file = loc + "/package.json";
+        }
+        if (inputs.getPaths() != null) {
+            for (String path : inputs.getPaths()) {
+                if (path.endsWith("/package.json") || path.endsWith("/yarn.json")) {
+                    files.add(path);
+                }
+            }
+        }
+        List<String> found = new ArrayList<>();
+        for (String file : files) {
             if (Minimatch.minimatch(file, include) && !Minimatch.minimatch(file, ignore)) {
+                String loc = file.substring(0, file.lastIndexOf('/'));
+                if (file.endsWith("/yarn.json") || !inputs.getManifests().containsKey(loc)) {
+                    throw new CannotKnow("the workspace member " + file + " (the host did not give its contents)");
+                }
                 found.add(file);
             }
         }

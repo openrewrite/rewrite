@@ -15,10 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -138,7 +140,7 @@ class NpmResolverTest {
     })
     void resolvesUnderTheRegistryTheEnvironmentNames(String variable, String value, String registry) {
         Map<String, String> env = value == null ? Collections.emptyMap() : Collections.singletonMap(variable, value);
-        Manifest manifest = resolve(YarnClassicOptions.load((String) null, null, env), "left-pad@1.3.0",
+        Manifest manifest = resolve(YarnClassicOptions.load(Collections.emptyMap(), env), "left-pad@1.3.0",
                 "{\"name\": \"left-pad\", \"dist-tags\": {\"latest\": \"1.3.0\"}, \"versions\": {\"1.3.0\": " +
                 "{\"name\": \"left-pad\", \"version\": \"1.3.0\", \"dist\": {\"tarball\": " +
                 "\"https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz\", " +
@@ -147,9 +149,47 @@ class NpmResolverTest {
                                                                        "#5b8a3a7765dfe001261dde915589e782f8c94d1e");
     }
 
+    /**
+     * npm-resolver.js swaps a locked entry's remote for the offline mirror's prebuilt package only when the entry
+     * holds this platform's variant and the mirror holds its file, which the engine cannot see.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "no variants||reused",
+            "the host's variant|left-pad-v1.3.0-darwin-arm64-137 abc|cannot-know left-pad-v1.3.0-darwin-arm64-137",
+            "another platform's variant|left-pad-v1.3.0-linux-x64-137 abc|reused",
+            "the host's variant without a mirror|left-pad-v1.3.0-darwin-arm64-137 abc|reused",
+    })
+    void reusesALockedEntryUnlessTheMirrorMayHoldItsPrebuiltVariant(String label, @Nullable String variant,
+                                                                   String outcome) {
+        String yarnrc = "experimental-pack-script-packages-in-mirror true\n" +
+                        (label.endsWith("without a mirror") ? "" : "yarn-offline-mirror \"./mirror\"\n");
+        YarnClassicOptions options = YarnClassicOptions.load(Collections.singletonMap(".yarnrc", yarnrc),
+                Collections.emptyMap());
+        String lock = "left-pad@1.3.0:\n  version \"1.3.0\"\n  resolved \"https://registry.yarnpkg.com/left-pad/-/" +
+                      "left-pad-1.3.0.tgz#5b8a3a7765dfe001261dde915589e782f8c94d1e\"\n" +
+                      "  integrity sha1-W4o6d2Xf4AEmHd6RVYnngvjJTR4=\n" +
+                      (variant == null ? "" : "  prebuiltVariants:\n    " + variant + "\n");
+        PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
+                new ResolutionMap(options), (registry, name) -> null, new ProjectFiles(Collections.emptyMap(), null),
+                Host.builder().os("darwin").cpu("arm64").build(), new ArrayList<>());
+        PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("left-pad@1.3.0")
+                .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
+        String answer;
+        try {
+            EventLoop.Promise<Manifest> found = new NpmResolver(request, "left-pad", "1.3.0").resolve();
+            resolver.loop.run();
+            answer = requireNonNull(found.getValue()).getVersion() != null ? "reused" : "none";
+        } catch (CannotKnow e) {
+            answer = "cannot-know " + e.getSubject().replaceFirst("^.* prebuilt package (\\S+) .*$", "$1");
+        }
+        assertThat(answer).isEqualTo(outcome);
+    }
+
     private static Manifest resolve(YarnClassicOptions options, String pattern, String packument) {
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
-                (registry, name) -> packument, new ProjectFiles(Collections.emptyMap()), new ArrayList<>());
+                (registry, name) -> packument, new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN,
+                new ArrayList<>());
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
                 .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);

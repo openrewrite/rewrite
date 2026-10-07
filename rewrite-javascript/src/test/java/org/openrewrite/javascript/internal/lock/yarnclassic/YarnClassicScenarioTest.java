@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,6 +58,7 @@ class YarnClassicScenarioTest {
 
     static final String RESULTS_ENV = "REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS";
     private static final String SYNTAX_ERROR_HEAD = "SyntaxError: package.json:";
+    private static final Pattern JS_ERROR = Pattern.compile("([A-Z][A-Za-z]*)?Error( \\[[A-Z_]+])?: ");
 
     private static final List<String> results = Collections.synchronizedList(new ArrayList<>());
 
@@ -102,12 +104,25 @@ class YarnClassicScenarioTest {
 
         @Override
         public @Nullable String packument(String registry, String name) {
-            String body = scenario.http(name);
+            String mirror = mirror(registry);
+            String body = mirror == null ? scenario.http(name) : scenario.file(mirror + "/" + name);
             if (body == null) {
                 missing.add(name);
                 return null;
             }
             return withRecordedVersions(name, body);
+        }
+
+        // a registry other than npm's and yarn's answers from http-<name>/ when the scenario recorded its documents
+        private @Nullable String mirror(String registry) {
+            String host = registry.replaceFirst("^[a-z]+://", "").replaceFirst("[/:].*$", "");
+            String[] labels = host.split("\\.");
+            if (labels.length < 3 || !"registry".equals(labels[0]) || "npmjs".equals(labels[1]) ||
+                "yarnpkg".equals(labels[1])) {
+                return null;
+            }
+            String dir = "http-" + labels[1];
+            return Files.isDirectory(scenario.getDir().resolve(dir)) ? dir : null;
         }
 
         private String withRecordedVersions(String name, String body) {
@@ -196,11 +211,13 @@ class YarnClassicScenarioTest {
                 ok = failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
                 break;
             case "pm-rejects":
-                // a package the registry does not have is the one route that is not recorded
+                // yarn prints its own messages bare and JavaScript's errors by name, which the registry's 404 is
+                // too; a package the registry does not have is the one route that is not recorded
                 ok = (detail.startsWith(YarnClassicLockRegenerator.YARN_REJECTS) ||
-                      detail.startsWith(YarnClassicLockRegenerator.YARN_FAILS)) && saysWhatYarnSaid(detail, rest) &&
-                     (http.missing.isEmpty() || rest.startsWith("Couldn't find package") ||
-                      rest.endsWith(": Not found"));
+                      JS_ERROR.matcher(rest).lookingAt() && detail.startsWith(YarnClassicLockRegenerator.YARN_FAILS)) &&
+                     saysWhatYarnSaid(detail, rest) &&
+                     (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND &&
+                      (rest.startsWith("Couldn't find package") || rest.endsWith(": Not found")));
                 break;
             case "second-install-rejects":
             case "unstable":

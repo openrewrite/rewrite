@@ -32,8 +32,10 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -50,6 +52,7 @@ final class YarnClassicScenarios {
     static final String FAMILY = "yarn-classic";
 
     private static final List<String> LOCKS = Arrays.asList("before", "after", "again");
+    private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S*) cpu=(\\S*)");
@@ -223,20 +226,47 @@ final class YarnClassicScenarios {
         }
 
         /**
-         * What yarn had in a phase: the lock it started from, the phase's manifests, and the .yarnrc and .npmrc the
-         * recorder placed (the scenario's {@code yarnrc} and {@code npmrc}, then the phase's tree over them).
+         * What yarn had in a phase: the lock it started from, the phase's manifests, the config files the recorder
+         * placed (the scenario's {@code yarnrc} and {@code npmrc}, the phase's tree over them, and the directories
+         * above the project: {@code parent/} and {@code grandparent/}), and every path of that layout when the
+         * recorder here made it.
          */
         YarnClassicLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
-            Map<String, String> tree = tree(before);
+            Map<String, String> configFiles = new LinkedHashMap<>();
+            putIfPresent(configFiles, ".yarnrc", file("yarnrc"));
+            putIfPresent(configFiles, ".npmrc", file("npmrc"));
+            Map<String, Map<String, String>> trees = new LinkedHashMap<>();
+            trees.put("", tree(before));
+            trees.put("../", tree("parent"));
+            trees.put("../../", tree("grandparent"));
+            Set<String> paths = new LinkedHashSet<>(configFiles.keySet());
+            paths.add("package.json");
+            if (lock != null) {
+                paths.add("yarn.lock");
+            }
+            for (Map.Entry<String, Map<String, String>> tree : trees.entrySet()) {
+                for (String name : CONFIG_FILES) {
+                    putIfPresent(configFiles, tree.getKey() + name, tree.getValue().get(name));
+                }
+                for (String path : tree.getValue().keySet()) {
+                    paths.add(tree.getKey() + path);
+                }
+            }
             return YarnClassicLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(before))
-                    .yarnrc(tree.containsKey(".yarnrc") ? tree.get(".yarnrc") : file("yarnrc"))
-                    .npmrc(tree.containsKey(".npmrc") ? tree.get(".npmrc") : file("npmrc"))
+                    .configFiles(configFiles)
+                    .paths(has("recorded-with") ? paths : null)
                     .env(new LinkedHashMap<>())
                     .host(host())
                     .now(now())
                     .build();
+        }
+
+        private void putIfPresent(Map<String, String> files, String path, @Nullable String text) {
+            if (text != null) {
+                files.put(path, text);
+            }
         }
 
         /**

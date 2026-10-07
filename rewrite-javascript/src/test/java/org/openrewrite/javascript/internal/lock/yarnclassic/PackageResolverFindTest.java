@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -114,7 +115,7 @@ class PackageResolverFindTest {
         YarnClassicOptions options = YarnClassicOptions.defaults();
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
                 new ResolutionMap(options), (url, name) -> registry.get(name),
-                new ProjectFiles(Collections.emptyMap()), new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
         List<DependencyRequestPattern> requests = new ArrayList<>();
         for (String root : roots) {
             requests.add(DependencyRequestPattern.builder().pattern(root).registry(NpmResolver.NPM_REGISTRY_ID)

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
@@ -124,6 +125,27 @@ final class NpmResolver {
         return url;
     }
 
+    /**
+     * The entry's {@code prebuiltVariants} key util/package-name-utils.js {@code getPlatformSpecificPackageFilename}
+     * gives on the host, when the entry has it; any of the entry's when the host's platform is not known.
+     */
+    private @Nullable String prebuiltVariant(Manifest shrunk) {
+        Object prebuiltVariants = shrunk.get("prebuiltVariants");
+        String name = Js.string(shrunk.getName());
+        String prefix = (name.startsWith("@") ? name.substring(1).replaceFirst("/", "-") : name) + "-v" +
+                        Js.string(shrunk.getVersion()) + "-";
+        Host host = request.resolver.host;
+        if (host.getOs() != null && host.getCpu() != null) {
+            prefix += host.getOs() + "-" + host.getCpu() + "-";
+        }
+        for (String key : Js.keys(prebuiltVariants)) {
+            if (key.startsWith(prefix) && Js.truthy(Js.get(prebuiltVariants, key))) {
+                return key;
+            }
+        }
+        return null;
+    }
+
     Promise<@Nullable Object> resolveRequest(@Nullable Object desiredVersion) {
         String escapedName = NpmRegistry.escapeName(name);
         String desiredRange = Js.truthy(desiredVersion) ? Js.string(desiredVersion) : range;
@@ -138,8 +160,12 @@ final class NpmResolver {
         EventLoop loop = request.resolver.loop;
         Manifest shrunk = request.getLocked("tarball");
         if (shrunk != null && config.isPackBuiltPackages() && Js.truthy(shrunk.get("prebuiltVariants")) &&
-            shrunk.remote != null && config.getOption("yarn-offline-mirror") != null) {
-            throw new CannotKnow("the offline mirror's prebuilt packages for " + request.pattern);
+            shrunk.remote != null) {
+            String prebuiltName = prebuiltVariant(shrunk);
+            if (prebuiltName != null && Js.truthy(config.getOfflineMirrorPath())) {
+                throw new CannotKnow("whether the offline mirror holds the prebuilt package " + prebuiltName +
+                                     " for " + request.pattern);
+            }
         }
         if (shrunk != null && shrunk.remote != null &&
             (Js.truthy(shrunk.remote.integrity) || !config.isAutoAddIntegrity())) {

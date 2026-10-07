@@ -1,0 +1,1 @@
+An .npmrc above the project sets registry: yarn requests the packument there and writes the mirror's tarball url.

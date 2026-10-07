@@ -26,8 +26,7 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Node's event loop as an install runs on it: every queued microtask runs before the next I/O completes. I/O
- * completes in the order it was issued; which other orders could change what yarn writes is the resolver's to tell.
+ * Node's event loop as an install runs on it: microtasks drain before the next I/O completes, in issue order.
  */
 final class EventLoop {
 
@@ -67,10 +66,7 @@ final class EventLoop {
         return io;
     }
 
-    /**
-     * The number of I/O operations issued so far: an operation whose id is at least a mark taken earlier was
-     * issued after it.
-     */
+    // an operation whose id is at least a mark was issued after the mark was taken
     int mark() {
         return issued;
     }
@@ -125,9 +121,7 @@ final class EventLoop {
             return promise;
         }
 
-        /**
-         * An async function's body run up to its first await: what it throws rejects the promise it returns.
-         */
+        // an async function's body up to its first await: what it throws rejects the promise it returns
         static <T> Promise<T> async(EventLoop loop, Supplier<Promise<T>> body) {
             try {
                 return body.get();
@@ -187,9 +181,6 @@ final class EventLoop {
             Promise<U> apply(@Nullable T value);
         }
 
-        /**
-         * {@code await} this promise, then continue with what the step returns; a rejection skips the step.
-         */
         <U> Promise<U> then(Step<T, U> step) {
             Promise<U> next = new Promise<>(loop);
             react(() -> {
@@ -247,10 +238,7 @@ final class EventLoop {
             return next;
         }
 
-        /**
-         * {@code for (const promise of promises) await promise}: the first rejection in order, after the promises
-         * before it settle.
-         */
+        // for (const promise of promises) await promise
         static Promise<Void> awaitInOrder(EventLoop loop, List<Promise<Void>> promises) {
             Promise<Void> chain = resolved(loop, null);
             for (Promise<Void> promise : promises) {

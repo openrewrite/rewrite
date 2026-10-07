@@ -21,18 +21,26 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.npm.Host;
+import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Every install yarn ran, recorded or probed, up to its first step: the error yarn stopped with, or the request.
@@ -261,25 +269,142 @@ class YarnClassicLockRegeneratorTest {
         assertThat(warnings).containsExactly("package.json" + collision, "p@1.0.0" + collision);
     }
 
+    /**
+     * A registry the host cannot reach or that refuses its credentials is the host's failure at any depth; a
+     * package the registry does not have is yarn's: the registry's 404 for a root dependency (open-root-package-404),
+     * {@code requiredPackageNotFoundRegistry} below one (small-workspace-protocol-unpublished-name).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "root-dep|UNREACHABLE|",
+            "child-dep|UNREACHABLE|",
+            "root-dep|AUTH_FAILED|",
+            "child-dep|AUTH_FAILED|",
+            "root-dep|absent|PACKAGE_NOT_FOUND root-dep: yarn rejects this edit: Error: " +
+            "https://registry.yarnpkg.com/root-dep: Not found",
+            "child-dep|absent|PACKAGE_NOT_FOUND null: yarn rejects this edit: Couldn't find package " +
+            "\"child-dep@^1.0.0\" required by \"root-dep@^1.0.0\" on the \"npm\" registry.",
+    })
+    void typesARegistryFailureByWhatFailed(String unfetched, String answer, @Nullable String failure) {
+        PackumentSource registry = (url, name) -> {
+            if (name.equals(unfetched)) {
+                if ("absent".equals(answer)) {
+                    return null;
+                }
+                throw new NodeRegistryException(NodeRegistryException.Reason.valueOf(answer), url, name, null,
+                        "the host could not fetch " + name, null);
+            }
+            return "{\"name\":\"" + name + "\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":" +
+                   "{\"name\":\"" + name + "\",\"version\":\"1.0.0\"," +
+                   ("root-dep".equals(name) ? "\"dependencies\":{\"child-dep\":\"^1.0.0\"}," : "") +
+                   "\"dist\":{\"tarball\":\"https://registry.npmjs.org/" + name + "/-/" + name + "-1.0.0.tgz\"," +
+                   "\"shasum\":\"abc\"}}}}";
+        };
+        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs
+                .builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .manifest("", "{\"name\":\"x\",\"version\":\"1.0.0\",\"dependencies\":{\"root-dep\":\"^1.0.0\"}}")
+                .now(Instant.EPOCH)
+                .build(), registry);
+        if (failure == null) {
+            assertThatThrownBy(regenerator::regenerate)
+                    .isInstanceOfSatisfying(NodeRegistryException.class, e ->
+                            assertThat(e.getReason()).isEqualTo(NodeRegistryException.Reason.valueOf(answer)));
+        } else {
+            Failure actual = requireNonNull(regenerator.regenerate().getFailure());
+            assertThat(actual.getReason() + " " + actual.getPackageName() + ": " + actual.getDetail())
+                    .isEqualTo(failure);
+        }
+    }
+
+    /**
+     * link-resolver.js writes a bare entry for a target without package.json; only the host's paths say so.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "paths without the target's package.json|package.json|success",
+            "paths with the target's package.json|package.json,local/package.json|cannot-know",
+            "no paths||cannot-know",
+    })
+    void linksATargetThePathsSayHasNoPackageJson(String label, @Nullable String paths, String outcome) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .manifest("", "{\"name\":\"x\",\"version\":\"1.0.0\",\"dependencies\":{\"local\":\"link:./local\"}}")
+                .host(Host.builder().os("darwin").build())
+                .now(Instant.EPOCH);
+        if (paths != null) {
+            inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
+        }
+        Result result = new YarnClassicLockRegenerator(inputs.build()).regenerate();
+        if ("success".equals(outcome)) {
+            assertThat(result.getLockFileContent()).isEqualTo("# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS " +
+                                                              "FILE DIRECTLY.\n# yarn lockfile v1\n\n\n" +
+                                                              "\"local@link:./local\":\n  version \"0.0.0\"\n" +
+                                                              "  uid \"\"\n");
+        } else {
+            assertThat(result.getErrorMessage()).contains(YarnClassicLockRegenerator.CANNOT_KNOW +
+                                                          " the package.json of link:./local");
+        }
+    }
+
+    /**
+     * Workspace members are what yarn's glob finds among the project's files (yarn 1.22.22's bundled glob over the
+     * same tree found {@code packages/node_modules/package.json} and {@code yarn.json} too), not the manifests the
+     * host chose to give, and config files above the project are read as the project's own are.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "a member the host did not give|packages/b/package.json|the workspace member packages/b/package.json",
+            "a directory the pattern names node_modules|packages/node_modules/package.json|" +
+            "the workspace member packages/node_modules/package.json",
+            "a member's yarn.json|packages/a/yarn.json|the workspace member packages/a/yarn.json",
+            "below a member's node_modules|packages/a/node_modules/x/package.json|",
+            "a hidden directory|packages/.b/package.json|",
+            "a .npmrc above the project|../.npmrc|../.npmrc (its contents were not read)",
+            "a .yarnrc.yml two directories up|../../.yarnrc.yml|../../.yarnrc.yml (its contents were not read)",
+            "a .yarnrc below the project|packages/a/.yarnrc|",
+    })
+    void readsWhatYarnFindsAmongTheProjectsPaths(String label, String path, @Nullable String cannotKnow) {
+        Result result = new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .manifest("", WORKSPACE_ROOT)
+                .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", "packages/a/package.json", path)))
+                .host(Host.builder().os("darwin").build())
+                .now(Instant.EPOCH)
+                .build()).regenerate();
+        if (cannotKnow == null) {
+            assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        } else {
+            assertThat(result.getErrorMessage()).contains(YarnClassicLockRegenerator.CANNOT_KNOW + " " + cannotKnow);
+        }
+    }
+
     private static YarnClassicLockRegenerator withMember(String root, @Nullable String yarnrc) {
-        return new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs.builder()
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", root)
                 .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}")
-                .yarnrc(yarnrc)
-                .now(Instant.EPOCH)
-                .build());
+                .now(Instant.EPOCH);
+        if (yarnrc != null) {
+            inputs.configFile(".yarnrc", yarnrc);
+        }
+        return new YarnClassicLockRegenerator(inputs.build());
     }
 
     private static Arguments probe(String label, String manifest, @Nullable String lock, @Nullable String yarnrc,
                                    @Nullable String npmrc, Map<String, String> env, String outcome) {
-        return Arguments.of(label, YarnClassicLockRegenerator.Inputs.builder()
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", manifest)
                 .lock(lock)
-                .yarnrc(yarnrc == null ? null : yarnrc + "\n")
-                .npmrc(npmrc == null ? null : npmrc + "\n")
                 .env(env)
-                .now(Instant.EPOCH)
-                .build(), outcome);
+                .now(Instant.EPOCH);
+        if (yarnrc != null) {
+            inputs.configFile(".yarnrc", yarnrc + "\n");
+        }
+        if (npmrc != null) {
+            inputs.configFile(".npmrc", npmrc + "\n");
+        }
+        return Arguments.of(label, inputs.build(), outcome);
     }
 
     private static Map<String, String> env(String... keysAndValues) {

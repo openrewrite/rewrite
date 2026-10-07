@@ -19,17 +19,20 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
- * The project's manifests by location relative to its root ({@code ""} the root, {@code packages/a} a member): what
- * yarn reads from the filesystem during an install.
+ * The project's manifests by location relative to its root ({@code ""} the root, {@code packages/a} a member) and the
+ * paths it holds when the host says: what yarn reads from the filesystem during an install.
  */
 final class ProjectFiles {
 
     private final Map<String, String> manifests;
+    private final @Nullable Set<String> paths;
 
-    ProjectFiles(Map<String, String> manifests) {
+    ProjectFiles(Map<String, String> manifests, @Nullable Set<String> paths) {
         this.manifests = manifests;
+        this.paths = paths;
     }
 
     /**
@@ -48,6 +51,18 @@ final class ProjectFiles {
 
     boolean hasManifest(@Nullable String location) {
         return location != null && manifests.containsKey(location);
+    }
+
+    /**
+     * Whether the project holds no such file; false when the host has not said which paths it holds.
+     */
+    boolean isAbsent(String path) {
+        return paths != null && !paths.contains(path);
+    }
+
+    @Nullable
+    Set<String> paths() {
+        return paths;
     }
 
     @Nullable

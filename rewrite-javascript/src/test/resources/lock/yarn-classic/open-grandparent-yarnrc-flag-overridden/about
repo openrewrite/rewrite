@@ -1,0 +1,1 @@
+--ignore-engines true two directories up, --ignore-engines false one directory up: the nearer line wins and the engine check fails.

@@ -44,7 +44,7 @@ final class LinkResolver {
         request.awaited(read);
         return read.promise.then(text -> {
             Manifest manifest;
-            if (location.isEmpty()) {
+            if (location.isEmpty() || text == null && resolver.files.isAbsent(location + "/package.json")) {
                 manifest = new Manifest();
                 manifest.put("_uid", "");
                 manifest.put("name", name);

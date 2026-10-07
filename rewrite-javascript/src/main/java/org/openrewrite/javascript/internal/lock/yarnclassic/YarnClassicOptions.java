@@ -146,53 +146,118 @@ public final class YarnClassicOptions {
     }
 
     public static YarnClassicOptions defaults() {
-        return load((String) null, null, Collections.emptyMap());
+        return load(Collections.emptyMap(), Collections.emptyMap());
     }
 
     /**
-     * @param yarnrc the project's .yarnrc.
-     * @param npmrc  the project's .npmrc.
-     * @param env    the environment yarn runs in, {@code null} when the host does not know it.
+     * @param configFiles the .yarnrc, .yarnrc.yml and .npmrc files of the project's directory and of the
+     *                    directories above it, by path relative to the project ({@code .yarnrc}, {@code ../.npmrc}).
+     * @param env         the environment yarn runs in, {@code null} when the host does not know it.
      */
-    public static YarnClassicOptions load(@Nullable String yarnrc, @Nullable String npmrc,
-                                          @Nullable Map<String, String> env) {
-        return load(rc(yarnrc), npmrc, env);
+    public static YarnClassicOptions load(Map<String, String> configFiles, @Nullable Map<String, String> env) {
+        return load(rc(configFiles), configFiles, env);
     }
 
     /**
-     * rc.js {@code getRcConfigForCwd} for the project's .yarnrc, read before anything else yarn reads.
+     * rc.js {@code getRcConfigForCwd}: each directory's .yarnrc then .yarnrc.yml from the topmost down, read before
+     * anything else yarn reads.
      */
-    static Map<String, @Nullable Object> rc(@Nullable String yarnrc) {
+    static Map<String, @Nullable Object> rc(Map<String, String> configFiles) {
         Map<String, @Nullable Object> rc = new LinkedHashMap<>();
-        if (yarnrc != null) {
-            Js.assign(rc, LockfileParser.parseLockfile(yarnrc.replace("\r\n", "\n"), ".yarnrc").getObject());
+        for (int depth = depth(configFiles); depth >= 0; depth--) {
+            for (String name : Arrays.asList(".yarnrc", ".yarnrc.yml")) {
+                String text = configFiles.get(up(depth) + name);
+                if (text != null) {
+                    Js.assign(rc, loadRcFile(text, name));
+                }
+            }
         }
         return rc;
     }
 
+    // rc.js loadRcFile; the directory keys it resolves name nothing a lock-only install reads
+    private static @Nullable Object loadRcFile(String text, String fileName) {
+        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), fileName).getObject();
+        Object yarnPath = Js.get(values, "yarnPath");
+        if (fileName.endsWith(".yml") && Js.truthy(values) && yarnPath instanceof String) {
+            Map<String, @Nullable Object> path = new LinkedHashMap<>();
+            path.put("yarn-path", yarnPath);
+            return path;
+        }
+        return values;
+    }
+
+    /**
+     * npm-registry.js {@code getPossibleConfigLocations} without the host's own files (the home directory's and
+     * the global prefix's): the project's {@code .<filename>}, then the project's again and each directory's above
+     * it, nearest first.
+     */
+    static List<String> getPossibleConfigLocations(String filename, Map<String, String> configFiles) {
+        List<String> locations = new ArrayList<>();
+        locations.add("." + filename);
+        for (int depth = 0; depth <= depth(configFiles); depth++) {
+            locations.add(up(depth) + "." + filename);
+        }
+        return locations;
+    }
+
+    private static int depth(Map<String, String> configFiles) {
+        int depth = 0;
+        for (String path : configFiles.keySet()) {
+            int d = 0;
+            while (path.startsWith("../", 3 * d)) {
+                d++;
+            }
+            depth = Math.max(depth, d);
+        }
+        return depth;
+    }
+
+    private static String up(int depth) {
+        StringBuilder up = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            up.append("../");
+        }
+        return up.toString();
+    }
+
     /**
      * The registries' {@code init}: npm's config from the environment's {@code yarn_} and {@code npm_config_}
-     * keys over the .npmrc, yarn's from its {@code yarn_} keys over the .yarnrc over yarn's defaults.
+     * keys over every .npmrc, yarn's from its {@code yarn_} keys over every .yarnrc over yarn's defaults.
      */
-    static YarnClassicOptions load(Map<String, @Nullable Object> rc, @Nullable String npmrc,
+    static YarnClassicOptions load(Map<String, @Nullable Object> rc, Map<String, String> configFiles,
                                    @Nullable Map<String, String> env) {
-        Map<String, @Nullable Object> npmEnv = new LinkedHashMap<>();
-        mergeEnv(npmEnv, "yarn_", env);
-        mergeEnv(npmEnv, "npm_config_", env);
         Map<String, @Nullable Object> npmConfig = new LinkedHashMap<>();
-        if (npmrc != null) {
-            Map<String, @Nullable Object> config = Ini.decode(npmrc.replace("\r\n", "\n"));
-            for (Map.Entry<String, @Nullable Object> entry : config.entrySet()) {
-                npmConfig.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
+        mergeEnv(npmConfig, "yarn_", env);
+        mergeEnv(npmConfig, "npm_config_", env);
+        for (String loc : getPossibleConfigLocations("npmrc", configFiles)) {
+            String file = configFiles.get(loc);
+            if (file == null) {
+                continue;
             }
+            Map<String, @Nullable Object> config = new LinkedHashMap<>();
+            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(file.replace("\r\n", "\n")).entrySet()) {
+                config.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
+            }
+            config.putAll(npmConfig);
+            npmConfig = config;
         }
-        npmConfig.putAll(npmEnv);
 
-        Map<String, @Nullable Object> yarnEnv = new LinkedHashMap<>();
-        mergeEnv(yarnEnv, "yarn_", env);
-        Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>(DEFAULTS);
-        yarnConfig.putAll(rc);
-        yarnConfig.putAll(yarnEnv);
+        Map<String, @Nullable Object> yarnConfig = new LinkedHashMap<>();
+        mergeEnv(yarnConfig, "yarn_", env);
+        for (String loc : getPossibleConfigLocations("yarnrc", configFiles)) {
+            String file = configFiles.get(loc);
+            if (file == null) {
+                continue;
+            }
+            Map<String, @Nullable Object> config = new LinkedHashMap<>();
+            Js.assign(config, LockfileParser.parseLockfile(file.replace("\r\n", "\n"), ".yarnrc").getObject());
+            config.putAll(yarnConfig);
+            yarnConfig = config;
+        }
+        Map<String, @Nullable Object> withDefaults = new LinkedHashMap<>(DEFAULTS);
+        withDefaults.putAll(yarnConfig);
+        yarnConfig = withDefaults;
 
         Map<String, @Nullable Object> commandLine = commandLine(rc);
         Object registry = commandLine.get("registry");
@@ -256,6 +321,9 @@ public final class YarnClassicOptions {
                             args.put("lockfile", false);
                         }
                         break;
+                    case "cwd":
+                        throw new CannotKnow("the project yarn installs in the directory the .yarnrc's --cwd " +
+                                             Js.string(value) + " names");
                     default:
                         if (Boolean.TRUE.equals(value)) {
                             args.put(camelCase(arg), true);
@@ -329,6 +397,24 @@ public final class YarnClassicOptions {
             return npmConfig.get(key);
         }
         return DEFAULTS.get(key);
+    }
+
+    /**
+     * config.js {@code getOfflineMirrorPath} without a package file: npm's registry config, then yarn's.
+     */
+    @Nullable
+    Object getOfflineMirrorPath() {
+        Object mirrorPath = null;
+        for (Map<String, @Nullable Object> registry : Arrays.asList(npmConfig, yarnConfig)) {
+            Object registryMirrorPath = registry.get("yarn-offline-mirror");
+            if (Boolean.FALSE.equals(registryMirrorPath)) {
+                return null;
+            }
+            if (registryMirrorPath != null) {
+                mirrorPath = registryMirrorPath;
+            }
+        }
+        return mirrorPath;
     }
 
     /**

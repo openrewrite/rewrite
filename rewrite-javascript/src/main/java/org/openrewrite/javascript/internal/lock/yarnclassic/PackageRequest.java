@@ -129,10 +129,6 @@ final class PackageRequest {
         return Js.truthy(value) ? value : new PlainObject();
     }
 
-    /**
-     * {@code findVersionOnRegistry}: an exotic range goes to its resolver, the name kept as the pattern gives it;
-     * any other to the registry resolver.
-     */
     Promise<Manifest> findVersionOnRegistry(String pattern) {
         return normalize(pattern).then(normalized -> {
             ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(normalized.getRange());
@@ -145,8 +141,8 @@ final class PackageRequest {
             }
             NpmResolver npmResolver = getRegistryResolver(normalized.getName(), normalized.getRange());
             return Promise.async(resolver.loop, npmResolver::resolve).recover(err -> {
-                if (!(err instanceof MessageError) && !(err instanceof CannotKnow) && parentRequest != null &&
-                    Js.truthy(parentRequest.pattern)) {
+                // only JavaScript's errors are yarn's; the host's failure to fetch stays the host's
+                if (err instanceof JsError && parentRequest != null && Js.truthy(parentRequest.pattern)) {
                     throw new MessageError(Lang.format("Couldn't find package $0 required by $1 on the $2 registry.",
                             pattern, parentRequest.pattern, registry));
                 }
@@ -195,9 +191,6 @@ final class PackageRequest {
         return Promise.async(resolver.loop, () -> ExoticResolvers.resolve(kind, this, range));
     }
 
-    /**
-     * {@code findVersionInfo}: an exotic pattern, a workspace member, or the registry.
-     */
     Promise<Manifest> findVersionInfo() {
         ExoticResolvers.Kind exoticResolver = ExoticResolvers.getExoticResolver(pattern);
         if (exoticResolver != null) {
@@ -210,10 +203,6 @@ final class PackageRequest {
         return findVersionOnRegistry(pattern);
     }
 
-    /**
-     * Joins a request whose version was resolved already to the highest manifest of that version, once every
-     * version the install uses is known.
-     */
     void resolveToExistingVersion(Manifest info) {
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
         String solvedRange = NodeSemver.validRange(normalized.getRange(), YarnClassicOptions.SEMVER) != null ?
@@ -231,10 +220,6 @@ final class PackageRequest {
         ref.addOptional(optional);
     }
 
-    /**
-     * {@code find}: the version info, then either the manifest already resolved at that version or a new reference
-     * whose dependencies are requested in turn.
-     */
     Promise<Void> find(boolean fresh, boolean frozen) {
         return Promise.async(resolver.loop, this::findVersionInfo).then(info -> {
             Object version = info.getVersion();

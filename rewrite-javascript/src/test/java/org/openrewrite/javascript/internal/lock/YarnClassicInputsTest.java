@@ -49,8 +49,9 @@ class YarnClassicInputsTest {
         assertThat(inputs.getLock()).isEqualTo("# yarn lockfile v1\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "local");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
-        assertThat(inputs.getYarnrc()).isEqualTo("registry \"https://registry.npmjs.org\"\n");
-        assertThat(inputs.getNpmrc()).isEqualTo("registry=https://registry.npmmirror.com/\n");
+        assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc", ".npmrc");
+        assertThat(inputs.getConfigFiles().get(".yarnrc")).isEqualTo("registry \"https://registry.npmjs.org\"\n");
+        assertThat(inputs.getConfigFiles().get(".npmrc")).isEqualTo("registry=https://registry.npmmirror.com/\n");
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
@@ -69,8 +70,35 @@ class YarnClassicInputsTest {
         Inputs inputs = YarnClassicInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc");
-        assertThat(inputs.getYarnrc()).isNull();
+        assertThat(inputs.getConfigFiles()).isEmpty();
         assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know .yarnrc (its contents were not read)");
+    }
+
+    /**
+     * yarn reads .yarnrc and .npmrc from every directory above the project (npm-registry.js
+     * {@code getPossibleConfigLocations}, rc.js), so a repository's own config reaches a project below it.
+     */
+    @Test
+    void theDirectoriesAboveTheProjectGiveTheirConfigFiles() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\"}")
+          .lock("")
+          .packageJsonPath(Paths.get("repo/web/app/package.json"))
+          .packageManagerFile(Paths.get("repo/web/.yarnrc"), "registry \"https://registry.npmjs.org\"\n")
+          .packageManagerFile(Paths.get(".npmrc"), "registry=https://registry.npmmirror.com/\n")
+          .packageManagerFile(Paths.get("repo/other/.npmrc"), "registry=https://example.com/\n")
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("repo/web/app/package.json"),
+            Paths.get("repo/web/.yarnrc"), Paths.get("repo/.yarnrc.yml"), Paths.get(".npmrc"),
+            Paths.get("README.md"), Paths.get("repo/other/.npmrc"), Paths.get("repo/web/src/index.js"))))
+          .build();
+
+        Inputs inputs = YarnClassicInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(inputs.getConfigFiles()).containsOnlyKeys("../.yarnrc", "../../../.npmrc");
+        assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "../.yarnrc", "../../.yarnrc.yml",
+          "../../../.npmrc", "../../../README.md");
+        assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
+          .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know ../../.yarnrc.yml (its contents were not read)");
     }
 }

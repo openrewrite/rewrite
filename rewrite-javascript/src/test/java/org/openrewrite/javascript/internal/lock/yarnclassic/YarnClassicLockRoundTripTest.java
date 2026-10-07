@@ -93,7 +93,7 @@ class YarnClassicLockRoundTripTest {
     private static @Nullable Loaded load(YarnClassicScenarios.Lock lock) {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(inputs);
-        YarnClassicOptions options = YarnClassicOptions.load(inputs.getYarnrc(), inputs.getNpmrc(), inputs.getEnv());
+        YarnClassicOptions options = YarnClassicOptions.load(inputs.getConfigFiles(), inputs.getEnv());
         Lockfile lockfile;
         try {
             lockfile = Lockfile.fromDirectory(inputs.getLock());
@@ -103,6 +103,12 @@ class YarnClassicLockRoundTripTest {
         }
         if (lockfile.getLockfilev2() != null) {
             assertThat(lock.getScenario().expect()).as("yarn sets a Yarn Berry lock aside").startsWith("malformed");
+            return null;
+        }
+        if (LockfileParser.CONFLICT.equals(lockfile.getParseResultType())) {
+            assertThat(logs(lock.getScenario())).as("yarn regenerates a lock whose conflict does not merge")
+                    .contains("could not be successfully merged, regenerating yarn.lock from scratch");
+            assertThat(lock.getScenario().expect()).startsWith("malformed");
             return null;
         }
         return new Loaded(lock, regenerator, options, lockfile);

@@ -168,7 +168,8 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * {@link #projectManifests} and the package-manager files beside any of them.
+     * {@link #projectManifests}, the package-manager files beside any of them or in a directory above them, and the
+     * paths under them or directly in a directory above them.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
         Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
@@ -180,13 +181,15 @@ public final class NodeDependencyScan {
         Map<Path, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : acc.packageManagerFiles.entrySet()) {
             Path dir = directory(file.getKey());
-            if (directories.contains(dir) || isPatch(file.getKey()) && under(dir, directories)) {
+            if (directories.contains(dir) || above(dir, directories) ||
+                isPatch(file.getKey()) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }
         Set<Path> paths = new LinkedHashSet<>();
         for (Path path : acc.paths) {
-            if (under(directory(path), directories)) {
+            Path dir = directory(path);
+            if (under(dir, directories) || above(dir, directories)) {
                 paths.add(path);
             }
         }
@@ -201,6 +204,15 @@ public final class NodeDependencyScan {
     private static boolean under(Path dir, Set<Path> directories) {
         for (Path candidate : directories) {
             if (candidate.toString().isEmpty() || dir.startsWith(candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean above(Path dir, Set<Path> directories) {
+        for (Path candidate : directories) {
+            if (dir.toString().isEmpty() || candidate.startsWith(dir)) {
                 return true;
             }
         }

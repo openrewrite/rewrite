@@ -1,0 +1,1 @@
+A .yarnrc in the directory above the project sets registry: yarn reads it and writes the bumped entry's resolved url on that registry.

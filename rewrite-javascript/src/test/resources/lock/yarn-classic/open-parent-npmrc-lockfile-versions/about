@@ -1,0 +1,1 @@
+An .npmrc above the project sets yarn-enable-lockfile-versions, which yarn's getOption reads from npm's config.

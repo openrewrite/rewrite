@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +62,7 @@ class YarnClassicOptionsTest {
     void readsTheEnvironmentIntoTheNpmConfig(Map<String, String> env, String npmConfig) {
         String answer;
         try {
-            answer = Js.jsonStringify(YarnClassicOptions.load((String) null, null, env).getNpmConfig());
+            answer = Js.jsonStringify(YarnClassicOptions.load(Collections.emptyMap(), env).getNpmConfig());
         } catch (JsError e) {
             answer = e.getName() + ": " + e.getMessage();
         }
@@ -118,7 +119,7 @@ class YarnClassicOptionsTest {
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("registries")
     void requestsMetadataFromTheRegistryYarnDoes(Map<String, String> env, String packageIdent, String registry) {
-        assertThat(YarnClassicOptions.load((String) null, null, env).getRegistry(packageIdent)).isEqualTo(registry);
+        assertThat(YarnClassicOptions.load(Collections.emptyMap(), env).getRegistry(packageIdent)).isEqualTo(registry);
     }
 
     /**
@@ -156,12 +157,84 @@ class YarnClassicOptionsTest {
     @MethodSource("npmrcRegistries")
     void requestsMetadataFromTheRegistryAnNpmrcNames(@Nullable String npmrc, Map<String, String> env,
                                                      String packageIdents, String registries) {
-        YarnClassicOptions options = YarnClassicOptions.load((String) null, npmrc, env);
+        YarnClassicOptions options = YarnClassicOptions.load(npmrc == null ? Collections.emptyMap() :
+                Collections.singletonMap(".npmrc", npmrc), env);
         List<String> answers = new ArrayList<>();
         for (String ident : packageIdents.split(" ")) {
             answers.add(options.getRegistry(ident));
         }
         assertThat(String.join(" ", answers)).isEqualTo(registries);
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/registries/npm-registry.js, getPossibleConfigLocations: the project's directory and
+     * each above it (the home directory's file is the host's).
+     */
+    @Test
+    void searchesRecursivelyToTheTopOfTheRepository() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("../../.yarnrc", "");
+        assertThat(YarnClassicOptions.getPossibleConfigLocations("npmrc", files))
+                .containsExactly(".npmrc", ".npmrc", "../.npmrc", "../../.npmrc");
+    }
+
+    @Test
+    void theNearestConfigFileWins() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put(".npmrc", "registry=https://a/\n");
+        files.put("../.npmrc", "registry=https://b/\n@s:registry=https://b/s/\n");
+        files.put("../../.npmrc", "@s:registry=https://c/s/\n@t:registry=https://c/t/\n");
+        files.put("../.yarnrc", "registry \"https://y/\"\n");
+        files.put("../../.yarnrc", "registry \"https://z/\"\nsave-prefix \"~\"\n");
+        YarnClassicOptions options = YarnClassicOptions.load(files, env());
+        assertThat(options.getRegistry("x")).isEqualTo("https://a/");
+        assertThat(options.getRegistry("@s/x")).isEqualTo("https://b/s/");
+        assertThat(options.getRegistry("@t/x")).isEqualTo("https://c/t/");
+        assertThat(options.getOption("registry")).isEqualTo("https://y/");
+        assertThat(options.getOption("save-prefix")).isEqualTo("~");
+        assertThat(options.getNpmConfig()).containsOnlyKeys("@s:registry", "@t:registry", "registry");
+    }
+
+    /**
+     * rc.js reads each directory's .yarnrc then .yarnrc.yml from the top down: the nearer line wins.
+     */
+    @Test
+    void theNearestFlagLineWins() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("../../.yarnrc", "--ignore-engines true\n");
+        files.put("../.yarnrc", "--ignore-engines false\n");
+        assertThat(YarnClassicOptions.load(files, env()).getFlags().isIgnoreEngines()).isFalse();
+
+        files.clear();
+        files.put("../.yarnrc", "--ignore-engines false\n");
+        files.put("../.yarnrc.yml", "\"--ignore-engines\": true\n");
+        files.put(".yarnrc", "--ignore-engines true\n");
+        assertThat(YarnClassicOptions.load(files, env()).getFlags().isIgnoreEngines()).isTrue();
+
+        files.clear();
+        files.put("../.yarnrc.yml", "\"--registry\": \"https://r/\"\n");
+        assertThat(YarnClassicOptions.load(files, env()).getRegistry("x")).isEqualTo("https://r/");
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/rc.js, prefixed arguments: a line for another command does not reach install.
+     */
+    @Test
+    void addsCommandNamePrefixedArguments() {
+        YarnClassicOptions options = YarnClassicOptions.load(Collections.singletonMap(".yarnrc",
+                "--add.ignore-engines true\n--install.ignore-optional true\n"), env());
+        assertThat(options.getFlags().isIgnoreEngines()).isFalse();
+        assertThat(options.getFlags().isIgnoreOptional()).isTrue();
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/rc.js, --cwd inside .yarnrc: yarn installs in that directory instead.
+     */
+    @Test
+    void aCwdLineMovesTheInstallElsewhere() {
+        assertThatThrownBy(() -> YarnClassicOptions.load(Collections.singletonMap(".yarnrc", "--cwd foo\n"), env()))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("--cwd foo");
     }
 
     /**
@@ -220,7 +293,7 @@ class YarnClassicOptionsTest {
         Map<String, String> env = env("npm_config_always_auth", "true", "npm_config__auth", "auth",
                 "npm_config__authtoken", "authToken", "npm_config__username", "username", "npm_config__password",
                 "password");
-        Map<String, @Nullable Object> config = YarnClassicOptions.load((String) null, null, env).getNpmConfig();
+        Map<String, @Nullable Object> config = YarnClassicOptions.load(Collections.emptyMap(), env).getNpmConfig();
         assertThat(config).containsEntry("always-auth", true)
                 .containsEntry("_auth", "auth")
                 .containsEntry("_authtoken", "authToken")

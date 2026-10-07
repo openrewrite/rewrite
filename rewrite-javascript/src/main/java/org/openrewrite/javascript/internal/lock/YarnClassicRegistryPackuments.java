@@ -23,9 +23,8 @@ import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The packuments a Yarn classic install reads, through the run's {@link NpmRegistryClient}, from the registry yarn's
- * own configuration names for each package. The host's credentials go only to the registry the host configured them
- * for.
+ * The packuments a Yarn classic install reads from the registry yarn's own config names; the host's credentials go
+ * only to the registry the host configured them for.
  */
 final class YarnClassicRegistryPackuments implements PackumentSource {
 

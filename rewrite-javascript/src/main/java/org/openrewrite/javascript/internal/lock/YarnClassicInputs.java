@@ -22,32 +22,53 @@ import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegen
 
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the Yarn classic regenerator takes it: the manifests placed as {@link NpmInputs} places
- * them, the .yarnrc and .npmrc of the lock's directory, and the paths under it the project holds. Without the .npmrc
- * file itself, the project's npmrc the marker read stands in for it.
+ * A recipe's request as the Yarn classic regenerator takes it, with the config files of the lock's directory and of
+ * each directory above it; the project's npmrc the marker read stands in for an .npmrc the request lacks.
  */
 final class YarnClassicInputs {
+
+    private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
 
     private YarnClassicInputs() {
     }
 
     static Inputs from(Request request, Host host, Instant now) {
         String rootDir = NpmInputs.rootDirectory(request);
-        String npmrc = file(request, rootDir, ".npmrc");
+        Map<String, String> configFiles = configFiles(request, rootDir);
+        if (!configFiles.containsKey(".npmrc")) {
+            String npmrc = NpmInputs.projectNpmrc(request.getMarker());
+            if (npmrc != null) {
+                configFiles.put(".npmrc", npmrc);
+            }
+        }
         return Inputs.builder()
                 .lock(request.getLock())
                 .manifests(NpmInputs.manifests(request, rootDir))
-                .yarnrc(file(request, rootDir, ".yarnrc"))
-                .npmrc(npmrc != null ? npmrc : NpmInputs.projectNpmrc(request.getMarker()))
+                .configFiles(configFiles)
                 .paths(paths(request, rootDir))
                 .host(host)
                 .now(now)
                 .build();
+    }
+
+    private static Map<String, String> configFiles(Request request, String rootDir) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
+            Path fileName = file.getKey().getFileName();
+            String up = fileName == null ? null : up(rootDir, NpmInputs.directory(file.getKey()));
+            if (up != null && CONFIG_FILES.contains(fileName.toString())) {
+                files.put(up + fileName, file.getValue());
+            }
+        }
+        return files;
     }
 
     private static @Nullable Set<String> paths(Request request, String rootDir) {
@@ -57,23 +78,32 @@ final class YarnClassicInputs {
         Set<String> paths = new LinkedHashSet<>();
         for (Path file : request.getProjectPaths()) {
             String path = file.normalize().toString().replace('\\', '/');
+            String up = file.getFileName() == null ? null : up(rootDir, NpmInputs.directory(file));
             if (rootDir.isEmpty()) {
                 paths.add(path);
             } else if (path.startsWith(rootDir + "/")) {
                 paths.add(path.substring(rootDir.length() + 1));
+            } else if (up != null) {
+                paths.add(up + file.getFileName());
             }
         }
         return paths;
     }
 
-    private static @Nullable String file(Request request, String rootDir, String name) {
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            Path fileName = file.getKey().getFileName();
-            if (fileName != null && name.equals(fileName.toString()) &&
-                rootDir.equals(NpmInputs.directory(file.getKey()))) {
-                return file.getValue();
-            }
+    // "../" for each directory from the root's up to dir, when dir is the root's or one above it
+    private static @Nullable String up(String rootDir, String dir) {
+        if (!dir.isEmpty() && !dir.equals(rootDir) && !rootDir.startsWith(dir + "/")) {
+            return null;
         }
-        return null;
+        int depth = segments(rootDir) - segments(dir);
+        StringBuilder up = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            up.append("../");
+        }
+        return up.toString();
+    }
+
+    private static int segments(String dir) {
+        return dir.isEmpty() ? 0 : dir.split("/").length;
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
@@ -60,7 +61,21 @@ final class NpmRegistry {
     }
 
     /**
+     * request-manager.js's rejection with the npm registry's {@code {"error":"Not found"}} body, the url prefixed.
+     */
+    @Getter
+    static final class NotFound extends JsError {
+        private final String packageName;
+
+        NotFound(String url, String packageName) {
+            super(ERROR, url + ": Not found");
+            this.packageName = packageName;
+        }
+    }
+
+    /**
      * The parsed packument; the request rejects with the registry's {@code Not found} when it has no such package.
+     * A host that cannot reach the registry throws what it throws.
      */
     EventLoop.Io<Object> request(String pathname, Set<Integer> causal) {
         String registry = config.getRegistry(pathname);
@@ -73,7 +88,7 @@ final class NpmRegistry {
         EventLoop.Io<Object> io = loop.io(causal, () -> {
             String body = source.packument(registry, name);
             if (body == null) {
-                throw new JsError(JsError.ERROR, url + ": Not found");
+                throw new NotFound(url, name);
             }
             return parse(body);
         });

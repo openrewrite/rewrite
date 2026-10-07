@@ -274,7 +274,7 @@ public final class NativeLockEngine {
         }
         // A single edited manifest resolves as a single importer. For a workspace that would drop the sibling
         // importers and write a truncated lock, so keep those deferred (return the per-dependency failure).
-        if (isMultiPackageProject(pm, editedPackageJson, existingLock, packageJsonPath)) {
+        if (isMultiPackageProject(pm, editedPackageJson, existingLock)) {
             throw perDependency;
         }
         try {
@@ -365,11 +365,9 @@ public final class NativeLockEngine {
     /**
      * Whether the project has more than the single root importer whole-closure resolution reproduces. A workspace root manifest
      * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers},
-     * berry {@code @workspace:} headers). yarn.lock is flat and cannot be told apart, so
-     * a manifest in a sub-directory is treated as a member conservatively.
+     * berry {@code @workspace:} headers).
      */
-    private static boolean isMultiPackageProject(PackageManager pm, String editedManifest, String lock,
-                                                 @Nullable Path packageJsonPath) {
+    private static boolean isMultiPackageProject(PackageManager pm, String editedManifest, String lock) {
         try {
             if (declaresWorkspaces(editedManifest) || multiImporterLock(pm, lock)) {
                 return true;
@@ -949,11 +947,9 @@ public final class NativeLockEngine {
 
 
     /**
-     * A direct dependency the recipe added, plus its runtime closure, into a {@code yarn.lock} v1. yarn lists one
-     * {@code name@range:} block per resolved {@code (name, version)}, so placement is mechanical (each block at its
-     * {@code sortAlpha} position) with a header of every range that resolves to the version. Every closure member
-     * must be brand-new (no header merge or second-version block) and none may declare peers or optionalDependencies
-     * (yarn resolves those into further blocks the clean placement does not model); anything else fails loud.
+     * A direct dependency the recipe added, plus its runtime closure, into a Yarn Berry lock: one entry per resolved
+     * {@code (name, version)}. Every closure member must be brand-new (no descriptor merge or second-version entry)
+     * and none may declare peers or optionalDependencies; anything else fails loud.
      */
     private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(PackageManager pm, DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,

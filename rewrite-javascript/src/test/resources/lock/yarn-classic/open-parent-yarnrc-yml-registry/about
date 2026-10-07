@@ -1,0 +1,1 @@
+A .yarnrc.yml above the project with a --registry key: rc.js reads .yarnrc.yml beside every .yarnrc for its flag lines.

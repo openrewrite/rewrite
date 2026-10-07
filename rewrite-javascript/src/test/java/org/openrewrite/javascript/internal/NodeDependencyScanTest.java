@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
@@ -47,6 +48,33 @@ class NodeDependencyScanTest {
         assertThat(sourceKept).isFalse();
         assertThat(acc.paths).containsExactlyInAnyOrder(read, unread, source);
         assertThat(acc.packageManagerFiles).containsOnlyKeys(read);
+    }
+
+    /**
+     * Yarn classic reads .yarnrc and .npmrc from every directory above the project as well as its own.
+     */
+    @Test
+    void theDirectoriesAboveTheProjectGiveTheirFilesAndPaths() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path manifest = Paths.get("repo/app/package.json");
+        NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
+        ps.capturedPackageJson = PlainText.builder().sourcePath(manifest).text("{\"name\":\"p\"}").build();
+        acc.projects.put(manifest, ps);
+        acc.lockToPackage.put(Paths.get("repo/app/yarn.lock"), manifest);
+        Path parentYarnrc = Paths.get("repo/.yarnrc");
+        Path rootNpmrc = Paths.get(".npmrc");
+        Path ownNpmrc = Paths.get("repo/app/.npmrc");
+        Path readme = Paths.get("README.md");
+        for (Path path : new Path[]{parentYarnrc, rootNpmrc, ownNpmrc, readme, Paths.get("repo/other/.npmrc"),
+          Paths.get("repo/docs/guide.md")}) {
+            NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder().sourcePath(path).text("x=y").build());
+        }
+
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          manifest);
+
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parentYarnrc, rootNpmrc, ownNpmrc);
+        assertThat(files.getPaths()).containsExactlyInAnyOrder(parentYarnrc, rootNpmrc, ownNpmrc, readme);
     }
 
     @Test
