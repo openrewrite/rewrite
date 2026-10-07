@@ -30,15 +30,30 @@ import java.util.Collection;
 @UtilityClass
 public class NodeSemver {
 
+    /**
+     * The node-semver release whose answers the functions give: 7.8.4, which npm bundles, or 5.5.0, which yarn
+     * 1.22.22 bundles.
+     */
+    public enum Release {
+        V5_5_0, V7_8_4
+    }
+
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
     public static final class Options {
-        public static final Options DEFAULT = new Options(false, false);
-        public static final Options LOOSE = new Options(true, false);
-        public static final Options INCLUDE_PRERELEASE = new Options(false, true);
-        public static final Options LOOSE_INCLUDE_PRERELEASE = new Options(true, true);
+        public static final Options DEFAULT = new Options(false, false, Release.V7_8_4);
+        public static final Options LOOSE = new Options(true, false, Release.V7_8_4);
+        public static final Options INCLUDE_PRERELEASE = new Options(false, true, Release.V7_8_4);
+        public static final Options LOOSE_INCLUDE_PRERELEASE = new Options(true, true, Release.V7_8_4);
+
+        /**
+         * node-semver 5.5.0, whose functions take only {@code loose}.
+         */
+        public static final Options V5_5_0 = new Options(false, false, Release.V5_5_0);
+        public static final Options V5_5_0_LOOSE = new Options(true, false, Release.V5_5_0);
 
         private final boolean loose;
         private final boolean includePrerelease;
+        private final Release release;
 
         public static Options of(boolean loose, boolean includePrerelease) {
             return loose ? (includePrerelease ? LOOSE_INCLUDE_PRERELEASE : LOOSE) :
@@ -58,7 +73,7 @@ public class NodeSemver {
      * @return the range's canonical form ({@code *} for any version), or {@code null} when invalid.
      */
     public static @Nullable String validRange(String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
         if (r == null) {
             return null;
         }
@@ -66,9 +81,21 @@ public class NodeSemver {
         return formatted.isEmpty() ? "*" : formatted;
     }
 
+    /**
+     * @throws IllegalArgumentException under 5.5.0, for a version that does not parse, as its {@code Range.test}
+     *                                  throws.
+     */
     public static boolean satisfies(String version, String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
-        return r != null && r.test(version, options.loose);
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        return r != null && test(r, version, options);
+    }
+
+    private static boolean test(UnionRange r, String version, Options options) {
+        if (options.release == Release.V5_5_0 && !version.isEmpty() &&
+            !ParsedVersion.parseNode(version, options.loose).isStrictSemver()) {
+            throw new IllegalArgumentException("Invalid Version: " + version);
+        }
+        return r.test(version, options.loose);
     }
 
     /**
@@ -87,7 +114,7 @@ public class NodeSemver {
         if (version instanceof String) {
             return satisfies((String) version, range, options);
         }
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
         if (r == null || !truthy(version)) {
             return false;
         }
@@ -125,14 +152,14 @@ public class NodeSemver {
      * @return the highest of the versions the range allows, the first of equal ones, or {@code null}.
      */
     public static @Nullable String maxSatisfying(Collection<String> versions, String range, Options options) {
-        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose);
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
         if (r == null) {
             return null;
         }
         String max = null;
         ParsedVersion maxVersion = null;
         for (String version : versions) {
-            if (r.test(version, options.loose)) {
+            if (test(r, version, options)) {
                 ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
                 if (maxVersion == null || maxVersion.comparePrecedence(v) < 0) {
                     max = version;
@@ -147,8 +174,8 @@ public class NodeSemver {
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean intersects(String range1, String range2, Options options) {
-        UnionRange r1 = UnionRange.parse(range1, options.includePrerelease, options.loose);
-        UnionRange r2 = UnionRange.parse(range2, options.includePrerelease, options.loose);
+        UnionRange r1 = UnionRange.parse(range1, options.includePrerelease, options.loose, options.release);
+        UnionRange r2 = UnionRange.parse(range2, options.includePrerelease, options.loose, options.release);
         if (r1 == null || r2 == null) {
             throw new IllegalArgumentException("Invalid SemVer Range: " + (r1 == null ? range1 : range2));
         }

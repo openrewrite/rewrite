@@ -39,8 +39,8 @@ import java.util.regex.Pattern;
 @Getter
 public final class YarnClassicOptions {
 
-    static final NodeSemver.Options SEMVER = NodeSemver.Options.DEFAULT;
-    static final NodeSemver.Options LOOSE_SEMVER = NodeSemver.Options.LOOSE;
+    static final NodeSemver.Options SEMVER = NodeSemver.Options.V5_5_0;
+    static final NodeSemver.Options LOOSE_SEMVER = NodeSemver.Options.V5_5_0_LOOSE;
 
     static final String YARN_REGISTRY = "https://registry.yarnpkg.com";
     static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
