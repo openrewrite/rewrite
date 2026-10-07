@@ -406,6 +406,20 @@ describe('namesReferencedWithin', () => {
         expect(referenced).toEqual(expect.arrayContaining(['Hidden', 'Checked', 'Value']));
     });
 
+    test('a binding pattern names what it binds, and reads only its defaults and computed keys', async () => {
+        // Asked of the statements alone, so nothing binds the pattern's names and a read of one would show.
+        const statements = (await parse(`
+            const {Defaulted = Fallback, [Computed]: Keyed, ...Rest} = source;
+            const [First, ...Others] = list;
+        `)).statements;
+
+        const referenced = [...namesReferencedWithin(statements)];
+        expect(referenced).toEqual(expect.arrayContaining(['Fallback', 'Computed', 'source', 'list']));
+        for (const name of ['Defaulted', 'Keyed', 'Rest', 'First', 'Others']) {
+            expect(referenced).not.toContain(name);
+        }
+    });
+
     test('a qualified type name reads a namespace, a space of its own beside values and types', async () => {
         // A namespace sits in a namespace or module, so the outer one here is what a function is elsewhere.
         const ns = (await parse(`
@@ -607,14 +621,17 @@ describe('isReference', () => {
         }
     });
 
-    test('position is all it reads, so a binding import and a type both answer as a reference', async () => {
-        // A caller that must tell these apart adds the test itself, as AddImport's rename does.
-        for (const source of ["import {target} from 'm';", 'let v: target;']) {
-            expect(await targetsReference(source)).not.toContain(false);
-        }
+    test('a type position reads alike to a value, and an import declares what it spells', async () => {
+        expect(await targetsReference('let v: target;')).toEqual([true]);
+        expect(await targetsReference("import {target, a as target2} from 'm';\nexport {target as published};"))
+            .toEqual([false, true]);
     });
 
     test('a shorthand property answers as the name it is, though it also reads the binding', async () => {
         expect(await targetsReference('const o = {target};')).toEqual([false]);
+    });
+
+    test('a computed key and a default value read from within a naming slot', async () => {
+        expect(await targetsReference('const {[target]: a, b = target} = o;')).toEqual([true, true]);
     });
 });

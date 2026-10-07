@@ -277,7 +277,7 @@ function readReferences(
         return;
     }
     if (kind === J.Kind.Identifier) {
-        onIdentifier(node as J.Identifier, reads(node as J.Identifier, parent) ? reading : undefined, scopes);
+        onIdentifier(node as J.Identifier, reading, scopes);
     }
     const within = scopeKinds.has(kind!) ? {node, parent, outer: scopes} : scopes;
     Object.entries(node as object).forEach(([key, value]) =>
@@ -299,17 +299,29 @@ function reachOf(node: any, parent: any, key: string, within: Frames | undefined
 
 /**
  * What a read in slot `key` of `node` reads with, given what `node` itself reads with. Undefined
- * is a slot that names rather than reads, as does everything under it: an import declares what it
- * spells, an alias's new name is its own, and a re-export's clause names another module's members.
+ * is a slot that names rather than reads, as does everything under it: a `name` or `label`, a
+ * destructured property, a JSX prop, an import, which declares what it spells, an alias's new
+ * name, and a re-export's clause, which names another module's members.
  */
 function meaningOf(node: any, key: string, reading: Reading): Reading {
+    // A computed key and a binding's default value read from within a naming slot.
+    if (node.kind === JS.Kind.ComputedPropertyName || node.kind === JS.Kind.BindingElement && key === 'initializer') {
+        return 'value';
+    }
     if (reading === undefined) {
         return undefined;
     }
     if (key === 'typeParameters' || key === 'typeArguments') {
         return 'type';
     }
+    if (key === 'label' || key === 'name' && !readsItsName(node)) {
+        return undefined;
+    }
     switch (node.kind) {
+        case JS.Kind.BindingElement:
+            return key === 'propertyName' ? undefined : reading;
+        case JS.Kind.JsxAttribute:
+            return key === 'key' ? undefined : reading;
         case JS.Kind.Import:
             // `import a = NS.b` reads `NS` as whatever it is; the rest of an import declares.
             return key === 'initializer' ? 'any' : undefined;
@@ -338,9 +350,6 @@ function meaningOf(node: any, key: string, reading: Reading): Reading {
         case JS.Kind.TypePredicate:
             // `x is Foo` names the parameter `x`, a value, from within a return type.
             return key === 'parameterName' ? 'value' : reading;
-        case JS.Kind.ComputedPropertyName:
-            // `[key]` reads the value `key`, in a type member as much as in an object literal.
-            return 'value';
         case JS.Kind.IndexSignatureDeclaration:
             return key === 'typeExpression' ? 'type' : reading;
         case JS.Kind.As:
@@ -357,6 +366,16 @@ function meaningOf(node: any, key: string, reading: Reading): Reading {
         default:
             return reading;
     }
+}
+
+/**
+ * Whether a node's `name` slot reads rather than names. A call names a member of whatever it
+ * selects from, so with nothing selected its name is the function called, and a shorthand `{x}`
+ * reads the `x` it also names.
+ */
+function readsItsName(node: any): boolean {
+    return node.kind === J.Kind.MethodInvocation && !(node as J.MethodInvocation).select ||
+        node.kind === JS.Kind.PropertyAssignment && (node as JS.PropertyAssignment).initializer === undefined;
 }
 
 /**
@@ -811,18 +830,49 @@ export function declarationsOf(statement: J | undefined): J.VariableDeclarations
 
 /**
  * Whether the identifier may be renamed in place. A name its parent introduces may not — a
- * property, a method, a variable, a type parameter — nor one drawn from a namespace of its own: a
- * statement label, declaring (`x:`) or referencing (`break x`), and a JSX attribute's prop.
- * Position is all this reads: an import specifier's own name answers true, and a type position
- * reads alike to a value. A shorthand property `{x}` answers false though it also reads `x`, since
- * a rename has to expand it to `{x: y}`. What `x` reads is {@link resolve}'s question.
+ * property, a method, a variable, a type parameter, an import's own name — nor one drawn from a
+ * namespace of its own: a statement label, declaring (`x:`) or referencing (`break x`), and a JSX
+ * attribute's prop. Position is all this reads, so a type position reads alike to a value. A
+ * shorthand property `{x}` answers false though it also reads `x`, since a rename has to expand it
+ * to `{x: y}`. What `x` reads is {@link resolve}'s question.
  */
 export function isReference(cursor: Cursor, identifier: J.Identifier): boolean {
-    let c: Cursor | undefined = cursor.parent;
-    while (c && isPadding(c.value)) {
-        c = c.parent;
+    const ancestors: object[] = [];
+    for (let c: Cursor | undefined = cursor.parent; c; c = c.parent) {
+        if (isTree(c.value)) {
+            ancestors.unshift(c.value);
+        }
     }
-    return references(identifier, c?.value);
+    const parent = ancestors[ancestors.length - 1] as { kind?: string; initializer?: unknown } | undefined;
+    if (parent?.kind === JS.Kind.PropertyAssignment && parent.initializer === undefined) {
+        return false;
+    }
+    // A naming slot can hold a read deeper down, so the fold runs to the end.
+    let reading: Reading = 'value';
+    for (let i = 0; i < ancestors.length; i++) {
+        const key = slotOf(ancestors[i], ancestors[i + 1] ?? identifier);
+        reading = key === undefined ? undefined : meaningOf(ancestors[i], key, reading);
+    }
+    return reading !== undefined;
+}
+
+/** The slot of `node` holding `child`, through padding, containers and lists. */
+function slotOf(node: object, child: unknown): string | undefined {
+    return Object.entries(node).find(([key, value]) => key !== 'markers' && holds(value, child))?.[0];
+}
+
+function holds(slot: unknown, child: unknown): boolean {
+    if (slot === child) {
+        return true;
+    }
+    if (Array.isArray(slot)) {
+        return slot.some(element => holds(element, child));
+    }
+    const kind = (slot as { kind?: string } | undefined)?.kind;
+    if (kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded) {
+        return holds((slot as J.RightPadded<any>).element, child);
+    }
+    return kind === J.Kind.Container && holds((slot as J.Container<any>).elements, child);
 }
 
 /** @deprecated Use {@link isReference}, the same function under a name that does not suggest it answers for values alone. */
@@ -874,45 +924,4 @@ function resolutions(root: Tree): Resolutions {
         resolved.set(root, found = {answers, doubled});
     }
     return found;
-}
-
-/** The position half of {@link isReference}, against a parent already found. */
-function references(identifier: J.Identifier, parent: unknown): boolean {
-    const owner = parent as {
-        kind?: string; name?: unknown; key?: unknown; label?: unknown; select?: unknown;
-        propertyName?: unknown;
-    } | undefined;
-
-    // A call names a member of whatever it selects from. With nothing selected there is no member,
-    // and its `name` is a reference to the function being called.
-    if (owner?.kind === J.Kind.MethodInvocation && !owner.select) {
-        return true;
-    }
-
-    // A binding element names the property it destructures and binds under `name`, so both slots
-    // name rather than reference.
-    if (owner?.kind === JS.Kind.BindingElement && holds(owner.propertyName, identifier)) {
-        return false;
-    }
-
-    // A JSX attribute keeps its prop name on `key`; the three label-bearing nodes keep theirs on
-    // `label`. Every other kind that names rather than references keeps it on `name`.
-    return !holds(owner?.kind === JS.Kind.JsxAttribute ? owner.key : (owner?.name ?? owner?.label), identifier);
-}
-
-/** Whether a node slot, padded or not, is the identifier itself. */
-function holds(slot: unknown, identifier: J.Identifier): boolean {
-    return slot === identifier || (slot as { element?: unknown } | undefined)?.element === identifier;
-}
-
-/** As {@link references}, for a collector rather than a renamer, so a shorthand property counts. */
-function reads(identifier: J.Identifier, parent: unknown): boolean {
-    const owner = parent as { kind?: string; initializer?: unknown } | undefined;
-    return (owner?.kind === JS.Kind.PropertyAssignment && owner.initializer === undefined) ||
-        references(identifier, parent);
-}
-
-function isPadding(value: unknown): boolean {
-    const kind = (value as { kind?: string } | undefined)?.kind;
-    return kind === J.Kind.RightPadded || kind === J.Kind.LeftPadded || kind === J.Kind.Container;
 }
