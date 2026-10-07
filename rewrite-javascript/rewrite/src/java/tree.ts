@@ -40,6 +40,21 @@ export interface Expression extends J {
     readonly type?: Type;
 }
 
+export namespace Expression {
+    /**
+     * Returns the first expression inside any number of nested parentheses, or the expression itself
+     * when it is not parenthesized.
+     */
+    export function unwrap(expr: Expression): Expression;
+    export function unwrap(expr: Expression | undefined): Expression | undefined;
+    export function unwrap(expr: Expression | undefined): Expression | undefined {
+        while (expr?.kind === J.Kind.Parentheses) {
+            expr = (expr as J.Parentheses<Expression>).tree.element;
+        }
+        return expr;
+    }
+}
+
 export interface MethodCall extends Expression {
     readonly methodType?: Type.Method;
 }
