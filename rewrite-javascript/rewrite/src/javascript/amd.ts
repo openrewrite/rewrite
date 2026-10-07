@@ -24,7 +24,6 @@ import {
     J,
     rightPadded,
     space,
-    spaceContainsNewline,
     Statement,
     TrailingComma
 } from "../java";
@@ -259,14 +258,24 @@ function moveTrailingComma<T extends J>(
 
 /**
  * The whitespace that separates one entry from the next, taken from the entries already
- * there so that a block listing its dependencies one per line keeps doing so.
+ * there so that a block listing its dependencies one per line keeps doing so. Comments in an
+ * entry's prefix document that entry, so they stay behind.
  */
 function separator<T extends J>(entries: readonly J.RightPadded<T>[], slot: Slot<T>): J.Space {
     if (entries.length >= 2) {
-        return slot.prefixOf(entries[1].element);
+        return space(layoutOf(slot.prefixOf(entries[1].element)));
     }
-    const first = slot.prefixOf(entries[0].element);
-    return spaceContainsNewline(first) ? first : space(" ");
+    const first = layoutOf(slot.prefixOf(entries[0].element));
+    return space(first.includes("\n") ? first : " ");
+}
+
+/** The whitespace that positions the line an entry's prefix starts or ends on. */
+function layoutOf(prefix: J.Space): string {
+    const last = prefix.comments[prefix.comments.length - 1];
+    if (last === undefined) {
+        return prefix.whitespace;
+    }
+    return last.suffix.includes("\n") || !prefix.whitespace.includes("\n") ? last.suffix : prefix.whitespace;
 }
 
 /**

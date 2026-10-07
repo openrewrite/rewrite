@@ -104,6 +104,25 @@ describe("withDependency", () => {
         ));
     });
 
+    test("an appended entry copies the whitespace before its neighbour, never a comment", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(
+            javascript(
+                `sap.ui.define(["a/B", /* the C */ "a/C"], function (B, C) {});`,
+                `sap.ui.define(["a/B", /* the C */ "a/C", "c/D"], function (B, C, D) {});`
+            ),
+            javascript(
+                `sap.ui.define([/* a\n b */ "a/B"], function (B) {});`,
+                `sap.ui.define([/* a\n b */ "a/B", "c/D"], function (B, D) {});`
+            ),
+            javascript(
+                `sap.ui.define([\n    // the B\n    "a/B"\n], function (B) {});`,
+                `sap.ui.define([\n    // the B\n    "a/B",\n    "c/D"\n], function (B, D) {});`
+            )
+        );
+    });
+
     test("a block with no dependency array gains one before the factory", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
