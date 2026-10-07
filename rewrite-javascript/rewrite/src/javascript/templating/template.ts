@@ -381,13 +381,11 @@ export class Template {
         // Normalize the values map: convert any Capture keys to string keys
         let normalizedValues: Pick<Map<string, J>, 'get'> | undefined;
         let wrappersMap: Map<string, J.RightPadded<J> | J.RightPadded<J>[]> = new Map();
-        let patternPrefixes: Map<string, J.Space> = new Map();
 
         if (values instanceof MatchResult) {
             // MatchResult - extract both bindings and wrappersMap
             normalizedValues = values;
             wrappersMap = (values as any)[WRAPPERS_MAP_SYMBOL]();
-            patternPrefixes = values[PATTERN_PREFIXES_SYMBOL]();
         } else if (values instanceof Map) {
             const normalized = new Map<string, J>();
             for (const [key, value] of values.entries()) {
@@ -446,7 +444,8 @@ export class Template {
             wrappersMap,
             options?.format ?? true,
             renames,
-            patternPrefixes
+            // Unformatted, a capture the template spaces as the pattern did keeps the source's spacing
+            options?.format === false && values instanceof MatchResult ? values[PATTERN_PREFIXES_SYMBOL]() : undefined
         );
     }
 }

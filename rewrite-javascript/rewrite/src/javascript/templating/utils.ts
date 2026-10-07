@@ -35,7 +35,7 @@ export type CaptureStorageValue = J | J.RightPadded<J> | J[] | J.RightPadded<J>[
  */
 export const WRAPPERS_MAP_SYMBOL = Symbol('wrappersMap');
 
-/** Symbol to access the prefix a pattern writes before each capture, by capture name */
+/** Symbol to access a match's pattern prefixes without exposing them as public API */
 export const PATTERN_PREFIXES_SYMBOL = Symbol('patternPrefixes');
 
 /**

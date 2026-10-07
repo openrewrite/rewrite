@@ -20,15 +20,7 @@ import {create as produce} from 'mutative';
 import {CaptureMarker, dedentTemplate, PlaceholderUtils, randomizeIds, retainIds, TEMPLATE_MODULE, treeIds, wrapCode} from './utils';
 import {CAPTURE_NAME_SYMBOL, CAPTURE_TYPE_SYMBOL, CaptureImpl, CaptureValue, RAW_CODE_SYMBOL, RawCode, TemplateParamImpl} from './capture';
 import {PlaceholderReplacementVisitor, SubstitutedValue} from './placeholder-replacement';
-import {
-    isTrailingMarker,
-    maybeParenthesize,
-    parenthesize,
-    Precedence,
-    precedenceOf,
-    requiredPrecedence,
-    startsWithDeclarationToken
-} from './precedence';
+import {isTrailingMarker, maybeParenthesize, parenthesize, requiredPrecedence, startsWithDeclarationToken} from './precedence';
 import {JavaCoordinates} from './template';
 import {autoIndent, maybeAutoFormat} from '../format';
 import {renameBindings} from './bindings';
@@ -333,7 +325,7 @@ export class TemplateEngine {
      * @param wrappersMap Map of capture names to J.RightPadded wrappers (for preserving markers)
      * @param format Whether to fit the result to where it lands
      * @param renames Local names for the template's declared bindings, keyed as declared
-     * @param patternPrefixes The prefix the matched pattern writes before each capture, by capture name
+     * @param patternPrefixes The matched pattern's capture prefixes, given only under `format: false`
      * @returns A Promise resolving to the generated AST node
      */
     static async applyTemplateFromAst(
@@ -345,7 +337,7 @@ export class TemplateEngine {
         wrappersMap: Pick<Map<string, J.RightPadded<J> | J.RightPadded<J>[]>, 'get'> = new Map(),
         format: boolean = true,
         renames: Record<string, string> = {},
-        patternPrefixes: Pick<Map<string, J.Space>, 'get'> = new Map()
+        patternPrefixes?: Pick<Map<string, J.Space>, 'get'>
     ): Promise<J | undefined> {
         // Create substitutions map for placeholders
         const substitutions = new Map<string, Parameter>();
@@ -362,9 +354,7 @@ export class TemplateEngine {
             : fresh.tree;
 
         // Unsubstitute placeholders with actual parameter values and match results
-        // Unformatted, a capture the template spaces as the pattern did keeps the source's spacing
-        const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap,
-            format ? new Map() : patternPrefixes);
+        const visitor = new PlaceholderReplacementVisitor(substitutions, values, wrappersMap, patternPrefixes);
         const unsubstitutedAst = (await visitor.visit(bound, null))!;
 
         // An id may only be kept where the node answering to it is leaving the tree, which is the
@@ -841,19 +831,15 @@ export class TemplateApplier {
         const originalTree = tree as J;
         let resultToUse = this.wrapTree(originalTree, this.ast);
         // A replaced node spliced back in as a capture carries its own trailing markers
-        const slotMarkers = (await treeIds(this.ast)).has(originalTree.id) ? undefined : trailingMarkers(originalTree);
+        const trailing = trailingMarkers(originalTree);
+        const slotMarkers = trailing && !(await treeIds(this.ast)).has(originalTree.id) ? trailing : undefined;
         if (slotMarkers) {
             resultToUse = {...resultToUse, markers: withMarkers(resultToUse.markers, slotMarkers)};
-            // `!` and `?.` follow a left-hand-side expression, whatever the slot itself accepts
-            if (isExpression(resultToUse) && precedenceOf(resultToUse) < Precedence.Call) {
-                resultToUse = parenthesize(resultToUse, slotMarkers);
-            }
         }
         const slot = this.replacedSlot(originalTree);
-        if (slot) {
-            // `format` substitutes the target's prefix, so decide against the prefix that will print
-            resultToUse = maybeParenthesize(slot[0], slot[1], {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
-        }
+        // `format` substitutes the target's prefix, so decide against the prefix that will print
+        resultToUse = maybeParenthesize(slot?.[0], slot?.[1] ?? originalTree.id,
+            {...resultToUse, prefix: originalTree.prefix}, slotMarkers);
         return this.format(resultToUse, originalTree);
     }
 

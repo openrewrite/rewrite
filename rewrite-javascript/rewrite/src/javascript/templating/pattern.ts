@@ -682,10 +682,7 @@ export class MatchResult implements IMatchResult {
         return value as J;
     }
 
-    /**
-     * The prefix the pattern writes before each capture, by capture name.
-     * @internal
-     */
+    /** @internal */
     [PATTERN_PREFIXES_SYMBOL](): Map<string, J.Space> {
         return this.patternPrefixes ??= this.computePatternPrefixes();
     }

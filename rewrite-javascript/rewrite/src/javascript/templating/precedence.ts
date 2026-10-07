@@ -327,23 +327,24 @@ export function requiredPrecedence(parent: J, childId: string): number | undefin
  */
 export function maybeParenthesize(parent: J | undefined, childId: string, expression: J,
                                   slotMarkers?: Markers): J {
-    if (!parent) {
-        return expression;
-    }
-
-    const constraints = slotConstraints(parent, childId);
+    const constraints = parent && slotConstraints(parent, childId);
     if (!constraints) {
-        return expression;
+        return followsTrailingMarker(expression, slotMarkers) ? parenthesize(expression, slotMarkers) : expression;
     }
 
     // A statement wrapper is transparent here: the parentheses belong around the expression
     if (expression.kind === JS.Kind.ExpressionStatement) {
         const inner = (expression as JS.ExpressionStatement).expression;
-        const wrapped = wrapIfNeeded(parent, childId, constraints, inner, slotMarkers);
+        const wrapped = wrapIfNeeded(parent!, childId, constraints, inner, slotMarkers);
         return wrapped === inner ? expression : {...expression, expression: wrapped} as JS.ExpressionStatement;
     }
-    const wrapped = wrapIfNeeded(parent, childId, constraints, expression, slotMarkers);
+    const wrapped = wrapIfNeeded(parent!, childId, constraints, expression, slotMarkers);
     return constraints.typeTree ? asTypeTree(wrapped) : wrapped;
+}
+
+/** Whether the slot puts a `!` or `?.` after `expression`, which binds looser than the left-hand side they follow. */
+function followsTrailingMarker(expression: J, slotMarkers: Markers | undefined): boolean {
+    return !!slotMarkers?.markers.some(isTrailingMarker) && precedenceOf(expression) < Precedence.Call;
 }
 
 function asTypeTree(expression: J): J {
@@ -404,7 +405,7 @@ export function parenthesize(expression: J, slotMarkers?: Markers): J.Parenthese
 
 function wrapIfNeeded(parent: J, childId: string, constraints: SlotConstraints, expression: J,
                       slotMarkers: Markers | undefined): J {
-    if (precedenceOf(expression) < constraints.precedence ||
+    if (precedenceOf(expression) < constraints.precedence || followsTrailingMarker(expression, slotMarkers) ||
         (constraints.noCallShape && isCallShaped(expression)) ||
         (constraints.noOptionalChain && hasOptionalChain(expression)) ||
         (constraints.noLeadingObjectLiteral && startsWithObjectLiteral(expression)) ||
