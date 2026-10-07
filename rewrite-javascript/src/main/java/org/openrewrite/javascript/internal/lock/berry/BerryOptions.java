@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -90,6 +91,7 @@ public final class BerryOptions {
 
     static {
         DEFINITIONS.put("yarnPath", Definition.of(Type.ABSOLUTE_PATH, null));
+        DEFINITIONS.put("ignorePath", Definition.of(Type.BOOLEAN, false));
         DEFINITIONS.put("enableStrictSettings", Definition.of(Type.BOOLEAN, true));
         DEFINITIONS.put("compressionLevel", new Definition(Type.NUMBER, 0,
                 Arrays.asList("mixed", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), false, Collections.emptyMap(), null));
@@ -144,18 +146,7 @@ public final class BerryOptions {
      */
     private final Map<String, String> keySources = new LinkedHashMap<>();
 
-    /**
-     * The keys set while {@code enableStrictSettings} held: one the release does not know is Yarn's usage error.
-     */
-    private final Set<String> strictKeys = new LinkedHashSet<>();
-
     private final Map<String, String> env;
-
-    /**
-     * The Yarn release the project runs: the root manifest's {@code packageManager}, else the release file
-     * {@code yarnPath} names; null when neither names one.
-     */
-    private @Nullable String yarnVersion;
 
     private BerryOptions(Map<String, String> env) {
         this.env = env;
@@ -215,25 +206,23 @@ public final class BerryOptions {
         return options;
     }
 
-    BerryOptions withYarnVersion(@Nullable String version) {
-        this.yarnVersion = version;
-        return this;
+    /**
+     * The version a root manifest's {@code packageManager} names ({@code yarn@4.10.3}, with or without a hash).
+     */
+    static @Nullable String packageManagerVersion(@Nullable String packageManager) {
+        if (packageManager == null) {
+            return null;
+        }
+        Matcher m = PACKAGE_MANAGER.matcher(packageManager);
+        return m.find() ? m.group(1) : null;
     }
 
     /**
-     * The Yarn release a project names: the root manifest's {@code packageManager} ({@code yarn@4.10.3}, with or
-     * without a hash), else the version in the file name of the release {@code yarnPath} names.
+     * The version in the file name of the release {@code yarnPath} names ({@code .yarn/releases/yarn-4.10.3.cjs}).
      */
-    static @Nullable String yarnVersion(@Nullable String packageManager, @Nullable String yarnPath) {
-        if (packageManager != null) {
-            Matcher m = PACKAGE_MANAGER.matcher(packageManager);
-            return m.find() ? m.group(1) : null;
-        }
-        if (yarnPath != null) {
-            Matcher m = YARN_RELEASE.matcher(yarnPath);
-            return m.find() ? m.group(1) : null;
-        }
-        return null;
+    static @Nullable String yarnPathVersion(String yarnPath) {
+        Matcher m = YARN_RELEASE.matcher(yarnPath);
+        return m.find() ? m.group(1) : null;
     }
 
     @SuppressWarnings("unchecked")
@@ -278,7 +267,6 @@ public final class BerryOptions {
     }
 
     void use(String source, Map<String, @Nullable Object> data) {
-        boolean strict = Boolean.TRUE.equals(values.get("enableStrictSettings"));
         List<String> keys = new ArrayList<>();
         keys.add("enableStrictSettings");
         keys.addAll(Js.keys(data));
@@ -299,9 +287,6 @@ public final class BerryOptions {
             }
             if (!"enableStrictSettings".equals(key)) {
                 keySources.putIfAbsent(key, source);
-                if (strict) {
-                    strictKeys.add(key);
-                }
             }
             Definition definition = DEFINITIONS.get(key);
             if (definition == null) {
@@ -317,7 +302,6 @@ public final class BerryOptions {
                 throw new UsageError(e.getMessage() + " in " + source);
             }
             if ("enableStrictSettings".equals(key) && !"<environment>".equals(source)) {
-                strict = Boolean.TRUE.equals(parsed);
                 continue;
             }
             if (definition.type == Type.MAP) {
@@ -337,11 +321,13 @@ public final class BerryOptions {
      * an unknown key is Yarn's usage error, otherwise it is set aside and its default stays.
      */
     void restrictTo(Set<String> releaseSettings) {
+        // an unknown key is read in the plugin pass, under the stored value, which only the environment sets
+        boolean strict = getBoolean("enableStrictSettings");
         for (Map.Entry<String, String> key : keySources.entrySet()) {
             if (releaseSettings.contains(key.getKey())) {
                 continue;
             }
-            if (strictKeys.contains(key.getKey())) {
+            if (strict) {
                 throw new UsageError("Unrecognized or legacy configuration settings found: " + key.getKey() +
                                      " - run \"yarn config\" to see the list of settings supported in Yarn (in " +
                                      key.getValue() + ")");
@@ -493,17 +479,37 @@ public final class BerryOptions {
         return value instanceof Number ? "number" : "undefined";
     }
 
-    // parseInt: the leading integer of the string, NaN when there is none
-    private static Object parseInt(String s) {
-        Matcher m = Pattern.compile("^[\\s\\uFEFF\\u00A0]*([+-]?\\d+)").matcher(s);
-        if (!m.find()) {
+    // parseInt: the leading integer of the string, hexadecimal after 0x, NaN when there is none
+    static Object parseInt(String s) {
+        int i = 0;
+        while (i < s.length() && isStrWhiteSpace(s.charAt(i))) {
+            i++;
+        }
+        boolean negative = false;
+        if (i < s.length() && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
+            negative = s.charAt(i) == '-';
+            i++;
+        }
+        int radix = 10;
+        if (i + 1 < s.length() && s.charAt(i) == '0' && (s.charAt(i + 1) == 'x' || s.charAt(i + 1) == 'X')) {
+            radix = 16;
+            i += 2;
+        }
+        int start = i;
+        while (i < s.length() && s.charAt(i) < 128 && Character.digit(s.charAt(i), radix) >= 0) {
+            i++;
+        }
+        if (i == start) {
             return Double.NaN;
         }
-        try {
-            return Integer.parseInt(m.group(1).startsWith("+") ? m.group(1).substring(1) : m.group(1));
-        } catch (NumberFormatException e) {
-            return Double.parseDouble(m.group(1));
-        }
+        BigInteger magnitude = new BigInteger(s.substring(start, i), radix);
+        BigInteger value = negative ? magnitude.negate() : magnitude;
+        return value.bitLength() < 32 ? (Object) value.intValue() : (Object) value.doubleValue();
+    }
+
+    private static boolean isStrWhiteSpace(char c) {
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == ' ' ||
+               c == '﻿' || Character.getType(c) == Character.SPACE_SEPARATOR;
     }
 
     /**

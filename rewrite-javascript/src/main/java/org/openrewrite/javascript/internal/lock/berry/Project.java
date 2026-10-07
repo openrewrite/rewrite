@@ -72,6 +72,12 @@ final class Project {
     @Nullable
     String lockfileContent;
 
+    /**
+     * {@link #lockfileContent} parsed, which the legacy migration reads too.
+     */
+    @Nullable
+    Map<String, @Nullable Object> parsedLockfile;
+
     Project(Configuration configuration) {
         this.configuration = configuration;
     }
@@ -85,11 +91,12 @@ final class Project {
         storedDescriptors = new LinkedHashMap<>();
         storedPackages = new LinkedHashMap<>();
         lockfileContent = content;
+        parsedLockfile = null;
         String defaultLanguageName = configuration.getOptions().getString("defaultLanguageName");
         if (content == null) {
             return;
         }
-        Map<String, @Nullable Object> parsed = Syml.parseSyml(content);
+        Map<String, @Nullable Object> parsed = parsedLockfile = Syml.parseSyml(content);
         Object metadata = parsed.get("__metadata");
         if (Js.truthy(metadata)) {
             Object lockfileVersion = Js.get(metadata, "version");

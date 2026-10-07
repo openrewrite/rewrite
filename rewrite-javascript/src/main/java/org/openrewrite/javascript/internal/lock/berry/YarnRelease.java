@@ -42,6 +42,12 @@ import java.util.zip.GZIPInputStream;
 @Getter
 final class YarnRelease {
 
+    /**
+     * The release whose code this package ports; a later one changes what reaches the lock (4.14.0 writes
+     * lockfile version 9).
+     */
+    static final String PORTED = "4.10.3";
+
     private static final String RESOURCE = "yarn-releases.json.gz";
     private static final String WORD = "[A-Za-z0-9_]";
 
@@ -95,6 +101,21 @@ final class YarnRelease {
                 Collections.unmodifiableList((List<String>) Js.get(release, "patches")),
                 Pattern.compile(jsRegExp((String) nodeGyp.get("pattern"))), (String) nodeGyp.get("range"),
                 Boolean.TRUE.equals(Js.get(release, "catalogs")), Collections.unmodifiableSet(settings));
+    }
+
+    /**
+     * Two release versions ({@code 4.10.3}) by major, minor and patch.
+     */
+    static int compareVersions(String a, String b) {
+        String[] x = a.split("\\.");
+        String[] y = b.split("\\.");
+        for (int i = 0; i < 3; i++) {
+            int c = Integer.compare(Integer.parseInt(x[i]), Integer.parseInt(y[i]));
+            if (c != 0) {
+                return c;
+            }
+        }
+        return 0;
     }
 
     // JavaScript's `\b` is between an ASCII word character and anything else

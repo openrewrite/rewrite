@@ -81,11 +81,10 @@ final class LegacyMigrationResolver implements Resolver {
      * an imported pattern matches is pinned, and the rest are reported.
      */
     void setup(Project project, List<String> warnings) {
-        String content = project.lockfileContent;
-        if (content == null) {
+        Map<String, @Nullable Object> parsed = project.parsedLockfile;
+        if (parsed == null) {
             return;
         }
-        Map<String, @Nullable Object> parsed = Syml.parseSyml(content);
         if (parsed.containsKey("__metadata")) {
             return;
         }

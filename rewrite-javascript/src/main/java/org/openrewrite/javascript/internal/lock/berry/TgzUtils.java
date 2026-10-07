@@ -19,9 +19,9 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -67,7 +67,7 @@ final class TgzUtils {
     }
 
     static void extractArchiveTo(byte[] tgz, ZipArchive targetFs, String prefixPath, int stripComponents) {
-        for (TarEntry entry : parseTar(gunzip(tgz))) {
+        for (TarEntry entry : parseTar(maybeGunzip(tgz))) {
             if (ignore(entry, stripComponents)) {
                 continue;
             }
@@ -118,17 +118,30 @@ final class TgzUtils {
         return parts.length <= stripComponents;
     }
 
-    static byte[] gunzip(byte[] gzipped) {
-        try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(gzipped))) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream(gzipped.length * 3);
+    /**
+     * Parse's first write: a stream that starts with the gzip magic bytes is inflated, any other is read as a tar.
+     *
+     * @throws ReportError when the gzip stream is corrupt, as Yarn fails to fetch the package
+     */
+    static byte[] maybeGunzip(byte[] tgz) {
+        if (tgz.length < 2 || tgz[0] != (byte) 0x1f || tgz[1] != (byte) 0x8b) {
+            return tgz;
+        }
+        try (InputStream in = new GZIPInputStream(new ByteArrayInputStream(tgz))) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream(tgz.length * 3);
             byte[] buf = new byte[8192];
             int n;
             while ((n = in.read(buf)) >= 0) {
                 out.write(buf, 0, n);
             }
             return out.toByteArray();
+        } catch (EOFException e) {
+            throw new ReportError(ReportError.EXCEPTION, "zlib: unexpected end of file");
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            String message = String.valueOf(e.getMessage());
+            throw new ReportError(ReportError.EXCEPTION, "zlib: " + ("Unsupported compression method".equals(message) ?
+                    "unknown compression method" : "Corrupt GZIP trailer".equals(message) ? "incorrect data check" :
+                    message));
         }
     }
 

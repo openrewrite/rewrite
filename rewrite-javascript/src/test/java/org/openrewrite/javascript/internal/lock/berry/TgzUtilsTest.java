@@ -1,0 +1,99 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.berry;
+
+import org.junit.jupiter.api.Test;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.zip.GZIPOutputStream;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
+/**
+ * Yarn's packages/yarnpkg-core/tests/tgzUtils.test.ts, with the archive's sha512 from @yarnpkg/core 4.4.4's
+ * {@code convertToZip} under {@code compressionLevel: 0} (the release Yarn 4.10.3 bundles), as the test calls it
+ * and as the npm fetcher does. "Without any workers" is not ported: the port has no worker pool, and the case runs
+ * at {@code compressionLevel: mixed}. The 808 KB {@code carbon-icons-svelte-10.21.0.tgz} fixture is not committed;
+ * {@code REWRITE_BERRY_TGZ_FIXTURES} names a directory holding it.
+ */
+class TgzUtilsTest {
+
+    @Test
+    void convertsATgzWithoutCompression() throws IOException {
+        byte[] tar = resource("parse5-0.0.28.tgz");
+        assertThat(tar[0]).isNotEqualTo((byte) 0x1f);
+        assertThat(sha512(tar, ".", 0)).isEqualTo("c43ced62833bb3d06b926b4b6993f83adac36b04905adc79821bfe02590d4b" +
+                                                 "1d12228454cafb31d2e114fbf5507983194e83ecd7f0894ebdc06d396a945cba02");
+        assertThat(Cache.checksum(tar, StructUtils.makeIdent(null, "parse5"), BerryOptions.defaults()))
+                .isEqualTo("10c0/9959b32e2b21283b46b0f240aafba623e7f21cddce511e8cabf0bf7c0b774b15e45e4ce17ade302ab5" +
+                           "2702684b491ca4ae0fcae4f53ccd44bc2c1773f71a50ab");
+    }
+
+    @Test
+    void readsTheSameEntriesGzippedOrNot() throws IOException {
+        byte[] tar = resource("parse5-0.0.28.tgz");
+        ByteArrayOutputStream gzipped = new ByteArrayOutputStream();
+        try (GZIPOutputStream out = new GZIPOutputStream(gzipped)) {
+            out.write(tar);
+        }
+        assertThat(sha512(gzipped.toByteArray(), ".", 0)).isEqualTo(sha512(tar, ".", 0));
+    }
+
+    @Test
+    void aCorruptGzipStreamFailsAsZlibDoes() {
+        assertThatThrownBy(() -> TgzUtils.convertToZip(new byte[]{0x1f, (byte) 0x8b, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+                ".", 0))
+                .isInstanceOf(ReportError.class)
+                .hasMessage("zlib: unknown compression method");
+    }
+
+    @Test
+    void convertsATarWithALotOfFiles() throws IOException {
+        String dir = System.getenv("REWRITE_BERRY_TGZ_FIXTURES");
+        Path fixture = dir == null ? null : Paths.get(dir, "carbon-icons-svelte-10.21.0.tgz");
+        assumeTrue(fixture != null && Files.isRegularFile(fixture));
+        byte[] tgz = Files.readAllBytes(fixture);
+        assertThat(sha512(tgz, ".", 0)).isEqualTo("9d2c2748de33b0fcd0e980308f97a1e5090151615769f542d64722165780985b" +
+                                                 "3539df5ac6064773fbc0e46242703a6cf2b54058d1b14a63ed426873bd01a89a");
+        assertThat(Cache.checksum(tgz, StructUtils.makeIdent(null, "carbon-icons-svelte"), BerryOptions.defaults()))
+                .isEqualTo("10c0/84acc5fd20f022a17adb1d948a9e38247e447999a0f4a172dde8e70b3692ca09041506c31ab4e943" +
+                           "8d875ea4c5210ef15ab3fca0c97aaef102ae54107eccb5f2");
+    }
+
+    private static String sha512(byte[] tgz, String prefixPath, int stripComponents) {
+        return HashUtils.sha512Hex(TgzUtils.convertToZip(tgz, prefixPath, stripComponents).toByteArray());
+    }
+
+    private static byte[] resource(String name) throws IOException {
+        try (InputStream in = TgzUtilsTest.class.getResourceAsStream("/yarn-berry/tgz-utils/" + name)) {
+            assertThat(in).as(name).isNotNull();
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
+    }
+}

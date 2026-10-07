@@ -178,9 +178,9 @@ final class QueryString {
 
     static String stringify(Map<String, ?> obj) {
         StringBuilder out = new StringBuilder();
-        for (Map.Entry<String, ?> field : obj.entrySet()) {
-            String key = UriComponent.encodeURIComponent(field.getKey()) + "=";
-            Object value = field.getValue();
+        for (String field : Js.keys(obj)) {
+            String key = UriComponent.encodeURIComponent(field) + "=";
+            Object value = obj.get(field);
             if (value instanceof List) {
                 for (Object item : (List<?>) value) {
                     if (out.length() > 0) {

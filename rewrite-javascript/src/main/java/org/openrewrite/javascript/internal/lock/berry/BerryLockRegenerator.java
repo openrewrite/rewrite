@@ -105,23 +105,37 @@ public final class BerryLockRegenerator {
     }
 
     /**
-     * The Yarn release the project runs, named by the root manifest's {@code packageManager}, else by the release
-     * file {@code yarnPath} names.
+     * The Yarn release the project runs: the release file {@code yarnPath} names unless {@code ignorePath} is set
+     * (the release corepack starts hands the install to it, yarnpkg-cli lib.ts {@code run}), else the root
+     * manifest's {@code packageManager}.
      *
-     * @throws CannotKnow when neither names one, or the data has none of the one named
+     * @throws CannotKnow when neither names a version, the data has none of the one named, or it is a release
+     *                    after the one this package ports
      */
     YarnRelease release() {
-        Manifest rootManifest = manifest("");
         BerryOptions options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
         Object yarnPath = options.get("yarnPath");
-        String version = BerryOptions.yarnVersion(rootManifest == null ? null : rootManifest.packageManager,
-                yarnPath instanceof String ? (String) yarnPath : null);
-        if (version == null) {
-            throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no yarnPath)");
+        String version;
+        if (yarnPath != null && !options.getBoolean("ignorePath")) {
+            version = BerryOptions.yarnPathVersion(Js.string(yarnPath));
+            if (version == null) {
+                throw new CannotKnow("the Yarn release " + Js.string(yarnPath) + " is (yarnPath names no version)");
+            }
+        } else {
+            Manifest rootManifest = manifest("");
+            version = BerryOptions.packageManagerVersion(rootManifest == null ? null : rootManifest.packageManager);
+            if (version == null) {
+                throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no " +
+                                     "yarnPath)");
+            }
         }
         YarnRelease release = YarnRelease.of(version);
         if (release == null) {
             throw new CannotKnow("the data of Yarn " + version);
+        }
+        if (YarnRelease.compareVersions(version, YarnRelease.PORTED) > 0) {
+            throw new CannotKnow("the lock Yarn " + version + " writes (this engine ports Yarn " +
+                                 YarnRelease.PORTED + ")");
         }
         return release;
     }
@@ -134,7 +148,6 @@ public final class BerryLockRegenerator {
     Loaded load(YarnRelease release) {
         BerryOptions options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
         options.restrictTo(release.getSettings());
-        options.withYarnVersion(release.getVersion());
 
         Project project = new Project(new Configuration(options, release));
         project.setupResolutions(inputs.getLock());
