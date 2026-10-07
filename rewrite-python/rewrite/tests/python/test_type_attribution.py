@@ -4179,6 +4179,10 @@ class TestSymbolTheStubsDoNotDeclare:
         assert self._call_owners(
             'from lib import gone as g\ng()\nclass C:\n    def g(self):\n        pass\n') == ['lib']
 
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    return gone\n') == ['lib'], \
+            'a global declaration binds nothing until something assigns it'
+
     def test_a_name_an_enclosing_scope_binds_is_not_attributed(self):
         assert self._call_owners(
             'from lib import gone\n'

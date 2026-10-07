@@ -187,6 +187,7 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
 
     def scan(scope: Union[ast.Module, _Scope], inner: List[ast.AST], walrus_names: Set[str]) -> None:
         names: Set[str] = set()
+        declared_global: Set[str] = set()
         hidden: List[Tuple[_Position, _Position]] = []
         if isinstance(scope, _FUNCTION_SCOPES):
             args = scope.args
@@ -229,8 +230,10 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
             elif isinstance(node, ast.MatchMapping) and node.rest:
                 names.add(node.rest)
             elif isinstance(node, ast.Global):
-                file_wide.update(node.names)
+                declared_global.update(node.names)
             todo.extend(ast.iter_child_nodes(node))
+        # A `global` declaration alone binds nothing. What the scope binds under it is module-scope.
+        file_wide.update(names & declared_global)
         if scope is tree:
             file_wide.update(names)
             return
