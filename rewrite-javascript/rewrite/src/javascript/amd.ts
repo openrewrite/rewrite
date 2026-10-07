@@ -202,7 +202,7 @@ export function identifierOf(parameter: J): J.Identifier | undefined {
 
 /**
  * Where an entry's leading whitespace sits. A dependency string carries it directly, while
- * a factory parameter carries it on the identifier inside the declaration that wraps it.
+ * a factory parameter carries it on the name its declaration wraps, even a destructuring one.
  */
 interface Slot<T extends J> {
     prefixOf(element: T): J.Space;
@@ -216,7 +216,9 @@ const dependencySlot: Slot<Expression> = {
 };
 
 const parameterSlot: Slot<J> = {
-    prefixOf: element => identifierOf(element)?.prefix ?? element.prefix,
+    prefixOf: element => element.kind === J.Kind.VariableDeclarations ?
+        (element as J.VariableDeclarations).variables[0]?.element.name.prefix ?? element.prefix :
+        element.prefix,
     withPrefix: (element, prefix) => {
         if (element.kind !== J.Kind.VariableDeclarations) {
             return {...element, prefix};

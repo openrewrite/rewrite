@@ -95,6 +95,15 @@ describe("withDependency", () => {
         ));
     });
 
+    test("an appended parameter takes its separator from a destructured one", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(addDependency("c/D", "D"));
+        await spec.rewriteRun(javascript(
+            `sap.ui.define(["a/B", "a/C"], function (B, {c}) {});`,
+            `sap.ui.define(["a/B", "a/C", "c/D"], function (B, {c}, D) {});`
+        ));
+    });
+
     test("a block with no dependency array gains one before the factory", async () => {
         const spec = new RecipeSpec();
         spec.recipe = fromVisitor(addDependency("c/D", "D"));
