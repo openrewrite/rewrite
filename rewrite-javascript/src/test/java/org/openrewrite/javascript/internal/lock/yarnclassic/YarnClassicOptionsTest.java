@@ -15,18 +15,25 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The config the registries read from the environment, as yarn 1.22.22's own registries answered from its bundle.
+ * The config the registries read from the environment and the .npmrc, as yarn 1.22.22's own registries answered
+ * from its bundle, and the cases of its own tests of the registries and util/env-replace.js.
  */
 class YarnClassicOptionsTest {
 
@@ -112,6 +119,113 @@ class YarnClassicOptionsTest {
     @MethodSource("registries")
     void requestsMetadataFromTheRegistryYarnDoes(Map<String, String> env, String packageIdent, String registry) {
         assertThat(YarnClassicOptions.load((String) null, null, env).getRegistry(packageIdent)).isEqualTo(registry);
+    }
+
+    /**
+     * An empty registry is the first an ident starts with and stops the search; yarn 1.22.22's bundled NpmRegistry
+     * over a project .npmrc answered each.
+     */
+    static Stream<Arguments> npmrcRegistries() {
+        return Stream.of(
+                Arguments.of("registry=https://a/\n@s:registry=https://a/b/\n", env(),
+                        "https://a/b/x https://a/x @s/x x", "https://a/ https://a/ https://a/b/ https://a/"),
+                Arguments.of("@s:registry=https://a/b/\nregistry=https://a/\n", env(),
+                        "https://a/b/x https://a/x @s/x x", "https://a/b/ https://a/ https://a/b/ https://a/"),
+                Arguments.of("registry=\n", env(), "https://x/y x //x/y",
+                        "https://registry.yarnpkg.com https://registry.yarnpkg.com https://registry.yarnpkg.com"),
+                Arguments.of("registry=\n@s:registry=https://s/\n", env(), "https://s/x https://q/@s/x",
+                        "https://registry.yarnpkg.com https://s/"),
+                Arguments.of("@s:registry=https://e/s/\n", env("npm_config_registry", "https://e/"),
+                        "https://e/s/x https://e/x", "https://e/s/ https://e/"),
+                Arguments.of("registry=https://a/\n", env("npm_config_registry", "https://b/"),
+                        "https://b/x https://a/x", "https://b/ https://b/"),
+                Arguments.of("registry=false\n", env(), "https://x/y x",
+                        "https://registry.yarnpkg.com https://registry.yarnpkg.com"),
+                Arguments.of("registry=true\n", env(), "https://x/y x", "true true"),
+                Arguments.of("@a:registry=https://h/a/\n@b:registry=https://h/\n", env(), "https://h/a/x https://h/x",
+                        "https://h/a/ https://h/"),
+                Arguments.of("registry=https://n/\n", env("YARN_REGISTRY", "https://y/"), "https://y/x x",
+                        "https://y/ https://y/"),
+                Arguments.of(null, env("npm_config_registry", ""), "https://x/y x",
+                        "https://registry.yarnpkg.com https://registry.yarnpkg.com"),
+                Arguments.of("registry = https://sp/ \n", env(), "https://sp/x x", "https://sp/ https://sp/")
+        );
+    }
+
+    @ParameterizedTest(name = "{0} {2}")
+    @MethodSource("npmrcRegistries")
+    void requestsMetadataFromTheRegistryAnNpmrcNames(@Nullable String npmrc, Map<String, String> env,
+                                                     String packageIdents, String registries) {
+        YarnClassicOptions options = YarnClassicOptions.load((String) null, npmrc, env);
+        List<String> answers = new ArrayList<>();
+        for (String ident : packageIdents.split(" ")) {
+            answers.add(options.getRegistry(ident));
+        }
+        assertThat(String.join(" ", answers)).isEqualTo(registries);
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/util/env-replace.js.
+     */
+    @Test
+    void replacesATokenThatExistsInTheEnvironment() {
+        Map<String, String> env = env("a", "token");
+        assertThat(YarnClassicOptions.envReplace("test ${a} replacement", env)).isEqualTo("test token replacement");
+        assertThat(YarnClassicOptions.envReplace("${a} replacement", env)).isEqualTo("token replacement");
+        assertThat(YarnClassicOptions.envReplace("${a}", env)).isEqualTo("token");
+    }
+
+    @Test
+    void doesNotReplaceATokenThatDoesNotExistInTheEnvironment() {
+        assertThatThrownBy(() -> YarnClassicOptions.envReplace("${a} replacement", env("b", "token")))
+                .isInstanceOf(JsError.class)
+                .hasMessage("Failed to replace env in config: ${a}");
+    }
+
+    @Test
+    void doesNotReplaceATokenPrefixedWithABackslash() {
+        assertThat(YarnClassicOptions.envReplace("\\${a} replacement", env("a", "token")))
+                .isEqualTo("\\${a} replacement");
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/registries/npm-registry.js, getScope functional test.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+            "normal|''",
+            "@scopedNoPkg|''",
+            "@scoped/notescaped|@scoped",
+            "not@scope/pkg|''",
+            "@scope?query=true|''",
+            "@scope%2fpkg|@scope",
+            "@scope%2fpkg%2fext|@scope",
+            "@scope%2fpkg?query=true|@scope",
+            "@scope%2fpkg%2f1.2.3|@scope",
+            "http://foo.bar:80/normal|''",
+            "http://foo.bar:80/@scopedNoPkg|''",
+            "http://foo.bar:80/@scoped/notescaped|@scoped",
+            "http://foo.bar:80/@scoped/notescaped/download/@scoped/notescaped-1.0.0.tgz|@scoped",
+            "http://foo.bar:80/not@scope/pkg|''",
+    })
+    void matchesScopeCorrectly(String pathname, String scope) {
+        assertThat(YarnClassicOptions.getScope(pathname)).isEqualTo(scope);
+    }
+
+    /**
+     * yarn 1.22.22's __tests__/registries/npm-registry.js, environment variables functional test.
+     */
+    @Test
+    void correctlyEscapesEnvironmentConfigVariables() {
+        Map<String, String> env = env("npm_config_always_auth", "true", "npm_config__auth", "auth",
+                "npm_config__authtoken", "authToken", "npm_config__username", "username", "npm_config__password",
+                "password");
+        Map<String, @Nullable Object> config = YarnClassicOptions.load((String) null, null, env).getNpmConfig();
+        assertThat(config).containsEntry("always-auth", true)
+                .containsEntry("_auth", "auth")
+                .containsEntry("_authtoken", "authToken")
+                .containsEntry("_username", "username")
+                .containsEntry("_password", "password");
     }
 
     private static Map<String, String> env(String... keysAndValues) {

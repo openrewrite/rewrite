@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import lombok.Value;
 import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 
 import java.util.regex.Pattern;
@@ -60,7 +61,16 @@ final class GitResolver {
         return git(request, "https://gist.github.com/" + parts[0] + ".git#" + (parts.length > 1 ? parts[1] : ""));
     }
 
-    private static void explodeHostedGitFragment(String fragment) {
+    @Value
+    static class ExplodedFragment {
+        String user;
+        String repo;
+        String hash;
+    }
+
+    static ExplodedFragment explodeHostedGitFragment(String fragment) {
+        int hashPosition = fragment.indexOf('#');
+        String hash = hashPosition == -1 ? "" : fragment.substring(hashPosition + 1);
         String[] preParts = fragment.split("@", -1);
         if (preParts.length > 2) {
             fragment = preParts[1] + "@" + preParts[2];
@@ -68,9 +78,11 @@ final class GitResolver {
         String stripped = STRIP_HASH.matcher(fragment).replaceFirst("$1");
         stripped = STRIP_PROTOCOL.matcher(stripped).replaceFirst("$1");
         stripped = GIT_SUFFIX.matcher(stripped).replaceFirst("");
-        if (stripped.split("/", -1).length < 2) {
+        String[] parts = stripped.split("/", -1);
+        if (parts.length < 2) {
             throw new MessageError(Lang.format("Invalid hosted git fragment $0.", fragment));
         }
+        return new ExplodedFragment(parts[parts.length - 2], parts[parts.length - 1], hash);
     }
 
     Promise<Manifest> resolve() {

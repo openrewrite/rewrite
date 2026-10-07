@@ -388,7 +388,7 @@ public final class YarnClassicOptions {
     }
 
     // util/env-replace.js
-    private static @Nullable Object envReplace(@Nullable Object value, @Nullable Map<String, String> env) {
+    static @Nullable Object envReplace(@Nullable Object value, @Nullable Map<String, String> env) {
         if (!(value instanceof String) || ((String) value).isEmpty()) {
             return value;
         }

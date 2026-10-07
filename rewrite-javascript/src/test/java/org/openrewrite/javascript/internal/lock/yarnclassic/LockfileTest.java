@@ -245,8 +245,44 @@ class LockfileTest {
     }
 
     static Stream<Arguments> entries() throws IOException {
+        return rows("lock-entries.tsv");
+    }
+
+    static Stream<Arguments> reusedEntries() throws IOException {
+        return rows("lock-entries-reused.tsv");
+    }
+
+    // a reference per pattern, which copies the entry's permissions, sorted as the round trip reuses them
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("reusedEntries")
+    void writesBackAReusedEntryAsYarnDoes(String entries, JsonNode outcome) {
+        String answer;
+        try {
+            Lockfile lockfile = Lockfile.fromDirectory("# yarn lockfile v1\n\n\n" + entries);
+            PackageResolver resolver = new PackageResolver(YarnClassicOptions.defaults(), lockfile);
+            List<String> keys = new ArrayList<>(Js.keys(lockfile.getCache()));
+            keys.sort(String::compareTo);
+            for (String pattern : keys) {
+                PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
+                        .registry("npm").build(), resolver);
+                Manifest info = request.getLocked("tarball");
+                if (info != null) {
+                    PackageReference ref = new PackageReference(request, info, requireNonNull(info.remote));
+                    ref.addPattern(pattern, info);
+                    info.reference = ref;
+                }
+            }
+            answer = LockfileStringifier.stringify(lockfile.getLockfile(resolver.patterns), false, false, null);
+        } catch (JsError e) {
+            answer = e.getName() + ": " + e.getMessage();
+        }
+        assertThat(answer).isEqualTo(outcome.has("wrote") ? outcome.get("wrote").asText() :
+                outcome.get("threw").asText());
+    }
+
+    private static Stream<Arguments> rows(String resource) throws IOException {
         List<Arguments> rows = new ArrayList<>();
-        try (InputStream is = requireNonNull(LockfileTest.class.getResourceAsStream("lock-entries.tsv"));
+        try (InputStream is = requireNonNull(LockfileTest.class.getResourceAsStream(resource));
              BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {

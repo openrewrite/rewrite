@@ -98,8 +98,8 @@ class NormalizeManifestTest {
     }
 
     /**
-     * yarn's own normalize-manifest from its 1.22.22 bundle ({@code ycf-normalize.js}): only a non-empty name
-     * prefixes what yarn reports.
+     * As yarn 1.22.22's own normalize-manifest from its bundle answered: only a non-empty name prefixes what yarn
+     * reports.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
@@ -163,8 +163,8 @@ class NormalizeManifestTest {
     }
 
     /**
-     * yarn's own resolve-relative.js from its 1.22.22 bundle ({@code ycf-resolve-relative.js}), the
-     * project at {@code /a/b/c/proj}: a target outside the project keeps its climb.
+     * As yarn 1.22.22's own resolve-relative.js from its bundle answered, the project at {@code /a/b/c/proj}: a
+     * target outside the project keeps its climb.
      */
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource(delimiter = '|', quoteCharacter = '`', value = {
