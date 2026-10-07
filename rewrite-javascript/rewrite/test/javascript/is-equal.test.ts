@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Moderne Source Available License (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,8 @@ describe("isEqual", () => {
 
         expect(await equal(`x = 'a'`, `x = "a"`)).toBe(true);
 
+        expect(await equal(`x = '\\uD83D\\uDE00'`, `x = "\\uD83D\\uDE00"`)).toBe(true);
+
         const call = await statement(`Math.max(1, 2)`) as J.MethodInvocation;
         expect(call.methodType).toBeDefined();
         expect(await isEqual(call, {...call, methodType: undefined} as J.MethodInvocation)).toBe(true);
@@ -47,6 +49,10 @@ describe("isEqual", () => {
         expect(await equal(`x = 1`, `x = 2`)).toBe(false);
 
         expect(await equal(`x = '1'`, `x = 1n`)).toBe(false);
+
+        expect(await equal(`x = /a/g`, `x = '/a/g'`)).toBe(false);
+
+        expect(await equal(`x = '\\uD800'`, `x = '\\uDC00'`)).toBe(false);
     });
 
     test("tells apart the markers that change what code means", async () => {
