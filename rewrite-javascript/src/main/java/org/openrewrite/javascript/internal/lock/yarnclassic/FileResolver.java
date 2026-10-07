@@ -56,6 +56,11 @@ final class FileResolver {
         EventLoop.Io<@Nullable String> read = resolver.loop.io(request.io, () -> resolver.files.manifest(location));
         request.awaited(read);
         return read.promise.then(text -> {
+            if (text == null && resolver.files.isMissing(location)) {
+                // yarn prints the absolute path, relative to the root here
+                throw new MessageError(Lang.format("Package $1 refers to a non-existing file '$0'.", location,
+                        request.pattern.split("@", -1)[0]));
+            }
             if (text == null) {
                 throw new CannotKnow("the package.json of " + FILE_PROTOCOL_PREFIX + loc + ", which the project's " +
                                      "manifests do not include");

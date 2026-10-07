@@ -72,6 +72,21 @@ final class ProjectFiles {
     }
 
     /**
+     * Whether the host says the project holds nothing at this location, neither a file nor a directory with files.
+     */
+    boolean isMissing(String location) {
+        if (paths == null || manifests.containsKey(location)) {
+            return false;
+        }
+        for (String path : paths) {
+            if (path.equals(location) || path.startsWith(location + "/")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Whether the host says the project holds this file.
      */
     boolean holds(String path) {

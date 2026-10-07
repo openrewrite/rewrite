@@ -249,6 +249,31 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
+     * file-resolver.js rejects a target that does not exist, naming its absolute path (here relative to the root;
+     * {@code open-member-cwd-implicit-file-member-dir}); a directory without package.json is a manifest named by that
+     * absolute path, and a host that gives no paths does not say.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "nothing there|package.json,yarn.lock|RESOLUTION_REQUIRED: yarn rejects this edit: Package \"x\" refers " +
+            "to a non-existing file '\"missing\"'.",
+            "a directory without package.json|package.json,yarn.lock,missing/README.md|RESOLUTION_REQUIRED: the " +
+            "engine cannot know the package.json of file:./missing, which the project's manifests do not include",
+            "no paths|-|RESOLUTION_REQUIRED: the engine cannot know the package.json of file:./missing, which the " +
+            "project's manifests do not include",
+    })
+    void rejectsAFileTargetThatDoesNotExist(String label, @Nullable String paths, String outcome) {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"file:./missing\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .now(Instant.EPOCH);
+        if (paths != null) {
+            inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
+        }
+        assertThat(new YarnClassicLockRegenerator(inputs.build()).regenerate().getErrorMessage()).isEqualTo(outcome);
+    }
+
+    /**
      * A yarn-path release directly in a directory above the project is missing when the host's paths reach that far
      * and do not hold it; further up it may sit above the repository.
      */

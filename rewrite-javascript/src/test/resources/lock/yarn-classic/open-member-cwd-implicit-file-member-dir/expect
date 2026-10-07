@@ -1,0 +1,1 @@
+pm-rejects Package "zz-openrewrite-absent-local-dep" refers to a non-existing file '"lib"'.

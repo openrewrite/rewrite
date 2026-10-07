@@ -1,0 +1,1 @@
+yarn run in packages/a adds zz-openrewrite-absent-local-dep@lib where packages/a holds lib/package.json: normalizeRange makes it file:lib, which FileResolver resolves against the root (lockfileFolder), where lib does not exist.
