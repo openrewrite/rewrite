@@ -7,13 +7,12 @@ import * as picomatch from "picomatch";
 export class IsSourceFile extends TreeVisitor<any, ExecutionContext> {
     private readonly matcher: (path: string) => boolean;
 
-    /** Reads `filePattern` the way Java's FindSourceFiles does, so the precondition agrees on both hosts. */
+    /** Reads and matches `filePattern` the way Java's FindSourceFiles does, so the precondition agrees on both hosts. */
     constructor(filePattern: string) {
         super();
         const patterns = filePattern.split(";")
             .map(p => p.trim().replace(/^\.?[/\\]/, ""))
             .filter(p => p.length > 0);
-        // Wildcards match dot-segments too, as PathUtils.matchesGlob does.
         const options = {dot: true};
         this.matcher = patterns.length === 0 ? () => true :
             picomatch.default ? picomatch.default(patterns, options) : (picomatch as any)(patterns, options);
