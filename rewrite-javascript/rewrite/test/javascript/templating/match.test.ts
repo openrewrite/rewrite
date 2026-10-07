@@ -226,4 +226,33 @@ describe('match extraction', () => {
         await withDir(async repo => spec.rewriteRun(npm(repo.path, util, main)), {unsafeCleanup: true});
         expect(matched).toBe(true);
     });
+
+    test('a call pattern with a variadic capture matches the callee by symbol, not by name', async () => {
+        const args = capture({variadic: true});
+        const isDateCall = pattern`isDate(${args})`
+            .configure({context: [`import {isDate} from 'node:util/types';`]});
+        let calls = 0;
+        let capturedArgs: J[] | undefined;
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                calls++;
+                const m = await isDateCall.match(method, this.cursor);
+                if (m) {
+                    capturedArgs = m.get(args) as J[];
+                }
+                return method;
+            }
+        });
+
+        await spec.rewriteRun(
+            typescript(`function isDate(value: unknown): boolean { return false; }\nconst result = isDate(new Date());`)
+        );
+        expect(calls).toBe(1);
+        expect(capturedArgs).toBeUndefined();
+
+        await spec.rewriteRun(
+            typescript(`import {isDate as checkDate} from 'node:util/types';\nconst result = checkDate(new Date());`)
+        );
+        expect(capturedArgs).toHaveLength(1);
+    });
 });

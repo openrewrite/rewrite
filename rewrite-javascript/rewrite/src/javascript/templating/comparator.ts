@@ -345,90 +345,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
         return this.match;
     }
 
-    override async visitMethodInvocation(methodInvocation: J.MethodInvocation, other: J): Promise<J | undefined> {
-        // Check if any arguments are variadic captures
-        const hasVariadicCapture = methodInvocation.arguments.elements.some(arg =>
-            PlaceholderUtils.isVariadicCapture(arg)
-        );
-
-        // If no variadic captures, use parent implementation (which includes semantic/type-aware matching)
-        if (!hasVariadicCapture) {
-            return super.visitMethodInvocation(methodInvocation, other);
-        }
-
-        // Otherwise, handle variadic captures ourselves
-        if (!this.match) {
-            return this.abort(methodInvocation);
-        }
-
-        if (other.kind !== J.Kind.MethodInvocation) {
-            // Set up cursors for kindMismatch
-            const savedCursor = this.cursor;
-            const savedTargetCursor = this.targetCursor;
-            this.cursor = new Cursor(methodInvocation, this.cursor);
-            this.targetCursor = new Cursor(other, this.targetCursor);
-            try {
-                return this.kindMismatch();
-            } finally {
-                this.cursor = savedCursor;
-                this.targetCursor = savedTargetCursor;
-            }
-        }
-
-        const otherMethodInvocation = other as J.MethodInvocation;
-
-        // Set up cursors for the entire method
-        const savedCursor = this.cursor;
-        const savedTargetCursor = this.targetCursor;
-        this.cursor = new Cursor(methodInvocation, this.cursor);
-        this.targetCursor = new Cursor(otherMethodInvocation, this.targetCursor);
-        try {
-            // Compare select
-            if ((methodInvocation.select === undefined) !== (otherMethodInvocation.select === undefined)) {
-                return this.structuralMismatch('select');
-            }
-
-            // Visit select if present
-            if (methodInvocation.select && otherMethodInvocation.select) {
-                await this.visit(methodInvocation.select.element, otherMethodInvocation.select.element);
-                if (!this.match) return methodInvocation;
-            }
-
-            // A pattern that spells out no type arguments says nothing about them, as with parentheses
-            if (methodInvocation.typeParameters) {
-                if (!otherMethodInvocation.typeParameters) {
-                    return this.structuralMismatch('typeParameters');
-                }
-
-                if (methodInvocation.typeParameters.elements.length !== otherMethodInvocation.typeParameters.elements.length) {
-                    return this.arrayLengthMismatch('typeParameters.elements');
-                }
-
-                // Visit each type parameter in lock step (visit RightPadded to check for markers)
-                for (let i = 0; i < methodInvocation.typeParameters.elements.length; i++) {
-                    await this.visitRightPadded(methodInvocation.typeParameters.elements[i], otherMethodInvocation.typeParameters.elements[i] as any);
-                    if (!this.match) return methodInvocation;
-                }
-            }
-
-            // Visit name
-            await this.visit(methodInvocation.name, otherMethodInvocation.name);
-            if (!this.match) {
-                return methodInvocation;
-            }
-
-            // Special handling for variadic captures in arguments
-            if (!await this.matchArguments(methodInvocation.arguments.elements, otherMethodInvocation.arguments.elements)) {
-                return this.structuralMismatch('arguments');
-            }
-
-            return methodInvocation;
-        } finally {
-            this.cursor = savedCursor;
-            this.targetCursor = savedTargetCursor;
-        }
-    }
-
     override async visitBlock(block: J.Block, other: J): Promise<J | undefined> {
         // Check if any statements have CaptureMarker indicating they're variadic
         const hasVariadicCapture = block.statements.some(stmt => {
@@ -528,14 +444,6 @@ export class PatternMatchingComparator extends JavaScriptSemanticComparatorVisit
             this.cursor = savedCursor;
             this.targetCursor = savedTargetCursor;
         }
-    }
-
-    /**
-     * Matches argument lists, with special handling for variadic captures.
-     * A variadic capture can match zero or more consecutive arguments.
-     */
-    private async matchArguments(patternArgs: J.RightPadded<J>[], targetArgs: J.RightPadded<J>[]): Promise<boolean> {
-        return await this.matchSequence(patternArgs, targetArgs, true);
     }
 
     /**
