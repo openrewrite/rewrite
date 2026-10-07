@@ -245,6 +245,11 @@ function positionOf(node: any, key: string, position: Meaning): Meaning {
         case JS.Kind.TypeQuery:
             // `typeof x` reads the value `x` from within a type.
             return key === 'typeExpression' ? 'value' : position;
+        case JS.Kind.ComputedPropertyName:
+            // `[key]` reads the value `key`, in a type member as much as in an object literal.
+            return 'value';
+        case JS.Kind.IndexSignatureDeclaration:
+            return key === 'typeExpression' ? 'type' : position;
         case JS.Kind.As:
             return key === 'right' ? 'type' : position;
         case JS.Kind.SatisfiesExpression:

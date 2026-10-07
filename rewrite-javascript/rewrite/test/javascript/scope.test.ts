@@ -239,7 +239,7 @@ describe('scopeOf', () => {
             const Merged = 1;
             anchor();
         `);
-        // A binding still collides with a type the same name, so unqualified, a type counts.
+        // A binding still collides with a type of the same name, so a type counts unless asked for values.
         expect(scope.declares('Object')).toBe(true);
         expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, {values: true})))
             .toEqual([]);
@@ -331,11 +331,14 @@ describe('namesDeclaredIn', () => {
 
 describe('namesReferencedWithin', () => {
     test('a value hides only value reads of its name, a type only type reads', async () => {
-        // Each name is declared in the kind its one use does not read, so every use reaches past it.
+        // A name declared in the kind its use does not read reaches past it, one in the same kind does not.
         const fn = (await parse(`
             function f() {
                 const Cast = 1, Satisfied = 1, Argument = 1, Implemented = 1, Asserted = 1;
-                const Aliased = 1, Indexed = 1, Bound = 1;
+                const Aliased = 1, Indexed = 1, ClassIndexed = 1, Bound = 1, Key = 1;
+                type Computed = 1;
+                const SameValue = 1;
+                interface SameType {}
                 interface Queried {}
                 x as Cast;
                 x satisfies Satisfied;
@@ -346,11 +349,20 @@ describe('namesReferencedWithin', () => {
                 type A = Aliased;
                 interface I { [key: number]: Indexed }
                 function h<P extends Bound>() {}
+                class C { [k: string]: ClassIndexed }
+                let m: { [Computed]: Key };
+                SameValue;
+                let s: SameType;
             }
         `)).statements[0].element;
 
-        expect([...namesReferencedWithin(fn)]).toEqual(expect.arrayContaining(
-            ['Aliased', 'Argument', 'Asserted', 'Bound', 'Cast', 'Implemented', 'Indexed', 'Queried', 'Satisfied']));
+        const referenced = [...namesReferencedWithin(fn)];
+        expect(referenced).toEqual(expect.arrayContaining([
+            'Aliased', 'Argument', 'Asserted', 'Bound', 'Cast', 'ClassIndexed', 'Computed', 'Implemented',
+            'Indexed', 'Key', 'Queried', 'Satisfied'
+        ]));
+        expect(referenced).not.toContain('SameValue');
+        expect(referenced).not.toContain('SameType');
     });
 });
 
