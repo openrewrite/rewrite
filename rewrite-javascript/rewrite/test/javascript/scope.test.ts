@@ -18,18 +18,20 @@ import {
     JavaScriptParser,
     JavaScriptVisitor,
     JS,
-    isValueReference,
+    isReference,
     namesDeclaredIn,
     namesDeclaredWithin,
     namesReferencedWithin,
     namesUsedWithin,
+    resolve,
     Scope,
     scopeOf,
     sourceFileCache,
     walk
 } from "../../src/javascript";
-import {J} from "../../src/java";
+import {J, NameTree} from "../../src/java";
 import {Cursor} from "../../src/tree";
+import {randomId} from "../../src/uuid";
 
 const parser = new JavaScriptParser({sourceFileCache});
 
@@ -168,6 +170,25 @@ describe('scopeOf', () => {
         expect(names).not.toContain('member');
     });
 
+    test('a namespace hoists the functions and vars in its body to itself, not to the file', async () => {
+        const inside = await scopeAtAnchor('namespace NS { function f() {} var v = 1; anchor(); }');
+        expect(inside.declaringScope('f')?.kind).toBe(JS.Kind.NamespaceDeclaration);
+        expect(inside.declaringScope('v')?.kind).toBe(JS.Kind.NamespaceDeclaration);
+
+        const outside = await scopeAtAnchor('namespace NS { function f() {} }\nanchor();');
+        expect(outside.declares('f')).toBe(false);
+    });
+
+    test('a computed-name method binds its parameters and hoists like a named one', async () => {
+        const scope = await scopeAtAnchor('class A { [k](p) { var v; anchor(); } }');
+        expect(scope.declaringScope('p')?.kind).toBe(JS.Kind.ComputedPropertyMethodDeclaration);
+        expect(scope.declaringScope('v')?.kind).toBe(JS.Kind.ComputedPropertyMethodDeclaration);
+    });
+
+    test('a global augmentation hoists to the file, as the whole file sees it', async () => {
+        expect((await scopeAtAnchor('declare global { var G: number; }\nanchor();')).declares('G')).toBe(true);
+    });
+
     test('a nested function keeps its declarations to itself', async () => {
         const names = await namesAtAnchor(`
             function outer() {
@@ -242,9 +263,11 @@ describe('scopeOf', () => {
         // A binding still collides with a type of the same name, so every kind counts unless asked otherwise.
         expect(scope.declares('Object')).toBe(true);
         expect(scope.declares('Object', 'type')).toBe(true);
+        // An import binds its name with every meaning: `typeof Imported` reads it as a value from a type.
         expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, 'value')))
-            .toEqual([]);
-        expect(scope.declares('Merged', 'value')).toBe(true);
+            .toEqual(['Imported', 'Specified']);
+        expect(scope.declares('Merged', 'value') && scope.declares('Merged', 'type')).toBe(true);
+        expect(scope.declares('Object', 'namespace')).toBe(false);
         expect(scope.declaringScope('Object', 'value')).toBeUndefined();
     });
 
@@ -379,16 +402,32 @@ describe('namesReferencedWithin', () => {
             type U<T> = T extends Promise<infer Inferred> ? Inferred : never;
             type V<T> = T extends Promise<infer Hidden> ? never : Hidden;
             type W = Checked extends Promise<infer Checked> ? never : never;
+            type P = (Param: any) => Param is Foo;
+            const h = (Pred: unknown): Pred is string => true;
             function w<Value>() { return Value; }
         `)).statements;
 
         const referenced = [...namesReferencedWithin(statements)];
-        for (const name of ['Fn', 'Cls', 'Alias', 'Arrow', 'FnType', 'Keys', 'Mapped', 'Inferred']) {
+        for (const name of ['Fn', 'Cls', 'Alias', 'Arrow', 'FnType', 'Keys', 'Mapped', 'Inferred', 'Param', 'Pred']) {
             expect(referenced).not.toContain(name);
         }
         // An `infer` name reaches neither the check type nor the false branch, and a type parameter
         // binds no value.
         expect(referenced).toEqual(expect.arrayContaining(['Hidden', 'Checked', 'Value']));
+    });
+
+    test('a binding pattern names what it binds, and reads only its defaults and computed keys', async () => {
+        // Asked of the statements alone, so nothing binds the pattern's names and a read of one would show.
+        const statements = (await parse(`
+            const {Defaulted = Fallback, [Computed]: Keyed, ...Rest} = source;
+            const [First, ...Others] = list;
+        `)).statements;
+
+        const referenced = [...namesReferencedWithin(statements)];
+        expect(referenced).toEqual(expect.arrayContaining(['Fallback', 'Computed', 'source', 'list']));
+        for (const name of ['Defaulted', 'Keyed', 'Rest', 'First', 'Others']) {
+            expect(referenced).not.toContain(name);
+        }
     });
 
     test('a qualified type name reads a namespace, a space of its own beside values and types', async () => {
@@ -401,8 +440,10 @@ describe('namesReferencedWithin', () => {
                 class Klass {}
                 namespace Hidden { export type T = 1 }
                 namespace TypesOnly { export type T = 1; interface I {} namespace Inner { type U = 1 } }
+                namespace ConstOnly { export const enum CE { A } }
                 namespace Deep { namespace Inner { export const v = 1 } }
                 namespace Dotted.Inner { export const v = 1 }
+                namespace Qualified.Inner { export type T = 1 }
                 enum Enum { A }
                 let a: Iface.T;
                 let b: Alias.T;
@@ -410,6 +451,7 @@ describe('namesReferencedWithin', () => {
                 let d: Klass.T;
                 let e: Hidden.T;
                 TypesOnly.go();
+                ConstOnly.go();
                 let g: Enum.A;
                 Deep.go();
                 Dotted.go();
@@ -419,9 +461,13 @@ describe('namesReferencedWithin', () => {
         const referenced = [...namesReferencedWithin(ns)];
         expect(referenced).toEqual(expect.arrayContaining(['Iface', 'Alias', 'Value', 'Klass', 'TypesOnly']));
         expect(referenced).not.toContain('Hidden');
+        // A const enum makes a namespace a value, as the binder has it, whatever the emitter drops.
+        expect(referenced).not.toContain('ConstOnly');
         expect(referenced).not.toContain('Enum');
         expect(referenced).not.toContain('Deep');
         expect(referenced).not.toContain('Dotted');
+        // A dotted declaration names its root, as much as a plain one.
+        expect(referenced).not.toContain('Qualified');
     });
 });
 
@@ -450,7 +496,8 @@ describe('walk', () => {
             visited++;
             seen.add(node);
             // Padding carries markers but no id, and a JavaType carries neither.
-            if (!('id' in node && 'markers' in node)) {
+            const value: object = node;
+            if (!('id' in value && 'markers' in value)) {
                 offTree.push(node.kind);
             }
             return true;
@@ -462,22 +509,152 @@ describe('walk', () => {
     });
 });
 
-/** What `isValueReference` answers for each occurrence of `target` in `source`. */
-async function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
-    const answers: boolean[] = [];
+describe('resolve', () => {
+    test('a read resolves to the scope binding what it reads, so a nearer binding of another kind hides nothing', async () => {
+        const source = `
+            import {Imported} from 'm';
+            namespace NS { export type Foo = 1 }
+            function f<T>(a: T): T {
+                interface Imported {}
+                let n: NS.Foo;
+                let t: T;
+                const o = {Imported};
+                return o.Imported ? Imported.go(a) : a;
+            }
+            function g() { const Imported = 1; let y: Imported; Imported: for (;;) { break Imported; } }
+            type U<X> = X extends Promise<infer I> ? I : I;
+            let i: import('other').Imported;
+            import a = NS.Foo;
+            export {NS};
+            const h = (P: unknown): P is string => P;
+            enum E { A = 1, B = A }
+            A;
+        `;
+        const cu = JS.Kind.CompilationUnit;
+        // In order: the specifier, the interface, the shorthand, the property key, the receiver, the
+        // const, the type, the label, the break and the qualified import type. Four read a binding
+        // the file reaches.
+        expect(await resolvedAt(source, 'Imported'))
+            .toEqual([undefined, undefined, cu, undefined, cu, undefined, cu, undefined, undefined, undefined]);
+        // The declaration, the qualifier in a type, the right-hand side of an import alias, and an
+        // export clause, which reads a name with whatever meaning it has.
+        expect(await resolvedAt(source, 'NS')).toEqual([undefined, cu, cu, cu]);
+        expect((await resolvedAt(source, 'T')).sort()).toEqual([...Array(3).fill(J.Kind.MethodDeclaration), undefined]);
+        // An `infer` name reaches the true branch alone, so the false branch reads past it to nothing.
+        expect(await resolvedAt(source, 'I')).toEqual([undefined, JS.Kind.ConditionalType, undefined]);
+        // An arrow's parameter is one binding, read from the predicate and the body alike.
+        expect(await resolvedAt(source, 'P')).toEqual([undefined, JS.Kind.ArrowFunction, JS.Kind.ArrowFunction]);
+        // An enum's members are in scope in its body alone.
+        expect(await resolvedAt(source, 'A')).toEqual([undefined, J.Kind.Block, undefined]);
+    });
+
+    test('asked from a call, the callee\'s receiver resolves as it would from its own position', async () => {
+        const receiverAt = async (source: string) => {
+            const answers: (string | undefined)[] = [];
+            await new class extends JavaScriptVisitor<undefined> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
+                    const select = method.select?.element;
+                    if (select?.kind === J.Kind.Identifier) {
+                        answers.push(resolve(this.cursor, select as J.Identifier)?.kind);
+                    }
+                    return super.visitMethodInvocation(method, p);
+                }
+            }().visit(await parse(source), undefined);
+            return answers;
+        };
+        expect(await receiverAt('Object.assign({}, o);')).toEqual([undefined]);
+        expect(await receiverAt('function f() { const Object = {}; Object.assign({}, o); }')).toEqual([J.Kind.Block]);
+        expect(await receiverAt('interface Object {}\nObject.assign({}, o);')).toEqual([undefined]);
+    });
+
+    test('a copy of an identifier resolves as the original, a node the cursor does not hold is refused', async () => {
+        const cu = await parse('const x = 1; use(x);');
+        const call = cu.statements[1].element as J.MethodInvocation;
+        const read = call.arguments.elements[0].element as J.Identifier;
+        const cursor = new Cursor(call, new Cursor(cu));
+
+        expect(resolve(cursor, read)).toBe(cu);
+        // A copy keeps its id and so stands for the tree's identifier. A fresh id stands for nothing in it.
+        expect(resolve(cursor, {...read})).toBe(cu);
+        expect(() => resolve(cursor, {...read, id: randomId()})).toThrow(/not under/);
+    });
+
+    test('one identifier standing at two positions resolves each by its own path', async () => {
+        const cu = await parse('const x = 1; use(x); function f(x) { use(x); }');
+        const outer = cu.statements[1].element as J.MethodInvocation;
+        const fn = cu.statements[2].element as J.MethodDeclaration;
+        const inner = fn.body!.statements[0].element as J.MethodInvocation;
+        const shared = outer.arguments.elements[0];
+        const innerDoubled = {...inner, arguments: {...inner.arguments, elements: [shared]}} as J.MethodInvocation;
+        const bodyDoubled = {...fn.body!, statements: [{...fn.body!.statements[0], element: innerDoubled}]} as J.Block;
+        const fnDoubled = {...fn, body: bodyDoubled} as J.MethodDeclaration;
+        const read = shared.element as J.Identifier;
+
+        expect(resolve(new Cursor(outer, new Cursor(cu)), read)).toBe(cu);
+        expect(resolve(new Cursor(innerDoubled, new Cursor(bodyDoubled, new Cursor(fnDoubled, new Cursor(cu)))), read))
+            .toBe(fnDoubled);
+    });
+
+    test('a visitor that rebuilds a node before descending still resolves what is under it', async () => {
+        const answers: (J | undefined)[] = [];
+        const cu = await parse('const x = 1; use(x);');
+        await new class extends JavaScriptVisitor<undefined> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
+                const elements = method.arguments.elements.map(e => ({...e, element: {...e.element}}));
+                return super.visitMethodInvocation({...method, arguments: {...method.arguments, elements}}, p);
+            }
+            override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+                if (identifier.simpleName === 'x') {
+                    answers.push(resolve(this.cursor, identifier));
+                }
+                return identifier;
+            }
+        }().visit(cu, undefined);
+        // The declaration, then the read under the rebuilt call.
+        expect(answers).toEqual([undefined, cu]);
+    });
+
+    test('a cursor holding another file above the identifier resolves within the nearer one', async () => {
+        const outerFile = await parse('const y = 1;');
+        const innerFile = await parse('const x = 1; use(x, y);');
+        const call = innerFile.statements[1].element as J.MethodInvocation;
+        const [x, y] = call.arguments.elements.map(e => e.element as J.Identifier);
+        const cursor = new Cursor(call, new Cursor(innerFile, new Cursor(outerFile)));
+
+        expect(resolve(cursor, x)).toBe(innerFile);
+        expect(resolve(cursor, y)).toBeUndefined();
+    });
+});
+
+/** What `ask` answers for each occurrence of `name` in `source`, from the identifier's own cursor. */
+async function answersAt<T>(
+    source: string, name: string, ask: (cursor: Cursor, identifier: J.Identifier) => T, sourcePath?: string
+): Promise<T[]> {
+    const answers: T[] = [];
     await new class extends JavaScriptVisitor<undefined> {
         override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
-            if (identifier.simpleName === 'target') {
-                answers.push(isValueReference(this.cursor, identifier));
+            if (identifier.simpleName === name) {
+                answers.push(ask(this.cursor, identifier));
             }
             return identifier;
+        }
+        protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
+            return await this.visit(nameTree, p) as N;
         }
     }().visit(await parse(source, sourcePath), undefined);
     expect(answers.length).toBeGreaterThan(0);
     return answers;
 }
 
-describe('isValueReference', () => {
+function resolvedAt(source: string, name: string): Promise<(string | undefined)[]> {
+    return answersAt(source, name, (cursor, identifier) => resolve(cursor, identifier)?.kind);
+}
+
+function targetsReference(source: string, sourcePath?: string): Promise<boolean[]> {
+    return answersAt(source, 'target', isReference, sourcePath);
+}
+
+describe('isReference', () => {
     test('a name its parent introduces, or one from a namespace of its own, is not a reference', async () => {
         for (const source of ['const o = {target: 1};', 'o.target;', 'target: while (c) { break target; }']) {
             expect(await targetsReference(source)).not.toContain(true);
@@ -492,14 +669,17 @@ describe('isValueReference', () => {
         }
     });
 
-    test('position is all it reads, so a binding import and a type both answer as a reference', async () => {
-        // A caller that must tell these apart adds the test itself, as AddImport's rename does.
-        for (const source of ["import {target} from 'm';", 'let v: target;']) {
-            expect(await targetsReference(source)).not.toContain(false);
-        }
+    test('a type position reads alike to a value, and an import declares what it spells', async () => {
+        expect(await targetsReference('let v: target;')).toEqual([true]);
+        expect(await targetsReference("import {target, a as target2} from 'm';\nexport {target as published};"))
+            .toEqual([false, true]);
     });
 
     test('a shorthand property answers as the name it is, though it also reads the binding', async () => {
         expect(await targetsReference('const o = {target};')).toEqual([false]);
+    });
+
+    test('a computed key and a default value read from within a naming slot', async () => {
+        expect(await targetsReference('const {[target]: a, b = target} = o;')).toEqual([true, true]);
     });
 });

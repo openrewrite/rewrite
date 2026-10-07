@@ -768,7 +768,7 @@ class Matcher {
         walk(this.patternAst, node => {
             const capture = isIdentifier(node) ? PlaceholderUtils.parseCapture(node.simpleName) : null;
             if (capture && !prefixes.has(capture.name) && !this.capturesWholeMatch(capture.name)) {
-                prefixes.set(capture.name, node.prefix);
+                prefixes.set(capture.name, (node as J.Identifier).prefix);
             }
             return true;
         });

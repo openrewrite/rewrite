@@ -15,7 +15,7 @@
  */
 import {J, NameTree} from '../../java';
 import {JavaScriptVisitor} from '../visitor';
-import {isValueReference, scopeOf} from '../scope';
+import {isReference, scopeOf} from '../scope';
 
 /**
  * Renames the identifiers a template uses for its declared bindings to the names the file
@@ -43,7 +43,7 @@ class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
         }
 
         // Only the context binds at module scope, so a reference nothing in the template rebinds reads it
-        const refersToBinding = isValueReference(this.cursor, identifier) &&
+        const refersToBinding = isReference(this.cursor, identifier) &&
             !scopeOf(this.cursor).declares(identifier.simpleName);
 
         return refersToBinding ? {...identifier, simpleName: renamed} as J.Identifier : identifier;
