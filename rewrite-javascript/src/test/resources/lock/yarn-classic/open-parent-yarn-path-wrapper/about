@@ -1,0 +1,1 @@
+The .yarnrc of the directory above the project names ./yarn-wrapper.js (resolved against that directory) as yarn-path: yarn 1.22.22 hands the install to it, and it writes its own yarn.lock.

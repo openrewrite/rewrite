@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -150,8 +151,7 @@ public final class YarnClassicOptions {
     }
 
     /**
-     * @param configFiles the .yarnrc, .yarnrc.yml and .npmrc files of the project's directory and of the
-     *                    directories above it, by path relative to the project ({@code .yarnrc}, {@code ../.npmrc}).
+     * @param configFiles the config files of the project's directory and those above it, by path relative to it.
      * @param env         the environment yarn runs in, {@code null} when the host does not know it.
      */
     public static YarnClassicOptions load(Map<String, String> configFiles, @Nullable Map<String, String> env) {
@@ -168,29 +168,56 @@ public final class YarnClassicOptions {
             for (String name : Arrays.asList(".yarnrc", ".yarnrc.yml")) {
                 String text = configFiles.get(up(depth) + name);
                 if (text != null) {
-                    Js.assign(rc, loadRcFile(text, name));
+                    Js.assign(rc, loadRcFile(text, up(depth) + name));
                 }
             }
         }
         return rc;
     }
 
-    // rc.js loadRcFile; the directory keys it resolves name nothing a lock-only install reads
-    private static @Nullable Object loadRcFile(String text, String fileName) {
-        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), fileName).getObject();
+    /**
+     * rc.js {@code loadRcFile}, its directory keys resolved against the file's directory as paths relative to the
+     * project's root.
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Object loadRcFile(String text, String filePath) {
+        Object values = LockfileParser.parseLockfile(text.replace("\r\n", "\n"), PosixPath.basename(filePath))
+                .getObject();
         Object yarnPath = Js.get(values, "yarnPath");
-        if (fileName.endsWith(".yml") && Js.truthy(values) && yarnPath instanceof String) {
+        if (filePath.endsWith(".yml") && Js.truthy(values) && yarnPath instanceof String) {
             Map<String, @Nullable Object> path = new LinkedHashMap<>();
             path.put("yarn-path", yarnPath);
-            return path;
+            values = path;
+        }
+        if (values instanceof Map) {
+            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) values;
+            for (String key : Js.keys(map)) {
+                if (PATH_KEYS.contains(PATH_KEY_PREFIX.matcher(key).replaceFirst(""))) {
+                    map.put(key, resolve(PosixPath.dirname(filePath), map.get(key)));
+                }
+            }
         }
         return values;
     }
 
+    private static final List<String> PATH_KEYS = Arrays.asList("yarn-path", "cache-folder", "global-folder",
+            "modules-folder", "cwd", "offline-cache-folder");
+    private static final Pattern PATH_KEY_PREFIX = Pattern.compile("^(--)?([^.]+\\.)*");
+
+    // path.resolve(dirname(filePath), value) relative to the project's root
+    private static String resolve(String dir, @Nullable Object value) {
+        if (!(value instanceof String)) {
+            throw JsError.invalidArgType("The \"paths[1]\" argument must be of type string", value);
+        }
+        String path = (String) value;
+        String resolved = PosixPath.isAbsolute(path) ? PosixPath.normalize(path) : PosixPath.join(dir, path);
+        return resolved.length() > 1 && resolved.endsWith("/") ? resolved.substring(0, resolved.length() - 1) :
+                resolved;
+    }
+
     /**
-     * npm-registry.js {@code getPossibleConfigLocations} without the host's own files (the home directory's and
-     * the global prefix's): the project's {@code .<filename>}, then the project's again and each directory's above
-     * it, nearest first.
+     * npm-registry.js {@code getPossibleConfigLocations} without the host's files (home, global prefix): the
+     * project's {@code .<filename>}, then the project's again and each directory's above it, nearest first.
      */
     static List<String> getPossibleConfigLocations(String filename, Map<String, String> configFiles) {
         List<String> locations = new ArrayList<>();

@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -48,9 +49,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class YarnClassicLockRegeneratorTest {
 
     private static final Pattern PROJECT_DIR = Pattern.compile("\\S*/project/");
+    private static final Pattern QUOTED_PROJECT_DIR = Pattern.compile("'[^\\s']*/project/");
     private static final Pattern OVER = Pattern.compile("(?m)^over=(\\S+)$");
     private static final Pattern STEP = Pattern.compile("^\\[\\d+/\\d+] ");
     private static final String MANIFEST_SYNTAX_ERROR = "error " + JsError.SYNTAX_ERROR + ": package.json: ";
+    private static final String CANNOT_KNOW = "cannot-know ";
 
     private static final String ROOT = "{\"name\":\"r\",\"version\":\"1.0.0\"}";
     private static final String WORKSPACE_ROOT = "{\"name\":\"r\",\"version\":\"1.0.0\",\"private\":true," +
@@ -90,7 +93,10 @@ class YarnClassicLockRegeneratorTest {
                              @Nullable String lock, String log) {
         String outcome = untilTheFirstStep(new YarnClassicLockRegenerator(scenario.inputs(before, lock)));
         String expected = errorBeforeTheSteps(log);
-        if (expected != null && expected.startsWith(MANIFEST_SYNTAX_ERROR)) {
+        if (outcome.startsWith(CANNOT_KNOW)) {
+            // yarn handed the install to another release, whose output the scenario does not expect
+            assertThat(scenario.expect()).startsWith("cannot-know");
+        } else if (expected != null && expected.startsWith(MANIFEST_SYNTAX_ERROR)) {
             // V8's JSON.parse wording is not ported, only the error and the file it names
             assertThat(outcome).startsWith(MANIFEST_SYNTAX_ERROR);
         } else if (expected != null) {
@@ -178,8 +184,64 @@ class YarnClassicLockRegeneratorTest {
                         env(), "requests ms@^2.0.0"),
                 probe("alias cycle", "{\"name\":\"r\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"1\"}}",
                         "# yarn lockfile v1\n\na \"b\"\nb \"a\"\n", null, null, env(),
-                        "error RangeError: Maximum call stack size exceeded")
+                        "error RangeError: Maximum call stack size exceeded"),
+                probe("yarn-path", ROOT, null, YARN_PATH, null, env(), HANDED_OFF),
+                probe("yarn-path, YARN_IGNORE_PATH=1", ROOT, null, YARN_PATH, null, env("YARN_IGNORE_PATH", "1"),
+                        "requests"),
+                probe("yarn-path, YARN_IGNORE_PATH=true", ROOT, null, YARN_PATH, null,
+                        env("YARN_IGNORE_PATH", "true"), "requests"),
+                probe("yarn-path, YARN_IGNORE_PATH=false", ROOT, null, YARN_PATH, null,
+                        env("YARN_IGNORE_PATH", "false"), HANDED_OFF),
+                probe("yarn-path, YARN_IGNORE_PATH=0", ROOT, null, YARN_PATH, null, env("YARN_IGNORE_PATH", "0"),
+                        HANDED_OFF),
+                probe("yarn-path, YARN_IGNORE_PATH empty", ROOT, null, YARN_PATH, null, env("YARN_IGNORE_PATH", ""),
+                        HANDED_OFF),
+                probe("packageManager", BERRY_MANAGED, null, null, null, env(), BERRY_REJECTED),
+                probe("packageManager, COREPACK_ROOT", BERRY_MANAGED, null, null, null, env("COREPACK_ROOT", "/x"),
+                        "requests"),
+                probe("packageManager, COREPACK_ROOT empty", BERRY_MANAGED, null, null, null,
+                        env("COREPACK_ROOT", ""), BERRY_REJECTED),
+                probe("packageManager, SKIP_YARN_COREPACK_CHECK=1", BERRY_MANAGED, null, null, null,
+                        env("SKIP_YARN_COREPACK_CHECK", "1"), "requests"),
+                probe("packageManager, SKIP_YARN_COREPACK_CHECK=0", BERRY_MANAGED, null, null, null,
+                        env("SKIP_YARN_COREPACK_CHECK", "0"), "requests")
         );
+    }
+
+    private static final String YARN_PATH = "yarn-path \"./r.js\"";
+    private static final String HANDED_OFF = CANNOT_KNOW + "what the release yarn-path names (r.js) writes: yarn " +
+                                             "1.22.22 hands the install to it";
+    private static final String BERRY_MANAGED = "{\"name\":\"r\",\"version\":\"1.0.0\"," +
+                                                "\"packageManager\":\"yarn@4.10.3\"}";
+    private static final String BERRY_REJECTED = "error This project's package.json defines \"packageManager\": " +
+                                                 "\"yarn@4.10.3\". However the current global version of Yarn is " +
+                                                 "1.22.22.";
+
+    /**
+     * A range that is not semver and names a directory holding a package.json is a {@code file:} dependency
+     * (package-request.js {@code normalizeRange}; {@code open-implicit-file-range}), whether or not the host read it.
+     */
+    @Test
+    void aRangeNamingADirectoryTheProjectHoldsIsAFileDependency() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"next\"}}")
+                .lock("# yarn lockfile v1\n\n\n")
+                .now(Instant.EPOCH);
+        Result unread = new YarnClassicLockRegenerator(inputs.paths(new LinkedHashSet<>(Arrays.asList(
+                "package.json", "yarn.lock", "next/package.json"))).build()).regenerate();
+        assertThat(unread.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the package.json " +
+                                                       "of file:next, which the project's manifests do not include");
+
+        Result absent = new YarnClassicLockRegenerator(inputs.paths(new LinkedHashSet<>(Arrays.asList(
+                "package.json", "yarn.lock"))).build()).regenerate();
+        assertThat(requireNonNull(absent.getFailure()).getReason()).isEqualTo(Reason.PACKAGE_NOT_FOUND);
+
+        Result outside = new YarnClassicLockRegenerator(inputs.manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\"," +
+                                                                            "\"dependencies\":{\"x\":\"a/../../b\"}}")
+                .build()).regenerate();
+        assertThat(outside.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know whether " +
+                                                        "a/../../b/package.json exists outside the project, which " +
+                                                        "makes the range a/../../b a file: dependency");
     }
 
     @ParameterizedTest(name = "{0}")
@@ -436,14 +498,18 @@ class YarnClassicLockRegeneratorTest {
             return out.toString();
         } catch (MessageError e) {
             return "error " + e.getMessage();
+        } catch (YarnClassicLockRegenerator.Rejected e) {
+            return "error " + e.getMessage().substring(YarnClassicLockRegenerator.YARN_REJECTS.length() + 2);
         } catch (JsError e) {
             return "error " + e.getName() + ": " + e.getMessage();
+        } catch (CannotKnow e) {
+            return CANNOT_KNOW + e.getSubject();
         }
     }
 
     /**
-     * The error line yarn printed before its first step, the recorder's project directory taken out of a path it
-     * names; {@code null} when yarn reached a step.
+     * The error line yarn printed before its first step, or node's when the release yarn-path names did not load,
+     * the recorder's project directory taken out of a path it names; {@code null} when yarn reached a step.
      */
     private static @Nullable String errorBeforeTheSteps(String log) {
         for (String line : log.split("\r?\n")) {
@@ -452,6 +518,9 @@ class YarnClassicLockRegeneratorTest {
             }
             if (line.startsWith("error ")) {
                 return "error " + PROJECT_DIR.matcher(line.substring("error ".length())).replaceFirst("");
+            }
+            if (line.startsWith("Error: ")) {
+                return "error " + QUOTED_PROJECT_DIR.matcher(line).replaceFirst("'");
             }
         }
         return null;

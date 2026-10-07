@@ -60,9 +60,11 @@ final class ProjectFiles {
         return paths != null && !paths.contains(path);
     }
 
-    @Nullable
-    Set<String> paths() {
-        return paths;
+    /**
+     * Whether the host says the project holds this file.
+     */
+    boolean holds(String path) {
+        return paths != null && paths.contains(path);
     }
 
     @Nullable

@@ -31,7 +31,7 @@ import java.util.Set;
 
 /**
  * A recipe's request as the Yarn classic regenerator takes it, with the config files of the lock's directory and of
- * each directory above it; the project's npmrc the marker read stands in for an .npmrc the request lacks.
+ * each directory above it, and those directories' package.json; the marker's npmrc stands in for a missing .npmrc.
  */
 final class YarnClassicInputs {
 
@@ -64,7 +64,8 @@ final class YarnClassicInputs {
         for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
             Path fileName = file.getKey().getFileName();
             String up = fileName == null ? null : up(rootDir, NpmInputs.directory(file.getKey()));
-            if (up != null && CONFIG_FILES.contains(fileName.toString())) {
+            if (up != null && (CONFIG_FILES.contains(fileName.toString()) ||
+                               !up.isEmpty() && "package.json".equals(fileName.toString()))) {
                 files.put(up + fileName, file.getValue());
             }
         }

@@ -77,6 +77,34 @@ class NodeDependencyScanTest {
         assertThat(files.getPaths()).containsExactlyInAnyOrder(parentYarnrc, rootNpmrc, ownNpmrc, readme);
     }
 
+    /**
+     * Yarn classic reads the packageManager of the nearest package.json from the project's directory up.
+     */
+    @Test
+    void thePackageJsonOfEachDirectoryAboveTheProjectIsKept() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path manifest = Paths.get("repo/app/package.json");
+        acc.lockToPackage.put(Paths.get("repo/app/yarn.lock"), manifest);
+        Path parent = Paths.get("repo/package.json");
+        Path top = Paths.get("package.json");
+        String[] names = {"app", "repo", "top", "other", "lib"};
+        Path[] paths = {manifest, parent, top, Paths.get("repo/other/package.json"),
+          Paths.get("repo/app/lib/package.json")};
+        for (int i = 0; i < paths.length; i++) {
+            NodeDependencyScan.ProjectState ps = new NodeDependencyScan.ProjectState();
+            ps.capturedPackageJson = PlainText.builder().sourcePath(paths[i]).text("{\"name\":\"" + names[i] + "\"}")
+              .build();
+            acc.projects.put(paths[i], ps);
+        }
+
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          manifest);
+
+        assertThat(files.getManifests()).containsOnlyKeys(manifest);
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parent, top);
+        assertThat(files.getPackageManagerFiles().get(parent)).isEqualTo("{\"name\":\"repo\"}");
+    }
+
     @Test
     void theEnvFilesAnInstallLoadsAreKept() {
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();

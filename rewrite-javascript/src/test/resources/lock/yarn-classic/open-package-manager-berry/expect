@@ -1,0 +1,1 @@
+pm-rejects This project's package.json defines "packageManager": "yarn@4.10.3". However the current global version of Yarn is 1.22.22.

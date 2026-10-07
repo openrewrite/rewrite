@@ -93,6 +93,12 @@ class YarnClassicLockRoundTripTest {
     private static @Nullable Loaded load(YarnClassicScenarios.Lock lock) {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(inputs);
+        try {
+            regenerator.requireRelease(YarnClassicOptions.rc(inputs.getConfigFiles()));
+        } catch (CannotKnow | JsError e) {
+            assertThat(lock.getScenario().expect()).matches("(cannot-know|pm-rejects) .*");
+            assumeFalse(true, "yarn 1.22.22 does not run this install: " + e.getMessage());
+        }
         YarnClassicOptions options = YarnClassicOptions.load(inputs.getConfigFiles(), inputs.getEnv());
         Lockfile lockfile;
         try {

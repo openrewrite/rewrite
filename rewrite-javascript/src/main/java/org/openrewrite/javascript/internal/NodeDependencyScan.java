@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -168,8 +169,8 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * {@link #projectManifests}, the package-manager files beside any of them or in a directory above them, and the
-     * paths under them or directly in a directory above them.
+     * {@link #projectManifests}, the package-manager files beside any of them or in a directory above them, the
+     * package.json of each directory above the project, and the paths under them or directly in a directory above.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
         Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
@@ -184,6 +185,14 @@ public final class NodeDependencyScan {
             if (directories.contains(dir) || above(dir, directories) ||
                 isPatch(file.getKey()) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
+            }
+        }
+        Path root = directory(manifests.isEmpty() ? packageJsonPath : manifests.keySet().iterator().next());
+        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
+            Path dir = directory(project.getKey());
+            if (project.getValue().capturedPackageJson != null && !dir.equals(root) &&
+                above(dir, Collections.singleton(root))) {
+                files.put(project.getKey(), print(ctx, project.getKey(), project.getValue()));
             }
         }
         Set<Path> paths = new LinkedHashSet<>();

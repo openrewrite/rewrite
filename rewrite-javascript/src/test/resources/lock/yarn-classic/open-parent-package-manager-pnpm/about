@@ -1,0 +1,1 @@
+The package.json of the directory above the project says packageManager pnpm@9.15.0+sha512.abc and the project says none: yarn 1.22.22 finds it walking up and exits 1.

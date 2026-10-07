@@ -1,0 +1,1 @@
+workspaces ["packages/*", "./packages/*"]: glob spells packages/a/package.json and ./packages/a/package.json as two files, both are the member a, and config.js rejects the second.

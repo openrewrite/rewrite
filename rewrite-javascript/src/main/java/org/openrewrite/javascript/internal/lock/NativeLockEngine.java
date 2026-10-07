@@ -540,7 +540,7 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, both yarns).
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, Yarn Berry).
         boolean prunesOrphans = dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
@@ -558,7 +558,7 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
             } else if (pm == PackageManager.YarnBerry) {
-                edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
+                edits.addAll(cascadeForcedMovesBerry(name, oldManifest, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -1623,14 +1623,14 @@ public final class NativeLockEngine {
     }
 
     /**
-     * A yarn direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new version.
-     * Both yarn formats are flat (the selector/descriptor is the requirer's range), so each move re-heads the
-     * transitive to the new range; a shared requirer, a dropped edge, a constraint-only reshuffle, or a multi-level
-     * cascade all fail loud. Only the format-specific lock reads differ between classic (text) and berry (YAML).
+     * A Yarn Berry direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new
+     * version. The lock is flat (the descriptor is the requirer's range), so each move re-heads the transitive to the
+     * new range; a shared requirer, a dropped edge, a constraint-only reshuffle, or a multi-level cascade fail loud.
      */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMovesYarn(PackageManager pm, String rootName,
-                                                                        VersionManifest rootOld, VersionManifest rootNew,
-                                                                        String lock, NodeRegistries registries, NpmRegistryClient client) {
+    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBerry(String rootName, VersionManifest rootOld,
+                                                                         VersionManifest rootNew, String lock,
+                                                                         NodeRegistries registries,
+                                                                         NpmRegistryClient client) {
         Map<String, String> oldDeps = rootOld.getDependencies() == null ? emptyMap() : rootOld.getDependencies();
         Map<String, String> newDeps = rootNew.getDependencies() == null ? emptyMap() : rootNew.getDependencies();
         // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop re-resolves
@@ -1639,7 +1639,7 @@ public final class NativeLockEngine {
         for (Map.Entry<String, String> e : newDeps.entrySet()) {
             String dep = e.getKey();
             String newConstraint = e.getValue();
-            Set<String> locked = findLockedVersions(pm, lock, dep);
+            Set<String> locked = findLockedVersions(PackageManager.YarnBerry, lock, dep);
             if (locked.isEmpty()) {
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                         "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
@@ -1658,25 +1658,27 @@ public final class NativeLockEngine {
                 }
                 continue;
             }
-            moves.add(resolveForcedMoveYarn(pm, rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries, client));
+            moves.add(resolveForcedMoveBerry(rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries,
+                    client));
         }
         return moves;
     }
 
-    /** Resolve and emit one yarn forced move, failing loud on a shared requirer or any deeper reshape. */
-    private static LockEditSet.PackageEdit resolveForcedMoveYarn(PackageManager pm, String rootName, String dep, String oldVersion,
-                                                                 @Nullable String oldConstraint, String newConstraint,
-                                                                 String lock, NodeRegistries registries, NpmRegistryClient client) {
+    /** Resolve and emit one Yarn Berry forced move, failing loud on a shared requirer or any deeper reshape. */
+    private static LockEditSet.PackageEdit resolveForcedMoveBerry(String rootName, String dep, String oldVersion,
+                                                                  @Nullable String oldConstraint, String newConstraint,
+                                                                  String lock, NodeRegistries registries,
+                                                                  NpmRegistryClient client) {
         if (oldConstraint == null) {
             // The transitive is locked but the upgraded root's old manifest never declared it (it was pulled in
             // via another path), so the minimal engine can't reshape this closure — defer to a real resolver.
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no prior selector for moved " + dep);
         }
-        if (yarnHasOtherRequirer(pm, lock, dep, rootName)) {
+        if (berryHasOtherRequirer(lock, dep, rootName)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     dep + " is required by more than the upgraded " + rootName + "; a merged selector defers");
         }
-        if (pm == PackageManager.YarnBerry && importerDeclaresBerry(lock, dep)) {
+        if (importerDeclaresBerry(lock, dep)) {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
                     dep + " is directly declared; moving it via cascade is not yet supported");
         }
@@ -1715,10 +1717,6 @@ public final class NativeLockEngine {
     }
 
     /** True when any package other than {@code rootName} also requires {@code dep} (so moving it would fork). */
-    private static boolean yarnHasOtherRequirer(PackageManager pm, String lock, String dep, String rootName) {
-        return berryHasOtherRequirer(lock, dep, rootName);
-    }
-
     private static boolean berryHasOtherRequirer(String lock, String dep, String rootName) {
         Object loaded = new Yaml().load(lock);
         if (!(loaded instanceof Map)) {

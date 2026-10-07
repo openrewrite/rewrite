@@ -101,4 +101,28 @@ class YarnClassicInputsTest {
         assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know ../../.yarnrc.yml (its contents were not read)");
     }
+
+    /**
+     * Without corepack, yarn 1.22.22 stops on the nearest packageManager from the project's directory up
+     * ({@code open-parent-package-manager-pnpm}).
+     */
+    @Test
+    void theDirectoriesAboveTheProjectGiveTheirPackageJson() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\"}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("repo/web/app/package.json"))
+          .packageManagerFile(Paths.get("repo/web/package.json"), "{\"packageManager\":\"pnpm@9.15.0\"}")
+          .packageManagerFile(Paths.get("package.json"), "{\"name\":\"top\"}")
+          .packageManagerFile(Paths.get("repo/other/package.json"), "{\"packageManager\":\"yarn@4.10.3\"}")
+          .build();
+
+        Inputs inputs = YarnClassicInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(inputs.getConfigFiles()).containsOnlyKeys("../package.json", "../../../package.json");
+        assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
+          .isEqualTo("RESOLUTION_REQUIRED: yarn rejects this edit: This project's package.json defines " +
+                     "\"packageManager\": \"yarn@pnpm@9.15.0\". However the current global version of Yarn is " +
+                     "1.22.22.");
+    }
 }

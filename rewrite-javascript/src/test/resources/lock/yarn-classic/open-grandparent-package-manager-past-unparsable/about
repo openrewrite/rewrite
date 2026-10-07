@@ -1,0 +1,1 @@
+The package.json above the project does not parse and the one above that says packageManager pnpm@9.15.0: findPackageManager skips what JSON.parse rejects and exits 1 on the grandparent.

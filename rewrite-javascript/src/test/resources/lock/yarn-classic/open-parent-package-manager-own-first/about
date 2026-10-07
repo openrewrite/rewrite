@@ -1,0 +1,1 @@
+The project package.json says packageManager yarn@1.22.22, the one above it pnpm@9.15.0: the walk stops at the project, so yarn 1.22.22 runs the install (the ms bump).

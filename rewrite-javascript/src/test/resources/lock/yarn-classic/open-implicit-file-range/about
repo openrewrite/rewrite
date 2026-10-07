@@ -1,0 +1,1 @@
+Adding x@next where the project holds next/package.json (not a workspace member): normalizeRange finds the directory and yarn copies it as file:next, with the deprecation warning.

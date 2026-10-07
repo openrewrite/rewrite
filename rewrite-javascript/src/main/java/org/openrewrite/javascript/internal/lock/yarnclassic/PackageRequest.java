@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
@@ -165,8 +166,14 @@ final class PackageRequest {
             return Promise.resolved(loop, pattern);
         }
         if (NodeSemver.validRange(pattern, YarnClassicOptions.SEMVER) == null) {
-            String location = ProjectFiles.location(pattern);
-            EventLoop.Io<Boolean> exists = loop.io(io, () -> resolver.files.hasManifest(location));
+            String location = ProjectFiles.location(".", pattern);
+            if (location == null) {
+                throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
+                                     "the range " + pattern + " a file: dependency");
+            }
+            EventLoop.Io<Boolean> exists = loop.io(io, () -> resolver.files.hasManifest(location) ||
+                                                              resolver.files.holds(PosixPath.join(location,
+                                                                      "package.json")));
             awaited(exists);
             return exists.promise.then(found -> {
                 if (Boolean.TRUE.equals(found)) {

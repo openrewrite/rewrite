@@ -1,0 +1,5 @@
+const {execFileSync} = require('child_process')
+const {realpathSync} = require('fs')
+const path = require('path')
+const yarn = realpathSync(execFileSync('/bin/sh', ['-c', 'command -v yarn']).toString().trim())
+require(path.join(path.dirname(yarn), '..', 'lib', 'cli.js'))

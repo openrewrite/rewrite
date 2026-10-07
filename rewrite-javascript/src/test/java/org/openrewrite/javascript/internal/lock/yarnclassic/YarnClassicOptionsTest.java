@@ -217,6 +217,60 @@ class YarnClassicOptionsTest {
     }
 
     /**
+     * rc.js {@code getRcConfigForCwd} of yarn 1.22.22's bundle over a project two directories below its repository:
+     * the directory keys resolved against their file's directory, here relative to the project.
+     */
+    static Stream<Arguments> rcDirectoryKeys() {
+        return Stream.of(
+                rcRow("{yarn-path=.yarn/releases/yarn-1.22.22.cjs}", ".yarnrc",
+                        "yarn-path \".yarn/releases/yarn-1.22.22.cjs\""),
+                rcRow("{yarn-path=.yarn/releases/yarn-1.22.22.cjs}", ".yarnrc",
+                        "yarn-path \"./.yarn/releases/yarn-1.22.22.cjs\""),
+                rcRow("{yarn-path=../yarn-wrapper.js}", "../.yarnrc", "yarn-path \"./yarn-wrapper.js\""),
+                rcRow("{yarn-path=../../tools/yarn.js}", "../../.yarnrc", "yarn-path \"tools/yarn.js\""),
+                rcRow("{yarn-path=../.yarn/releases/yarn-4.10.3.cjs}", "../.yarnrc.yml",
+                        "yarnPath: .yarn/releases/yarn-4.10.3.cjs\nnodeLinker: node-modules"),
+                rcRow("{yarn-path=x.cjs}", ".yarnrc.yml", "yarnPath: ./x.cjs"),
+                rcRow("{yarn-path=../y.js}", "../.yarnrc.yml", "yarn-path: y.js"),
+                rcRow("{yarn-path=/opt/yarn/yarn-1.22.22.js}", ".yarnrc", "yarn-path \"/opt/yarn/yarn-1.22.22.js\""),
+                rcRow("{yarn-path=../../../x/yarn.js}", ".yarnrc", "yarn-path \"../../../x/yarn.js\""),
+                rcRow("{cache-folder=cache}", ".yarnrc", "cache-folder \"./cache/\""),
+                rcRow("{--cache-folder=c}", ".yarnrc", "--cache-folder \"c\""),
+                rcRow("{--install.modules-folder=../nm}", "../.yarnrc", "--install.modules-folder \"nm\""),
+                rcRow("{yarn-path=b.js}", "../.yarnrc", "yarn-path \"a.js\"", ".yarnrc", "yarn-path \"b.js\""),
+                rcRow("{yarn-path=b.cjs}", ".yarnrc", "yarn-path \"a.js\"", ".yarnrc.yml", "yarnPath: b.cjs"),
+                rcRow("{yarnPath=./z.js}", ".yarnrc", "yarnPath \"./z.js\""),
+                rcRow("TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type string. " +
+                      "Received type boolean (true)", ".yarnrc", "yarn-path true"),
+                rcRow("TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type string. " +
+                      "Received type number (5)", ".yarnrc", "yarn-path 5"),
+                rcRow("TypeError [ERR_INVALID_ARG_TYPE]: The \"paths[1]\" argument must be of type string. " +
+                      "Received type boolean (false)", "../.yarnrc", "cache-folder false"),
+                rcRow("{yarn-path=.}", ".yarnrc", "yarn-path \"\"")
+        );
+    }
+
+    private static Arguments rcRow(String rc, String... filesAndTexts) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (int i = 0; i < filesAndTexts.length; i += 2) {
+            files.put(filesAndTexts[i], filesAndTexts[i + 1] + "\n");
+        }
+        return Arguments.of(files, rc);
+    }
+
+    @ParameterizedTest
+    @MethodSource("rcDirectoryKeys")
+    void resolvesTheDirectoryKeysAgainstTheirFile(Map<String, String> files, String rc) {
+        String actual;
+        try {
+            actual = YarnClassicOptions.rc(files).toString();
+        } catch (JsError e) {
+            actual = e.toString();
+        }
+        assertThat(actual).isEqualTo(rc);
+    }
+
+    /**
      * yarn 1.22.22's __tests__/rc.js, prefixed arguments: a line for another command does not reach install.
      */
     @Test

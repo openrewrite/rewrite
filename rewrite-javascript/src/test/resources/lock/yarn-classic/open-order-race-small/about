@@ -1,0 +1,1 @@
+Inside one root request (is-descriptor@1.0.3) the fresh is-accessor-descriptor@^1.0.1 leads to the locked hasown@^2.0.3 (registry.npmjs.org) while the fresh is-data-descriptor@^1.0.1 leads to the fresh hasown@^2.0.0: which is resolved first depends on which packument arrives first (open-order-race-direct with smaller packuments).

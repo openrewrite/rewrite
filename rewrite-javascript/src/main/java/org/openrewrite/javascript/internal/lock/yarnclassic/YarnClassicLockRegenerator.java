@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -69,7 +70,7 @@ public final class YarnClassicLockRegenerator {
 
         /**
          * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory and of the directories above it in
-         * the repository, by path relative to the project's root ({@code .yarnrc}, {@code ../.npmrc}).
+         * the repository, and those directories' package.json, by path relative to the root ({@code ../.npmrc}).
          */
         @Singular
         Map<String, String> configFiles;
@@ -404,12 +405,14 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * config.js {@code init} at the project's root, after rc.js read the .yarnrc: the root manifest as
-     * {@code findWorkspaceRoot} reads it, the registries' config, the manifest again, the workspaces check.
+     * cli/index.js {@code start} and {@code main}, then config.js {@code init} at the project's root: the root
+     * manifest as {@code findWorkspaceRoot} reads it, the registries' config, the manifest again, the workspaces check.
      */
     YarnClassicOptions init(List<String> warnings) {
         Map<String, @Nullable Object> rc = YarnClassicOptions.rc(inputs.getConfigFiles());
+        requireRelease(rc);
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
+        requirePackageManager();
         String rootText = inputs.getManifests().get("");
         Manifest root = rootText == null ? null : tryManifest("", rootText, looseSemver, true, null, warnings);
         YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.getConfigFiles(), inputs.getEnv());
@@ -421,6 +424,100 @@ public final class YarnClassicLockRegenerator {
                                    "config. Please check \"workspaces-experimental\" in your .yarnrc file.");
         }
         return config;
+    }
+
+    private static final Pattern RELEASE = Pattern.compile("yarn-1\\.22\\.22\\.[cm]?js");
+    private static final Pattern IN_A_DIRECTORY_ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
+    private static final Pattern YARN_0_OR_1 = Pattern.compile("^yarn@[01]\\.");
+    private static final Pattern BUILD_METADATA = Pattern.compile("\\+" + Js.DOT + "*");
+
+    /**
+     * cli/index.js {@code start}: a yarn-path in the rc chain hands the install to the release it names, which is
+     * this port only when it is a yarn 1.22.22 release the project holds.
+     */
+    void requireRelease(Map<String, @Nullable Object> rc) {
+        Object yarnPath = Js.truthy(rc.get("yarn-path")) ? rc.get("yarn-path") : rc.get("yarnPath");
+        Map<String, String> env = inputs.getEnv();
+        if (!Js.truthy(yarnPath) ||
+            YarnClassicOptions.boolifyWithDefault(env == null ? null : env.get("YARN_IGNORE_PATH"), false)) {
+            return;
+        }
+        String release = PosixPath.normalize(Js.string(yarnPath));
+        Set<String> paths = inputs.getPaths();
+        if (yarnPath instanceof String && RELEASE.matcher(PosixPath.basename(release)).matches()) {
+            if (paths == null || paths.contains(release)) {
+                return;
+            }
+            // the host's paths cover the project and the files directly in each directory above it
+            if (!PosixPath.isAbsolute(release) &&
+                (!release.startsWith("../") || IN_A_DIRECTORY_ABOVE.matcher(release).matches())) {
+                throw new JsError(JsError.ERROR, "Cannot find module '" + release + "'");
+            }
+        }
+        throw new CannotKnow("what the release yarn-path names (" + release + ") writes: yarn 1.22.22 hands the " +
+                             "install to it");
+    }
+
+    /**
+     * cli/index.js {@code main} without corepack: the nearest package.json from the project's directory up with a
+     * packageManager field stops yarn when that field names another package manager than yarn 0 or 1.
+     */
+    private void requirePackageManager() {
+        Map<String, String> env = inputs.getEnv();
+        if (env != null && (Js.truthy(env.get("COREPACK_ROOT")) || Js.truthy(env.get("SKIP_YARN_COREPACK_CHECK")))) {
+            return;
+        }
+        String packageManager = findPackageManager();
+        if (packageManager != null && !YARN_0_OR_1.matcher(packageManager).find()) {
+            String version = BUILD_METADATA.matcher(packageManager.replaceFirst("^yarn@", "")).replaceFirst("");
+            throw new Rejected(Reason.RESOLUTION_REQUIRED, YARN_REJECTS + ": This project's package.json defines " +
+                                                           "\"packageManager\": \"yarn@" + version + "\". However " +
+                                                           "the current global version of Yarn is 1.22.22.");
+        }
+    }
+
+    // cli/index.js findPackageManager, which passes over a package.json JSON.parse rejects
+    private @Nullable String findPackageManager() {
+        Set<String> paths = inputs.getPaths();
+        String up = "";
+        for (int depth = 0; depth <= depthAbove(); depth++, up += "../") {
+            String file = up + "package.json";
+            String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(file);
+            if (text == null) {
+                if (depth > 0 && paths != null && paths.contains(file)) {
+                    throw new CannotKnow(file + " (its contents were not read)");
+                }
+                continue;
+            }
+            Object data;
+            try {
+                data = Js.jsonParse(text);
+            } catch (JsError e) {
+                continue;
+            }
+            Object packageManager = Js.truthy(data) ? Js.get(data, "packageManager") : null;
+            if (packageManager instanceof String) {
+                return (String) packageManager;
+            }
+        }
+        return null;
+    }
+
+    // how many directories above the project's the inputs reach
+    private int depthAbove() {
+        Set<String> files = new LinkedHashSet<>(inputs.getConfigFiles().keySet());
+        if (inputs.getPaths() != null) {
+            files.addAll(inputs.getPaths());
+        }
+        int depth = 0;
+        for (String file : files) {
+            int d = 0;
+            while (file.startsWith("../", 3 * d)) {
+                d++;
+            }
+            depth = Math.max(depth, d);
+        }
+        return depth;
     }
 
     /**
@@ -696,7 +793,8 @@ public final class YarnClassicLockRegenerator {
         for (Object pattern : (List<?>) patterns) {
             files.addAll(glob(Js.templateString(pattern)));
         }
-        for (String loc : files) {
+        for (String file : files) {
+            String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));
             Manifest manifest = tryManifest(loc, Objects.requireNonNull(inputs.getManifests().get(loc)),
                     config.isLooseSemver(), false, "", warnings);
             if (!Js.truthy(manifest.getName())) {
@@ -718,12 +816,14 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * glob 7.1.2 of {@code <pattern>/+(package.json|yarn.json)} over the project's files, without those under the
-     * pattern's node_modules, sorted as glob sorts: the members' locations.
+     * pattern's node_modules, sorted as glob sorts and spelled with the pattern's leading {@code ./}.
      */
     private List<String> glob(String pattern) {
         String base = pattern.replaceFirst("/?\\z", "");
+        String prefix = "";
         while (base.startsWith("./")) {
             base = base.substring(2);
+            prefix += "./";
         }
         String include = base + "/+(package.json|yarn.json)";
         String ignore = base + "/node_modules/**/+(package.json|yarn.json)";
@@ -751,11 +851,11 @@ public final class YarnClassicLockRegenerator {
             }
         }
         found.sort(LocaleCompare::en);
-        List<String> locations = new ArrayList<>();
+        List<String> spelled = new ArrayList<>();
         for (String file : found) {
-            locations.add(file.substring(0, file.length() - "/package.json".length()));
+            spelled.add(prefix + file);
         }
-        return locations;
+        return spelled;
     }
 
     /**

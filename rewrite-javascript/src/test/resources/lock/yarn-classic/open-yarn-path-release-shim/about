@@ -1,0 +1,1 @@
+The project .yarnrc yarn-path names .yarn/releases/yarn-1.22.22.cjs, a script that loads the yarn 1.22.22 on PATH (the release by name, small enough to commit): the ms bump as yarn 1.22.22 writes it.
