@@ -1,0 +1,1 @@
+Adding resolutions {wrappy: 1.0.1} with once 1.4.0: wrappy resolves to 1.0.1 under the resolution descriptor; the once entry keeps wrappy 1 as its declared range.

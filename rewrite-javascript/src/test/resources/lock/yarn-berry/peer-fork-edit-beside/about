@@ -1,0 +1,1 @@
+npm shape: Swap an unrelated dependency beside an existing peer fork (the literal case of rewrite#8932). Recorded with Yarn Berry to see what reaches its lock.

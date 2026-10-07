@@ -1,0 +1,9 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "resolve": "1.22.8",
+    "wrappy": "1.0.2"
+  }
+}

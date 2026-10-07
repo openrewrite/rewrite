@@ -1,0 +1,12 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "dependencies": {
+    "lib": "workspace:~"
+  }
+}

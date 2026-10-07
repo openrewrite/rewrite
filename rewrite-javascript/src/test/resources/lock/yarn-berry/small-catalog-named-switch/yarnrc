@@ -1,0 +1,5 @@
+catalog:
+  path-is-absolute: 1.0.1
+catalogs:
+  legacy:
+    path-is-absolute: 1.0.0

@@ -1,0 +1,7 @@
+{
+  "name": "m48",
+  "version": "1.0.0",
+  "dependencies": {
+    "ms": ">=1.0.48"
+  }
+}

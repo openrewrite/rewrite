@@ -1,0 +1,11 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "lwb-cond-list": "1.0.0",
+    "lwb-cond-neg": "1.0.0",
+    "lwb-cond-string": "1.0.0",
+    "lwb-leaf": "1.0.0"
+  }
+}

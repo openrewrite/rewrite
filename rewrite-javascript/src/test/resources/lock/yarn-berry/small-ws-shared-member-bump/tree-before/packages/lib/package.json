@@ -1,0 +1,7 @@
+{
+  "name": "lib",
+  "version": "1.0.0",
+  "dependencies": {
+    "path-is-absolute": "1.0.0"
+  }
+}

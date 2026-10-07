@@ -1,0 +1,8 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0035: │ @isaacs/this-does-not-exist-at-all@npm:*: Package not found
+➤ YN0035: │   Response Code: 404 (Not Found)
+➤ YN0035: │   Request Method: GET
+➤ YN0035: │   Request URL: https://registry.yarnpkg.com/@isaacs%2fthis-does-not-exist-at-all
+➤ YN0000: └ Completed in 0s 663ms
+➤ YN0000: · Failed with errors in 0s 667ms

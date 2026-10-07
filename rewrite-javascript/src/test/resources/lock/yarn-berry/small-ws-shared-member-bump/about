@@ -1,0 +1,1 @@
+Both members declare path-is-absolute 1.0.0 (one shared entry); app bumps to 1.0.1: a second entry, 1.0.0 stays for lib.

@@ -1,0 +1,1 @@
+Adding query-ast 1.0.4: the builtin extension query-ast@<1.0.5 adds lodash ^4.17.21, which resolves (to the locked 4.18.1, joining its key) while the query-ast entry does not list it.

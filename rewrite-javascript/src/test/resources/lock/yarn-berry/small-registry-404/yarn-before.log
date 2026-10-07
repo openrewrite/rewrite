@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + wrappy@npm:1.0.2
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ A package was added to the project (+ 3.65 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 130ms

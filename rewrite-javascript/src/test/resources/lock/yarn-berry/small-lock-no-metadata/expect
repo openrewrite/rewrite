@@ -1,0 +1,1 @@
+malformed lock without __metadata (Yarn discards it and resolves from scratch)

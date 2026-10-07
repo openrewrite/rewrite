@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + lwb-archive@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwb-archive%2F-%2Frenamed-1.0.0.tgz
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ A package was added to the project (+ 0.61 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 74ms

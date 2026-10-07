@@ -1,0 +1,1 @@
+touch 3.1.1 to 3.1.0 gains nopt ~1.0.10, which brings abbrev 1 (new edges two levels deep), and the bin path changes from bin/nodetouch.js to ./bin/nodetouch.js.

@@ -1,0 +1,17 @@
+{
+  "name": "lwb-archive",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-archive",
+      "version": "1.0.0",
+      "dist": {
+        "shasum": "19d7055cd0e1b58dd298b31c94d600662fea4b4a",
+        "integrity": "sha512-PS3YUwieRtImvbmk7WCiBXKv8qyR0be5wZxvDBo3E19ry/erFDJAkcayF5gfdPzldYIi9+LjS2SqKiMHLawY6A==",
+        "tarball": "http://127.0.0.1:47391/lwb-archive/-/renamed-1.0.0.tgz"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+Adding @isaacs/testing-dev-optional-flags 1.0.0, which lists own-or and wrappy in both dependencies and optionalDependencies: its entry lists them in dependencies with dependenciesMeta optional.

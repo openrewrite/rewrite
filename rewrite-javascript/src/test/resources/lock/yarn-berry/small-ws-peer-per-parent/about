@@ -1,0 +1,1 @@
+app holds testing-peer-deps-b 2.0.0 (peer testing-peer-deps-c *) with c 2.0.0; lib, with c 1.2.3, adds b 2.0.0: one b entry serves two providers, no virtual entries.

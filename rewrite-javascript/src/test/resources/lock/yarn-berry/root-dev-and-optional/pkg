@@ -1,0 +1,14 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "ms": "2.1.3"
+  },
+  "devDependencies": {
+    "is-number": "7.0.0"
+  },
+  "optionalDependencies": {
+    "is-odd": "3.0.1"
+  }
+}

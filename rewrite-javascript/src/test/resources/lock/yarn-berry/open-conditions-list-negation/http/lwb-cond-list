@@ -1,0 +1,25 @@
+{
+  "name": "lwb-cond-list",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-cond-list",
+      "version": "1.0.0",
+      "os": [
+        "darwin",
+        "linux"
+      ],
+      "cpu": [
+        "x64",
+        "arm64"
+      ],
+      "dist": {
+        "shasum": "84fca561d3a45c71b4ef8444512630697b578a9a",
+        "integrity": "sha512-a8SNisIIIIC1iXKo6pRN1y/18/Hf6V/tHrSb2m+NC3blga+f2+Q18Ef7L0bWUIOp7ESljd08yV6EWpEW4T0NAQ==",
+        "tarball": "https://registry.npmjs.org/lwb-cond-list/-/lwb-cond-list-1.0.0.tgz"
+      }
+    }
+  }
+}

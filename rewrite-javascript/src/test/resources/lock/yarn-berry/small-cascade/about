@@ -1,0 +1,1 @@
+nopt 6.0.0 to 7.0.0 changes its abbrev requirement ^1.0.0 to ^2.0.0: the old abbrev entry is pruned and the new descriptor resolves to 2.0.0.

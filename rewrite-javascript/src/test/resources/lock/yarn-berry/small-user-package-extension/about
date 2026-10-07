@@ -1,0 +1,1 @@
+The project adds a .yarnrc.yml packageExtensions rule giving the locked once 1.4.0 a path-is-absolute 1.0.1 dependency: the added descriptor resolves into the lock, the once entry does not list it.

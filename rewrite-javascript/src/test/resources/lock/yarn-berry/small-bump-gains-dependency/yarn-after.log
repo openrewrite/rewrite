@@ -1,0 +1,12 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + touch@npm:3.1.0, abbrev@npm:1.1.1, nopt@npm:1.0.10
+➤ YN0085: │ - touch@npm:3.1.1
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 3 packages were added to the project (+ 44.07 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 201ms

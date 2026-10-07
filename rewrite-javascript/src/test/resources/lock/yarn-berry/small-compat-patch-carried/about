@@ -1,0 +1,1 @@
+The lock holds resolve 1.22.8 with its builtin compat patch entry; adding wrappy leaves both resolve entries as they are.

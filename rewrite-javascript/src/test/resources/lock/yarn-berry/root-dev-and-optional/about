@@ -1,0 +1,1 @@
+Adding a devDependency and an optionalDependency at the root: both land in the workspace dependencies block, the optional one flagged in dependenciesMeta.

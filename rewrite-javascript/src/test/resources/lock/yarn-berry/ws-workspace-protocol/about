@@ -1,0 +1,1 @@
+app adds lib as workspace:^: the descriptor lib@workspace:^ joins the lib workspace entry key.

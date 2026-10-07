@@ -1,0 +1,16 @@
+{
+  "name": "lwb-bundler",
+  "version": "1.0.0",
+  "dependencies": {
+    "lwb-leaf": "1.0.0"
+  },
+  "bundleDependencies": [
+    "lwb-leaf"
+  ],
+  "bin": "./cli.js",
+  "dist": {
+    "shasum": "5f5ec2d05465ce7b7348226a24f8feece95cd989",
+    "integrity": "sha512-RBSPDrSXpkGV7GK90beuI0+N68TM/pDyOiyeGgU7yjgwPqfCKsg26eTBF4/ycWeJtHsm1locdZeErMJqYD37sQ==",
+    "tarball": "https://registry.npmjs.org/lwb-bundler/-/lwb-bundler-1.0.0.tgz"
+  }
+}

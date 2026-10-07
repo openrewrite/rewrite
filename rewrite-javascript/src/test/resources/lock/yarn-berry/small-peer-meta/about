@@ -1,0 +1,1 @@
+Adding testing-peer-optional-conflict-a-x (optional peer, peerDependenciesMeta) and testing-peer-deps-a 1.2.3 (peer testing-peer-deps-b *, absent): peer fields copied, nothing installed for either peer.

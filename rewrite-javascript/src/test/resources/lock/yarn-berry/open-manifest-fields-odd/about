@@ -1,0 +1,1 @@
+Adding packages with an invalid peer range, a non-boolean peerDependenciesMeta optional, a meta-only peer, bundleDependencies with the bundled copy in the tarball, a string bin, and an unsatisfiable engines.node with a postinstall script: what each entry records.

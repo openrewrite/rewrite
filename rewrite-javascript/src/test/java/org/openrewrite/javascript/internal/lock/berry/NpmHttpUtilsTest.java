@@ -1,0 +1,85 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.berry;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.Collections;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Yarn's packages/plugin-npm/tests/NpmSemverFetcher.test.js, every {@code isConventionalTarballUrl} case, and the
+ * registry a scope resolves to.
+ */
+class NpmHttpUtilsTest {
+
+    private final BerryOptions configuration = BerryOptions.defaults();
+    private final String registry = configuration.getString("npmRegistryServer");
+
+    @Test
+    void detectsAConventionalPath() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent(null, "foo"), "npm:1.0.0");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, registry + "/foo/-/foo-1.0.0.tgz", configuration))
+                .isTrue();
+    }
+
+    @Test
+    void detectsAConventionalScopedPath() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent("scope", "foo"), "npm:1.0.0");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, registry + "/@scope/foo/-/foo-1.0.0.tgz",
+                configuration)).isTrue();
+    }
+
+    @Test
+    void detectsAConventionalEncodedScopedPath() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent("scope", "foo"), "npm:1.0.0");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, registry + "/@scope%2ffoo/-/foo-1.0.0.tgz",
+                configuration)).isTrue();
+    }
+
+    @Test
+    void detectsANonConventionalRegistry() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent(null, "foo"), "npm:1.0.0");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, "https://not-the-right-registry/foo/-/foo-1.0.0.tgz",
+                configuration)).isFalse();
+    }
+
+    @Test
+    void detectsANonConventionalPath() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent(null, "foo"), "npm:1.0.0");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, registry + "/archives/foo/foo-1.0.0.tgz",
+                configuration)).isFalse();
+    }
+
+    @Test
+    void takesTheNpmjsHostAsYarnpkg() {
+        Locator locator = StructUtils.makeLocator(StructUtils.makeIdent(null, "ms"), "npm:2.1.3");
+        assertThat(NpmHttpUtils.isConventionalTarballUrl(locator, "http://registry.npmjs.org/ms/-/ms-2.1.3.tgz",
+                configuration)).isTrue();
+    }
+
+    @Test
+    void aScopeEntryDefaultsToThePublicRegistry() {
+        BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
+                "npmRegistryServer: \"https://mirror.example\"\nnpmScopes:\n  corp:\n    npmAuthToken: x\n"),
+                Collections.emptyMap());
+        assertThat(NpmHttpUtils.getScopeRegistry(null, options)).isEqualTo("https://mirror.example");
+        assertThat(NpmHttpUtils.getScopeRegistry("corp", options)).isEqualTo("https://registry.yarnpkg.com");
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", options)).isEqualTo("https://npm.jsr.io");
+        assertThat(NpmHttpUtils.getIdentUrl(StructUtils.makeIdent("types", "node"))).isEqualTo("/@types%2fnode");
+    }
+}

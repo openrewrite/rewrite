@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + is-number@https://github.com/jonschlinkert/is-number.git#commit=98e8ff1da1a89f93d1397a24d7413ed15421c139
+➤ YN0000: └ Completed in 1s 463ms
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ A package was added to the project (+ 12.65 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 1s 470ms

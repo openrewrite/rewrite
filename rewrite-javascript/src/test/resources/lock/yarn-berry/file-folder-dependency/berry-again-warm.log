@@ -1,0 +1,23 @@
++ warm-up: yarn install --mode=skip-build over after
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 3 packages were added to the project (+ 18.06 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0000: └ Completed
+➤ YN0000: · Done in 0s 118ms
+warm-up exit=0
++ second install: yarn install --mode=update-lockfile
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 14ms
+exit=0
+lock unchanged

@@ -1,0 +1,9 @@
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0001: │ Error: ENOENT: no such file or directory, stat '/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.aOZgQgMPAv/cache/local-file-5b703e35a1-28b8818f36.zip'
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 17ms
+exit=1
+no lock written

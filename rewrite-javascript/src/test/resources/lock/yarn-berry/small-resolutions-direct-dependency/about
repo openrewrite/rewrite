@@ -1,0 +1,1 @@
+Adding resolutions {wrappy: 1.0.1} while the root itself declares wrappy ^1.0.0: the root descriptor is redirected too.

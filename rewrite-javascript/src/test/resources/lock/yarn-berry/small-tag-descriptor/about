@@ -1,0 +1,1 @@
+once 1.4.0 holds wrappy@npm:1 at 1.0.2; adding wrappy latest at the root resolves the dist-tag to the same package, and the entry key lists both descriptors.

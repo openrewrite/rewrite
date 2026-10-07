@@ -1,0 +1,24 @@
+{
+  "name": "lwb-peer-bad",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "lwb-leaf": "not a range!!",
+    "lwb-other": "^1.0.0 || >=2 <3"
+  },
+  "peerDependenciesMeta": {
+    "lwb-leaf": {
+      "optional": "yes"
+    },
+    "lwb-other": {
+      "optional": false
+    },
+    "lwb-meta-only": {
+      "optional": true
+    }
+  },
+  "dist": {
+    "shasum": "7d5d04fbdb34583aab741cbf6d45b2b7efc16e08",
+    "integrity": "sha512-lJIoSrjS7nhhw1ffgKkxac3OacC+QaztcEExOvEDKJVXHO3mp2YD0luKCS1wl0MnFE+d4OERlzeBPd3jAlkAlw==",
+    "tarball": "https://registry.npmjs.org/lwb-peer-bad/-/lwb-peer-bad-1.0.0.tgz"
+  }
+}

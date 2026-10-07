@@ -1,0 +1,1 @@
+app adds is-number 7.0.0 while lib already has it at 7.0.0: the shared descriptor is reused.

@@ -1,0 +1,1 @@
+lwb-host depends on lwb-plugin, which peer-depends on lwb-host; the root installs lwb-host under the alias host-alias: does the self-provision descriptor lwb-host@npm:lwb-host@^1.0.0 reach the lock.

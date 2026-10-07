@@ -1,0 +1,1 @@
+workspace:* and workspace:<path> from app, workspace:~ from the root: the descriptors each join their member's entry key.

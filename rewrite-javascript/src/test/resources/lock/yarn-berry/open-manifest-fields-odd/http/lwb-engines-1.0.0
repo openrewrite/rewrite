@@ -1,0 +1,15 @@
+{
+  "name": "lwb-engines",
+  "version": "1.0.0",
+  "engines": {
+    "node": "<1"
+  },
+  "scripts": {
+    "postinstall": "node ./setup.js"
+  },
+  "dist": {
+    "shasum": "4a787ba5e9542b6e825bee9a609f2624ff979e79",
+    "integrity": "sha512-3ZMmLX2mlbZNDTUAFSHxHHwc5u3cfHi/jd7nsiK+qvOLyFSelhBxblY9HNPhHR2jd/X2a51HbgKXvoMKiK9XmA==",
+    "tarball": "https://registry.npmjs.org/lwb-engines/-/lwb-engines-1.0.0.tgz"
+  }
+}

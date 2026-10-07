@@ -1,0 +1,1 @@
+The lock holds wrappy@npm:^1.0.0 at 1.0.1 (set resolution); changing the range to ^1.0.1 resolves the new descriptor to the registry max 1.0.2, not the locked 1.0.1.

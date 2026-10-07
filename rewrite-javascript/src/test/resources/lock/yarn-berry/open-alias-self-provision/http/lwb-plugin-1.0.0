@@ -1,0 +1,12 @@
+{
+  "name": "lwb-plugin",
+  "version": "1.0.0",
+  "peerDependencies": {
+    "lwb-host": "^1.0.0"
+  },
+  "dist": {
+    "shasum": "426c6aac5ce1c7dd92350a60ca649603dac4a7d9",
+    "integrity": "sha512-WJWxT+jZ62Ze+z5JzrwogxEM4giu6j0LfxxA4qlsfTrL5GhdHY8EStGyFTxSGhtjaRGNmqZ6/R0SaTUuO226hw==",
+    "tarball": "https://registry.npmjs.org/lwb-plugin/-/lwb-plugin-1.0.0.tgz"
+  }
+}

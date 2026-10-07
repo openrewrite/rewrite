@@ -1,0 +1,10 @@
+{
+  "name": "lwb-cond-string",
+  "version": "1.0.0",
+  "os": "linux",
+  "dist": {
+    "shasum": "640e696d86b1096c9e54dfb302a2c8057f6cc72b",
+    "integrity": "sha512-MFuAkJkFtzit2f3ptLbx80G51mQuHgtmAVF4SziUz2lvBEdkHHvB4M7t/GjisyW6t3lxysf6y6IE5x/RbO3riQ==",
+    "tarball": "https://registry.npmjs.org/lwb-cond-string/-/lwb-cond-string-1.0.0.tgz"
+  }
+}

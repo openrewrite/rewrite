@@ -1,0 +1,9 @@
+{
+  "name": "lwb-tar",
+  "version": "1.0.0",
+  "dist": {
+    "shasum": "e969c6e0feee7f35742c731d6b09b0f9a4a34e63",
+    "integrity": "sha512-MPsktTx7tYkKOSzQx/H7SYaIYXa+lXpu7/6PPaQZ/t28S8nWwVwxid+NKx7mq7Sr0ZGAWq7tVK5ucTUj4cARsQ==",
+    "tarball": "https://registry.npmjs.org/lwb-tar/-/lwb-tar-1.0.0.tgz"
+  }
+}

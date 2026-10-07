@@ -1,0 +1,9 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "@isaacs/testing-peer-dep-conflict-chain-single-a": "2.0.0",
+    "@isaacs/testing-peer-dep-conflict-chain-single-b": "2.0.0"
+  }
+}

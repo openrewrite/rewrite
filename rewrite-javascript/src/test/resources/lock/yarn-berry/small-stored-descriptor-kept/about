@@ -1,0 +1,1 @@
+The lock holds wrappy@npm:^1.0.0 at 1.0.1 (set resolution) while 1.0.2 exists; adding path-is-absolute leaves the stored descriptor at 1.0.1.

@@ -1,0 +1,12 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "platform-specifying-test-package": "1.0.0",
+    "wrappy": "1.0.2"
+  },
+  "optionalDependencies": {
+    "lightningcss-linux-x64-gnu": "1.27.0"
+  }
+}

@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + debug@npm:4.3.7, is-number@npm:7.0.0, ms@npm:2.1.3
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 3 packages were added to the project (+ 59.82 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 185ms

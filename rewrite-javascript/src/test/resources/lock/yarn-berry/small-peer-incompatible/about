@@ -1,0 +1,1 @@
+The root holds single-b 1.0.0 (peer single-a 1) and single-a 1.0.0, and bumps single-a to 2.0.0: the peer no longer fits, Yarn warns and writes the lock.

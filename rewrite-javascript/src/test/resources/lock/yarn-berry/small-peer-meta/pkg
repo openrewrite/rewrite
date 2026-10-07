@@ -1,0 +1,10 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "@isaacs/testing-peer-deps-a": "1.2.3",
+    "@isaacs/testing-peer-optional-conflict-a-x": "1.0.0",
+    "wrappy": "1.0.2"
+  }
+}

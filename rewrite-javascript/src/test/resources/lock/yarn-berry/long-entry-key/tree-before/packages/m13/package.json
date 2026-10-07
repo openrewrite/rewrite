@@ -1,0 +1,7 @@
+{
+  "name": "m13",
+  "version": "1.0.0",
+  "dependencies": {
+    "ms": ">=1.0.13"
+  }
+}

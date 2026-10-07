@@ -1,0 +1,11 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "lwb-bundler": "1.0.0",
+    "lwb-engines": "1.0.0",
+    "lwb-leaf": "1.0.0",
+    "lwb-peer-bad": "1.0.0"
+  }
+}

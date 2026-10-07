@@ -1,0 +1,9 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "host-alias": "npm:lwb-host@^1.0.0",
+    "lwb-leaf": "1.0.0"
+  }
+}

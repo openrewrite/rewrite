@@ -1,0 +1,7 @@
+{
+  "name": "m32",
+  "version": "1.0.0",
+  "dependencies": {
+    "ms": ">=1.0.32"
+  }
+}

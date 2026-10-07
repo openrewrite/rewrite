@@ -1,0 +1,1 @@
+Adding w2 as npm:wrappy@latest beside wrappy 1.0.2: the alias to a dist-tag resolves to the same package and joins its entry key.

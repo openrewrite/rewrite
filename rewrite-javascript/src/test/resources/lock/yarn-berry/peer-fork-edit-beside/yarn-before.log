@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + micromatch@npm:4.0.8, ms@npm:2.1.3, tinyglobby@npm:0.2.14, braces@npm:3.0.3, fdir@npm:6.5.0, fill-range@npm:7.1.1, is-number@npm:7.0.0, and 3 more.
+➤ YN0000: └ Completed in 0s 208ms
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 10 packages were added to the project (+ 427.79 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 315ms

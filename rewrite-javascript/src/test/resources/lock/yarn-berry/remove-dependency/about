@@ -1,0 +1,1 @@
+Removing debug@4.3.4 prunes debug and ms; is-odd and is-number stay.

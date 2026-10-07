@@ -1,0 +1,1 @@
+Starts from range-change-picks-registry-max/before with its __metadata block removed (crafted before-given): ms@npm:^2.1.0 locked at 2.1.2; the edit adds wrappy. Does Yarn keep the stale pin or discard the lock.

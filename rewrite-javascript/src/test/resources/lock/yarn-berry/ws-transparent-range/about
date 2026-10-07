@@ -1,0 +1,1 @@
+app adds lib as ^1.0.0 (lib is 1.0.0): transparent workspaces resolve the npm: descriptor to the workspace.

@@ -1,0 +1,15 @@
+➤ YN0000: · Yarn 4.5.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ Error: ms@catalog: isn't supported by any available resolver
+    at Pg.getResolverByDescriptor (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:141:1698)
+    at Pg.bindDescriptor (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:141:1083)
+    at t.preparePackage (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:210:6173)
+    at async Z (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:210:7587)
+    at async Promise.allSettled (index 0)
+    at async Wc (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:140:53201)
+    at async /Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:210:9166
+    at async Lt.startProgressPromise (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:140:139272)
+    at async t.resolveEverything (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:210:7138)
+    at async /Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.5.3/yarn.js:213:2645
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 8ms

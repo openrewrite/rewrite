@@ -1,0 +1,10 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "invariant": "2.2.4",
+    "lodash": "4.18.1",
+    "query-ast": "1.0.4"
+  }
+}

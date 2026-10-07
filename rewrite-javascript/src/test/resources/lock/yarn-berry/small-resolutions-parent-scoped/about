@@ -1,0 +1,1 @@
+Adding resolutions {"once/wrappy": 1.0.1} beside a root wrappy 1.0.2: only the wrappy dependency of once is redirected.

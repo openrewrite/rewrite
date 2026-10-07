@@ -1,0 +1,544 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.berry;
+
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+/**
+ * Port of @yarnpkg/core sources/Configuration.ts {@code find} (Yarn 4.10.3) for the settings that reach the lock:
+ * the {@code .yarnrc.yml} files from the project's directory up, merged by configUtils, under the {@code YARN_*}
+ * environment, each parsed by its definition. A setting Yarn knows but the lock never reads is kept by name only.
+ */
+@Getter
+public final class BerryOptions {
+
+    static final String DEFAULT_RC_FILENAME = ".yarnrc.yml";
+    private static final String ENVIRONMENT_PREFIX = "yarn_";
+    private static final Pattern YARN_RELEASE = Pattern.compile("(?:^|/)yarn-(\\d+\\.\\d+\\.\\d+[^/]*?)\\.c?js$");
+    private static final Pattern PACKAGE_MANAGER = Pattern.compile("^yarn@(\\d+\\.\\d+\\.\\d+(?:-[^+]*)?)(?:\\+.*)?$");
+
+    // Configuration.ts IGNORED_ENV_VARIABLES
+    private static final Set<String> IGNORED_ENV_VARIABLES = new LinkedHashSet<>(Arrays.asList("rcFilename",
+            "version", "command", "wrapOutput", "home", "confDir", "registry", "ignoreCwd"));
+
+    private enum Type {
+        ANY, BOOLEAN, ABSOLUTE_PATH, NUMBER, STRING, SECRET, SHAPE, MAP
+    }
+
+    /**
+     * A setting's definition, as {@code SettingsDefinition} declares it.
+     */
+    private static final class Definition {
+        final Type type;
+        final @Nullable Object defaultValue;
+        final @Nullable List<Object> values;
+        final boolean isArray;
+        final Map<String, Definition> properties;
+        final @Nullable Definition valueDefinition;
+
+        Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
+                   Map<String, Definition> properties, @Nullable Definition valueDefinition) {
+            this.type = type;
+            this.defaultValue = defaultValue;
+            this.values = values;
+            this.isArray = isArray;
+            this.properties = properties;
+            this.valueDefinition = valueDefinition;
+        }
+
+        static Definition of(Type type, @Nullable Object defaultValue) {
+            return new Definition(type, defaultValue, null, false, Collections.emptyMap(), null);
+        }
+
+        static Definition map(Definition valueDefinition) {
+            return new Definition(Type.MAP, null, null, false, Collections.emptyMap(), valueDefinition);
+        }
+
+        static Definition shape(Map<String, Definition> properties) {
+            return new Definition(Type.SHAPE, null, null, false, properties, null);
+        }
+    }
+
+    private static final Map<String, Definition> DEFINITIONS = new LinkedHashMap<>();
+
+    static {
+        DEFINITIONS.put("yarnPath", Definition.of(Type.ABSOLUTE_PATH, null));
+        DEFINITIONS.put("enableStrictSettings", Definition.of(Type.BOOLEAN, true));
+        DEFINITIONS.put("compressionLevel", new Definition(Type.NUMBER, 0,
+                Arrays.asList("mixed", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), false, Collections.emptyMap(), null));
+        DEFINITIONS.put("defaultLanguageName", Definition.of(Type.STRING, "node"));
+        DEFINITIONS.put("defaultProtocol", Definition.of(Type.STRING, "npm:"));
+        DEFINITIONS.put("enableTransparentWorkspaces", Definition.of(Type.BOOLEAN, true));
+        DEFINITIONS.put("enableHardenedMode", Definition.of(Type.BOOLEAN, false));
+        DEFINITIONS.put("checksumBehavior", Definition.of(Type.STRING, "throw"));
+
+        Map<String, Definition> peerMeta = new LinkedHashMap<>();
+        peerMeta.put("optional", Definition.of(Type.BOOLEAN, false));
+        Map<String, Definition> extension = new LinkedHashMap<>();
+        extension.put("dependencies", Definition.map(Definition.of(Type.STRING, null)));
+        extension.put("peerDependencies", Definition.map(Definition.of(Type.STRING, null)));
+        extension.put("peerDependenciesMeta", Definition.map(Definition.shape(peerMeta)));
+        DEFINITIONS.put("packageExtensions", Definition.map(Definition.shape(extension)));
+
+        Map<String, Definition> registry = new LinkedHashMap<>();
+        registry.put("npmAlwaysAuth", Definition.of(Type.BOOLEAN, false));
+        registry.put("npmAuthIdent", Definition.of(Type.SECRET, null));
+        registry.put("npmAuthToken", Definition.of(Type.SECRET, null));
+        Map<String, Definition> scope = new LinkedHashMap<>(registry);
+        scope.put("npmAuditRegistry", Definition.of(Type.STRING, null));
+        scope.put("npmPublishRegistry", Definition.of(Type.STRING, null));
+        scope.put("npmRegistryServer", Definition.of(Type.STRING, "https://registry.yarnpkg.com"));
+        DEFINITIONS.putAll(scope);
+        DEFINITIONS.put("npmMinimalAgeGate", Definition.of(Type.NUMBER, 0));
+        DEFINITIONS.put("npmPreapprovedPackages", new Definition(Type.STRING, new ArrayList<>(), null, true,
+                Collections.emptyMap(), null));
+        DEFINITIONS.put("npmScopes", Definition.map(Definition.shape(scope)));
+        DEFINITIONS.put("npmRegistries", Definition.map(Definition.shape(registry)));
+
+        DEFINITIONS.put("catalog", Definition.map(Definition.of(Type.STRING, null)));
+        DEFINITIONS.put("catalogs", Definition.map(Definition.map(Definition.of(Type.STRING, null))));
+    }
+
+    /**
+     * Yarn's configuration error: a value its definition rejects, or a key no definition has.
+     */
+    public static final class UsageError extends RuntimeException {
+        UsageError(String message) {
+            super(message);
+        }
+    }
+
+    private final Map<String, @Nullable Object> values = new LinkedHashMap<>();
+    private final Map<String, String> sources = new LinkedHashMap<>();
+
+    /**
+     * Every key the environment and the rc files set, with its first source; the release decides whether Yarn
+     * knows it.
+     */
+    private final Map<String, String> keySources = new LinkedHashMap<>();
+
+    /**
+     * The keys set while {@code enableStrictSettings} held: one the release does not know is Yarn's usage error.
+     */
+    private final Set<String> strictKeys = new LinkedHashSet<>();
+
+    private final Map<String, String> env;
+
+    /**
+     * The Yarn release the project runs: the root manifest's {@code packageManager}, else the release file
+     * {@code yarnPath} names; null when neither names one.
+     */
+    private @Nullable String yarnVersion;
+
+    private BerryOptions(Map<String, String> env) {
+        this.env = env;
+        for (Map.Entry<String, Definition> definition : DEFINITIONS.entrySet()) {
+            values.put(definition.getKey(), getDefaultValue(definition.getValue(), false));
+        }
+    }
+
+    /**
+     * The defaults, as a project with no rc file and no environment has them.
+     */
+    public static BerryOptions defaults() {
+        return new BerryOptions(Collections.emptyMap());
+    }
+
+    /**
+     * @param configFiles the rc files by path from the project's directory ({@code .yarnrc.yml},
+     *                    {@code ../.yarnrc.yml}); a file under another name is read only when
+     *                    {@code YARN_RC_FILENAME} names it
+     * @param env         the environment Yarn runs under
+     * @throws UsageError where Yarn's configuration rejects a file or a value
+     */
+    public static BerryOptions load(Map<String, String> configFiles, Map<String, String> env) {
+        BerryOptions options = new BerryOptions(env);
+        String rcFilename = getRcFilename(env);
+        TreeMap<Integer, Object[]> byDepth = new TreeMap<>(Collections.reverseOrder());
+        for (Map.Entry<String, String> file : configFiles.entrySet()) {
+            String path = file.getKey();
+            int up = 0;
+            String rest = path;
+            while (rest.startsWith("../")) {
+                rest = rest.substring(3);
+                up++;
+            }
+            if (!rest.equals(rcFilename)) {
+                continue;
+            }
+            Object data;
+            try {
+                data = Syml.parseSyml(file.getValue());
+            } catch (RuntimeException e) {
+                String tip = Pattern.compile("^\\s+(?!-)[^:]+\\s+\\S+", Pattern.MULTILINE).matcher(file.getValue())
+                        .find() ? " (in particular, make sure you list the colons after each key name)" : "";
+                throw new UsageError("Parse error when loading " + path + "; please check it's proper Yaml" + tip);
+            }
+            byDepth.put(up, new Object[]{path, data});
+        }
+        List<Object[]> rcFiles = new ArrayList<>(byDepth.values());
+        ConfigUtils.Resolved resolvedRcFile = ConfigUtils.resolveRcFiles(rcFiles);
+
+        Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env);
+        environmentSettings.remove("rcFilename");
+        options.use("<environment>", environmentSettings);
+        if (resolvedRcFile != null) {
+            options.use(resolvedRcFile.getSource(), asMap(resolvedRcFile.getValue()));
+        }
+        return options;
+    }
+
+    BerryOptions withYarnVersion(@Nullable String version) {
+        this.yarnVersion = version;
+        return this;
+    }
+
+    /**
+     * The Yarn release a project names: the root manifest's {@code packageManager} ({@code yarn@4.10.3}, with or
+     * without a hash), else the version in the file name of the release {@code yarnPath} names.
+     */
+    static @Nullable String yarnVersion(@Nullable String packageManager, @Nullable String yarnPath) {
+        if (packageManager != null) {
+            Matcher m = PACKAGE_MANAGER.matcher(packageManager);
+            return m.find() ? m.group(1) : null;
+        }
+        if (yarnPath != null) {
+            Matcher m = YARN_RELEASE.matcher(yarnPath);
+            return m.find() ? m.group(1) : null;
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> asMap(@Nullable Object value) {
+        return value instanceof Map ? (Map<String, @Nullable Object>) value : new LinkedHashMap<>();
+    }
+
+    private static String getRcFilename(Map<String, String> env) {
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            if ((ENVIRONMENT_PREFIX + "rc_filename").equals(entry.getKey().toLowerCase(Locale.ROOT))) {
+                return entry.getValue();
+            }
+        }
+        return DEFAULT_RC_FILENAME;
+    }
+
+    private static Map<String, @Nullable Object> getEnvironmentSettings(Map<String, String> env) {
+        Map<String, @Nullable Object> environmentSettings = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            String key = entry.getKey().toLowerCase(Locale.ROOT);
+            if (!key.startsWith(ENVIRONMENT_PREFIX)) {
+                continue;
+            }
+            environmentSettings.put(camelcase(key.substring(ENVIRONMENT_PREFIX.length())), entry.getValue());
+        }
+        return environmentSettings;
+    }
+
+    // the camelcase package for the lower-cased snake keys an environment gives
+    private static String camelcase(String input) {
+        StringBuilder out = new StringBuilder();
+        boolean upper = false;
+        for (char c : input.toCharArray()) {
+            if (c == '_' || c == '-' || c == '.' || c == ' ') {
+                upper = out.length() > 0;
+                continue;
+            }
+            out.append(upper ? Character.toUpperCase(c) : c);
+            upper = false;
+        }
+        return out.toString();
+    }
+
+    private void use(String source, Map<String, @Nullable Object> data) {
+        boolean strict = Boolean.TRUE.equals(values.get("enableStrictSettings"));
+        List<String> keys = new ArrayList<>();
+        keys.add("enableStrictSettings");
+        keys.addAll(Js.keys(data));
+        for (String key : keys) {
+            Object value = data.containsKey(key) ? data.get(key) : Syml.UNDEFINED;
+            String fieldSource = ConfigUtils.getSource(value);
+            if (fieldSource != null) {
+                source = fieldSource;
+            }
+            if (value == Syml.UNDEFINED || "plugins".equals(key)) {
+                continue;
+            }
+            if ("<environment>".equals(source) && IGNORED_ENV_VARIABLES.contains(key)) {
+                continue;
+            }
+            if ("rcFilename".equals(key)) {
+                throw new UsageError("The rcFilename settings can only be set via YARN_RC_FILENAME, not via a rc file");
+            }
+            if (!"enableStrictSettings".equals(key)) {
+                keySources.putIfAbsent(key, source);
+                if (strict) {
+                    strictKeys.add(key);
+                }
+            }
+            Definition definition = DEFINITIONS.get(key);
+            if (definition == null) {
+                continue;
+            }
+            if (sources.containsKey(key) && definition.type != Type.MAP && !definition.isArray) {
+                continue;
+            }
+            Object parsed;
+            try {
+                parsed = parseValue(key, value, definition);
+            } catch (UsageError | IllegalArgumentException e) {
+                throw new UsageError(e.getMessage() + " in " + source);
+            }
+            if ("enableStrictSettings".equals(key) && !"<environment>".equals(source)) {
+                strict = Boolean.TRUE.equals(parsed);
+                continue;
+            }
+            if (definition.type == Type.MAP) {
+                Map<String, @Nullable Object> merged = new LinkedHashMap<>(asMap(parsed));
+                merged.putAll(asMap(values.get(key)));
+                values.put(key, merged);
+                sources.put(key, (sources.containsKey(key) ? sources.get(key) : "undefined") + ", " + source);
+            } else {
+                values.put(key, parsed);
+                sources.put(key, source);
+            }
+        }
+    }
+
+    /**
+     * {@code use}'s check of a key against the settings the release defines: under {@code enableStrictSettings}
+     * an unknown key is Yarn's usage error, otherwise it is set aside and its default stays.
+     */
+    void restrictTo(Set<String> releaseSettings) {
+        for (Map.Entry<String, String> key : keySources.entrySet()) {
+            if (releaseSettings.contains(key.getKey())) {
+                continue;
+            }
+            if (strictKeys.contains(key.getKey())) {
+                throw new UsageError("Unrecognized or legacy configuration settings found: " + key.getKey() +
+                                     " - run \"yarn config\" to see the list of settings supported in Yarn (in " +
+                                     key.getValue() + ")");
+            }
+            Definition definition = DEFINITIONS.get(key.getKey());
+            if (definition != null) {
+                values.put(key.getKey(), getDefaultValue(definition, false));
+                sources.remove(key.getKey());
+            }
+        }
+    }
+
+    private @Nullable Object parseValue(String path, @Nullable Object valueBase, Definition definition) {
+        Object value = ConfigUtils.getValue(valueBase);
+        if (definition.isArray || (definition.type == Type.ANY && value instanceof List)) {
+            List<@Nullable Object> out = new ArrayList<>();
+            if (!(value instanceof List)) {
+                for (String segment : Js.string(value).split(",", -1)) {
+                    out.add(parseSingleValue(path, segment, definition));
+                }
+            } else {
+                List<?> list = (List<?>) value;
+                for (int i = 0; i < list.size(); i++) {
+                    out.add(parseSingleValue(path + "[" + i + "]", list.get(i), definition));
+                }
+            }
+            return out;
+        }
+        if (value instanceof List) {
+            throw new IllegalArgumentException("Non-array configuration settings \"" + path +
+                                               "\" cannot be an array");
+        }
+        return parseSingleValue(path, valueBase, definition);
+    }
+
+    private @Nullable Object parseSingleValue(String path, @Nullable Object valueBase, Definition definition) {
+        Object value = ConfigUtils.getValue(valueBase);
+        switch (definition.type) {
+            case ANY:
+                return ConfigUtils.getValueByTree(value);
+            case SHAPE:
+                return parseShape(path, valueBase, definition);
+            case MAP:
+                return parseMap(path, valueBase, definition);
+            default:
+                break;
+        }
+        if (value == null && definition.defaultValue != null) {
+            throw new IllegalArgumentException("Non-nullable configuration settings \"" + path +
+                                               "\" cannot be set to null");
+        }
+        if (definition.values != null && definition.values.contains(value)) {
+            return value;
+        }
+        Object interpreted;
+        if (definition.type == Type.BOOLEAN && !(value instanceof String)) {
+            interpreted = MiscUtils.parseBoolean(value);
+        } else {
+            if (!(value instanceof String)) {
+                throw new IllegalArgumentException("Expected configuration setting \"" + path +
+                                                   "\" to be a string, got " + typeOf(value));
+            }
+            String replaced = MiscUtils.replaceEnvVariables((String) value, env);
+            switch (definition.type) {
+                case NUMBER:
+                    interpreted = parseInt(replaced);
+                    break;
+                case BOOLEAN:
+                    interpreted = MiscUtils.parseBoolean(replaced);
+                    break;
+                default:
+                    interpreted = replaced;
+            }
+        }
+        if (definition.values != null && !definition.values.contains(interpreted)) {
+            List<String> expected = new ArrayList<>();
+            for (Object v : definition.values) {
+                expected.add(String.valueOf(v));
+            }
+            throw new IllegalArgumentException("Invalid value, expected one of " + String.join(", ", expected));
+        }
+        return interpreted;
+    }
+
+    private Map<String, @Nullable Object> parseShape(String path, @Nullable Object valueBase, Definition definition) {
+        Object value = ConfigUtils.getValue(valueBase);
+        if (!(value instanceof Map) && value != null) {
+            throw new UsageError("Object configuration settings \"" + path + "\" must be an object");
+        }
+        Map<String, @Nullable Object> result = asMap(getDefaultValue(definition, true));
+        if (value == null) {
+            return result;
+        }
+        for (Map.Entry<String, @Nullable Object> entry : Js.entries(value)) {
+            String subPath = path + "." + entry.getKey();
+            Definition subDefinition = definition.properties.get(entry.getKey());
+            if (subDefinition == null) {
+                throw new UsageError("Unrecognized configuration settings found: " + subPath +
+                                     " - run \"yarn config\" to see the list of settings supported in Yarn");
+            }
+            result.put(entry.getKey(), parseValue(subPath, entry.getValue(), subDefinition));
+        }
+        return result;
+    }
+
+    private Map<String, @Nullable Object> parseMap(String path, @Nullable Object valueBase, Definition definition) {
+        Object value = ConfigUtils.getValue(valueBase);
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        if (!(value instanceof Map) && value != null) {
+            throw new UsageError("Map configuration settings \"" + path + "\" must be an object");
+        }
+        if (value == null) {
+            return result;
+        }
+        for (Map.Entry<String, @Nullable Object> entry : Js.entries(value)) {
+            result.put(entry.getKey(), parseValue(path + "['" + entry.getKey() + "']", entry.getValue(),
+                    definition.valueDefinition));
+        }
+        return result;
+    }
+
+    private static @Nullable Object getDefaultValue(Definition definition, boolean ignoreArrays) {
+        switch (definition.type) {
+            case SHAPE: {
+                if (definition.isArray && !ignoreArrays) {
+                    return new ArrayList<>();
+                }
+                Map<String, @Nullable Object> result = new LinkedHashMap<>();
+                for (Map.Entry<String, Definition> property : definition.properties.entrySet()) {
+                    result.put(property.getKey(), getDefaultValue(property.getValue(), false));
+                }
+                return result;
+            }
+            case MAP:
+                return definition.isArray && !ignoreArrays ? new ArrayList<>() : new LinkedHashMap<>();
+            default:
+                return definition.defaultValue instanceof List ? new ArrayList<>((List<?>) definition.defaultValue) :
+                        definition.defaultValue;
+        }
+    }
+
+    private static String typeOf(@Nullable Object value) {
+        if (value == null || value instanceof Map || value instanceof List) {
+            return "object";
+        }
+        if (value instanceof Boolean) {
+            return "boolean";
+        }
+        return value instanceof Number ? "number" : "undefined";
+    }
+
+    // parseInt: the leading integer of the string, NaN when there is none
+    private static Object parseInt(String s) {
+        Matcher m = Pattern.compile("^[\\s\\uFEFF\\u00A0]*([+-]?\\d+)").matcher(s);
+        if (!m.find()) {
+            return Double.NaN;
+        }
+        try {
+            return Integer.parseInt(m.group(1).startsWith("+") ? m.group(1).substring(1) : m.group(1));
+        } catch (NumberFormatException e) {
+            return Double.parseDouble(m.group(1));
+        }
+    }
+
+    /**
+     * {@code configuration.use("<compat>", {[name]: value}, {overwrite: true})} for a setting no source set: a
+     * lockfile migration rule. False when a source set it.
+     */
+    boolean useCompat(String name, Object value) {
+        if (sources.containsKey(name) || keySources.containsKey(name)) {
+            return false;
+        }
+        if (DEFINITIONS.containsKey(name)) {
+            values.put(name, value);
+        }
+        sources.put(name, "<compat>");
+        return true;
+    }
+
+    @Nullable
+    Object get(String key) {
+        if (!values.containsKey(key)) {
+            throw new IllegalArgumentException("Couldn't find a configuration settings named \"" + key + "\"");
+        }
+        return values.get(key);
+    }
+
+    String getString(String key) {
+        return (String) get(key);
+    }
+
+    boolean getBoolean(String key) {
+        return Boolean.TRUE.equals(get(key));
+    }
+
+    @SuppressWarnings("unchecked")
+    Map<String, @Nullable Object> getMap(String key) {
+        return (Map<String, @Nullable Object>) get(key);
+    }
+}

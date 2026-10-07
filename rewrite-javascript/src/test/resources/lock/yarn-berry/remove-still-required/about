@@ -1,0 +1,1 @@
+Root ms ^2.1.3 shares its descriptor with debug@4.3.7; removing it from the root leaves the entry untouched.

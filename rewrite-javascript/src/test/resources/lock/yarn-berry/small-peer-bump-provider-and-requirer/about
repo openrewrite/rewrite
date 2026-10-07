@@ -1,0 +1,1 @@
+single-a and single-b (peer single-a) both bump 1.0.0 to 2.0.0: the requirer entry carries its new peer range.

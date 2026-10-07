@@ -1,0 +1,1 @@
+Removing the only dependency: the workspace entry loses its dependencies block.

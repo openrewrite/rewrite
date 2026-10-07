@@ -1,0 +1,1 @@
+Adding path-is-absolute * (2.0.0 deprecated: 1.0.1), get-func-name >=2.0.0 <2.0.2 (2.0.1 deprecated: 2.0.0) and asap >=2.0.0 <2.0.3 (every candidate deprecated: the highest, 2.0.2).

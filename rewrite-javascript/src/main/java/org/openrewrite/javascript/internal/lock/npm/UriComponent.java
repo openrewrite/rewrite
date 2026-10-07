@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 /**
  * ECMAScript's {@code encodeURIComponent} and {@code decodeURIComponent}.
  */
-final class UriComponent {
+public final class UriComponent {
 
     private static final String UNRESERVED = "-_.!~*'()";
 
@@ -34,7 +34,7 @@ final class UriComponent {
     /**
      * @throws IllegalArgumentException where JavaScript throws {@code URIError}.
      */
-    static String decodeURIComponent(String s) {
+    public static String decodeURIComponent(String s) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < s.length(); ) {
             char c = s.charAt(i);
@@ -71,7 +71,7 @@ final class UriComponent {
     /**
      * @throws IllegalArgumentException for a lone surrogate, where JavaScript throws {@code URIError}.
      */
-    static String encodeURIComponent(String s) {
+    public static String encodeURIComponent(String s) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);

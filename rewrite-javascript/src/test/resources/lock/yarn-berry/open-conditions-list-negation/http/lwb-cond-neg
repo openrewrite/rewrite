@@ -1,0 +1,23 @@
+{
+  "name": "lwb-cond-neg",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-cond-neg",
+      "version": "1.0.0",
+      "os": [
+        "!win32"
+      ],
+      "libc": [
+        "glibc"
+      ],
+      "dist": {
+        "shasum": "647ffafa2aad6ff6c8b6e283161362bf6aed13ac",
+        "integrity": "sha512-fiPYCVwWhs555MKs+QihxqlxlzJCu96pN677NnUzCvEI6dFLX12ZMaVNE56CXNlXrgyH8EYT2TVeqnUIO/EYpw==",
+        "tarball": "https://registry.npmjs.org/lwb-cond-neg/-/lwb-cond-neg-1.0.0.tgz"
+      }
+    }
+  }
+}

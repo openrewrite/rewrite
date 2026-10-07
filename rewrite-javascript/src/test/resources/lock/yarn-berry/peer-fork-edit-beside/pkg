@@ -1,0 +1,10 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "escape-string-regexp": "4.0.0",
+    "micromatch": "4.0.8",
+    "tinyglobby": "0.2.14"
+  }
+}

@@ -1,0 +1,1 @@
+Adding ms2 as npm:ms@2.1.3 beside ms 2.1.3: both descriptors resolve to the same package and share one entry key.

@@ -1,0 +1,1 @@
+Adding lwb-tar, whose tarball holds a global pax header, pax and GNU long names, a symlink, a hardlink, a duplicate path, .. and absolute paths, a one-component path, a fifo, a contiguous file, ./ and // in paths, modes 755/610/600 and a 700 directory: which entries Yarn keeps and the checksum.

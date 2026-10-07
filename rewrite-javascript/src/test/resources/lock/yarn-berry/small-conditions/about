@@ -1,0 +1,1 @@
+Adding platform-specifying-test-package 1.0.0 (os win32) as a dependency and lightningcss-linux-x64-gnu 1.27.0 (os, cpu, libc) as an optionalDependency on darwin-arm64: conditions on both, a checksum only on the hard one.

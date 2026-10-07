@@ -1,0 +1,1 @@
+touch 3.1.0 to 3.1.1 drops nopt: nopt and its abbrev leave the lock, and the bin path changes from ./bin/nodetouch.js to bin/nodetouch.js.

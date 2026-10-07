@@ -1,0 +1,1 @@
+Yarn 3.8.7 writes a version 6 lock (cacheKey 8); Yarn 4.5.3 with the same manifest migrates it.

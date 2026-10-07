@@ -1,0 +1,1 @@
+Yarn 2.4.3 writes a version 4 lock (phase one is a full install: Yarn 2 has no --mode); Yarn 4.10.3 with the same dependencies migrates it.

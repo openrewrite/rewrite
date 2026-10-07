@@ -1,0 +1,1 @@
+A Yarn 1 lock where ms@^2.1.1 is at 2.1.2 (lock-seed is the format-v1-migration Yarn 1 lock with that one block set back to 2.1.2 by hand, as Yarn 1 wrote it when 2.1.2 was latest): does the migration keep 2.1.2.
