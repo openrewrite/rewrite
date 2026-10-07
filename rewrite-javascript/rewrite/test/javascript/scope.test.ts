@@ -22,12 +22,12 @@ import {
     namesDeclaredIn,
     namesDeclaredWithin,
     namesReferencedWithin,
+    namesUsedWithin,
     Scope,
     scopeOf,
     sourceFileCache,
     walk
 } from "../../src/javascript";
-import {namesUsedWithin} from "../../src/javascript/scope";
 import {J} from "../../src/java";
 import {Cursor} from "../../src/tree";
 
