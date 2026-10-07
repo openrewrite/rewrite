@@ -30,35 +30,42 @@ const noNames: ReadonlySet<string> = new Set();
  */
 export type Meaning = 'value' | 'type' | 'namespace';
 
-/** The names a scope binds, each with the meanings it has there. */
-type Bindings = ReadonlyMap<string, ReadonlySet<Meaning>>;
+/** One name a scope binds, with every meaning it has there and the declarations giving it each. */
+interface Binding {
+    meanings: ReadonlySet<Meaning>;
+    declarations: readonly Bound[];
+}
+
+type Bindings = ReadonlyMap<string, Binding>;
 
 const noBindings: Bindings = new Map();
 
 /** Whether `bindings` holds `name` with `meaning`, or with any meaning where none is asked for. */
 function binds(bindings: Bindings, name: string, meaning?: Meaning): boolean {
-    const meanings = bindings.get(name);
-    return meanings !== undefined && (meaning === undefined || meanings.has(meaning));
+    const binding = bindings.get(name);
+    return binding !== undefined && (meaning === undefined || binding.meanings.has(meaning));
 }
 
-/** One name a declaration binds, and the meanings it has there. */
+/** One name a declaration binds, as the identifier spelling it, and the meanings it has there. */
 interface Bound {
-    name: string;
+    identifier: J.Identifier;
     meanings: readonly Meaning[];
 }
 
-function bound(names: string[], ...meanings: Meaning[]): Bound[] {
-    return names.map(name => ({name, meanings}));
+function bound(identifiers: J.Identifier[], ...meanings: Meaning[]): Bound[] {
+    return identifiers.map(identifier => ({identifier, meanings}));
 }
 
 function toBindings(bound: Bound[]): Bindings {
-    const bindings = new Map<string, Set<Meaning>>();
-    for (const {name, meanings} of bound) {
+    const bindings = new Map<string, { meanings: Set<Meaning>; declarations: Bound[] }>();
+    for (const declaration of bound) {
+        const name = declaration.identifier.simpleName;
         let held = bindings.get(name);
         if (!held) {
-            bindings.set(name, held = new Set());
+            bindings.set(name, held = {meanings: new Set(), declarations: []});
         }
-        meanings.forEach(meaning => held.add(meaning));
+        declaration.meanings.forEach(meaning => held.meanings.add(meaning));
+        held.declarations.push(declaration);
     }
     return bindings;
 }
@@ -178,14 +185,14 @@ export function namesDeclaredWithin(node: unknown, cacheKey: object = node as ob
 
     const names = new Set<string>();
     const collect = (node: Tree): boolean => {
-        declarationNames(node).forEach(({name}) => names.add(name));
+        declarationNames(node).forEach(({identifier}) => names.add(identifier.simpleName));
         const members = membersOf(node);
         if (!members) {
             return true;
         }
         // The walk ends at this branch, so what else the node holds is read here.
         if (node.kind === J.Kind.ClassDeclaration) {
-            typeParameterNames(node).forEach(({name}) => names.add(name));
+            typeParameterNames(node).forEach(({identifier}) => names.add(identifier.simpleName));
         } else if (node.kind === J.Kind.NewClass) {
             walk((node as J.NewClass).arguments, collect);
         }
@@ -234,9 +241,11 @@ interface Frames {
 }
 
 /** The innermost of `scopes` binding `name` as `reading` asks, or undefined where none does. */
-function bindingFrame(scopes: Frames | undefined, name: string, reading: Meaning | 'any'): Frames | undefined {
+function bindingFrame(
+    scopes: Frames | undefined, name: string, reading: Exclude<Reading, undefined>
+): Frames | undefined {
     for (let scope = scopes; scope; scope = scope.outer) {
-        if (binds(frameBindings(scope.node, scope.parent), name, reading === 'any' ? undefined : reading)) {
+        if (binds(frameBindings(scope.node, scope.parent), name, meaningRead(reading))) {
             return scope;
         }
     }
@@ -244,32 +253,45 @@ function bindingFrame(scopes: Frames | undefined, name: string, reading: Meaning
 }
 
 /**
- * What an identifier reads with: one meaning, any meaning a binding of its name has, which is
- * how an export clause or an `import a = NS.b` reads, or undefined where it names rather than reads.
+ * What an identifier reads with. That is one meaning, or `'any'`, which is how an export clause or
+ * an `import a = NS.b` reads, or `'write'`, a value it assigns to. Undefined is a slot that names
+ * rather than reads.
  */
-type Reading = Meaning | 'any' | undefined;
+type Reading = Meaning | 'any' | 'write' | undefined;
 
-/** Told of each identifier a walk finds: what it reads with, and the scopes around it. */
-type OnIdentifier = (identifier: J.Identifier, reading: Reading, scopes: Frames | undefined) => void;
+/** The meaning a reading resolves against, or undefined for any. */
+function meaningRead(reading: Exclude<Reading, undefined>): Meaning | undefined {
+    return reading === 'any' ? undefined : reading === 'write' ? 'value' : reading;
+}
+
+/**
+ * Told of each identifier a walk finds, with what it reads with and the scopes around it. `trail`
+ * holds the nodes from the walk's root down to it, and changes as the walk goes on.
+ */
+type OnIdentifier =
+    (identifier: J.Identifier, reading: Reading, scopes: Frames | undefined, trail: readonly Tree[]) => void;
 
 /**
  * Walks `node` top-down, telling `onIdentifier` of every identifier. `reading` is what `node`
  * itself reads with, or undefined under a slot that names rather than reads.
  */
 function readReferences(
-    node: Tree, parent: Tree | undefined, scopes: Frames | undefined, reading: Reading, onIdentifier: OnIdentifier
+    node: Tree, parent: Tree | undefined, scopes: Frames | undefined, reading: Reading, onIdentifier: OnIdentifier,
+    trail: Tree[] = []
 ): void {
+    trail.push(node);
     if (node.kind === J.Kind.Identifier) {
-        onIdentifier(node as J.Identifier, reading, scopes);
+        onIdentifier(node as J.Identifier, reading, scopes, trail);
     }
     const within = framesAt(node, parent, scopes);
     for (const [key, value] of Object.entries(node)) {
         if (key !== 'markers') {
             const [below, reads] = descend(node, parent, key, within, reading);
             // A naming position reads against the tree parent, so the padding between is stepped over.
-            treesIn(value).forEach(child => readReferences(child, node, below, reads, onIdentifier));
+            treesIn(value).forEach(child => readReferences(child, node, below, reads, onIdentifier, trail));
         }
     }
+    trail.pop();
 }
 
 /** The scopes a node sits in, with its own in front where it is one. */
@@ -309,11 +331,17 @@ function meaningOf(node: Tree, key: string, reading: Reading): Reading {
     if (reading === undefined) {
         return undefined;
     }
+    if (reading === 'write') {
+        return carriesWrite(node, key) ? 'write' : meaningOf(node, key, 'value');
+    }
     if (key === 'typeParameters' || key === 'typeArguments') {
         return 'type';
     }
     if (key === 'label' || key === namingSlots[node.kind] || key === 'name' && !readsItsName(node)) {
         return undefined;
+    }
+    if (writes(node, key)) {
+        return 'write';
     }
     switch (node.kind) {
         case JS.Kind.Import:
@@ -355,6 +383,61 @@ function meaningOf(node: Tree, key: string, reading: Reading): Reading {
     }
 }
 
+/** Whether slot `key` of `node` is one {@link isWrite} counts as assigned to. A declaring loop head names instead. */
+function writes(node: Tree, key: string): boolean {
+    switch (node.kind) {
+        case J.Kind.Assignment:
+        case J.Kind.AssignmentOperation:
+        case JS.Kind.AssignmentOperation:
+            return key === 'variable';
+        case J.Kind.Unary:
+            return key === 'expression' && incrementing.has((node as J.Unary).operator.element);
+        case J.Kind.ForEachLoopControl:
+            return key === 'variable';
+        default:
+            return false;
+    }
+}
+
+const incrementing = new Set<J.Unary.Type>([
+    J.Unary.Type.PreIncrement, J.Unary.Type.PreDecrement, J.Unary.Type.PostIncrement, J.Unary.Type.PostDecrement
+]);
+
+/**
+ * Whether slot `key` of `node` passes a write on to what it holds, which parentheses, a type
+ * assertion and the shapes of a destructuring target do. Anything else under a target reads, as
+ * `x` does in `x.y = 1`.
+ */
+function carriesWrite(node: Tree, key: string): boolean {
+    switch (node.kind) {
+        case J.Kind.Parentheses:
+            return key === 'tree';
+        case JS.Kind.As:
+            return key === 'left';
+        case JS.Kind.ExpressionStatement:
+        case JS.Kind.Spread:
+        case JS.Kind.SatisfiesExpression:
+        case J.Kind.TypeCast:
+            return key === 'expression';
+        case J.Kind.NewArray:
+            return key === 'initializer';
+        case J.Kind.NewClass:
+            return key === 'body';
+        case J.Kind.Block:
+            return key === 'statements';
+        case JS.Kind.PropertyAssignment:
+            return key === (isShorthand(node) ? 'name' : 'initializer');
+        case JS.Kind.ArrayBindingPattern:
+            return key === 'elements';
+        case JS.Kind.ObjectBindingPattern:
+            return key === 'bindings';
+        case JS.Kind.BindingElement:
+            return key === 'name';
+        default:
+            return false;
+    }
+}
+
 /**
  * Whether a node's `name` slot reads rather than names. A call names a member of whatever it
  * selects from, so with nothing selected its name is the function called, and a shorthand `{x}`
@@ -384,29 +467,37 @@ const namingSlots: Record<string, string> = {
  * property, an array element is chosen by position, and a rest name gathers what nothing claimed.
  */
 export function bindingNames(pattern: J | undefined): { name: string; member?: string }[] {
+    return patternBindings(pattern).map(({identifier, member}) =>
+        member === undefined ? {name: identifier.simpleName} : {name: identifier.simpleName, member});
+}
+
+/** As {@link bindingNames}, with the identifier each name is read from. */
+function patternBindings(pattern: J | undefined): { identifier: J.Identifier; member?: string }[] {
     switch (pattern?.kind) {
         case J.Kind.Identifier: {
-            const simpleName = (pattern as J.Identifier).simpleName;
-            return simpleName ? [{name: simpleName}] : [];
+            const identifier = pattern as J.Identifier;
+            return identifier.simpleName ? [{identifier}] : [];
         }
         case JS.Kind.Spread:
-            return bindingNames((pattern as JS.Spread).expression);
+            return patternBindings((pattern as JS.Spread).expression);
         case JS.Kind.ArrayBindingPattern:
             return unnamedMembers((pattern as JS.ArrayBindingPattern).elements.elements
-                .flatMap(element => bindingNames(unwrap(element))));
+                .flatMap(element => patternBindings(unwrap(element))));
         case JS.Kind.ObjectBindingPattern:
             return (pattern as JS.ObjectBindingPattern).bindings.elements
-                .flatMap(element => bindingNames(unwrap(element)));
+                .flatMap(element => patternBindings(unwrap(element)));
         case JS.Kind.BindingElement: {
             const element = pattern as JS.BindingElement;
             if (element.name?.kind !== J.Kind.Identifier) {
-                return unnamedMembers(bindingNames(element.name as J));
+                return unnamedMembers(patternBindings(element.name as J));
             }
-            const name = (element.name as J.Identifier).simpleName;
+            const identifier = element.name as J.Identifier;
             const propertyName = unwrap(element.propertyName);
             return [{
-                name,
-                member: propertyName?.kind === J.Kind.Identifier ? (propertyName as J.Identifier).simpleName : name
+                identifier,
+                member: propertyName?.kind === J.Kind.Identifier
+                    ? (propertyName as J.Identifier).simpleName
+                    : identifier.simpleName
             }];
         }
         default:
@@ -414,12 +505,12 @@ export function bindingNames(pattern: J | undefined): { name: string; member?: s
     }
 }
 
-function boundNames(pattern: J | undefined): string[] {
-    return bindingNames(pattern).map(bound => bound.name);
+function boundIdentifiers(pattern: J | undefined): J.Identifier[] {
+    return patternBindings(pattern).map(bound => bound.identifier);
 }
 
-function unnamedMembers(bound: { name: string }[]): { name: string }[] {
-    return bound.map(({name}) => ({name}));
+function unnamedMembers(bound: { identifier: J.Identifier }[]): { identifier: J.Identifier }[] {
+    return bound.map(({identifier}) => ({identifier}));
 }
 
 /**
@@ -472,7 +563,7 @@ function frameBindings(node: Tree, parent: Tree | undefined): Bindings {
     if (node.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
         let bindings = selfNamed.get(node);
         if (!bindings) {
-            const self = bound(boundNames((node as J.MethodDeclaration).name), 'value');
+            const self = bound(boundIdentifiers((node as J.MethodDeclaration).name), 'value');
             selfNamed.set(node, bindings = toBindings([...self, ...readBindings(node)]));
         }
         return bindings;
@@ -528,12 +619,13 @@ function readBindings(node: Tree): Bound[] {
             return inferredNames((node as JS.ConditionalType).condition.element.condition);
         case J.Kind.TryCatch:
             return declaredNames([(node as J.Try.Catch).parameter.tree]);
+        // A loop head's `var` hoists past the loop, as one anywhere in a function body does.
         case J.Kind.ForLoop:
-            return declaredNames((node as J.ForLoop).control.init);
+            return blockScopedNames((node as J.ForLoop).control.init);
         case J.Kind.ForEachLoop:
-            return declaredNames([(node as J.ForEachLoop).control.variable]);
+            return blockScopedNames([(node as J.ForEachLoop).control.variable]);
         case JS.Kind.ForInLoop:
-            return declaredNames([(node as JS.ForInLoop).control.variable]);
+            return blockScopedNames([(node as JS.ForInLoop).control.variable]);
         default:
             return [];
     }
@@ -577,22 +669,22 @@ function declarationNames(statement: Tree | undefined): Bound[] {
         case J.Kind.VariableDeclarations:
             return bound((statement as J.VariableDeclarations).variables.flatMap(variable => {
                 const named = unwrap(variable) as J.VariableDeclarations.NamedVariable | undefined;
-                return boundNames(named?.name);
+                return boundIdentifiers(named?.name);
             }), 'value');
         case JS.Kind.ScopedVariableDeclarations:
             return declaredNames((statement as JS.ScopedVariableDeclarations).variables);
         case J.Kind.MethodDeclaration:
-            return bound(boundNames((statement as J.MethodDeclaration).name), 'value');
+            return bound(boundIdentifiers((statement as J.MethodDeclaration).name), 'value');
         case J.Kind.ClassDeclaration: {
             const declaration = statement as J.ClassDeclaration;
             switch (declaration.classKind.type) {
                 case J.ClassDeclaration.Kind.Type.Interface:
-                    return bound(boundNames(declaration.name), 'type');
+                    return bound(boundIdentifiers(declaration.name), 'type');
                 case J.ClassDeclaration.Kind.Type.Enum:
                     // An enum's members are read as `E.A` in a type, so it is a namespace too.
-                    return bound(boundNames(declaration.name), 'value', 'type', 'namespace');
+                    return bound(boundIdentifiers(declaration.name), 'value', 'type', 'namespace');
                 default:
-                    return bound(boundNames(declaration.name), 'value', 'type');
+                    return bound(boundIdentifiers(declaration.name), 'value', 'type');
             }
         }
         case JS.Kind.NamespaceDeclaration: {
@@ -600,17 +692,17 @@ function declarationNames(statement: Tree | undefined): Bound[] {
             if (isGlobalAugmentation(declaration)) {
                 return [];
             }
-            const names = boundNames(rootName(unwrap(declaration.name)));
+            const names = boundIdentifiers(rootName(unwrap(declaration.name)));
             return isInstantiated(declaration) ? bound(names, 'namespace', 'value') : bound(names, 'namespace');
         }
         case JS.Kind.TypeDeclaration:
-            return bound(boundNames(unwrap((statement as JS.TypeDeclaration).name)), 'type');
+            return bound(boundIdentifiers(unwrap((statement as JS.TypeDeclaration).name)), 'type');
         case J.Kind.TypeParameter:
             // A type parameter binds across the declaration carrying it, not in the scope that one
             // sits in, so no statement list leads here.
-            return bound(boundNames((statement as J.TypeParameter).name), 'type');
+            return bound(boundIdentifiers((statement as J.TypeParameter).name), 'type');
         case JS.Kind.MappedTypeParameter:
-            return bound(boundNames((statement as JS.MappedType.Parameter).name as J), 'type');
+            return bound(boundIdentifiers((statement as JS.MappedType.Parameter).name as J), 'type');
         case J.Kind.Case:
             // The cases of a switch share the block it opens, so each one's declarations bind in all.
             return declaredNames((statement as J.Case).statements.elements);
@@ -658,7 +750,7 @@ function enumMemberNames(body: J.Block): Bound[] {
     return body.statements.flatMap(statement => {
         const element = unwrap(statement);
         return element?.kind === J.Kind.EnumValueSet
-            ? bound((element as J.EnumValueSet).enums.map(value => value.element.name.simpleName), 'value')
+            ? bound((element as J.EnumValueSet).enums.map(value => value.element.name), 'value')
             : [];
     });
 }
@@ -705,7 +797,7 @@ function importNames(jsImport: JS.Import): Bound[] {
     if (!importClause) {
         return [];
     }
-    const names = boundNames(unwrap(importClause.name));
+    const names = boundIdentifiers(unwrap(importClause.name));
     const namedBindings = importClause.namedBindings;
     if (namedBindings?.kind === JS.Kind.NamedImports) {
         for (const element of (namedBindings as JS.NamedImports).elements.elements) {
@@ -720,9 +812,9 @@ function importNames(jsImport: JS.Import): Bound[] {
     return bound(names, 'value', 'type', 'namespace');
 }
 
-function aliasedName(specifier: J | undefined): string[] {
+function aliasedName(specifier: J | undefined): J.Identifier[] {
     const name = specifier?.kind === JS.Kind.Alias ? (specifier as JS.Alias).alias : specifier;
-    return boundNames(name);
+    return boundIdentifiers(name);
 }
 
 const blockScoped = new Set(['let', 'const', 'using']);
@@ -880,35 +972,51 @@ export function isReference(cursor: Cursor, identifier: J.Identifier): boolean {
  * one holding `identifier`, which is the cursor's own node or that node's parent.
  */
 function pathTo(cursor: Cursor, identifier: J.Identifier): Tree[] {
-    const path: Tree[] = [];
+    const path = treePath(cursor);
+    if (path[path.length - 1] === identifier) {
+        path.pop();
+    }
+    return path;
+}
+
+/** The cursors on `cursor`'s chain holding tree nodes, down from the nearest compilation unit or outermost tree. */
+function treeCursors(cursor: Cursor): Cursor[] {
+    const cursors: Cursor[] = [];
     for (let c: Cursor | undefined = cursor; c; c = c.parent) {
-        if (isTree(c.value) && c.value !== identifier) {
-            path.unshift(c.value);
+        if (isTree(c.value)) {
+            cursors.unshift(c);
         }
         if (c.value?.kind === JS.Kind.CompilationUnit) {
             break;
         }
     }
-    return path;
+    return cursors;
+}
+
+function treePath(cursor: Cursor): Tree[] {
+    return treeCursors(cursor).map(c => c.value as Tree);
 }
 
 /**
- * The scopes around `identifier` and what it reads with, folded down `path`. The fold runs to the
- * end since a naming slot can hold a read deeper down.
+ * The scopes around `leaf` and what it reads with, folded down `path`, which ends at the node
+ * holding `leaf`, and what each node of `path` reads with. The fold runs to the end since a naming
+ * slot can hold a read deeper down.
  */
-function position(path: Tree[], identifier: J.Identifier): [Frames | undefined, Reading] {
+function position(path: Tree[], leaf: Tree): [Frames | undefined, Reading, Reading[]] {
     let scopes: Frames | undefined;
     let reading: Reading = 'value';
+    const readings: Reading[] = [];
     for (let i = 0; i < path.length; i++) {
-        const child = path[i + 1] ?? identifier;
+        readings.push(reading);
+        const child = path[i + 1] ?? leaf;
         const key = slotOf(path[i], child);
         if (key === undefined) {
-            const spelled = (child as J.Identifier).simpleName ?? child.kind;
+            const spelled = (child as Partial<J.Identifier>).simpleName ?? child.kind;
             throw new Error(`\`${spelled}\` is not under the cursor it is resolved from`);
         }
         [scopes, reading] = descend(path[i], path[i - 1], key, framesAt(path[i], path[i - 1], scopes), reading);
     }
-    return [scopes, reading];
+    return [scopes, reading, readings];
 }
 
 /**
@@ -960,4 +1068,77 @@ export const isValueReference = isReference;
 export function resolve(cursor: Cursor, identifier: J.Identifier): J | undefined {
     const [scopes, reading] = position(pathTo(cursor, identifier), identifier);
     return reading && (bindingFrame(scopes, identifier.simpleName, reading)?.node as J | undefined);
+}
+
+/**
+ * Whether the identifier is assigned to where it stands. An assignment's target, plain or compound,
+ * is, and so are the operand of `++` or `--`, the head of a for-in or for-of declaring nothing, and
+ * a name in such a target's destructuring pattern. A write resolves as a value read, since
+ * `x = 2` assigns to the `x` it reads. The cursor is as {@link resolve} takes it.
+ */
+export function isWrite(cursor: Cursor, identifier: J.Identifier): boolean {
+    return position(pathTo(cursor, identifier), identifier)[1] === 'write';
+}
+
+/** One identifier referring to a binding, from {@link referencesOf}. */
+export interface Reference {
+    /** The identifier's position, holding the tree nodes above it with no padding between them. */
+    cursor: Cursor;
+    identifier: J.Identifier;
+    /** Whether the identifier is one declaring the binding. */
+    declares: boolean;
+    /** Whether the identifier is assigned to, as {@link isWrite} answers. */
+    writes: boolean;
+}
+
+/**
+ * Every identifier referring to the binding `name` has at `cursor`, the ones declaring it and the
+ * ones resolving to it, in the order the tree holds them, which a type annotation can depart from.
+ * The binding is the innermost one of the name with `meaning`, or with any meaning where none is
+ * asked for. A read with any meaning, as an export clause reads, refers to every meaning it finds.
+ * A name bound nowhere has no references. Each reference's cursor continues the caller's chain.
+ */
+export function referencesOf(cursor: Cursor, name: string, meaning?: Meaning): Reference[] {
+    const cursors = treeCursors(cursor);
+    const path = cursors.map(c => c.value as Tree);
+    if (path.length === 0) {
+        return [];
+    }
+    const [scopes, reading, readings] = position(path.slice(0, -1), path[path.length - 1]);
+    readings.push(reading);
+    const here = framesAt(path[path.length - 1], path[path.length - 2], scopes);
+    const frame = bindingFrame(here, name, meaning ?? 'any');
+    if (!frame) {
+        return [];
+    }
+    const declarations = new Set(frameBindings(frame.node, frame.parent).get(name)!.declarations
+        .filter(declaration => meaning === undefined || declaration.meanings.includes(meaning))
+        .map(declaration => declaration.identifier.id));
+    // A class binds its own name in its body too, so a frame further out declaring the same
+    // identifier holds the same binding, and its references sit under that frame.
+    const sharesBinding = (scope: Frames | undefined): boolean => scope !== undefined &&
+        (frameBindings(scope.node, scope.parent).get(name)?.declarations ?? [])
+            .some(declaration => declarations.has(declaration.identifier.id));
+    let root = frame;
+    for (let outer = frame.outer; outer; outer = outer.outer) {
+        if (sharesBinding(outer)) {
+            root = outer;
+        }
+    }
+    const at = path.indexOf(root.node);
+    const references: Reference[] = [];
+    readReferences(root.node, root.parent, root.outer, readings[at], (identifier, reads, scopes, trail) => {
+        if (identifier.simpleName !== name) {
+            return;
+        }
+        const declares = declarations.has(identifier.id);
+        const refers = !declares && reads !== undefined &&
+            (meaning === undefined || reads === 'any' || meaningRead(reads) === meaning) &&
+            sharesBinding(bindingFrame(scopes, name, reads));
+        if (declares || refers) {
+            const standing = trail.reduce((above, node) => new Cursor(node, above), cursors[at].parent);
+            references.push({cursor: standing!, identifier, declares, writes: reads === 'write'});
+        }
+    });
+    return references;
 }

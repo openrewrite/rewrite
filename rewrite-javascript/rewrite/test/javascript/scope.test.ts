@@ -19,10 +19,13 @@ import {
     JavaScriptVisitor,
     JS,
     isReference,
+    isWrite,
     namesDeclaredIn,
     namesDeclaredWithin,
     namesReferencedWithin,
     namesUsedWithin,
+    Reference,
+    referencesOf,
     resolve,
     Scope,
     scopeOf,
@@ -289,6 +292,9 @@ describe('scopeOf', () => {
 
         const blockScoped = await scopeAtAnchor(`function f(p) { let p = 1; anchor(); }`);
         expect(blockScoped.declaringScope('p')?.kind).toBe(J.Kind.Block);
+
+        const loopHead = await scopeAtAnchor(`function f() { for (var i = 0; ; ) { anchor(); } }`);
+        expect(loopHead.declaringScope('i')?.kind).toBe(J.Kind.MethodDeclaration);
     });
 });
 
@@ -681,5 +687,108 @@ describe('isReference', () => {
 
     test('a computed key and a default value read from within a naming slot', async () => {
         expect(await targetsReference('const {[target]: a, b = target} = o;')).toEqual([true, true]);
+    });
+});
+
+describe('isWrite', () => {
+    test('an assignment target, a ++/-- operand, a loop head declaring nothing and a destructuring target write', async () => {
+        expect(await answersAt(`
+            target = 1; target += 1; target ??= 1; target++; --target; (target) = 1;
+            (target as any) = 1; (<any>target) = 1; (target satisfies number) = 1;
+            for (target of xs) {} for (target in o) {}
+            [target, ...target] = arr; [target = 1] = arr; [[target]] = arr;
+            ({target} = o); ({k: target} = o); ({target = 1} = o); ({...target} = o); ({k: [target]} = o);
+            for ([target] of xs) {} for ({target} of xs) {}
+        `, 'target', isWrite)).not.toContain(false);
+    });
+
+    test('what a target selects from, a default, a computed key and a declaration read or name', async () => {
+        expect(await answersAt(`
+            let target = 1; target; f(target); target.p = 1; target[0] = 1; o.target = 1; -target;
+            for (const target of xs) {} ({[target]: v} = o); ({k: v = target} = o); [v = target] = arr;
+            v = target; { const {target} = o; } ({target: v} = o);
+        `, 'target', isWrite)).not.toContain(true);
+    });
+});
+
+/** The references of `name` at the anchor, each as what holds it and whether it declares, writes or reads. */
+async function referencesAtAnchor(source: string, name: string, meaning?: 'value' | 'type'): Promise<string[]> {
+    const cursor = await cursorAtAnchor(source);
+    return referencesOf(cursor, name, meaning).map(describe);
+
+    function describe({cursor, declares, writes}: Reference): string {
+        const parent = (cursor.parent!.value as J).kind.replace(/^.*\$/, '');
+        return `${parent}:${declares ? 'declares' : writes ? 'writes' : 'reads'}`;
+    }
+}
+
+describe('referencesOf', () => {
+    test('lists every declaration and every read or write resolving to the binding, in tree order', async () => {
+        const source = `
+            import {x as y} from 'm';
+            function f(x) {
+                x--;
+                var x = x + 1;
+                x += 1;
+                ({x} = o);
+                { let x = 2; x = 3; }
+                let t: typeof x;
+                interface x {}
+                let u: x;
+                o.x; ({x: 1}); x();
+                anchor();
+            }
+            x;
+        `;
+        expect(await referencesAtAnchor(source, 'x', 'value')).toEqual([
+            'NamedVariable:declares', 'Unary:writes', 'NamedVariable:declares', 'Binary:reads',
+            'AssignmentOperation:writes',
+            'PropertyAssignment:writes', 'TypeQuery:reads', 'MethodInvocation:reads'
+        ]);
+        expect(await referencesAtAnchor(source, 'x', 'type')).toEqual(['ClassDeclaration:declares', 'TypeInfo:reads']);
+        // Any meaning: the innermost binding of the name at the anchor, which the interface's block is.
+        expect(await referencesAtAnchor(source, 'x')).toEqual(['ClassDeclaration:declares', 'TypeInfo:reads']);
+        expect(await referencesAtAnchor(source, 'o')).toEqual([]);
+    });
+
+    test('a value and a type of one name in one scope are two bindings', async () => {
+        const source = 'const Foo = 1; type Foo = string; let a: Foo = Foo; anchor();';
+
+        expect(await referencesAtAnchor(source, 'Foo', 'value'))
+            .toEqual(['NamedVariable:declares', 'NamedVariable:reads']);
+        expect(await referencesAtAnchor(source, 'Foo', 'type')).toEqual(['TypeDeclaration:declares', 'TypeInfo:reads']);
+    });
+
+    test('a class\'s own name and a loop head\'s var are one binding, inside and out', async () => {
+        const source = `
+            class X { static m() { anchor(); return new X(); } }
+            new X();
+            for (var i = 0; i < 3; i++) { use(i); }
+            use(i);
+        `;
+        expect(await referencesAtAnchor(source, 'X', 'value'))
+            .toEqual(['ClassDeclaration:declares', 'NewClass:reads', 'NewClass:reads']);
+        expect(await referencesAtAnchor(source, 'i'))
+            .toEqual([
+                'NamedVariable:declares', 'Binary:reads', 'Unary:writes', 'MethodInvocation:reads',
+                'MethodInvocation:reads'
+            ]);
+    });
+
+    test('each reference comes with a cursor on the caller\'s chain, which resolves it back to the binding', async () => {
+        const cursor = await cursorAtAnchor('const x = 1; function f() { x(); anchor(); } use(x);');
+        const references = referencesOf(cursor, 'x');
+
+        expect(references.map(r => r.declares)).toEqual([true, false, false]);
+        for (const reference of references) {
+            expect(reference.cursor.root).toBe(cursor.root);
+            expect(reference.cursor.value).toBe(reference.identifier);
+            expect(resolve(reference.cursor, reference.identifier)?.kind)
+                .toBe(reference.declares ? undefined : JS.Kind.CompilationUnit);
+        }
+        // The callee: its parent is the call, with no padding between.
+        const call = references[1].cursor.parent!.value as J.MethodInvocation;
+        expect(call.kind).toBe(J.Kind.MethodInvocation);
+        expect(call.name).toBe(references[1].identifier);
     });
 });
