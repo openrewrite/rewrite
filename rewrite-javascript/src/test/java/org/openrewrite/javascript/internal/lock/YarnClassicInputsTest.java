@@ -103,6 +103,34 @@ class YarnClassicInputsTest {
     }
 
     /**
+     * yarn installs at the nearest directory above the project whose workspaces list the project's path from it
+     * (config.js {@code findWorkspaceRoot}, {@code open-parent-workspaces-lists-project}).
+     */
+    @Test
+    void theProjectsDirectoryDecidesWhetherARepositorysWorkspacesListIt() {
+        Request.RequestBuilder request = Request.builder()
+          .packageJson("{\"name\":\"app\",\"version\":\"1.0.0\"}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("web/app/package.json"))
+          .packageManagerFile(Paths.get("package.json"), "{\"private\":true,\"workspaces\":[\"web/*\"]}");
+
+        Inputs listed = YarnClassicInputs.from(request.build(), Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(listed.getDirectory()).isEqualTo("web/app");
+        assertThat(new YarnClassicLockRegenerator(listed, (registry, name) -> null).regenerate().getErrorMessage())
+          .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the lock yarn writes for this edit: yarn installs " +
+                     "at the workspace root ../../, whose workspaces list web/app, and writes ../../yarn.lock, not " +
+                     "this project's");
+
+        Inputs unlisted = YarnClassicInputs.from(request.packageJsonPath(Paths.get("tools/app/package.json")).build(),
+          Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(unlisted.getDirectory()).isEqualTo("tools/app");
+        assertThat(new YarnClassicLockRegenerator(unlisted, (registry, name) -> null).regenerate().isSuccess())
+          .isTrue();
+    }
+
+    /**
      * Without corepack, yarn 1.22.22 stops on the nearest packageManager from the project's directory up
      * ({@code open-parent-package-manager-pnpm}).
      */
