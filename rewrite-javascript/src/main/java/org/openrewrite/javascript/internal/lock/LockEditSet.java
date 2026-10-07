@@ -65,10 +65,6 @@ public class LockEditSet {
         @Nullable
         String newIntegrity;
 
-        /** {@code dist.shasum} (sha1) — yarn-classic records this in its {@code resolved} suffix. */
-        @Nullable
-        String newShasum;
-
         /** Yarn Berry's {@code <cacheKey>/<hash>} checksum for the new version, derived from its tarball. */
         @Nullable
         String newBerryChecksum;
@@ -85,7 +81,7 @@ public class LockEditSet {
         @Nullable
         EntryMetadata metadata;
 
-        /** Pre-edit constraint, so yarn-classic can split a moving selector out of a merged header rather than renaming it. */
+        /** Pre-edit constraint: the descriptor the entry is keyed by before the edit. */
         @Nullable
         String oldConstraint;
 

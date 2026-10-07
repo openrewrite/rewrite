@@ -27,115 +27,15 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 
-import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Byte-exact golden tests for the yarn-classic / yarn-berry patchers. Each golden was recorded from the
- * real package manager (yarn 1.22.22, corepack yarn@4) for a closure-unchanged edit; the patcher
- * is invoked directly and its output asserted equal to the recorded {@code after} lock, byte for byte.
+ * Golden tests for the yarn-berry patcher. Each golden was recorded from the real package manager (corepack
+ * yarn@4) for a closure-unchanged edit; the patcher is invoked directly.
  */
 class LockPatcherTest {
-
-    // --- yarn classic --------------------------------------------------------
-
-    @Test
-    void yarnInPlaceBump() {
-        PackageEdit edit = PackageEdit.builder()
-                .name("left-pad")
-                .oldVersion("1.2.0")
-                .newVersion("1.3.0")
-                .oldConstraint("1.2.0")
-                .newResolved("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz")
-                .newShasum("5b8a3a7765dfe001261dde915589e782f8c94d1e")
-                .newIntegrity("sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/yarn-classic/inplace/before"),
-                Paths.get("yarn.lock"),
-                PackageManager.YarnClassic,
-                resource("/lock/yarn-classic/inplace/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new YarnClassicLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/yarn-classic/inplace/after"));
-    }
-
-    @Test
-    void yarnMergedHeaderSplit() {
-        PackageEdit edit = PackageEdit.builder()
-                .name("is-number")
-                .oldVersion("6.0.0")
-                .newVersion("7.0.0")
-                .oldConstraint("~6.0.0")
-                .newResolved("https://registry.npmjs.org/is-number/-/is-number-7.0.0.tgz")
-                .newShasum("7535345b896734d5f80c4d06c50955527a14f12b")
-                .newIntegrity("sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng==")
-                .newDependencies(emptyMap())
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/yarn-classic/split/before"),
-                Paths.get("yarn.lock"),
-                PackageManager.YarnClassic,
-                resource("/lock/yarn-classic/split/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new YarnClassicLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/yarn-classic/split/after"));
-    }
-
-    @Test
-    void yarnInPlaceBumpKeepsNpmjsHost() {
-        // A lock already on registry.npmjs.org must stay there — the host is mirrored from the siblings,
-        // not force-rewritten to yarnpkg.com.
-        PackageEdit edit = PackageEdit.builder()
-                .name("left-pad")
-                .oldVersion("1.2.0")
-                .newVersion("1.3.0")
-                .oldConstraint("1.2.0")
-                .newResolved("https://registry.npmjs.org/left-pad/-/left-pad-1.3.0.tgz")
-                .newShasum("5b8a3a7765dfe001261dde915589e782f8c94d1e")
-                .newIntegrity("sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/yarn-classic/inplace-npmjs/before"),
-                Paths.get("yarn.lock"),
-                PackageManager.YarnClassic,
-                resource("/lock/yarn-classic/inplace-npmjs/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new YarnClassicLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/yarn-classic/inplace-npmjs/after"));
-    }
-
-    @Test
-    void yarnRemoveLeaf() {
-        PackageEdit edit = PackageEdit.builder()
-                .name("left-pad")
-                .oldVersion("1.3.0")
-                .newVersion(null)
-                .oldConstraint("1.3.0")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(
-                resource("/lock/yarn-classic/remove/before"),
-                Paths.get("yarn.lock"),
-                PackageManager.YarnClassic,
-                resource("/lock/yarn-classic/remove/pkg-after"),
-                singletonList(edit));
-
-        assertThat(new YarnClassicLockPatcher().patch(edits))
-                .isEqualTo(resource("/lock/yarn-classic/remove/after"));
-    }
 
     // --- yarn berry (parse-only, fail loud) ----------------------------------
 
@@ -163,54 +63,6 @@ class LockPatcherTest {
                 .isInstanceOfSatisfying(EngineFailure.class, ef -> {
                     assertThat(ef.failure.getReason()).isEqualTo(Reason.CHECKSUM_UNAVAILABLE);
                     assertThat(ef.failure.getPackageName()).isEqualTo("is-odd");
-                });
-    }
-
-    @Test
-    void malformedYarnFailsLoud() {
-        LockEditSet edits = new LockEditSet(
-                "{\"not\":\"a yarn lock\"}\n",
-                Paths.get("yarn.lock"),
-                PackageManager.YarnClassic,
-                "{}",
-                singletonList(PackageEdit.builder()
-                        .name("left-pad").oldVersion("1.2.0").newVersion("1.3.0")
-                        .oldConstraint("1.2.0").scope("dependencies").build()));
-
-        assertThatThrownBy(() -> new YarnClassicLockPatcher().patch(edits))
-                .isInstanceOfSatisfying(EngineFailure.class, ef ->
-                        assertThat(ef.failure.getReason()).isEqualTo(Reason.MALFORMED_LOCK));
-    }
-
-    @Test
-    void yarnUnmatchedDescriptorDefersResolution() {
-        // The lock is well-formed, but a complex major bump leaves the engine's computed old descriptor
-        // (@scope/name keyed under a range the minimal engine can't reproduce) unmatched. That is a reshape the
-        // engine can't do, not a broken lock: RESOLUTION_REQUIRED, never MALFORMED_LOCK.
-        String before =
-                "# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS FILE DIRECTLY.\n" +
-                "# yarn lockfile v1\n" +
-                "\n" +
-                "\"@sentry/integrations@^6.19.7\":\n" +
-                "  version \"6.19.7\"\n" +
-                "  resolved \"https://registry.yarnpkg.com/@sentry/integrations/-/integrations-6.19.7.tgz#abcd\"\n" +
-                "  integrity sha512-abcd==\n";
-
-        PackageEdit edit = PackageEdit.builder()
-                .name("@sentry/integrations")
-                .oldVersion("6.19.7")
-                .newVersion("7.0.0")
-                .oldConstraint("6")
-                .scope("dependencies")
-                .build();
-
-        LockEditSet edits = new LockEditSet(before, Paths.get("yarn.lock"),
-                PackageManager.YarnClassic, "{}", singletonList(edit));
-
-        assertThatThrownBy(() -> new YarnClassicLockPatcher().patch(edits))
-                .isInstanceOfSatisfying(EngineFailure.class, ef -> {
-                    assertThat(ef.failure.getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-                    assertThat(ef.failure.getPackageName()).isEqualTo("@sentry/integrations");
                 });
     }
 

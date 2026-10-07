@@ -4,10 +4,10 @@ Date: 2026-07-28
 
 ## Status
 
-Accepted. For npm and Bun, superseded by [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md):
-each of those routes is a port of the package manager's own resolver that writes the whole lock, so the
-byte-preserving patching, the per-dependency whitelist and the `RESOLUTION_REQUIRED` refusals below describe
-pnpm and Yarn only.
+Accepted. For npm, Bun and Yarn classic, superseded by
+[ADR 0013](0013-lock-regeneration-follows-each-package-manager.md): each of those routes is a port of the
+package manager's own resolver that writes the whole lock, so the byte-preserving patching, the per-dependency
+whitelist and the `RESOLUTION_REQUIRED` refusals below describe pnpm and Yarn Berry only.
 
 ## Context
 
@@ -129,16 +129,14 @@ A shared, package-manager-agnostic orchestrator plus a per-format patcher:
 - **Whole-closure resolution** — `GraphBuilder` resolves the closure from the importer manifest
   (regular/dev/optional scopes, satisfied peers, `npm:` aliases), preferring a locked version that
   still satisfies its range over the registry maximum; `ResolutionGraph` / `ResolvedNode` are the
-  plain value model. A per-format graph-to-lock diff (`PnpmLockDiff`,
-  `YarnClassicLockDiff`, `YarnBerryLockDiff`) matches the graph to the lock's own keys —
-  `name@version` content addresses, flat selector blocks, or merged descriptors —
+  plain value model. A per-format graph-to-lock diff (`PnpmLockDiff`, `YarnBerryLockDiff`) matches the
+  graph to the lock's own keys — `name@version` content addresses or merged descriptors —
   and expresses the difference as `PackageEdit`s. A peer that resolves to several versions (a peer
   fork) and a missing non-optional peer defer: the graph models neither placement nor auto-install
   (npm's `PlaceDep` does, ADR 0013). A dependency the importer no longer declares but that is still
   resolved keeps its entry; only the importer's edge is removed.
 - **`LockPatcher`** per format —
-  `PnpmLockPatcher` (v9 + v6, workspaces, via rewrite-yaml; v5.4 fails loud), `YarnClassicLockPatcher`
-  (targeted text patch with merged-header split),
+  `PnpmLockPatcher` (v9 + v6, workspaces, via rewrite-yaml; v5.4 fails loud),
   `YarnBerryLockPatcher` (via rewrite-yaml; each moving entry's `checksum` reproduced from its
   tarball by `BerryZipChecksum`, untouched entries keeping theirs).
 
@@ -152,7 +150,8 @@ package manager rejects the edit, or would write a lock its next install rejects
 sides as npm's message does). Every detail says which kind the failure is: the package manager rejects
 the edit (with its error code), or the engine cannot know something (a tarball's contents, a manifest
 outside the registry, the filesystem, the host). `RESOLUTION_REQUIRED` for a shape the proof cannot
-express is a pnpm or Yarn failure only; on the npm and Bun routes the kinds are those of ADR 0013, and a
+express is a pnpm or Yarn Berry failure only; on the npm, Bun and Yarn classic routes the kinds are those of
+ADR 0013, and a
 lock npm's next install would reject is `PEER_CONFLICT`. Recipes surface failures via the
 existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table (source path, package,
 reason, detail) for fleet aggregation. On failure the old lock is untouched.

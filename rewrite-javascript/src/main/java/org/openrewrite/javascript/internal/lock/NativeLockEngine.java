@@ -35,6 +35,7 @@ import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.internal.lock.npm.RegistryPackuments;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.registry.AbbreviatedPackument;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -69,7 +70,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 /**
  * Native lock regeneration, by package manager. npm goes through {@link NpmLockRegenerator}: the ported
  * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. Bun goes through
- * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model. pnpm and Yarn
+ * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model, and Yarn classic through
+ * {@link YarnClassicLockRegenerator}, the port of yarn 1's. pnpm and Yarn Berry
  * take the per-dependency flow below until each follows its own resolver: diff the pre-edit and post-edit
  * {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
  * version against the registry, and hand a proven {@link LockEditSet} to the format's {@link LockPatcher};
@@ -130,6 +132,9 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Bun) {
                 return regenerateBun(request, ctx);
             }
+            if (pm == PackageManager.YarnClassic) {
+                return regenerateYarnClassic(request, ctx);
+            }
             return doRegenerate(pm, request.getPackageJson(), request.getOriginalPackageJson(), request.getLock(),
                     request.getMarker(), request.getPackageJsonPath(), ctx);
         } catch (EngineFailure ef) {
@@ -160,6 +165,15 @@ public final class NativeLockEngine {
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         ManifestSource manifests = new BunRegistryManifests(registries, view.getRegistryClient());
         return new BunLockRegenerator(BunInputs.from(request, host(view), Instant.now()), manifests).regenerate();
+    }
+
+    private static Result regenerateYarnClassic(Request request, ExecutionContext ctx) {
+        NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
+        YarnClassicRegistryPackuments packuments = new YarnClassicRegistryPackuments(registries,
+                view.getRegistryClient());
+        return new YarnClassicLockRegenerator(YarnClassicInputs.from(request, host(view), Instant.now()), packuments)
+                .regenerate();
     }
 
     private static Host host(NodeExecutionContextView view) {
@@ -267,10 +281,7 @@ public final class NativeLockEngine {
             if (pm == PackageManager.Pnpm) {
                 return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
             }
-            if (pm == PackageManager.YarnBerry) {
-                return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
-            }
-            return resolveAndPatchYarnClassic(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
         } catch (NodeRegistryException nre) {
             // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
             // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
@@ -315,41 +326,6 @@ public final class NativeLockEngine {
                         locked.computeIfAbsent(res.substring(0, npm), k -> new LinkedHashSet<>())
                                 .add(res.substring(npm + "@npm:".length()));
                     }
-                }
-            }
-        }
-        return locked;
-    }
-
-    /** Resolve the closure seeded by the existing yarn.lock, diff against its flat blocks, and patch only the difference. */
-    private static Result resolveAndPatchYarnClassic(String editedPackageJson, String existingLock,
-                                                     @Nullable Path packageJsonPath, NodeRegistries registries,
-                                                     NpmRegistryClient client) {
-        Registry registry = new RegistryAdapter(registries, client);
-        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsYarnClassic(existingLock))
-                .build(singletonMap("", editedPackageJson));
-        List<LockEditSet.PackageEdit> edits = YarnClassicLockDiff.diff(graph, existingLock);
-        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnClassic, packageJsonPath),
-                PackageManager.YarnClassic, editedPackageJson, edits);
-        return Result.success(new YarnClassicLockPatcher().patch(editSet));
-    }
-
-    /** The versions the lock already resolves, scanned from every {@code name@range:} header's version line. */
-    private static Map<String, Set<String>> lockedVersionsYarnClassic(String lock) {
-        Map<String, Set<String>> locked = new LinkedHashMap<>();
-        String name = null;
-        for (String line : lock.split("\n")) {
-            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0)) && line.charAt(0) != '#' &&
-                    line.trim().endsWith(":")) {
-                String selector = unquote(line.trim().substring(0, line.trim().length() - 1).split(",")[0].trim());
-                int at = selector.lastIndexOf('@');
-                name = at > 0 ? selector.substring(0, at) : null;
-            } else if (name != null) {
-                String trimmed = line.trim();
-                if (trimmed.startsWith("version ")) {
-                    locked.computeIfAbsent(name, k -> new LinkedHashSet<>())
-                            .add(unquote(trimmed.substring("version ".length()).trim()));
-                    name = null;
                 }
             }
         }
@@ -401,11 +377,6 @@ public final class NativeLockEngine {
         } catch (RuntimeException ignored) {
             // Unparseable here: let the resolution's own gates decide rather than misclassify.
         }
-        if (pm == PackageManager.YarnClassic && packageJsonPath != null) {
-            Path parent = packageJsonPath.getParent();
-            String dir = parent == null ? "" : parent.toString().replace('\\', '/');
-            return !(dir.isEmpty() || ".".equals(dir));
-        }
         return false;
     }
 
@@ -422,7 +393,7 @@ public final class NativeLockEngine {
             case YarnBerry:
                 return berryWorkspaceHeaderCount(lock) > 1;
             default:
-                return false; // yarn classic: flat lock, no importer sections to count
+                return false;
         }
     }
 
@@ -576,7 +547,6 @@ public final class NativeLockEngine {
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
                 .newIntegrity(dist == null ? null : dist.getIntegrity())
-                .newShasum(dist == null ? null : dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .newOptionalDependencies(newManifest.getOptionalDependencies())
                 .metadata(surfaces)
@@ -589,7 +559,7 @@ public final class NativeLockEngine {
         if (!depsEqual) {
             if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
-            } else if (pm == PackageManager.YarnBerry || pm == PackageManager.YarnClassic) {
+            } else if (pm == PackageManager.YarnBerry) {
                 edits.addAll(cascadeForcedMovesYarn(pm, name, oldManifest, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
@@ -892,7 +862,6 @@ public final class NativeLockEngine {
                 // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
                 // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
                 return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
-            case YarnClassic:
             case YarnBerry:
                 // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
                 // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
@@ -989,13 +958,12 @@ public final class NativeLockEngine {
     private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(PackageManager pm, DepChange change, String rootName,
                                                                        String rootConstraint, String existingLock,
                                                                        NodeRegistries registries, NpmRegistryClient client) {
-        Set<String> existingNames = pm == PackageManager.YarnBerry ?
-                existingBerryNames(existingLock) : existingYarnNames(existingLock);
+        Set<String> existingNames = existingBerryNames(existingLock);
         boolean dev = "devDependencies".equals(change.scope);
 
         // Promoting a transitive to a direct dep: if it is already present at a satisfying version, yarn merges the
         // new selector/descriptor into the existing entry (no new blocks). A non-satisfying version forks.
-        if ((pm == PackageManager.YarnClassic || pm == PackageManager.YarnBerry) && existingNames.contains(rootName)) {
+        if (existingNames.contains(rootName)) {
             return promoteYarn(pm, change, rootName, rootConstraint, existingLock);
         }
 
@@ -1045,7 +1013,6 @@ public final class NativeLockEngine {
                     .oldVersion("")
                     .newVersion(p.version)
                     .newResolved(dist.getTarball())
-                    .newShasum(dist.getShasum())
                     .newIntegrity(dist.getIntegrity())
                     .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
                     .scope(p.dev ? "devDependencies" : "dependencies")
@@ -1090,25 +1057,6 @@ public final class NativeLockEngine {
 
     private static void requireEmittableYarnClosureMember(String name, VersionManifest m) {
         requireNoOptionalOrPeer(name, m, "yarn");
-    }
-
-    /** Every package name that heads a block in the yarn.lock (across all merged selectors). */
-    private static Set<String> existingYarnNames(String lock) {
-        Set<String> names = new LinkedHashSet<>();
-        for (String line : lock.split("\n")) {
-            if (line.isEmpty() || Character.isWhitespace(line.charAt(0)) || line.charAt(0) == '#' || !line.endsWith(":")) {
-                continue;
-            }
-            String header = line.substring(0, line.length() - 1);
-            for (String selector : header.split(",")) {
-                String s = unquote(selector.trim());
-                int at = s.lastIndexOf('@');
-                if (at > 0) {
-                    names.add(s.substring(0, at));
-                }
-            }
-        }
-        return names;
     }
 
     /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
@@ -1323,7 +1271,6 @@ public final class NativeLockEngine {
                 proveReverseDependentsBerry(name, targetVersion, lock);
                 break;
             default:
-                // yarn-classic merges selectors into shared headers; the single-locked-version guard covers the common case.
                 break;
         }
     }
@@ -1492,7 +1439,7 @@ public final class NativeLockEngine {
             case YarnBerry:
                 return findImporterDirBerry(lock, name, oldConstraint);
             default:
-                return null; // yarn-classic merges selectors into a flat file, with no importer keys
+                return null;
         }
     }
 
@@ -1640,8 +1587,6 @@ public final class NativeLockEngine {
         switch (pm) {
             case Pnpm:
                 return findLockedVersionsPnpm(lock, name);
-            case YarnClassic:
-                return findLockedVersionsYarn(lock, name);
             case YarnBerry:
                 return findLockedVersionsBerry(lock, name);
             default:
@@ -1766,7 +1711,6 @@ public final class NativeLockEngine {
                 .newConstraint(newConstraint)
                 .newResolved(dist.getTarball())
                 .newIntegrity(dist.getIntegrity())
-                .newShasum(dist.getShasum())
                 .newDependencies(newManifest.getDependencies())
                 .scope("dependencies")
                 .importerDir(null)
@@ -1776,8 +1720,7 @@ public final class NativeLockEngine {
 
     /** True when any package other than {@code rootName} also requires {@code dep} (so moving it would fork). */
     private static boolean yarnHasOtherRequirer(PackageManager pm, String lock, String dep, String rootName) {
-        return pm == PackageManager.YarnBerry ?
-                berryHasOtherRequirer(lock, dep, rootName) : yarnClassicHasOtherRequirer(lock, dep, rootName);
+        return berryHasOtherRequirer(lock, dep, rootName);
     }
 
     private static boolean berryHasOtherRequirer(String lock, String dep, String rootName) {
@@ -1795,34 +1738,6 @@ public final class NativeLockEngine {
             for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
                 Object deps = entry.get(scope);
                 if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Scan the flat {@code yarn.lock} for a {@code dependencies:} line naming {@code dep} under any block whose
-     * header is not {@code rootName}. yarn.lock is not valid YAML, so this is a header/indent line walk.
-     */
-    private static boolean yarnClassicHasOtherRequirer(String lock, String dep, String rootName) {
-        boolean rootBlock = false;
-        boolean inDependencies = false;
-        for (String line : lock.split("\n")) {
-            if (line.isEmpty() || line.charAt(0) == '#') {
-                continue;
-            }
-            if (!Character.isWhitespace(line.charAt(0)) && line.trim().endsWith(":")) {
-                rootBlock = headerMatchesName(line, rootName);
-                inDependencies = false;
-            } else if (line.startsWith("  dependencies:")) {
-                inDependencies = true;
-            } else if (line.startsWith("  ") && !line.startsWith("    ")) {
-                inDependencies = false; // a sibling field (version/resolved/…) ends the dependencies block
-            } else if (inDependencies && !rootBlock && line.startsWith("    ")) {
-                String depName = unquote(line.trim().split("\\s+", 2)[0]);
-                if (depName.equals(dep)) {
                     return true;
                 }
             }
@@ -2016,36 +1931,6 @@ public final class NativeLockEngine {
         }
     }
 
-    private static Set<String> findLockedVersionsYarn(String lock, String name) {
-        // yarn.lock is not valid YAML; best-effort scan of "name@range:" headers and their `version` line.
-        Set<String> versions = new LinkedHashSet<>();
-        String[] lines = lock.split("\n");
-        boolean inMatchingBlock = false;
-        for (String line : lines) {
-            if (!line.isEmpty() && !Character.isWhitespace(line.charAt(0)) && line.trim().endsWith(":")) {
-                inMatchingBlock = headerMatchesName(line, name);
-            } else if (inMatchingBlock) {
-                String trimmed = line.trim();
-                if (trimmed.startsWith("version ")) {
-                    versions.add(unquote(trimmed.substring("version ".length()).trim()));
-                    inMatchingBlock = false;
-                }
-            }
-        }
-        return versions;
-    }
-
-    private static boolean headerMatchesName(String header, String name) {
-        for (String selector : header.substring(0, header.length() - 1).split(",")) {
-            String s = unquote(selector.trim());
-            int at = s.lastIndexOf('@');
-            if (at > 0 && s.substring(0, at).equals(name)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private static void requireSupportedPnpmVersion(String lock) {
         Object loaded;
         try {
@@ -2078,7 +1963,6 @@ public final class NativeLockEngine {
     private static @Nullable LockPatcher patcherFor(PackageManager pm) {
         switch (pm) {
             case Pnpm:        return new PnpmLockPatcher();
-            case YarnClassic: return new YarnClassicLockPatcher();
             case YarnBerry:   return new YarnBerryLockPatcher();
             default:          return null;
         }
