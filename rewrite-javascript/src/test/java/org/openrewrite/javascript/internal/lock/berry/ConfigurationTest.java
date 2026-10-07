@@ -26,7 +26,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Yarn's packages/yarnpkg-core/tests/Configuration.test.ts, the cases about settings that reach a lock: the tag
- * pattern, environment interpolation and map merging. Not ported: secrets hiding, mergeable arrays
+ * pattern, environment interpolation, map merging and the ignored environment variables. Not ported: secrets
+ * hiding, mergeable arrays
  * ({@code logFilters}, {@code unsafeHttpWhitelist}), {@code overwrite} merging and the multiple-rc-file listing
  * of {@code yarn config}, none of which reaches a lock.
  */
@@ -112,6 +113,14 @@ class ConfigurationTest {
         assertThat(scope(options, "foo").get("npmAuthToken")).isEqualTo("token for foo");
         assertThat(scope(options, "foo").get("npmAlwaysAuth")).isEqualTo(false);
         assertThat(scope(options, "bar").get("npmAlwaysAuth")).isEqualTo(true);
+    }
+
+    @Test
+    void ignoresYarnRegistryIfSet() {
+        BerryOptions options = BerryOptions.load(Collections.emptyMap(),
+                Collections.singletonMap("YARN_REGISTRY", "https://example.org"));
+        options.restrictTo(YarnRelease.of("4.10.3").getSettings());
+        assertThat(options.get("npmRegistryServer")).isEqualTo("https://registry.yarnpkg.com");
     }
 
     @SuppressWarnings("unchecked")
