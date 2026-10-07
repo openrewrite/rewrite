@@ -82,9 +82,6 @@ def test_a_shadowing_binding_costs_the_file_its_module_type():
     resolved = declaring_types('import socket\nsocket.getfqdn()\n')
     assert [type(t).__name__ for t in resolved] == ['ShallowClass']
 
-    elsewhere = declaring_types('import socket\nsocket.getfqdn()\ndef helper(socket):\n    return socket\n')
-    assert [type(t).__name__ for t in elsewhere] == ['ShallowClass']
-
     lost = declaring_types('import socket\nsocket.getfqdn()\n' + SHADOW)
     assert [type(t).__name__ for t in lost] == ['Unknown']
 

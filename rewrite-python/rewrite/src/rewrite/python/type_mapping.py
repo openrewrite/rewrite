@@ -29,7 +29,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 from ..java import JavaType
 
@@ -140,16 +140,37 @@ _Region = Tuple[_Position, _Position, List[Tuple[_Position, _Position]]]
 
 _FUNCTION_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
 _COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
-_TYPE_PARAMS = tuple(getattr(ast, n) for n in ('TypeVar', 'ParamSpec', 'TypeVarTuple')
-                     if hasattr(ast, n))
+_Scope = Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
+               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp]
 
 
-def _start(node: Any) -> _Position:
+def _start(node: Union[ast.stmt, ast.expr]) -> _Position:
     return node.lineno, node.col_offset
 
 
-def _end(node: Any) -> _Position:
+def _end(node: Union[ast.stmt, ast.expr]) -> _Position:
+    # `ast.parse` sets the end position typeshed leaves optional for hand-built nodes
+    assert node.end_lineno is not None and node.end_col_offset is not None
     return node.end_lineno, node.end_col_offset
+
+
+def _split_scope(node: _Scope) -> Tuple[List[ast.AST], List[ast.AST]]:
+    """The parts of a function, class or comprehension evaluated in the scope around it, and
+    the parts evaluated in its own."""
+    if isinstance(node, _COMPREHENSIONS):
+        first = node.generators[0]
+        nested = [c for c in ast.iter_child_nodes(node) if c is not first]
+        return [first.iter], nested + [first.target, *first.ifs]
+    if isinstance(node, ast.ClassDef):
+        return [*node.decorator_list, *node.bases, *node.keywords], list(node.body)
+    args = node.args
+    outer: List[ast.AST] = [*args.defaults, *(d for d in args.kw_defaults if d)]
+    if isinstance(node, ast.Lambda):
+        return outer, [node.body]
+    annotations = [a.annotation for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                          args.vararg, args.kwarg) if a and a.annotation]
+    return [*node.decorator_list, *outer, *annotations, *([node.returns] if node.returns else [])], \
+        list(node.body)
 
 
 def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
@@ -157,13 +178,14 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
     """The names this file binds other than by its own module-level imports. A module-scope
     or ``global`` binding reaches the whole file, and any other the scope it is bound in.
 
-    Coarse where scoping is subtle, as with a function's defaults, which count as inside it.
+    Coarse where scoping is subtle, as with a comprehension in a class body, which counts as
+    seeing the class's bindings.
     Declining to attribute a reference costs less than attributing it wrong.
     """
     file_wide: Set[str] = set()
     regions: Dict[str, List[_Region]] = {}
 
-    def scan(scope: ast.AST, walrus_names: Set[str]) -> None:
+    def scan(scope: Union[ast.Module, _Scope], inner: List[ast.AST], walrus_names: Set[str]) -> None:
         names: Set[str] = set()
         hidden: List[Tuple[_Position, _Position]] = []
         if isinstance(scope, _FUNCTION_SCOPES):
@@ -171,19 +193,24 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
             names.update(a.arg for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
                                          args.vararg, args.kwarg) if a)
         comprehension = isinstance(scope, _COMPREHENSIONS)
-        todo = list(ast.iter_child_nodes(scope))
+        todo = list(inner)
         while todo:
             node = todo.pop()
             if isinstance(node, (*_FUNCTION_SCOPES, ast.ClassDef, *_COMPREHENSIONS)):
                 if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
                     names.add(node.name)
+                outer, nested = _split_scope(node)
+                todo.extend(outer)
+                # Type parameters reach everything inside, a class's methods included
+                for param in getattr(node, 'type_params', ()):
+                    regions.setdefault(param.name, []).append((_start(node), _end(node), []))
                 body = getattr(node, 'body', None)
                 if isinstance(body, list):
                     hidden.append((_start(body[0]), _end(node)))
                 elif isinstance(body, ast.AST):
                     hidden.append((_start(body), _end(body)))
                 # An assignment expression in a comprehension binds in the scope around it
-                scan(node, walrus_names if comprehension and isinstance(node, _COMPREHENSIONS)
+                scan(node, nested, walrus_names if comprehension and isinstance(node, _COMPREHENSIONS)
                      else names)
                 continue
             if isinstance(node, ast.NamedExpr) and comprehension:
@@ -196,7 +223,7 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
             elif isinstance(node, ast.alias):
                 if id(node) not in module_level_aliases:
                     names.add(node.asname or node.name.split('.')[0])
-            elif isinstance(node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar, *_TYPE_PARAMS)):
+            elif isinstance(node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)):
                 if node.name:
                     names.add(node.name)
             elif isinstance(node, ast.MatchMapping) and node.rest:
@@ -212,7 +239,7 @@ def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
         for name in names:
             regions.setdefault(name, []).append(region)
 
-    scan(tree, set())
+    scan(tree, tree.body, set())
     return file_wide, regions
 
 
@@ -1161,7 +1188,6 @@ class PythonTypeMapping:
         """Whether the name ``node`` is written under is bound a second time in reach of it."""
         while isinstance(node, ast.Attribute):
             node = node.value
-        self._import_bindings()
         return isinstance(node, ast.Name) and self._shadowed(node)
 
     def _lookup_binding(self, node: ast.expr) -> Optional[Dict[str, str]]:
@@ -1243,6 +1269,7 @@ class PythonTypeMapping:
 
     def _shadowed(self, node: ast.Name) -> bool:
         """Whether a binding other than this file's module-level imports reaches ``node``."""
+        self._import_bindings()
         if node.id in self._shadowed_names:
             return True
         position = _start(node)

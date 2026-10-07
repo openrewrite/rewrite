@@ -4188,6 +4188,13 @@ class TestSymbolTheStubsDoNotDeclare:
             'from lib import gone\ngone()\ndef f():\n    global gone\n    gone = None\n') == [None], \
             'a global declaration binds at module scope'
 
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f(a=(gone := 1)):\n    pass\n') == [None], \
+            'a default is evaluated in the scope around its function'
+        assert self._call_owners(
+            'from lib import gone\nclass C[gone]:\n    def m(self):\n        gone()\n') == [None], \
+            "a class's type parameters reach its methods"
+
     def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
         owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')
         assert owner is None, 'a function-scope import binds only inside that function'
