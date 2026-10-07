@@ -25,6 +25,8 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -70,6 +72,22 @@ class BunInputsTest {
 
         assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", "bunfig.toml");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
+        assertThat(inputs.getPaths()).isNull();
+    }
+
+    @Test
+    void thePathsUnderTheRootAreTheProjectsPaths() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\"}")
+          .lock("{}")
+          .packageJsonPath(Paths.get("repo/package.json"))
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("repo/package.json"), Paths.get("repo/bun.lock"),
+            Paths.get("repo/patches/./ms@2.1.3.patch"), Paths.get("other/patches/x.patch"))))
+          .build();
+
+        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "bun.lock", "patches/ms@2.1.3.patch");
     }
 
     @Test

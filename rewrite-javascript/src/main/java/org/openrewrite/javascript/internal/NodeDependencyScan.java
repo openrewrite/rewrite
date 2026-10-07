@@ -21,12 +21,14 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,28 +52,36 @@ public final class NodeDependencyScan {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
         public final Map<Path, String> packageManagerFiles = new HashMap<>();
+        /** Every file the scan visited: what the host holds of the repository. */
+        public final Set<Path> paths = new HashSet<>();
     }
 
     /**
-     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path.
+     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path, and
+     * which paths the project holds at all (null when the host has not said).
      */
     @Value
     public static class ProjectFiles {
-        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap());
+        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap(), null);
 
         Map<Path, String> manifests;
         Map<Path, String> packageManagerFiles;
+        @Nullable Set<Path> paths;
     }
 
     /**
-     * Keep a package manager's configuration file or a patch file the scan visits; true when {@code sf} is one.
+     * Note a file the scan visits and keep its contents when it is a package manager's configuration file or a
+     * patch file; true when {@code sf} is one. A {@link Quark} has a path and no contents.
      */
     public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
+        acc.paths.add(sf.getSourcePath());
         Path name = sf.getSourcePath().getFileName();
         if (name == null || !PACKAGE_MANAGER_FILES.contains(name.toString()) && !isPatch(sf.getSourcePath())) {
             return false;
         }
-        acc.packageManagerFiles.put(sf.getSourcePath(), sf.printAll());
+        if (!(sf instanceof Quark)) {
+            acc.packageManagerFiles.put(sf.getSourcePath(), sf.printAll());
+        }
         return true;
     }
 
@@ -172,7 +182,13 @@ public final class NodeDependencyScan {
                 files.put(file.getKey(), file.getValue());
             }
         }
-        return new ProjectFiles(manifests, files);
+        Set<Path> paths = new LinkedHashSet<>();
+        for (Path path : acc.paths) {
+            if (under(directory(path), directories)) {
+                paths.add(path);
+            }
+        }
+        return new ProjectFiles(manifests, files, paths);
     }
 
     private static Path directory(Path file) {

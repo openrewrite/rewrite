@@ -169,6 +169,7 @@ class BunScenarioTest {
           .npmrc(scenario.config(false, "npmrc", ".npmrc"))
           .bunfig(scenario.config(false, "bunfig", "bunfig.toml"))
           .files(scenario.tree(false))
+          .paths(scenario.paths(false, before))
           .now(scenario.now())
           .build();
     }

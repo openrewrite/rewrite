@@ -34,7 +34,9 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -244,6 +246,20 @@ final class BunScenarios {
                 out.putAll(tree("tree"));
             }
             return out;
+        }
+
+        /**
+         * Every path the project holds in a phase: its tree, its manifests and its lock.
+         */
+        Set<String> paths(boolean before, @Nullable String lock) {
+            Set<String> paths = new TreeSet<>(tree(before).keySet());
+            for (String location : manifests(before, lock == null ? "" : lock).keySet()) {
+                paths.add(location.isEmpty() ? "package.json" : location + "/package.json");
+            }
+            if (lock != null) {
+                paths.add("bun.lock");
+            }
+            return paths;
         }
 
         private Map<String, String> tree(String treeDir) {

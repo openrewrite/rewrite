@@ -1,0 +1,4 @@
+bun 1.3.10, node v24.19.0 (fetch only), 2026-10-07
+before exit=0, after exit=1, frozen-over-after exit=skipped, fresh exit=1, again exit=1, empty-cache rerun exit=1
+platform os=darwin cpu=arm64 libc=
+edit started 2026-10-07T01:39:11Z

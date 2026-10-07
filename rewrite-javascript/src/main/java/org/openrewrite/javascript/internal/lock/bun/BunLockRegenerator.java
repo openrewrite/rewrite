@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,6 +81,13 @@ public final class BunLockRegenerator {
          */
         @Singular
         Map<String, String> files;
+
+        /**
+         * Every path under the root the project holds, relative to it, whether or not its contents are in
+         * {@link #files}; null when the host has not said which paths exist.
+         */
+        @Nullable
+        Set<String> paths;
 
         @Singular("env")
         Map<String, String> env;
@@ -229,6 +237,7 @@ public final class BunLockRegenerator {
             throw new Rejected(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no bun.lock");
         }
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
+        requireConfigFiles(these);
         Log log = new Log();
         PendingInstall install;
         try {
@@ -267,17 +276,40 @@ public final class BunLockRegenerator {
         return written;
     }
 
+    // PackageManagerOptions.load reads both from the project: one it holds that the host did not read is unknown
+    private static void requireConfigFiles(Inputs inputs) {
+        if (inputs.getPaths() == null) {
+            return;
+        }
+        if (inputs.getBunfig() == null && inputs.getPaths().contains("bunfig.toml")) {
+            throw new PackageManager.CannotKnow("bunfig.toml (its contents were not read)");
+        }
+        if (inputs.getNpmrc() == null && inputs.getPaths().contains(".npmrc")) {
+            throw new PackageManager.CannotKnow(".npmrc (its contents were not read)");
+        }
+    }
+
     // calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
     private static void requirePatchFiles(Inputs inputs, Lockfile lockfile) {
         Map<String, String> files = new HashMap<>();
         for (Map.Entry<String, String> file : inputs.getFiles().entrySet()) {
             files.put(PosixPaths.normalize(file.getKey()), file.getValue());
         }
+        Set<String> paths = inputs.getPaths() == null ? null : new HashSet<>();
+        if (paths != null) {
+            for (String path : inputs.getPaths()) {
+                paths.add(PosixPaths.normalize(path));
+            }
+        }
         for (String patch : lockfile.patchedDependencies.values()) {
             String path = PosixPaths.normalize(patch);
             String contents = files.get(path);
             if (contents == null) {
-                throw new PackageManager.CannotKnow("patch file " + patch + " (not among the project's files)");
+                if (paths == null || paths.contains(path) || path.equals("..") || path.startsWith("../")) {
+                    throw new PackageManager.CannotKnow("patch file " + patch + " (its contents were not read)");
+                }
+                throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
+                        BUN_REJECTS + ": Couldn't find patch file: '" + patch + "'");
             }
             if (contents.isEmpty()) {
                 throw new Rejected(Reason.RESOLUTION_REQUIRED, null,

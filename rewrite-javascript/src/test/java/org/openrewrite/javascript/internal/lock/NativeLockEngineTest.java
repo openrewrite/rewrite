@@ -37,12 +37,16 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -111,6 +115,55 @@ class NativeLockEngineTest {
         assertThat(withoutDirectory.getFailure().getDetail()).startsWith("the engine cannot know directory manifest of local");
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunFindsAPatchFileAmongThePathsTheHostHolds() {
+        String scenario = "lock/bun/open-patched-dot-slash/";
+        String patch = "patches/ms@2.1.3.patch";
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"));
+        Set<Path> withoutPatch = new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/bun.lock")));
+        Set<Path> withPatch = new HashSet<>(withoutPatch);
+        withPatch.add(Paths.get("app/" + patch));
+
+        Result noView = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
+        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withPatch).build(), ctx);
+        Result absent = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withoutPatch).build(),
+                ctx);
+        Result read = NativeLockEngine.regenerate(PackageManager.Bun, request.projectPaths(withPatch)
+                .packageManagerFile(Paths.get("app/" + patch), resource(scenario + "tree/" + patch)).build(), ctx);
+
+        assertThat(noView.getFailure().getDetail()).startsWith("the engine cannot know patch file ./" + patch);
+        assertThat(unread.getFailure().getDetail()).startsWith("the engine cannot know patch file ./" + patch);
+        assertThat(absent.getFailure().getDetail())
+                .isEqualTo("bun rejects this edit: Couldn't find patch file: './" + patch + "'");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void bunCannotKnowAConfigFileTheHostHoldsUnread() {
+        String scenario = "lock/bun/small-registry-mirror/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.npmrc"))));
+
+        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = NativeLockEngine.regenerate(PackageManager.Bun,
+                request.packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc")).build(), ctx);
+
+        assertThat(unread.getFailure().getDetail())
+                .isEqualTo("the engine cannot know .npmrc (its contents were not read)");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
     }
 
     @Test

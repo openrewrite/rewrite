@@ -23,12 +23,15 @@ import org.openrewrite.javascript.internal.lock.npm.Host;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A recipe's request as the Bun regenerator takes it: the manifests placed as {@link NpmInputs} places them, the
- * .npmrc and bunfig.toml of the lock's directory, and the package-manager files under it (the patch files) by
- * path. Without the .npmrc file itself, the project's npmrc the marker read stands in for it.
+ * .npmrc and bunfig.toml of the lock's directory, the package-manager files under it (the patch files) by path,
+ * and the paths under it the project holds. Without the .npmrc file itself, the project's npmrc the marker read
+ * stands in for it.
  */
 final class BunInputs {
 
@@ -44,6 +47,7 @@ final class BunInputs {
                 .npmrc(npmrc != null ? npmrc : NpmInputs.projectNpmrc(request.getMarker()))
                 .bunfig(file(request, rootDir, "bunfig.toml"))
                 .files(files(request, rootDir))
+                .paths(paths(request, rootDir))
                 .host(host)
                 .now(now)
                 .build();
@@ -53,14 +57,34 @@ final class BunInputs {
     private static Map<String, String> files(Request request, String rootDir) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            String path = file.getKey().normalize().toString().replace('\\', '/');
-            if (rootDir.isEmpty()) {
+            String path = underRoot(file.getKey(), rootDir);
+            if (path != null) {
                 files.put(path, file.getValue());
-            } else if (path.startsWith(rootDir + "/")) {
-                files.put(path.substring(rootDir.length() + 1), file.getValue());
             }
         }
         return files;
+    }
+
+    private static @Nullable Set<String> paths(Request request, String rootDir) {
+        if (request.getProjectPaths() == null) {
+            return null;
+        }
+        Set<String> paths = new LinkedHashSet<>();
+        for (Path file : request.getProjectPaths()) {
+            String path = underRoot(file, rootDir);
+            if (path != null) {
+                paths.add(path);
+            }
+        }
+        return paths;
+    }
+
+    private static @Nullable String underRoot(Path file, String rootDir) {
+        String path = file.normalize().toString().replace('\\', '/');
+        if (rootDir.isEmpty()) {
+            return path;
+        }
+        return path.startsWith(rootDir + "/") ? path.substring(rootDir.length() + 1) : null;
     }
 
     private static @Nullable String file(Request request, String rootDir, String name) {
