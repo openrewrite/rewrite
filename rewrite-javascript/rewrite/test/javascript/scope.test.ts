@@ -390,6 +390,39 @@ describe('namesReferencedWithin', () => {
         // binds no value.
         expect(referenced).toEqual(expect.arrayContaining(['Hidden', 'Checked', 'Value']));
     });
+
+    test('a qualified type name reads a namespace, a space of its own beside values and types', async () => {
+        // A namespace sits in a namespace or module, so the outer one here is what a function is elsewhere.
+        const ns = (await parse(`
+            namespace Outer {
+                interface Iface {}
+                type Alias = 1;
+                const Value = 1;
+                class Klass {}
+                namespace Hidden { export type T = 1 }
+                namespace TypesOnly { export type T = 1; interface I {} namespace Inner { type U = 1 } }
+                namespace Deep { namespace Inner { export const v = 1 } }
+                namespace Dotted.Inner { export const v = 1 }
+                enum Enum { A }
+                let a: Iface.T;
+                let b: Alias.T;
+                let c: Value.T;
+                let d: Klass.T;
+                let e: Hidden.T;
+                TypesOnly.go();
+                let g: Enum.A;
+                Deep.go();
+                Dotted.go();
+            }
+        `)).statements[0].element;
+
+        const referenced = [...namesReferencedWithin(ns)];
+        expect(referenced).toEqual(expect.arrayContaining(['Iface', 'Alias', 'Value', 'Klass', 'TypesOnly']));
+        expect(referenced).not.toContain('Hidden');
+        expect(referenced).not.toContain('Enum');
+        expect(referenced).not.toContain('Deep');
+        expect(referenced).not.toContain('Dotted');
+    });
 });
 
 describe('namesUsedWithin', () => {
