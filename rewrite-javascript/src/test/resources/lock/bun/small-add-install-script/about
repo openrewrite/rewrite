@@ -1,0 +1,1 @@
+Add @isaacs/testing-fail-install@1.0.0 (hasInstallScript, its install script fails) beside abbrev: the lock-only install runs no script and the tuple carries no install-script flag (small form of the cpu-features entry of add-optional-transitive).

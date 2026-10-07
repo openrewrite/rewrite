@@ -26,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -63,6 +64,7 @@ final class BunScenarios {
     private static final Pattern MEMBER_MANIFEST = Pattern.compile("^pkg-(.+?)(?:-(before|after))?$");
     private static final Pattern LOAD_ERROR = Pattern.compile("(?m)^error: (.*)$");
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
+    private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
 
     private BunScenarios() {
     }
@@ -185,6 +187,32 @@ final class BunScenarios {
         String expect() {
             String expect = file("expect");
             return expect == null ? null : expect.trim();
+        }
+
+        /**
+         * Whether the scenario records an edit: a starting lock and the edited manifest.
+         */
+        boolean isEdit() {
+            return has("before") && (has("pkg") || has("pkg-after") || has("pkg-root"));
+        }
+
+        /**
+         * When bun ran the edit, as the open-question recorder writes it ({@code edit started <instant>}), else now.
+         */
+        Instant now() {
+            String recorded = file("recorded-with");
+            if (recorded != null) {
+                Matcher started = EDIT_STARTED.matcher(recorded);
+                if (started.find()) {
+                    return Instant.parse(started.group(1));
+                }
+            }
+            return Instant.now();
+        }
+
+        @Nullable
+        String recordedWith() {
+            return file("recorded-with");
         }
 
         /**

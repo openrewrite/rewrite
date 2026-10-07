@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-peer-dep-conflict-chain-single-a": "2.0.0",
+        "@isaacs/testing-peer-dep-conflict-chain-single-b": "2.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-peer-dep-conflict-chain-single-a": ["@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0", "", {}, "sha512-EeEqcHtFFh8U7DBN3DF3sY0pTobDFMQdK/ld2dpP5FLjyqux4xJayaCCxgxOEAzuF/umuoLb5ctt4txWznEvqQ=="],
+
+    "@isaacs/testing-peer-dep-conflict-chain-single-b": ["@isaacs/testing-peer-dep-conflict-chain-single-b@2.0.0", "", { "peerDependencies": { "@isaacs/testing-peer-dep-conflict-chain-single-a": "2" } }, "sha512-wHWh9R+t+2OF0SexH3pCiZvyKz5qnrBUAIgl8FsvRC7uAkYc5RSRIr98Vx3DfVkmCvVK2EOYL/9oLhwUzsH2ww=="],
+  }
+}

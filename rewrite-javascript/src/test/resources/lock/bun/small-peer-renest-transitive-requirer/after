@@ -1,0 +1,26 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-peer-deps": "2",
+        "@isaacs/testing-peer-deps-b": "2",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-peer-deps": ["@isaacs/testing-peer-deps@2.0.0", "", { "dependencies": { "@isaacs/testing-peer-deps-a": "1", "@isaacs/testing-peer-deps-d": "2" } }, "sha512-4urwrUZGQ948uZfnIeY2nuYOGrh6eBhMpIvJo6KTTdG8ys25NylqN3MmeXdraXTQLr7vb3UrPq1pVL6h9vkuvA=="],
+
+    "@isaacs/testing-peer-deps-a": ["@isaacs/testing-peer-deps-a@1.2.4", "", { "peerDependencies": { "@isaacs/testing-peer-deps-b": "1" } }, "sha512-AZh6hYg/RYoS8Ea59JUOxYKS8Tg/95kW5hiZHyhpB/eg4hDllp6dAedxTvZzJN68aKpvA4YYuqodMtdzUinNPQ=="],
+
+    "@isaacs/testing-peer-deps-b": ["@isaacs/testing-peer-deps-b@2.0.1", "", { "peerDependencies": { "@isaacs/testing-peer-deps-c": "2" } }, "sha512-sgYGXt0YwVLZ31DZKgoQm7JHEETS71GE2x9g1RIqQ1xarGFfGyor2sF3ekxUOeaE/4FInrh+K+nUP5YgPXLBQQ=="],
+
+    "@isaacs/testing-peer-deps-c": ["@isaacs/testing-peer-deps-c@1.2.3", "", {}, "sha512-sq2Bc2XsWCrvCm1Hw+hVEd9oadnsb7T/91v3OwtLx0KMqinj6ncn6p4uixsB6dZuC+sHJlFHZjbnB4crfeVSgw=="],
+
+    "@isaacs/testing-peer-deps-d": ["@isaacs/testing-peer-deps-d@2.0.0", "", { "dependencies": { "@isaacs/testing-peer-deps-a": "2" } }, "sha512-uVdlNNBv6K1Cqo9NeCCX6Byv5WobrWpAgW3I9FnyVb3w2M7Q7kds+zvcXn5tDY+VzKUqFH/JcrKmSXRo7Jt2xQ=="],
+
+    "@isaacs/testing-peer-deps-d/@isaacs/testing-peer-deps-a": ["@isaacs/testing-peer-deps-a@2.0.0", "", { "peerDependencies": { "@isaacs/testing-peer-deps-b": "2" } }, "sha512-jpHyXoPZrCrwuiZjZPd5PU0tsgVAnpCVGpR772ZhF5B93GGfTlhKdi06Ev7gVaqQnTkV9gk6xKS/loJfRmAzTw=="],
+  }
+}

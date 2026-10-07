@@ -1,0 +1,1 @@
+An override of a root dependency: root ms ^2.0.0 with overrides {ms: 2.0.0}.

@@ -100,6 +100,19 @@ final class Lockfile {
     }
 
     /**
+     * Whether a dependency belongs to the root or to a workspace member.
+     */
+    boolean isWorkspaceDependency(int id) {
+        for (Package pkg : packages) {
+            if ((pkg.resolution.tag == Resolution.Tag.WORKSPACE || pkg.resolution.tag == Resolution.Tag.ROOT) &&
+                pkg.containsDependency(id)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * An existing package that is the resolution, or one whose npm version the range satisfies, highest first.
      */
     @Nullable

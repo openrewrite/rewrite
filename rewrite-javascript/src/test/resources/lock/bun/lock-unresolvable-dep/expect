@@ -1,0 +1,1 @@
+malformed lock debug requires ms and no packages key provides it (bun: Failed to resolve prod dependency 'ms' for package 'debug'; Ignoring lockfile)

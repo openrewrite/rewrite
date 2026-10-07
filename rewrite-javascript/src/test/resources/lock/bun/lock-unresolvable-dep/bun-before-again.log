@@ -1,0 +1,15 @@
+bun install v1.3.10 (30e609e0)
+13 |     "debug": ["debug@2.6.9", "", { "dependencies": { "ms": "2.0.0" } }, "sha512-bC7E
+         ^
+error: Failed to resolve prod dependency 'ms' for package 'debug'
+    at bun.lock:13:5
+InvalidPackageInfo: failed to parse lockfile: 'bun.lock'
+
+warn: Ignoring lockfile
+Resolving dependencies
+Resolved, downloaded and extracted [4]
+Saved lockfile
+
+Saved bun.lock (3 packages) [88.00ms]
+exit=0
+lock changed

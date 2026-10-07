@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "abbrev": "1.1.1",
+        "is-number": "github:jonschlinkert/is-number#7.0.0",
+      },
+    },
+  },
+  "packages": {
+    "abbrev": ["abbrev@1.1.1", "", {}, "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q=="],
+
+    "is-number": ["is-number@github:jonschlinkert/is-number#98e8ff1", {}, "jonschlinkert-is-number-98e8ff1", "sha512-VRiId6WxXNzVNsf8kootsozLJ3nE+6fNmpwihMjEudNZbnSjqsRZDgvAIgzdsl5qk714XNJqG6QzO4cQ/WhULQ=="],
+  }
+}

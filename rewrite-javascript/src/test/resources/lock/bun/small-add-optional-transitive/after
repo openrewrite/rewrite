@@ -1,0 +1,22 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-dev-optional-flags": "1.0.0",
+        "abbrev": "1.1.1",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-dev-optional-flags": ["@isaacs/testing-dev-optional-flags@1.0.0", "", { "optionalDependencies": { "own-or": "^1.0.0", "wrappy": "^1.0.2" } }, "sha512-//nrzGwTMCWa53Ub08qnrjE2fSoFgBvAxNaqBoV/TCU2HQPyTWet1PsAnNzRftGaN5s/qAjpX7KF/K9oHSCdbg=="],
+
+    "abbrev": ["abbrev@1.1.1", "", {}, "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q=="],
+
+    "own-or": ["own-or@1.0.0", "", {}, "sha512-NfZr5+Tdf6MB8UI9GLvKRs4cXY8/yB0w3xtt84xFdWy8hkGjn+JFc60VhzS/hFRfbyxFcGYMTjnF4Me+RbbqrA=="],
+
+    "wrappy": ["wrappy@1.0.2", "", {}, "sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ=="],
+  }
+}

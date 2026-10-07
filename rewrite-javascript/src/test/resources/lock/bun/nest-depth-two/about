@@ -1,0 +1,1 @@
+is-even@1.0.0 -> is-odd@0.1.x -> is-number@^3 beside root is-odd@3.0.1 (is-number ^6): a key nested two levels deep.

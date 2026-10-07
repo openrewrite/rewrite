@@ -1,0 +1,1 @@
+is-odd (is-number ^6) and to-regex-range (is-number ^7) added, is-number undeclared: the first root dep in name order wins the top slot.

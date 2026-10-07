@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-peer-deps-a": "2.0.0",
+        "@isaacs/testing-peer-deps-b": "2.0.1",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-peer-deps-a": ["@isaacs/testing-peer-deps-a@2.0.0", "", { "peerDependencies": { "@isaacs/testing-peer-deps-b": "2" } }, "sha512-jpHyXoPZrCrwuiZjZPd5PU0tsgVAnpCVGpR772ZhF5B93GGfTlhKdi06Ev7gVaqQnTkV9gk6xKS/loJfRmAzTw=="],
+
+    "@isaacs/testing-peer-deps-b": ["@isaacs/testing-peer-deps-b@2.0.1", "", { "peerDependencies": { "@isaacs/testing-peer-deps-c": "2" } }, "sha512-sgYGXt0YwVLZ31DZKgoQm7JHEETS71GE2x9g1RIqQ1xarGFfGyor2sF3ekxUOeaE/4FInrh+K+nUP5YgPXLBQQ=="],
+
+    "@isaacs/testing-peer-deps-c": ["@isaacs/testing-peer-deps-c@1.2.3", "", {}, "sha512-sq2Bc2XsWCrvCm1Hw+hVEd9oadnsb7T/91v3OwtLx0KMqinj6ncn6p4uixsB6dZuC+sHJlFHZjbnB4crfeVSgw=="],
+  }
+}

@@ -1,0 +1,1 @@
+A bun.lock with lockfileVersion 99, then an add: whether bun ignores the lock and resolves from scratch.

@@ -1,0 +1,1 @@
+Add postcss-load-config@6.0.0 (four optional peers, declared tsx, jiti, yaml, postcss) beside abbrev: optionalPeers and their order, nothing installed (small form of add-optional-peers).

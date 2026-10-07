@@ -1,0 +1,24 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "abbrev": "1.1.1",
+      },
+      "devDependencies": {
+        "better-opn": "0.1.0",
+      },
+    },
+  },
+  "packages": {
+    "abbrev": ["abbrev@1.1.1", "", {}, "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q=="],
+
+    "better-opn": ["better-opn@0.1.0", "", { "peerDependencies": { "opn": "^5.3.0" } }, "sha512-QSKWYBHz7+AcQkgwfExX+GrkAA9C47GsJC2Tmok8V7KPADfOKQuGyZ+2AV+eZPxYKpFtyPvnR5F6/y91vnlPZA=="],
+
+    "is-wsl": ["is-wsl@1.1.0", "", {}, "sha512-gfygJYZ2gLTDlmbWMI0CE2MwnFzSN/2SZfkMlItC4K/JBlsWVDB0bO6XhqcY13YXE7iMcAJnzTCJjPiTeJJ0Mw=="],
+
+    "opn": ["opn@5.5.0", "", { "dependencies": { "is-wsl": "^1.1.0" } }, "sha512-PqHpggC9bLV0VeWcdKhkpxY+3JTzetLSqTCWL/z/tFIbI6G8JCjondXklT1JinczLz2Xib62sSp0T/gKT4KksA=="],
+  }
+}

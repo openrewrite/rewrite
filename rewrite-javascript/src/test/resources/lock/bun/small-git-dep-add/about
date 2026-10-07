@@ -1,0 +1,1 @@
+Add a github: dependency (is-number from jonschlinkert/is-number#7.0.0): bun resolves the ref on GitHub.

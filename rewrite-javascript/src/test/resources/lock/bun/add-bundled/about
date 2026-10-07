@@ -1,0 +1,1 @@
+Add @isaacs/testing-bundledeps (bundles testing-bundledeps-a): lockfile-only resolves the bundled dep from the registry and marks it bundled.

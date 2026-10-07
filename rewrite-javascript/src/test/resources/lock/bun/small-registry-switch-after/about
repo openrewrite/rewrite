@@ -1,0 +1,1 @@
+Lock written against the default registry, then is-number added under a project .npmrc naming registry.npmmirror.com: untouched "" entries are re-expanded. http/ holds the mirror's responses (as registry-switch-after, whose http/ is npmjs').

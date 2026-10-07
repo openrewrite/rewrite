@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/testing-fail-install": "1.0.0",
+        "abbrev": "1.1.1",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/testing-fail-install": ["@isaacs/testing-fail-install@1.0.0", "", {}, "sha512-MlK05L4wasrk2/fQqgCeR8s+1KE8LEfMI3ZzaGfR5Dyvgi4R8vQY0fvwYcvKh6cqrmMX7wORvGKi5YJn8LZ9bg=="],
+
+    "abbrev": ["abbrev@1.1.1", "", {}, "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q=="],
+  }
+}

@@ -1,0 +1,1 @@
+Add ms as a remote tarball URL (https://registry.npmjs.org/ms/-/ms-2.1.3.tgz): bun downloads the tarball for its manifest and integrity.

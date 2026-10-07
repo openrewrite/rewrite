@@ -1,0 +1,3 @@
+bun install v1.3.10 (30e609e0)
+error: No version matching "^99.0.0" found for specifier "ms" (but package exists)
+error: ms@^99.0.0 failed to resolve

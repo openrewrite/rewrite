@@ -1,0 +1,7 @@
+bun install v1.3.10 (30e609e0)
+Resolving dependencies
+Resolved, downloaded and extracted [4]
+warn: incorrect peer dependency "@isaacs/testing-peer-deps-c@1.2.3"
+Saved lockfile
+
+Saved bun.lock (8 packages) [123.00ms]

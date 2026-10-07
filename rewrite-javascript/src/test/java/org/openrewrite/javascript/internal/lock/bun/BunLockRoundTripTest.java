@@ -50,7 +50,8 @@ class BunLockRoundTripTest {
           .manifests(lock.manifests())
           .npmrc(lock.npmrc())
           .bunfig(lock.bunfig())
-          .build());
+          .now(lock.getScenario().now())
+          .build(), null);
     }
 
     @ParameterizedTest(name = "{0}")
@@ -71,6 +72,7 @@ class BunLockRoundTripTest {
             assertThat(install.getEnqueued()).as("bun resolves on an install that changes nothing").isNotEmpty();
             return;
         }
+        assertThat(install.hasPendingWork()).as("dependencies left to resolve").isFalse();
         assertThat(install.getEnqueued()).as("dependencies enqueued").isEmpty();
         String rewritten = lock.rewritten();
         String expected = lock.deletedAgain() ? null : rewritten != null ? rewritten : lock.getText();

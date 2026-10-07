@@ -1,0 +1,1 @@
+Bump single-b 1.0.0 -> 2.0.0 (peer single-a 1 -> 2) alone while root single-a stays 1.0.0: the requirer changes its peer range (small form of bump-peer-surface-change).

@@ -1,0 +1,1 @@
+Root pins dedupe-tests-b@1.0.0 beside x (alias of dedupe-tests-a@1.0.0, needs b 2); adding x-a (the same alias) nests b@2.0.0 under both: key order x/... before x-a/... and the same version at two keys (small form of nested-key-order and dup-nested-same-version).

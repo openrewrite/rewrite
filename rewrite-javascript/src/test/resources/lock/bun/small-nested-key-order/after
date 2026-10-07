@@ -1,0 +1,25 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "p",
+      "dependencies": {
+        "@isaacs/dedupe-tests-b": "1.0.0",
+        "x": "npm:@isaacs/dedupe-tests-a@1.0.0",
+        "x-a": "npm:@isaacs/dedupe-tests-a@1.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@isaacs/dedupe-tests-b": ["@isaacs/dedupe-tests-b@1.0.0", "", {}, "sha512-3nmvzIb8QL8OXODzipwoV3U8h9OQD9g9RwOPuSBQqjqSg9JZR1CCFOWNsDUtOfmwY8HFUJV9EAZ124uhqVxq+w=="],
+
+    "x": ["@isaacs/dedupe-tests-a@1.0.0", "", { "dependencies": { "@isaacs/dedupe-tests-b": "2" } }, "sha512-Y9sHdh0cE0fW0M8sn0DZ//vzOMplR5b/yvE7NKRFTpsI0hVbapYFuHRRJm8JZj9ODDNOFL8njErYiU5hm7//iw=="],
+
+    "x-a": ["@isaacs/dedupe-tests-a@1.0.0", "", { "dependencies": { "@isaacs/dedupe-tests-b": "2" } }, "sha512-Y9sHdh0cE0fW0M8sn0DZ//vzOMplR5b/yvE7NKRFTpsI0hVbapYFuHRRJm8JZj9ODDNOFL8njErYiU5hm7//iw=="],
+
+    "x/@isaacs/dedupe-tests-b": ["@isaacs/dedupe-tests-b@2.0.0", "", {}, "sha512-KTYkpRv9EzlmCg4Gsm/jpclWmRYFCXow8GZKJXjK08sIZBlElTZEa5Bw/UQxIvEfcKmWXczSqItD49Kr8Ax4UA=="],
+
+    "x-a/@isaacs/dedupe-tests-b": ["@isaacs/dedupe-tests-b@2.0.0", "", {}, "sha512-KTYkpRv9EzlmCg4Gsm/jpclWmRYFCXow8GZKJXjK08sIZBlElTZEa5Bw/UQxIvEfcKmWXczSqItD49Kr8Ax4UA=="],
+  }
+}

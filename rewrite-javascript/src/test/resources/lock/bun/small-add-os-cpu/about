@@ -1,0 +1,1 @@
+Add @napi-rs/nice-linux-x64-gnu@1.1.1 (os linux, cpu x64; libc glibc in its full manifest only) as an optionalDependency on darwin (small form of add-os-cpu-libc and add-os).

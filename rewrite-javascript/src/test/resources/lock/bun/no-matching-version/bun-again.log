@@ -1,0 +1,7 @@
+bun install v1.3.10 (30e609e0)
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+error: No version matching "^99.0.0" found for specifier "ms" (but package exists)
+error: ms@^99.0.0 failed to resolve
+exit=1
+lock unchanged (over before: the edit failed)

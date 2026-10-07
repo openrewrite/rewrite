@@ -1,0 +1,1 @@
+Adding humanize-ms (ms ^2.0.0) beside debug@2.6.9 (ms 2.0.0 locked): does the new range reuse the locked ms@2.0.0 or take latest?

@@ -46,7 +46,12 @@ class PackageManifestTest {
             if (fresh == null || pkg == null) {
                 continue;
             }
-            Json.Expr manifest = Json.parse(pkg);
+            Json.Expr manifest;
+            try {
+                manifest = Json.parse(pkg);
+            } catch (Json.SyntaxError e) {
+                continue;
+            }
             if (manifest.get("workspaces") != null || manifest.get("overrides") != null ||
                 manifest.get("resolutions") != null) {
                 continue;
@@ -110,7 +115,12 @@ class PackageManifestTest {
         if (before == null || after == null) {
             return null;
         }
-        Json.Expr packages = Json.parse(before).get("packages");
+        Json.Expr packages;
+        try {
+            packages = Json.parse(before).get("packages");
+        } catch (Json.SyntaxError e) {
+            return null;
+        }
         return packages == null || packages.properties().isEmpty() ? after : null;
     }
 

@@ -1,0 +1,1 @@
+As fork-transitive-name-order but to-regex-range is a devDependency: dev deps hoist before prod (DepSorter), so is-number@7 wins top.

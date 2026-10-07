@@ -1,0 +1,1 @@
+Add a file: directory dependency (local, which depends on is-number): bun reads ./local/package.json from disk.

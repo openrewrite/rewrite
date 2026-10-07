@@ -1,0 +1,15 @@
+bun install v1.3.10 (30e609e0)
+2 |   "lockfileVersion": 99,
+                         ^
+error: Unknown lockfile version
+    at bun.lock:2:22
+UnknownLockfileVersion: failed to parse lockfile: 'bun.lock'
+
+warn: Ignoring lockfile
+Resolving dependencies
+Resolved, downloaded and extracted [2]
+Saved lockfile
+
+Saved bun.lock (2 packages) [50.00ms]
+exit=0
+lock changed

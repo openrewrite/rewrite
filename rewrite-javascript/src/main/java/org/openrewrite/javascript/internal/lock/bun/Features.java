@@ -22,6 +22,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 final class Features {
 
     static final Features MAIN = new Features(true, true, true, true, true, true, true, true);
+    static final Features FOLDER = new Features(true, true, false, true, true, false, false, false);
     static final Features WORKSPACE = new Features(true, true, false, true, true, true, false, false);
     static final Features NPM = new Features(true, false, false, true, true, false, false, false);
 

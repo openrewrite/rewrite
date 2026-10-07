@@ -1,0 +1,1 @@
+As trusted-deps with the manifest list reversed: the written order is hash-map order, not manifest order.

@@ -1,0 +1,1 @@
+Add @isaacs/testing-dev-optional-flags@1.0.0, which lists own-or and wrappy in both dependencies and optionalDependencies: its tuple and closure (small form of add-optional-transitive).

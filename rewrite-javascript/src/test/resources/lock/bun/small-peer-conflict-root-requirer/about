@@ -1,0 +1,1 @@
+Root holds single-b@1.0.0 (peer single-a 1) and bumps its single-a to 2.0.0: whether the peer dedupes onto the root dependency and single-a@1 is dropped (small form of peer-conflict-root-requirer).

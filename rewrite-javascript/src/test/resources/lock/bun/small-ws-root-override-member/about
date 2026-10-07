@@ -1,0 +1,1 @@
+Root overrides {dedupe-tests-b: 2.0.0} added while member a declares dedupe-tests-b 1.0.0 (small form of ws-root-override-member).

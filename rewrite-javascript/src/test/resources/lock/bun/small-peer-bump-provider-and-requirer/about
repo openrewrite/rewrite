@@ -1,0 +1,1 @@
+Bump a root peer provider and its root requirer together: single-a 1.0.0 -> 2.0.0 and single-b 1.0.0 (peer single-a 1) -> 2.0.0 (peer single-a 2) (small form of peer-bump-provider-and-requirer).

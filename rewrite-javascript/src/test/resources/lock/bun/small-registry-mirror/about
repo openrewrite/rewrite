@@ -1,0 +1,1 @@
+Project .npmrc points at registry.npmmirror.com and is-number is added: the tuple registry field is the full tarball URL. http/ holds the mirror's responses (as registry-mirror, whose http/ is npmjs').

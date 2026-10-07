@@ -141,6 +141,14 @@ final class Package {
      */
     void parseWithJSON(Lockfile lockfile, BunOptions options, Log log, String sourceDir, Json.Expr json,
                        Features features, Map<String, String> manifests) {
+        parseWithJSON(lockfile, options, log, sourceDir, json, features, manifests, null);
+    }
+
+    /**
+     * @param resolved what a folder or workspace resolver resolves a package that is not the root to.
+     */
+    void parseWithJSON(Lockfile lockfile, BunOptions options, Log log, String sourceDir, Json.Expr json,
+                       Features features, Map<String, String> manifests, @Nullable Resolution resolved) {
         meta.origin = features.isMain ? Origin.LOCAL : Origin.NPM;
         name = "";
         nameHash = 0;
@@ -227,6 +235,8 @@ final class Package {
         }
         if (features.isMain) {
             resolution = Resolution.ROOT;
+        } else if (resolved != null) {
+            resolution = resolved;
         }
 
         Json.Expr patchedDeps = json.get("patchedDependencies");

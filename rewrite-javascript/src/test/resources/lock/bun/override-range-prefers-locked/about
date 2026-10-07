@@ -1,0 +1,1 @@
+overrides ms 2.1.2 -> ^2.1.0: the re-resolved range keeps the locked 2.1.2 over latest.
