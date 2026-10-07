@@ -496,7 +496,8 @@ describe('walk', () => {
             visited++;
             seen.add(node);
             // Padding carries markers but no id, and a JavaType carries neither.
-            if (!('id' in node && 'markers' in node)) {
+            const value: object = node;
+            if (!('id' in value && 'markers' in value)) {
                 offTree.push(node.kind);
             }
             return true;
@@ -566,7 +567,7 @@ describe('resolve', () => {
         expect(await receiverAt('interface Object {}\nObject.assign({}, o);')).toEqual([undefined]);
     });
 
-    test('an identifier the tree does not hold is refused, not read as a global', async () => {
+    test('a copy of an identifier resolves as the original, a node the cursor does not hold is refused', async () => {
         const cu = await parse('const x = 1; use(x);');
         const call = cu.statements[1].element as J.MethodInvocation;
         const read = call.arguments.elements[0].element as J.Identifier;
@@ -575,22 +576,53 @@ describe('resolve', () => {
         expect(resolve(cursor, read)).toBe(cu);
         // A copy keeps its id and so stands for the tree's identifier. A fresh id stands for nothing in it.
         expect(resolve(cursor, {...read})).toBe(cu);
-        expect(() => resolve(cursor, {...read, id: randomId()})).toThrow(/not in the tree/);
+        expect(() => resolve(cursor, {...read, id: randomId()})).toThrow(/not under/);
     });
 
-    test('an identifier standing at two positions is refused, not resolved as the last of them', async () => {
-        const cu = await parse('use(x); use(x);');
-        const second = cu.statements[1].element as J.MethodInvocation;
-        const shared = (cu.statements[0].element as J.MethodInvocation).arguments.elements[0];
-        const doubled = {
-            ...cu,
-            statements: [cu.statements[0], {
-                ...cu.statements[1],
-                element: {...second, arguments: {...second.arguments, elements: [shared]}}
-            }]
-        } as JS.CompilationUnit;
+    test('one identifier standing at two positions resolves each by its own path', async () => {
+        const cu = await parse('const x = 1; use(x); function f(x) { use(x); }');
+        const outer = cu.statements[1].element as J.MethodInvocation;
+        const fn = cu.statements[2].element as J.MethodDeclaration;
+        const inner = fn.body!.statements[0].element as J.MethodInvocation;
+        const shared = outer.arguments.elements[0];
+        const innerDoubled = {...inner, arguments: {...inner.arguments, elements: [shared]}} as J.MethodInvocation;
+        const bodyDoubled = {...fn.body!, statements: [{...fn.body!.statements[0], element: innerDoubled}]} as J.Block;
+        const fnDoubled = {...fn, body: bodyDoubled} as J.MethodDeclaration;
+        const read = shared.element as J.Identifier;
 
-        expect(() => resolve(new Cursor(doubled), shared.element as J.Identifier)).toThrow(/two positions/);
+        expect(resolve(new Cursor(outer, new Cursor(cu)), read)).toBe(cu);
+        expect(resolve(new Cursor(innerDoubled, new Cursor(bodyDoubled, new Cursor(fnDoubled, new Cursor(cu)))), read))
+            .toBe(fnDoubled);
+    });
+
+    test('a visitor that rebuilds a node before descending still resolves what is under it', async () => {
+        const answers: (J | undefined)[] = [];
+        const cu = await parse('const x = 1; use(x);');
+        await new class extends JavaScriptVisitor<undefined> {
+            override async visitMethodInvocation(method: J.MethodInvocation, p: undefined): Promise<J | undefined> {
+                const elements = method.arguments.elements.map(e => ({...e, element: {...e.element}}));
+                return super.visitMethodInvocation({...method, arguments: {...method.arguments, elements}}, p);
+            }
+            override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
+                if (identifier.simpleName === 'x') {
+                    answers.push(resolve(this.cursor, identifier));
+                }
+                return identifier;
+            }
+        }().visit(cu, undefined);
+        // The declaration, then the read under the rebuilt call.
+        expect(answers).toEqual([undefined, cu]);
+    });
+
+    test('a cursor holding another file above the identifier resolves within the nearer one', async () => {
+        const outerFile = await parse('const y = 1;');
+        const innerFile = await parse('const x = 1; use(x, y);');
+        const call = innerFile.statements[1].element as J.MethodInvocation;
+        const [x, y] = call.arguments.elements.map(e => e.element as J.Identifier);
+        const cursor = new Cursor(call, new Cursor(innerFile, new Cursor(outerFile)));
+
+        expect(resolve(cursor, x)).toBe(innerFile);
+        expect(resolve(cursor, y)).toBeUndefined();
     });
 });
 
