@@ -815,15 +815,14 @@ describe("maybeBind", () => {
     });
 });
 
-    test("a type-only import does not answer a request for a value", async () => {
-        // The name a type-only import binds erases, so reusing it would emit an unbound reference.
+    test("a value request turns a type-only import of the module into a value import", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
         spec.recipe = fromVisitor(rebind("m", bound));
         await spec.rewriteRun(typescript(
             `import type X from "m";\ntarget();`,
-            `import type X from "m";\nimport m from "m";\nm.target();`));
-        expect(bound.name).toBe("m");
+            `import X from "m";\nX.target();`));
+        expect(bound.name).toBe("X");
     });
 
     test("a file that exports is a module, whatever else it requires", async () => {
@@ -945,6 +944,79 @@ function rebindTo(to: MaybeRebindOptions["to"], bound: {name?: string}, from: Ma
         }
     });
 }
+
+describe("maybeBind and type-only imports", () => {
+    /** Binds `options` once, from the compilation unit, recording the name it answers with. */
+    function bindOnce(options: MaybeBindOptions, bound: {name?: string}) {
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.name = maybeBind(this, {...options, onlyIfReferenced: false});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+    }
+
+    test("a type-only request reuses a value import under the name the file gives it", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "vitest", member: "Mocked", typeOnly: true}, bound);
+        await spec.rewriteRun(typescript(`import {Mocked as M} from "vitest";\nlet m: M<{}>;`));
+        expect(bound.name).toBe("M");
+    });
+
+    test("a value request turns the type-only import of its member into a value import", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "vitest", member: "Mocked"}, bound);
+        await spec.rewriteRun(typescript(
+            `import type {Mocked as M} from "vitest";\nlet m: M<{}>;`,
+            `import {Mocked as M} from "vitest";\nlet m: M<{}>;`
+        ));
+        expect(bound.name).toBe("M");
+    });
+
+    test("the members a type-only statement also imports stay type-only", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = bindOnce({module: "vitest", member: "Mocked"}, {});
+        await spec.rewriteRun(typescript(
+            `import type {MockInstance, Mocked} from "vitest";\nlet m: Mocked<MockInstance>;`,
+            `import {type MockInstance, Mocked} from "vitest";\nlet m: Mocked<MockInstance>;`
+        ));
+    });
+
+    test("a member marked type on its own is type-only, and a value request removes the mark", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "vitest", member: "Mocked"}, bound);
+        await spec.rewriteRun(typescript(
+            `import {type Mocked, vi} from "vitest";\nlet m: Mocked<typeof vi>;`,
+            `import {Mocked, vi} from "vitest";\nlet m: Mocked<typeof vi>;`
+        ));
+        expect(bound.name).toBe("Mocked");
+    });
+
+    test("a type-only request takes the name a value request queued for the same member", async () => {
+        const spec = new RecipeSpec();
+        const names: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                names.push(maybeBind(this, {module: "vitest", member: "vi", onlyIfReferenced: false}));
+                names.push(maybeBind(this, {module: "vitest", member: "vi", typeOnly: true, onlyIfReferenced: false}));
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(`const vi = 1;`, `import {vi as vi_1} from 'vitest';\n\nconst vi = 1;`));
+        expect(names).toEqual(["vi_1", "vi_1"]);
+    });
+
+    test("a namespace import answers a type-only request for the whole module", async () => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = bindOnce({module: "vitest", member: "*", typeOnly: true}, bound);
+        await spec.rewriteRun(typescript(`import * as v from "vitest";\nlet m: v.Mocked<{}>;`));
+        expect(bound.name).toBe("v");
+    });
+});
 
 describe("maybeRebind", () => {
     test("an ESM member rename takes the new name, carrying the references that resolve to it", async () => {
