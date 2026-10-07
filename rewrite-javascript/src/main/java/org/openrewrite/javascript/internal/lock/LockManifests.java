@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * Reads the range a recipe re-pinned for a dependency out of the edited {@code package.json}, for the
- * yarn-classic and bun patchers whose descriptor/importer surface {@link LockEditSet.PackageEdit} does not carry.
+ * Yarn Berry patcher, whose descriptor surface {@link LockEditSet.PackageEdit} does not carry.
  */
 final class LockManifests {
     private static final ObjectMapper JSON = new ObjectMapper();
