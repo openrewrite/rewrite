@@ -25,8 +25,10 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * A recipe's request as the npm regenerator takes it: the manifests by path, placed relative to the lock's
@@ -48,7 +50,28 @@ final class NpmInputs {
                 .now(now)
                 .directoryName(rootDir.isEmpty() || rootName == null ? null : rootName.toString())
                 .manifests(manifests(request, rootDir))
+                .parentManifests(parentManifests(request, rootDir))
                 .build();
+    }
+
+    /**
+     * The package.json of each directory above the lock's, nearest first, keyed by the lock's directory as seen from
+     * there. Only an edit of the lock's own manifest walks them: the host sends a member's edit to the workspace root
+     * that lists it, which is where npm's walk from the member stops.
+     */
+    private static Map<String, String> parentManifests(Request request, String rootDir) {
+        Map<String, String> parents = new TreeMap<>(Comparator.comparingInt(String::length));
+        if (!directory(packageJsonPath(request)).equals(rootDir)) {
+            return parents;
+        }
+        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
+            Path name = file.getKey().getFileName();
+            String dir = directory(file.getKey());
+            if (name != null && "package.json".equals(name.toString()) && !dir.equals(rootDir) && contains(dir, rootDir)) {
+                parents.put(dir.isEmpty() ? rootDir : rootDir.substring(dir.length() + 1), file.getValue());
+            }
+        }
+        return parents;
     }
 
     /**

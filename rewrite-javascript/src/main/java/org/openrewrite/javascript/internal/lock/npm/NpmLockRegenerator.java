@@ -82,6 +82,13 @@ public final class NpmLockRegenerator {
          */
         @Nullable
         String directoryName;
+
+        /**
+         * The package.json of each directory above the project that npm walks through from where it runs, nearest
+         * first, keyed by the project's location from that directory ({@code packages/a}).
+         */
+        @Singular
+        Map<String, String> parentManifests;
     }
 
     static final String NPM_REJECTS = "npm rejects this edit";
@@ -102,6 +109,7 @@ public final class NpmLockRegenerator {
         String path;
         String written;
         try {
+            loadLocalPrefix();
             options = NpmOptions.fromNpmrc(inputs.getNpmrc());
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
@@ -133,6 +141,41 @@ public final class NpmLockRegenerator {
             return Result.failure(failure(e, SECOND_INSTALL + " would reject it", SECOND_INSTALL + " would fail"));
         }
         return Result.success(written);
+    }
+
+    /**
+     * @npmcli/config {@code loadLocalPrefix}: npm installs at the nearest directory above whose workspaces map the
+     * project, and writes that directory's lock, not this one.
+     */
+    private void loadLocalPrefix() {
+        String manifest = inputs.getManifests().get("");
+        if (manifest == null) {
+            return;
+        }
+        for (Map.Entry<String, String> parent : inputs.getParentManifests().entrySet()) {
+            Map<String, Object> pkg;
+            try {
+                pkg = PackageJson.normalize(parent.getValue()).getContent();
+            } catch (PackageJson.NeedsPackageFiles e) {
+                throw e;
+            } catch (RuntimeException e) {
+                continue;
+            }
+            if (!truthy(pkg.get("workspaces"))) {
+                continue;
+            }
+            VirtualTreeLoader.ProjectFiles project = VirtualTreeLoader.ProjectFiles.builder()
+                    .manifest(parent.getKey(), manifest)
+                    .build();
+            if (MapWorkspaces.mapWorkspaces("/", pkg, project).containsValue("/" + parent.getKey())) {
+                StringBuilder up = new StringBuilder("..");
+                for (int i = parent.getKey().split("/").length; i > 1; i--) {
+                    up.append("/..");
+                }
+                throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
+                                     ", whose workspaces list this project, and writes that root's lock");
+            }
+        }
     }
 
     /**
