@@ -30,11 +30,14 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,7 +45,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The port against Yarn 4.10.3's own code (@yarnpkg/core 4.4.4, @yarnpkg/parsers 3.0.3), row by row: what Yarn
  * answers for every lock, descriptor, locator, range and registry document of the committed scenarios and for
- * strings drawn at random, from {@code src/test/resources/yarn-berry/generate/differential.js}. With
+ * strings drawn at random, from {@code src/test/resources/yarn-berry/generate/differential.js}; and the glob
+ * modules Yarn 4.10.3 bundles over workspace patterns, from {@code generate/globs.js}. With
  * {@code REWRITE_BERRY_DIFFERENTIAL} naming a directory of such rows (the corpus's), those are checked too.
  */
 class BerryDifferentialTest {
@@ -180,6 +184,115 @@ class BerryDifferentialTest {
             });
             if (!answers(row[1], actual)) {
                 differences.add(row[0] + " => " + row[1] + " / " + actual);
+            }
+        }
+        assertThat(differences).isEmpty();
+    }
+
+    @Test
+    void picomatchCompilesAsYarnsBundleDoes() {
+        List<String> differences = new ArrayList<>();
+        for (String[] row : rows("glob-picomatch.tsv.gz")) {
+            boolean dot = "1".equals(row[1]);
+            String actual;
+            try {
+                actual = Picomatch.source(row[0], dot);
+            } catch (JsError e) {
+                actual = "!" + e;
+            }
+            if (!actual.equals(row[2])) {
+                differences.add(row[0] + " dot=" + dot + " => " + row[2] + " / " + actual);
+                continue;
+            }
+            if (actual.startsWith("!")) {
+                continue;
+            }
+            Pattern regex = Picomatch.makeRe(row[0], dot);
+            tree(row[3]).fields().forEachRemaining(test -> {
+                if (regex.matcher(test.getKey()).find() != test.getValue().asBoolean()) {
+                    differences.add(row[0] + " dot=" + dot + " test " + test.getKey() + " => " + test.getValue());
+                }
+            });
+        }
+        assertThat(differences).isEmpty();
+    }
+
+    @Test
+    void bracesExpandAsYarnsBundleDoes() {
+        List<String> differences = new ArrayList<>();
+        for (String[] row : rows("glob-braces.tsv.gz")) {
+            String actual;
+            try {
+                actual = MAPPER.writeValueAsString(FastGlob.braces(row[0]));
+            } catch (JsError e) {
+                actual = "!" + e;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            if (!actual.equals(row[1]) && !(actual.startsWith("[") && tree(actual).equals(tree(row[1])))) {
+                differences.add(row[0] + " => " + row[1] + " / " + actual);
+            }
+        }
+        assertThat(differences).isEmpty();
+    }
+
+    @Test
+    void globParentAndScanAnswerAsYarnsBundleDoes() {
+        List<String> differences = new ArrayList<>();
+        for (String[] row : rows("glob-parent.tsv.gz")) {
+            String base = GlobParent.globParent(row[0]);
+            JsonNode parts = NODES.arrayNode().addAll(PicomatchScan.parts(row[0]).stream()
+                    .map(NODES::textNode).collect(Collectors.toList()));
+            boolean dynamic = FastGlob.isDynamicPattern(row[0]);
+            if (!base.equals(row[1]) || !parts.equals(tree(row[2])) || dynamic != "1".equals(row[3])) {
+                differences.add(row[0] + " => " + row[1] + " " + row[2] + " " + row[3] + " / " + base + " " + parts +
+                                " " + dynamic);
+            }
+        }
+        assertThat(differences).isEmpty();
+    }
+
+    /**
+     * A row Yarn answers by which of two fast-glob tasks reports a directory first may be one the port cannot
+     * know, as may a pattern that reaches outside the project; every other row is answered exactly.
+     */
+    @Test
+    void workspacesAreFoundAsYarnsBundleFindsThem() {
+        List<String> differences = new ArrayList<>();
+        for (String[] row : rows("glob-workspaces.tsv.gz")) {
+            BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder()
+                    .manifest("", "{\"private\": true, \"workspaces\": " + row[1] + "}")
+                    .now(Instant.EPOCH);
+            for (JsonNode directory : tree(row[0])) {
+                inputs.manifest(directory.asText(), "{}");
+            }
+            String actual;
+            try {
+                List<String> members = new ArrayList<>();
+                for (Workspace workspace : new BerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3"))
+                        .getProject().workspaces) {
+                    if (!".".equals(workspace.getRelativeCwd())) {
+                        members.add(workspace.getRelativeCwd());
+                    }
+                }
+                actual = MAPPER.writeValueAsString(members);
+            } catch (CannotKnow e) {
+                if ("1".equals(row[3]) || e.getMessage().contains("outside the project") ||
+                    e.getMessage().contains("an absolute path")) {
+                    continue;
+                }
+                actual = "!" + e;
+            } catch (JsError e) {
+                actual = "!" + e;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            // a file system error names the absolute path
+            String expected = row[2].contains("<root>") ? row[2].substring(0, row[2].indexOf(", ")) : row[2];
+            boolean same = expected.startsWith("!") ? actual.startsWith(expected) :
+                    !actual.startsWith("!") && tree(actual).equals(tree(expected));
+            if (!same) {
+                differences.add(row[0] + " " + row[1] + " => " + row[2] + " / " + actual);
             }
         }
         assertThat(differences).isEmpty();

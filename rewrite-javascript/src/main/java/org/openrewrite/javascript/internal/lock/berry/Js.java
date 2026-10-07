@@ -21,11 +21,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * The JavaScript semantics Yarn's plain objects follow: {@code undefined} for a missing property, the order
@@ -34,6 +36,8 @@ import java.util.Map;
 final class Js {
 
     private static final long MAX_ARRAY_INDEX = 4294967294L;
+    private static final Pattern DECIMAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
+    private static final Pattern RADIX_INTEGER = Pattern.compile("0(?:[xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
@@ -196,5 +200,48 @@ final class Js {
             return out.toString();
         }
         return value.toString();
+    }
+
+    /**
+     * {@code StrWhiteSpaceChar}: the white space and line terminators {@code trim} and {@code Number} skip.
+     */
+    static boolean isWhiteSpace(char c) {
+        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == ' ' ||
+               c == '﻿' || Character.getType(c) == Character.SPACE_SEPARATOR;
+    }
+
+    static String trim(String s) {
+        int start = 0;
+        int end = s.length();
+        while (start < end && isWhiteSpace(s.charAt(start))) {
+            start++;
+        }
+        while (end > start && isWhiteSpace(s.charAt(end - 1))) {
+            end--;
+        }
+        return s.substring(start, end);
+    }
+
+    /**
+     * {@code Number(s)}: a decimal literal, {@code Infinity}, or a hexadecimal, octal or binary integer, between
+     * white space; 0 for none, NaN for anything else.
+     */
+    static double stringToNumber(String s) {
+        String t = trim(s);
+        if (t.isEmpty()) {
+            return 0;
+        }
+        if (DECIMAL.matcher(t).matches()) {
+            return Double.parseDouble(t);
+        }
+        if (RADIX_INTEGER.matcher(t).matches()) {
+            char prefix = Character.toLowerCase(t.charAt(1));
+            return new BigInteger(t.substring(2), prefix == 'x' ? 16 : prefix == 'o' ? 8 : 2).doubleValue();
+        }
+        return Double.NaN;
+    }
+
+    static boolean isInteger(double d) {
+        return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
     }
 }

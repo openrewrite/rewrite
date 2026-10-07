@@ -259,15 +259,7 @@ public final class BerryOptions {
 
     // camelcase 5.3.1 of a key already lower-cased, so preserveCamelCase never runs
     static String camelcase(String key) {
-        int start = 0;
-        int end = key.length();
-        while (start < end && isStrWhiteSpace(key.charAt(start))) {
-            start++;
-        }
-        while (end > start && isStrWhiteSpace(key.charAt(end - 1))) {
-            end--;
-        }
-        String input = key.substring(start, end);
+        String input = Js.trim(key);
         if (input.length() <= 1) {
             return input.toLowerCase(Locale.ROOT);
         }
@@ -504,7 +496,7 @@ public final class BerryOptions {
     // parseInt: the leading integer of the string, hexadecimal after 0x, NaN when there is none
     static Object parseInt(String s) {
         int i = 0;
-        while (i < s.length() && isStrWhiteSpace(s.charAt(i))) {
+        while (i < s.length() && Js.isWhiteSpace(s.charAt(i))) {
             i++;
         }
         boolean negative = false;
@@ -527,11 +519,6 @@ public final class BerryOptions {
         BigInteger magnitude = new BigInteger(s.substring(start, i), radix);
         BigInteger value = negative ? magnitude.negate() : magnitude;
         return value.bitLength() < 32 ? (Object) value.intValue() : (Object) value.doubleValue();
-    }
-
-    static boolean isStrWhiteSpace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == '\u2028' || c == '\u2029' ||
-               c == '\uFEFF' || Character.getType(c) == Character.SPACE_SEPARATOR;
     }
 
     /**

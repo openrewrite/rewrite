@@ -456,25 +456,6 @@ final class Project {
         if (value == null) {
             return 0;
         }
-        if (!(value instanceof String)) {
-            return Double.NaN;
-        }
-        String s = ((String) value).trim();
-        if (s.isEmpty()) {
-            return 0;
-        }
-        if (s.matches("[+-]?(Infinity|(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?)")) {
-            return Double.parseDouble(s);
-        }
-        if (s.matches("0[xX][0-9a-fA-F]+")) {
-            return Long.parseLong(s.substring(2), 16);
-        }
-        if (s.matches("0[oO][0-7]+")) {
-            return Long.parseLong(s.substring(2), 8);
-        }
-        if (s.matches("0[bB][01]+")) {
-            return Long.parseLong(s.substring(2), 2);
-        }
-        return Double.NaN;
+        return value instanceof String ? Js.stringToNumber((String) value) : Double.NaN;
     }
 }

@@ -19,19 +19,21 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The order of a project's workspaces: Yarn sorts the paths fast-glob 3.3.3 reports, which keep a pattern's
- * leading {@code ./} unless a dynamic pattern based at the root merges the walk into one task there. Every
- * expectation is fast-glob's own answer over the same directories ({@code ybf-glob.js}, {@code ybf-glob2.js}).
+ * A project's workspaces: Yarn sorts the paths fast-glob 3.3.2 reports and keeps those that hold a package.json.
+ * Every expectation is fast-glob 3.3.2's own answer over the same directories, and those of the negated, globstar
+ * and {@code ?} patterns are Yarn 4.10.3's {@code yarn workspaces list} as well.
  */
 class WorkspaceTest {
 
-    private static final String[] MEMBERS = {"packages/a", "packages/b", "apps/x", "apps/y", "libs/one"};
+    private static final List<String> MEMBERS = Arrays.asList("packages/a", "packages/b", "apps/x", "apps/y",
+            "libs/one");
 
     @Test
     void aLeadingDotSlashSortsBeforeOtherPatterns() {
@@ -71,25 +73,97 @@ class WorkspaceTest {
     }
 
     @Test
-    void dotSegmentsAreNotPorted() {
-        assertThatThrownBy(() -> members("\"././packages/*\"")).isInstanceOf(CannotKnow.class);
-        assertThatThrownBy(() -> members("\"apps/./*\"")).isInstanceOf(CannotKnow.class);
+    void oneStaticTaskReportsTheFirstSpelling() {
+        assertThat(members("\"packages/a\", \"./packages/a\", \"tools\"")).containsExactly("packages/a");
     }
 
     @Test
-    void bracesExpandAsMicromatchDoes() {
-        assertThat(GlobPattern.process("a{b,c}d{e,f}")).containsExactly("abde", "abdf", "acde", "acdf");
-        assertThat(GlobPattern.process("{a,{b,c}}/x//y")).containsExactly("a/x/y", "b/x/y", "c/x/y");
-        assertThat(GlobPattern.base("./packages/*")).isEqualTo("./packages");
-        assertThat(GlobPattern.base("./*/a")).isEqualTo(".");
-        assertThat(GlobPattern.base("./apps/x/")).isEqualTo("./apps/x");
+    void dotSegmentsResolveAfterTheWalk() {
+        assertThat(members("\"././packages/*\"")).isEmpty();
+        assertThat(members("\"apps/./*\"")).containsExactly("apps/x", "apps/y");
+        assertThat(members("\"packages/../apps/*\"")).containsExactly("apps/x", "apps/y");
+    }
+
+    @Test
+    void aNegatedDirectoryIsNotWalked() {
+        assertThat(members(Arrays.asList("packages/a", "packages/a/__fixtures__/proj", "packages/b"),
+                "\"packages/**\", \"!packages/**/__fixtures__\"")).containsExactly("packages/a", "packages/b");
+        List<String> legacy = Arrays.asList("packages/b", "packages/legacy/sub");
+        assertThat(members(legacy, "\"packages/**\", \"!packages/legacy\"")).containsExactly("packages/b");
+        assertThat(members(legacy, "\"packages/**\", \"!./packages/legacy\"")).containsExactly("packages/b");
+    }
+
+    @Test
+    void aTrailingGlobstarMatchesItsOwnDirectory() {
+        assertThat(members(Arrays.asList("packages/a", "packages/a/nested"), "\"packages/*/**\""))
+                .containsExactly("packages/a", "packages/a/nested");
+        assertThat(members(Arrays.asList("tools", "packages/a"), "\"*/**\"")).containsExactly("packages/a", "tools");
+        assertThat(members(Arrays.asList("packages/a", "packages/b"), "\"packages/*/\""))
+                .containsExactly("packages/a", "packages/b");
+    }
+
+    @Test
+    void aLeadingQuestionMarkIsTheBaseDirectory() {
+        assertThat(members(Arrays.asList("1/z", "a/b"), "\"./?/?\"")).isEmpty();
+        assertThat(members(Arrays.asList("a/b", "1/z"), "\"?/[ab]\"")).isEmpty();
+        assertThat(members(Arrays.asList("a/b", "1/z"), "\"?/?\"")).isEmpty();
+        assertThat(members(Arrays.asList("?/x", "a/x"), "\"?/x\"")).containsExactly("?/x");
+        assertThat(members(Arrays.asList("a/b"), "\"[ab]/*\"")).containsExactly("a/b");
+    }
+
+    @Test
+    void theIgnoredDirectoriesAreNotWalked() {
+        assertThat(members(Arrays.asList("packages/a", "node_modules/foo", "packages/node_modules/q"),
+                "\"packages/*\", \"node_modules/foo\"")).containsExactly("node_modules/foo", "packages/a");
+        assertThat(members(Arrays.asList("packages/a", "packages/.hidden", "packages/.hidden/node_modules/x",
+                "packages/.hidden/y"), "\"packages/**\"")).containsExactly("packages/a");
+    }
+
+    @Test
+    void bracesClassesAndExtglobs() {
+        assertThat(members(Arrays.asList("packages/a", "packages/b", "v1", "v2", "v4"),
+                "\"packages/{a,b}\", \"v{1..3}\"")).containsExactly("packages/a", "packages/b", "v1", "v2");
+        assertThat(members(Arrays.asList("packages/a", "packages/b", "packages/c"),
+                "\"packages/*\", \"!packages/[ab]\"")).containsExactly("packages/c");
+        assertThat(members("\"@(apps|libs)/*\"")).containsExactly("apps/x", "apps/y", "libs/one");
+        assertThat(members("\"!(packages)/*\"")).containsExactly("apps/x", "apps/y", "libs/one");
+        assertThat(members("\"packages/!(a)\"")).containsExactly("packages/b");
+    }
+
+    @Test
+    void whatFastGlobThrows() {
+        assertThatThrownBy(() -> members("\"constructor\"")).isInstanceOf(JsError.class)
+                .hasMessage("output.startsWith is not a function");
+        assertThatThrownBy(() -> members("\"packages/*\", \"!__proto__\"")).isInstanceOf(JsError.class)
+                .hasMessage("output.startsWith is not a function");
+        assertThatThrownBy(() -> members("\"hasOwnProperty/*\"")).isInstanceOf(JsError.class)
+                .hasMessage("collection[base].push is not a function");
+        assertThatThrownBy(() -> members("\"\"")).isInstanceOf(JsError.class)
+                .hasMessage("Patterns must be a string (non empty) or an array of strings");
+        assertThatThrownBy(() -> members("\"{x}{(a)\"")).isInstanceOf(JsError.class)
+                .hasMessage("Cannot read properties of undefined (reading 'push')");
+        assertThatThrownBy(() -> members("\"v{1..1001}\"")).isInstanceOf(JsError.class)
+                .hasMessageStartingWith("expanded array length exceeds range limit");
+        assertThatThrownBy(() -> members("\"packages/a/package.json/*\"")).isInstanceOf(JsError.class)
+                .hasMessageStartingWith("ENOTDIR: not a directory, scandir");
+        assertThat(members("\"!\"")).isEmpty();
+    }
+
+    @Test
+    void aPatternOutsideTheProjectIsNotKnown() {
+        assertThatThrownBy(() -> members("\"../x/*\"")).isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> members("\"/abs/*\"")).isInstanceOf(CannotKnow.class);
     }
 
     private static List<String> members(String patterns) {
+        return members(MEMBERS, patterns);
+    }
+
+    private static List<String> members(List<String> directories, String patterns) {
         BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\": \"root\", \"private\": true, \"workspaces\": [" + patterns + "]}")
                 .now(Instant.EPOCH);
-        for (String member : MEMBERS) {
+        for (String member : directories) {
             inputs.manifest(member, "{\"name\": \"" + member.replace('/', '-') + "\"}");
         }
         Project project = new BerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3")).getProject();
