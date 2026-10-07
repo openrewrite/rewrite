@@ -1,0 +1,1 @@
+A project .env setting NPM_CONFIG_REGISTRY to a mirror, added in the edit: bun install loads .env (env_loader.zig loadDefaultFiles) and Options.load takes the registry from it; the new entry carries the mirror URL and the untouched "" entry re-expands to it.

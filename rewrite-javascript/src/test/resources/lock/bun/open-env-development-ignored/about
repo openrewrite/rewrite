@@ -1,0 +1,1 @@
+.env.development, .env.development.local and .env.test name a mirror: install loads with the .production suffix and never reads them, so the lock is written against the default registry ("" fields).

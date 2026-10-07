@@ -29,9 +29,9 @@ import java.util.Set;
 
 /**
  * A recipe's request as the Bun regenerator takes it: the manifests placed as {@link NpmInputs} places them, the
- * .npmrc and bunfig.toml of the lock's directory, the package-manager files under it (the patch files) by path,
- * and the paths under it the project holds. Without the .npmrc file itself, the project's npmrc the marker read
- * stands in for it.
+ * .npmrc and bunfig.toml of the lock's directory, the package-manager files under it (the patch files, the .env
+ * files) by path, and the paths under it the project holds. Without the .npmrc file itself, the project's npmrc
+ * the marker read stands in for it.
  */
 final class BunInputs {
 

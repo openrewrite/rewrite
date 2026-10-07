@@ -65,12 +65,13 @@ class BunInputsTest {
           .packageJsonPath(Paths.get("repo/package.json"))
           .packageManagerFile(Paths.get("repo/patches/ms@2.1.3.patch"), "--- a/index.js\n+++ b/index.js\n")
           .packageManagerFile(Paths.get("repo/bunfig.toml"), "[install]\n")
+          .packageManagerFile(Paths.get("repo/.env"), "NPM_CONFIG_REGISTRY=https://registry.npmmirror.com\n")
           .packageManagerFile(Paths.get("other/patches/x.patch"), "")
           .build();
 
         Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", "bunfig.toml");
+        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", "bunfig.toml", ".env");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
         assertThat(inputs.getPaths()).isNull();
     }

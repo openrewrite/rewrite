@@ -48,4 +48,17 @@ class NodeDependencyScanTest {
         assertThat(acc.paths).containsExactlyInAnyOrder(read, unread, source);
         assertThat(acc.packageManagerFiles).containsOnlyKeys(read);
     }
+
+    @Test
+    void theEnvFilesAnInstallLoadsAreKept() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        for (String name : new String[]{".env", ".env.local", ".env.production", ".env.production.local",
+          ".env.development", ".env.test"}) {
+            NodeDependencyScan.capturePackageManagerFile(acc,
+              PlainText.builder().sourcePath(Paths.get("app/" + name)).text("NPM_CONFIG_REGISTRY=https://r/").build());
+        }
+
+        assertThat(acc.packageManagerFiles).containsOnlyKeys(Paths.get("app/.env"), Paths.get("app/.env.local"),
+          Paths.get("app/.env.production"), Paths.get("app/.env.production.local"));
+    }
 }

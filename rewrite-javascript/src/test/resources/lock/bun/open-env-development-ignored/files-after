@@ -1,0 +1,5 @@
+.env.development
+.env.development.local
+.env.test
+bun.lock
+package.json

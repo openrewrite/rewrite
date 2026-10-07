@@ -77,7 +77,7 @@ public final class BunLockRegenerator {
 
         /**
          * The project's package-manager files under the root, by path relative to it, with their contents: the
-         * patch files {@code patchedDependencies} names are read from here.
+         * patch files {@code patchedDependencies} names and the .env files are read from here.
          */
         @Singular
         Map<String, String> files;
@@ -89,6 +89,9 @@ public final class BunLockRegenerator {
         @Nullable
         Set<String> paths;
 
+        /**
+         * The process environment, which the project's .env files never override.
+         */
         @Singular("env")
         Map<String, String> env;
 
@@ -276,10 +279,15 @@ public final class BunLockRegenerator {
         return written;
     }
 
-    // PackageManagerOptions.load reads both from the project: one it holds that the host did not read is unknown
+    // init loads the project's .env files, bunfig.toml and .npmrc: one it holds that the host did not read is unknown
     private static void requireConfigFiles(Inputs inputs) {
         if (inputs.getPaths() == null) {
             return;
+        }
+        for (String file : DotEnv.FILES) {
+            if (inputs.getPaths().contains(file) && !inputs.getFiles().containsKey(file)) {
+                throw new PackageManager.CannotKnow(file + " (its contents were not read)");
+            }
         }
         if (inputs.getBunfig() == null && inputs.getPaths().contains("bunfig.toml")) {
             throw new PackageManager.CannotKnow("bunfig.toml (its contents were not read)");
@@ -377,7 +385,8 @@ public final class BunLockRegenerator {
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
     static PendingInstall installWithManager(Inputs inputs, @Nullable ManifestSource registry, Log log) {
-        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(), inputs.getEnv());
+        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
+                DotEnv.load(inputs.getEnv(), inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(inputs.getLock(), options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();

@@ -167,6 +167,27 @@ class NativeLockEngineTest {
     }
 
     @Test
+    void bunReadsTheProjectsEnvFileAndCannotKnowOneTheHostHoldsUnread() {
+        String scenario = "lock/bun/open-env-registry/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+        Request.RequestBuilder request = Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.env"))));
+
+        Result unread = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
+        Result read = NativeLockEngine.regenerate(PackageManager.Bun,
+                request.packageManagerFile(Paths.get("app/.env"), resource(scenario + "tree/.env")).build(), ctx);
+
+        assertThat(unread.getFailure().getDetail())
+                .isEqualTo("the engine cannot know .env (its contents were not read)");
+        assertThat(read.isSuccess()).as(String.valueOf(read.getErrorMessage())).isTrue();
+        assertThat(read.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
     void bunWithoutALockFailsLoud() {
         Result result = regen(PackageManager.Bun, "{\"dependencies\":{}}", "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
