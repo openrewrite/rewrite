@@ -520,7 +520,7 @@ public class RewriteRpc {
         // Required-option validation is enforced server-side: PrepareRecipe instantiates the whole
         // tree there and validates each recipe's option values (root and children alike), which a
         // host-side check on the root descriptor alone cannot cover.
-        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options), PrepareRecipeResponse.class);
+        PrepareRecipeResponse r = send("PrepareRecipe", new PrepareRecipe(id, options, true), PrepareRecipeResponse.class);
         return recipeFromPrepareResponse(r);
     }
 
@@ -537,7 +537,7 @@ public class RewriteRpc {
         }
         return new RpcRecipe(this, r.getId(), r.getDescriptor(), r.getEditVisitor(),
                 matchAll(r.getEditPreconditions()), r.getScanVisitor(), matchAll(r.getScanPreconditions()),
-                r.getRecipeList());
+                r.getRecipeList(), Boolean.TRUE.equals(r.getCausesAnotherCycle()));
     }
 
     private @Nullable TreeVisitor<?, ExecutionContext> matchAll(List<PrepareRecipeResponse.Precondition> preconditions) {

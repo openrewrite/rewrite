@@ -539,6 +539,14 @@ class RewriteRpcTest implements RewriteTest {
         );
     }
 
+    @Test
+    void causesAnotherCycleCrossesRpc() {
+        Recipe recipe = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$CausesAnotherCycleRecipe", Map.of());
+        assertThat(recipe.causesAnotherCycle()).isTrue();
+        assertThat(recipe.getRecipeList()).singleElement()
+          .satisfies(child -> assertThat(child.causesAnotherCycle()).isFalse());
+    }
+
     /**
      * A composite whose recipe list yields multiple instances of the same recipe class with
      * different option values must keep each prepared child a distinct instance with its own
@@ -885,6 +893,28 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public String getDescription() {
             return "To verify that it is possible for a recipe list to be called over RPC.";
+        }
+
+        @Override
+        public void buildRecipeList(RecipeList recipes) {
+            recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    static class CausesAnotherCycleRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A recipe that causes another cycle";
+        }
+
+        @Override
+        public String getDescription() {
+            return "To verify that causesAnotherCycle is carried over RPC.";
+        }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return true;
         }
 
         @Override

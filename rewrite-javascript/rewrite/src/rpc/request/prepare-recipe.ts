@@ -26,7 +26,10 @@ import {withMetrics} from "./metrics";
 import {RecipeMarketplace} from "../../marketplace";
 
 export class PrepareRecipe {
-    constructor(private readonly id: string, private readonly options?: any) {
+    constructor(private readonly id: string,
+                private readonly options?: any,
+                // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked.
+                private readonly acceptsCausesAnotherCycle?: boolean) {
     }
 
     static handle(connection: MessageConnection,
@@ -41,18 +44,19 @@ export class PrepareRecipe {
                 metricsCsv,
                 (context) => async (request) => {
                     context.target = request.id;
+                    const accepts = request.acceptsCausesAnotherCycle === true;
                     const recipeCtor = marketplace.findRecipe(request.id);
                     if (!recipeCtor) {
                         // A miss means the host owns this recipe (e.g. a Java-delegate child a host
                         // re-prepares by name), so answer with a delegatesTo stand-in for it to resolve.
                         return await PrepareRecipe.prepareInstance(new DelegatingRecipe(request.id, request.options ?? {}),
-                            snowflake, preparedRecipes, marketplace);
+                            snowflake, preparedRecipes, marketplace, accepts);
                     }
                     if (!recipeCtor[1]) {
                         throw new Error(`Recipe ${request.id} was installed without a constructor`);
                     }
                     return await PrepareRecipe.prepareInstance(new recipeCtor[1](request.options),
-                        snowflake, preparedRecipes, marketplace);
+                        snowflake, preparedRecipes, marketplace, accepts);
                 }
             )
         );
@@ -68,7 +72,8 @@ export class PrepareRecipe {
     private static async prepareInstance(recipe: Recipe,
                                          snowflake: ReturnType<typeof SnowflakeId>,
                                          preparedRecipes: Map<String, Recipe>,
-                                         marketplace: RecipeMarketplace): Promise<PrepareRecipeResponse> {
+                                         marketplace: RecipeMarketplace,
+                                         acceptsCausesAnotherCycle: boolean): Promise<PrepareRecipeResponse> {
         const id = snowflake.generate();
         const delegatesTo = PrepareRecipe.delegatesTo(recipe);
         if (delegatesTo) {
@@ -106,6 +111,9 @@ export class PrepareRecipe {
             scanVisitor: recipe instanceof ScanningRecipe ? `scan:${id}` : undefined,
             scanPreconditions: scanPreconditions
         };
+        if (acceptsCausesAnotherCycle && recipe.causesAnotherCycle === true) {
+            response.causesAnotherCycle = true;
+        }
 
         const childResponses: PrepareRecipeResponse[] = [];
         for (const child of await recipe.recipeList()) {
@@ -118,7 +126,7 @@ export class PrepareRecipe {
                     }
                 }
                 childResponses.push(await PrepareRecipe.prepareInstance(new DelegatingRecipe(child.name, options),
-                    snowflake, preparedRecipes, marketplace));
+                    snowflake, preparedRecipes, marketplace, acceptsCausesAnotherCycle));
                 continue;
             }
             // Register a child that was instantiated in recipeList() but never installed, so a peer
@@ -126,7 +134,8 @@ export class PrepareRecipe {
             if (!PrepareRecipe.delegatesTo(child) && !marketplace.findRecipe(child.name)) {
                 await marketplace.install(child.constructor as any, []);
             }
-            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace));
+            childResponses.push(await PrepareRecipe.prepareInstance(child, snowflake, preparedRecipes, marketplace,
+                acceptsCausesAnotherCycle));
         }
         response.recipeList = childResponses;
 
@@ -276,6 +285,7 @@ export interface PrepareRecipeResponse {
      * locally from these instead of re-preparing each child by name (the whole-tree optimization).
      */
     recipeList?: PrepareRecipeResponse[]
+    causesAnotherCycle?: boolean
 }
 
 /**
