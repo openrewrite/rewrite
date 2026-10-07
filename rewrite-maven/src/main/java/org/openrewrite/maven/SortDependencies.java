@@ -26,9 +26,8 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
-
-import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -76,33 +75,18 @@ public class SortDependencies extends Recipe {
                     return t;
                 }
 
-                List<DependencyGroup> sortedReplacements = groups.stream()
+                Iterator<DependencyGroup> sortedReplacements = groups.stream()
                         .filter(group -> !group.importedBom)
-                        .sorted(Comparator.<DependencyGroup, Boolean>comparing(
-                            group -> "test".equals(group.tag.getChildValue("scope").orElse(null))
-                        ).thenComparing(
-                            group -> groupArtifactSortKey(group.tag)
-                        ))
-                        .collect(toList());
+                        .sorted(Comparator.<DependencyGroup, Boolean>comparing(group -> group.testScoped)
+                                .thenComparing(group -> group.sortKey))
+                        .iterator();
 
-                List<DependencyGroup> reorderedGroups = new ArrayList<>(groups);
-                int replacementIndex = 0;
-                for (int i = 0; i < groups.size(); i++) {
-                    if (!groups.get(i).importedBom) {
-                        reorderedGroups.set(i, sortedReplacements.get(replacementIndex++));
-                    }
+                List<DependencyGroup> reorderedGroups = new ArrayList<>(groups.size());
+                for (DependencyGroup group : groups) {
+                    reorderedGroups.add(group.importedBom ? group : sortedReplacements.next());
                 }
 
-                // Check if order actually changed
-                boolean changed = false;
-                for (int i = 0; i < groups.size(); i++) {
-                    if (groups.get(i).tag != reorderedGroups.get(i).tag) {
-                        changed = true;
-                        break;
-                    }
-                }
-
-                if (!changed) {
+                if (groups.equals(reorderedGroups)) {
                     return t;
                 }
 
@@ -159,21 +143,21 @@ public class SortDependencies extends Recipe {
         };
     }
 
-    // Compared only as a whole key; `:` cannot occur in a groupId or artifactId
-    private static String groupArtifactSortKey(Xml.Tag dependency) {
-        return dependency.getChildValue("groupId").orElse("") + ":" +
-               dependency.getChildValue("artifactId").orElse("");
-    }
-
     private static class DependencyGroup {
         final Xml.Tag tag;
         final List<Content> precedingContent;
         final boolean importedBom;
+        final boolean testScoped;
+        // Compared only as a whole key; `:` cannot occur in a groupId or artifactId
+        final String sortKey;
 
         DependencyGroup(Xml.Tag tag, List<Content> precedingContent, boolean importedBom) {
             this.tag = tag;
             this.precedingContent = precedingContent;
             this.importedBom = importedBom;
+            this.testScoped = "test".equals(tag.getChildValue("scope").orElse(null));
+            this.sortKey = tag.getChildValue("groupId").orElse("") + ":" +
+                           tag.getChildValue("artifactId").orElse("");
         }
     }
 }
