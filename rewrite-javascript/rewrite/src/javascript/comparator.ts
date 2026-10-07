@@ -2757,3 +2757,50 @@ export class JavaScriptSemanticComparatorVisitor extends JavaScriptComparatorVis
         return literal;
     }
 }
+
+/**
+ * Whether two trees are the same code. Whitespace, comments, optional semicolons and trailing
+ * commas, a literal's spelling (`'a'` and `"a"`, `255` and `0xFF`) and type attribution do not
+ * count. Markers count only where they are syntax that changes meaning, such as `?.`, a non-null
+ * `!`, `function*` and `yield*`, so a marker a recipe attaches does not make trees differ.
+ */
+export async function isEqual(a: J, b: J): Promise<boolean> {
+    return new CodeComparator().compare(a, b);
+}
+
+class CodeComparator extends JavaScriptComparatorVisitor {
+    private readonly meaningfulMarkers: ReadonlySet<string> = new Set([
+        JS.Markers.Optional, JS.Markers.NonNullAssertion, JS.Markers.Generator, JS.Markers.DelegatedYield
+    ]);
+
+    override async visit<R extends J>(j: Tree, p: J, parent?: Cursor): Promise<R | undefined> {
+        if (this.match && this.meaningOf(j as J) !== this.meaningOf(p)) {
+            return this.structuralMismatch('markers') as R;
+        }
+        return super.visit(j, p, parent);
+    }
+
+    protected override async visitProperty(j: any, other: any, propertyName?: string): Promise<any> {
+        if (Type.isType(j) || Type.isType(other)) {
+            return j;
+        }
+        return super.visitProperty(j, other, propertyName);
+    }
+
+    override async visitLiteral(literal: J.Literal, other: J): Promise<J | undefined> {
+        if (!this.match) return literal;
+        const otherLiteral = other as J.Literal;
+        if (literal.value !== otherLiteral.value || literal.type?.keyword !== otherLiteral.type?.keyword) {
+            return this.valueMismatch('value', literal.value, otherLiteral.value);
+        }
+        return literal;
+    }
+
+    private meaningOf(tree: J): string {
+        return (tree.markers?.markers ?? [])
+            .map(marker => marker.kind)
+            .filter(kind => this.meaningfulMarkers.has(kind))
+            .sort()
+            .join(',');
+    }
+}
