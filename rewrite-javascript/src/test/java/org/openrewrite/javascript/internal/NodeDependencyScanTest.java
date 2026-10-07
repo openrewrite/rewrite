@@ -16,6 +16,8 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -109,33 +111,82 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * A workspace member with a lock of its own regenerates that lock, whichever lock the scan met first, and the
-     * root's lock does not take the member's result.
+     * Run in a workspace member that has a lock of its own, npm, Yarn classic, pnpm and Bun install at the workspace
+     * root and write its lock, leaving the member's as it was.
+     */
+    @ParameterizedTest
+    @CsvSource({"Npm, package-lock.json", "YarnClassic, yarn.lock", "Pnpm, pnpm-lock.yaml", "Bun, bun.lock"})
+    void aMemberWithItsOwnLockRegeneratesTheWorkspaceRootsLock(PackageManager pm, String lockName) {
+        NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(pm, pm, lockName, lockName);
+        Path rootLock = Paths.get(lockName);
+        Path memberLock = Paths.get("packages/a/" + lockName);
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          MEMBER);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(rootLock);
+        assertThat(files.getManifests()).containsOnlyKeys(ROOT, MEMBER);
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
+        assertThat(NodeDependencyScan.lockImporters(acc, rootLock)).containsExactly(ROOT, MEMBER);
+        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+    }
+
+    /**
+     * Yarn Berry's project is the nearest directory holding a yarn.lock: the member's own.
      */
     @Test
-    void aMemberWithItsOwnLockIsItsOwnProject() {
-        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
-        Path root = Paths.get("package.json");
-        Path member = Paths.get("packages/a/package.json");
-        NodeDependencyScan.ProjectState rootPs = new NodeDependencyScan.ProjectState();
-        rootPs.capturedPackageJson = PlainText.builder().sourcePath(root)
-          .text("{\"private\":true,\"workspaces\":[\"packages/*\"]}")
-          .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.YarnClassic,
-            singletonList("packages/a/package.json")))))
-          .build();
-        NodeDependencyScan.ProjectState memberPs = new NodeDependencyScan.ProjectState();
-        memberPs.capturedPackageJson = PlainText.builder().sourcePath(member).text("{\"name\":\"a\"}").build();
-        acc.projects.put(root, rootPs);
-        acc.projects.put(member, memberPs);
-        acc.lockToPackage.put(Paths.get("yarn.lock"), root);
-        acc.lockToPackage.put(Paths.get("packages/a/yarn.lock"), member);
+    void aYarnBerryMemberWithItsOwnLockIsItsOwnProject() {
+        NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(PackageManager.YarnBerry, PackageManager.YarnBerry,
+          "yarn.lock", "yarn.lock");
+        Path memberLock = Paths.get("packages/a/yarn.lock");
 
+        NodeDependencyScan.linkWorkspaceMembers(acc);
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          member);
+          MEMBER);
 
-        assertThat(files.getManifests()).containsOnlyKeys(member);
-        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(root);
-        assertThat(NodeDependencyScan.lockImporters(acc, root, rootPs)).containsExactly(root);
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
+        assertThat(files.getManifests()).containsOnlyKeys(MEMBER);
+        assertThat(files.getPackageManagerFiles()).containsOnlyKeys(ROOT);
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("member lock");
+        assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
+        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).containsExactly(MEMBER);
+    }
+
+    /**
+     * A root holding no lock of the member's package manager is not where that lock is written: the member's own
+     * goes to the engine, which finds the root above it.
+     */
+    @Test
+    void aMemberKeepsItsOwnLockWhenTheRootHoldsNoneOfItsPackageManager() {
+        NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(PackageManager.YarnClassic, PackageManager.Npm,
+          "yarn.lock", "package-lock.json");
+        Path memberLock = Paths.get("packages/a/package-lock.json");
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("member lock");
+        assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
+        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).containsExactly(MEMBER);
+    }
+
+    private static final Path ROOT = Paths.get("package.json");
+    private static final Path MEMBER = Paths.get("packages/a/package.json");
+
+    private static NodeDependencyScan.Accumulator workspaceWithMemberLock(PackageManager rootPm, PackageManager memberPm,
+                                                                        String rootLock, String memberLock) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(rootLock)).text("root lock").build());
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + memberLock))
+          .text("member lock").build());
+        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+          .text("{\"private\":true,\"workspaces\":[\"packages/*\"]}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(rootPm, singletonList("packages/a/package.json")))))
+          .build();
+        acc.projects.get(MEMBER).capturedPackageJson = PlainText.builder().sourcePath(MEMBER).text("{\"name\":\"a\"}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(memberPm)))).build();
+        return acc;
     }
 
     @Test

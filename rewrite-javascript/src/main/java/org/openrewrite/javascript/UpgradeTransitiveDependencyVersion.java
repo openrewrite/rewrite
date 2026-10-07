@@ -85,10 +85,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 if (NodeDependencyScan.capturePackageManagerFile(acc, sf)) return tree;
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
-                        Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(p);
-                        NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(packagePath, k -> new NodeDependencyScan.ProjectState());
-                        ps.capturedLockContent = sf.printAll();
-                        acc.lockToPackage.put(p, packagePath);
+                        NodeDependencyScan.captureLock(acc, sf);
                     }
                     return tree;
                 }
@@ -135,12 +132,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                     }
                 }
 
-                Path packagePath = acc.lockToPackage.get(p);
-                if (packagePath == null) return tree;
-                NodeDependencyScan.ProjectState rootPs = acc.projects.get(packagePath);
-                if (rootPs == null) return tree;
-
-                for (Path importer : NodeDependencyScan.lockImporters(acc, packagePath, rootPs)) {
+                for (Path importer : NodeDependencyScan.lockImporters(acc, p)) {
                     NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
                     if (ips == null) continue;
                     if (ips.modifiedPackageJson == null) {

@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.quark.Quark;
 
@@ -54,6 +56,7 @@ public final class NodeDependencyScan {
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
+        public final Map<Path, String> locks = new HashMap<>();
         public final Map<Path, String> packageManagerFiles = new HashMap<>();
         /** Every file the scan visited: what the host holds of the repository. */
         public final Set<Path> paths = new HashSet<>();
@@ -105,23 +108,73 @@ public final class NodeDependencyScan {
         public boolean failureRecorded;
     }
 
-    /**
-     * Link each workspace-member {@code package.json} to the ancestor root lock, so editing a member
-     * regenerates that lock. A member with its own sibling lock keeps it.
-     */
+    /** Note a lock the scan visits; it belongs to the package.json beside it. */
+    public static void captureLock(Accumulator acc, SourceFile lock) {
+        Path packagePath = PackageJsonHelper.correspondingPackageJsonPath(lock.getSourcePath());
+        acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
+        acc.locks.put(lock.getSourcePath(), lock.printAll());
+        acc.lockToPackage.put(lock.getSourcePath(), packagePath);
+    }
+
+    /** Give each package.json the content of the lock {@link #lockFor} says its edits regenerate. */
     public static void linkWorkspaceMembers(Accumulator acc) {
-        for (Map.Entry<Path, Path> e : acc.lockToPackage.entrySet()) {
-            ProjectState root = acc.projects.get(e.getValue());
-            if (root == null || root.capturedPackageJson == null || root.capturedLockContent == null) {
-                continue;
-            }
-            for (Path member : PackageJsonHelper.workspaceMemberPaths(root.capturedPackageJson)) {
-                ProjectState memberPs = acc.projects.get(member);
-                if (memberPs != null && memberPs.capturedLockContent == null) {
-                    memberPs.capturedLockContent = root.capturedLockContent;
-                }
+        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
+            Path lock = lockFor(acc, project.getKey());
+            project.getValue().capturedLockContent = lock == null ? null : acc.locks.get(lock);
+        }
+    }
+
+    /**
+     * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. Yarn Berry's
+     * project is the nearest directory with a yarn.lock. npm, Yarn classic, pnpm and Bun install at the nearest
+     * workspace root that lists the package; that root's lock of the same package manager is the one written, and
+     * without one the package's own lock stands, for the engine to find the root itself.
+     */
+    public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
+        ProjectState ps = acc.projects.get(packageJsonPath);
+        PackageManager pm = null;
+        if (ps != null && ps.capturedPackageJson != null) {
+            NodeResolutionResult marker = ps.capturedPackageJson.getMarkers()
+                    .findFirst(NodeResolutionResult.class).orElse(null);
+            pm = marker == null ? null : marker.getPackageManager();
+        }
+        LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
+        Path own = lockBeside(acc, packageJsonPath, regeneration);
+        if (own != null && pm == PackageManager.YarnBerry) {
+            return own;
+        }
+        Path root = nearestListingRoot(acc, packageJsonPath);
+        Path rootLock = root == null ? null : lockBeside(acc, root, regeneration);
+        return rootLock == null ? own : rootLock;
+    }
+
+    private static @Nullable Path lockBeside(Accumulator acc, Path packageJsonPath,
+                                             @Nullable LockFileRegeneration regeneration) {
+        Path found = null;
+        for (Map.Entry<Path, Path> lock : acc.lockToPackage.entrySet()) {
+            Path name = lock.getKey().getFileName();
+            if (lock.getValue().equals(packageJsonPath) && name != null &&
+                (regeneration == null ? found == null || lock.getKey().compareTo(found) < 0 :
+                        regeneration.getLockFile().equals(name.toString()))) {
+                found = lock.getKey();
             }
         }
+        return found;
+    }
+
+    private static @Nullable Path nearestListingRoot(Accumulator acc, Path packageJsonPath) {
+        Path nearest = null;
+        for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
+            Path candidate = project.getKey();
+            SourceFile manifest = project.getValue().capturedPackageJson;
+            if (!candidate.equals(packageJsonPath) && manifest != null &&
+                PackageJsonHelper.workspaceMemberPaths(manifest).contains(packageJsonPath) &&
+                (nearest == null || candidate.getNameCount() > nearest.getNameCount() ||
+                 candidate.getNameCount() == nearest.getNameCount() && candidate.compareTo(nearest) < 0)) {
+                nearest = candidate;
+            }
+        }
+        return nearest;
     }
 
     /**
@@ -140,21 +193,12 @@ public final class NodeDependencyScan {
 
     /**
      * The manifests of the project whose lock an edit of {@code packageJsonPath} regenerates, by path, as
-     * edited so far in this run: the package.json beside the lock and every workspace member in the source set.
-     * A package.json with a lock of its own regenerates that lock, as {@link #linkWorkspaceMembers} leaves it.
+     * edited so far in this run: the package.json beside the lock {@link #lockFor} names and every workspace member
+     * in the source set.
      */
     public static Map<Path, String> projectManifests(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        Path root = acc.lockToPackage.containsValue(packageJsonPath) ? packageJsonPath : null;
-        if (root == null) {
-            for (Path candidate : new LinkedHashSet<>(acc.lockToPackage.values())) {
-                ProjectState ps = acc.projects.get(candidate);
-                if (ps != null && ps.capturedPackageJson != null &&
-                    PackageJsonHelper.workspaceMemberPaths(ps.capturedPackageJson).contains(packageJsonPath)) {
-                    root = candidate;
-                    break;
-                }
-            }
-        }
+        Path lock = lockFor(acc, packageJsonPath);
+        Path root = lock == null ? null : acc.lockToPackage.get(lock);
         ProjectState rootPs = root == null ? null : acc.projects.get(root);
         if (rootPs == null || rootPs.capturedPackageJson == null) {
             return emptyMap();
@@ -239,16 +283,23 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * The manifests that can regenerate this lock: the sibling manifest first, then any workspace members it covers
-     * that have no lock of their own.
+     * The manifests whose edits regenerate {@code lock}, by {@link #lockFor}: the sibling manifest first, then the
+     * workspace members it lists.
      */
-    public static List<Path> lockImporters(Accumulator acc, Path packagePath, ProjectState rootPs) {
+    public static List<Path> lockImporters(Accumulator acc, Path lock) {
         List<Path> importers = new ArrayList<>();
-        importers.add(packagePath);
+        Path packagePath = acc.lockToPackage.get(lock);
+        ProjectState rootPs = packagePath == null ? null : acc.projects.get(packagePath);
+        if (rootPs == null) {
+            return importers;
+        }
+        if (lock.equals(lockFor(acc, packagePath))) {
+            importers.add(packagePath);
+        }
         if (rootPs.capturedPackageJson != null) {
             for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
                 if (!member.equals(packagePath) && acc.projects.containsKey(member) &&
-                    !acc.lockToPackage.containsValue(member)) {
+                    lock.equals(lockFor(acc, member))) {
                     importers.add(member);
                 }
             }
