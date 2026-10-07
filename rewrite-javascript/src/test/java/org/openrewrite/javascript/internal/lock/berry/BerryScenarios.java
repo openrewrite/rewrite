@@ -235,8 +235,9 @@ final class BerryScenarios {
         @Nullable
         String yarnrc(Phase phase) {
             List<String> order = phase == Phase.BEFORE ? Arrays.asList("yarnrc-before.written", "yarnrc") :
-                    phase == Phase.REFRESH ? Arrays.asList("yarnrc-refresh.written", "yarnrc-before.written", "yarnrc") :
-                    Arrays.asList("yarnrc.written", "yarnrc-after", "yarnrc-before.written", "yarnrc");
+                    phase == Phase.REFRESH ?
+                            Arrays.asList("yarnrc-refresh.written", "yarnrc-before.written", "yarnrc") :
+                            Arrays.asList("yarnrc.written", "yarnrc-after", "yarnrc-before.written", "yarnrc");
             for (String f : order) {
                 if (has(f)) {
                     return file(f);
@@ -267,7 +268,8 @@ final class BerryScenarios {
                 try (Stream<Path> files = Files.list(dir)) {
                     files.map(f -> f.getFileName().toString())
                             .filter(f -> f.startsWith("pkg-") && !f.equals("pkg-before") && !f.equals("pkg-after") &&
-                                         !f.equals("pkg-root") && !f.endsWith(phase == Phase.AFTER ? "-before" : "-after"))
+                                         !f.equals("pkg-root") &&
+                                         !f.endsWith(phase == Phase.AFTER ? "-before" : "-after"))
                             .sorted()
                             .forEach(f -> manifests.put("packages/" + f.substring(4).replaceAll("-(before|after)$", ""),
                                     read(dir.resolve(f))));

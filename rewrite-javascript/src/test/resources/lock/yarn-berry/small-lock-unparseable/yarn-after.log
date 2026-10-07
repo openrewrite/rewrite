@@ -3,13 +3,13 @@
                    ^
       resolution: "ms@npm:2.1.2"
                    ^
-    at Nte (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:19:802)
-    at Tr (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:19:905)
-    at P9e (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:26:1612)
-    at yE (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:26:4430)
-    at Q9e (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:26:6580)
-    at Ote (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:27:260)
-    at Mte (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:27:475)
-    at T9e (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:27:748)
-    at IWe (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:64:87)
-    at as (/Users/jon/Projects/github/openrewrite/rewrite/.claude/worktrees/npm-peer-lock/.lockwork/corepack-home/v1/yarn/4.10.3/yarn.js:64:435)
+    at Nte ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:19:802)
+    at Tr ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:19:905)
+    at P9e ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:26:1612)
+    at yE ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:26:4430)
+    at Q9e ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:26:6580)
+    at Ote ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:27:260)
+    at Mte ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:27:475)
+    at T9e ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:27:748)
+    at IWe ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:64:87)
+    at as ($COREPACK_HOME/v1/yarn/4.10.3/yarn.js:64:435)

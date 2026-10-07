@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,10 +27,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Yarn's packages/yarnpkg-core/tests/Configuration.test.ts, the cases about settings that reach a lock: the tag
- * pattern, environment interpolation, map merging and the ignored environment variables. Not ported: secrets
- * hiding, mergeable arrays
- * ({@code logFilters}, {@code unsafeHttpWhitelist}), {@code overwrite} merging and the multiple-rc-file listing
- * of {@code yarn config}, none of which reaches a lock.
+ * pattern, environment interpolation, map merging, multiple rc files and the ignored environment variables. The
+ * multiple-rc-files case runs with settings of each type that reach a lock in place of its test plugin's (no
+ * setting of type ANY does). Not ported: secrets hiding, mergeable arrays ({@code logFilters},
+ * {@code unsafeHttpWhitelist}) and {@code overwrite} merging, none of which reaches a lock.
  */
 class ConfigurationTest {
 
@@ -121,6 +122,92 @@ class ConfigurationTest {
                 Collections.singletonMap("YARN_REGISTRY", "https://example.org"));
         options.restrictTo(YarnRelease.of("4.10.3").getSettings());
         assertThat(options.get("npmRegistryServer")).isEqualTo("https://registry.yarnpkg.com");
+    }
+
+    /**
+     * "Multiple RC files": three nested rc files, the middle one with {@code onConflict} directives, read as
+     * {@code Configuration.find} reads them from the nearest directory; Yarn 4.10.3 answers the same over these
+     * files ({@code ybf-rcfiles-probe.sh}).
+     */
+    @Test
+    void resolvesTheStringsOfMultipleRcFiles() {
+        BerryOptions options = load(
+                "defaultLanguageName: foo\ndefaultProtocol: foo\nchecksumBehavior: foo\nnpmPublishRegistry: foo\n",
+                "defaultLanguageName: bar\n" +
+                "defaultProtocol:\n  onConflict: reset\n  value: bar\n" +
+                "checksumBehavior:\n  onConflict: extend\n  value: bar\n" +
+                "npmPublishRegistry:\n  onConflict: reset\n  value: bar\n",
+                "npmPublishRegistry: baz\n");
+        assertThat(options.get("defaultLanguageName")).isEqualTo("bar");
+        assertThat(options.get("defaultProtocol")).isEqualTo("bar");
+        assertThat(options.get("checksumBehavior")).isEqualTo("bar");
+        assertThat(options.get("npmPublishRegistry")).isEqualTo("baz");
+    }
+
+    @Test
+    void resolvesTheStringArraysOfMultipleRcFiles() {
+        String far = "npmPreapprovedPackages: [foo]\n";
+        assertThat(load(far, "npmPreapprovedPackages: [bar]\n", "").get("npmPreapprovedPackages"))
+                .isEqualTo(Arrays.asList("foo", "bar"));
+        assertThat(load(far, "npmPreapprovedPackages:\n  onConflict: reset\n  value: [bar]\n", "")
+                .get("npmPreapprovedPackages")).isEqualTo(Collections.singletonList("bar"));
+        assertThat(load(far, "npmPreapprovedPackages:\n  onConflict: extend\n  value: [bar]\n", "")
+                .get("npmPreapprovedPackages")).isEqualTo(Arrays.asList("foo", "bar"));
+        assertThat(load(far, "npmPreapprovedPackages:\n  onConflict: hardReset\n  value: [bar]\n",
+                "npmPreapprovedPackages: [baz]\n").get("npmPreapprovedPackages"))
+                .isEqualTo(Collections.singletonList("baz"));
+    }
+
+    /**
+     * The test plugin's shape {@code {number, string}} is a scope's {@code {npmAlwaysAuth, npmRegistryServer}}
+     * here: {@code 0} is {@code false}, {@code 2} is {@code true}, {@code "default"} the default registry.
+     */
+    @Test
+    void resolvesTheMapsOfMultipleRcFiles() {
+        String far = "npmScopes:\n  foo:\n    npmRegistryServer: foo\n";
+        String bar = "    bar:\n      npmAlwaysAuth: true\n      npmRegistryServer: bar\n";
+        assertThat(scopes(load(far, "npmScopes:\n  bar:\n    npmAlwaysAuth: true\n    npmRegistryServer: bar\n",
+                ""))).isEqualTo("{foo=false foo, bar=true bar}");
+        assertThat(scopes(load(far, "npmScopes:\n  onConflict: reset\n  value:\n" + bar, "")))
+                .isEqualTo("{bar=true bar}");
+        assertThat(scopes(load(far, "npmScopes:\n  onConflict: extend\n  value:\n" + bar, "")))
+                .isEqualTo("{foo=false foo, bar=true bar}");
+        assertThat(scopes(load(far, "npmScopes:\n  onConflict: hardReset\n  value:\n" + bar,
+                "npmScopes:\n  baz:\n    npmRegistryServer: baz\n"))).isEqualTo("{baz=false baz}");
+    }
+
+    @Test
+    void resolvesTheShapesOfMultipleRcFiles() {
+        String far = "npmScopes:\n  s:\n    npmRegistryServer: foo\n";
+        String value = "      npmAlwaysAuth: true\n";
+        String defaultRegistry = "https://registry.yarnpkg.com";
+        assertThat(scopes(load(far, "npmScopes:\n  s:\n    npmAlwaysAuth: true\n", "")))
+                .isEqualTo("{s=true foo}");
+        assertThat(scopes(load(far, "npmScopes:\n  s:\n    onConflict: reset\n    value:\n" + value, "")))
+                .isEqualTo("{s=true " + defaultRegistry + "}");
+        assertThat(scopes(load(far, "npmScopes:\n  s:\n    onConflict: extend\n    value:\n" + value, "")))
+                .isEqualTo("{s=true foo}");
+        assertThat(scopes(load(far, "npmScopes:\n  s:\n    onConflict: hardReset\n    value:\n" + value,
+                "npmScopes:\n  s:\n    npmRegistryServer: baz\n"))).isEqualTo("{s=false baz}");
+    }
+
+    private static BerryOptions load(String far, String mid, String near) {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("../../.yarnrc.yml", far);
+        files.put("../.yarnrc.yml", mid);
+        if (!near.isEmpty()) {
+            files.put(".yarnrc.yml", near);
+        }
+        return BerryOptions.load(files, Collections.emptyMap());
+    }
+
+    private static String scopes(BerryOptions options) {
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> scope : options.getMap("npmScopes").entrySet()) {
+            @SuppressWarnings("unchecked") Map<String, Object> shape = (Map<String, Object>) scope.getValue();
+            out.put(scope.getKey(), shape.get("npmAlwaysAuth") + " " + shape.get("npmRegistryServer"));
+        }
+        return out.toString();
     }
 
     @SuppressWarnings("unchecked")

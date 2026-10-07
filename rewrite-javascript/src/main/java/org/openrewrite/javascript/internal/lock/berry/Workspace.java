@@ -21,8 +21,10 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
@@ -76,13 +78,17 @@ final class Workspace {
         if (patterns.isEmpty()) {
             return;
         }
-        List<Pattern> include = new ArrayList<>();
+        Map<String, Pattern> include = new LinkedHashMap<>();
         List<Pattern> exclude = new ArrayList<>();
+        boolean dynamicAtRoot = false;
         for (String pattern : patterns) {
             if (pattern.startsWith("!")) {
                 exclude.add(GlobPattern.compile(pattern.substring(1)));
-            } else {
-                include.add(GlobPattern.compile(pattern));
+                continue;
+            }
+            for (String processed : GlobPattern.process(pattern)) {
+                include.put(processed, GlobPattern.compile(processed));
+                dynamicAtRoot |= GlobPattern.isDynamic(processed) && ".".equals(GlobPattern.base(processed));
             }
         }
         List<String> relativeCwds = new ArrayList<>();
@@ -92,15 +98,39 @@ final class Workspace {
                 continue;
             }
             String relative = directory.substring(prefix.length());
-            if (isIgnored(relative) || !matchesAny(include, relative) || matchesAny(exclude, relative)) {
+            if (isIgnored(relative) || matchesAny(exclude, relative)) {
                 continue;
             }
-            relativeCwds.add(relative);
+            // fast-glob's unique filter keys an entry by its path without a leading ./
+            Map<String, String> byKey = new LinkedHashMap<>();
+            for (Map.Entry<String, Pattern> pattern : include.entrySet()) {
+                if (pattern.getValue().matcher(relative).matches()) {
+                    String spelled = spelling(pattern.getKey(), relative, dynamicAtRoot);
+                    String other = byKey.putIfAbsent(spelled.startsWith("./") ? spelled.substring(2) : spelled,
+                            spelled);
+                    if (other != null && !other.equals(spelled)) {
+                        throw new CannotKnow("the order of the workspaces " + relativeCwd + " lists (fast-glob's " +
+                                             "tasks race to report " + other + " or " + spelled + ")");
+                    }
+                }
+            }
+            relativeCwds.addAll(byKey.values());
         }
         relativeCwds.sort(String::compareTo);
-        for (String relative : relativeCwds) {
-            workspacesCwds.add(prefix + relative);
+        for (String spelled : relativeCwds) {
+            workspacesCwds.add(prefix + PortablePath.normalize(spelled).replaceAll("/+$", ""));
         }
+    }
+
+    /**
+     * The directory as fast-glob reports it: a static pattern as written, a dynamic one under its base directory
+     * as spelled, unless a dynamic pattern based at the root merged them all into one task there.
+     */
+    private static String spelling(String pattern, String relative, boolean dynamicAtRoot) {
+        if (!GlobPattern.isDynamic(pattern)) {
+            return pattern;
+        }
+        return !dynamicAtRoot && GlobPattern.base(pattern).startsWith("./") ? "./" + relative : relative;
     }
 
     private static boolean isIgnored(String relative) {

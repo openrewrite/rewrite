@@ -102,7 +102,7 @@ final class NpmHttpUtils {
         return picked;
     }
 
-    // lodash-style pick of the cached field paths
+    // es-toolkit/compat's pick of the cached field paths
     private static Map<String, @Nullable Object> pick(@Nullable Object value) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
         for (String field : CACHED_FIELDS) {

@@ -19,8 +19,8 @@
  * and workspace resolvers, Workspace, CorePlugin, Cache, tgzUtils, semverUtils, miscUtils, hashUtils),
  * packages/yarnpkg-parsers (syml, resolution), packages/plugin-npm (the semver, tag and remap resolvers,
  * npmHttpUtils, npmConfigUtils), packages/plugin-compat, packages/plugin-catalog, packages/yarnpkg-extensions (as
- * data, in {@code yarn-releases.json}) and packages/plugin-essentials (the install command). It is distributed under
- * the BSD 2-Clause License:
+ * data, in {@code yarn-releases.json.gz}) and packages/plugin-essentials (the install command). It is distributed
+ * under the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors.
  * All rights reserved.
