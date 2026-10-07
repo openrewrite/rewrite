@@ -228,6 +228,36 @@ describe('scopeOf', () => {
         expect(reachable.declaringScope('B')?.kind).toBe(JS.Kind.CompilationUnit);
     });
 
+    test('a value reference is shadowed by a value, not by a type of the same name', async () => {
+        const scope = await scopeAtAnchor(`
+            import type {Imported} from 'm';
+            import {type Specified} from 'm';
+            interface Object {}
+            type Math = {};
+            interface Merged {}
+            const Merged = 1;
+            anchor();
+        `);
+        // A binding still collides with a type the same name, so unqualified, a type counts.
+        expect(scope.declares('Object')).toBe(true);
+        expect(['Imported', 'Specified', 'Object', 'Math'].filter(name => scope.declares(name, {values: true})))
+            .toEqual([]);
+        expect(scope.declares('Merged', {values: true})).toBe(true);
+        expect(scope.declaringScope('Object', {values: true})).toBeUndefined();
+    });
+
+    test('an object or type literal binds none of its members, around it or inside it', async () => {
+        expect(await namesAtAnchor(`const o = { foo() { anchor(); }, get bar() { return 1; } };`))
+            .toEqual(['o']);
+        expect(await namesAtAnchor(`
+            function f() {
+                g({ method() {} });
+                type T = { property: string; signature(): void };
+                anchor();
+            }
+        `)).toEqual(['T', 'f']);
+    });
+
     test('a var belongs to the function it sits in, a let to the block', async () => {
         const hoisting = await scopeAtAnchor(`function f(p) { var p = 1; anchor(); }`);
         expect(hoisting.declaringScope('p')?.kind).toBe(J.Kind.MethodDeclaration);
@@ -277,6 +307,16 @@ describe('namesDeclaredIn', () => {
                 field = (bound) => bound;
             }
         `))].sort()).toEqual(['K', 'bound', 'local', 'param']);
+    });
+
+    test('an object or type literal member is reached through a value, so its name is not the file\'s', async () => {
+        expect([...namesDeclaredIn(await parse(`
+            const o = {
+                undefined() { const local = 1; },
+                get getter() { return 1; }
+            };
+            let t: { undefined: string; signature(): void };
+        `))].sort()).toEqual(['local', 'o', 't']);
     });
 
     test('a type parameter is a name that shadows, so the file declares it', async () => {

@@ -33,16 +33,19 @@ export interface Scope {
      */
     walk(visit: (scope: Scope) => boolean): void;
 
-    /** Whether this scope or one enclosing it binds `name`. */
-    declares(name: string): boolean;
+    /**
+     * Whether this scope or one enclosing it binds `name`. A type counts unless `values` is set,
+     * since a new binding collides with a type of its name while a value reference never reads one.
+     */
+    declares(name: string, options?: { values?: boolean }): boolean;
 
     /**
      * The node owning the innermost scope that binds `name` — the compilation unit for a
      * module-scope binding, otherwise the function, block or loop holding it — or undefined where
      * nothing in scope does. A caller holding a declaration asks whether this is the node it came
-     * from: anything nearer shadows it.
+     * from: anything nearer shadows it. `values` is as for `declares`.
      */
-    declaringScope(name: string): J | undefined;
+    declaringScope(name: string, options?: { values?: boolean }): J | undefined;
 }
 
 /**
@@ -56,7 +59,7 @@ export function scopeOf(cursor: Cursor): Scope {
 
 function scopeAt(cursor: Cursor): Scope {
     return {
-        names: () => frameBindings(cursor.value, cursor.parent?.value),
+        names: () => frameBindings(cursor.value, cursor.parent?.value, false),
         walk: visit => {
             for (let c: Cursor | undefined = cursor; c; c = enclosingScopeCursor(c.parent)) {
                 if (!visit(scopeAt(c))) {
@@ -64,8 +67,8 @@ function scopeAt(cursor: Cursor): Scope {
                 }
             }
         },
-        declares: name => declaringScopeOf(cursor, name) !== undefined,
-        declaringScope: name => declaringScopeOf(cursor, name)
+        declares: (name, options) => declaringScopeOf(cursor, name, options?.values ?? false) !== undefined,
+        declaringScope: (name, options) => declaringScopeOf(cursor, name, options?.values ?? false)
     };
 }
 
@@ -133,14 +136,19 @@ export function namesDeclaredWithin(node: unknown, cacheKey: object = node as ob
 
     const names = new Set<string>();
     const collect = (node: any): boolean => {
-        declarationNames(node).forEach(name => names.add(name));
-        if (node.kind !== J.Kind.ClassDeclaration) {
+        declarationNames(node, false).forEach(name => names.add(name));
+        const members = membersOf(node);
+        if (!members) {
             return true;
         }
-        // The walk ends at this branch, so the class's own type parameters are read here.
-        typeParameterNames(node).forEach(name => names.add(name));
+        // The walk ends at this branch, so what else the node holds is read here.
+        if (node.kind === J.Kind.ClassDeclaration) {
+            typeParameterNames(node).forEach(name => names.add(name));
+        } else if (node.kind === J.Kind.NewClass) {
+            walk((node as J.NewClass).arguments, collect);
+        }
         // A member's name is not one the file binds, though the code inside one still declares names.
-        for (const member of (node as J.ClassDeclaration).body?.statements ?? []) {
+        for (const member of members.statements) {
             const element = unwrap(member);
             walk(element, node => node === element || collect(node));
         }
@@ -181,7 +189,7 @@ interface Frames {
 /** Whether a scope between the name and where the walk began binds it. */
 function shadowed(scopes: Frames | undefined, name: string): boolean {
     for (let scope = scopes; scope; scope = scope.outer) {
-        if (frameBindings(scope.node, scope.parent).has(name)) {
+        if (frameBindings(scope.node, scope.parent, false).has(name)) {
             return true;
         }
     }
@@ -255,9 +263,26 @@ function unnamedMembers(bound: { name: string }[]): { name: string }[] {
     return bound.map(({name}) => ({name}));
 }
 
-function declaringScopeOf(cursor: Cursor, name: string): J | undefined {
+/**
+ * The block of members a class, object literal or type literal holds. A member is reached through
+ * the value or type holding it, so its name binds nowhere.
+ */
+function membersOf(node: any): J.Block | undefined {
+    switch (node?.kind) {
+        case J.Kind.ClassDeclaration:
+            return (node as J.ClassDeclaration).body;
+        case J.Kind.NewClass:
+            return (node as J.NewClass).body;
+        case JS.Kind.TypeLiteral:
+            return (node as JS.TypeLiteral).members;
+        default:
+            return undefined;
+    }
+}
+
+function declaringScopeOf(cursor: Cursor, name: string, values: boolean): J | undefined {
     for (let c: Cursor | undefined = cursor; c; c = c.parent) {
-        if (frameBindings(c.value, c.parent?.value).has(name)) {
+        if (frameBindings(c.value, c.parent?.value, values).has(name)) {
             return c.value;
         }
     }
@@ -268,62 +293,63 @@ function declaringScopeOf(cursor: Cursor, name: string): J | undefined {
  * What one node on the cursor path binds, `parent` being the node it hangs from. Only these two
  * answers turn on the parent; a node alone settles the rest, which is what makes them cacheable.
  */
-function frameBindings(node: any, parent: any): ReadonlySet<string> {
-    // A class body holds members, which are reached through an instance rather than by name.
-    if (node?.kind === J.Kind.Block && parent?.kind === J.Kind.ClassDeclaration) {
+function frameBindings(node: any, parent: any, values: boolean): ReadonlySet<string> {
+    if (node?.kind === J.Kind.Block && membersOf(parent) === node) {
         return noNames;
     }
     // A function expression is the only function whose own name its body reaches: a declaration's
     // name belongs to the enclosing block, a method's to an instance.
     if (node?.kind === J.Kind.MethodDeclaration && parent?.kind === JS.Kind.StatementExpression) {
-        let names = selfNamed.get(node);
+        const cache = selfNamed[values ? 'values' : 'all'];
+        let names = cache.get(node);
         if (!names) {
             const self = bindingNames((node as J.MethodDeclaration).name).map(bound => bound.name);
-            selfNamed.set(node, names = new Set([...self, ...ownBindings(node)]));
+            cache.set(node, names = new Set([...self, ...ownBindings(node, values)]));
         }
         return names;
     }
-    return ownBindings(node);
+    return ownBindings(node, values);
 }
 
-function ownBindings(node: any): ReadonlySet<string> {
+function ownBindings(node: any, values: boolean): ReadonlySet<string> {
     if (typeof node !== 'object' || node === null) {
         return noNames;
     }
-    let names = frames.get(node);
+    const cache = frames[values ? 'values' : 'all'];
+    let names = cache.get(node);
     if (!names) {
-        frames.set(node, names = new Set(readBindings(node)));
+        cache.set(node, names = new Set(readBindings(node, values)));
     }
     return names;
 }
 
 
-function readBindings(node: any): string[] {
+function readBindings(node: any, values: boolean): string[] {
     switch (node.kind) {
         case JS.Kind.CompilationUnit: {
             const statements = (node as JS.CompilationUnit).statements;
-            return [...declaredNames(statements), ...hoistedNames(statements)];
+            return [...declaredNames(statements, values), ...hoistedNames(statements)];
         }
         case J.Kind.Block:
-            return blockScopedNames((node as J.Block).statements);
+            return blockScopedNames((node as J.Block).statements, values);
         case J.Kind.MethodDeclaration: {
             const method = node as J.MethodDeclaration;
-            return [...declaredNames(method.parameters.elements), ...hoistedNames(method.body)];
+            return [...declaredNames(method.parameters.elements, values), ...hoistedNames(method.body)];
         }
         case J.Kind.Lambda: {
             const lambda = node as J.Lambda;
-            return [...declaredNames(lambda.parameters.parameters), ...hoistedNames(lambda.body)];
+            return [...declaredNames(lambda.parameters.parameters, values), ...hoistedNames(lambda.body)];
         }
         case J.Kind.ClassDeclaration:
-            return bindingNames((node as J.ClassDeclaration).name).map(bound => bound.name);
+            return declarationNames(node, values);
         case J.Kind.TryCatch:
-            return declaredNames([(node as J.Try.Catch).parameter.tree]);
+            return declaredNames([(node as J.Try.Catch).parameter.tree], values);
         case J.Kind.ForLoop:
-            return declaredNames((node as J.ForLoop).control.init);
+            return declaredNames((node as J.ForLoop).control.init, values);
         case J.Kind.ForEachLoop:
-            return declaredNames([(node as J.ForEachLoop).control.variable]);
+            return declaredNames([(node as J.ForEachLoop).control.variable], values);
         case JS.Kind.ForInLoop:
-            return declaredNames([(node as JS.ForInLoop).control.variable]);
+            return declaredNames([(node as JS.ForInLoop).control.variable], values);
         default:
             return [];
     }
@@ -333,7 +359,7 @@ function readBindings(node: any): string[] {
  * The names statements bind in the block holding them — the complement of what
  * {@link hoistedNames} claims, so `function (x) { var x = 1; }` reads as one binding, not two.
  */
-function blockScopedNames(statements: any[]): string[] {
+function blockScopedNames(statements: any[], values: boolean): string[] {
     return statements.flatMap(statement => {
         const element = unwrap(statement);
         switch (element?.kind) {
@@ -341,11 +367,11 @@ function blockScopedNames(statements: any[]): string[] {
                 return [];
             case J.Kind.VariableDeclarations:
             case JS.Kind.ScopedVariableDeclarations:
-                return isBlockScoped(element) ? declarationNames(element) : [];
+                return isBlockScoped(element) ? declarationNames(element, values) : [];
             case J.Kind.Case:
-                return blockScopedNames((element as J.Case).statements.elements);
+                return blockScopedNames((element as J.Case).statements.elements, values);
             default:
-                return declarationNames(element);
+                return declarationNames(element, values);
         }
     });
 }
@@ -355,35 +381,40 @@ function isBlockScoped(declaration: any): boolean {
 }
 
 /** The names statements declare directly in the scope holding them. */
-function declaredNames(statements: any[]): string[] {
-    return statements.flatMap(statement => declarationNames(unwrap(statement)));
+function declaredNames(statements: any[], values: boolean): string[] {
+    return statements.flatMap(statement => declarationNames(unwrap(statement), values));
 }
 
-function declarationNames(statement: any): string[] {
+/** The names a declaration binds, of values alone when `values` is set. */
+function declarationNames(statement: any, values: boolean): string[] {
     switch (statement?.kind) {
         case JS.Kind.Import:
-            return importNames(statement as JS.Import);
+            return importNames(statement as JS.Import, values);
         case J.Kind.VariableDeclarations:
             return (statement as J.VariableDeclarations).variables
                 .flatMap(variable => bindingNames(unwrap(variable)?.name))
                 .map(bound => bound.name);
         case JS.Kind.ScopedVariableDeclarations:
-            return declaredNames((statement as JS.ScopedVariableDeclarations).variables);
+            return declaredNames((statement as JS.ScopedVariableDeclarations).variables, values);
         case J.Kind.MethodDeclaration:
             return bindingNames((statement as J.MethodDeclaration).name).map(bound => bound.name);
-        case J.Kind.ClassDeclaration:
-            return bindingNames((statement as J.ClassDeclaration).name).map(bound => bound.name);
+        case J.Kind.ClassDeclaration: {
+            const declaration = statement as J.ClassDeclaration;
+            return values && declaration.classKind.type === J.ClassDeclaration.Kind.Type.Interface
+                ? []
+                : bindingNames(declaration.name).map(bound => bound.name);
+        }
         case JS.Kind.NamespaceDeclaration:
             return bindingNames(unwrap((statement as JS.NamespaceDeclaration).name)).map(bound => bound.name);
         case JS.Kind.TypeDeclaration:
-            return bindingNames(unwrap((statement as JS.TypeDeclaration).name)).map(bound => bound.name);
+            return values ? [] : bindingNames(unwrap((statement as JS.TypeDeclaration).name)).map(bound => bound.name);
         case J.Kind.TypeParameter:
             // Reached by namesDeclaredWithin's walk, never through a statement list: a type
             // parameter binds across the declaration carrying it, not in the scope that one sits in.
-            return bindingNames((statement as J.TypeParameter).name).map(bound => bound.name);
+            return values ? [] : bindingNames((statement as J.TypeParameter).name).map(bound => bound.name);
         case J.Kind.Case:
             // The cases of a switch share the block it opens, so each one's declarations bind in all.
-            return declaredNames((statement as J.Case).statements.elements);
+            return declaredNames((statement as J.Case).statements.elements, values);
         default:
             return [];
     }
@@ -398,13 +429,13 @@ function typeParameterNames(node: any): string[] {
     const parameters = held?.kind === J.Kind.TypeParameters
         ? (held as J.TypeParameters).typeParameters
         : (held as J.Container<J.TypeParameter> | undefined)?.elements;
-    return (parameters ?? []).flatMap(parameter => declarationNames(unwrap(parameter)));
+    return (parameters ?? []).flatMap(parameter => declarationNames(unwrap(parameter), false));
 }
 
 /** The names an import binds, which for an aliased or namespace specifier is the alias. */
-function importNames(jsImport: JS.Import): string[] {
+function importNames(jsImport: JS.Import, values: boolean): string[] {
     const importClause = jsImport.importClause;
-    if (!importClause) {
+    if (!importClause || values && importClause.typeOnly) {
         return [];
     }
     const names = bindingNames(unwrap(importClause.name)).map(bound => bound.name);
@@ -412,7 +443,8 @@ function importNames(jsImport: JS.Import): string[] {
     if (namedBindings?.kind === JS.Kind.NamedImports) {
         for (const element of (namedBindings as JS.NamedImports).elements.elements) {
             const specifier = unwrap(element);
-            if (specifier?.kind === JS.Kind.ImportSpecifier) {
+            if (specifier?.kind === JS.Kind.ImportSpecifier &&
+                !(values && (specifier as JS.ImportSpecifier).importType.element)) {
                 names.push(...aliasedName((specifier as JS.ImportSpecifier).specifier));
             }
         }
@@ -437,8 +469,8 @@ const hoisted = new WeakMap<object, string[]>();
 const declared = new WeakMap<object, ReadonlySet<string>>();
 const used = new WeakMap<object, ReadonlySet<string>>();
 const referenced = new WeakMap<object, ReadonlySet<string>>();
-const frames = new WeakMap<object, ReadonlySet<string>>();
-const selfNamed = new WeakMap<object, ReadonlySet<string>>();
+const frames = {all: new WeakMap<object, ReadonlySet<string>>(), values: new WeakMap<object, ReadonlySet<string>>()};
+const selfNamed = {all: new WeakMap<object, ReadonlySet<string>>(), values: new WeakMap<object, ReadonlySet<string>>()};
 
 /**
  * The names blocks under `scope` hoist out to it. A `var` or function declaration reaches the whole
@@ -458,12 +490,12 @@ function hoistedNames(scope: any): string[] {
     const collect = (node: any): boolean => {
         switch (node.kind) {
             case J.Kind.MethodDeclaration:
-                names.push(...declarationNames(node));
+                names.push(...declarationNames(node, false));
                 return false;
             case J.Kind.VariableDeclarations:
             case JS.Kind.ScopedVariableDeclarations:
                 if (!isBlockScoped(node)) {
-                    names.push(...declarationNames(node));
+                    names.push(...declarationNames(node, false));
                 }
                 return false;
             case J.Kind.TryCatch:
@@ -475,6 +507,9 @@ function hoistedNames(scope: any): string[] {
                 return false;
             case J.Kind.Lambda:
             case J.Kind.ClassDeclaration:
+            case J.Kind.NewClass:
+            case JS.Kind.TypeLiteral:
+                // Nothing in an expression or a type hoists past it.
                 return false;
             default:
                 return true;
