@@ -189,9 +189,8 @@ final class ResolveDependencies {
     }
 
     /**
-     * {@code DependenciesTreeNode}: the children by alias (computed when first asked for), whether the package is
-     * installable, the resolved package, and the depth it was first reached at ({@code -1} for a node whose
-     * package is only named).
+     * {@code DependenciesTreeNode}: the children by alias (computed when first asked for), installability, the package
+     * and the depth it was first reached at ({@code -1} when only named).
      */
     @Getter
     @Setter

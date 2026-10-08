@@ -155,9 +155,8 @@ final class SettingsChecker {
     }
 
     /**
-     * {@code calcPatchHashes}: each patch file's sha256 (hex) with CRLF read as LF.
-     *
-     * @param files the project's files by path relative to the lock's directory
+     * {@code calcPatchHashes}: each patch file's sha256 (hex), CRLF read as LF, from the files by path relative to the
+     * lock's directory.
      */
     static Map<String, @Nullable Object> calcPatchHashes(Map<String, String> patches, Map<String, String> files) {
         Map<String, @Nullable Object> hashes = new LinkedHashMap<>();

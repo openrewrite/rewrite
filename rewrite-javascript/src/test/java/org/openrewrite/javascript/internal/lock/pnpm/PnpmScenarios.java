@@ -34,7 +34,9 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -427,6 +429,29 @@ final class PnpmScenarios {
             }
             return httpCache != null && Files.isRegularFile(httpCache.resolve(full ? name + "@full" : name)) ?
                     read(httpCache.resolve(full ? name + "@full" : name)) : null;
+        }
+
+        /**
+         * The registries pnpm fetched packuments from in a phase, as its metadata cache names them (the host, a port
+         * after a {@code +}); registry.npmjs.org for a recording without that cache.
+         */
+        Set<String> registryHosts(String phase) {
+            Set<String> hosts = new TreeSet<>();
+            for (String kind : new String[]{"metadata", "metadata-full"}) {
+                Path metadata = dir.resolve("probes").resolve(phase + "-cache").resolve("v11").resolve(kind);
+                if (!Files.isDirectory(metadata)) {
+                    continue;
+                }
+                try (Stream<Path> registries = Files.list(metadata)) {
+                    registries.filter(Files::isDirectory).forEach(p -> hosts.add(p.getFileName().toString()));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            if (hosts.isEmpty()) {
+                hosts.add("registry.npmjs.org");
+            }
+            return hosts;
         }
 
         @Override

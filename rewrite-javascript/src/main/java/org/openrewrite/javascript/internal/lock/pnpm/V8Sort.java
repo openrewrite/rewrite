@@ -20,9 +20,8 @@ import java.util.Comparator;
 import java.util.List;
 
 /**
- * V8's {@code Array.prototype.sort} (third_party/v8/builtins/array-sort.tq) for fewer than 64 elements: one run,
- * found by {@code CountAndMakeRun} and completed by binary insertion. pnpm sorts with comparators that are not
- * consistent (a comparison that never answers 0, or answers both ways), where only V8's own steps give its order.
+ * V8's {@code Array.prototype.sort} (array-sort.tq) for fewer than 64 elements, whose order pnpm's inconsistent
+ * comparators depend on.
  */
 final class V8Sort {
 
@@ -30,9 +29,7 @@ final class V8Sort {
     }
 
     /**
-     * Sorts in place.
-     *
-     * @throws CannotKnow for 64 elements or more, where V8 merges runs this port does not follow
+     * Sorts in place; cannot-know for 64 elements or more, where V8 merges runs.
      */
     static <T> void sort(List<T> a, Comparator<T> c, String what) {
         int n = a.size();

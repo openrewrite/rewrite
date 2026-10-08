@@ -23,9 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Port of @pnpm/lockfile.types {@code ProjectSnapshot} (pnpm 11.2.2): one importer, its manifest specifiers by
- * alias and the reference each dependency field resolved the alias to. {@code dependenciesMeta} and
- * {@code publishDirectory} are the JavaScript values read.
+ * Port of @pnpm/lockfile.types {@code ProjectSnapshot} (pnpm 11.2.2): one importer's specifiers by alias and what
+ * each dependency field resolved them to.
  */
 @Getter
 @Setter

@@ -57,9 +57,8 @@ final class Manifests {
     }
 
     /**
-     * {@code readJsonFile}: the text without its byte order mark.
-     *
-     * @throws PnpmError {@code ERR_PNPM_JSON_PARSE} when the text is not JSON, or is JSON but not an object
+     * {@code readJsonFile}: {@code ERR_PNPM_JSON_PARSE} for text that is not JSON, cannot-know for JSON that is not an
+     * object.
      */
     @SuppressWarnings("unchecked")
     static Map<String, @Nullable Object> parse(String text, String path) {
@@ -87,11 +86,8 @@ final class Manifests {
     }
 
     /**
-     * {@code JSON.parse} of a registry document as far as the caller reads it: the top-level members {@code whole}
-     * names, and of those {@code keysOnly} names, an object's keys alone (each {@code true}); null for JSON
-     * {@code null}, and no member for any other value that is not an object. The rest is checked, not kept.
-     *
-     * @throws PnpmError {@code ERR_PNPM_JSON_PARSE} when the text is not JSON
+     * {@code JSON.parse} of a registry document as far as the caller reads it: the members {@code whole} names, and of
+     * those {@code keysOnly} names an object's keys alone (each {@code true}).
      */
     static @Nullable Map<String, @Nullable Object> parseMembers(String text, String path, Set<String> whole,
                                                                 Set<String> keysOnly) {

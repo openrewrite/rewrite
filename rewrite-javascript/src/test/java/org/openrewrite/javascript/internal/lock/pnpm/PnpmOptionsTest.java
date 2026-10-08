@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,13 +27,16 @@ import java.util.function.Function;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.json;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * config/reader/test/getOptionsFromRootManifest.test.ts, env.test.ts and the registry, .npmrc and
- * minimumReleaseAgeStrict cases of index.ts, and @pnpm/config.env-replace 4.1.0's env-replace.spec.ts, of pnpm 11.2.2.
+ * config/reader/test/getOptionsFromRootManifest.test.ts, env.test.ts, parseCreds.test.ts, getNetworkConfigs.test.ts and
+ * the registry, .npmrc and minimumReleaseAgeStrict cases of index.ts, and @pnpm/config.env-replace 4.1.0's
+ * env-replace.spec.ts, of pnpm 11.2.2.
  * Not ported from index.ts: the cases of a CLI option other than {@code --lockfile-only} and of the user's own config
  * files (~/.npmrc, auth.ini, config.yaml), which are the host's.
  */
@@ -399,5 +404,107 @@ class PnpmOptionsTest {
         assertThat(PnpmOptions.envReplaceLossy("-${foo}-${bar}-", ENV)).isEqualTo("-foo_value-bar_value-");
         assertThat(PnpmOptions.envReplaceLossy("\\${baz}", ENV)).isEqualTo("${baz}");
         assertThat(PnpmOptions.envReplaceLossy("\\\\${foo}", ENV)).isEqualTo("\\foo_value");
+    }
+
+    // parseCreds.test.ts: the port keeps what parseCreds throws, not the creds it returns, which reach no lock
+
+    private static String btoa(String s) {
+        return Base64.getEncoder().encodeToString(s.getBytes(StandardCharsets.ISO_8859_1));
+    }
+
+    @Test
+    void parseCredsOfUsableCredentials() {
+        assertThatCode(() -> {
+            PnpmOptions.parseCreds(env());
+            PnpmOptions.parseCreds(env("authToken", "example auth token"));
+            PnpmOptions.parseCreds(env("authToken", ""));
+            PnpmOptions.parseCreds(env("authPairBase64", btoa("foo:bar")));
+            PnpmOptions.parseCreds(env("authPairBase64", btoa("foo:bar:baz")));
+            PnpmOptions.parseCreds(env("authPairBase64", btoa("foo:bar") + "="));
+            PnpmOptions.parseCreds(env("authUsername", "foo", "authPassword", btoa("bar")));
+            PnpmOptions.parseCreds(env("authUsername", "foo"));
+            PnpmOptions.parseCreds(env("authPassword", "bar"));
+            PnpmOptions.parseCreds(env("authUsername", "foo", "authPassword", btoa("bar") + "="));
+            PnpmOptions.parseCreds(env("tokenHelper", "example-token-helper --foo --bar baz"));
+            PnpmOptions.parseCreds(env("tokenHelper", "./example-token-helper.sh --foo --bar baz"));
+            PnpmOptions.parseCreds(env("tokenHelper", "node ./example-token-helper.js --foo --bar baz"));
+            PnpmOptions.parseCreds(env("tokenHelper", "./example-token-helper.sh"));
+        }).doesNotThrowAnyException();
+    }
+
+    @Test
+    void authPairBase64MustHaveASeparator() {
+        assertThatThrownBy(() -> PnpmOptions.parseCreds(env("authPairBase64", btoa("foo"))))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_MISSING_SEPARATOR"));
+    }
+
+    @Test
+    void authPairBase64AndAuthPasswordMustBeBase64() {
+        assertThatThrownBy(() -> PnpmOptions.parseCreds(env("authPairBase64", "foo*bar")))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_INVALID_BASE64"))
+          .hasMessage("Failed to decode _auth as base64");
+        assertThatThrownBy(() -> PnpmOptions.parseCreds(env("authUsername", "foo", "authPassword", "bar*baz")))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_AUTH_INVALID_BASE64"))
+          .hasMessage("Failed to decode _password as base64");
+    }
+
+    @Test
+    void tokenHelperDoesNotSupportEnvironmentVariablesOrQuotations() {
+        for (String[] helper : new String[][]{{"example-token-helper $MY_VAR", "$"},
+          {"example-token-helper \"hello world\"", "\""}, {"example-token-helper 'hello world'", "'"}}) {
+            assertThatThrownBy(() -> PnpmOptions.parseCreds(env("tokenHelper", helper[0])))
+              .isInstanceOfSatisfying(PnpmError.class,
+                e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_TOKEN_HELPER_UNSUPPORTED_CHARACTER"))
+              .hasMessage("Unexpected character " + Js.jsonStringify(helper[1]));
+        }
+    }
+
+    // getNetworkConfigs.test.ts: the registries; configByUri (TLS and creds) reaches no lock
+
+    private static final String FOO = "'@foo:registry':'https://example.com/foo'";
+
+    private static Map<String, String> networkRegistries(String... keys) {
+        return PnpmOptions.getNetworkConfigs(obj("{" + String.join(",", keys) + "}"));
+    }
+
+    @Test
+    void getNetworkConfigsWithoutFiles() {
+        assertThat(networkRegistries()).isEmpty();
+        assertThat(networkRegistries(FOO)).containsExactly(entry("@foo", "https://example.com/foo"));
+        assertThat(networkRegistries("'//example.com/foo:ca':'some-ca'")).isEmpty();
+        assertThat(networkRegistries("'//example.com/foo:cert':'some-cert'")).isEmpty();
+        assertThat(networkRegistries(FOO, "'//example.com/foo:ca':'some-ca'", "'//example.com/foo:cert':'some-cert'"))
+          .containsExactly(entry("@foo", "https://example.com/foo"));
+    }
+
+    /**
+     * Upstream reads the files; the port does not have the host's file system.
+     */
+    @Test
+    void getNetworkConfigsWithFiles() {
+        assertThatThrownBy(() -> networkRegistries(FOO, "'//example.com/foo:cafile':'cafile'",
+          "'//example.com/foo:certfile':'certfile'"))
+          .isInstanceOf(CannotKnow.class);
+    }
+
+    @Test
+    void getNetworkConfigsAuthAndTlsCombined() {
+        for (String creds : new String[]{"'//example.com/foo:_authToken':'example auth token'",
+          "'//example.com/foo:_auth':'" + btoa("foo:bar") + "'",
+          "'//example.com/foo:username':'foo','//example.com/foo:_password':'" + btoa("bar") + "'",
+          "'//example.com/foo:tokenHelper':'node ./my-token-helper.cjs'"}) {
+            assertThat(networkRegistries(FOO, creds)).containsExactly(entry("@foo", "https://example.com/foo"));
+        }
+        assertThat(networkRegistries("'//example.com/foo:_authToken':'token'", "'//example.com/foo:cert':'some-cert'",
+          "'//example.com/foo:key':'some-key'")).isEmpty();
+    }
+
+    @Test
+    void getNetworkConfigsUnsupportedKey() {
+        assertThat(networkRegistries(FOO, "'//example.com/foo:someUnsupportedKey':'hello world'"))
+          .containsExactly(entry("@foo", "https://example.com/foo"));
     }
 }

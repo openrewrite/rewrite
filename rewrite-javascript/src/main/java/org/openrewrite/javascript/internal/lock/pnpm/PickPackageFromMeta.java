@@ -29,9 +29,8 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Port of @pnpm/resolving.npm-resolver src/pickPackageFromMeta.ts and src/parseBareSpecifier.ts
- * (pnpm 11.2.2), with @pnpm/resolving.registry.pkg-metadata-filter and parse-npm-tarball-url
- * 5.0.0.
+ * Port of @pnpm/resolving.npm-resolver src/pickPackageFromMeta.ts and src/parseBareSpecifier.ts (pnpm 11.2.2), with
+ * @pnpm/resolving.registry.pkg-metadata-filter and parse-npm-tarball-url 5.0.0.
  */
 final class PickPackageFromMeta {
 
@@ -138,11 +137,8 @@ final class PickPackageFromMeta {
     }
 
     /**
-     * {@code pickPackageFromMeta}: the version manifest the spec selects, null when none does.
-     *
-     * @param publishedBy        the cutoff of {@code minimumReleaseAge}, null without one
-     * @param publishedByExclude what {@code minimumReleaseAgeExclude} says of the package: true, the versions it
-     *                           trusts, or null
+     * {@code pickPackageFromMeta}: the version manifest the spec selects, null when none does;
+     * {@code publishedByExclude} answers true, the versions it trusts, or null.
      */
     @SuppressWarnings("unchecked")
     static @Nullable Map<String, @Nullable Object> pickPackageFromMeta(

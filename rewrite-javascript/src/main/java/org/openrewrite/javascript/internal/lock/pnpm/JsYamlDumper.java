@@ -25,9 +25,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Port of @zkochan/js-yaml 0.0.11 lib/dumper.js {@code dump} under the options pnpm 11.2.2's
- * {@code lockfileYamlDump} passes: {@code blankLines: true, lineWidth: -1, noCompatMode: true, noRefs: true,
- * sortKeys: false}, the default schema, two-space indent and single quotes.
+ * Port of @zkochan/js-yaml 0.0.11 lib/dumper.js {@code dump} under the options of pnpm 11.2.2's
+ * {@code lockfileYamlDump}.
  */
 final class JsYamlDumper {
 

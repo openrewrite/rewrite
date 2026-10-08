@@ -17,8 +17,12 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
+import java.util.Set;
+
 /**
- * The registry documents a scenario recorded for the phase that read a lock.
+ * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked in
+ * that phase.
  */
 final class ScenarioRegistry implements RegistryMetadata {
 
@@ -41,6 +45,10 @@ final class ScenarioRegistry implements RegistryMetadata {
 
     @Override
     public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+        Set<String> hosts = scenario.registryHosts(phase);
+        if (!hosts.contains(cacheDirectory(registry))) {
+            throw new RouteNotRecorded("GET " + registry + name + " (pnpm asked " + String.join(", ", hosts) + ")");
+        }
         String document = scenario.packument(name, fullMetadata, phase);
         if (document == null) {
             throw new RouteNotRecorded("GET " + registry + name + (fullMetadata ? " (full)" : ""));
@@ -52,5 +60,11 @@ final class ScenarioRegistry implements RegistryMetadata {
     @Override
     public @Nullable String attestations(String registry, String name, String version) {
         return null;
+    }
+
+    // the directory pnpm's metadata cache keeps a registry's documents in: its host, a port after a +
+    private static String cacheDirectory(String registry) {
+        URI uri = URI.create(registry);
+        return uri.getPort() == -1 ? uri.getHost() : uri.getHost() + "+" + uri.getPort();
     }
 }

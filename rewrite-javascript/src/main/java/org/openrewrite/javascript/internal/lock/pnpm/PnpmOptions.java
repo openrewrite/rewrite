@@ -108,10 +108,8 @@ final class PnpmOptions {
     }
 
     /**
-     * @param workspaceManifest the text of pnpm-workspace.yaml at the workspace root, null without one
-     * @param npmrc             the text of the .npmrc beside it, null without one
-     * @param rootManifest      the root package.json as parsed, for {@code $name} references in overrides
-     * @param env               the process environment, null when the host does not know it
+     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc (null without one), the root manifest and
+     * the environment (null when the host does not know it).
      */
     @SuppressWarnings("unchecked")
     static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc,
@@ -462,7 +460,7 @@ final class PnpmOptions {
      * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
      * credentials themselves and the certificates are the host's.
      */
-    private static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig) {
+    static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig) {
         Map<String, String> registries = new LinkedHashMap<>();
         Map<String, Map<String, String>> rawCredsMap = new LinkedHashMap<>();
         for (String configKey : Js.keys(rawConfig)) {
@@ -500,7 +498,7 @@ final class PnpmOptions {
     }
 
     // parseCreds' checks: what it throws for a token helper, _auth or _password pnpm cannot use
-    private static void parseCreds(Map<String, String> input) {
+    static void parseCreds(Map<String, String> input) {
         String tokenHelper = input.get("tokenHelper");
         if (tokenHelper != null && !tokenHelper.isEmpty()) {
             for (char c : Js.trim(tokenHelper).toCharArray()) {
@@ -642,9 +640,8 @@ final class PnpmOptions {
             Arrays.asList("init-version", "node-version", "umask").contains(key) ? null : ConfigTypes.TYPES.get(key);
 
     /**
-     * src/env.ts {@code parseEnvVars}: the {@code pnpm_config_} (or {@code PNPM_CONFIG_}) variables by camelCase
-     * key, a value the schema does not parse {@link JsYaml#UNDEFINED}. A host that does not know the environment
-     * gives none.
+     * src/env.ts {@code parseEnvVars}: the {@code pnpm_config_} variables by camelCase key, {@link JsYaml#UNDEFINED}
+     * where the schema does not parse one.
      */
     static List<ConfigPair> parseEnvVars(Function<String, @Nullable Object> getSchema,
                                          @Nullable Map<String, String> env) {

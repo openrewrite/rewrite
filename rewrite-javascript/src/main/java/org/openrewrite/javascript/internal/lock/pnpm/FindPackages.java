@@ -38,10 +38,8 @@ final class FindPackages {
     }
 
     /**
-     * {@code findWorkspaceProjectsNoCheck}: the directories of the workspace's projects, sorted as pnpm sorts them
-     * ({@code ""} is the root).
-     *
-     * @param manifestDirs the directories holding a package.json
+     * {@code findWorkspaceProjectsNoCheck}: the project directories among the directories holding a package.json,
+     * sorted as pnpm sorts them ({@code ""} is the root).
      */
     static List<String> findWorkspaceProjects(Collection<String> manifestDirs, List<String> patterns) {
         List<String> projects = findPackages(manifestDirs, patterns, IGNORE, true);

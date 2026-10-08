@@ -35,9 +35,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * The JavaScript semantics pnpm's code relies on, over the values {@link JsYaml} loads: objects are
- * {@code LinkedHashMap}s whose own key order is computed on read (array indices first, ascending, then insertion
- * order), arrays are lists, numbers are doubles.
+ * The JavaScript semantics pnpm's code relies on, over the values {@link JsYaml} loads: objects in
+ * {@code Object.keys} order, arrays as lists, numbers as doubles.
  */
 final class Js {
 
@@ -456,9 +455,8 @@ final class Js {
     }
 
     /**
-     * {@code new Date(text).getTime()}: NaN for an invalid date.
-     *
-     * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
+     * {@code new Date(text).getTime()}: NaN for an invalid date; cannot-know for a date-time without an offset, which
+     * JavaScript reads in the host's time zone.
      */
     static double dateParse(String text) {
         Double time = V8Date.parse(text);

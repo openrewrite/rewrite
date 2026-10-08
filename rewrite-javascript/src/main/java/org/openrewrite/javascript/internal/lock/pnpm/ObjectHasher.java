@@ -27,9 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/crypto.object-hasher src/index.ts (pnpm 11.2.2) over object-hash 3.0.0: the sha256 of
- * object-hash's serialization of a value, with {@code respectType: false} and every object, array and set
- * unordered.
+ * Port of @pnpm/crypto.object-hasher src/index.ts (pnpm 11.2.2) over object-hash 3.0.0.
  */
 final class ObjectHasher {
 

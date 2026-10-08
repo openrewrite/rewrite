@@ -50,9 +50,8 @@ final class ReadPackageHook {
     }
 
     /**
-     * {@code createReadPackageHook}; null when no hook applies.
-     *
-     * @param lockfileDir where relative {@code link:}/{@code file:} override targets start, relative to the root
+     * {@code createReadPackageHook}, null when no hook applies; {@code lockfileDir} is where relative override
+     * targets start.
      */
     static @Nullable ReadPackageHook createReadPackageHook(boolean ignoreCompatibilityDb, String lockfileDir,
                                                            List<ParseOverrides.VersionOverride> overrides,

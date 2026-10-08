@@ -25,8 +25,7 @@ import java.util.List;
 
 /**
  * Port of @pnpm/lockfile.fs src/read.ts, src/yamlDocuments.ts and src/gitMergeFile.ts (pnpm 11.2.2): the text of
- * pnpm-lock.yaml to a {@link LockfileObject}, as {@code readWantedLockfileAndAutofixConflicts} reads it for an
- * install.
+ * pnpm-lock.yaml to a {@link LockfileObject}.
  */
 final class LockfileReader {
 
@@ -61,9 +60,8 @@ final class LockfileReader {
     }
 
     /**
-     * {@code _read} with {@code autofixMergeConflicts}, {@code wantedVersions: ['9.0']} and
-     * {@code ignoreIncompatible: false}, as an install reads the wanted lock. Every error {@code readLockfiles}
-     * catches and warns about is an {@link IgnoredLockfile}.
+     * {@code _read} as an install reads the wanted lock; every error {@code readLockfiles} warns about is an
+     * {@link IgnoredLockfile}.
      */
     static ReadResult read(String text) {
         String lockfileRawContent = extractMainDocument(stripBom(text));
@@ -104,9 +102,7 @@ final class LockfileReader {
     }
 
     /**
-     * node-semver's {@code major}.
-     *
-     * @throws IllegalArgumentException as node-semver throws its TypeError for an invalid version
+     * node-semver's {@code major}; an IllegalArgumentException where node-semver throws its TypeError.
      */
     static long semverMajor(String version) {
         NodeSemver.compare(version, version, NodeSemver.Options.DEFAULT);

@@ -30,10 +30,8 @@ final class WorkspaceManifest {
     }
 
     /**
-     * {@code readWorkspaceManifest}: null when the file is absent or empty.
-     *
-     * @throws PnpmError {@code ERR_PNPM_INVALID_WORKSPACE_CONFIGURATION} for a manifest pnpm rejects
-     * @throws JsYaml.YamlException when the file is not YAML, which fails pnpm's start
+     * {@code readWorkspaceManifest}: null for an absent or empty file; pnpm's INVALID_WORKSPACE_CONFIGURATION for one
+     * it rejects, a {@link JsYaml.YamlException} for one that is not YAML.
      */
     static @Nullable Map<String, @Nullable Object> readWorkspaceManifest(@Nullable String text) {
         if (text == null) {
