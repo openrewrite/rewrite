@@ -1,0 +1,12 @@
+? Verifying lockfile against supply-chain policies (1 entry)...
+✓ Lockfile passes supply-chain policies (1 entry in 6.6s)
+Progress: resolved 1, reused 0, downloaded 0, added 0
+[WARN] GET https://github.com/denoland/deno/releases/download/v2.2.15/deno-aarch64-apple-darwin.zip.sha256sum error (23). Will retry in 10 seconds. 2 retries left.
+[WARN] GET https://github.com/denoland/deno/releases/download/v2.2.15/deno-aarch64-unknown-linux-gnu.zip.sha256sum error (23). Will retry in 10 seconds. 2 retries left.
+[WARN] GET https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-apple-darwin.zip.sha256sum error (23). Will retry in 10 seconds. 2 retries left.
+[WARN] GET https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-pc-windows-msvc.zip.sha256sum error (23). Will retry in 10 seconds. 2 retries left.
+[WARN] GET https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-apple-darwin.zip.sha256sum error (23). Will retry in 1 minute. 1 retries left.
+Progress: resolved 2, reused 0, downloaded 0, added 0
+Progress: resolved 2, reused 0, downloaded 0, added 0, done
+
+Done in 4m 2.4s using pnpm v11.2.2

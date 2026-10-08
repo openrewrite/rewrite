@@ -1,0 +1,1 @@
+Add devEngines.runtime deno 2.2.15 with onFail download beside wrappy: the deno resolver reads the version from the npm registry's deno package, then the GitHub release and each asset's sha256sum.

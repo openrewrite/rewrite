@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","devEngines":{"runtime":{"name":"deno","version":"2.2.15","onFail":"download"}},"dependencies":{"wrappy":"1.0.2"}}

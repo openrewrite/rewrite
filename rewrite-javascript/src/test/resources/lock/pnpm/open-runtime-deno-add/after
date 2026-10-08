@@ -1,0 +1,82 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+    devDependencies:
+      deno:
+        specifier: runtime:2.2.15
+        version: runtime:2.2.15
+
+packages:
+
+  deno@runtime:2.2.15:
+    resolution:
+      type: variations
+      variants:
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-sWFvh1D+W5KoYdENA0WjW9zwOyTyv5ywo6uE8zNrkSA=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.2.15/deno-aarch64-apple-darwin.zip
+          targets:
+            - cpu: arm64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-9vkX9jp+W+R2xCIbIk6pCU7l7tMPOylJ/aJN+xXZ3H8=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.2.15/deno-aarch64-unknown-linux-gnu.zip
+          targets:
+            - cpu: arm64
+              os: linux
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-nw2A+WoVc52BK5N/SONbHylhF7sPVbGS0zQVnA1kQx8=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-apple-darwin.zip
+          targets:
+            - cpu: x64
+              os: darwin
+        - resolution:
+            archive: zip
+            bin: deno.exe
+            integrity: sha256-ie2a8rHiplI82vNnDyc8ETSHhMug1O3cA6GpoTWxLPc=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-pc-windows-msvc.zip
+          targets:
+            - cpu: x64
+              os: win32
+            - cpu: arm64
+              os: win32
+        - resolution:
+            archive: zip
+            bin: deno
+            integrity: sha256-cLrWKEaJ59IOncj6T+q5K4lTlrors/r4SOkHiy112xQ=
+            type: binary
+            url: https://github.com/denoland/deno/releases/download/v2.2.15/deno-x86_64-unknown-linux-gnu.zip
+          targets:
+            - cpu: x64
+              os: linux
+    version: 2.2.15
+    hasBin: true
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  deno@runtime:2.2.15: {}
+
+  wrappy@1.0.2: {}
