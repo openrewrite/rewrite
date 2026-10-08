@@ -2481,6 +2481,41 @@ class TestDeclarationDeclaringType:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    @requires_ty_types_cli
+    def test_every_declaration_but_an_instance_method_is_static(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(other: "Mine"): ...
+                @classmethod
+                def c(cls, x): ...
+
+            def top(x):
+                def nested(): ...
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            static = {
+                node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+                and mapping.method_declaration_type(node).flags_bit_map & JavaType.Flag.Static
+            }
+            assert static == {'s', 'c', 'top', 'nested'}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    @requires_ty_types_cli
+    def test_module_function_types_are_static(self):
+        source = '''
+            from helpers import util
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source, {'helpers.py': 'def util(x): ...\n'})
+        try:
+            alias = mapping.import_alias_type(tree.body[0].names[0])
+            assert alias.flags_bit_map & JavaType.Flag.Static
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
 
 @requires_ty_types_cli
 class TestDeclaringTypeUnification:
