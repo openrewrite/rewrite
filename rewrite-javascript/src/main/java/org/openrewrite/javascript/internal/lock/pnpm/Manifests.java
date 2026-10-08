@@ -15,16 +15,21 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @pnpm/workspace.project-manifest-reader {@code readJsonFile} (pnpm 11.2.2): a package.json without its byte order
@@ -35,6 +40,8 @@ final class Manifests {
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
+    private static final ObjectReader MEMBER = MAPPER.readerFor(Object.class)
+            .without(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
 
     private Manifests() {
     }
@@ -64,6 +71,50 @@ final class Manifests {
             return order(MAPPER.readValue(text, Object.class));
         } catch (JsonProcessingException e) {
             throw new PnpmError("JSON_PARSE", e.getOriginalMessage() + " in " + path);
+        }
+    }
+
+    /**
+     * {@code JSON.parse} of a registry document as far as the caller reads it: the top-level members {@code whole}
+     * names, and of those {@code keysOnly} names, an object's keys alone (each {@code true}); null for JSON
+     * {@code null}, and no member for any other value that is not an object. The rest is checked, not kept.
+     *
+     * @throws PnpmError {@code ERR_PNPM_JSON_PARSE} when the text is not JSON
+     */
+    static @Nullable Map<String, @Nullable Object> parseMembers(String text, String path, Set<String> whole,
+                                                                Set<String> keysOnly) {
+        try (JsonParser parser = MAPPER.getFactory().createParser(text)) {
+            Map<String, @Nullable Object> members = new LinkedHashMap<>();
+            JsonToken token = parser.nextToken();
+            if (token == JsonToken.VALUE_NULL) {
+                members = null;
+            } else if (token != JsonToken.START_OBJECT) {
+                parser.skipChildren();
+            } else {
+                while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                    String name = parser.currentName();
+                    JsonToken value = parser.nextToken();
+                    if (keysOnly.contains(name) && value == JsonToken.START_OBJECT) {
+                        Map<String, @Nullable Object> keys = new LinkedHashMap<>();
+                        while (parser.nextToken() == JsonToken.FIELD_NAME) {
+                            keys.put(parser.currentName(), Boolean.TRUE);
+                            parser.nextToken();
+                            parser.skipChildren();
+                        }
+                        members.put(name, Js.ordered(keys));
+                    } else if (whole.contains(name) || keysOnly.contains(name)) {
+                        members.put(name, order(MEMBER.readValue(parser)));
+                    } else {
+                        parser.skipChildren();
+                    }
+                }
+            }
+            if (parser.nextToken() != null) {
+                throw new PnpmError("JSON_PARSE", "Unexpected non-whitespace character after JSON in " + path);
+            }
+            return members;
+        } catch (IOException e) {
+            throw new PnpmError("JSON_PARSE", e.getMessage() + " in " + path);
         }
     }
 

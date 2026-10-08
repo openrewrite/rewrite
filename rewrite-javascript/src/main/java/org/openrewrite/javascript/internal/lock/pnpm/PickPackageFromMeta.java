@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.internal.lock.npm.UriComponent;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
@@ -204,7 +203,7 @@ final class PickPackageFromMeta {
                 ((Map<String, Object>) manifest).put("name", meta.get("name"));
             }
             return (Map<String, @Nullable Object>) manifest;
-        } catch (PnpmError e) {
+        } catch (PnpmError | CannotKnow e) {
             throw e;
         } catch (RuntimeException e) {
             throw new PnpmError("MALFORMED_METADATA", "Received malformed metadata for \"" + spec.getName() + "\"",
@@ -223,17 +222,8 @@ final class PickPackageFromMeta {
         if (!Js.truthy(modified)) {
             return null;
         }
-        double time = dateParse(Js.string(modified));
+        double time = Js.dateParse(Js.string(modified));
         return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
-    }
-
-    // new Date(text).getTime()
-    private static double dateParse(String text) {
-        Double time = V8Date.parse(text);
-        if (time == null) {
-            throw new CannotKnow("the time \"" + text + "\" (JavaScript reads it in the host's time zone)");
-        }
-        return time;
     }
 
     private static boolean semverSatisfiesLoose(@Nullable String version, String range) {
@@ -267,7 +257,8 @@ final class PickPackageFromMeta {
         }
         List<String> versions = versionKeys(options.getMeta());
         if ("*".equals(options.getVersionRange())) {
-            V8Sort.sort(versions, (a, b) -> NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT), "versions");
+            // semver.compare is consistent, so any stable sort gives V8's order
+            versions.sort((a, b) -> NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT));
             return versions.isEmpty() ? null : versions.get(0);
         }
         return NodeSemver.minSatisfying(versions, options.getVersionRange(), NodeSemver.Options.LOOSE);
@@ -399,8 +390,8 @@ final class PickPackageFromMeta {
         Map<String, @Nullable Object> versionsWithinDate = new LinkedHashMap<>();
         for (String version : Js.keys(versions)) {
             Object timeStr = time.get(version);
-            boolean withinDate = Js.truthy(timeStr) && !Double.isNaN(dateParse(Js.string(timeStr))) &&
-                                 dateParse(Js.string(timeStr)) <= publishedBy.toEpochMilli();
+            boolean withinDate = Js.truthy(timeStr) && !Double.isNaN(Js.dateParse(Js.string(timeStr))) &&
+                                 Js.dateParse(Js.string(timeStr)) <= publishedBy.toEpochMilli();
             if (withinDate || trustedVersions != null && trustedVersions.contains(version)) {
                 versionsWithinDate.put(version, versions.get(version));
             }

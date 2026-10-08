@@ -1,0 +1,8 @@
+{
+  "name": "open-release-age-again-without-exclude",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "7.0.0",
+    "@cuple/client": "^2.3.0"
+  }
+}

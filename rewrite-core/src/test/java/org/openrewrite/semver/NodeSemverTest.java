@@ -244,6 +244,20 @@ class NodeSemverTest {
         }
     }
 
+    // test/functions/prerelease.js
+    @Test
+    void prerelease() {
+        assertThat(NodeSemver.prerelease("1.2.2-alpha.1", Options.DEFAULT)).containsExactly("alpha", 1L);
+        assertThat(NodeSemver.prerelease("0.6.1-1", Options.DEFAULT)).containsExactly(1L);
+        assertThat(NodeSemver.prerelease("1.0.0-beta.2", Options.DEFAULT)).containsExactly("beta", 2L);
+        assertThat(NodeSemver.prerelease("v0.5.4-pre", Options.DEFAULT)).containsExactly("pre");
+        assertThat(NodeSemver.prerelease("1.2.2-alpha.1", Options.DEFAULT)).containsExactly("alpha", 1L);
+        assertThat(NodeSemver.prerelease("0.6.1beta", Options.LOOSE)).containsExactly("beta");
+        assertThat(NodeSemver.prerelease("1.0.0", Options.LOOSE)).isNull();
+        assertThat(NodeSemver.prerelease("~2.0.0-alpha.1", Options.DEFAULT)).isNull();
+        assertThat(NodeSemver.prerelease("invalid version", Options.DEFAULT)).isNull();
+    }
+
     // test/ranges/max-satisfying.js
     @Test
     void maxSatisfying() {

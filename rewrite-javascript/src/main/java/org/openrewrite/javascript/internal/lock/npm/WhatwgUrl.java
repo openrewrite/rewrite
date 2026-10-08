@@ -89,6 +89,26 @@ public final class WhatwgUrl {
         return basicParse(input, null);
     }
 
+    /**
+     * {@code new URL(input, base)}, or null where it throws.
+     */
+    public static @Nullable WhatwgUrl tryParse(String input, String base) {
+        WhatwgUrl baseUrl = basicParse(base, null);
+        return baseUrl == null ? null : basicParse(input, baseUrl);
+    }
+
+    /**
+     * {@code URL.prototype.origin}.
+     */
+    public String getOrigin() {
+        if ("blob".equals(scheme)) {
+            WhatwgUrl inner = basicParse(getPathname(), null);
+            return inner != null && ("http".equals(inner.scheme) || "https".equals(inner.scheme)) ?
+                    inner.getOrigin() : "null";
+        }
+        return SPECIAL.containsKey(scheme) && !"file".equals(scheme) ? scheme + "://" + getHost() : "null";
+    }
+
     public String getProtocol() {
         return scheme + ":";
     }

@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,19 +30,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 /**
- * An install that changes nothing, for every pnpm-lock.yaml {@link PnpmScenarios} finds, with the manifests,
- * pnpm-workspace.yaml and project files of the phase that read or wrote it: the configuration read, the lock loaded
- * into the model, the lock-level settings checked against the configuration, every project checked against its
- * importer, and, when pnpm takes that path, the whole file written from the model. The bytes are the lock's own or
- * what pnpm itself wrote on that install ({@link PnpmScenarios.Lock#againLock()}).
- * <p>
- * Where pnpm's log of that install shows it resolving (or merging a conflicted lock), the model must say pnpm
- * resolves, and the lock is still written back from the model unchanged: the resolution is the resolver's. A lock pnpm
- * ignores ({@code Ignoring broken lockfile}) fails to load with pnpm's reason. Without a recorded install, a lock
- * pnpm wrote is one it would leave as it is (every recorded second install did). A lock with no manifests (some
- * downloaded fixtures) is loaded and written back.
+ * An install that changes nothing over every pnpm-lock.yaml {@link PnpmScenarios} finds: the lock written back
+ * byte-exact, or the resolution, rejection or ignored lock pnpm's log of that install records.
  */
 class PnpmLockRoundTripTest {
 
@@ -63,12 +56,17 @@ class PnpmLockRoundTripTest {
         if (lock.npmrc() != null) {
             files.put(".npmrc", lock.npmrc());
         }
-        return PnpmLockRegenerator.Inputs.builder()
+        PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock.getText())
           .manifests(lock.manifests())
           .files(files)
           .now(lock.now())
-          .build();
+          .registry(new ScenarioRegistry(lock.getScenario(), lock.phase()));
+        if (lock.getScenario().recordedWith() == null) {
+            // a downloaded fixture records no clock and no publish times, so its lock cannot be checked for maturity
+            inputs.env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"));
+        }
+        return inputs.build();
     }
 
     @ParameterizedTest(name = "{0}")
@@ -92,14 +90,26 @@ class PnpmLockRoundTripTest {
             assertThat(ignoredReason(readingLog)).as("pnpm ignores the lock").isEqualTo(e.getMessage().split("\n")[0]);
             return;
         } catch (CannotKnow e) {
-            assertThat(lock.getScenario().expect()).as(e.getMessage()).startsWith("cannot-know");
+            String expect = lock.getScenario().expect();
+            assertThat(expect).as(e.getMessage()).startsWith("cannot-know");
+            assertThat(e.getSubject()).as("the subject of " + expect).contains(subject(expect));
+            return;
+        } catch (PnpmError e) {
+            assertThat(log).as(e.getCode() + " " + e.getMessage()).isNotNull();
+            String[] lines = e.getMessage().split("\n");
+            assertThat(log).as("pnpm rejects the lock").contains("[" + e.getCode() + "] " + lines[0]);
+            if (lines.length > 1) {
+                // the cutoff is the clock's, which the recording keeps to the second
+                int cutoff = lines[1].indexOf(" cutoff (");
+                assertThat(log).as("the first entry pnpm rejects")
+                  .contains(cutoff < 0 ? lines[1] : lines[1].substring(0, cutoff + " cutoff (".length()));
+            }
+            return;
+        } catch (ScenarioRegistry.RouteNotRecorded e) {
+            fail(e.getMessage());
             return;
         }
-        if (log != null && verifierRejects(log)) {
-            assertThat(install.getWritten()).as("the lock as it stands, which pnpm's verification then rejects")
-              .isEqualTo(lock.getText());
-            return;
-        }
+        assertThat(log == null || !verifierRejects(log)).as("pnpm rejects the lock").isTrue();
         boolean resolves = log != null &&
                            (log.contains("Progress: resolved") || log.contains("Merge conflict detected"));
         if (resolves) {
@@ -117,6 +127,16 @@ class PnpmLockRoundTripTest {
         assertThat(install.getResolution()).as("pnpm writes the lock without resolving").isNull();
         String expected = log != null ? lock.againLock() : lock.getText();
         assertThat(install.getWritten()).isEqualTo(expected);
+    }
+
+    // the last word of an expect line's subject: the file, spec or tarball it names
+    private static String subject(String expect) {
+        String subject = expect.substring("cannot-know ".length());
+        int paren = subject.indexOf(" (");
+        if (paren >= 0) {
+            subject = subject.substring(0, paren);
+        }
+        return subject.substring(subject.lastIndexOf(' ') + 1);
     }
 
     private static void assertModelRoundTrip(PnpmScenarios.Lock lock) {
@@ -138,7 +158,7 @@ class PnpmLockRoundTripTest {
     }
 
     private static boolean verifierRejects(String log) {
-        return log.contains("ERR_PNPM_MINIMUM_RELEASE_AGE_VIOLATION") || log.contains("ERR_PNPM_MISSING_TIME");
+        return log.contains("lockfile entries failed verification");
     }
 
     // the reason of pnpm's "Ignoring broken lockfile at <dir>: <reason>", the lock named as the port names it

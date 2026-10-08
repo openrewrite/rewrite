@@ -15,13 +15,23 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
 /**
- * A JavaScript {@code Error} without a pnpm code that pnpm's code throws, ending the install: its message is what
- * pnpm prints.
+ * A JavaScript {@code Error} without a pnpm code that ends the install, with Node's code when it has one.
  */
+@Getter
 final class JsError extends RuntimeException {
 
+    private final @Nullable String code;
+
     JsError(String message) {
+        this(null, message);
+    }
+
+    JsError(@Nullable String code, String message) {
         super(message);
+        this.code = code;
     }
 }

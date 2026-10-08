@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -372,14 +372,12 @@ final class ReadPackageHook {
                version.contains("catalog:");
     }
 
-    // createOptionalDependenciesRemover over @pnpm/config.matcher's createMatcher
     @SuppressWarnings("unchecked")
     private static Hook createOptionalDependenciesRemover(List<String> toBeRemoved) {
-        List<Object[]> matchers = new ArrayList<>();
-        for (String pattern : toBeRemoved) {
-            boolean ignore = !pattern.isEmpty() && pattern.charAt(0) == '!';
-            matchers.add(new Object[]{ignore, matcherFromPattern(ignore ? pattern.substring(1) : pattern)});
+        if (toBeRemoved.isEmpty()) {
+            return (manifest, dir) -> manifest;
         }
+        Predicate<String> shouldBeRemoved = Matcher.createMatcher(toBeRemoved);
         return (manifest, dir) -> {
             Object optionalDependencies = manifest.get("optionalDependencies");
             if (!(optionalDependencies instanceof Map)) {
@@ -387,7 +385,7 @@ final class ReadPackageHook {
             }
             Map<String, @Nullable Object> optional = (Map<String, @Nullable Object>) optionalDependencies;
             for (String optionalDependency : new ArrayList<>(Js.keys(optional))) {
-                if (matches(matchers, optionalDependency)) {
+                if (shouldBeRemoved.test(optionalDependency)) {
                     optional.remove(optionalDependency);
                     Object dependencies = manifest.get("dependencies");
                     if (dependencies instanceof Map) {
@@ -397,61 +395,5 @@ final class ReadPackageHook {
             }
             return manifest;
         };
-    }
-
-    // createMatcher: one pattern answers by itself (a negated one inverts); several follow createMatcherWithIndex
-    private static boolean matches(List<Object[]> matchers, String input) {
-        if (matchers.size() == 1) {
-            boolean match = ((Pattern) matchers.get(0)[1]).matcher(input).matches();
-            return (Boolean) matchers.get(0)[0] != match;
-        }
-        boolean hasIgnore = false;
-        boolean hasInclude = false;
-        for (Object[] m : matchers) {
-            if ((Boolean) m[0]) {
-                hasIgnore = true;
-            } else {
-                hasInclude = true;
-            }
-        }
-        if (!hasIgnore) {
-            for (Object[] m : matchers) {
-                if (((Pattern) m[1]).matcher(input).matches()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        if (!hasInclude) {
-            for (Object[] m : matchers) {
-                if (((Pattern) m[1]).matcher(input).matches()) {
-                    return false;
-                }
-            }
-            return true;
-        }
-        int matchedPatternIndex = -1;
-        for (int i = 0; i < matchers.size(); i++) {
-            boolean match = ((Pattern) matchers.get(i)[1]).matcher(input).matches();
-            if ((Boolean) matchers.get(i)[0]) {
-                if (match) {
-                    matchedPatternIndex = -1;
-                }
-            } else if (matchedPatternIndex == -1 && match) {
-                matchedPatternIndex = i;
-            }
-        }
-        return matchedPatternIndex != -1;
-    }
-
-    private static Pattern matcherFromPattern(String pattern) {
-        if ("*".equals(pattern)) {
-            return Pattern.compile("(?s).*");
-        }
-        List<String> parts = new ArrayList<>();
-        for (String part : pattern.split("\\*", -1)) {
-            parts.add(part.isEmpty() ? "" : Pattern.quote(part));
-        }
-        return Pattern.compile(String.join(".*", parts));
     }
 }

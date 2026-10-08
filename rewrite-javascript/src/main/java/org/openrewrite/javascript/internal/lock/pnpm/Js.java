@@ -16,10 +16,15 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -27,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * The JavaScript semantics pnpm's code relies on, over the values {@link JsYaml} loads: objects are
@@ -192,6 +198,34 @@ final class Js {
         }
         return s.substring(start, end);
     }
+
+    /**
+     * {@code Number(string)}.
+     */
+    static double toNumber(String value) {
+        String s = trim(value);
+        if (s.isEmpty()) {
+            return 0;
+        }
+        if (DECIMAL_LITERAL.matcher(s).matches()) {
+            return Double.parseDouble(s);
+        }
+        if (s.length() > 2 && s.charAt(0) == '0') {
+            char radix = Character.toLowerCase(s.charAt(1));
+            int base = radix == 'x' ? 16 : radix == 'o' ? 8 : radix == 'b' ? 2 : 0;
+            if (base != 0) {
+                try {
+                    return new BigInteger(s.substring(2), base).doubleValue();
+                } catch (NumberFormatException ignored) {
+                    return Double.NaN;
+                }
+            }
+        }
+        return Double.NaN;
+    }
+
+    private static final Pattern DECIMAL_LITERAL =
+            Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
 
     private static boolean isWhiteSpace(char c) {
         return c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r' || c == ' ' || c == 0xA0 ||
@@ -420,4 +454,31 @@ final class Js {
         }
         return keys;
     }
+
+    /**
+     * {@code new Date(text).getTime()}: NaN for an invalid date.
+     *
+     * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
+     */
+    static double dateParse(String text) {
+        Double time = V8Date.parse(text);
+        if (time == null) {
+            throw new CannotKnow("the time \"" + text + "\" (JavaScript reads it in the host's time zone)");
+        }
+        return time;
+    }
+
+    /**
+     * {@code Date.prototype.toISOString} of a valid time value.
+     */
+    static String toISOString(double time) {
+        Instant instant = Instant.ofEpochMilli((long) time);
+        int year = instant.atZone(ZoneOffset.UTC).getYear();
+        String yearText = year >= 0 && year <= 9999 ? String.format("%04d", year) :
+                (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year));
+        return yearText + ISO_REST.format(instant);
+    }
+
+    private static final DateTimeFormatter ISO_REST =
+            DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 }

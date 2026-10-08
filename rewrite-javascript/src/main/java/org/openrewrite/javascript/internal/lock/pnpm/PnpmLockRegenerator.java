@@ -23,16 +23,14 @@ import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * Port of @pnpm/installing.deps-installer src/install/index.ts (pnpm 11.2.2) for {@code pnpm install
- * --lockfile-only}, with @pnpm/installing.context's {@code readLockfiles}: the configuration and the lock read,
- * the lock-level settings checked, and, when every project is up to date with the lock, the lock written as it
- * stands without resolving anything. Otherwise pnpm resolves the whole graph; {@link Install} then holds the lock
- * the resolution starts from.
+ * --lockfile-only}, with @pnpm/installing.context's {@code readLockfiles}, up to the resolution.
  */
 public final class PnpmLockRegenerator {
 
@@ -72,6 +70,9 @@ public final class PnpmLockRegenerator {
          */
         @NonNull
         Instant now;
+
+        @NonNull
+        RegistryMetadata registry;
     }
 
     /**
@@ -101,21 +102,35 @@ public final class PnpmLockRegenerator {
 
     private final Inputs inputs;
 
+    // a project pnpm lists without a package.json, which it reports once the lock is verified
+    private @Nullable String missingManifest;
+
     public PnpmLockRegenerator(Inputs inputs) {
         this.inputs = inputs;
     }
 
     Install install() {
+        String rootManifestText = inputs.getManifests().get("");
+        Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
         for (String pnpmfile : new String[]{".pnpmfile.mjs", ".pnpmfile.cjs"}) {
             if (inputs.getFiles().containsKey(pnpmfile)) {
                 throw new CannotKnow("what " + pnpmfile + " does (pnpm runs its hooks)");
             }
         }
-        String rootManifestText = inputs.getManifests().get("");
-        Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null :
-                Manifests.parse(rootManifestText, "package.json");
-        PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"), rootManifest,
-                inputs.getEnv());
+        PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"),
+                inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
+        if (!options.isTrue("useLockfile")) {
+            throw new PnpmError("CONFIG_CONFLICT_LOCKFILE_ONLY_WITH_NO_LOCKFILE", "Cannot generate a " +
+                    LockfileReader.WANTED_LOCKFILE + " because lockfile is set to false");
+        }
+        if (options.isTrue("useGitBranchLockfile")) {
+            throw new CannotKnow("the git branch (gitBranchLockfile names the lock after it)");
+        }
+        Object branchPattern = options.get("mergeGitBranchLockfilesBranchPattern");
+        if (options.isTrue("mergeGitBranchLockfiles") ||
+            branchPattern instanceof List && !((List<?>) branchPattern).isEmpty()) {
+            throw new CannotKnow("the git branch lockfiles mergeGitBranchLockfiles merges");
+        }
         boolean workspace = options.getWorkspacePackagePatterns() != null;
         List<ParseOverrides.VersionOverride> parsedOverrides = ParseOverrides.parseOverrides(options.getOverrides(),
                 options.getCatalogs());
@@ -137,6 +152,11 @@ public final class PnpmLockRegenerator {
             }
         }
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
+        VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, resolutionVerifiers(options));
+        if (missingManifest != null) {
+            throw new JsError("No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) +
+                              "\"");
+        }
 
         Object packageExtensions = options.get("packageExtensions");
         String packageExtensionsChecksum = ObjectHasher.hashObjectNullableWithPrefix(packageExtensions);
@@ -214,7 +234,10 @@ public final class PnpmLockRegenerator {
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
             if (text == null) {
-                throw new JsError("No package.json found in \"" + (dir.isEmpty() ? "." : dir) + "\"");
+                if (missingManifest == null) {
+                    missingManifest = dir;
+                }
+                continue;
             }
             String path = dir.isEmpty() ? "package.json" : dir + "/package.json";
             Map<String, @Nullable Object> manifest = Manifests.parse(text, path);
@@ -222,6 +245,87 @@ public final class PnpmLockRegenerator {
                     readPackageHook == null ? manifest : readPackageHook.apply(manifest, dir)));
         }
         return projects;
+    }
+
+    // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON
+    private static Map<String, @Nullable Object> rootManifest(String text) {
+        try {
+            return Manifests.parse(text, "package.json");
+        } catch (PnpmError e) {
+            if ("ERR_PNPM_JSON_PARSE".equals(e.getCode())) {
+                throw new JsError("ERR_INVALID_PACKAGE_CONFIG", "Invalid package config package.json.");
+            }
+            throw e;
+        }
+    }
+
+    // createResolutionVerifiers: the npm verifier when minimumReleaseAge or trustPolicy is active
+    private List<ResolutionVerifier> resolutionVerifiers(PnpmOptions options) {
+        NpmResolutionVerifier npmVerifier = NpmResolutionVerifier.createNpmResolutionVerifier(
+                NpmResolutionVerifier.Options.builder()
+                        .minimumReleaseAge(number(options, "minimumReleaseAge"))
+                        .minimumReleaseAgeExclude(strings(options, "minimumReleaseAgeExclude"))
+                        .ignoreMissingTimeField(
+                                Boolean.TRUE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")))
+                        .trustPolicy(options.get("trustPolicy") == null ? null :
+                                Js.string(options.get("trustPolicy")))
+                        .trustPolicyExclude(strings(options, "trustPolicyExclude"))
+                        .trustPolicyIgnoreAfter(number(options, "trustPolicyIgnoreAfter"))
+                        .registries(options.getRegistries())
+                        .namedRegistries(namedRegistries(options))
+                        .fetch(inputs.getRegistry())
+                        .now(inputs.getNow())
+                        .build());
+        return npmVerifier == null ? Collections.emptyList() : Collections.singletonList(npmVerifier);
+    }
+
+    private static @Nullable Double number(PnpmOptions options, String name) {
+        Object value = options.get(name);
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(value instanceof Number)) {
+            throw new CannotKnow("what pnpm makes of " + name + " (" + Js.typeOf(value) +
+                                 ", where pnpm reads a number)");
+        }
+        return ((Number) value).doubleValue();
+    }
+
+    private static @Nullable List<String> strings(PnpmOptions options, String name) {
+        Object value = options.get(name);
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        if (value instanceof String) {
+            // for...of over a string: its code points
+            ((String) value).codePoints().forEach(c -> out.add(new String(Character.toChars(c))));
+            return out;
+        }
+        if (!(value instanceof List)) {
+            throw new CannotKnow("what pnpm makes of " + name + " (" + Js.typeOf(value) +
+                                 ", where pnpm reads an array)");
+        }
+        for (Object item : (List<?>) value) {
+            if (!(item instanceof String)) {
+                throw new CannotKnow("what pnpm makes of " + name + " (an item that is not a string)");
+            }
+            out.add((String) item);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable Map<String, @Nullable Object> namedRegistries(PnpmOptions options) {
+        Object value = options.get("namedRegistries");
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(value instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of namedRegistries (" + Js.typeOf(value) +
+                                 ", where pnpm reads an object)");
+        }
+        return (Map<String, @Nullable Object>) value;
     }
 
     // arrayOfWorkspacePackagesToMap: each project by name, then version

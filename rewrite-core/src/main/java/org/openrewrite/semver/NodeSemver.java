@@ -187,6 +187,15 @@ public class NodeSemver {
     }
 
     /**
+     * @return the version's prerelease identifiers, each a {@code Long} or a {@code String}, or {@code null} when it
+     * has none or does not parse.
+     */
+    public static @Nullable List<Object> prerelease(String version, Options options) {
+        ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+        return v.isStrictSemver() && v.hasPrerelease() ? v.strictPrerelease() : null;
+    }
+
+    /**
      * @return the highest of the versions the range allows, the first of equal ones, or {@code null}.
      */
     public static @Nullable String maxSatisfying(Collection<String> versions, String range, Options options) {

@@ -40,23 +40,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded pnpm scenarios a test can replay: every directory holding a pnpm-lock.yaml under {@code lock/pnpm/}
- * on the test classpath (the in-repo fixtures and the downloaded ones merge there), and, when the environment
- * variable {@code REWRITE_LOCK_SCENARIOS} names a directory, every one under its {@code pnpm} sibling, or under the
- * directory itself when it holds pnpm scenarios. {@code REWRITE_LOCK_HTTP_CACHE} names a directory of registry
- * responses a scenario's own {@code http/} falls back on.
- * <p>
- * The layout is the one {@code record-pnpm.sh} and {@code record-pnpm-open.sh} write: {@code pkg-before},
- * {@code before}, {@code pkg}, {@code after}, a starting lock pnpm did not write {@code seed-lock} (then
- * {@code before} is a copy), pnpm-workspace.yaml per phase ({@code workspace-before}, {@code workspace}: a phase
- * without its own keeps the other's), the project config {@code npmrc} ({@code npmrc-before} for the first phase
- * only), the project files {@code tree-before/} and {@code tree/} copied over it before each phase, the second
- * phase's flags {@code args}, and {@code http/}. What pnpm writes on an install that changes nothing over a lock,
- * when it differs, is {@code <lock>-again} ({@code again} for {@code after}), beside {@code pnpm-<lock>-again.log}
- * ({@code pnpm-again.log} for {@code after}). The downloaded fixtures spell the edited manifest {@code pkg-after},
- * a workspace's root {@code pkg-root}, its members {@code pkg-<name>}, {@code pkg-<name>-before} and
- * {@code pkg-<name>-after} (placed at the importer whose last path segment is the name) and pnpm-workspace.yaml
- * {@code workspace-yaml}.
+ * The recorded pnpm scenarios under {@code lock/pnpm/} on the test classpath and under {@code REWRITE_LOCK_SCENARIOS}'s
+ * {@code pnpm} directory, with each lock's phase inputs; {@code REWRITE_LOCK_HTTP_CACHE} backs their {@code http/}.
  */
 final class PnpmScenarios {
 
@@ -92,9 +77,13 @@ final class PnpmScenarios {
             return scenario.manifests(before, text);
         }
 
+        /**
+         * pnpm-workspace.yaml as the install over this lock found it: after the edit, as pnpm rewrote it.
+         */
         @Nullable
         String workspaceManifest() {
-            return scenario.workspaceManifest(before);
+            String rewritten = before ? null : scenario.file("probes/after-changed/pnpm-workspace.yaml");
+            return rewritten != null ? rewritten : scenario.workspaceManifest(before);
         }
 
         @Nullable
@@ -106,8 +95,19 @@ final class PnpmScenarios {
             return scenario.tree(before);
         }
 
+        /**
+         * The recorded phase that ran the install that changes nothing over this lock, or wrote it.
+         */
+        String phase() {
+            if (before) {
+                return "before".equals(fileName) && scenario.editChangesNothing() &&
+                       scenario.file("pnpm-before-again.log") == null ? "after" : "before";
+            }
+            return "after".equals(fileName) && scenario.has("pnpm-again.log") ? "again" : "after";
+        }
+
         Instant now() {
-            return scenario.phaseTime(before ? "before" : "after");
+            return scenario.phaseTime(phase());
         }
 
         /**
@@ -392,6 +392,41 @@ final class PnpmScenarios {
                 return read(httpCache.resolve(name));
             }
             return null;
+        }
+
+        /**
+         * A packument as pnpm received it: {@code http/}, else pnpm's own metadata cache of the phase (then of the
+         * other phases) under {@code probes/<phase>-cache/}, else the shared cache.
+         */
+        @Nullable
+        String packument(String name, boolean full, String phase) {
+            Path own = dir.resolve("http").resolve(full ? name + "@full" : name);
+            if (Files.isRegularFile(own)) {
+                return read(own);
+            }
+            List<String> phases = new ArrayList<>(Arrays.asList("before", "after", "again"));
+            phases.remove(phase);
+            phases.add(0, phase);
+            for (String p : phases) {
+                Path metadata = dir.resolve("probes").resolve(p + "-cache").resolve("v11")
+                        .resolve(full ? "metadata-full" : "metadata");
+                if (!Files.isDirectory(metadata)) {
+                    continue;
+                }
+                try (Stream<Path> registries = Files.list(metadata)) {
+                    for (Path registry : (Iterable<Path>) registries::iterator) {
+                        Path mirror = registry.resolve(name + ".jsonl");
+                        if (Files.isRegularFile(mirror)) {
+                            String jsonl = read(mirror);
+                            return jsonl.substring(jsonl.indexOf('\n') + 1);
+                        }
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
+            return httpCache != null && Files.isRegularFile(httpCache.resolve(full ? name + "@full" : name)) ?
+                    read(httpCache.resolve(full ? name + "@full" : name)) : null;
         }
 
         @Override

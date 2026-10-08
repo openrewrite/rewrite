@@ -50,7 +50,7 @@ public final class Ini {
      * {@code false} and {@code null} the JSON values, a quoted value what {@code JSON.parse} makes of it.
      */
     @SuppressWarnings("unchecked")
-    static Map<String, @Nullable Object> decode(String str) {
+    public static Map<String, @Nullable Object> decode(String str) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
         Object p = out;
         for (String line : LINES.split(str, -1)) {

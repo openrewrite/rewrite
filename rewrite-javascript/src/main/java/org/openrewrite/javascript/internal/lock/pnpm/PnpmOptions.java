@@ -17,24 +17,25 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.Ini;
+import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/config.reader src/index.ts {@code getConfig} and src/getOptionsFromRootManifest.ts (pnpm 11.2.2),
- * as far as a lock-only install reads the result, with the defaults of @pnpm/installing.deps-installer
- * src/install/extendInstallOptions.ts beneath: the settings by pnpm's own (camelCase) names, as the JavaScript
- * values pnpm-workspace.yaml gives, the catalogs, and the workspace's package patterns.
- * <p>
- * pnpm 11 reads no setting from package.json and only auth, registry and network keys from .npmrc.
+ * Port of @pnpm/config.reader src/index.ts {@code getConfig} (pnpm 11.2.2) and the modules it reads the project's
+ * .npmrc, pnpm-workspace.yaml and environment with, for {@code pnpm install --lockfile-only}.
  */
 @Getter
 final class PnpmOptions {
@@ -42,9 +43,14 @@ final class PnpmOptions {
     private static final Pattern CAMEL_CASE = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}]+)}");
     private static final Pattern ENV_VALUE = Pattern.compile("([^:-]+)(:?)-(.+)");
+    private static final Pattern LOWER_SNAKE_SEGMENT = Pattern.compile("^[a-z0-9]+$");
+    private static final Pattern UPPER_SNAKE_SEGMENT = Pattern.compile("^[A-Z0-9]+$");
+    private static final Pattern HOME_PREFIX = Pattern.compile("^~[/\\\\]");
+    private static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+    private static final List<String> CLI_OPTIONS = Collections.singletonList("lockfile-only");
 
     /**
-     * The settings by name, the defaults overlaid by pnpm-workspace.yaml's.
+     * The settings by name: the defaults, the .npmrc's, pnpm-workspace.yaml's, then the environment's.
      */
     private final Map<String, @Nullable Object> config;
 
@@ -53,29 +59,86 @@ final class PnpmOptions {
     private final Map<String, @Nullable Map<String, @Nullable Object>> catalogs;
 
     /**
+     * The registry of every package ({@code default}) and of each scope that has its own, normalized.
+     */
+    private final Map<String, String> registries;
+
+    /**
      * The workspace's package globs; null without a pnpm-workspace.yaml (no workspace).
      */
     private final @Nullable List<String> workspacePackagePatterns;
 
     private PnpmOptions(Map<String, @Nullable Object> config, Set<String> explicitlySetKeys,
-                        Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+                        Map<String, @Nullable Map<String, @Nullable Object>> catalogs, Map<String, String> registries,
                         @Nullable List<String> workspacePackagePatterns) {
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
+        this.registries = registries;
         this.workspacePackagePatterns = workspacePackagePatterns;
+    }
+
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable Map<String, @Nullable Object> rootManifest,
+                            @Nullable Map<String, String> env) {
+        return load(workspaceManifest, null, rootManifest, env);
     }
 
     /**
      * @param workspaceManifest the text of pnpm-workspace.yaml at the workspace root, null without one
+     * @param npmrc             the text of the .npmrc beside it, null without one
      * @param rootManifest      the root package.json as parsed, for {@code $name} references in overrides
      * @param env               the process environment, null when the host does not know it
      */
     @SuppressWarnings("unchecked")
-    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable Map<String, @Nullable Object> rootManifest,
-                            @Nullable Map<String, String> env) {
-        Map<String, @Nullable Object> config = defaults();
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc,
+                            @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> defaultOptions = defaultOptions();
+        Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
+                readAndFilterNpmrc(npmrc, env);
+        Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
+        builtin.put("registry", DEFAULT_REGISTRY);
+        builtin.put("@jsr:registry", "https://npm.jsr.io/");
+        Map<String, @Nullable Object> rawConfig = new LinkedHashMap<>();
+        Map<String, @Nullable Object> mergedConfig = new LinkedHashMap<>();
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, workspaceNpmrc)) {
+            for (String key : Js.keys(source)) {
+                rawConfig.put(key, source.get(key));
+                if (isNpmrcReadableKey(key)) {
+                    mergedConfig.put(key, source.get(key));
+                }
+            }
+        }
+
+        Map<String, @Nullable Object> config = new LinkedHashMap<>();
+        for (String key : Js.keys(defaultOptions)) {
+            config.put(camelcase(key), defaultOptions.get(key));
+        }
+        for (String key : Js.keys(mergedConfig)) {
+            if (ConfigTypes.TYPES.containsKey(key)) {
+                config.put(camelcase(key), mergedConfig.get(key));
+            }
+        }
         Set<String> explicitlySetKeys = new LinkedHashSet<>();
+        for (String option : CLI_OPTIONS) {
+            explicitlySetKeys.add(camelcase(option));
+        }
+
+        Map<String, @Nullable Object> authConfig = pickIniConfig(rawConfig);
+        Map<String, String> networkRegistries = getNetworkConfigs(authConfig);
+        Map<String, String> registriesFromNpmrc = new LinkedHashMap<>();
+        registriesFromNpmrc.put("default", normalizeRegistryUrl(authConfig.get("registry")));
+        registriesFromNpmrc.putAll(networkRegistries);
+        getDefaultCreds(authConfig);
+        for (String key : Js.keys(authConfig)) {
+            if (key.endsWith("tokenHelper")) {
+                throw new PnpmError("TOKEN_HELPER_IN_PROJECT_CONFIG",
+                        "tokenHelper must not be configured in project-level .npmrc",
+                        "The key \"" + key + "\" was found in project config. Move it to ~/.npmrc or the global " +
+                        "pnpm auth.ini.");
+            }
+        }
+        config.put("registries", new LinkedHashMap<>(registriesFromNpmrc));
+
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
         if (workspaceManifest != null) {
@@ -85,6 +148,9 @@ final class PnpmOptions {
                     Collections.singletonList(".");
             if (manifest != null) {
                 Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env);
+                for (String option : CLI_OPTIONS) {
+                    newSettings.put(camelcase(option), true);
+                }
                 for (Map.Entry<String, @Nullable Object> setting : newSettings.entrySet()) {
                     if (!CAMEL_CASE.matcher(setting.getKey()).matches()) {
                         continue;
@@ -95,45 +161,518 @@ final class PnpmOptions {
                 catalogs = Catalogs.getCatalogsFromWorkspaceManifest(manifest);
             }
         }
+
+        Map<String, String> registries = new LinkedHashMap<>(registriesFromNpmrc);
+        Object workspaceRegistries = config.get("registries");
+        if (workspaceRegistries instanceof Map) {
+            for (String scope : Js.keys((Map<String, @Nullable Object>) workspaceRegistries)) {
+                Object url = ((Map<String, @Nullable Object>) workspaceRegistries).get(scope);
+                if (!(url instanceof String)) {
+                    throw new CannotKnow("what pnpm makes of registries." + scope + " (" + Js.typeOf(url) +
+                                         ", where pnpm reads a string)");
+                }
+                registries.put(scope, (String) url);
+            }
+        } else if (workspaceRegistries != null) {
+            throw new CannotKnow("what pnpm makes of registries (" + Js.typeOf(workspaceRegistries) +
+                                 ", where pnpm reads an object)");
+        }
+        if (!Js.truthy(registries.get("default"))) {
+            registries.put("default", registriesFromNpmrc.get("default"));
+        }
+        for (Map.Entry<String, String> registry : registries.entrySet()) {
+            registry.setValue(normalizeRegistryUrl(registry.getValue()));
+        }
+        if (!explicitlySetKeys.contains("registry") &&
+            !registries.get("default").equals(registriesFromNpmrc.get("default"))) {
+            config.put("registry", registries.get("default"));
+        }
+
+        Map<String, String> fromEnv = new LinkedHashMap<>();
+        for (ConfigPair pair : parseEnvVars(ENV_TYPES, env)) {
+            if (pair.value == JsYaml.UNDEFINED) {
+                continue;
+            }
+            if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
+                continue;
+            }
+            String previous = fromEnv.put(pair.key, pair.envKey);
+            if (previous != null && !Js.strictEquals(config.get(pair.key), pair.value)) {
+                throw new CannotKnow("which of " + previous + " and " + pair.envKey + " pnpm reads (the order of " +
+                                     "the environment)");
+            }
+            config.put(pair.key, pair.value);
+            explicitlySetKeys.add(pair.key);
+            if ("registry".equals(pair.key)) {
+                if (!(pair.value instanceof String)) {
+                    throw new JsError("Unexpected type of registry, expecting a string but received " +
+                                      Js.jsonStringify(pair.value));
+                }
+                registries.put("default", normalizeRegistryUrl(pair.value));
+            }
+        }
+        config.put("registries", registries);
+
         if (explicitlySetKeys.contains("minimumReleaseAge") && config.get("minimumReleaseAgeStrict") == null) {
             config.put("minimumReleaseAgeStrict", true);
         }
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, patterns);
+        Object lockfile = config.get("lockfile");
+        Object packageLock = config.get("packageLock");
+        config.put("useLockfile", lockfile instanceof Boolean ? lockfile :
+                packageLock instanceof Boolean ? packageLock : false);
+        Object gitBranchLockfile = config.get("gitBranchLockfile");
+        config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns);
     }
 
-    // the defaults a lock-only install reads, config/reader's over extendInstallOptions'
-    private static Map<String, @Nullable Object> defaults() {
+    // config/reader's defaultOptions, by pnpm's own (kebab-case) names, as far as a lock-only install reads them
+    private static Map<String, @Nullable Object> defaultOptions() {
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
-        config.put("autoInstallPeers", true);
-        config.put("autoInstallPeersFromHighestMatch", false);
-        config.put("blockExoticSubdeps", true);
-        config.put("dedupeDirectDeps", false);
-        config.put("dedupeInjectedDeps", true);
-        config.put("dedupePeerDependents", true);
-        config.put("dedupePeers", false);
-        config.put("engineStrict", false);
-        config.put("excludeLinksFromLockfile", false);
-        config.put("ignoreCompatibilityDb", false);
-        config.put("injectWorkspacePackages", false);
-        config.put("linkWorkspacePackages", false);
-        config.put("lockfileIncludeTarballUrl", false);
-        config.put("minimumReleaseAge", 1440.0);
-        config.put("minimumReleaseAgeIgnoreMissingTime", true);
+        config.put("auto-install-peers", true);
+        config.put("dedupe-peer-dependents", true);
+        config.put("dedupe-peers", false);
+        config.put("dedupe-direct-deps", false);
+        config.put("dedupe-injected-deps", true);
+        config.put("disallow-workspace-cycles", false);
+        config.put("exclude-links-from-lockfile", false);
+        config.put("git-branch-lockfile", false);
         config.put("optional", true);
-        config.put("peersSuffixMaxLength", 1000.0);
-        config.put("preferFrozenLockfile", true);
-        config.put("preferWorkspacePackages", false);
-        config.put("registry", "https://registry.npmjs.org/");
-        config.put("resolutionMode", "highest");
-        config.put("resolvePeersFromWorkspaceRoot", true);
-        config.put("saveWorkspaceProtocol", "rolling");
-        config.put("sharedWorkspaceLockfile", true);
-        config.put("strictPeerDependencies", false);
+        config.put("inject-workspace-packages", false);
+        config.put("link-workspace-packages", false);
+        config.put("lockfile-include-tarball-url", false);
+        config.put("minimum-release-age", 1440.0);
+        config.put("minimum-release-age-ignore-missing-time", true);
+        config.put("package-lock", true);
+        config.put("prefer-workspace-packages", false);
+        config.put("registry", DEFAULT_REGISTRY);
+        config.put("block-exotic-subdeps", true);
+        config.put("resolution-mode", "highest");
+        config.put("resolve-peers-from-workspace-root", true);
+        config.put("save-workspace-protocol", "rolling");
+        config.put("shared-workspace-lockfile", true);
+        config.put("strict-peer-dependencies", false);
+        config.put("registry-supports-time-field", false);
+        config.put("peers-suffix-max-length", 1000.0);
+        // extendInstallOptions' defaults where config/reader sets none
+        config.put("auto-install-peers-from-highest-match", false);
+        config.put("engine-strict", false);
+        config.put("ignore-compatibility-db", false);
+        config.put("prefer-frozen-lockfile", true);
         return config;
     }
 
+    // loadNpmrcFiles' readAndFilterNpmrc over read-ini-file 5 (ini 6 after strip-bom)
+    private static Map<String, @Nullable Object> readAndFilterNpmrc(String text, @Nullable Map<String, String> env) {
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        Map<String, @Nullable Object> raw;
+        try {
+            raw = Ini.decode(LockfileReader.stripBom(text));
+        } catch (IllegalArgumentException e) {
+            // pnpm warns of the file and reads nothing from it
+            return result;
+        }
+        for (String rawKey : Js.keys(raw)) {
+            Object rawValue = raw.get(rawKey);
+            String key = envReplaceLossy(rawKey, env);
+            Object value = rawValue instanceof String ? envReplaceLossy((String) rawValue, env) : rawValue;
+            if (isNpmrcReadableKey(key)) {
+                result.put(key, value);
+            }
+        }
+        return result;
+    }
+
+    private static final List<String> NPM_AUTH_SETTINGS = Arrays.asList("ca", "cafile", "cert", "key", "registry",
+            "_auth", "_authToken", "_password", "email", "keyfile", "username");
+    private static final List<String> NETWORK_INI_KEYS = Arrays.asList("https-proxy", "proxy", "no-proxy",
+            "http-proxy", "local-address", "strict-ssl");
+
+    static boolean isIniConfigKey(String key) {
+        return key.startsWith("@") || key.startsWith("//") || NPM_AUTH_SETTINGS.contains(key);
+    }
+
+    static boolean isNpmrcReadableKey(String key) {
+        return isIniConfigKey(key) || NETWORK_INI_KEYS.contains(key);
+    }
+
+    private static Map<String, @Nullable Object> pickIniConfig(Map<String, @Nullable Object> rawConfig) {
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        for (String key : Js.keys(rawConfig)) {
+            if (isIniConfigKey(key)) {
+                result.put(key, rawConfig.get(key));
+            }
+        }
+        return result;
+    }
+
+    private static final Pattern AUTH_SUFFIX = Pattern.compile(":(_auth|_authToken|_password|username|tokenHelper)$");
+    private static final Pattern SSL_FILE_SUFFIX = Pattern.compile(":(cert|key|ca)file$");
+    private static final Map<String, String> AUTH_SUFFIX_KEY_MAP = new LinkedHashMap<>();
+
+    static {
+        AUTH_SUFFIX_KEY_MAP.put("_auth", "authPairBase64");
+        AUTH_SUFFIX_KEY_MAP.put("_authToken", "authToken");
+        AUTH_SUFFIX_KEY_MAP.put("_password", "authPassword");
+        AUTH_SUFFIX_KEY_MAP.put("username", "authUsername");
+        AUTH_SUFFIX_KEY_MAP.put("tokenHelper", "tokenHelper");
+    }
+
+    /**
+     * getNetworkConfigs: the scoped registries, after the checks pnpm makes of each registry's credentials; the
+     * credentials themselves and the certificates are the host's.
+     */
+    private static Map<String, String> getNetworkConfigs(Map<String, @Nullable Object> rawConfig) {
+        Map<String, String> registries = new LinkedHashMap<>();
+        Map<String, Map<String, String>> rawCredsMap = new LinkedHashMap<>();
+        for (String configKey : Js.keys(rawConfig)) {
+            Object value = rawConfig.get(configKey);
+            if (!configKey.isEmpty() && configKey.charAt(0) == '@' && configKey.endsWith(":registry")) {
+                registries.put(configKey.substring(0, configKey.indexOf(':')), normalizeRegistryUrl(value));
+                continue;
+            }
+            Matcher creds = AUTH_SUFFIX.matcher(configKey);
+            if (creds.find()) {
+                rawCredsMap.computeIfAbsent(configKey.substring(0, creds.start()), r -> new LinkedHashMap<>())
+                        .put(AUTH_SUFFIX_KEY_MAP.get(creds.group(1)), Js.string(value));
+                continue;
+            }
+            if (SSL_FILE_SUFFIX.matcher(configKey).find()) {
+                throw new CannotKnow("whether " + Js.string(value) + " exists (pnpm reads the .npmrc's " +
+                                     configKey + ")");
+            }
+        }
+        for (Map<String, String> creds : rawCredsMap.values()) {
+            parseCreds(creds);
+        }
+        return registries;
+    }
+
+    private static void getDefaultCreds(Map<String, @Nullable Object> rawConfig) {
+        Map<String, String> input = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : AUTH_SUFFIX_KEY_MAP.entrySet()) {
+            Object value = rawConfig.get(entry.getKey());
+            if (value != null) {
+                input.put(entry.getValue(), Js.string(value));
+            }
+        }
+        parseCreds(input);
+    }
+
+    // parseCreds' checks: what it throws for a token helper, _auth or _password pnpm cannot use
+    private static void parseCreds(Map<String, String> input) {
+        String tokenHelper = input.get("tokenHelper");
+        if (tokenHelper != null && !tokenHelper.isEmpty()) {
+            for (char c : Js.trim(tokenHelper).toCharArray()) {
+                if ("$%`\"'".indexOf(c) >= 0) {
+                    String hint = "Try wrapping the current command in a script whose name does not contain " +
+                                  "unsupported characters";
+                    if (c == '"' || c == '\'') {
+                        hint = "pnpm does not support quotations in tokenHelper. " + hint;
+                    } else if (c == '$' || c == '%') {
+                        hint = "pnpm does not support environment variables. " + hint;
+                    }
+                    throw new PnpmError("TOKEN_HELPER_UNSUPPORTED_CHARACTER",
+                            "Unexpected character " + Js.jsonStringify(String.valueOf(c)), hint);
+                }
+            }
+        }
+        String authPairBase64 = input.get("authPairBase64");
+        if (authPairBase64 != null && !authPairBase64.isEmpty()) {
+            if (decodeBase64Credential(authPairBase64, "_auth").indexOf(':') < 0) {
+                throw new PnpmError("AUTH_MISSING_SEPARATOR", "No separator found in the decoded form of _auth",
+                        "_auth is a base64 encoded form of <username>:<password> where the colon (:) serves as the " +
+                        "separator");
+            }
+            return;
+        }
+        String authUsername = input.get("authUsername");
+        String authPassword = input.get("authPassword");
+        if (authUsername != null && !authUsername.isEmpty() && authPassword != null && !authPassword.isEmpty()) {
+            decodeBase64Credential(authPassword, "_password");
+        }
+    }
+
+    private static String decodeBase64Credential(String value, String key) {
+        String decoded = atob(value);
+        if (decoded == null) {
+            String normalizedValue = normalizeBase64Padding(value);
+            if (!normalizedValue.equals(value)) {
+                decoded = atob(normalizedValue);
+            }
+        }
+        if (decoded == null) {
+            throw new PnpmError("AUTH_INVALID_BASE64", "Failed to decode " + key + " as base64",
+                    key + " must contain a base64-encoded " + ("_auth".equals(key) ? "<username>:<password>" :
+                            "password") + " value");
+        }
+        return decoded;
+    }
+
+    private static String normalizeBase64Padding(String value) {
+        int paddingStart = value.length();
+        while (paddingStart > 0 && value.charAt(paddingStart - 1) == '=') {
+            paddingStart--;
+        }
+        String valueWithoutPadding = value.substring(0, paddingStart);
+        if (valueWithoutPadding.isEmpty()) {
+            return value;
+        }
+        int remainder = valueWithoutPadding.length() % 4;
+        if (remainder == 1) {
+            return value;
+        }
+        StringBuilder padded = new StringBuilder(valueWithoutPadding);
+        for (int i = 0; i < (4 - remainder) % 4; i++) {
+            padded.append('=');
+        }
+        return padded.toString();
+    }
+
+    private static final String BASE64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+    // the HTML standard's forgiving-base64 decode, which atob runs; null where atob throws
+    private static @Nullable String atob(String data) {
+        StringBuilder s = new StringBuilder();
+        for (char c : data.toCharArray()) {
+            if (c != '\t' && c != '\n' && c != '\f' && c != '\r' && c != ' ') {
+                s.append(c);
+            }
+        }
+        if (s.length() % 4 == 0) {
+            if (s.length() >= 2 && s.charAt(s.length() - 1) == '=' && s.charAt(s.length() - 2) == '=') {
+                s.setLength(s.length() - 2);
+            } else if (s.length() >= 1 && s.charAt(s.length() - 1) == '=') {
+                s.setLength(s.length() - 1);
+            }
+        }
+        if (s.length() % 4 == 1) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        int buffer = 0;
+        int bits = 0;
+        for (int i = 0; i < s.length(); i++) {
+            int v = BASE64.indexOf(s.charAt(i));
+            if (v < 0) {
+                return null;
+            }
+            buffer = buffer << 6 | v;
+            bits += 6;
+            if (bits >= 8) {
+                bits -= 8;
+                out.append((char) (buffer >> bits & 0xFF));
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * normalize-registry-url 2.0.1.
+     */
+    static String normalizeRegistryUrl(@Nullable Object value) {
+        if (!(value instanceof String)) {
+            throw new JsError("`registry` should be a string");
+        }
+        String registry = (String) value;
+        WhatwgUrl url = WhatwgUrl.tryParse(registry);
+        if (url != null) {
+            registry = url.toString();
+        }
+        if (registry.endsWith("/") || registry.indexOf('/', registry.indexOf("//") + 2) != -1) {
+            return registry;
+        }
+        return registry + "/";
+    }
+
+    static final class ConfigPair {
+        final String envKey;
+        final String key;
+        final @Nullable Object value;
+
+        ConfigPair(String envKey, String key, @Nullable Object value) {
+            this.envKey = envKey;
+            this.key = key;
+            this.value = value;
+        }
+    }
+
+    // the types config/reader parses the environment with: all but those whose schema its parser cannot read
+    private static final Function<String, @Nullable Object> ENV_TYPES = key ->
+            Arrays.asList("init-version", "node-version", "umask").contains(key) ? null : ConfigTypes.TYPES.get(key);
+
+    /**
+     * src/env.ts {@code parseEnvVars}: the {@code pnpm_config_} (or {@code PNPM_CONFIG_}) variables by camelCase
+     * key, a value the schema does not parse {@link JsYaml#UNDEFINED}. A host that does not know the environment
+     * gives none.
+     */
+    static List<ConfigPair> parseEnvVars(Function<String, @Nullable Object> getSchema,
+                                         @Nullable Map<String, String> env) {
+        List<ConfigPair> pairs = new ArrayList<>();
+        if (env == null) {
+            return pairs;
+        }
+        for (Map.Entry<String, String> entry : env.entrySet()) {
+            String suffix = getEnvKeySuffix(entry.getKey());
+            if (suffix == null || entry.getValue() == null) {
+                continue;
+            }
+            String schemaKey = suffix.replace('_', '-');
+            Object schema = getSchema.apply(schemaKey);
+            if (schema == null) {
+                continue;
+            }
+            pairs.add(new ConfigPair(entry.getKey(), camelcase(schemaKey),
+                    parseValueBySchema(schema, entry.getValue(), env)));
+        }
+        return pairs;
+    }
+
+    private static @Nullable Object parseValueBySchema(Object schema, String envVar, Map<String, String> env) {
+        if (schema instanceof List) {
+            List<?> variants = (List<?>) schema;
+            List<Object> sorted = new ArrayList<>();
+            for (Object variant : variants) {
+                if (variant != ConfigTypes.Type.STRING) {
+                    sorted.add(variant);
+                }
+            }
+            if (variants.contains(ConfigTypes.Type.STRING)) {
+                sorted.add(ConfigTypes.Type.STRING);
+            }
+            for (Object variant : sorted) {
+                Object value;
+                if (variant instanceof String) {
+                    value = envVar.equals(variant) ? variant : JsYaml.UNDEFINED;
+                } else if (variant instanceof Boolean) {
+                    value = variant.toString().equals(envVar) ? variant : JsYaml.UNDEFINED;
+                } else if (variant == ConfigTypes.NULL) {
+                    value = "null".equals(envVar) ? null : JsYaml.UNDEFINED;
+                } else {
+                    value = parseValueByType((ConfigTypes.Type) variant, envVar, env);
+                }
+                if (value != JsYaml.UNDEFINED) {
+                    return value;
+                }
+            }
+            return JsYaml.UNDEFINED;
+        }
+        return parseValueByType((ConfigTypes.Type) schema, envVar, env);
+    }
+
+    private static @Nullable Object parseValueByType(ConfigTypes.Type type, String envVar, Map<String, String> env) {
+        switch (type) {
+            case ARRAY: {
+                Object value;
+                try {
+                    value = Manifests.parseValue(envVar, "the environment");
+                } catch (PnpmError e) {
+                    return JsYaml.UNDEFINED;
+                }
+                return value instanceof List ? value : JsYaml.UNDEFINED;
+            }
+            case BOOLEAN:
+                return "true".equals(envVar) ? Boolean.TRUE : "false".equals(envVar) ? Boolean.FALSE : JsYaml.UNDEFINED;
+            case NUMBER: {
+                double value = Js.toNumber(envVar);
+                return Double.isNaN(value) ? JsYaml.UNDEFINED : value;
+            }
+            case STRING:
+                return envVar;
+            case PATH: {
+                String home = env.get("HOME");
+                Matcher m = HOME_PREFIX.matcher(envVar);
+                if (home != null && !home.isEmpty() && m.find()) {
+                    return join(home, envVar.substring(m.end()));
+                }
+                return envVar;
+            }
+            case URL: {
+                WhatwgUrl url = WhatwgUrl.tryParse(envVar);
+                if (url == null) {
+                    throw new JsError("Invalid URL");
+                }
+                return url.toString();
+            }
+            default:
+                return JsYaml.UNDEFINED;
+        }
+    }
+
+    // Node's posix path.join of two segments
+    private static String join(String dir, String path) {
+        String joined = dir + "/" + path;
+        boolean absolute = joined.startsWith("/");
+        List<String> out = new ArrayList<>();
+        for (String segment : joined.split("/")) {
+            if (segment.isEmpty() || ".".equals(segment)) {
+                continue;
+            }
+            if ("..".equals(segment) && !out.isEmpty() && !"..".equals(out.get(out.size() - 1))) {
+                out.remove(out.size() - 1);
+            } else if (!"..".equals(segment) || !absolute) {
+                out.add(segment);
+            }
+        }
+        String normalized = String.join("/", out);
+        if (!normalized.isEmpty() && joined.endsWith("/")) {
+            normalized += "/";
+        }
+        return absolute ? "/" + normalized : normalized.isEmpty() ? "." : normalized;
+    }
+
+    private static @Nullable String getEnvKeySuffix(String envKey) {
+        if (envKey.startsWith("pnpm_config_")) {
+            String suffix = envKey.substring("pnpm_config_".length());
+            return isSnakeCase(suffix, LOWER_SNAKE_SEGMENT) ? suffix : null;
+        }
+        if (envKey.startsWith("PNPM_CONFIG_")) {
+            String suffix = envKey.substring("PNPM_CONFIG_".length());
+            return isSnakeCase(suffix, UPPER_SNAKE_SEGMENT) ? suffix.toLowerCase(Locale.ROOT) : null;
+        }
+        return null;
+    }
+
+    private static boolean isSnakeCase(String s, Pattern segment) {
+        if (s.isEmpty()) {
+            return false;
+        }
+        for (String part : s.split("_", -1)) {
+            if (!segment.matcher(part).matches()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // camelcase 6 of a kebab-case name of lowercase letters
+    private static String camelcase(String kebab) {
+        StringBuilder out = new StringBuilder();
+        boolean upper = false;
+        for (char c : kebab.toCharArray()) {
+            if (c == '-') {
+                upper = true;
+            } else {
+                out.append(upper ? Character.toUpperCase(c) : c);
+                upper = false;
+            }
+        }
+        return out.toString();
+    }
+
+    private static String kebabCase(String camel) {
+        StringBuilder out = new StringBuilder();
+        for (char c : camel.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                out.append('-').append(Character.toLowerCase(c));
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
     @SuppressWarnings("unchecked")
-    private static Map<String, @Nullable Object> getOptionsFromPnpmSettings(
+    static Map<String, @Nullable Object> getOptionsFromPnpmSettings(
             Map<String, @Nullable Object> pnpmSettings, @Nullable Map<String, @Nullable Object> manifest,
             @Nullable Map<String, String> env) {
         Map<String, @Nullable Object> settings = new LinkedHashMap<>();
@@ -142,13 +681,17 @@ final class PnpmOptions {
             String newKey = envReplace(key, env);
             if (value instanceof String) {
                 settings.put(newKey, envReplace((String) value, env));
-            } else if (("registries".equals(newKey) || "namedRegistries".equals(newKey)) && value instanceof Map) {
-                Map<String, @Nullable Object> out = new LinkedHashMap<>();
-                for (String k : Js.keys((Map<String, @Nullable Object>) value)) {
-                    Object v = ((Map<String, @Nullable Object>) value).get(k);
-                    out.put(k, v instanceof String ? envReplace((String) v, env) : v);
+            } else if ("registries".equals(newKey) || "namedRegistries".equals(newKey)) {
+                if (value instanceof Map) {
+                    Map<String, @Nullable Object> out = new LinkedHashMap<>();
+                    for (String k : Js.keys((Map<String, @Nullable Object>) value)) {
+                        Object v = ((Map<String, @Nullable Object>) value).get(k);
+                        out.put(k, v instanceof String ? envReplace((String) v, env) : v);
+                    }
+                    settings.put(newKey, out);
+                } else {
+                    settings.put(newKey, value);
                 }
-                settings.put(newKey, out);
             } else {
                 settings.put(newKey, value);
             }
@@ -173,17 +716,19 @@ final class PnpmOptions {
     private static void assertValidOverrides(@Nullable Object overrides) {
         if (!(overrides instanceof Map)) {
             throw new PnpmError("INVALID_OVERRIDES", "The overrides field should be an object, but got " +
-                                                     (overrides instanceof List ? "array" : Js.typeOf(overrides)));
+                                                     renderReceivedType(overrides));
         }
         for (Map.Entry<?, ?> entry : ((Map<?, ?>) overrides).entrySet()) {
             Object spec = entry.getValue();
             if (!(spec instanceof String)) {
                 throw new PnpmError("INVALID_OVERRIDES", "The value of overrides." + entry.getKey() +
-                                                         " should be a string, but got " +
-                                                         (spec == null ? "null" : spec instanceof List ? "array" :
-                                                                 Js.typeOf(spec)));
+                                                         " should be a string, but got " + renderReceivedType(spec));
             }
         }
+    }
+
+    private static String renderReceivedType(@Nullable Object value) {
+        return value == null ? "null" : value instanceof List ? "array" : Js.typeOf(value);
     }
 
     @SuppressWarnings("unchecked")
@@ -211,6 +756,20 @@ final class PnpmOptions {
      * @pnpm/config.env-replace 4.1.0 {@code envReplace}.
      */
     static String envReplace(String settingValue, @Nullable Map<String, String> env) {
+        return replaceWith(settingValue, env, orig -> {
+            throw new JsError("Failed to replace env in config: " + orig);
+        });
+    }
+
+    /**
+     * @pnpm/config.env-replace 4.1.0 {@code envReplaceLossy}: an unresolved placeholder is dropped.
+     */
+    static String envReplaceLossy(String settingValue, @Nullable Map<String, String> env) {
+        return replaceWith(settingValue, env, orig -> "");
+    }
+
+    private static String replaceWith(String settingValue, @Nullable Map<String, String> env,
+                                      Function<String, String> onUnresolved) {
         Matcher m = ENV_EXPR.matcher(settingValue);
         StringBuffer out = new StringBuffer();
         while (m.find()) {
@@ -223,13 +782,10 @@ final class PnpmOptions {
             } else {
                 String halfEscape = escape.substring(escape.length() / 2);
                 if (env == null) {
-                    throw new CannotKnow("the environment (" + orig + " in pnpm-workspace.yaml)");
+                    throw new CannotKnow("the environment (" + orig + " in the configuration)");
                 }
                 String envValue = getEnvValue(env, name);
-                if (envValue == null) {
-                    throw new JsError("Failed to replace env in config: " + orig);
-                }
-                replacement = halfEscape + envValue;
+                replacement = halfEscape + (envValue == null ? onUnresolved.apply(orig) : envValue);
             }
             m.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
@@ -239,7 +795,7 @@ final class PnpmOptions {
 
     private static @Nullable String getEnvValue(Map<String, String> env, String name) {
         Matcher matched = ENV_VALUE.matcher(name);
-        if (!matched.matches()) {
+        if (!matched.find()) {
             return env.get(name);
         }
         String v = env.get(matched.group(1));
