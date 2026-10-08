@@ -43,7 +43,7 @@ class Resolution {
     Specifier descriptor;
 
     /**
-     * @throws IllegalArgumentException for a glob pattern, or a key the grammar does not match.
+     * @throws JsError for a glob pattern, or a key the grammar does not match.
      */
     static Resolution parseResolution(String source) {
         Matcher legacy = LEGACY_RESOLUTION.matcher(source);

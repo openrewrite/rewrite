@@ -73,7 +73,7 @@ final class MiscUtils {
     }
 
     /**
-     * @throws IllegalArgumentException for anything but the boolean spellings Yarn accepts.
+     * @throws JsError for anything but the boolean spellings Yarn accepts.
      */
     static boolean parseBoolean(@Nullable Object value) {
         if ("true".equals(value) || "1".equals(value) || Integer.valueOf(1).equals(value) ||
@@ -103,7 +103,7 @@ final class MiscUtils {
     }
 
     /**
-     * @throws IllegalArgumentException as Yarn's UsageError when a variable without a fallback is not set.
+     * @throws BerryOptions.UsageError when a variable without a fallback is not set.
      */
     static String replaceEnvVariables(String value, Map<String, String> env) {
         Matcher m = ENV_VARIABLE.matcher(value);
