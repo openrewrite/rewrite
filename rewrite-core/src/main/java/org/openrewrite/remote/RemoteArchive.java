@@ -117,7 +117,7 @@ public class RemoteArchive implements Remote {
         if (extracted == null) {
             InputStream archive;
             try {
-                archive = getArchiveInputStream(httpSender);
+                archive = getArchiveInputStream(httpSender, ctx);
             } catch (Exception e) {
                 ctx.getOnError().accept(e);
                 throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
@@ -159,12 +159,12 @@ public class RemoteArchive implements Remote {
         return URI.create("archive:" + key);
     }
 
-    private InputStream getArchiveInputStream(HttpSender httpSender) throws IOException {
+    private InputStream getArchiveInputStream(HttpSender httpSender, ExecutionContext ctx) throws IOException {
         if ("file".equals(uri.getScheme())) {
             return Files.newInputStream(Paths.get(uri));
         }
         //noinspection resource
-        HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
+        HttpSender.Response response = RemoteDownload.get(httpSender, uri, ctx);
         if (!response.isSuccessful()) {
             throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
         }
