@@ -1,0 +1,1 @@
+Add local from file:./local beside wrappy@1.0.2; local's own dependencies alias wrappy-old to npm:wrappy@1.0.1.
