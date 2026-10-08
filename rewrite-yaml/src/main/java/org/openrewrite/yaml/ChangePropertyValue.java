@@ -52,14 +52,14 @@ public class ChangePropertyValue extends Recipe {
 
     @Option(displayName = "Regex",
             description = "Default `false`. If enabled, `oldValue` will be interpreted as a Regular Expression, " +
-                          "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
+                    "to replace only all parts that match the regex. Capturing group can be used in `newValue`.",
             required = false)
     @Nullable
     Boolean regex;
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                          "rules. Default is `true`. Set to `false`  to use exact matching.",
+                    "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -140,7 +140,7 @@ public class ChangePropertyValue extends Recipe {
                     @Override
                     public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
                         if (scalar.getAnchor() != null && !isMappingKey(getCursor()) &&
-                            !isValueOfMatchingKey(getCursor(), keyMatcher) && matchesOldValue(scalar)) {
+                                !isValueOfMatchingKey(getCursor(), keyMatcher) && matchesOldValue(scalar)) {
                             anchored.put(scalar.getAnchor().getId(), scalar);
                         }
                         return super.visitScalar(scalar, p);
@@ -150,7 +150,11 @@ public class ChangePropertyValue extends Recipe {
                     public Yaml visitAlias(Yaml.Alias alias, Integer p) {
                         UUID id = alias.getAnchor().getId();
                         if (anchored.containsKey(id)) {
-                            (isValueOfMatchingKey(getCursor(), keyMatcher) ? aliasedFromMatchingKey : aliasedElsewhere).add(id);
+                            if (isValueOfMatchingKey(getCursor(), keyMatcher)) {
+                                aliasedFromMatchingKey.add(id);
+                            } else {
+                                aliasedElsewhere.add(id);
+                            }
                         }
                         return super.visitAlias(alias, p);
                     }
@@ -174,15 +178,10 @@ public class ChangePropertyValue extends Recipe {
     }
 
     private static boolean isValueOfMatchingKey(Cursor cursor, NameCaseConvention.Compiled keyMatcher) {
-        Cursor value = cursor;
-        Cursor parent = value.getParentTreeCursor();
-        while (parent.getValue() instanceof Yaml.Sequence.Entry) {
-            value = parent.getParentTreeCursor();
-            parent = value.getParentTreeCursor();
-        }
-        return parent.getValue() instanceof Yaml.Mapping.Entry &&
-               ((Yaml.Mapping.Entry) parent.getValue()).getValue() == value.getValue() &&
-               keyMatcher.matchesGlob(getProperty(parent));
+        Cursor entry = cursor.dropParentWhile(v -> v instanceof Yaml.Sequence || v instanceof Yaml.Sequence.Entry);
+        return entry.getValue() instanceof Yaml.Mapping.Entry &&
+                !isMappingKey(cursor) &&
+                keyMatcher.matchesGlob(getProperty(entry));
     }
 
     private static boolean isMappingKey(Cursor cursor) {
@@ -226,9 +225,9 @@ public class ChangePropertyValue extends Recipe {
 
     private boolean matchesOldValue(Yaml.Scalar scalar) {
         return StringUtils.isNullOrEmpty(oldValue) ||
-               (Boolean.TRUE.equals(regex) ?
-                       Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
-                       scalar.getValue().equals(oldValue));
+                (Boolean.TRUE.equals(regex) ?
+                        Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
+                        scalar.getValue().equals(oldValue));
     }
 
     private static String getProperty(Cursor cursor) {
