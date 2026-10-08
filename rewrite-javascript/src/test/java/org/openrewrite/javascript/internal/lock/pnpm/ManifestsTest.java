@@ -25,9 +25,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.json;
 
 /**
- * {@link Manifests#parseMembers} reads what {@code JSON.parse} and the property reads after it give.
+ * {@link Manifests#parseMembers} reads what {@code JSON.parse} and the property reads after it give, and pnpm
+ * 11.2.2's workspace/project-manifest-reader/test/index.ts cases of the conversion a read applies.
  */
 class ManifestsTest {
+
+    @Test
+    void readProjectManifestConvertsDevEnginesRuntimeToDevDependencies() {
+        assertThat(json(Manifests.readProjectManifest("{\"devEngines\":{\"runtime\":{\"name\":\"node\"," +
+                                                      "\"version\":\"24\",\"onFail\":\"download\"}}}", "package.json")))
+          .isEqualTo("{'devEngines':{'runtime':{'name':'node','version':'24','onFail':'download'}}," +
+                     "'devDependencies':{'node':'runtime:24'}}");
+    }
+
+    @Test
+    void readProjectManifestConvertsEnginesRuntimeToDependencies() {
+        assertThat(json(Manifests.readProjectManifest("{\"engines\":{\"runtime\":{\"name\":\"node\"," +
+                                                      "\"version\":\"24\",\"onFail\":\"download\"}}}", "package.json")))
+          .isEqualTo("{'engines':{'runtime':{'name':'node','version':'24','onFail':'download'}}," +
+                     "'dependencies':{'node':'runtime:24'}}");
+    }
 
     private static final Set<String> MODIFIED = Collections.singleton("modified");
     private static final Set<String> VERSIONS = Collections.singleton("versions");

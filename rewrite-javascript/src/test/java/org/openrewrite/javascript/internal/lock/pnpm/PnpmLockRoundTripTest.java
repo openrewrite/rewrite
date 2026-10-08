@@ -72,6 +72,11 @@ class PnpmLockRoundTripTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("locks")
     void writesBackWhatPnpmWrites(String name, PnpmScenarios.Lock lock) {
+        EnvLockfile envLockfile = EnvLockfile.readEnvLockfile(lock.getText());
+        if (envLockfile != null) {
+            assertThat(EnvLockfile.writeEnvLockfile(lock.getText(), envLockfile)).as("the env document")
+              .isEqualTo(lock.getText());
+        }
         String log = lock.againLog();
         if (lock.manifests().isEmpty()) {
             assertModelRoundTrip(lock);

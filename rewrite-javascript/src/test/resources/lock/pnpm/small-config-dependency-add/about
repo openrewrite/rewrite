@@ -1,0 +1,1 @@
+Add configDependencies is-positive 3.1.0 to pnpm-workspace.yaml over a wrappy lock: pnpm resolves it into the env document at the top of pnpm-lock.yaml.

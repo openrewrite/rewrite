@@ -1,0 +1,8 @@
+Installing config dependencies...
+Installed config dependencies: is-positive@3.1.0
+? Verifying lockfile against supply-chain policies (1 entry)...
+✓ Lockfile passes supply-chain policies (1 entry in 21ms)
+Done in 236ms using pnpm v11.2.2
+pnpm 11.2.2, node v24.19.0, 2026-10-08T06:23:46Z
+exit=0
+lock unchanged

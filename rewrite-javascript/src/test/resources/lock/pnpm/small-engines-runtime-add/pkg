@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","dependencies":{"wrappy":"1.0.2"},"engines":{"runtime":{"name":"node","version":"22.11.0","onFail":"download"}}}

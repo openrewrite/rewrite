@@ -32,8 +32,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * @pnpm/workspace.project-manifest-reader {@code readJsonFile} (pnpm 11.2.2): a package.json without its byte order
- * mark, parsed as {@code JSON.parse} would, into the values {@link Js} works over.
+ * Port of @pnpm/workspace.project-manifest-reader (pnpm 11.2.2): a package.json parsed as {@code JSON.parse} would
+ * and converted as every read converts it.
  */
 final class Manifests {
 
@@ -47,6 +47,18 @@ final class Manifests {
     }
 
     /**
+     * {@code readProjectManifest} of a package.json: {@code readJsonFile}, then {@code convertManifestAfterRead}.
+     */
+    static Map<String, @Nullable Object> readProjectManifest(String text, String path) {
+        Map<String, @Nullable Object> manifest = parse(text, path);
+        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies");
+        PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies");
+        return manifest;
+    }
+
+    /**
+     * {@code readJsonFile}: the text without its byte order mark.
+     *
      * @throws PnpmError {@code ERR_PNPM_JSON_PARSE} when the text is not JSON, or is JSON but not an object
      */
     @SuppressWarnings("unchecked")

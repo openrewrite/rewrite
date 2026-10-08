@@ -1,0 +1,1 @@
+A .pnpmfile.cjs that would add is-positive to every package, under ignorePnpmfile: true: pnpm never loads it and records no pnpmfileChecksum; abbrev is added beside wrappy.

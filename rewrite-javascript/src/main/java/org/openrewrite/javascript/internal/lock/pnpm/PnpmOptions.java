@@ -16,9 +16,12 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Getter;
+import lombok.Value;
+import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.npm.Ini;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -68,14 +71,35 @@ final class PnpmOptions {
      */
     private final @Nullable List<String> workspacePackagePatterns;
 
+    /**
+     * What the root manifest's devEngines.packageManager or packageManager names; null when neither names one.
+     */
+    private final @Nullable WantedPackageManager wantedPackageManager;
+
     private PnpmOptions(Map<String, @Nullable Object> config, Set<String> explicitlySetKeys,
                         Map<String, @Nullable Map<String, @Nullable Object>> catalogs, Map<String, String> registries,
-                        @Nullable List<String> workspacePackagePatterns) {
+                        @Nullable List<String> workspacePackagePatterns,
+                        @Nullable WantedPackageManager wantedPackageManager) {
         this.config = config;
         this.explicitlySetKeys = explicitlySetKeys;
         this.catalogs = catalogs;
         this.registries = registries;
         this.workspacePackagePatterns = workspacePackagePatterns;
+        this.wantedPackageManager = wantedPackageManager;
+    }
+
+    @Value
+    @With
+    static class WantedPackageManager {
+        Object name;
+
+        @Nullable
+        Object version;
+
+        @Nullable
+        Object onFail;
+
+        boolean fromDevEngines;
     }
 
     static PnpmOptions load(@Nullable String workspaceManifest, @Nullable Map<String, @Nullable Object> rootManifest,
@@ -222,7 +246,111 @@ final class PnpmOptions {
                 packageLock instanceof Boolean ? packageLock : false);
         Object gitBranchLockfile = config.get("gitBranchLockfile");
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
-        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns);
+        WantedPackageManager wantedPackageManager = rootManifest == null ? null :
+                getWantedPackageManager(rootManifest);
+        if (wantedPackageManager != null) {
+            Object pmOnFail = config.get("pmOnFail");
+            if (Js.truthy(pmOnFail)) {
+                wantedPackageManager = wantedPackageManager.withOnFail(pmOnFail);
+            } else if (wantedPackageManager.getOnFail() == null) {
+                wantedPackageManager = wantedPackageManager.withOnFail("download");
+            }
+        }
+        return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager);
+    }
+
+    static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest) {
+        WantedPackageManager pmFromDevEngines = parseDevEnginesPackageManager(manifest.get("devEngines"));
+        if (pmFromDevEngines != null) {
+            Object version = pmFromDevEngines.getVersion();
+            if (version != null && !(version instanceof String &&
+                                     NodeSemver.validRange((String) version, NodeSemver.Options.DEFAULT) != null)) {
+                pmFromDevEngines = pmFromDevEngines.withVersion(null);
+            }
+            return pmFromDevEngines.withFromDevEngines(true);
+        }
+        Object packageManager = manifest.get("packageManager");
+        if (!Js.truthy(packageManager)) {
+            return null;
+        }
+        if (!(packageManager instanceof String)) {
+            throw new CannotKnow("what pnpm makes of packageManager (" + Js.typeOf(packageManager) +
+                                 ", where pnpm reads a string)");
+        }
+        String[] pm = parsePackageManager((String) packageManager);
+        String version = pm[1];
+        if (version != null) {
+            String cleanVersion = NodeSemver.valid(version, NodeSemver.Options.DEFAULT);
+            if (cleanVersion == null || !cleanVersion.equals(version)) {
+                version = null;
+            }
+        }
+        return new WantedPackageManager(pm[0], version, null, false);
+    }
+
+    /**
+     * {@code parsePackageManager}: the name and version of {@code <name>@<version>[+<hash>]}.
+     */
+    static @Nullable String[] parsePackageManager(String packageManager) {
+        if (!packageManager.contains("@")) {
+            return new String[]{packageManager, null};
+        }
+        String[] parts = packageManager.split("@", -1);
+        String pmReference = parts[1];
+        if (pmReference.contains(":")) {
+            return new String[]{parts[0], null};
+        }
+        return new String[]{parts[0], pmReference.split("\\+", -1)[0]};
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable WantedPackageManager parseDevEnginesPackageManager(@Nullable Object devEngines) {
+        Object packageManager = devEngines instanceof Map ?
+                ((Map<String, @Nullable Object>) devEngines).get("packageManager") : null;
+        if (!Js.truthy(packageManager)) {
+            return null;
+        }
+        Object pmEngine;
+        Object onFail;
+        if (packageManager instanceof List) {
+            List<@Nullable Object> engines = (List<@Nullable Object>) packageManager;
+            if (engines.isEmpty()) {
+                return null;
+            }
+            int pnpmIndex = -1;
+            for (int i = 0; i < engines.size() && pnpmIndex == -1; i++) {
+                if ("pnpm".equals(property(engines.get(i), "name"))) {
+                    pnpmIndex = i;
+                }
+            }
+            if (pnpmIndex != -1) {
+                pmEngine = engines.get(pnpmIndex);
+                Object own = property(pmEngine, "onFail");
+                onFail = own != null ? own : pnpmIndex == engines.size() - 1 ? "error" : "ignore";
+            } else {
+                pmEngine = engines.get(0);
+                Object own = property(engines.get(engines.size() - 1), "onFail");
+                onFail = own != null ? own : "error";
+            }
+        } else {
+            pmEngine = packageManager;
+            onFail = property(pmEngine, "onFail");
+        }
+        Object name = pmEngine instanceof Map ? ((Map<String, @Nullable Object>) pmEngine).get("name") : null;
+        if (!Js.truthy(name)) {
+            return null;
+        }
+        return new WantedPackageManager(name, property(pmEngine, "version"), onFail, false);
+    }
+
+    // value.key where pnpm reads a property: undefined on a primitive, a TypeError on null or undefined
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object property(@Nullable Object value, String key) {
+        if (value == null || value == JsYaml.UNDEFINED) {
+            throw new JsError("Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
+        }
+        Object property = value instanceof Map ? ((Map<String, @Nullable Object>) value).get(key) : null;
+        return property == JsYaml.UNDEFINED ? null : property;
     }
 
     // config/reader's defaultOptions, by pnpm's own (kebab-case) names, as far as a lock-only install reads them

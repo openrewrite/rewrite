@@ -1,0 +1,1 @@
+Add configDependencies is-positive in the object form with a version in its integrity and a registry.yarnpkg.com tarball over a wrappy lock: pnpm migrates it into the env document and keeps the tarball it cannot derive.

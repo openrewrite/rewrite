@@ -16,13 +16,15 @@
 /**
  * pnpm's lockfile model and resolver, ported from pnpm 11.2.2 (pnpm/pnpm, tag v11.2.2): lockfile/types,
  * lockfile/fs (read, write, the format converters, sortLockfileKeys, the env document), lockfile/merger,
- * lockfile/settings-checker, lockfile/verification, lockfile/preferred-versions, deps/path, object/key-sorting,
- * config/reader (the .npmrc, pnpm-workspace.yaml and environment settings), config/matcher, config/version-policy,
- * config/pick-registry-for-package, config/parse-overrides, catalogs/*, workspace/workspace-manifest-reader,
- * workspace/projects-reader, resolving/resolver-base, resolving/parse-wanted-dependency, resolving/npm-resolver
+ * lockfile/settings-checker, lockfile/verification, lockfile/preferred-versions, lockfile/utils, deps/path,
+ * object/key-sorting, config/reader (the .npmrc, pnpm-workspace.yaml and environment settings), config/matcher,
+ * config/version-policy, config/pick-registry-for-package, config/parse-overrides, catalogs/*,
+ * workspace/workspace-manifest-reader, workspace/project-manifest-reader, workspace/projects-reader,
+ * pkg-manifest/utils, resolving/resolver-base, resolving/parse-wanted-dependency, resolving/npm-resolver
  * (pickPackage, pickPackageFromMeta, the resolution verifier, trustChecks), resolving/registry/pkg-metadata-filter,
- * crypto/object-hasher, crypto/hash and installing/deps-installer (the lock-only install and the lockfile's
- * verification). pnpm is distributed under the MIT License:
+ * crypto/object-hasher, crypto/hash, installing/env-installer, installing/deps-installer (the lock-only install and
+ * the lockfile's verification) and the pnpm command's own checks before an install. pnpm is distributed under the
+ * MIT License:
  * <pre>
  * Copyright (c) 2015-2016 Rico Sta. Cruz and other contributors
  * Copyright (c) 2016-2026 Zoltan Kochan and other contributors
@@ -51,7 +53,8 @@
  * (https://sindresorhus.com)) with @pnpm/util.lex-comparator 3.0.2 and comver-to-semver 2.0.0 (Copyright (c)
  * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
  * version-selector-type 3.0.0 (Copyright (c) 2017-2020 Zoltan Kochan &lt;z@kochan.io&gt;); parse-npm-tarball-url
- * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); and @pnpm/config.env-replace 4.1.0.
+ * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); get-npm-tarball-url 2.1.0
+ * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); and @pnpm/config.env-replace 4.1.0.
  * <p>
  * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2, distributed under the ISC License:
  * <pre>

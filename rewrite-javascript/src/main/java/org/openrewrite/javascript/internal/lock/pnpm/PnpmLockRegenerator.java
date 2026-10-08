@@ -20,6 +20,7 @@ import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -29,8 +30,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/installing.deps-installer src/install/index.ts (pnpm 11.2.2) for {@code pnpm install
- * --lockfile-only}, with @pnpm/installing.context's {@code readLockfiles}, up to the resolution.
+ * Port of pnpm 11.2.2's {@code pnpm install --lockfile-only} up to the resolution: pnpm/src main.ts and getConfig.ts
+ * before the command, then @pnpm/installing.commands installDeps and @pnpm/installing.deps-installer install/index.ts.
  */
 public final class PnpmLockRegenerator {
 
@@ -90,6 +91,18 @@ public final class PnpmLockRegenerator {
         @Nullable
         String resolution;
 
+        /**
+         * The pnpm version or range pnpm resolves into the env document's packageManagerDependencies first; null
+         * when it does not.
+         */
+        @Nullable
+        String packageManagerToResolve;
+
+        /**
+         * The config dependencies pnpm resolves into the env document first, name to specifier.
+         */
+        Map<String, String> configDependenciesToResolve;
+
         LockfileObject wantedLockfile;
 
         PnpmOptions options;
@@ -99,6 +112,8 @@ public final class PnpmLockRegenerator {
         boolean lockfileHadConflicts;
     }
 
+
+    private static final String PNPM_VERSION = "11.2.2";
 
     private final Inputs inputs;
 
@@ -112,13 +127,37 @@ public final class PnpmLockRegenerator {
     Install install() {
         String rootManifestText = inputs.getManifests().get("");
         Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
-        for (String pnpmfile : new String[]{".pnpmfile.mjs", ".pnpmfile.cjs"}) {
-            if (inputs.getFiles().containsKey(pnpmfile)) {
-                throw new CannotKnow("what " + pnpmfile + " does (pnpm runs its hooks)");
-            }
-        }
         PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"),
                 inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
+        String lockText = inputs.getLock();
+        String packageManagerToResolve = checkWantedPackageManager(options, EnvLockfile.readEnvLockfile(lockText));
+
+        Object configDependencies = options.get("configDependencies");
+        Map<String, String> configDependenciesToResolve = Collections.emptyMap();
+        if (Js.truthy(configDependencies)) {
+            if (!(configDependencies instanceof Map)) {
+                throw new CannotKnow("what pnpm makes of configDependencies (" + Js.typeOf(configDependencies) +
+                                     ", where pnpm reads an object)");
+            }
+            EnvLockfile envLockfile = EnvLockfile.readEnvLockfile(lockText);
+            if (envLockfile == null) {
+                envLockfile = EnvLockfile.createEnvLockfile();
+            }
+            @SuppressWarnings("unchecked")
+            EnvInstaller.ConfigDepsResult configDeps = EnvInstaller.resolveAndInstallConfigDeps(
+                    (Map<String, @Nullable Object>) configDependencies, envLockfile, options.getRegistries());
+            configDependenciesToResolve = configDeps.getDepsToResolve();
+            if (configDependenciesToResolve.isEmpty() && configDeps.isLockfileChanged()) {
+                lockText = EnvLockfile.writeEnvLockfile(lockText, envLockfile);
+            }
+        }
+        loadHooks(options, configDependencies);
+
+        boolean workspace = options.getWorkspacePackagePatterns() != null;
+        List<Verification.Project> projectManifests = projects(options, workspace);
+        if (!workspace) {
+            agent(options);
+        }
         if (!options.isTrue("useLockfile")) {
             throw new PnpmError("CONFIG_CONFLICT_LOCKFILE_ONLY_WITH_NO_LOCKFILE", "Cannot generate a " +
                     LockfileReader.WANTED_LOCKFILE + " because lockfile is set to false");
@@ -131,16 +170,22 @@ public final class PnpmLockRegenerator {
             branchPattern instanceof List && !((List<?>) branchPattern).isEmpty()) {
             throw new CannotKnow("the git branch lockfiles mergeGitBranchLockfiles merges");
         }
-        boolean workspace = options.getWorkspacePackagePatterns() != null;
         List<ParseOverrides.VersionOverride> parsedOverrides = ParseOverrides.parseOverrides(options.getOverrides(),
                 options.getCatalogs());
         ReadPackageHook readPackageHook = ReadPackageHook.createReadPackageHook(
                 options.isTrue("ignoreCompatibilityDb"), "", parsedOverrides,
                 options.get("ignoredOptionalDependencies"), options.get("packageExtensions"));
-        List<Verification.Project> projects = projects(options, workspace, readPackageHook);
+        if (workspace && !projectManifests.isEmpty()) {
+            agent(options);
+        }
+        List<Verification.Project> projects = new ArrayList<>();
+        for (Verification.Project project : projectManifests) {
+            projects.add(readPackageHook == null ? project : new Verification.Project(project.getRootDir(),
+                    project.getId(), readPackageHook.apply(project.getManifest(), project.getRootDir())));
+        }
 
-        LockfileReader.ReadResult read = inputs.getLock() == null ? new LockfileReader.ReadResult(null, false) :
-                LockfileReader.read(inputs.getLock());
+        LockfileReader.ReadResult read = lockText == null ? new LockfileReader.ReadResult(null, false) :
+                LockfileReader.read(lockText);
         if (read.getLockfile() == null) {
             throw new LockfileReader.IgnoredLockfile("no " + LockfileReader.WANTED_LOCKFILE);
         }
@@ -191,8 +236,8 @@ public final class PnpmLockRegenerator {
             wantedLockfile.set("pnpmfileChecksum", JsYaml.UNDEFINED);
             wantedLockfile.set("patchedDependencies", patchedDependencies);
             return new Install(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
-                    "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), wantedLockfile, options,
-                    projects, read.isHadConflicts());
+                    "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), packageManagerToResolve,
+                    configDependenciesToResolve, wantedLockfile, options, projects, read.isHadConflicts());
         }
 
         boolean pruneLockfileImporters = workspace;
@@ -215,14 +260,16 @@ public final class PnpmLockRegenerator {
             reason = "projects not up to date with the lock";
         }
         if (reason != null) {
-            return new Install(null, reason, wantedLockfile, options, projects, read.isHadConflicts());
+            return new Install(null, reason, packageManagerToResolve, configDependenciesToResolve, wantedLockfile,
+                    options, projects, read.isHadConflicts());
         }
-        return new Install(LockfileWriter.writeWantedLockfile(wantedLockfile, inputs.getLock()), null, wantedLockfile,
-                options, projects, false);
+        boolean envResolves = packageManagerToResolve != null || !configDependenciesToResolve.isEmpty();
+        return new Install(envResolves ? null : LockfileWriter.writeWantedLockfile(wantedLockfile, lockText), null,
+                packageManagerToResolve, configDependenciesToResolve, wantedLockfile, options, projects, false);
     }
 
-    private List<Verification.Project> projects(PnpmOptions options, boolean workspace,
-                                                @Nullable ReadPackageHook readPackageHook) {
+    // installDeps: each project's manifest as read, under the runtimeOnFail setting
+    private List<Verification.Project> projects(PnpmOptions options, boolean workspace) {
         List<String> dirs = new ArrayList<>();
         if (workspace) {
             dirs.addAll(FindPackages.findWorkspaceProjects(inputs.getManifests().keySet(),
@@ -230,6 +277,7 @@ public final class PnpmLockRegenerator {
         } else {
             dirs.add("");
         }
+        Object runtimeOnFail = options.get("runtimeOnFail");
         List<Verification.Project> projects = new ArrayList<>();
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
@@ -239,18 +287,191 @@ public final class PnpmLockRegenerator {
                 }
                 continue;
             }
-            String path = dir.isEmpty() ? "package.json" : dir + "/package.json";
-            Map<String, @Nullable Object> manifest = Manifests.parse(text, path);
-            projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir),
-                    readPackageHook == null ? manifest : readPackageHook.apply(manifest, dir)));
+            Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
+                    dir.isEmpty() ? "package.json" : dir + "/package.json");
+            if (Js.truthy(runtimeOnFail)) {
+                PkgManifestUtils.applyRuntimeOnFailOverride(manifest, runtimeOnFail);
+            }
+            projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir), manifest));
         }
         return projects;
     }
 
-    // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON
+    // main.ts: the wanted package manager is checked before anything else, and a pnpm release other than this one
+    // takes the install over; what pnpm resolves into the env document's packageManagerDependencies, or null
+    private @Nullable String checkWantedPackageManager(PnpmOptions options, @Nullable EnvLockfile envLockfile) {
+        PnpmOptions.WantedPackageManager pm = options.getWantedPackageManager();
+        if (pm == null || "ignore".equals(pm.getOnFail())) {
+            return null;
+        }
+        boolean underCorepack = inputs.getEnv() != null && inputs.getEnv().containsKey("COREPACK_ROOT");
+        if ("pnpm".equals(pm.getName()) && "download".equals(pm.getOnFail()) && !underCorepack) {
+            return switchCliVersion(pm, envLockfile);
+        }
+        checkPackageManager(pm, underCorepack);
+        return syncEnvLockfile(pm, envLockfile);
+    }
+
+    private static @Nullable String switchCliVersion(PnpmOptions.WantedPackageManager pm,
+                                                     @Nullable EnvLockfile envLockfile) {
+        if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null) {
+            return null;
+        }
+        String version = Js.string(pm.getVersion());
+        boolean persistLockfile = shouldPersistLockfile(pm);
+        if (!persistLockfile && PNPM_VERSION.equals(version)) {
+            return null;
+        }
+        EnvLockfile locked = persistLockfile ? envLockfile : null;
+        Object pmVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
+                "pnpm");
+        if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            // the registry decides the release, which is this one only within a range the env document records
+            if (!persistLockfile ||
+                !NodeSemver.satisfies(PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+                throw switchesTo(version);
+            }
+            return version;
+        }
+        if (!PNPM_VERSION.equals(pmVersion)) {
+            throw switchesTo(Js.string(pmVersion));
+        }
+        return EnvInstaller.isPackageManagerResolved(locked, PNPM_VERSION) ? null : PNPM_VERSION;
+    }
+
+    private static CannotKnow switchesTo(String release) {
+        return new CannotKnow("the lock pnpm " + release + " writes (pnpm " + PNPM_VERSION + " hands the install " +
+                              "to the release the project names)");
+    }
+
+    private static void checkPackageManager(PnpmOptions.WantedPackageManager pm, boolean underCorepack) {
+        if (!Js.truthy(pm.getName())) {
+            return;
+        }
+        boolean shouldError = "error".equals(pm.getOnFail()) || "download".equals(pm.getOnFail());
+        if (!"pnpm".equals(pm.getName())) {
+            if (shouldError) {
+                throw new PnpmError("OTHER_PM_EXPECTED", "This project is configured to use " +
+                                                         Js.string(pm.getName()));
+            }
+            return;
+        }
+        if (Js.truthy(pm.getVersion()) &&
+            !NodeSemver.satisfies(PNPM_VERSION, Js.string(pm.getVersion()), NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            String msg = "This project is configured to use " + Js.string(pm.getVersion()) +
+                         " of pnpm. Your current pnpm is v" + PNPM_VERSION;
+            if (underCorepack) {
+                msg += "\nCorepack invoked pnpm with this version, and pnpm does not switch versions when running " +
+                       "under corepack.";
+            }
+            if (shouldError) {
+                String baseHint = "If you want to bypass this version check, you can set the \"pmOnFail\" " +
+                                  "configuration to \"warn\" or \"ignore\" (e.g. via --pm-on-fail=ignore). If using " +
+                                  "\"devEngines.packageManager\", you can set its \"onFail\" to \"warn\" or \"ignore\"";
+                throw new PnpmError("BAD_PM_VERSION", msg, underCorepack ?
+                        "Align the \"packageManager\" field in package.json with \"devEngines.packageManager\", " +
+                        "or invoke pnpm directly (without corepack) so it can switch versions automatically.\n" +
+                        baseHint : baseHint);
+            }
+        }
+    }
+
+    static @Nullable String syncEnvLockfile(PnpmOptions.WantedPackageManager pm, @Nullable EnvLockfile envLockfile) {
+        if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null || !shouldPersistLockfile(pm)) {
+            return null;
+        }
+        String version = Js.string(pm.getVersion());
+        if (!NodeSemver.satisfies(PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            return null;
+        }
+        Object lockedVersion = EnvInstaller.lockedVersion(envLockfile == null ? null :
+                envLockfile.packageManagerDependencies(), "pnpm");
+        if (lockedVersion != null && lockedVersion != JsYaml.UNDEFINED &&
+            NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            return null;
+        }
+        return PNPM_VERSION;
+    }
+
+    static boolean shouldPersistLockfile(PnpmOptions.WantedPackageManager pm) {
+        if (pm.isFromDevEngines()) {
+            return true;
+        }
+        if (pm.getVersion() == null) {
+            return false;
+        }
+        String valid = NodeSemver.valid(Js.string(pm.getVersion()), NodeSemver.Options.DEFAULT);
+        return valid != null && Long.parseLong(valid.substring(0, valid.indexOf('.'))) >= 12;
+    }
+
+    // installConfigDepsAndLoadHooks: every pnpmfile pnpm loads is JavaScript, its plugins' among them
+    private void loadHooks(PnpmOptions options, @Nullable Object configDependencies) {
+        if (options.isTrue("ignorePnpmfile")) {
+            return;
+        }
+        if (configDependencies instanceof Map) {
+            @SuppressWarnings("unchecked")
+            List<String> names = new ArrayList<>(Js.keys((Map<String, @Nullable Object>) configDependencies));
+            Collections.sort(names);
+            for (String name : names) {
+                if (isPluginName(name)) {
+                    throw new CannotKnow("what the pnpmfile of the config dependency " + name + " does (pnpm runs " +
+                                         "its hooks)");
+                }
+            }
+        }
+        Object globalPnpmfile = options.get("globalPnpmfile");
+        if (Js.truthy(globalPnpmfile)) {
+            throw new CannotKnow("what " + Js.string(globalPnpmfile) + " does (pnpm runs its hooks)");
+        }
+        Object pnpmfile = options.get("pnpmfile");
+        if (pnpmfile == null || pnpmfile == JsYaml.UNDEFINED) {
+            for (String defaultPnpmfile : new String[]{".pnpmfile.mjs", ".pnpmfile.cjs"}) {
+                if (inputs.getFiles().containsKey(defaultPnpmfile)) {
+                    throw new CannotKnow("what " + defaultPnpmfile + " does (pnpm runs its hooks)");
+                }
+            }
+            return;
+        }
+        Object first = pnpmfile instanceof List ? ((List<?>) pnpmfile).isEmpty() ? null : ((List<?>) pnpmfile).get(0) :
+                pnpmfile;
+        if (first != null) {
+            throw new CannotKnow("what " + Js.string(first) + " does (pnpm runs its hooks, or fails when there is " +
+                                 "no such file)");
+        }
+    }
+
+    private static boolean isPluginName(String configDepName) {
+        if (configDepName.startsWith("pnpm-plugin-")) {
+            return true;
+        }
+        if (configDepName.isEmpty() || configDepName.charAt(0) != '@') {
+            return false;
+        }
+        return configDepName.startsWith("@pnpm/plugin-") || configDepName.contains("/pnpm-plugin-");
+    }
+
+    // install / mutateModules: with an agent configured, the agent server resolves the install
+    private static void agent(PnpmOptions options) {
+        Object agent = options.get("agent");
+        if (!Js.truthy(agent)) {
+            return;
+        }
+        if ("no-downgrade".equals(options.get("trustPolicy"))) {
+            throw new PnpmError("TRUST_POLICY_INCOMPATIBLE_WITH_AGENT", "The pnpm agent does not yet enforce " +
+                    "`trustPolicy: no-downgrade`, so running an install through the agent under this policy would " +
+                    "produce a lockfile that the local verifier rejects.", "Unset `trustPolicy` for this install, or " +
+                    "disable the agent (unset `--agent` / `agent` in pnpm-workspace.yaml) so resolution runs locally " +
+                    "and the trust check applies.");
+        }
+        throw new CannotKnow("what the pnpm agent at " + Js.string(agent) + " resolves");
+    }
+
+    // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON; config
+    // reads it as every project manifest is read
     private static Map<String, @Nullable Object> rootManifest(String text) {
         try {
-            return Manifests.parse(text, "package.json");
+            return Manifests.readProjectManifest(text, "package.json");
         } catch (PnpmError e) {
             if ("ERR_PNPM_JSON_PARSE".equals(e.getCode())) {
                 throw new JsError("ERR_INVALID_PACKAGE_CONFIG", "Invalid package config package.json.");
