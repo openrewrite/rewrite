@@ -2485,8 +2485,9 @@ function withRequire(declaration: J.VariableDeclarations, module: string, patter
 }
 
 /**
- * The binding a require's `pattern` gives up, shaped for `member` of its target under `boundName`:
- * a name for a whole module, a destructured element for a member. An element keeps a default it has.
+ * The binding a require's `pattern` gives up, shaped for `member` of its target under `boundName`.
+ * A whole module binds as a name and a member as a destructured element.
+ * An element keeps a default it has.
  */
 function movedBinding(
     pattern: J,
@@ -2583,12 +2584,7 @@ function withElementAt(
     return {...pattern, bindings: {...pattern.bindings, elements}};
 }
 
-/** `pattern` with `binding` appended, unless it already binds that member under that name. */
 function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElement): JS.ObjectBindingPattern {
-    const bound = bindingNames(binding)[0];
-    if (bindingNames(pattern).some(b => b.name === bound.name && b.member === bound.member)) {
-        return pattern;
-    }
     const elements = pattern.bindings.elements;
     const last = elements[elements.length - 1];
     const first = elements[0].element.prefix;

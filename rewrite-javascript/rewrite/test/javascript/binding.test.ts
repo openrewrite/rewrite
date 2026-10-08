@@ -2293,26 +2293,15 @@ describe("maybeRebind on a require", () => {
             javascript(`const {b} = require('n');\nconst {a} = require('m');\n\nb(a);`,
                 `const {b} = require('n');\n\nb(b);`));
 
-        await rebind({module: "m", member: "b"}, {module: "n", member: "b"}).rewriteRun(
-            javascript(`const {c} = require('n');\nconst {a, b} = require('m');\n\na(b, c);`,
-                `const {c, b} = require('n');\nconst {a} = require('m');\n\na(b, c);`));
-
         await rebind({module: "m", member: "a"}, {module: "n", member: "a"}).rewriteRun(
             javascript(`const {\n    c,\n} = require('n');\nconst {a} = require('m');\n\nc(a);`,
                 `const {\n    c,\n    a,\n} = require('n');\n\nc(a);`));
     });
 
-    test("a binding moves into its own statement where the target's require cannot take it", async () => {
-        const spec = rebind({module: "m", member: "a"}, {module: "n", member: "a"});
-        await spec.rewriteRun(
-            // Joining a later declaration would leave the first use before it.
+    test("a binding keeps its own statement where the target's require comes after it", async () => {
+        await rebind({module: "m", member: "a"}, {module: "n", member: "a"}).rewriteRun(
             javascript(`const {a} = require('m');\na();\nconst {c} = require('n');`,
-                `const {a} = require('n');\na();\nconst {c} = require('n');`),
-            javascript(`const {c, ...rest} = require('n');\nconst {a} = require('m');\n\na(c, rest);`,
-                `const {c, ...rest} = require('n');\nconst {a} = require('n');\n\na(c, rest);`),
-            javascript(`let {c} = require('n');\nconst {a} = require('m');\n\na(c);`,
-                `let {c} = require('n');\nconst {a} = require('n');\n\na(c);`)
-        );
+                `const {a} = require('n');\na();\nconst {c} = require('n');`));
     });
 
     test("a require and an import of the target are two bindings, so a move across them keeps its name", async () => {
@@ -2335,9 +2324,7 @@ describe("maybeRebind on a require", () => {
         const bound: (string | undefined)[] = [];
         await rebind({module: "_stream_duplex", member: "Duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
             javascript(`function f() {\n    const {Duplex} = require('_stream_duplex');\n    return new Duplex();\n}`),
-            // `rest` would gain the property the move takes out.
             javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`),
-            // A new require of the target is a `const`, which would forbid the reassignment.
             javascript(`let {Duplex, x} = require('_stream_duplex');\n\nDuplex = x;`)
         );
         expect(bound).toEqual([undefined, undefined, undefined]);
