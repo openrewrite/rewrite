@@ -53,6 +53,45 @@ final class PreferredVersions {
         }
     }
 
+    /**
+     * A {@code PreferredVersions} object: the selectors by package name it holds itself, then those of the object it
+     * was created from ({@code Object.create(parent)}).
+     */
+    static final class ByName {
+        private final Map<String, Map<String, Selector>> own;
+        private final @Nullable ByName parent;
+
+        ByName(Map<String, Map<String, Selector>> own, @Nullable ByName parent) {
+            this.own = own;
+            this.parent = parent;
+        }
+
+        static ByName of(Map<String, Map<String, Selector>> own) {
+            return new ByName(own, null);
+        }
+
+        @Nullable
+        Map<String, Selector> get(String name) {
+            Map<String, Selector> selectors = own.get(name);
+            return selectors != null || parent == null ? selectors : parent.get(name);
+        }
+
+        boolean hasOwn(String name) {
+            return own.containsKey(name);
+        }
+
+        void put(String name, Map<String, Selector> selectors) {
+            own.put(name, selectors);
+        }
+
+        /**
+         * {@code {...object}}: its own selectors alone.
+         */
+        Map<String, Map<String, Selector>> spreadOwn() {
+            return new LinkedHashMap<>(own);
+        }
+    }
+
     private PreferredVersions() {
     }
 

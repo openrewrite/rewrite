@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Function;
 
@@ -121,6 +122,129 @@ final class PickPackage {
             Map<String, @Nullable Object> meta) {
         return pickerOpts.getPublishedBy() != null ? pickRespectingMinReleaseAge(pickerOpts, spec, meta) :
                 pickIgnoringReleaseAge(pickerOpts, spec, meta);
+    }
+
+    /**
+     * {@code pickPackage}'s result: the packument read and the version it selected.
+     */
+    @Value
+    static class PickResult {
+        Map<String, @Nullable Object> meta;
+
+        @Nullable
+        Map<String, @Nullable Object> pickedPackage;
+    }
+
+    /**
+     * {@code pickPackage} as a lock-only install runs it: no metadata on disk, the run's own cache of each packument
+     * (abbreviated, or full for an optional dependency), and the full one fetched when the abbreviated document says
+     * the package changed after the release-age cutoff.
+     */
+    static PickResult pickPackage(Map<String, Map<String, @Nullable Object>> metaCache, RegistryMetadata registry,
+                                  PickPackageFromMeta.RegistryPackageSpec spec, PickerOptions pickerOpts,
+                                  String registryUrl, boolean optional, boolean filterMetadata) {
+        String name = spec.getName();
+        if (name.contains("/") && name.charAt(0) != '@') {
+            throw new PnpmError("INVALID_PACKAGE_NAME", "Package name " + name + " is invalid, it should have a @scope");
+        }
+        boolean fullMetadata = optional || filterMetadata;
+        String cacheKey = fullMetadata ? name + ":full" : name;
+        Map<String, @Nullable Object> cached = metaCache.get(cacheKey);
+        if (cached != null) {
+            Map<String, @Nullable Object> upgraded = maybeUpgradeForReleaseAge(registry, spec, pickerOpts, registryUrl,
+                    cached);
+            if (upgraded != cached) {
+                metaCache.put(cacheKey, upgraded);
+            }
+            return new PickResult(upgraded, pickMatchingVersionFinal(pickerOpts, spec, upgraded));
+        }
+        Map<String, @Nullable Object> meta = fetch(registry, registryUrl, name, fullMetadata);
+        if (pickerOpts.getPublishedBy() != null && !fullMetadata && meta.get("time") == null &&
+            !excluded(pickerOpts, name)) {
+            Instant modified = modifiedDate(meta);
+            if (modified == null || modified.isAfter(pickerOpts.getPublishedBy())) {
+                meta = fetch(registry, registryUrl, name, true);
+            }
+        }
+        if (filterMetadata) {
+            meta = clearMeta(meta);
+        }
+        metaCache.put(cacheKey, meta);
+        return new PickResult(meta, pickMatchingVersionFinal(pickerOpts, spec, meta));
+    }
+
+    private static Map<String, @Nullable Object> maybeUpgradeForReleaseAge(
+            RegistryMetadata registry, PickPackageFromMeta.RegistryPackageSpec spec, PickerOptions pickerOpts,
+            String registryUrl, Map<String, @Nullable Object> meta) {
+        if (pickerOpts.getPublishedBy() == null || meta.get("time") != null || excluded(pickerOpts, spec.getName())) {
+            return meta;
+        }
+        Instant modified = modifiedDate(meta);
+        if (modified != null && !modified.isAfter(pickerOpts.getPublishedBy())) {
+            return meta;
+        }
+        return fetch(registry, registryUrl, spec.getName(), true);
+    }
+
+    private static final String[] VERSION_FIELDS = {"name", "version", "bin", "directories", "devDependencies",
+            "optionalDependencies", "dependencies", "peerDependencies", "dist", "engines", "peerDependenciesMeta", "cpu",
+            "os", "libc", "deprecated", "bundleDependencies", "bundledDependencies", "hasInstallScript", "_npmUser"};
+
+    // clearMeta: the abbreviated document's fields of each version, with libc
+    private static Map<String, @Nullable Object> clearMeta(Map<String, @Nullable Object> pkg) {
+        Map<String, @Nullable Object> versions = new LinkedHashMap<>();
+        Map<String, @Nullable Object> all = ResolveDependencies.asMap(pkg.get("versions"));
+        for (String version : Js.keys(all)) {
+            Map<String, @Nullable Object> info = ResolveDependencies.asMap(all.get(version));
+            Map<String, @Nullable Object> picked = new LinkedHashMap<>();
+            for (String field : VERSION_FIELDS) {
+                if (info.containsKey(field)) {
+                    picked.put(field, info.get(field));
+                }
+            }
+            versions.put(version, picked);
+        }
+        Map<String, @Nullable Object> out = new LinkedHashMap<>();
+        out.put("name", pkg.get("name"));
+        out.put("dist-tags", pkg.get("dist-tags"));
+        out.put("versions", versions);
+        out.put("time", pkg.get("time"));
+        out.put("modified", pkg.get("modified"));
+        return out;
+    }
+
+    private static boolean excluded(PickerOptions pickerOpts, String name) {
+        return pickerOpts.getPublishedByExclude() != null &&
+               Boolean.TRUE.equals(pickerOpts.getPublishedByExclude().apply(name));
+    }
+
+    private static @Nullable Instant modifiedDate(Map<String, @Nullable Object> meta) {
+        Object modified = meta.get("modified");
+        if (!Js.truthy(modified)) {
+            return null;
+        }
+        double time = Js.dateParse(Js.string(modified));
+        return Double.isNaN(time) ? null : Instant.ofEpochMilli((long) time);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> fetch(RegistryMetadata registry, String registryUrl, String name,
+                                                       boolean fullMetadata) {
+        String text = registry.packument(registryUrl, name, fullMetadata);
+        if (text == null) {
+            throw new PnpmError("FETCH_404", "GET " + registryUrl + encodeName(name) + ": Not Found - 404",
+                    name + " is not in the npm registry, or you have no permission to fetch it.");
+        }
+        Object meta = Manifests.parseValue(text, registryUrl + name);
+        if (!(meta instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of the packument of " + name + " (JSON, but not an object)");
+        }
+        return (Map<String, @Nullable Object>) meta;
+    }
+
+    // the registry path of a name, a scoped name's slash escaped
+    private static String encodeName(String name) {
+        return name.startsWith("@") ? name.replace("/", "%2F") : name;
     }
 
     /**

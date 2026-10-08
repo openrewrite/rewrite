@@ -361,14 +361,59 @@ class NativeLockEngineTest {
     }
 
     @Test
-    void pnpmLegacyLockfileVersionUnsupported() {
+    void pnpmDiscardsALockOfAnotherMajor() {
         Result result = regen(PackageManager.Pnpm,
                 "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
                 "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
                 "lockfileVersion: 5.4\n");
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getReason()).isEqualTo(Reason.UNSUPPORTED_LOCKFILE_VERSION);
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    @Test
+    void pnpmRegeneratesFromItsWorkspaceManifest() {
+        String scenario = "lock/pnpm/small-overrides-ws-direct/";
+        routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/pnpm-workspace.yaml"), resource(scenario + "workspace"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void pnpmReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/pnpm/small-ws-member-bump/";
+        routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.Pnpm, Request.builder()
+                .packageJson(resource(scenario + "tree/packages/a/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/a/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/b/package.json"),
+                        resource(scenario + "tree-before/packages/b/package.json"))
+                .packageManagerFile(Paths.get("pnpm-workspace.yaml"), resource(scenario + "workspace-before"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void pnpmWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{}}", "{\"dependencies\":{\"ms\":\"2.0.0\"}}",
+                null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
 
     @Test

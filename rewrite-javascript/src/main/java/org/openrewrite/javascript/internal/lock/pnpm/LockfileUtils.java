@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -62,6 +63,57 @@ final class LockfileUtils {
         }
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
         out.put("integrity", integrity);
+        return out;
+    }
+
+    /**
+     * {@code pkgSnapshotToResolution}: the resolution a snapshot records, its tarball URL filled in for a registry
+     * package.
+     */
+    static Map<String, @Nullable Object> pkgSnapshotToResolution(String depPath, PackageSnapshot pkgSnapshot,
+                                                                 Map<String, String> registries) {
+        Map<String, @Nullable Object> resolution = pkgSnapshot.getResolution();
+        if (resolution == null) {
+            resolution = new LinkedHashMap<>();
+        }
+        Object tarball = resolution.get("tarball");
+        if (Js.truthy(resolution.get("type")) || tarball instanceof String && ((String) tarball).startsWith("file:") ||
+            Boolean.TRUE.equals(resolution.get("gitHosted"))) {
+            return resolution;
+        }
+        DepPath.DependencyPath parsed = DepPath.parse(depPath);
+        String nonSemverVersion = parsed.getNonSemverVersion();
+        if (nonSemverVersion != null && nonSemverVersion.startsWith("file:")) {
+            Map<String, @Nullable Object> out = new LinkedHashMap<>(resolution);
+            out.put("tarball", nonSemverVersion);
+            return out;
+        }
+        String name = parsed.getName();
+        String version = pkgSnapshot.getVersion() != null ? pkgSnapshot.getVersion() : parsed.getVersion();
+        String registry = "";
+        if (name != null && !name.isEmpty() && name.charAt(0) == '@') {
+            String scoped = registries.get(name.split("/", -1)[0]);
+            registry = scoped == null ? "" : scoped;
+        }
+        if (registry.isEmpty()) {
+            registry = registries.get("default");
+        }
+        String url;
+        if (!Js.truthy(tarball)) {
+            if (name == null || version == null) {
+                throw new JsError("Couldn't get tarball URL from dependency path " + depPath);
+            }
+            url = getNpmTarballUrl(name, version, registry);
+        } else {
+            WhatwgUrl parsedUrl = WhatwgUrl.tryParse(Js.string(tarball), registry.endsWith("/") ? registry :
+                    registry + "/");
+            if (parsedUrl == null) {
+                throw new JsError("TypeError: Invalid URL");
+            }
+            url = parsedUrl.toString();
+        }
+        Map<String, @Nullable Object> out = new LinkedHashMap<>(resolution);
+        out.put("tarball", url);
         return out;
     }
 

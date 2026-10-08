@@ -4,10 +4,10 @@ Date: 2026-07-28
 
 ## Status
 
-Accepted. For npm, Bun, Yarn classic and Yarn Berry, superseded by
-[ADR 0013](0013-lock-regeneration-follows-each-package-manager.md): each of those routes is a port of the
-package manager's own resolver that writes the whole lock, so the byte-preserving patching, the per-dependency
-whitelist and the `RESOLUTION_REQUIRED` refusals below describe pnpm only.
+Superseded by [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md): every route (npm, pnpm, Bun,
+Yarn classic, Yarn Berry) is a port of the package manager's own resolver that writes the whole lock. The
+byte-preserving patching, the per-dependency whitelist and the `RESOLUTION_REQUIRED` refusals below describe the
+engine that was removed.
 
 ## Context
 

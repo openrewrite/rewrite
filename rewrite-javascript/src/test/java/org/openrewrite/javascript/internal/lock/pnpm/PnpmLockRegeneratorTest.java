@@ -25,7 +25,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.entry;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
@@ -133,9 +132,9 @@ class PnpmLockRegeneratorTest {
     @Test
     void anAddedConfigDependencyIsResolvedIntoTheEnvDocument() {
         PnpmLockRegenerator.Install install = edit("small-config-dependency-add");
-        assertThat(install.getConfigDependenciesToResolve()).containsExactly(entry("is-positive", "3.1.0"));
+        assertThat(install.getConfigDependenciesToResolve()).isEmpty();
         assertThat(install.getResolution()).isNull();
-        assertThat(install.getWritten()).isNull();
+        assertThat(install.getWritten()).isEqualTo(scenario("small-config-dependency-add").file("after"));
     }
 
     @Test
@@ -166,10 +165,10 @@ class PnpmLockRegeneratorTest {
         assertThat(install(lock, MANIFEST, null, Collections.emptyMap()).getWritten()).isEqualTo(lock);
         assertThat(install(lock, MANIFEST, "configDependencies: {}", Collections.emptyMap()).getWritten())
           .isEqualTo(lock);
-        assertThat(install(lock, MANIFEST, "configDependencies:\n  is-positive: 3.0.0", Collections.emptyMap())
-          .getConfigDependenciesToResolve()).containsExactly(entry("is-positive", "3.0.0"));
-        assertThat(install(lock, MANIFEST, "configDependencies:\n  is-positive: ^3.0.0", Collections.emptyMap())
-          .getConfigDependenciesToResolve()).containsExactly(entry("is-positive", "^3.0.0"));
+        assertThatThrownBy(() -> install(lock, MANIFEST, "configDependencies:\n  is-positive: 3.0.0",
+          Collections.emptyMap())).hasMessageContaining("fetched https://registry.npmjs.org/is-positive");
+        assertThatThrownBy(() -> install(lock, MANIFEST, "configDependencies:\n  is-positive: ^3.0.0",
+          Collections.emptyMap())).hasMessageContaining("fetched https://registry.npmjs.org/is-positive");
     }
 
     @Test
@@ -177,6 +176,15 @@ class PnpmLockRegeneratorTest {
         String lock = scenario("small-config-dependency-add").file("after");
         assertThatThrownBy(() -> install(lock, MANIFEST, "configDependencies:\n  is-positive: 3.1.0\n" +
                                                          "  '@pnpm/plugin-x': 1.0.0", Collections.emptyMap()))
+          .hasMessageContaining("fetched https://registry.npmjs.org/@pnpm/plugin-x");
+        String withPlugin = lock.replace("    configDependencies:\n", "    configDependencies:\n" +
+          "      '@pnpm/plugin-x':\n        specifier: 1.0.0\n        version: 1.0.0\n")
+          .replace("packages:\n\n  is-positive@3.1.0:", "packages:\n\n  '@pnpm/plugin-x@1.0.0':\n" +
+            "    resolution: {integrity: sha512-AAAA}\n\n  is-positive@3.1.0:")
+          .replace("snapshots:\n\n  is-positive@3.1.0: {}", "snapshots:\n\n  '@pnpm/plugin-x@1.0.0': {}\n\n" +
+            "  is-positive@3.1.0: {}");
+        assertThatThrownBy(() -> install(withPlugin, MANIFEST, "configDependencies:\n  is-positive: 3.1.0\n" +
+                                                               "  '@pnpm/plugin-x': 1.0.0", Collections.emptyMap()))
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("@pnpm/plugin-x"));
     }
 

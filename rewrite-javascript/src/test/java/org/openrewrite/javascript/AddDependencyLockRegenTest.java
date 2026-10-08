@@ -137,44 +137,42 @@ class AddDependencyLockRegenTest implements RewriteTest {
 
     @Test
     void pnpmLeafAddRegeneratesLockByteExact() {
-        // pnpm is content-addressed: is-number@7.0.0 (a scalar-only leaf) inserts one packages+snapshots entry
-        // plus the importer edge, byte-exact end-to-end.
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-leaf/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/7.0.0", resource("lock/pnpm/add-leaf/http/is-number-7.0.0"));
+        // once@1.4.0 reuses the locked wrappy@1.0.1 over the latest 1.0.2
+        String scenario = "lock/pnpm/small-add-dedupes-existing/";
+        routes.put("https://registry.npmjs.org/once", resource(scenario + "http/once"));
+        routes.put("https://registry.npmjs.org/wrappy", resource(scenario + "http/wrappy"));
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("is-number", "^7.0.0", "dependencies"))
+                spec -> spec.recipe(new AddDependency("once", "1.4.0", "dependencies"))
                         .executionContext(ctx),
-                packageJson(resource("lock/pnpm/add-leaf/pkg-before"), null,
-                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("wrappy", "1.0.1")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"is-number\": \"^7.0.0\"");
+                            assertThat(actual).contains("\"once\"");
                             return actual;
                         })),
-                pnpmLock(resource("lock/pnpm/add-leaf/before"), resource("lock/pnpm/add-leaf/after"),
+                pnpmLock(resource(scenario + "before"), resource(scenario + "after"),
                         s -> s.noTrim())
         );
     }
 
     @Test
     void pnpmCleanClosureAddRegeneratesLockByteExact() {
-        // is-odd@3.0.1 -> is-number@6.0.0: a clean closure with no peers, one packages+snapshots entry per
-        // member, snapshot referencing the resolved transitive — byte-exact end-to-end.
-        routes.put("https://registry.npmjs.org/is-odd", resource("lock/pnpm/add-closure/http/is-odd"));
-        routes.put("https://registry.npmjs.org/is-odd/3.0.1", resource("lock/pnpm/add-closure/http/is-odd-3.0.1"));
-        routes.put("https://registry.npmjs.org/is-number", resource("lock/pnpm/add-closure/http/is-number"));
-        routes.put("https://registry.npmjs.org/is-number/6.0.0", resource("lock/pnpm/add-closure/http/is-number-6.0.0"));
+        // is-odd@3.0.1 needs is-number ^6.0.0 beside the direct is-number 7.0.0: a second version
+        String scenario = "lock/pnpm/small-add-beside-incompatible/";
+        routes.put("https://registry.npmjs.org/is-odd", resource(scenario + "http/is-odd"));
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
 
         rewriteRun(
-                spec -> spec.recipe(new AddDependency("is-odd", "^3.0.1", "dependencies"))
+                spec -> spec.recipe(new AddDependency("is-odd", "3.0.1", "dependencies"))
                         .executionContext(ctx),
-                packageJson(resource("lock/pnpm/add-closure/pkg-before"), null,
-                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.3")),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("is-number", "7.0.0")),
                         s -> s.after(actual -> {
-                            assertThat(actual).contains("\"is-odd\": \"^3.0.1\"");
+                            assertThat(actual).contains("\"is-odd\"");
                             return actual;
                         })),
-                pnpmLock(resource("lock/pnpm/add-closure/before"), resource("lock/pnpm/add-closure/after"),
+                pnpmLock(resource(scenario + "before"), resource(scenario + "after"),
                         s -> s.noTrim())
         );
     }

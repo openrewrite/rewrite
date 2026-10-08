@@ -398,7 +398,8 @@ final class PnpmScenarios {
 
         /**
          * A packument as pnpm received it: {@code http/}, else pnpm's own metadata cache of the phase (then of the
-         * other phases) under {@code probes/<phase>-cache/}, else the shared cache.
+         * other phases) under {@code probes/<phase>-cache/}, else the shared cache. pnpm keeps the full document it
+         * fetched after an abbreviated one (for the release age) in the abbreviated mirror.
          */
         @Nullable
         String packument(String name, boolean full, String phase) {
@@ -409,22 +410,23 @@ final class PnpmScenarios {
             List<String> phases = new ArrayList<>(Arrays.asList("before", "after", "again"));
             phases.remove(phase);
             phases.add(0, phase);
-            for (String p : phases) {
-                Path metadata = dir.resolve("probes").resolve(p + "-cache").resolve("v11")
-                        .resolve(full ? "metadata-full" : "metadata");
-                if (!Files.isDirectory(metadata)) {
-                    continue;
-                }
-                try (Stream<Path> registries = Files.list(metadata)) {
-                    for (Path registry : (Iterable<Path>) registries::iterator) {
-                        Path mirror = registry.resolve(name + ".jsonl");
-                        if (Files.isRegularFile(mirror)) {
-                            String jsonl = read(mirror);
-                            return jsonl.substring(jsonl.indexOf('\n') + 1);
-                        }
+            for (String kind : full ? new String[]{"metadata-full", "metadata"} : new String[]{"metadata"}) {
+                for (String p : phases) {
+                    Path metadata = dir.resolve("probes").resolve(p + "-cache").resolve("v11").resolve(kind);
+                    if (!Files.isDirectory(metadata)) {
+                        continue;
                     }
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
+                    try (Stream<Path> registries = Files.list(metadata)) {
+                        for (Path registry : (Iterable<Path>) registries::iterator) {
+                            Path mirror = registry.resolve(name + ".jsonl");
+                            if (Files.isRegularFile(mirror)) {
+                                String jsonl = read(mirror);
+                                return jsonl.substring(jsonl.indexOf('\n') + 1);
+                            }
+                        }
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
                 }
             }
             return httpCache != null && Files.isRegularFile(httpCache.resolve(full ? name + "@full" : name)) ?

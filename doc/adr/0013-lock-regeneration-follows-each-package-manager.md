@@ -22,8 +22,8 @@ predicted a failure, and a fresh install of the same manifest fails.
 
 Lock regeneration follows each package manager's own resolver: the module that package manager runs is
 ported, in its own package, and the lock is written the way that package manager writes it. Each package
-manager gets its own port against its own resolver; the shared engine of ADR 0011 remains for pnpm only
-until its port exists, and carries no npm, Bun, Yarn classic or Yarn Berry code.
+manager gets its own port against its own resolver; the shared engine of ADR 0011 is gone, and
+`NativeLockEngine` only dispatches to the port of the project's package manager.
 
 For Bun the resolver is Bun 1.3.10's package manager, ported from its Zig sources into
 `org.openrewrite.javascript.internal.lock.bun`: the lockfile model (`Lockfile`, `Package`, `Dependency`,
@@ -48,6 +48,16 @@ checksums (`Cache`, `TgzUtils`, `ZipArchive`), the configuration (`BerryOptions`
 builtin extensions and patches as data) and `YarnBerryLockRegenerator` (`yarn install --mode=update-lockfile`).
 Peers never change the lock; a builtin compat patch added or changed, a fresh checksum under a non-zero
 `compressionLevel`, and git, `file:` and remote tarball contents are what the engine cannot know.
+
+For pnpm the resolver is pnpm 11.2.2's, ported into `org.openrewrite.javascript.internal.lock.pnpm`: the lock as
+dependency paths keyed by peer suffix (`LockfileObject`, `LockfileReader`, `LockfileWriter` over the js-yaml
+dumper pnpm bundles), the config (`PnpmOptions`, with pnpm-workspace.yaml's settings, overrides and catalogs),
+the up-to-date check (`Verification`, `SettingsChecker`), the resolver (`ResolveDependencyTree`,
+`ResolveDependencies` with the lock's preferred versions and peer hoisting, `ResolvePeers`, `NpmResolver`,
+`PackageRequester`), the lock rebuilt from the graph (`DepsResolver`, `UpdateLockfile` with the pruner) and
+`PnpmLockRegenerator` (`pnpm install --lockfile-only`). Peer conflicts are warnings unless
+`strictPeerDependencies`; git, remote and local tarball contents, a pnpmfile and the release-age policy's
+persisted excludes are what the engine cannot know or write.
 
 For npm the resolver is `@npmcli/arborist` (npm 11.17.0), ported module for module into
 `org.openrewrite.javascript.internal.lock.npm`, same names, same control flow and iteration order:
@@ -94,5 +104,5 @@ says so.
   override nests under the dependent, a fresh install of the same manifest may differ.
 - The maintenance commitment is tracking arborist: the port names its source version, and a new npm
   release is a diff against that version, replayed against the corpus.
-- pnpm still carries the ADR 0011 engine and its refusals; it is a separate port of its own resolver, in
-  its own package, under the same rules and the same kind of oracle.
+- pnpm, Bun, Yarn classic and Yarn Berry are each a separate port of their own resolver, in their own
+  package, under the same rules and the same kind of oracle; the ADR 0011 engine and its refusals are gone.

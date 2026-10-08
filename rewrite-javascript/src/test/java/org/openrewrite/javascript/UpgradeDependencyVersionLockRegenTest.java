@@ -128,15 +128,15 @@ class UpgradeDependencyVersionLockRegenTest implements RewriteTest {
 
     @Test
     void pnpmClosureUnchangedBumpRegeneratesLockByteExact() {
-        routes.put("https://registry.npmjs.org/ms", resource("lock/pnpm/v9/http/ms"));
-        routes.put("https://registry.npmjs.org/ms/2.1.2", resource("lock/pnpm/v9/http/ms-2.1.2"));
-        routes.put("https://registry.npmjs.org/ms/2.1.3", resource("lock/pnpm/v9/http/ms-2.1.3"));
+        String scenario = "lock/pnpm/small-bump-past-other-version/";
+        routes.put("https://registry.npmjs.org/is-number", resource(scenario + "http/is-number"));
+        routes.put("https://registry.npmjs.org/is-odd", resource(scenario + "http/is-odd"));
 
         rewriteRun(
-                spec -> spec.recipe(new UpgradeDependencyVersion("ms", null, "2.1.3")).executionContext(ctx),
-                packageJson(resource("lock/pnpm/v9/pkg-before"), resource("lock/pnpm/v9/pkg-after"),
-                        nodeResolutionResult(PackageManager.Pnpm, dependency("ms", "2.1.2"))),
-                pnpmLock(resource("lock/pnpm/v9/before"), resource("lock/pnpm/v9/after"),
+                spec -> spec.recipe(new UpgradeDependencyVersion("is-number", null, "7.0.0")).executionContext(ctx),
+                packageJson(resource(scenario + "pkg-before"), resource(scenario + "pkg"),
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("is-number", "4.0.0"))),
+                pnpmLock(resource(scenario + "before"), resource(scenario + "after"),
                         s -> s.noTrim())
         );
     }

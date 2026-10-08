@@ -51,7 +51,7 @@ public final class NodeDependencyScan {
 
     // the four .env files are the ones bun install loads (env_loader.zig loadDefaultFiles for .production)
     private static final List<String> PACKAGE_MANAGER_FILES = Arrays.asList(
-            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml",
+            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs",
             ".env", ".env.local", ".env.production", ".env.production.local");
 
     public static final class Accumulator {

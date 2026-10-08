@@ -20,27 +20,37 @@ import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Port of pnpm 11.2.2's {@code pnpm install --lockfile-only} up to the resolution: pnpm/src main.ts and getConfig.ts
- * before the command, then @pnpm/installing.commands installDeps and @pnpm/installing.deps-installer install/index.ts.
+ * Port of pnpm 11.2.2's {@code pnpm install --lockfile-only}: pnpm/src main.ts and getConfig.ts before the command,
+ * then @pnpm/installing.commands installDeps and @pnpm/installing.deps-installer install/index.ts.
  */
 public final class PnpmLockRegenerator {
+
+    static final String PNPM_REJECTS = "pnpm rejects this edit";
+    static final String DISCARDS_LOCK = "pnpm would discard the lock and resolve everything from scratch";
+    static final String SECOND_INSTALL = "a second pnpm install over the lock written for this edit";
 
     /**
      * What the engine is given for a pnpm project.
      */
     @Value
-    @Builder
+    @Builder(toBuilder = true)
     public static class Inputs {
         /**
          * The pnpm-lock.yaml; null when the project has none.
@@ -75,6 +85,15 @@ public final class PnpmLockRegenerator {
 
         @NonNull
         RegistryMetadata registry;
+
+        @Builder.Default
+        Host host = Host.UNKNOWN;
+
+        /**
+         * The files the project holds relative to its root, when the host says.
+         */
+        @Nullable
+        Set<String> paths;
     }
 
     /**
@@ -111,6 +130,15 @@ public final class PnpmLockRegenerator {
         List<Verification.Project> projects;
 
         boolean lockfileHadConflicts;
+
+        /**
+         * The lock text whose env document a write keeps in front.
+         */
+        @Nullable
+        String lockText;
+
+        @Nullable
+        ReadPackageHook readPackageHook;
     }
 
 
@@ -123,6 +151,472 @@ public final class PnpmLockRegenerator {
 
     public PnpmLockRegenerator(Inputs inputs) {
         this.inputs = inputs;
+    }
+
+    /**
+     * The lock pnpm writes for the edited manifests over the project's lock, or the failure, after a second install
+     * over the written lock changed nothing.
+     */
+    public Result regenerate() {
+        if (inputs.getLock() == null) {
+            return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no " +
+                                                                           LockfileReader.WANTED_LOCKFILE));
+        }
+        String written;
+        try {
+            written = writeLock();
+        } catch (RuntimeException e) {
+            return Result.failure(failure(e, ""));
+        }
+        try {
+            String rewritten = new PnpmLockRegenerator(inputs.toBuilder().lock(written).build()).writeLock();
+            if (!rewritten.equals(written)) {
+                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
+                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
+            }
+        } catch (RuntimeException e) {
+            return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
+        }
+        return Result.success(written);
+    }
+
+    /**
+     * One {@code pnpm install --lockfile-only} over the lock: the lock it writes.
+     */
+    String writeLock() {
+        Install install = install();
+        if (install.getWritten() != null) {
+            return install.getWritten();
+        }
+        return resolve(install);
+    }
+
+    private static Failure failure(RuntimeException e, String prefix) {
+        if (e instanceof LockfileReader.IgnoredLockfile) {
+            return new Failure(Reason.MALFORMED_LOCK, null, prefix + DISCARDS_LOCK + ": " + e.getMessage());
+        }
+        if (e instanceof CannotKnow) {
+            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + e.getMessage());
+        }
+        if (e instanceof PeerDependencyIssuesError) {
+            return new Failure(Reason.PEER_CONFLICT, ((PeerDependencyIssuesError) e).peerName,
+                    prefix + PNPM_REJECTS + ": [ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage());
+        }
+        if (e instanceof PnpmError) {
+            String code = ((PnpmError) e).getCode();
+            return new Failure(reasonFor(code), null, prefix + PNPM_REJECTS + ": [" + code + "] " + e.getMessage());
+        }
+        if (e instanceof JsError) {
+            String code = ((JsError) e).getCode();
+            Reason reason = "ERR_INVALID_PACKAGE_CONFIG".equals(code) ? Reason.MALFORMED_MANIFEST :
+                    Reason.RESOLUTION_REQUIRED;
+            return new Failure(reason, null, prefix + PNPM_REJECTS + ": " + (code == null ? "" : "[" + code + "] ") +
+                                             e.getMessage());
+        }
+        throw e;
+    }
+
+    private static Reason reasonFor(String code) {
+        switch (code) {
+            case "ERR_PNPM_NO_MATCHING_VERSION":
+            case "ERR_PNPM_NO_MATURE_MATCHING_VERSION":
+            case "ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE":
+                return Reason.VERSION_NOT_FOUND;
+            case "ERR_PNPM_FETCH_404":
+            case "ERR_PNPM_WORKSPACE_PKG_NOT_FOUND":
+                return Reason.PACKAGE_NOT_FOUND;
+            case "ERR_PNPM_JSON_PARSE":
+            case "ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION":
+            case "ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC":
+                return Reason.MALFORMED_MANIFEST;
+            case "ERR_PNPM_BROKEN_LOCKFILE":
+            case "ERR_PNPM_ENV_LOCKFILE_CORRUPTED":
+                return Reason.MALFORMED_LOCK;
+            default:
+                return Reason.RESOLUTION_REQUIRED;
+        }
+    }
+
+    private static String firstDifference(String a, String b) {
+        String[] as = a.split("\n", -1);
+        String[] bs = b.split("\n", -1);
+        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
+            String x = i < as.length ? as[i] : "";
+            String y = i < bs.length ? bs[i] : "";
+            if (!x.equals(y)) {
+                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
+            }
+        }
+        return "the line endings change";
+    }
+
+    /**
+     * {@code ERR_PNPM_PEER_DEP_ISSUES}: strictPeerDependencies over peers the resolution left unmet.
+     */
+    static final class PeerDependencyIssuesError extends PnpmError {
+        private final @Nullable String peerName;
+
+        PeerDependencyIssuesError(@Nullable String peerName) {
+            super("PEER_DEP_ISSUES", "Unmet peer dependencies");
+            this.peerName = peerName;
+        }
+    }
+
+    /**
+     * The rest of {@code _install} once the lock needs resolving: each project's wanted dependencies with the lock's
+     * resolutions of changed specifiers forgotten, then {@code _installInContext}'s resolution, its write, and the
+     * checks after it.
+     */
+    String resolve(Install install) {
+        if (install.getPackageManagerToResolve() != null) {
+            throw new CannotKnow("the packageManagerDependencies pnpm resolves for pnpm " +
+                                 install.getPackageManagerToResolve() + " (the env document's resolution of pnpm's " +
+                                 "own release is not ported)");
+        }
+        if (!install.getConfigDependenciesToResolve().isEmpty()) {
+            throw new CannotKnow("the config dependencies pnpm resolves into the env document (" +
+                                 String.join(", ", install.getConfigDependenciesToResolve().keySet()) + ")");
+        }
+        PnpmOptions options = install.getOptions();
+        LockfileObject wantedLockfile = install.getWantedLockfile();
+        Object patched = options.get("patchedDependencies");
+        if (Js.truthy(patched)) {
+            List<String> patchFiles = new ArrayList<>();
+            if (patched instanceof Map) {
+                for (Object file : ((Map<?, ?>) patched).values()) {
+                    patchFiles.add(Js.string(file));
+                }
+            }
+            throw new CannotKnow("patch file " + String.join(", ", patchFiles) + " (pnpm applies the patch to the " +
+                                 "package it resolves; patching while resolving is not ported)");
+        }
+        if (Js.truthy(options.get("peerDependencyRules")) && options.isTrue("strictPeerDependencies")) {
+            throw new CannotKnow("which peer issues peerDependencyRules lets through under strictPeerDependencies");
+        }
+        boolean autoInstallPeers = options.isTrue("autoInstallPeers");
+        boolean workspace = options.getWorkspacePackagePatterns() != null;
+        List<Verification.Project> projects = install.getProjects();
+
+        Map<String, @Nullable Map<String, @Nullable Object>> catalogs = options.getCatalogs();
+        List<ResolveDependencyTree.Importer> importers = new ArrayList<>();
+        for (Verification.Project project : projects) {
+            List<ResolveDependencies.WantedDependency> wantedDependencies =
+                    ResolveDependencyTree.getWantedDependencies(project.getManifest(), autoInstallPeers);
+            for (ResolveDependencies.WantedDependency dep : wantedDependencies) {
+                dep.setUpdateSpec(true);
+            }
+            ProjectSnapshot importer = wantedLockfile.getImporters().get(project.getId());
+            if (importer != null) {
+                forgetResolutionsOfPrevWantedDeps(importer, wantedDependencies, wantedLockfile.getCatalogs(),
+                        catalogs);
+            }
+            importers.add(new ResolveDependencyTree.Importer(project.getId(), project.getRootDir(),
+                    project.getManifest(), wantedDependencies));
+        }
+        for (ResolveDependencyTree.Importer importer : importers) {
+            wantedLockfile.getImporters().computeIfAbsent(importer.getId(), id -> new ProjectSnapshot());
+        }
+        if (workspace) {
+            Set<String> projectIds = new LinkedHashSet<>();
+            for (ResolveDependencyTree.Importer importer : importers) {
+                projectIds.add(importer.getId());
+            }
+            wantedLockfile.getImporters().keySet().retainAll(projectIds);
+        }
+        List<Map<String, @Nullable Object>> manifests = new ArrayList<>();
+        for (Verification.Project project : projects) {
+            manifests.add(project.getManifest());
+        }
+        PreferredVersions.ByName preferredVersions = PreferredVersions.ByName.of(
+                PreferredVersions.getPreferredVersionsFromLockfileAndManifests(wantedLockfile.getPackages(),
+                        manifests));
+
+        Map<String, String> registries = options.getRegistries();
+        Map<String, String> files = new LinkedHashMap<>(inputs.getFiles());
+        for (Map.Entry<String, String> manifest : inputs.getManifests().entrySet()) {
+            files.put(manifest.getKey().isEmpty() ? "package.json" : manifest.getKey() + "/package.json",
+                    manifest.getValue());
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> supportedArchitectures = options.get("supportedArchitectures") instanceof Map ?
+                (Map<String, @Nullable Object>) options.get("supportedArchitectures") : null;
+        boolean fullMetadata = ("time-based".equals(options.get("resolutionMode")) ||
+                                "no-downgrade".equals(options.get("trustPolicy"))) &&
+                               !options.isTrue("registrySupportsTimeField");
+        NpmResolver npmResolver = new NpmResolver(inputs.getRegistry(), registries,
+                options.get("saveWorkspaceProtocol"), !Boolean.FALSE.equals(
+                options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata);
+        Host host = inputs.getHost();
+        if (Js.truthy(options.get("nodeVersion"))) {
+            host = host.toBuilder().nodeVersion(Js.string(options.get("nodeVersion"))).build();
+        }
+        PackageRequester requester = new PackageRequester(npmResolver, files, host, options.isTrue("engineStrict"),
+                supportedArchitectures);
+
+        ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(wantedLockfile, "",
+                requester);
+        ctx.setAutoInstallPeers(autoInstallPeers);
+        ctx.setAutoInstallPeersFromHighestMatch(options.isTrue("autoInstallPeersFromHighestMatch"));
+        ctx.setCatalogs(catalogs);
+        ctx.setForceFullResolution(true);
+        ctx.setInjectWorkspacePackages(options.isTrue("injectWorkspacePackages"));
+        ctx.setLinkWorkspacePackagesDepth(options.getLinkWorkspacePackagesDepth());
+        ctx.setPreferWorkspacePackages(options.isTrue("preferWorkspacePackages"));
+        ctx.setReadPackageHook(install.getReadPackageHook());
+        ctx.setRegistries(registries);
+        List<String> namedRegistryPrefixes = new ArrayList<>();
+        namedRegistryPrefixes.add("gh:");
+        Object named = options.get("namedRegistries");
+        if (named instanceof Map) {
+            for (Object key : ((Map<?, ?>) named).keySet()) {
+                if (!"gh".equals(key)) {
+                    namedRegistryPrefixes.add(key + ":");
+                }
+            }
+        }
+        ctx.setNamedRegistryPrefixes(namedRegistryPrefixes);
+        Object resolutionMode = options.get("resolutionMode");
+        ctx.setResolutionMode(resolutionMode == null ? null : Js.string(resolutionMode));
+        ctx.setWorkspacePackages(workspacePackages(projects));
+        ctx.setHoistPeers(autoInstallPeers || options.isTrue("dedupePeerDependents"));
+        ctx.setResolvePeersFromWorkspaceRoot(options.isTrue("resolvePeersFromWorkspaceRoot"));
+        ctx.setBlockExoticSubdeps(options.isTrue("blockExoticSubdeps"));
+        Double minimumReleaseAge = number(options, "minimumReleaseAge");
+        List<String> minimumReleaseAgeExclude = strings(options, "minimumReleaseAgeExclude");
+        if (minimumReleaseAge != null && minimumReleaseAge != 0) {
+            ctx.setMaximumPublishedBy(inputs.getNow().minusMillis((long) (minimumReleaseAge * 60 * 1000)));
+        }
+        if (minimumReleaseAgeExclude != null) {
+            ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
+                    "minimumReleaseAgeExclude"));
+        }
+        Object peersSuffixMaxLength = options.get("peersSuffixMaxLength");
+        DepsResolver.Options resolverOptions = new DepsResolver.Options(autoInstallPeers,
+                options.isTrue("dedupePeerDependents"), options.isTrue("dedupePeers"),
+                options.isTrue("dedupeInjectedDeps"), options.isTrue("excludeLinksFromLockfile"), options.isTrue("lockfileIncludeTarballUrl"),
+                options.isTrue("resolvePeersFromWorkspaceRoot"),
+                peersSuffixMaxLength instanceof Number ? ((Number) peersSuffixMaxLength).intValue() : 1000,
+                registries);
+        DepsResolver.Result result = DepsResolver.resolveDependencies(importers, ctx, preferredVersions,
+                resolverOptions);
+        handleResolutionPolicyViolations(options, result.getResolutionPolicyViolations(), minimumReleaseAge);
+
+        LockfileObject newLockfile = result.getNewLockfile();
+        newLockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
+        String written = LockfileWriter.writeWantedLockfile(newLockfile, install.getLockText());
+        reportPeerDependencyIssues(result.getPeerDependencyIssuesByProjects(),
+                options.isTrue("strictPeerDependencies"));
+        return written;
+    }
+
+    // resolveAndInstallConfigDeps from the registry: each config dependency and its exact optional dependencies into
+    // the env document, which is then pruned
+    @SuppressWarnings("unchecked")
+    private void resolveConfigDeps(Map<String, String> depsToResolve, EnvLockfile envLockfile,
+                                   Map<String, String> registries) {
+        NpmResolver resolveFromNpm = new NpmResolver(inputs.getRegistry(), registries, null, true, false);
+        for (Map.Entry<String, String> dep : depsToResolve.entrySet()) {
+            String name = dep.getKey();
+            String specifier = dep.getValue();
+            NpmResolver.ResolveResult resolution = resolveFromNpm(resolveFromNpm, name, specifier, false);
+            if (resolution == null || !(resolution.resolution.get("integrity") instanceof String) ||
+                ((String) resolution.resolution.get("integrity")).isEmpty()) {
+                throw new PnpmError("BAD_CONFIG_DEP", "Cannot resolve " + name + "@" + specifier +
+                                                      " as a configuration dependency because it has no integrity");
+            }
+            Map<String, @Nullable Object> manifest = resolution.manifest == null ? new LinkedHashMap<>() :
+                    resolution.manifest;
+            String version = Js.string(manifest.get("version"));
+            String registry = PickRegistryForPackage.pickRegistryForPackage(registries, name, null);
+            String pkgKey = name + "@" + version;
+            Map<String, @Nullable Object> locked = new LinkedHashMap<>();
+            locked.put("specifier", specifier);
+            locked.put("version", version);
+            envLockfile.configDependencies().put(name, locked);
+            Map<String, @Nullable Object> entry = new LinkedHashMap<>();
+            entry.put("resolution", LockfileUtils.toLockfileResolution(name, version, resolution.resolution, registry,
+                    false));
+            envLockfile.packages().put(pkgKey, entry);
+            Map<String, @Nullable Object> optionalSubdeps = new LinkedHashMap<>();
+            Map<String, @Nullable Object> optionalDeps = ResolveDependencies.asMap(manifest.get("optionalDependencies"));
+            for (String subdepName : Js.keys(optionalDeps)) {
+                String subdepSpec = Js.string(optionalDeps.get(subdepName));
+                if (NodeSemver.valid(subdepSpec, NodeSemver.Options.DEFAULT) == null) {
+                    throw new PnpmError("CONFIG_DEP_OPTIONAL_NOT_EXACT", "Cannot install \"" + subdepName + "@" +
+                            subdepSpec + "\" as an optionalDependency of config dependency \"" + name +
+                            "\": only exact versions are supported (got \"" + subdepSpec + "\")");
+                }
+                NpmResolver.ResolveResult sub;
+                try {
+                    sub = resolveFromNpm(resolveFromNpm, subdepName, subdepSpec, true);
+                } catch (PnpmError e) {
+                    if ("ERR_PNPM_TRUST_DOWNGRADE".equals(e.getCode())) {
+                        throw e;
+                    }
+                    continue;
+                } catch (JsError e) {
+                    continue;
+                }
+                if (sub == null || !(sub.resolution.get("integrity") instanceof String) ||
+                    ((String) sub.resolution.get("integrity")).isEmpty() || sub.manifest == null) {
+                    throw new PnpmError("BAD_CONFIG_DEP", "Cannot resolve optionalDependency \"" + subdepName +
+                            "\" of config dependency \"" + name + "\" because it has no integrity");
+                }
+                String subVersion = Js.string(sub.manifest.get("version"));
+                String subKey = subdepName + "@" + subVersion;
+                Map<String, @Nullable Object> subEntry = new LinkedHashMap<>();
+                subEntry.put("resolution", LockfileUtils.toLockfileResolution(subdepName, subVersion, sub.resolution,
+                        PickRegistryForPackage.pickRegistryForPackage(registries, subdepName, null), false));
+                for (String field : new String[]{"os", "cpu", "libc"}) {
+                    Object value = sub.manifest.get(field);
+                    if (value instanceof List && !((List<?>) value).isEmpty() ||
+                        value instanceof String && !((String) value).isEmpty()) {
+                        subEntry.put(field, value);
+                    }
+                }
+                envLockfile.packages().put(subKey, subEntry);
+                if (envLockfile.snapshots().get(subKey) == null) {
+                    Map<String, @Nullable Object> optional = new LinkedHashMap<>();
+                    optional.put("optional", true);
+                    envLockfile.snapshots().put(subKey, optional);
+                }
+                optionalSubdeps.put(subdepName, subVersion);
+            }
+            Map<String, @Nullable Object> snapshot = new LinkedHashMap<>();
+            if (!optionalSubdeps.isEmpty()) {
+                snapshot.put("optionalDependencies", optionalSubdeps);
+            }
+            envLockfile.snapshots().put(pkgKey, snapshot);
+        }
+        Map<String, @Nullable Object> dependencies = new LinkedHashMap<>(envLockfile.configDependencies());
+        if (envLockfile.packageManagerDependencies() != null) {
+            dependencies.putAll(envLockfile.packageManagerDependencies());
+        }
+        Map<String, @Nullable Object> importer = new LinkedHashMap<>();
+        importer.put("dependencies", dependencies);
+        Map<String, @Nullable Object> importers = new LinkedHashMap<>();
+        importers.put(".", importer);
+        Map<String, @Nullable Object> file = new LinkedHashMap<>();
+        file.put("lockfileVersion", envLockfile.getDocument().get("lockfileVersion"));
+        file.put("importers", importers);
+        file.put("packages", envLockfile.packages());
+        file.put("snapshots", envLockfile.snapshots());
+        LockfileObject pruned = UpdateLockfile.pruneSharedLockfile(LockfileFormatConverters.convertToLockfileObject(file),
+                null);
+        Map<String, @Nullable Object> prunedFile = LockfileFormatConverters.convertToLockfileFile(pruned);
+        Object packages = prunedFile.get("packages");
+        Object snapshots = prunedFile.get("snapshots");
+        envLockfile.getDocument().put("packages", packages == null ? new LinkedHashMap<>() : packages);
+        envLockfile.getDocument().put("snapshots", snapshots == null ? new LinkedHashMap<>() : snapshots);
+    }
+
+    private static NpmResolver.@Nullable ResolveResult resolveFromNpm(NpmResolver resolver, String name,
+                                                                      String specifier, boolean optional) {
+        ResolveDependencies.WantedDependency wanted = new ResolveDependencies.WantedDependency(name, specifier, false,
+                optional);
+        PackageRequester.RequestPackageOptions opts = new PackageRequester.RequestPackageOptions();
+        opts.lockfileDir = "";
+        opts.projectDir = "";
+        return resolver.resolveNpm(wanted, opts, PreferredVersions.ByName.of(new LinkedHashMap<>()));
+    }
+
+    // forgetResolutionsOfPrevWantedDeps: a specifier that changed re-resolves
+    private static void forgetResolutionsOfPrevWantedDeps(ProjectSnapshot importer,
+                                                          List<ResolveDependencies.WantedDependency> wantedDeps,
+                                                          @Nullable Object prevCatalogs,
+                                                          Map<String, @Nullable Map<String, @Nullable Object>> catalogs) {
+        if (importer.getDependencies() == null) {
+            importer.setDependencies(new LinkedHashMap<>());
+        }
+        if (importer.getDevDependencies() == null) {
+            importer.setDevDependencies(new LinkedHashMap<>());
+        }
+        if (importer.getOptionalDependencies() == null) {
+            importer.setOptionalDependencies(new LinkedHashMap<>());
+        }
+        for (ResolveDependencies.WantedDependency dep : wantedDeps) {
+            String alias = dep.getAlias();
+            if (!Js.truthy(alias) || isWantedDepBareSpecifierSame(prevCatalogs, catalogs, alias,
+                    importer.getSpecifiers().get(alias), dep.getBareSpecifier())) {
+                continue;
+            }
+            String ref = importer.getDependencies().get(alias);
+            if (ref == null || !ref.startsWith("link:")) {
+                importer.getDependencies().remove(alias);
+            }
+            importer.getDevDependencies().remove(alias);
+            importer.getOptionalDependencies().remove(alias);
+        }
+    }
+
+    private static boolean isWantedDepBareSpecifierSame(@Nullable Object prevCatalogs,
+                                                        Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+                                                        String alias, @Nullable String prevBareSpecifier,
+                                                        String nextBareSpecifier) {
+        if (!nextBareSpecifier.equals(prevBareSpecifier)) {
+            return false;
+        }
+        String catalogName = Catalogs.parseCatalogProtocol(prevBareSpecifier);
+        if (catalogName == null) {
+            return true;
+        }
+        Object prevCatalog = prevCatalogs instanceof Map ? ((Map<?, ?>) prevCatalogs).get(catalogName) : null;
+        Object prevEntry = prevCatalog instanceof Map ? ((Map<?, ?>) prevCatalog).get(alias) : null;
+        Object prevSpec = prevEntry instanceof Map ? ((Map<?, ?>) prevEntry).get("specifier") : null;
+        Map<String, @Nullable Object> catalog = catalogs.get(catalogName);
+        Object nextSpec = catalog == null ? null : catalog.get(alias);
+        return Js.strictEquals(prevSpec, nextSpec);
+    }
+
+    // the minimumReleaseAge handler of installing.commands' setupPolicyHandlers, outside a terminal
+    private static void handleResolutionPolicyViolations(PnpmOptions options,
+                                                         List<ResolveDependencies.PolicyViolation> violations,
+                                                         @Nullable Double minimumReleaseAge) {
+        if (violations.isEmpty() || minimumReleaseAge == null || minimumReleaseAge == 0 ||
+            !options.isTrue("minimumReleaseAgeStrict")) {
+            return;
+        }
+        List<ResolveDependencies.PolicyViolation> immature = new ArrayList<>();
+        for (ResolveDependencies.PolicyViolation violation : violations) {
+            if (NpmResolver.MINIMUM_RELEASE_AGE_VIOLATION_CODE.equals(violation.getCode())) {
+                immature.add(violation);
+            }
+        }
+        if (immature.isEmpty()) {
+            return;
+        }
+        immature.sort((a, b) -> (a.getName() + "@" + a.getVersion()).compareTo(b.getName() + "@" + b.getVersion()));
+        StringBuilder list = new StringBuilder();
+        for (ResolveDependencies.PolicyViolation v : immature) {
+            if (list.length() > 0) {
+                list.append('\n');
+            }
+            list.append("  ").append(v.getName()).append('@').append(v.getVersion()).append(' ').append(v.getReason());
+        }
+        throw new PnpmError("NO_MATURE_MATCHING_VERSION", immature.size() + " " + (immature.size() == 1 ?
+                "version does" : "versions do") + " not meet the minimumReleaseAge constraint:\n" + list);
+    }
+
+    // reportPeerDependencyIssues under strictPeerDependencies
+    private static void reportPeerDependencyIssues(Map<String, ResolvePeers.PeerDependencyIssues> issuesByProjects,
+                                                   boolean strictPeerDependencies) {
+        if (!strictPeerDependencies) {
+            return;
+        }
+        for (ResolvePeers.PeerDependencyIssues issues : issuesByProjects.values()) {
+            if (!issues.getBad().isEmpty()) {
+                throw new PeerDependencyIssuesError(issues.getBad().keySet().iterator().next());
+            }
+            for (Map.Entry<String, List<Map<String, @Nullable Object>>> missing : issues.getMissing().entrySet()) {
+                boolean allOptional = true;
+                for (Map<String, @Nullable Object> issue : missing.getValue()) {
+                    allOptional &= Boolean.TRUE.equals(issue.get("optional"));
+                }
+                if (!allOptional) {
+                    throw new PeerDependencyIssuesError(missing.getKey());
+                }
+            }
+        }
     }
 
     Install install() {
@@ -148,8 +642,10 @@ public final class PnpmLockRegenerator {
             @SuppressWarnings("unchecked")
             EnvInstaller.ConfigDepsResult configDeps = EnvInstaller.resolveAndInstallConfigDeps(
                     (Map<String, @Nullable Object>) configDependencies, envLockfile, options.getRegistries());
-            configDependenciesToResolve = configDeps.getDepsToResolve();
-            if (configDependenciesToResolve.isEmpty() && configDeps.isLockfileChanged()) {
+            if (!configDeps.getDepsToResolve().isEmpty()) {
+                resolveConfigDeps(configDeps.getDepsToResolve(), envLockfile, options.getRegistries());
+                lockText = EnvLockfile.writeEnvLockfile(lockText, envLockfile);
+            } else if (configDeps.isLockfileChanged()) {
                 lockText = EnvLockfile.writeEnvLockfile(lockText, envLockfile);
             }
         }
@@ -239,7 +735,8 @@ public final class PnpmLockRegenerator {
             wantedLockfile.set("patchedDependencies", patchedDependencies);
             return new Install(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
                     "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), packageManagerToResolve,
-                    configDependenciesToResolve, wantedLockfile, options, projects, read.isHadConflicts());
+                    configDependenciesToResolve, wantedLockfile, options, projects, read.isHadConflicts(), lockText,
+                    readPackageHook);
         }
 
         boolean pruneLockfileImporters = workspace;
@@ -263,11 +760,12 @@ public final class PnpmLockRegenerator {
         }
         if (reason != null) {
             return new Install(null, reason, packageManagerToResolve, configDependenciesToResolve, wantedLockfile,
-                    options, projects, read.isHadConflicts());
+                    options, projects, read.isHadConflicts(), lockText, readPackageHook);
         }
         boolean envResolves = packageManagerToResolve != null || !configDependenciesToResolve.isEmpty();
         return new Install(envResolves ? null : LockfileWriter.writeWantedLockfile(wantedLockfile, lockText), null,
-                packageManagerToResolve, configDependenciesToResolve, wantedLockfile, options, projects, false);
+                packageManagerToResolve, configDependenciesToResolve, wantedLockfile, options, projects, false, lockText,
+                readPackageHook);
     }
 
     // installDeps: each project's manifest as read, under the runtimeOnFail setting
@@ -431,7 +929,8 @@ public final class PnpmLockRegenerator {
         Object pnpmfile = options.get("pnpmfile");
         if (pnpmfile == null || pnpmfile == JsYaml.UNDEFINED) {
             for (String defaultPnpmfile : new String[]{".pnpmfile.mjs", ".pnpmfile.cjs"}) {
-                if (inputs.getFiles().containsKey(defaultPnpmfile)) {
+                if (inputs.getFiles().containsKey(defaultPnpmfile) ||
+                    inputs.getPaths() != null && inputs.getPaths().contains(defaultPnpmfile)) {
                     throw new CannotKnow("what " + defaultPnpmfile + " does (pnpm runs its hooks)");
                 }
             }

@@ -17,12 +17,19 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 
 /**
  * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked in
- * that phase.
+ * that phase. A 404 is served where pnpm's log of a phase reports one. A fixture recorded elsewhere holds packuments
+ * whose version entries are empty; each is filled from its {@code http/<name>-<version>} document.
  */
 final class ScenarioRegistry implements RegistryMetadata {
 
@@ -51,15 +58,78 @@ final class ScenarioRegistry implements RegistryMetadata {
         }
         String document = scenario.packument(name, fullMetadata, phase);
         if (document == null) {
+            if (answered404(registry, name)) {
+                return null;
+            }
             throw new RouteNotRecorded("GET " + registry + name + (fullMetadata ? " (full)" : ""));
         }
-        return document;
+        return scenario.recordedWith() == null ? filled(name, document) : document;
     }
 
     // the recorder never saves this route; every request pnpm made for it answered 404
     @Override
     public @Nullable String attestations(String registry, String name, String version) {
         return null;
+    }
+
+    private boolean answered404(String registry, String name) {
+        String route = "GET " + registry + (name.startsWith("@") ? name.replace("/", "%2F") : name) +
+                       ": Not Found - 404";
+        for (String file : scenario.files()) {
+            String log = file.startsWith("pnpm-") && file.endsWith(".log") ? scenario.file(file) : null;
+            if (log != null && log.contains(route)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // an empty version entry a lock of the fixture names, and no document of it, is a route not recorded; the shared
+    // cache's packument serves it when there is one
+    @SuppressWarnings("unchecked")
+    private String filled(String name, String document) {
+        Object meta = Manifests.parseValue(document, name);
+        if (!(meta instanceof Map) || !(((Map<String, Object>) meta).get("versions") instanceof Map)) {
+            return document;
+        }
+        Map<String, Object> versions = (Map<String, Object>) ((Map<String, Object>) meta).get("versions");
+        for (Map.Entry<String, Object> version : versions.entrySet()) {
+            if (version.getValue() instanceof Map && ((Map<?, ?>) version.getValue()).isEmpty()) {
+                String manifest = scenario.http(name + "-" + version.getKey());
+                if (manifest != null) {
+                    version.setValue(Manifests.parseValue(manifest, name + "-" + version.getKey()));
+                } else if (named(name + "@" + version.getKey())) {
+                    String cached = cached(name);
+                    if (cached != null) {
+                        return cached;
+                    }
+                    throw new RouteNotRecorded("GET " + name + "/" + version.getKey());
+                }
+            }
+        }
+        return Js.jsonStringify(meta);
+    }
+
+    private boolean named(String pkgId) {
+        for (String lock : new String[]{"before", "after"}) {
+            String text = scenario.file(lock);
+            if (text != null && (text.contains(pkgId + ":") || text.contains("'" + pkgId + "':"))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private @Nullable String cached(String name) {
+        Path cache = scenario.getHttpCache();
+        if (cache == null || !Files.isRegularFile(cache.resolve(name))) {
+            return null;
+        }
+        try {
+            return new String(Files.readAllBytes(cache.resolve(name)), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     // the directory pnpm's metadata cache keeps a registry's documents in: its host, a port after a +

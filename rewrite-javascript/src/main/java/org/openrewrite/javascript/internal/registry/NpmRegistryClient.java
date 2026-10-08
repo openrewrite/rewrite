@@ -90,6 +90,21 @@ public class NpmRegistryClient {
         return cached;
     }
 
+    /**
+     * Another document the registry serves for a package version, at {@code url} (an attestations bundle). Cached
+     * per run.
+     */
+    public String getDocumentText(NodeRegistry registry, String name, String version, String url) {
+        String key = "document:" + url;
+        String cached = documentCache.get(key);
+        if (cached == null) {
+            guard(registry);
+            cached = new String(send(registry, name, version, url, FULL_ACCEPT, false), StandardCharsets.UTF_8);
+            documentCache.put(key, cached);
+        }
+        return cached;
+    }
+
     public AbbreviatedPackument getPackument(NodeRegistry registry, String name) {
         String key = registry.getUrl() + "#" + name;
         AbbreviatedPackument cached = packumentCache.get(key);
