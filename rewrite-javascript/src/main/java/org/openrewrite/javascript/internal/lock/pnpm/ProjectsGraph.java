@@ -26,9 +26,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/workspace.projects-graph src/index.ts (pnpm 11.2.2) with the parts of @pnpm/npm-package-arg 2.0.0's
- * {@code npa} and hosted-git-info 4.1.0's {@code fromUrl} that type a dependency, over directories relative to the
- * workspace root.
+ * Port of @pnpm/workspace.projects-graph src/index.ts (pnpm 11.2.2), with the parts of @pnpm/npm-package-arg 2.0.0
+ * and hosted-git-info 4.1.0 that type a dependency.
  */
 final class ProjectsGraph {
 

@@ -36,10 +36,8 @@ import java.util.zip.GZIPInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The glob modules pnpm 11.2.2 bundles (tinyglobby 0.2.16, picomatch 4.0.4, fdir 6.5.0) against the port, row by
- * row, from {@code src/test/resources/pnpm/generate/globs.js}: picomatch's regular expression and matches under
- * tinyglobby's options, scan's parts, and the projects findWorkspaceProjects finds over a tree of directories. A
- * pattern above or outside the project is one the engine cannot know.
+ * The glob modules pnpm 11.2.2 bundles against the port, row by row, from
+ * {@code src/test/resources/pnpm/generate/globs.js}; a pattern outside the project is one the engine cannot know.
  */
 class TinyglobbyDifferentialTest {
 

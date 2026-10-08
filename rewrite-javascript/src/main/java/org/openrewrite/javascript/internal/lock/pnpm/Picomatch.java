@@ -28,8 +28,7 @@ import java.util.regex.PatternSyntaxException;
 
 /**
  * Port of picomatch 4.0.4 index.js, lib/picomatch.js, lib/utils.js and lib/constants.js under the options
- * tinyglobby 0.2.16 gives it ({@code posix: true}, braces, extglobs and globstars on, case-sensitive), on a host
- * whose paths use forward slashes.
+ * tinyglobby 0.2.16 gives it, over paths with forward slashes.
  */
 final class Picomatch {
 

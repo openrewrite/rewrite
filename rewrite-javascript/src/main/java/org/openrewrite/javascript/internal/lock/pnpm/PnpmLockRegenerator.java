@@ -921,8 +921,9 @@ public final class PnpmLockRegenerator {
                 }
                 cycles.add(String.join(", ", ids));
             }
+            String cyclicDependenciesInfo = cycles.isEmpty() ? "" : ": " + String.join("; ", cycles);
             throw new PnpmError("DISALLOW_WORKSPACE_CYCLES", "There are cyclic workspace dependencies" +
-                                                             (cycles.isEmpty() ? "" : ": " + String.join("; ", cycles)));
+                                                             cyclicDependenciesInfo);
         }
         if (!projectsGraph.getUnknown().isEmpty()) {
             throw new CannotKnow("whether " + projectsGraph.getUnknown().get(0) + " names a project of the " +
