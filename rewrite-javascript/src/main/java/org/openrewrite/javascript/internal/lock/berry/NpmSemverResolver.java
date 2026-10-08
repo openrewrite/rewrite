@@ -92,7 +92,7 @@ final class NpmSemverResolver implements Resolver {
         List<Locator> out = new ArrayList<>();
         for (String version : finalCandidates) {
             Locator versionLocator = StructUtils.makeLocator(descriptor, PROTOCOL + version);
-            Object archiveUrl = Js.get(Js.get(Js.get(versions, version), "dist"), "tarball");
+            Object archiveUrl = Js.read(Js.read(Js.get(versions, version), "dist"), "tarball");
             if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration.getOptions())) {
                 out.add(versionLocator);
             } else {

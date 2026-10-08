@@ -78,7 +78,7 @@ class BerryOptionsTest {
 
     @Test
     void anUnknownSettingIsTheReleasesToJudge() {
-        BerryLockRegenerator regenerator = new BerryLockRegenerator(BerryLockRegenerator.Inputs.builder()
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\": \"p\", \"packageManager\": \"yarn@4.5.3\"}")
                 .configFile(".yarnrc.yml", "catalog:\n  ms: ^2.1.0\n")
                 .now(Instant.EPOCH)
@@ -94,18 +94,18 @@ class BerryOptionsTest {
 
     @Test
     void eachLoadStartsFromTheSettingsTheSourcesSet() {
-        BerryLockRegenerator regenerator = new BerryLockRegenerator(BerryLockRegenerator.Inputs.builder()
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock("__metadata:\n  version: 6\n  cacheKey: 8\n")
                 .manifest("", "{\"name\": \"p\", \"packageManager\": \"yarn@4.5.3\"}")
                 .configFile(".yarnrc.yml", "catalog:\n  ms: ^2.1.0\n")
                 .env("YARN_ENABLE_STRICT_SETTINGS", "false")
                 .now(Instant.EPOCH)
                 .build());
-        BerryLockRegenerator.Loaded first = regenerator.load(YarnRelease.of("4.5.3"));
+        YarnBerryLockRegenerator.Loaded first = regenerator.load(YarnRelease.of("4.5.3"));
         assertThat(first.getProject().configuration.getOptions().getMap("catalog")).isEmpty();
         assertThat(first.getMigratedSettings()).containsOnlyKeys("enableGlobalCache", "compressionLevel");
 
-        BerryLockRegenerator.Loaded second = regenerator.load(YarnRelease.of("4.10.3"));
+        YarnBerryLockRegenerator.Loaded second = regenerator.load(YarnRelease.of("4.10.3"));
         assertThat(second.getProject().configuration.getOptions().getMap("catalog")).containsEntry("ms", "^2.1.0");
         assertThat(second.getMigratedSettings()).isEqualTo(first.getMigratedSettings());
     }

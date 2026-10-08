@@ -16,9 +16,11 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -61,6 +63,28 @@ final class Project {
     final Set<String> optionalBuilds = new LinkedHashSet<>();
 
     /**
+     * Each descriptor of the lockfile as read, with the locator it resolved to: what an unchanged builtin patch is
+     * carried from.
+     */
+    final Map<String, Locator> lockfileLocators = new LinkedHashMap<>();
+
+    /**
+     * {@code getPackageMetadata}'s answers by registry and package.
+     */
+    final Map<String, Map<String, @Nullable Object>> packageMetadata = new HashMap<>();
+
+    /**
+     * The package.json of a directory relative to the root ({@code .} the root), null without one.
+     */
+    Function<String, @Nullable Manifest> manifests = cwd -> null;
+
+    /**
+     * The files the project holds relative to its root, when the host says.
+     */
+    @Nullable
+    Set<String> paths;
+
+    /**
      * {@code __metadata.version} as the lockfile spells it ({@code "8"}), {@code -1} for a Yarn 1 lockfile, null
      * for none.
      */
@@ -93,6 +117,7 @@ final class Project {
         storedResolutions = new LinkedHashMap<>();
         storedDescriptors = new LinkedHashMap<>();
         storedPackages = new LinkedHashMap<>();
+        lockfileLocators.clear();
         lockfileContent = content;
         parsedLockfile = null;
         String defaultLanguageName = configuration.getOptions().getString("defaultLanguageName");
@@ -167,6 +192,7 @@ final class Project {
                     }
                     storedDescriptors.put(descriptor.descriptorHash, descriptor);
                     storedResolutions.put(descriptor.descriptorHash, locator.locatorHash);
+                    lockfileLocators.put(descriptor.descriptorHash, locator);
                 }
             }
         } else if (content.contains("yarn lockfile v1")) {
@@ -184,6 +210,7 @@ final class Project {
      * @throws CannotKnow when two workspaces whose setups may end in either order list one member
      */
     void setupWorkspaces(FastGlob fastGlob, Function<String, @Nullable Manifest> manifests) {
+        this.manifests = manifests;
         workspaces.clear();
         workspacesByCwd.clear();
         workspacesByIdent.clear();
@@ -400,6 +427,552 @@ final class Project {
             entry.setValue(resolver.bindDescriptor(dependency, pkg, opts));
         }
         return pkg;
+    }
+
+    /**
+     * The package.json of a directory relative to the root, null when the project holds none there.
+     *
+     * @throws CannotKnow when the host says nothing of the project's files
+     */
+    @Nullable
+    Manifest readManifest(String cwd) {
+        Manifest manifest = manifests.apply(cwd);
+        if (manifest == null && paths == null) {
+            throw new CannotKnow(cwd + "/package.json (the host gave no view of the project's files)");
+        }
+        return manifest;
+    }
+
+    /**
+     * {@code resolveEverything} of an install that is not lockfile-only: the transient resolutions forgotten,
+     * every workspace's descriptor resolved through the lockfile, the legacy pins and the resolvers, each package
+     * prepared and its dependencies scheduled, wave after wave; then the virtual pass, and the new maps stored.
+     *
+     * @param checkResolutions whether each resolution must satisfy its descriptor without the lockfile (hardened
+     *                         mode)
+     */
+    void resolveEverything(LegacyMigrationResolver legacyMigrationResolver, RegistrySource registry,
+                           boolean checkResolutions) {
+        forgetVirtualResolutions();
+        Resolver realResolver = configuration.makeResolver();
+        forgetTransientResolutions(realResolver, new Resolver.ResolveOptions(this, realResolver, registry));
+
+        Resolver resolver = new MultiResolver(new LockfileResolver(realResolver), legacyMigrationResolver,
+                realResolver);
+        Resolver noLockfileResolver = new MultiResolver(legacyMigrationResolver, realResolver);
+        ResolutionPass pass = new ResolutionPass(new Resolver.ResolveOptions(this, resolver, registry),
+                checkResolutions ? new Resolver.ResolveOptions(this, noLockfileResolver, registry) : null);
+        for (Workspace workspace : workspaces) {
+            pass.resolutionQueue.add(Collections.singletonList(workspace.getAnchoredDescriptor()));
+        }
+        while (!pass.resolutionQueue.isEmpty()) {
+            List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
+            pass.resolutionQueue.clear();
+            for (List<Descriptor> dependencies : copy) {
+                for (Descriptor descriptor : dependencies) {
+                    pass.scheduleDescriptorResolution(descriptor);
+                }
+            }
+        }
+
+        Set<String> volatileDescriptors = new LinkedHashSet<>();
+        Set<String> newOptionalBuilds = new LinkedHashSet<>(pass.allPackages.keySet());
+        Set<String> newAccessibleLocators = new LinkedHashSet<>();
+        new VirtualPass(pass.allDescriptors, pass.allResolutions, pass.allPackages, newAccessibleLocators,
+                newOptionalBuilds, volatileDescriptors).apply();
+        newOptionalBuilds.removeAll(pass.resolutionDependencies);
+        for (String descriptorHash : volatileDescriptors) {
+            pass.allDescriptors.remove(descriptorHash);
+            pass.allResolutions.remove(descriptorHash);
+        }
+
+        Set<String> newConditionalLocators = new LinkedHashSet<>();
+        for (Package pkg : pass.allPackages.values()) {
+            if (pkg.conditions != null && newOptionalBuilds.contains(pkg.locatorHash)) {
+                newConditionalLocators.add(pkg.locatorHash);
+            }
+        }
+
+        storedResolutions = pass.allResolutions;
+        storedDescriptors = pass.allDescriptors;
+        storedPackages = pass.allPackages;
+        accessibleLocators.clear();
+        accessibleLocators.addAll(newAccessibleLocators);
+        conditionalLocators.clear();
+        conditionalLocators.addAll(newConditionalLocators);
+        originalPackages.clear();
+        originalPackages.putAll(pass.originalPackages);
+        optionalBuilds.clear();
+        optionalBuilds.addAll(newOptionalBuilds);
+    }
+
+    /**
+     * The scheduling of {@code resolveEverything}: a descriptor or package is resolved once, a package's
+     * dependencies wait for the next wave, and the first failure in schedule order is the one Yarn reports.
+     */
+    private final class ResolutionPass {
+        final Resolver.ResolveOptions opts;
+        final Resolver.@Nullable ResolveOptions checkOpts;
+
+        final Map<String, Descriptor> allDescriptors = new LinkedHashMap<>();
+        final Map<String, Package> allPackages = new LinkedHashMap<>();
+        final Map<String, String> allResolutions = new LinkedHashMap<>();
+        final Map<String, Package> originalPackages = new LinkedHashMap<>();
+        final Set<String> resolutionDependencies = new LinkedHashSet<>();
+        final List<List<Descriptor>> resolutionQueue = new ArrayList<>();
+
+        // each hash's outcome: its package, or what it threw
+        final Map<String, Object> packageResolutions = new HashMap<>();
+        final Map<String, Object> descriptorResolutions = new HashMap<>();
+
+        ResolutionPass(Resolver.ResolveOptions opts, Resolver.@Nullable ResolveOptions checkOpts) {
+            this.opts = opts;
+            this.checkOpts = checkOpts;
+        }
+
+        Package scheduleDescriptorResolution(Descriptor descriptor) {
+            Object outcome = descriptorResolutions.get(descriptor.descriptorHash);
+            if (outcome == null) {
+                allDescriptors.put(descriptor.descriptorHash, descriptor);
+                try {
+                    outcome = startDescriptorResolution(descriptor);
+                } catch (RuntimeException e) {
+                    outcome = e;
+                }
+                descriptorResolutions.put(descriptor.descriptorHash, outcome);
+            }
+            if (outcome instanceof RuntimeException) {
+                throw (RuntimeException) outcome;
+            }
+            return (Package) outcome;
+        }
+
+        private Package startDescriptorResolution(Descriptor descriptor) {
+            Resolver resolver = opts.getResolver();
+            Map<String, Package> resolvedDependencies = new LinkedHashMap<>();
+            for (Map.Entry<String, Descriptor> dependency :
+                    resolver.getResolutionDependencies(descriptor, opts).entrySet()) {
+                Descriptor bound = resolver.bindDescriptor(dependency.getValue(),
+                        getTopLevelWorkspace().getAnchoredLocator(), opts);
+                Package resolvedPackage = scheduleDescriptorResolution(bound);
+                resolutionDependencies.add(resolvedPackage.locatorHash);
+                resolvedDependencies.put(dependency.getKey(), resolvedPackage);
+            }
+
+            List<Locator> candidateResolutions;
+            try {
+                candidateResolutions = resolver.getCandidates(descriptor, resolvedDependencies, opts);
+            } catch (RuntimeException e) {
+                throw prettify(e, StructUtils.stringifyDescriptor(descriptor));
+            }
+            if (candidateResolutions.isEmpty()) {
+                throw new ReportError(ReportError.RESOLUTION_FAILED, StructUtils.stringifyDescriptor(descriptor) +
+                                                                     ": No candidates found");
+            }
+            Locator finalResolution = candidateResolutions.get(0);
+
+            if (checkOpts != null) {
+                List<Locator> locators = checkOpts.getResolver().getSatisfying(descriptor, resolvedDependencies,
+                        Collections.singletonList(finalResolution), checkOpts).getLocators();
+                boolean found = false;
+                for (Locator locator : locators) {
+                    found |= locator.locatorHash.equals(finalResolution.locatorHash);
+                }
+                if (!found) {
+                    throw new ReportError(ReportError.RESOLUTION_MISMATCH,
+                            "Invalid resolution " + prettyResolution(descriptor, finalResolution));
+                }
+            }
+
+            allDescriptors.put(descriptor.descriptorHash, descriptor);
+            allResolutions.put(descriptor.descriptorHash, finalResolution.locatorHash);
+            return schedulePackageResolution(finalResolution);
+        }
+
+        private Package schedulePackageResolution(Locator locator) {
+            Object outcome = packageResolutions.get(locator.locatorHash);
+            if (outcome == null) {
+                try {
+                    outcome = startPackageResolution(locator);
+                } catch (RuntimeException e) {
+                    outcome = e;
+                }
+                packageResolutions.put(locator.locatorHash, outcome);
+            }
+            if (outcome instanceof RuntimeException) {
+                throw (RuntimeException) outcome;
+            }
+            return (Package) outcome;
+        }
+
+        private Package startPackageResolution(Locator locator) {
+            Package originalPkg;
+            try {
+                originalPkg = opts.getResolver().resolve(locator, opts);
+            } catch (RuntimeException e) {
+                throw prettify(e, StructUtils.stringifyLocator(locator));
+            }
+            if (!StructUtils.areLocatorsEqual(locator, originalPkg)) {
+                throw new JsError(JsError.ERROR, "Assertion failed: The locator cannot be changed by the resolver " +
+                                                 "(went from " + StructUtils.stringifyLocator(locator) + " to " +
+                                                 StructUtils.stringifyLocator(originalPkg) + ")");
+            }
+            originalPackages.put(originalPkg.locatorHash, originalPkg);
+            Package pkg = preparePackage(originalPkg, opts.getResolver(), opts);
+            resolutionQueue.add(new ArrayList<>(pkg.dependencies.values()));
+            allPackages.put(pkg.locatorHash, pkg);
+            return pkg;
+        }
+    }
+
+    /**
+     * {@code miscUtils.prettifyAsyncErrors}: Yarn's error with what failed in front of its message.
+     */
+    private static RuntimeException prettify(RuntimeException e, String what) {
+        if (e instanceof ReportError) {
+            return new ReportError(((ReportError) e).getCode(), what + ": " + e.getMessage());
+        }
+        if (e instanceof JsError) {
+            return new JsError(((JsError) e).getName(), what + ": " + e.getMessage());
+        }
+        if (e instanceof IllegalStateException || e instanceof IllegalArgumentException) {
+            Matcher named = JS_ERROR_NAME.matcher(String.valueOf(e.getMessage()));
+            return named.matches() ? new JsError(named.group(1), what + ": " + named.group(2)) :
+                    new JsError(JsError.ERROR, what + ": " + e.getMessage());
+        }
+        return e;
+    }
+
+    private static final Pattern JS_ERROR_NAME = Pattern.compile("([A-Z][A-Za-z]*Error): (.*)", Pattern.DOTALL);
+
+    private static String prettyResolution(Descriptor descriptor, Locator resolution) {
+        Descriptor devirtualized = StructUtils.isVirtualDescriptor(descriptor) ?
+                StructUtils.devirtualizeDescriptor(descriptor) : descriptor;
+        return StructUtils.stringifyDescriptor(devirtualized) + " \u2192 " +
+               (devirtualized.identHash.equals(resolution.identHash) ? resolution.reference :
+                       StructUtils.stringifyLocator(resolution));
+    }
+
+    /**
+     * {@code applyVirtualResolutionMutations}, as far as the lockfile sees it: which packages are reached only
+     * through optional edges, and the descriptor a package installed under an alias provides itself to its peers
+     * by. Peer requirements and their warnings are not kept.
+     */
+    private final class VirtualPass {
+        final Map<String, Descriptor> allDescriptors;
+        final Map<String, String> allResolutions;
+        final Map<String, Package> allPackages;
+        final Set<String> accessibleLocators;
+        final Set<String> optionalBuilds;
+        final Set<String> volatileDescriptors;
+
+        final Map<String, Integer> virtualStack = new HashMap<>();
+        final List<Locator> resolutionStack = new ArrayList<>();
+        final Map<String, Locator> allVirtualInstances = new HashMap<>();
+        final Map<String, Set<String>> allVirtualDependents = new HashMap<>();
+        final Map<String, Set<String>> allVirtualResolutions = new HashMap<>();
+        final Map<String, Package> originalWorkspaceDefinitions = new HashMap<>();
+
+        VirtualPass(Map<String, Descriptor> allDescriptors, Map<String, String> allResolutions,
+                    Map<String, Package> allPackages, Set<String> accessibleLocators, Set<String> optionalBuilds,
+                    Set<String> volatileDescriptors) {
+            this.allDescriptors = allDescriptors;
+            this.allResolutions = allResolutions;
+            this.allPackages = allPackages;
+            this.accessibleLocators = accessibleLocators;
+            this.optionalBuilds = optionalBuilds;
+            this.volatileDescriptors = volatileDescriptors;
+        }
+
+        void apply() {
+            for (Workspace workspace : workspaces) {
+                String locatorHash = workspace.getAnchoredLocator().locatorHash;
+                Package pkg = allPackages.get(locatorHash);
+                if (pkg == null) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: The workspace should have an associated " +
+                                                     "package");
+                }
+                originalWorkspaceDefinitions.put(locatorHash, StructUtils.copyPackage(pkg));
+            }
+            for (Workspace workspace : workspaces) {
+                Locator locator = workspace.getAnchoredLocator();
+                volatileDescriptors.remove(workspace.getAnchoredDescriptor().descriptorHash);
+                resolvePeerDependencies(workspace.getAnchoredDescriptor(), locator, locator.locatorHash, false);
+            }
+        }
+
+        private void reportStackOverflow() {
+            throw new ReportError(ReportError.STACK_OVERFLOW_RESOLUTION, "Encountered a stack overflow when " +
+                                                                         "resolving peer dependencies");
+        }
+
+        private void resolvePeerDependencies(Descriptor parentDescriptor, Locator parentLocator, String top,
+                                             boolean optional) {
+            if (resolutionStack.size() > 1000) {
+                reportStackOverflow();
+            }
+            resolutionStack.add(parentLocator);
+            resolvePeerDependenciesImpl(parentDescriptor, parentLocator, top, optional);
+            resolutionStack.remove(resolutionStack.size() - 1);
+        }
+
+        private void resolvePeerDependenciesImpl(Descriptor parentDescriptor, Locator parentLocator, String top,
+                                                 boolean optional) {
+            if (!optional) {
+                optionalBuilds.remove(parentLocator.locatorHash);
+            }
+            if (!accessibleLocators.add(parentLocator.locatorHash)) {
+                return;
+            }
+            Package parentPackage = allPackages.get(parentLocator.locatorHash);
+            if (parentPackage == null) {
+                throw new JsError(JsError.ERROR, "Assertion failed: The package (" +
+                                                 StructUtils.stringifyLocator(parentLocator) + ") should have been " +
+                                                 "registered");
+            }
+
+            Set<String> dedupeCandidates = new LinkedHashSet<>();
+            Map<String, Descriptor> parentPeerProvisions = new HashMap<>();
+            List<Runnable> firstPass = new ArrayList<>();
+            List<Runnable> secondPass = new ArrayList<>();
+            List<Runnable> thirdPass = new ArrayList<>();
+            List<Runnable> fourthPass = new ArrayList<>();
+
+            for (Descriptor descriptor : new ArrayList<>(parentPackage.dependencies.values())) {
+                if (parentPackage.peerDependencies.containsKey(descriptor.identHash) &&
+                    !parentPackage.locatorHash.equals(top)) {
+                    continue;
+                }
+                if (StructUtils.isVirtualDescriptor(descriptor)) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: Virtual packages shouldn't be encountered " +
+                                                     "when virtualizing a branch");
+                }
+                volatileDescriptors.remove(descriptor.descriptorHash);
+
+                boolean isOptional = optional;
+                if (!isOptional) {
+                    Map<@Nullable String, Map<String, Object>> dependencyMetaSet =
+                            parentPackage.dependenciesMeta.get(StructUtils.stringifyIdent(descriptor));
+                    Map<String, Object> dependencyMeta = dependencyMetaSet == null ? null : dependencyMetaSet.get(null);
+                    if (dependencyMeta != null && Js.truthy(dependencyMeta.get("optional"))) {
+                        isOptional = true;
+                    }
+                }
+                boolean dependencyOptional = isOptional;
+
+                String resolution = allResolutions.get(descriptor.descriptorHash);
+                if (resolution == null) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: The resolution (" +
+                                                     StructUtils.stringifyDescriptor(descriptor) + ") should have " +
+                                                     "been registered");
+                }
+                Package original = originalWorkspaceDefinitions.get(resolution);
+                Package pkg = original != null ? original : allPackages.get(resolution);
+                if (pkg == null) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: The package (" + resolution + ", resolved " +
+                                                     "from " + StructUtils.stringifyDescriptor(descriptor) + ") " +
+                                                     "should have been registered");
+                }
+                if (pkg.peerDependencies.isEmpty()) {
+                    resolvePeerDependencies(descriptor, pkg, top, dependencyOptional);
+                    continue;
+                }
+
+                Descriptor[] virtualizedDescriptor = new Descriptor[1];
+                Package[] virtualizedPackage = new Package[1];
+                Set<String> missingPeerDependencies = new LinkedHashSet<>();
+
+                firstPass.add(() -> {
+                    virtualizedDescriptor[0] = StructUtils.virtualizeDescriptor(descriptor,
+                            parentLocator.locatorHash);
+                    virtualizedPackage[0] = StructUtils.virtualizePackage(pkg, parentLocator.locatorHash);
+                    parentPackage.dependencies.put(descriptor.identHash, virtualizedDescriptor[0]);
+                    allResolutions.put(virtualizedDescriptor[0].descriptorHash, virtualizedPackage[0].locatorHash);
+                    allDescriptors.put(virtualizedDescriptor[0].descriptorHash, virtualizedDescriptor[0]);
+                    allPackages.put(virtualizedPackage[0].locatorHash, virtualizedPackage[0]);
+                    allVirtualResolutions.computeIfAbsent(virtualizedPackage[0].locatorHash,
+                            k -> new LinkedHashSet<>()).add(virtualizedDescriptor[0].descriptorHash);
+                    dedupeCandidates.add(virtualizedPackage[0].locatorHash);
+                });
+
+                secondPass.add(() -> {
+                    Package virtual = virtualizedPackage[0];
+                    for (Descriptor peerDescriptor : new ArrayList<>(virtual.peerDependencies.values())) {
+                        Descriptor peerProvision = parentPeerProvisions.computeIfAbsent(peerDescriptor.identHash,
+                                k -> provide(parentPackage, parentDescriptor, parentLocator, peerDescriptor));
+                        if ("missing:".equals(peerProvision.range) &&
+                            virtual.dependencies.containsKey(peerDescriptor.identHash)) {
+                            virtual.peerDependencies.remove(peerDescriptor.identHash);
+                            continue;
+                        }
+                        virtual.dependencies.put(peerDescriptor.identHash, peerProvision);
+                        if (StructUtils.isVirtualDescriptor(peerProvision)) {
+                            String dependentLocatorHash = allResolutions.get(peerProvision.descriptorHash);
+                            allVirtualDependents.computeIfAbsent(String.valueOf(dependentLocatorHash),
+                                    k -> new LinkedHashSet<>()).add(virtual.locatorHash);
+                        }
+                        if ("missing:".equals(peerProvision.range)) {
+                            missingPeerDependencies.add(peerProvision.identHash);
+                        }
+                    }
+                    Map<String, Descriptor> sorted = new LinkedHashMap<>();
+                    for (Map.Entry<String, Descriptor> entry : MiscUtils.sortMap(virtual.dependencies.entrySet(),
+                            e -> StructUtils.stringifyIdent(e.getValue()))) {
+                        sorted.put(entry.getKey(), entry.getValue());
+                    }
+                    virtual.dependencies = sorted;
+                });
+
+                thirdPass.add(() -> {
+                    if (!allPackages.containsKey(virtualizedPackage[0].locatorHash)) {
+                        return;
+                    }
+                    Integer stackDepth = virtualStack.get(pkg.locatorHash);
+                    if (stackDepth != null && stackDepth >= 2) {
+                        reportStackOverflow();
+                    }
+                    int next = stackDepth != null ? stackDepth + 1 : 1;
+                    virtualStack.put(pkg.locatorHash, next);
+                    resolvePeerDependencies(virtualizedDescriptor[0], virtualizedPackage[0], top,
+                            dependencyOptional);
+                    virtualStack.put(pkg.locatorHash, next - 1);
+                });
+
+                fourthPass.add(() -> {
+                    if (!allPackages.containsKey(virtualizedPackage[0].locatorHash)) {
+                        return;
+                    }
+                    for (String missingPeerDependency : missingPeerDependencies) {
+                        virtualizedPackage[0].dependencies.remove(missingPeerDependency);
+                    }
+                });
+            }
+
+            firstPass.forEach(Runnable::run);
+            secondPass.forEach(Runnable::run);
+
+            while (!dedupeCandidates.isEmpty()) {
+                String locatorHash = dedupeCandidates.iterator().next();
+                dedupeCandidates.remove(locatorHash);
+                dedupe(allPackages.get(locatorHash), top, dedupeCandidates);
+            }
+
+            thirdPass.forEach(Runnable::run);
+            fourthPass.forEach(Runnable::run);
+        }
+
+        // the peer provision a parent gives its dependencies: a sibling, the parent itself, or nothing
+        private Descriptor provide(Package parentPackage, Descriptor parentDescriptor, Locator parentLocator,
+                                   Descriptor peerDescriptor) {
+            Descriptor peerProvision = parentPackage.dependencies.get(peerDescriptor.identHash);
+            if (peerProvision == null && StructUtils.areIdentsEqual(parentLocator, peerDescriptor)) {
+                if (parentDescriptor.identHash.equals(parentLocator.identHash)) {
+                    peerProvision = parentDescriptor;
+                } else {
+                    peerProvision = StructUtils.makeDescriptor(parentLocator, parentDescriptor.range);
+                    allDescriptors.put(peerProvision.descriptorHash, peerProvision);
+                    allResolutions.put(peerProvision.descriptorHash, parentLocator.locatorHash);
+                    volatileDescriptors.remove(peerProvision.descriptorHash);
+                }
+            }
+            return peerProvision != null ? peerProvision : StructUtils.makeDescriptor(peerDescriptor, "missing:");
+        }
+
+        // a virtual package with the same dependencies as one met before resolves to that one instead
+        private void dedupe(Package virtualPackage, String top, Set<String> dedupeCandidates) {
+            List<String> parts = new ArrayList<>();
+            parts.add(StructUtils.devirtualizeLocator(virtualPackage).locatorHash);
+            for (Descriptor descriptor : virtualPackage.dependencies.values()) {
+                String resolution = !"missing:".equals(descriptor.range) ?
+                        allResolutions.get(descriptor.descriptorHash) : "missing:";
+                if (resolution == null) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: Expected the resolution for " +
+                                                     StructUtils.stringifyDescriptor(descriptor) + " to have been " +
+                                                     "registered");
+                }
+                parts.add(resolution.equals(top) ? resolution + " (top)" : resolution);
+            }
+            String dependencyHash = HashUtils.makeHash(parts.toArray(new String[0]));
+
+            Locator masterLocator = allVirtualInstances.get(dependencyHash);
+            if (masterLocator == null) {
+                allVirtualInstances.put(dependencyHash, virtualPackage);
+                return;
+            }
+            Set<String> masterResolutions = allVirtualResolutions.computeIfAbsent(masterLocator.locatorHash,
+                    k -> new LinkedHashSet<>());
+            Set<String> resolutions = allVirtualResolutions.get(virtualPackage.locatorHash);
+            if (resolutions != null) {
+                for (String descriptorHash : new ArrayList<>(resolutions)) {
+                    allResolutions.put(descriptorHash, masterLocator.locatorHash);
+                    masterResolutions.add(descriptorHash);
+                }
+            }
+            allPackages.remove(virtualPackage.locatorHash);
+            accessibleLocators.remove(virtualPackage.locatorHash);
+            dedupeCandidates.remove(virtualPackage.locatorHash);
+
+            Set<String> dependents = allVirtualDependents.get(virtualPackage.locatorHash);
+            if (dependents != null) {
+                Set<String> masterDependents = allVirtualDependents.computeIfAbsent(masterLocator.locatorHash,
+                        k -> new LinkedHashSet<>());
+                for (String dependent : new ArrayList<>(dependents)) {
+                    masterDependents.add(dependent);
+                    dedupeCandidates.add(dependent);
+                }
+            }
+        }
+    }
+
+    /**
+     * {@code fetchEverything} of an install that only updates the lockfile: each locator the lockfile has no
+     * checksum for is fetched, in locator order, and its checksum stored, or dropped when the fetch reports none.
+     *
+     * @throws CannotKnow naming every checksum the engine cannot compute, when Yarn's own fetches all succeed
+     */
+    void fetchEverything(RegistrySource registry) {
+        Fetcher fetcher = configuration.makeFetcher();
+        Fetcher.FetchOptions opts = new Fetcher.FetchOptions(this, fetcher, registry);
+        Set<String> locatorHashes = new LinkedHashSet<>(MiscUtils.sortMap(storedResolutions.values(), locatorHash -> {
+            Package pkg = storedPackages.get(locatorHash);
+            if (pkg == null) {
+                throw new JsError(JsError.ERROR, "Assertion failed: The locator should have been registered");
+            }
+            return StructUtils.stringifyLocator(pkg);
+        }));
+        locatorHashes.removeIf(storedChecksums::containsKey);
+
+        RuntimeException firstError = null;
+        List<String> unknown = new ArrayList<>();
+        for (String locatorHash : locatorHashes) {
+            Package pkg = storedPackages.get(locatorHash);
+            if (StructUtils.isVirtualLocator(pkg)) {
+                continue;
+            }
+            String checksum;
+            try {
+                checksum = fetcher.fetch(pkg, opts);
+            } catch (CannotKnow e) {
+                unknown.add(e.getSubject());
+                continue;
+            } catch (ReportError | JsError e) {
+                if (firstError == null) {
+                    firstError = prettify(e, StructUtils.stringifyLocator(pkg));
+                }
+                continue;
+            }
+            if (checksum != null) {
+                storedChecksums.put(pkg.locatorHash, checksum);
+            } else {
+                storedChecksums.remove(pkg.locatorHash);
+            }
+        }
+        if (firstError != null) {
+            throw firstError;
+        }
+        if (!unknown.isEmpty()) {
+            throw new CannotKnow(String.join("; ", unknown), Reason.CHECKSUM_UNAVAILABLE);
+        }
     }
 
     /**

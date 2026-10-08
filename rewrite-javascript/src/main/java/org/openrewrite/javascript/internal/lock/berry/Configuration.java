@@ -98,6 +98,26 @@ final class Configuration {
     }
 
     /**
+     * {@code makeResolver}: the virtual and workspace resolvers, then each plugin's in the order the CLI bundles
+     * the plugins.
+     */
+    Resolver makeResolver() {
+        return new MultiResolver(new VirtualResolver(), new WorkspaceResolver(), new ExecResolver(),
+                new TarballFileResolver(), new FileResolver(), new GitResolver(), new TarballHttpResolver(),
+                new JsrResolver(), new LinkResolver(), new PortalResolver(), new NpmRemapResolver(),
+                new NpmSemverResolver(), new NpmTagResolver(), new PatchResolver());
+    }
+
+    /**
+     * {@code makeFetcher}, as far as the fetchers that reach a lockfile: the workspace fetcher, then each plugin's in
+     * the order the CLI bundles the plugins.
+     */
+    Fetcher makeFetcher() {
+        return new MultiFetcher(new WorkspaceFetcher(), new GitFetcher(), new TarballHttpFetcher(), new JsrFetcher(),
+                new LinkFetcher(), new NpmHttpFetcher(), new NpmSemverFetcher(), new PatchFetcher());
+    }
+
+    /**
      * {@code reduceHook(hooks => hooks.reduceDependency, ...)} over the plugins in order.
      */
     Descriptor reduceDependency(Descriptor dependency, Project project, Locator locator, Resolver resolver,

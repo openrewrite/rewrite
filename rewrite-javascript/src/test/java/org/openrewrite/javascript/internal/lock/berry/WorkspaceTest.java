@@ -248,8 +248,8 @@ class WorkspaceTest {
                 .hasMessageContaining("packages/b/package.json (its contents were not read)");
     }
 
-    private static List<String> workspaces(BerryLockRegenerator.Inputs.InputsBuilder inputs) {
-        Project project = new BerryLockRegenerator(inputs.now(Instant.EPOCH).build()).load(YarnRelease.of("4.10.3"))
+    private static List<String> workspaces(YarnBerryLockRegenerator.Inputs.InputsBuilder inputs) {
+        Project project = new YarnBerryLockRegenerator(inputs.now(Instant.EPOCH).build()).load(YarnRelease.of("4.10.3"))
                 .getProject();
         List<String> out = new ArrayList<>();
         for (Workspace workspace : project.workspaces) {
@@ -259,8 +259,8 @@ class WorkspaceTest {
     }
 
     // a directory's manifest, with the workspaces after an = ("" the root's)
-    private static BerryLockRegenerator.Inputs.InputsBuilder tree(String... directories) {
-        BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder();
+    private static YarnBerryLockRegenerator.Inputs.InputsBuilder tree(String... directories) {
+        YarnBerryLockRegenerator.Inputs.InputsBuilder inputs = YarnBerryLockRegenerator.Inputs.builder();
         for (String directory : directories) {
             int eq = directory.indexOf('=');
             String location = eq < 0 ? directory : directory.substring(0, eq);
@@ -276,13 +276,13 @@ class WorkspaceTest {
     }
 
     private static List<String> members(List<String> directories, String patterns) {
-        BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder()
+        YarnBerryLockRegenerator.Inputs.InputsBuilder inputs = YarnBerryLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\": \"root\", \"private\": true, \"workspaces\": [" + patterns + "]}")
                 .now(Instant.EPOCH);
         for (String member : directories) {
             inputs.manifest(member, "{\"name\": \"" + member.replace('/', '-') + "\"}");
         }
-        Project project = new BerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3")).getProject();
+        Project project = new YarnBerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3")).getProject();
         List<String> out = new ArrayList<>();
         for (Workspace workspace : project.workspaces) {
             if (!".".equals(workspace.getRelativeCwd())) {

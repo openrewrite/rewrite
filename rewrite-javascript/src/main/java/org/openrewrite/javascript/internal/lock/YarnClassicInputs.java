@@ -73,7 +73,7 @@ final class YarnClassicInputs {
                 continue;
             }
             String dir = NpmInputs.directory(file.getKey());
-            String up = up(rootDir, dir);
+            String up = NpmInputs.up(rootDir, dir);
             if (up != null && (CONFIG_FILES.contains(fileName.toString()) ||
                                !up.isEmpty() && "package.json".equals(fileName.toString()))) {
                 files.put(up + fileName, file.getValue());
@@ -95,7 +95,7 @@ final class YarnClassicInputs {
         Set<String> paths = new LinkedHashSet<>();
         for (Path file : request.getProjectPaths()) {
             String path = file.normalize().toString().replace('\\', '/');
-            String up = file.getFileName() == null ? null : up(rootDir, NpmInputs.directory(file));
+            String up = file.getFileName() == null ? null : NpmInputs.up(rootDir, NpmInputs.directory(file));
             if (rootDir.isEmpty()) {
                 paths.add(path);
             } else if (path.startsWith(rootDir + "/")) {
@@ -105,22 +105,5 @@ final class YarnClassicInputs {
             }
         }
         return paths;
-    }
-
-    // "../" for each directory from the root's up to dir, when dir is the root's or one above it
-    private static @Nullable String up(String rootDir, String dir) {
-        if (!dir.isEmpty() && !dir.equals(rootDir) && !rootDir.startsWith(dir + "/")) {
-            return null;
-        }
-        int depth = segments(rootDir) - segments(dir);
-        StringBuilder up = new StringBuilder();
-        for (int i = 0; i < depth; i++) {
-            up.append("../");
-        }
-        return up.toString();
-    }
-
-    private static int segments(String dir) {
-        return dir.isEmpty() ? 0 : dir.split("/").length;
     }
 }

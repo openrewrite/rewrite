@@ -15,8 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.jspecify.annotations.Nullable;
+
+import java.util.function.Supplier;
+
 /**
- * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and a fetched npm package's checksum (Yarn 4.10.3).
+ * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and {@code fetchPackageFromCache} as an install that
+ * only updates the lockfile reaches it, with a fetched npm package's checksum (Yarn 4.10.3).
  */
 final class Cache {
 
@@ -32,14 +37,27 @@ final class Cache {
     }
 
     /**
+     * {@code fetchPackageFromCache} for a locator the lockfile has no checksum for: a package whose presence is
+     * conditional has its checksum hidden, any other gets the checksum of the archive the loader makes.
+     */
+    static @Nullable String fetchPackageFromCache(Locator locator, Supplier<String> loader, Project project) {
+        if (project.conditionalLocators.contains(locator.locatorHash)) {
+            return null;
+        }
+        return loader.get();
+    }
+
+    /**
      * {@code <cacheKey>/<sha512>} of the archive {@code NpmSemverFetcher} makes from the tarball: the package under
      * {@code node_modules/<ident>}, the tarball's first path component stripped.
      */
     static String checksum(byte[] tgz, Ident ident, BerryOptions options) {
         Object compressionLevel = options.get("compressionLevel");
         if (!Integer.valueOf(0).equals(compressionLevel)) {
-            throw new CannotKnow("the checksum of " + StructUtils.stringifyIdent(ident) + " under compressionLevel " +
-                                 Js.string(compressionLevel) + " (zlib-ng deflate)");
+            String name = ident instanceof Locator ? StructUtils.stringifyLocator((Locator) ident) :
+                    StructUtils.stringifyIdent(ident);
+            throw new CannotKnow("the checksum of " + name + " under compressionLevel " + Js.string(compressionLevel) +
+                                 " (zlib-ng deflate)");
         }
         byte[] zip = TgzUtils.convertToZip(tgz, StructUtils.getIdentVendorPath(ident), 1).toByteArray();
         return getCacheKey(options) + "/" + HashUtils.sha512Hex(zip);

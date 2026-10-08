@@ -85,7 +85,7 @@ class NpmHttpUtilsTest {
 
     /**
      * packages/plugin-npm/tests/npmHttpUtils.test.ts: {@code get} requests the normalized registry followed by the
-     * path, which is what {@link NpmHttpUtils.Registry} is handed.
+     * path, which is what {@link RegistrySource} is handed.
      */
     @Test
     void craftsTheFinalPathCorrectly() {

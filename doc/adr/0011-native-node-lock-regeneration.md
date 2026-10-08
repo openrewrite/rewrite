@@ -4,10 +4,10 @@ Date: 2026-07-28
 
 ## Status
 
-Accepted. For npm, Bun and Yarn classic, superseded by
+Accepted. For npm, Bun, Yarn classic and Yarn Berry, superseded by
 [ADR 0013](0013-lock-regeneration-follows-each-package-manager.md): each of those routes is a port of the
 package manager's own resolver that writes the whole lock, so the byte-preserving patching, the per-dependency
-whitelist and the `RESOLUTION_REQUIRED` refusals below describe pnpm and Yarn Berry only.
+whitelist and the `RESOLUTION_REQUIRED` refusals below describe pnpm only.
 
 ## Context
 
@@ -150,7 +150,7 @@ package manager rejects the edit, or would write a lock its next install rejects
 sides as npm's message does). Every detail says which kind the failure is: the package manager rejects
 the edit (with its error code), or the engine cannot know something (a tarball's contents, a manifest
 outside the registry, the filesystem, the host). `RESOLUTION_REQUIRED` for a shape the proof cannot
-express is a pnpm or Yarn Berry failure only; on the npm, Bun and Yarn classic routes the kinds are those of
+express is a pnpm failure only; on the npm, Bun, Yarn classic and Yarn Berry routes the kinds are those of
 ADR 0013, and a
 lock npm's next install would reject is `PEER_CONFLICT`. Recipes surface failures via the
 existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table (source path, package,

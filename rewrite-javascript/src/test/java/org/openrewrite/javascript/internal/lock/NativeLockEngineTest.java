@@ -57,14 +57,19 @@ class NativeLockEngineTest {
 
     private ExecutionContext ctx;
     private final Map<String, String> routes = new HashMap<>();
+    private final Map<String, byte[]> binaryRoutes = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         routes.clear();
+        binaryRoutes.clear();
         HttpSender http = request -> {
-            String body = routes.get(request.getUrl().toString());
-            return new HttpSender.Response(body == null ? 404 : 200,
-                    new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
+            String url = request.getUrl().toString();
+            String body = routes.get(url);
+            byte[] bytes = binaryRoutes.containsKey(url) ? binaryRoutes.get(url) :
+                    (body == null ? "" : body).getBytes(StandardCharsets.UTF_8);
+            return new HttpSender.Response(body == null && !binaryRoutes.containsKey(url) ? 404 : 200,
+                    new ByteArrayInputStream(bytes), () -> {
             });
         };
         ctx = new InMemoryExecutionContext(t -> {
@@ -235,6 +240,49 @@ class NativeLockEngineTest {
     void yarnClassicWithoutALockFailsLoud() {
         Result result = regen(PackageManager.YarnClassic, "{\"dependencies\":{}}",
                 "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    @Test
+    void yarnBerryRegeneratesFromItsConfigurationFiles() {
+        String scenario = "lock/yarn-berry/small-catalog-default-edit/";
+        routes.put("https://registry.yarnpkg.com/path-is-absolute", resource(scenario + "http/path-is-absolute"));
+        binaryRoutes.put("https://registry.yarnpkg.com/path-is-absolute/-/path-is-absolute-1.0.1.tgz",
+                bytes(scenario + "http/path-is-absolute-1.0.1.tgz"));
+
+        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry, Request.builder()
+                .packageJson(resource(scenario + "pkg"))
+                .originalPackageJson(resource(scenario + "pkg-before"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("app/package.json"))
+                .packageManagerFile(Paths.get("app/.yarnrc.yml"), resource(scenario + "yarnrc-after"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnBerryReadsWorkspaceMembersFromTheProjectManifests() {
+        String scenario = "lock/yarn-berry/ws-member-add/";
+        Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry, Request.builder()
+                .packageJson(resource(scenario + "tree/packages/app/package.json"))
+                .lock(resource(scenario + "before"))
+                .packageJsonPath(Paths.get("packages/app/package.json"))
+                .manifest(Paths.get("package.json"), resource(scenario + "pkg"))
+                .manifest(Paths.get("packages/lib/package.json"), resource(scenario + "tree/packages/lib/package.json"))
+                .build(), ctx);
+
+        assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
+        assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
+    }
+
+    @Test
+    void yarnBerryWithoutALockFailsLoud() {
+        Result result = regen(PackageManager.YarnBerry, "{\"dependencies\":{}}",
+                "{\"packageManager\":\"yarn@4.10.3\",\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
@@ -500,6 +548,10 @@ class NativeLockEngineTest {
     }
 
     private static String resource(String path) {
+        return new String(bytes(path), StandardCharsets.UTF_8);
+    }
+
+    private static byte[] bytes(String path) {
         try (InputStream in = NativeLockEngineTest.class.getClassLoader().getResourceAsStream(path)) {
             if (in == null) {
                 throw new IllegalStateException("missing test resource " + path);
@@ -510,7 +562,7 @@ class NativeLockEngineTest {
             while ((n = in.read(buf)) >= 0) {
                 out.write(buf, 0, n);
             }
-            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+            return out.toByteArray();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

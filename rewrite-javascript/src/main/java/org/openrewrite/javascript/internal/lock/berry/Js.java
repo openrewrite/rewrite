@@ -65,6 +65,17 @@ final class Js {
         return Syml.UNDEFINED;
     }
 
+    /**
+     * {@code value[key]} where reading a property of {@code undefined} or {@code null} is V8's TypeError.
+     */
+    static @Nullable Object read(@Nullable Object value, String key) {
+        if (value == null || value == Syml.UNDEFINED) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of " +
+                                                  (value == null ? "null" : "undefined") + " (reading '" + key + "')");
+        }
+        return get(value, key);
+    }
+
     static boolean isObject(@Nullable Object value) {
         return value instanceof Map || value instanceof List;
     }

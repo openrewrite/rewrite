@@ -77,7 +77,7 @@ final class NpmTagResolver implements Resolver {
             NpmHttpUtils.isPackageApproved(project.configuration.getOptions());
         }
         Locator versionLocator = StructUtils.makeLocator(descriptor, PROTOCOL + Js.string(version));
-        Object archiveUrl = Js.get(Js.get(Js.get(registryData.get("versions"), Js.string(version)), "dist"),
+        Object archiveUrl = Js.read(Js.read(Js.read(registryData.get("versions"), Js.string(version)), "dist"),
                 "tarball");
         if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration.getOptions())) {
             return Collections.singletonList(versionLocator);

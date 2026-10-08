@@ -29,6 +29,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
+import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.ManifestSource;
 import org.openrewrite.javascript.internal.lock.npm.Host;
@@ -70,10 +72,10 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 /**
  * Native lock regeneration, by package manager. npm goes through {@link NpmLockRegenerator}: the ported
  * arborist tree, loaded from the lock, rebuilt for the edited manifests and written whole. Bun goes through
- * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model, and Yarn classic through
- * {@link YarnClassicLockRegenerator}, the port of yarn 1's. pnpm and Yarn Berry
- * take the per-dependency flow below until each follows its own resolver: diff the pre-edit and post-edit
- * {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
+ * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model, Yarn classic through
+ * {@link YarnClassicLockRegenerator}, the port of yarn 1's, and Yarn Berry through {@link YarnBerryLockRegenerator},
+ * the port of Yarn 4's. pnpm takes the per-dependency flow below until it follows its own resolver: diff the
+ * pre-edit and post-edit {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
  * version against the registry, and hand a proven {@link LockEditSet} to the format's {@link LockPatcher};
  * when that proof cannot be made, the whole closure is resolved instead, seeded by the existing lock, and
  * diffed into the same edits.
@@ -92,10 +94,6 @@ public final class NativeLockEngine {
     /** Constraint protocols the native engine cannot re-pin without repo/filesystem access. */
     private static final List<String> UNSUPPORTED_PROTOCOLS = Arrays.asList(
             "git:", "git+", "github:", "file:", "link:", "portal:", "workspace:", "http://", "https://");
-
-    /** Manifest dependency scopes an importer entry can declare a dependency under. */
-    private static final List<String> DECLARED_SCOPES = Arrays.asList(
-            "dependencies", "devDependencies", "peerDependencies", "optionalDependencies");
 
     /**
      * The cannot-reshape deferrals whole-closure resolution may still reproduce byte-exact. Genuine
@@ -134,6 +132,9 @@ public final class NativeLockEngine {
             }
             if (pm == PackageManager.YarnClassic) {
                 return regenerateYarnClassic(request, ctx);
+            }
+            if (pm == PackageManager.YarnBerry) {
+                return regenerateYarnBerry(request, ctx);
             }
             return doRegenerate(pm, request.getPackageJson(), request.getOriginalPackageJson(), request.getLock(),
                     request.getMarker(), request.getPackageJsonPath(), ctx);
@@ -197,6 +198,14 @@ public final class NativeLockEngine {
         YarnClassicRegistryPackuments packuments = new YarnClassicRegistryPackuments(registries,
                 view.getRegistryClient());
         return new YarnClassicLockRegenerator(YarnClassicInputs.from(request, host(view), Instant.now()), packuments)
+                .regenerate();
+    }
+
+    private static Result regenerateYarnBerry(Request request, ExecutionContext ctx) {
+        NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
+        RegistrySource registry = new YarnBerryRegistrySource(registries, view.getRegistryClient());
+        return new YarnBerryLockRegenerator(YarnBerryInputs.from(request, host(view), Instant.now()), registry)
                 .regenerate();
     }
 
@@ -269,9 +278,6 @@ public final class NativeLockEngine {
         for (DepChange change : changes) {
             edits.addAll(resolveEdit(pm, change, existingLock, memberImporterDir, registries, client));
         }
-        if (pm == PackageManager.YarnBerry) {
-            edits = enrichBerryChecksums(edits, existingLock, registries, client);
-        }
 
         LockEditSet editSet = new LockEditSet(existingLock, lockPath, pm, editedPackageJson, edits);
 
@@ -302,58 +308,13 @@ public final class NativeLockEngine {
             throw perDependency;
         }
         try {
-            if (pm == PackageManager.Pnpm) {
-                return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
-            }
-            return resolveAndPatchYarnBerry(editedPackageJson, existingLock, packageJsonPath, registries, client);
+            return resolveAndPatchPnpm(editedPackageJson, existingLock, packageJsonPath, registries, client);
         } catch (NodeRegistryException nre) {
             // The deeper closure walk hit a registry/environment error the per-dependency path did not need to
             // reach; it produced no better answer, so return that deferral unchanged (no wrong lock either way).
             throw perDependency;
         }
         // An EngineFailure from the deeper attempt propagates: its reason/detail is preferred.
-    }
-
-    /**
-     * Resolve the closure seeded by the existing berry lock, diff it, and patch only the difference. Untouched
-     * entries keep their recorded checksums; only fresh or moved entries reproduce theirs from the tarball.
-     */
-    private static Result resolveAndPatchYarnBerry(String editedPackageJson, String existingLock,
-                                                   @Nullable Path packageJsonPath, NodeRegistries registries,
-                                                   NpmRegistryClient client) {
-        Registry registry = new RegistryAdapter(registries, client);
-        ResolutionGraph graph = new GraphBuilder(registry, lockedVersionsBerry(existingLock))
-                .build(singletonMap("", editedPackageJson));
-        List<LockEditSet.PackageEdit> edits = YarnBerryLockDiff.diff(graph, existingLock);
-        for (LockEditSet.PackageEdit edit : edits) {
-            if (edit.getNewResolved() != null) {
-                edits = enrichBerryChecksums(edits, existingLock, registries, client);
-                break;
-            }
-        }
-        LockEditSet editSet = new LockEditSet(existingLock, lockPath(PackageManager.YarnBerry, packageJsonPath),
-                PackageManager.YarnBerry, editedPackageJson, edits);
-        return Result.success(new YarnBerryLockPatcher().patch(editSet));
-    }
-
-    /** The versions the berry lock already resolves, by name (each entry's {@code name@npm:version} resolution). */
-    private static Map<String, Set<String>> lockedVersionsBerry(String lock) {
-        Map<String, Set<String>> locked = new LinkedHashMap<>();
-        Object loaded = new Yaml().load(lock);
-        if (loaded instanceof Map) {
-            for (Object value : ((Map<?, ?>) loaded).values()) {
-                if (value instanceof Map) {
-                    Object resolution = ((Map<?, ?>) value).get("resolution");
-                    String res = resolution == null ? null : String.valueOf(resolution);
-                    int npm = res == null ? -1 : res.lastIndexOf("@npm:");
-                    if (npm > 0) {
-                        locked.computeIfAbsent(res.substring(0, npm), k -> new LinkedHashSet<>())
-                                .add(res.substring(npm + "@npm:".length()));
-                    }
-                }
-            }
-        }
-        return locked;
     }
 
     /** Resolve the closure seeded by the existing pnpm lock, diff it, and patch only the difference. */
@@ -388,8 +349,7 @@ public final class NativeLockEngine {
 
     /**
      * Whether the project has more than the single root importer whole-closure resolution reproduces. A workspace root manifest
-     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers},
-     * berry {@code @workspace:} headers).
+     * declares {@code workspaces}; a member edit carries a multi-importer root lock (pnpm {@code importers}).
      */
     private static boolean isMultiPackageProject(PackageManager pm, String editedManifest, String lock) {
         try {
@@ -412,22 +372,9 @@ public final class NativeLockEngine {
         switch (pm) {
             case Pnpm:
                 return pnpmImporterKeys(lock).size() > 1;
-            case YarnBerry:
-                return berryWorkspaceHeaderCount(lock) > 1;
             default:
                 return false;
         }
-    }
-
-    private static int berryWorkspaceHeaderCount(String lock) {
-        int count = 0;
-        for (String line : lock.split("\n")) {
-            String trimmed = line.trim();
-            if (trimmed.contains("@workspace:") && trimmed.endsWith("\":")) {
-                count++;
-            }
-        }
-        return count;
     }
 
     private static @Nullable EngineFailure engineFailureCause(Throwable t) {
@@ -505,14 +452,6 @@ public final class NativeLockEngine {
         }
         String oldVersion = lockedVersions.iterator().next();
 
-        // A member-declared bump must own its registry entry alone: if a sibling workspace importer declares the
-        // same dependency at the same range, they share one lock entry, so re-heading it would break the sibling.
-        if (pm == PackageManager.YarnBerry &&
-                importersDeclaring(existingLock, name, change.oldConstraint) > 1) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " is declared by multiple workspace importers; a per-member bump would fork (deferred)");
-        }
-
         String targetVersion = resolveTarget(client, registries, name, oldVersion, change.newConstraint);
 
         if (pm == PackageManager.Pnpm && !targetVersion.equals(oldVersion)) {
@@ -564,7 +503,7 @@ public final class NativeLockEngine {
 
         VersionManifest.Dist dist = newManifest.getDist();
         // A dropped `dependencies` edge (present in the old manifest, gone in the new) orphan-prunes rather than
-        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9, Yarn Berry).
+        // fails loud: the patcher removes the edge and GCs whatever it leaves unreachable (pnpm v9).
         boolean prunesOrphans = dropsDependencyEdge(oldManifest, newManifest);
         LockEditSet.PackageEdit rootEdit = edit
                 .newResolved(dist == null ? null : dist.getTarball())
@@ -581,8 +520,6 @@ public final class NativeLockEngine {
         if (!depsEqual) {
             if (pm == PackageManager.Pnpm) {
                 edits.addAll(cascadeForcedMovesPnpm(name, oldVersion, newManifest, existingLock, registries, client));
-            } else if (pm == PackageManager.YarnBerry) {
-                edits.addAll(cascadeForcedMovesBerry(name, oldManifest, newManifest, existingLock, registries, client));
             } else {
                 // The remaining patchers cannot reshape a changed closure so far; other formats defer.
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name, name + " dependencies changed");
@@ -884,11 +821,6 @@ public final class NativeLockEngine {
                 // pnpm is content-addressed: placement is mechanical (one packages+snapshots entry per closure
                 // member), but every closure member must be brand-new (no dedupe/conflict) and peer-free.
                 return resolveClosureAddPnpm(change, rootName, rootConstraint, existingLock, memberImporterDir, registries, client);
-            case YarnBerry:
-                // yarn lists one entry per resolved (name, version); placement is not hoisted, so every closure
-                // member must be brand-new (no merge/second entry for an existing name). Berry adds get their
-                // checksums enriched afterward; scoped members (leaf or clean closure) are byte-exact.
-                return resolveClosureAddYarn(pm, change, rootName, rootConstraint, existingLock, registries, client);
             default:
                 throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, "adding " + rootName + " requires resolution");
         }
@@ -970,99 +902,6 @@ public final class NativeLockEngine {
     }
 
 
-    /**
-     * A direct dependency the recipe added, plus its runtime closure, into a Yarn Berry lock: one entry per resolved
-     * {@code (name, version)}. Every closure member must be brand-new (no descriptor merge or second-version entry)
-     * and none may declare peers or optionalDependencies; anything else fails loud.
-     */
-    private static List<LockEditSet.PackageEdit> resolveClosureAddYarn(PackageManager pm, DepChange change, String rootName,
-                                                                       String rootConstraint, String existingLock,
-                                                                       NodeRegistries registries, NpmRegistryClient client) {
-        Set<String> existingNames = existingBerryNames(existingLock);
-        boolean dev = "devDependencies".equals(change.scope);
-
-        // Promoting a transitive to a direct dep: if it is already present at a satisfying version, yarn merges the
-        // new selector/descriptor into the existing entry (no new blocks). A non-satisfying version forks.
-        if (existingNames.contains(rootName)) {
-            return promoteYarn(pm, change, rootName, rootConstraint, existingLock);
-        }
-
-        Map<String, Placement> placed = new LinkedHashMap<>();
-        Deque<Requirement> queue = new ArrayDeque<>();
-        queue.add(new Requirement(rootName, rootConstraint, dev));
-
-        while (!queue.isEmpty()) {
-            Requirement req = queue.poll();
-            if (existingNames.contains(req.name)) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
-                        " is already present in the lock; yarn would merge a selector or fork a second block (deferred)");
-            }
-            Placement already = placed.get(req.name);
-            if (already != null) {
-                if (existingSatisfies(already.version, req.constraint)) {
-                    continue;
-                }
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, req.name, req.name +
-                        " is required at two incompatible versions within the added closure (" +
-                        already.version + " vs " + req.constraint + "); deferred");
-            }
-
-            NodeRegistry registry = registries.registryFor(req.name);
-            String version = resolveAddedVersion(client, registry, req.name, req.constraint);
-            VersionManifest manifest = client.getManifest(registry, req.name, version);
-            requireEmittableYarnClosureMember(req.name, manifest);
-
-            VersionManifest.Dist dist = manifest.getDist();
-            if (dist == null || dist.getTarball() == null || dist.getShasum() == null || dist.getIntegrity() == null) {
-                throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, req.name,
-                        req.name + "@" + version + " has no registry tarball/shasum/integrity");
-            }
-
-            placed.put(req.name, new Placement(version, manifest, req.dev));
-            enqueueDeps(queue, manifest.getDependencies(), req.dev);
-        }
-
-        List<LockEditSet.PackageEdit> edits = new ArrayList<>();
-        for (Map.Entry<String, Placement> e : placed.entrySet()) {
-            Placement p = e.getValue();
-            VersionManifest.Dist dist = Objects.requireNonNull(p.manifest.getDist());
-            // Only the root writes an importer edge in package.json; the patcher derives each block header's
-            // selector ranges from the added edits' dependency maps plus the root's declared constraint.
-            edits.add(LockEditSet.PackageEdit.builder()
-                    .name(e.getKey())
-                    .oldVersion("")
-                    .newVersion(p.version)
-                    .newResolved(dist.getTarball())
-                    .newIntegrity(dist.getIntegrity())
-                    .newDependencies(notEmpty(p.manifest.getDependencies()) ? p.manifest.getDependencies() : null)
-                    .scope(p.dev ? "devDependencies" : "dependencies")
-                    .importerDir(null)
-                    .kind(ADD)
-                    .build());
-        }
-        return edits;
-    }
-
-    /** A yarn promotion: merge the declared selector/descriptor into the existing entry if its version satisfies. */
-    private static List<LockEditSet.PackageEdit> promoteYarn(PackageManager pm, DepChange change, String rootName,
-                                                             String rootConstraint, String existingLock) {
-        Set<String> locked = findLockedVersions(pm, existingLock, rootName);
-        if (locked.size() != 1) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName,
-                    rootName + " is present at multiple versions; promoting it may fork (deferred)");
-        }
-        if (!Semver.satisfies(locked.iterator().next(), rootConstraint, NODE)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, rootName, rootName + " is locked at " +
-                    locked.iterator().next() + " which excludes " + rootConstraint + " (yarn would fork); deferred");
-        }
-        return singletonList(LockEditSet.PackageEdit.builder()
-                .name(rootName)
-                .newConstraint(rootConstraint)
-                .scope(change.scope)
-                .kind(PROMOTION)
-                .build());
-    }
-
     /** The add gates reject any optional or peer dependency: none of these placements models them. */
     private static void requireNoOptionalOrPeer(String name, VersionManifest m, String pm) {
         if (notEmpty(m.getOptionalDependencies())) {
@@ -1073,10 +912,6 @@ public final class NativeLockEngine {
             throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
                     "adding " + name + " declares peerDependencies not yet supported for " + pm + " adds");
         }
-    }
-
-    private static void requireEmittableYarnClosureMember(String name, VersionManifest m) {
-        requireNoOptionalOrPeer(name, m, "yarn");
     }
 
     /** The only packages-entry metadata the pnpm add patcher renders is {@code engines}; carry it, drop the rest. */
@@ -1287,46 +1122,8 @@ public final class NativeLockEngine {
             case Pnpm:
                 proveReverseDependentsPnpm(name, oldVersion, targetVersion, lock);
                 break;
-            case YarnBerry:
-                proveReverseDependentsBerry(name, targetVersion, lock);
-                break;
             default:
                 break;
-        }
-    }
-
-    /** A berry entry's {@code dependencies} map records the requirer's range; a range excluding the target forks. */
-    private static void proveReverseDependentsBerry(String name, String targetVersion, String lock) {
-        Object loaded = new Yaml().load(lock);
-        if (!(loaded instanceof Map)) {
-            return;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-            String key = String.valueOf(e.getKey());
-            // Skip the importer (its constraint is the user's package.json, re-pinned by the patcher).
-            if ("__metadata".equals(key) || key.contains("@workspace:") || !(e.getValue() instanceof Map)) {
-                continue;
-            }
-            Map<?, ?> entry = (Map<?, ?>) e.getValue();
-            checkBerryReverseConstraint(name, targetVersion, key, entry.get("dependencies"));
-            checkBerryReverseConstraint(name, targetVersion, key, entry.get("optionalDependencies"));
-            checkBerryReverseConstraint(name, targetVersion, key, entry.get("peerDependencies"));
-        }
-    }
-
-    private static void checkBerryReverseConstraint(String name, String targetVersion, String dependent,
-                                                    @Nullable Object depMap) {
-        if (!(depMap instanceof Map)) {
-            return;
-        }
-        Object value = ((Map<?, ?>) depMap).get(name);
-        if (!(value instanceof String) || !((String) value).startsWith("npm:")) {
-            return;
-        }
-        String range = ((String) value).substring("npm:".length());
-        if (Semver.validate(range, null, NODE).isValid() && !Semver.satisfies(targetVersion, range, NODE)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, name,
-                    name + " is required by " + dependent + " at " + value + " which excludes " + targetVersion);
         }
     }
 
@@ -1456,71 +1253,9 @@ public final class NativeLockEngine {
         switch (pm) {
             case Pnpm:
                 return findImporterDirPnpm(lock, name, oldConstraint);
-            case YarnBerry:
-                return findImporterDirBerry(lock, name, oldConstraint);
             default:
                 return null;
         }
-    }
-
-    /**
-     * The berry workspace importer ({@code <name>@workspace:<dir>}) that declares this dependency, as its directory
-     * relative to the lock, or {@code null} for the root importer ({@code @workspace:.}) or a single-package lock.
-     */
-    private static @Nullable String findImporterDirBerry(String lock, String name, @Nullable String oldConstraint) {
-        Object loaded = new Yaml().load(lock);
-        if (!(loaded instanceof Map)) {
-            return null;
-        }
-        String unique = null;
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-            String key = String.valueOf(e.getKey());
-            int idx = key.indexOf("@workspace:");
-            if (idx < 0 || !(e.getValue() instanceof Map)) {
-                continue;
-            }
-            String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
-            if (c != null && (oldConstraint == null || oldConstraint.equals(c))) {
-                String dir = key.substring(idx + "@workspace:".length());
-                if (".".equals(dir)) {
-                    return null; // the root importer owns it
-                }
-                if (unique != null) {
-                    return null; // ambiguous; the shared-importer guard fails this loud
-                }
-                unique = dir;
-            }
-        }
-        return unique;
-    }
-
-    /** A berry importer records its declared range as {@code npm:<range>}; return the bare range. */
-    private static @Nullable String berryImporterConstraint(Map<?, ?> importer, String name) {
-        for (String scope : DECLARED_SCOPES) {
-            Object scopeMap = importer.get(scope);
-            if (scopeMap instanceof Map && ((Map<?, ?>) scopeMap).get(name) != null) {
-                String v = String.valueOf(((Map<?, ?>) scopeMap).get(name));
-                return v.startsWith("npm:") ? v.substring("npm:".length()) : v;
-            }
-        }
-        return null;
-    }
-
-    /** How many berry workspace importers declare {@code name} at exactly {@code constraint} (a shared entry when {@code > 1}). */
-    private static int importersDeclaring(String lock, String name, @Nullable String constraint) {
-        int count = 0;
-        Object loaded = new Yaml().load(lock);
-        if (loaded instanceof Map) {
-            for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-                if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
-                    String c = berryImporterConstraint((Map<?, ?>) e.getValue(), name);
-                    if (c != null && (constraint == null || constraint.equals(c))) {
-                        count++;
-                    }
-                }
-            }
-        }
-        return count;
     }
 
     private static @Nullable String findImporterDirPnpm(String lock, String name, @Nullable String oldConstraint) {
@@ -1607,235 +1342,9 @@ public final class NativeLockEngine {
         switch (pm) {
             case Pnpm:
                 return findLockedVersionsPnpm(lock, name);
-            case YarnBerry:
-                return findLockedVersionsBerry(lock, name);
             default:
                 return emptySet();
         }
-    }
-
-    /** Berry entries are keyed by {@code "<name>@<protocol>:<selector>"} (a valid YAML mapping); read their versions. */
-    private static Set<String> findLockedVersionsBerry(String lock, String name) {
-        Set<String> versions = new LinkedHashSet<>();
-        Object loaded = new Yaml().load(lock);
-        if (!(loaded instanceof Map)) {
-            return versions;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-            if (berryKeyDeclaresName(String.valueOf(e.getKey()), name) && e.getValue() instanceof Map) {
-                Object v = ((Map<?, ?>) e.getValue()).get("version");
-                if (v != null) {
-                    versions.add(String.valueOf(v));
-                }
-            }
-        }
-        return versions;
-    }
-
-    /** True when any comma-merged descriptor in {@code key} is {@code <name>@npm:…} (never {@code __metadata}/workspace). */
-    private static boolean berryKeyDeclaresName(String key, String name) {
-        if ("__metadata".equals(key)) {
-            return false;
-        }
-        for (String descriptor : key.split(",")) {
-            String d = descriptor.trim();
-            if (d.startsWith(name + "@npm:")) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * A Yarn Berry direct-dep bump whose new {@code dependencies} force a currently-locked transitive to a new
-     * version. The lock is flat (the descriptor is the requirer's range), so each move re-heads the transitive to the
-     * new range; a shared requirer, a dropped edge, a constraint-only reshuffle, or a multi-level cascade fail loud.
-     */
-    private static List<LockEditSet.PackageEdit> cascadeForcedMovesBerry(String rootName, VersionManifest rootOld,
-                                                                         VersionManifest rootNew, String lock,
-                                                                         NodeRegistries registries,
-                                                                         NpmRegistryClient client) {
-        Map<String, String> oldDeps = rootOld.getDependencies() == null ? emptyMap() : rootOld.getDependencies();
-        Map<String, String> newDeps = rootNew.getDependencies() == null ? emptyMap() : rootNew.getDependencies();
-        // A dropped edge is handled by the patcher's orphan GC (flagged via prunesOrphans); this loop re-resolves
-        // only kept edges.
-        List<LockEditSet.PackageEdit> moves = new ArrayList<>();
-        for (Map.Entry<String, String> e : newDeps.entrySet()) {
-            String dep = e.getKey();
-            String newConstraint = e.getValue();
-            Set<String> locked = findLockedVersions(PackageManager.YarnBerry, lock, dep);
-            if (locked.isEmpty()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                        "upgrading " + rootName + " introduces new transitive " + dep + " (add-during-bump) not yet supported");
-            }
-            if (locked.size() > 1) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " is present at multiple versions; deferred");
-            }
-            if (isUnsupportedProtocol(newConstraint) || !Semver.validate(newConstraint, null, NODE).isValid()) {
-                throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " has an unresolvable range: " + newConstraint);
-            }
-            String cur = locked.iterator().next();
-            if (Semver.satisfies(cur, newConstraint, NODE)) {
-                if (!newConstraint.equals(oldDeps.get(dep))) {
-                    throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                            dep + " constraint changed without a version move (selector reselect) not yet supported");
-                }
-                continue;
-            }
-            moves.add(resolveForcedMoveBerry(rootName, dep, cur, oldDeps.get(dep), newConstraint, lock, registries,
-                    client));
-        }
-        return moves;
-    }
-
-    /** Resolve and emit one Yarn Berry forced move, failing loud on a shared requirer or any deeper reshape. */
-    private static LockEditSet.PackageEdit resolveForcedMoveBerry(String rootName, String dep, String oldVersion,
-                                                                  @Nullable String oldConstraint, String newConstraint,
-                                                                  String lock, NodeRegistries registries,
-                                                                  NpmRegistryClient client) {
-        if (oldConstraint == null) {
-            // The transitive is locked but the upgraded root's old manifest never declared it (it was pulled in
-            // via another path), so the minimal engine can't reshape this closure — defer to a real resolver.
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no prior selector for moved " + dep);
-        }
-        if (berryHasOtherRequirer(lock, dep, rootName)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is required by more than the upgraded " + rootName + "; a merged selector defers");
-        }
-        if (importerDeclaresBerry(lock, dep)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    dep + " is directly declared; moving it via cascade is not yet supported");
-        }
-        NodeRegistry registry = registries.registryFor(dep);
-        String target = maxSatisfyingAll(client.getPackument(registry, dep).getVersions(), singleton(newConstraint));
-        if (target == null) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, "no version of " + dep + " satisfies " + newConstraint);
-        }
-        if (target.equals(oldVersion)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep, dep + " resolves back to its locked version; deferred");
-        }
-        VersionManifest oldManifest = client.getManifest(registry, dep, oldVersion);
-        VersionManifest newManifest = client.getManifest(registry, dep, target);
-        proveNonDependencySurfacesUnchanged(dep, oldManifest, newManifest);
-        if (!dependenciesEqual(oldManifest, newManifest)) {
-            throw new EngineFailure(Reason.RESOLUTION_REQUIRED, dep,
-                    "moving " + dep + " to " + target + " changes its own dependencies (multi-level cascade) not yet supported");
-        }
-        VersionManifest.Dist dist = newManifest.getDist();
-        if (dist == null || dist.getTarball() == null || dist.getIntegrity() == null) {
-            throw new EngineFailure(Reason.UNSUPPORTED_ENTRY_TYPE, dep, dep + "@" + target + " has no registry tarball/integrity");
-        }
-        return LockEditSet.PackageEdit.builder()
-                .name(dep)
-                .oldVersion(oldVersion)
-                .newVersion(target)
-                .oldConstraint(oldConstraint)
-                .newConstraint(newConstraint)
-                .newResolved(dist.getTarball())
-                .newIntegrity(dist.getIntegrity())
-                .newDependencies(newManifest.getDependencies())
-                .scope("dependencies")
-                .importerDir(null)
-                .kind(FORCED_MOVE)
-                .build();
-    }
-
-    /** True when any package other than {@code rootName} also requires {@code dep} (so moving it would fork). */
-    private static boolean berryHasOtherRequirer(String lock, String dep, String rootName) {
-        Object loaded = new Yaml().load(lock);
-        if (!(loaded instanceof Map)) {
-            return false;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-            String key = String.valueOf(e.getKey());
-            if ("__metadata".equals(key) || key.contains("@workspace:") ||
-                    berryKeyDeclaresName(key, rootName) || !(e.getValue() instanceof Map)) {
-                continue;
-            }
-            Map<?, ?> entry = (Map<?, ?>) e.getValue();
-            for (String scope : Arrays.asList("dependencies", "optionalDependencies", "peerDependencies")) {
-                Object deps = entry.get(scope);
-                if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /** True when the workspace importer declares {@code dep} directly (so a cascade would touch its own range). */
-    private static boolean importerDeclaresBerry(String lock, String dep) {
-        Object loaded = new Yaml().load(lock);
-        if (!(loaded instanceof Map)) {
-            return false;
-        }
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) loaded).entrySet()) {
-            if (String.valueOf(e.getKey()).contains("@workspace:") && e.getValue() instanceof Map) {
-                Map<?, ?> importer = (Map<?, ?>) e.getValue();
-                for (String scope : DECLARED_SCOPES) {
-                    Object deps = importer.get(scope);
-                    if (deps instanceof Map && ((Map<?, ?>) deps).containsKey(dep)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    /** Every registry package name that heads a berry entry (across merged descriptors); ignores importer/metadata. */
-    private static Set<String> existingBerryNames(String lock) {
-        Set<String> names = new LinkedHashSet<>();
-        Object loaded = new Yaml().load(lock);
-        if (loaded instanceof Map) {
-            for (Object key : ((Map<?, ?>) loaded).keySet()) {
-                for (String descriptor : String.valueOf(key).split(",")) {
-                    int at = descriptor.trim().indexOf("@npm:");
-                    if (at > 0) {
-                        names.add(descriptor.trim().substring(0, at));
-                    }
-                }
-            }
-        }
-        return names;
-    }
-
-    /** Fetch each new version's tarball and derive its berry checksum from the lock's cacheKey. */
-    private static List<LockEditSet.PackageEdit> enrichBerryChecksums(List<LockEditSet.PackageEdit> edits,
-                                                                      String lock, NodeRegistries registries,
-                                                                      NpmRegistryClient client) {
-        String cacheKey = berryCacheKey(lock);
-        List<LockEditSet.PackageEdit> out = new ArrayList<>(edits.size());
-        for (LockEditSet.PackageEdit edit : edits) {
-            if (edit.getNewVersion() == null || edit.getNewResolved() == null) {
-                out.add(edit);
-                continue;
-            }
-            NodeRegistry registry = registries.registryFor(edit.getName());
-            byte[] tarball = client.getTarball(registry, edit.getName(), edit.getNewVersion(), edit.getNewResolved());
-            out.add(edit.toBuilder()
-                    .newBerryChecksum(BerryZipChecksum.checksum(tarball, edit.getName(), cacheKey))
-                    .build());
-        }
-        return out;
-    }
-
-    /** The lock's {@code __metadata.cacheKey}; only the validated {@code 10c0} zip format is reproducible so far. */
-    private static String berryCacheKey(String lock) {
-        String cacheKey = null;
-        Object loaded = new Yaml().load(lock);
-        if (loaded instanceof Map) {
-            Object meta = ((Map<?, ?>) loaded).get("__metadata");
-            if (meta instanceof Map) {
-                Object value = ((Map<?, ?>) meta).get("cacheKey");
-                cacheKey = value == null ? null : String.valueOf(value);
-            }
-        }
-        if (!"10c0".equals(cacheKey)) {
-            throw new EngineFailure(Reason.CHECKSUM_UNAVAILABLE, null,
-                    "yarn berry cacheKey " + cacheKey + " is not a validated checksum format (only 10c0 so far)");
-        }
-        return cacheKey;
     }
 
     private static Set<String> findLockedVersionsPnpm(String lock, String name) {
@@ -1981,7 +1490,6 @@ public final class NativeLockEngine {
     private static @Nullable LockPatcher patcherFor(PackageManager pm) {
         switch (pm) {
             case Pnpm:        return new PnpmLockPatcher();
-            case YarnBerry:   return new YarnBerryLockPatcher();
             default:          return null;
         }
     }
@@ -2042,14 +1550,6 @@ public final class NativeLockEngine {
 
     private static boolean bool(@Nullable Boolean b) {
         return Boolean.TRUE.equals(b);
-    }
-
-    private static String unquote(String s) {
-        String t = s.trim();
-        if (t.length() >= 2 && t.charAt(0) == '"' && t.charAt(t.length() - 1) == '"') {
-            return t.substring(1, t.length() - 1);
-        }
-        return t;
     }
 
     private static Failure toFailure(NodeRegistryException e) {

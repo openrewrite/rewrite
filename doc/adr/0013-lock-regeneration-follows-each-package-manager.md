@@ -22,8 +22,8 @@ predicted a failure, and a fresh install of the same manifest fails.
 
 Lock regeneration follows each package manager's own resolver: the module that package manager runs is
 ported, in its own package, and the lock is written the way that package manager writes it. Each package
-manager gets its own port against its own resolver; the shared engine of ADR 0011 remains for pnpm and
-Yarn Berry only until theirs exist, and carries no npm, Bun or Yarn classic code.
+manager gets its own port against its own resolver; the shared engine of ADR 0011 remains for pnpm only
+until its port exists, and carries no npm, Bun, Yarn classic or Yarn Berry code.
 
 For Bun the resolver is Bun 1.3.10's package manager, ported from its Zig sources into
 `org.openrewrite.javascript.internal.lock.bun`: the lockfile model (`Lockfile`, `Package`, `Dependency`,
@@ -39,6 +39,15 @@ the lock as a map from pattern to entry (`Lockfile`, `LockfileParser`, `Lockfile
 `YarnClassicLockRegenerator` (`install.js` without node_modules). yarn's find runs on a model of Node's event loop:
 which of two patterns of one version is resolved first decides the entry they share, and where that follows
 the order the registry answers in, the engine says it cannot know.
+
+For Yarn Berry the resolver is Yarn 4.10.3's, ported into `org.openrewrite.javascript.internal.lock.berry`: the
+lock as stored descriptors, resolutions and packages (`Project`, `Syml`, `Manifest`, `structUtils`), the resolver
+chain (`LockfileResolver`, `LegacyMigrationResolver`, `WorkspaceResolver` and each plugin's resolver and fetcher),
+`Project.resolveEverything` with the virtual pass that decides which packages are optional, the fetch step's
+checksums (`Cache`, `TgzUtils`, `ZipArchive`), the configuration (`BerryOptions`, with each release's settings,
+builtin extensions and patches as data) and `YarnBerryLockRegenerator` (`yarn install --mode=update-lockfile`).
+Peers never change the lock; a builtin compat patch added or changed, a fresh checksum under a non-zero
+`compressionLevel`, and git, `file:` and remote tarball contents are what the engine cannot know.
 
 For npm the resolver is `@npmcli/arborist` (npm 11.17.0), ported module for module into
 `org.openrewrite.javascript.internal.lock.npm`, same names, same control flow and iteration order:
@@ -85,5 +94,5 @@ says so.
   override nests under the dependent, a fresh install of the same manifest may differ.
 - The maintenance commitment is tracking arborist: the port names its source version, and a new npm
   release is a diff against that version, replayed against the corpus.
-- pnpm and Yarn Berry still carry the ADR 0011 engine and its refusals; each is a separate port of its
-  own resolver, in its own package, under the same rules and the same kind of oracle.
+- pnpm still carries the ADR 0011 engine and its refusals; it is a separate port of its own resolver, in
+  its own package, under the same rules and the same kind of oracle.

@@ -116,7 +116,7 @@ class CatalogsTest {
     private static Descriptor resolve(Project project, Descriptor dependency) {
         Resolver resolver = new BindingResolver();
         return Catalogs.resolveDescriptorFromCatalog(project, dependency, resolver,
-                new Resolver.ResolveOptions(project, resolver, (registry, identUrl) -> null));
+                new Resolver.ResolveOptions(project, resolver, BerryScenarios.NO_REGISTRY));
     }
 
     private static Descriptor descriptor(String scope, String name, String range) {

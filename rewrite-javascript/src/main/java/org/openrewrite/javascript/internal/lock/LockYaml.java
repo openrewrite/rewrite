@@ -32,9 +32,9 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 
 /**
- * Byte-exact keyed access and edit primitives over a YAML lockfile's LST, shared by the pnpm and yarn-berry
- * patchers (both formats round-trip byte-identical through rewrite-yaml). Each edit returns a new mapping,
- * rewriting only the named entry and leaving every other byte untouched.
+ * Byte-exact keyed access and edit primitives over a YAML lockfile's LST for the pnpm patcher (the format
+ * round-trips byte-identical through rewrite-yaml). Each edit returns a new mapping, rewriting only the named entry
+ * and leaving every other byte untouched.
  */
 final class LockYaml {
 

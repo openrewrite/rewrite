@@ -33,18 +33,6 @@ final class NpmHttpUtils {
             "cpu", "libc", "dependencies", "dependenciesMeta", "optionalDependencies", "peerDependencies",
             "peerDependenciesMeta", "deprecated");
 
-    /**
-     * Where the full packument of a package comes from: {@code GET <registry>/<name>} with no abbreviated
-     * Accept header.
-     */
-    interface Registry {
-        /**
-         * The packument as parsed JSON, null when the registry answers 404.
-         */
-        @Nullable
-        Object getPackument(String registry, String identUrl);
-    }
-
     private NpmHttpUtils() {
     }
 
@@ -82,13 +70,33 @@ final class NpmHttpUtils {
      *
      * @throws ReportError YN0035 when the registry has no such package
      */
-    @SuppressWarnings("unchecked")
-    static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, Registry registry) {
+    static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, RegistrySource registry) {
         String registryUrl = getScopeRegistry(ident.scope, project.configuration.getOptions());
-        Object packument = registry.getPackument(registryUrl, getIdentUrl(ident));
-        if (packument == null) {
+        return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
+            String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident));
+            if (packument == null) {
+                throw new ReportError(ReportError.NETWORK_ERROR, "Package not found");
+            }
+            return pickMetadata(Js.jsonParse(packument));
+        });
+    }
+
+    /**
+     * {@code get} of a package's tarball: a path joins the scope's registry, a url is fetched as it is.
+     *
+     * @throws ReportError YN0035 when the server does not have it
+     */
+    static byte[] get(String path, Locator locator, String version, Project project, RegistrySource registry) {
+        String registryUrl = getScopeRegistry(locator.scope, project.configuration.getOptions());
+        byte[] tarball = registry.tarball(path.startsWith("/") ? registryUrl + path : path,
+                StructUtils.stringifyIdent(locator), version);
+        if (tarball == null) {
             throw new ReportError(ReportError.NETWORK_ERROR, "Package not found");
         }
+        return tarball;
+    }
+
+    private static Map<String, @Nullable Object> pickMetadata(@Nullable Object packument) {
         Map<String, @Nullable Object> picked = new LinkedHashMap<>();
         picked.put("dist-tags", Js.get(packument, "dist-tags"));
         Map<String, @Nullable Object> versions = new LinkedHashMap<>();

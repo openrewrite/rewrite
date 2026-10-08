@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Getter;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 /**
  * What Yarn would write depends on something the engine is not given.
@@ -24,9 +25,15 @@ import lombok.Getter;
 final class CannotKnow extends RuntimeException {
 
     private final String subject;
+    private final Reason reason;
 
     CannotKnow(String subject) {
+        this(subject, Reason.RESOLUTION_REQUIRED);
+    }
+
+    CannotKnow(String subject, Reason reason) {
         super("the engine cannot know " + subject);
         this.subject = subject;
+        this.reason = reason;
     }
 }

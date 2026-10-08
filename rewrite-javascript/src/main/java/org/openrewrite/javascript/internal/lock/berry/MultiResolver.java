@@ -86,7 +86,7 @@ final class MultiResolver implements Resolver {
     private Resolver getResolverByDescriptor(Descriptor descriptor, ResolveOptions opts) {
         Resolver resolver = tryResolverByDescriptor(descriptor, opts);
         if (resolver == null) {
-            throw new IllegalStateException(StructUtils.stringifyDescriptor(descriptor) +
+            throw new JsError(JsError.ERROR, StructUtils.stringifyDescriptor(descriptor) +
                                             " isn't supported by any available resolver");
         }
         return resolver;
@@ -104,7 +104,7 @@ final class MultiResolver implements Resolver {
     private Resolver getResolverByLocator(Locator locator, ResolveOptions opts) {
         Resolver resolver = tryResolverByLocator(locator, opts);
         if (resolver == null) {
-            throw new IllegalStateException(StructUtils.stringifyLocator(locator) +
+            throw new JsError(JsError.ERROR, StructUtils.stringifyLocator(locator) +
                                             " isn't supported by any available resolver");
         }
         return resolver;

@@ -91,6 +91,23 @@ final class StructUtils {
         return renamePackage(pkg, pkg);
     }
 
+    static Ident wrapIdentIntoScope(Ident ident, String scope) {
+        return ident.scope != null && !ident.scope.isEmpty() ? makeIdent(scope, ident.scope + "__" + ident.name) :
+                makeIdent(scope, ident.name);
+    }
+
+    static Ident unwrapIdentFromScope(Ident ident, String scope) {
+        if (!scope.equals(ident.scope)) {
+            return ident;
+        }
+        int underscoreUnderscore = ident.name.indexOf("__");
+        if (underscoreUnderscore == -1) {
+            return makeIdent(null, ident.name);
+        }
+        return makeIdent(ident.name.substring(0, underscoreUnderscore),
+                ident.name.substring(underscoreUnderscore + 2));
+    }
+
     static Descriptor virtualizeDescriptor(Descriptor descriptor, String entropy) {
         if (entropy.contains("#")) {
             throw new IllegalArgumentException("Invalid entropy");

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.npm.Host;
@@ -36,7 +38,9 @@ import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -67,6 +71,24 @@ final class BerryScenarios {
     }
     private static final Pattern PLATFORM = Pattern.compile("\\(node (\\w+)-(\\w+)\\)");
     private static final Pattern RECORDED_ON = Pattern.compile("(\\d{4}-\\d{2}-\\d{2})\\s*$", Pattern.MULTILINE);
+    private static final Pattern RECORDING_REGISTRY = Pattern.compile("^registry: yarn-berry-registry\\.js on " +
+                                                                      "(127\\.0\\.0\\.1:\\d+) ", Pattern.MULTILINE);
+    private static final String NPM_REGISTRY = "https://registry.npmjs.org/";
+
+    /**
+     * A registry that has nothing.
+     */
+    static final RegistrySource NO_REGISTRY = new RegistrySource() {
+        @Override
+        public @Nullable String packument(String registry, String name) {
+            return null;
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version) {
+            return null;
+        }
+    };
 
     /**
      * The environment every recorder here runs Yarn under.
@@ -105,7 +127,7 @@ final class BerryScenarios {
             this.phase = phase;
         }
 
-        BerryLockRegenerator.Inputs inputs() {
+        YarnBerryLockRegenerator.Inputs inputs() {
             return scenario.inputs(phase, text);
         }
 
@@ -212,20 +234,68 @@ final class BerryScenarios {
          * What Yarn had in a phase: the phase's manifests and {@code .yarnrc.yml}, the recorder's environment, the
          * machine and the day.
          */
-        BerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
+        YarnBerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
             String yarnrc = yarnrc(phase);
             if (yarnrc != null) {
                 configFiles.put(BerryOptions.DEFAULT_RC_FILENAME, yarnrc);
             }
-            return BerryLockRegenerator.Inputs.builder()
+            Map<String, String> env = new LinkedHashMap<>();
+            if (has("recorded-with")) {
+                env.putAll(RECORDER_ENV);
+                String registry = recordingRegistry();
+                if (registry != null) {
+                    env.put("YARN_NPM_REGISTRY_SERVER", registry);
+                }
+            }
+            return YarnBerryLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))
                     .configFiles(configFiles)
-                    .env(has("recorded-with") ? RECORDER_ENV : new LinkedHashMap<>())
+                    .paths(paths(phase, yarnrc != null))
+                    .env(env)
                     .host(host())
                     .now(now())
                     .build();
+        }
+
+        /**
+         * The registry Yarn was pointed at through the recorder's home {@code .yarnrc.yml}, when it named its port.
+         */
+        @Nullable
+        String recordingRegistry() {
+            String recorded = file("recorded-with");
+            Matcher m = recorded == null ? null : RECORDING_REGISTRY.matcher(recorded);
+            return m != null && m.find() ? "http://" + m.group(1) : null;
+        }
+
+        /**
+         * The files of the project directory the recorder laid out for a phase; none for a recording made elsewhere.
+         */
+        @Nullable
+        Set<String> paths(Phase phase, boolean yarnrc) {
+            if (!has("recorded-with")) {
+                return null;
+            }
+            Set<String> paths = new TreeSet<>(tree(phase).keySet());
+            paths.add("package.json");
+            paths.add("yarn.lock");
+            if (yarnrc) {
+                paths.add(BerryOptions.DEFAULT_RC_FILENAME);
+            }
+            return paths;
+        }
+
+        /**
+         * The registry as the scenario recorded it: {@code http/<name>} for a packument whatever the registry's
+         * url, {@code http/<name>-<version>.tgz} for a tarball. A packument is recorded abbreviated (the downloaded
+         * fixtures' with their versions empty) beside the version documents Yarn read as {@code http/<name>-<version>},
+         * which stand in for their entries of the full packument Yarn asks for; an empty entry without one takes the
+         * shared cache's packument instead, else is a route not recorded. Through a recording registry, the
+         * documents carry its url as Yarn saw them.
+         */
+        ScenarioRegistry registry() {
+            return new ScenarioRegistry(this);
         }
 
         /**
@@ -338,6 +408,18 @@ final class BerryScenarios {
         }
 
         /**
+         * A registry response of the shared cache.
+         */
+        byte @Nullable [] cached(String name) {
+            try {
+                Path file = httpCache == null ? null : httpCache.resolve(name);
+                return file != null && Files.isRegularFile(file) ? Files.readAllBytes(file) : null;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
          * A recorded registry response from the scenario's {@code http/}, else the shared cache.
          */
         @Nullable
@@ -359,6 +441,87 @@ final class BerryScenarios {
         @Override
         public String toString() {
             return name;
+        }
+    }
+
+    /**
+     * {@link Scenario#registry()}, with every route it was asked for and does not have.
+     */
+    static final class ScenarioRegistry implements RegistrySource {
+        private static final ObjectMapper JSON = new ObjectMapper();
+
+        private final Scenario scenario;
+        final List<String> missing = new ArrayList<>();
+
+        ScenarioRegistry(Scenario scenario) {
+            this.scenario = scenario;
+        }
+
+        @Override
+        public @Nullable String packument(String registry, String name) {
+            byte[] body = scenario.http(name);
+            if (body == null) {
+                missing.add(name);
+                return null;
+            }
+            String text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), false);
+            byte[] cached = scenario.getHttpCache() == null ? null : scenario.cached(name);
+            if (text == null && cached != null) {
+                text = withRecordedVersions(name, new String(cached, StandardCharsets.UTF_8), false);
+            }
+            if (text == null) {
+                missing.add(name + "-<version> for the versions recorded empty");
+                text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), true);
+            }
+            String recording = scenario.recordingRegistry();
+            return recording == null ? text : text.replace(NPM_REGISTRY, recording + "/");
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version) {
+            String file = name + "-" + version + ".tgz";
+            byte[] tgz = scenario.http(file);
+            if (tgz == null) {
+                missing.add(file);
+            }
+            return tgz;
+        }
+
+        // the packument with each recorded version document in its entry; null when an entry is left empty unless
+        // that is acceptable
+        private @Nullable String withRecordedVersions(String name, String body, boolean incomplete) {
+            Object packument = Js.jsonParse(body);
+            Object versions = Js.get(packument, "versions");
+            if (!(versions instanceof Map)) {
+                return body;
+            }
+            boolean filled = false;
+            int unrecorded = 0;
+            @SuppressWarnings("unchecked") Map<String, Object> byVersion = (Map<String, Object>) versions;
+            for (Map.Entry<String, Object> entry : byVersion.entrySet()) {
+                byte[] manifest = scenario.http(name + "-" + entry.getKey());
+                if (manifest != null) {
+                    entry.setValue(Js.jsonParse(new String(manifest, StandardCharsets.UTF_8)));
+                    filled = true;
+                } else if (entry.getValue() instanceof Map && ((Map<?, ?>) entry.getValue()).isEmpty()) {
+                    unrecorded++;
+                }
+            }
+            if (unrecorded > 0 && !incomplete) {
+                return null;
+            }
+            if (!filled) {
+                return body;
+            }
+            try {
+                return JSON.writeValueAsString(packument);
+            } catch (JsonProcessingException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        String describe() {
+            return missing.isEmpty() ? "" : " [routes not recorded: " + String.join(", ", missing) + "]";
         }
     }
 

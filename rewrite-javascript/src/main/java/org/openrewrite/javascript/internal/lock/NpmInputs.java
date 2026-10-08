@@ -120,6 +120,25 @@ final class NpmInputs {
         return ".".equals(location) ? "" : location;
     }
 
+    /**
+     * "../" for each directory from the root's up to dir, when dir is the root's or one above it, else null.
+     */
+    static @Nullable String up(String rootDir, String dir) {
+        if (!dir.isEmpty() && !dir.equals(rootDir) && !rootDir.startsWith(dir + "/")) {
+            return null;
+        }
+        int depth = segments(rootDir) - segments(dir);
+        StringBuilder up = new StringBuilder();
+        for (int i = 0; i < depth; i++) {
+            up.append("../");
+        }
+        return up.toString();
+    }
+
+    private static int segments(String dir) {
+        return dir.isEmpty() ? 0 : dir.split("/").length;
+    }
+
     // only the project's own npmrc is an input
     static @Nullable String projectNpmrc(@Nullable NodeResolutionResult marker) {
         if (marker == null || marker.getNpmrcConfigs() == null) {

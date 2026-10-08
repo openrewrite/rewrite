@@ -20,7 +20,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -34,6 +36,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The cache key and the {@code compressionLevel: 0} checksum, against what Yarn wrote: every registry entry of a
@@ -87,6 +90,43 @@ class CacheTest {
     @MethodSource("checksums")
     void reproducesTheChecksumYarnWrote(String name, Locator locator, byte[] tgz, String checksum) {
         assertThat(Cache.checksum(tgz, locator, BerryOptions.defaults())).isEqualTo(checksum);
+    }
+
+    /**
+     * The downloaded fixtures' registry tarballs (a leaf, nested directories with an executable bin, a scoped and
+     * an ESM package), against the checksum Yarn 4.5.3 wrote for each; skipped when the fixtures are not on the
+     * classpath.
+     */
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("downloadedTarballs")
+    void reproducesTheChecksumsOfTheDownloadedTarballs(String fixture, String name, String checksum)
+            throws IOException {
+        byte[] tgz;
+        try (InputStream in = CacheTest.class.getClassLoader().getResourceAsStream("lock/yarn-berry/checksum/" +
+                                                                                     fixture)) {
+            assumeTrue(in != null, "the downloaded fixtures are not on the classpath");
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) >= 0) {
+                out.write(buf, 0, n);
+            }
+            tgz = out.toByteArray();
+        }
+        assertThat(Cache.checksum(tgz, StructUtils.parseIdent(name), BerryOptions.defaults())).isEqualTo(checksum);
+    }
+
+    static Stream<Arguments> downloadedTarballs() {
+        return Stream.of(
+                Arguments.of("ms-2.1.3.tgz", "ms", "10c0/d924b57e7312b3b63ad21fc5b3dc0af5e78d61a1fc7cfb5457edaf2632" +
+                        "6bf62be5307cc87ffb6862ef1c2b33b0233cdb5d4f01c4c958cc0d660948b65a287a48"),
+                Arguments.of("semver-7.6.3.tgz", "semver", "10c0/88f33e148b210c153873cb08cfe1e281d518aaa9a666d4d148a" +
+                        "dd6560db5cd3c582f3a08ccb91f38d5f379ead256da9931234ed122057f40bb5766e65e58adaf"),
+                Arguments.of("babel-code-frame-7.24.7.tgz", "@babel/code-frame", "10c0/ab0af539473a9f5aeaac7047e377" +
+                        "cb4f4edd255a81d84a76058595f8540784cc3fbe8acf73f1e073981104562490aabfb23008cd66dc677a456a4" +
+                        "ed5390fdde6"),
+                Arguments.of("chalk-5.3.0.tgz", "chalk", "10c0/8297d436b2c0f95801103ff2ef67268d362021b8210daf8ddbe3" +
+                        "49695333eb3610a71122172ff3b0272f1ef2cf7cc2c41fdaa4715f52e49ffe04c56340feed09"));
     }
 
     @Test

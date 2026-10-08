@@ -15,12 +15,14 @@
  */
 /**
  * Yarn Berry's lockfile and resolver model, ported from Yarn 4.10.3 (yarnpkg/berry, tag @yarnpkg/cli/4.10.3):
- * packages/yarnpkg-core (Project, structUtils, Manifest, Configuration, configUtils, the lockfile, legacy migration
- * and workspace resolvers, Workspace, CorePlugin, Cache, tgzUtils, semverUtils, miscUtils, hashUtils),
- * packages/yarnpkg-parsers (syml, resolution), packages/plugin-npm (the semver, tag and remap resolvers,
- * npmHttpUtils, npmConfigUtils), packages/plugin-compat, packages/plugin-catalog, packages/yarnpkg-extensions (as
- * data, in {@code yarn-releases.json.gz}) and packages/plugin-essentials (the install command). It is distributed
- * under the BSD 2-Clause License:
+ * packages/yarnpkg-core (Project, structUtils, Manifest, Configuration, configUtils, the lockfile, legacy migration,
+ * multi, virtual and workspace resolvers, the multi and workspace fetchers, Workspace, CorePlugin, Cache, tgzUtils,
+ * semverUtils, miscUtils, hashUtils), packages/yarnpkg-parsers (syml, resolution), packages/plugin-npm (the semver,
+ * tag and remap resolvers, the semver and http fetchers, npmHttpUtils, npmConfigUtils), packages/plugin-patch (the
+ * resolver, the fetcher, patchUtils), packages/plugin-link, plugin-git, plugin-http, plugin-file, plugin-exec and
+ * plugin-jsr (their resolvers and fetchers), packages/plugin-compat, packages/plugin-catalog,
+ * packages/yarnpkg-extensions (as data, in {@code yarn-releases.json.gz}) and packages/plugin-essentials (the install
+ * command). It is distributed under the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors.
  * All rights reserved.
@@ -53,8 +55,9 @@
  * Jon Schlinkert), as micromatch 4.0.5 calls it (Copyright (c) 2014-present, Jon Schlinkert); {@code Braces} braces
  * 3.0.2 (Copyright (c) 2014-2018, Jon Schlinkert); {@code FillRange} fill-range 7.0.1 (Copyright (c) 2014-present,
  * Jon Schlinkert); {@code GlobParent} is-glob 4.0.3 (Copyright (c) 2014-2017, Jon Schlinkert) and is-extglob 2.1.1
- * (Copyright (c) 2014-2016, Jon Schlinkert); and {@code BerryOptions} camelcase 5.3.1 (Copyright (c) Sindre Sorhus
- * &lt;sindresorhus@gmail.com&gt; (sindresorhus.com)), all distributed under the MIT License:
+ * (Copyright (c) 2014-2016, Jon Schlinkert); {@code BerryOptions} camelcase 5.3.1 (Copyright (c) Sindre Sorhus
+ * &lt;sindresorhus@gmail.com&gt; (sindresorhus.com)); and {@code YarnBerryLockRegenerator} corepack 0.35.0's
+ * {@code parseSpec} (Copyright (c) Corepack contributors), all distributed under the MIT License:
  * <pre>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in

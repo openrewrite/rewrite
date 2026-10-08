@@ -38,7 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * under corepack 0.35.0 with the 4.5.3 release file as the {@code yarnPath} target, the locks Yarn 4.14.0 and 4.18.1
  * write for an empty project, and the recorded migrations.
  */
-class BerryLockRegeneratorTest {
+class YarnBerryLockRegeneratorTest {
 
     private static final String YARN_PATH = "yarnPath: .yarn/releases/yarn-4.5.3.cjs\n";
     private static final Pattern LOCKFILE_VERSION = Pattern.compile("^__metadata:\\n {2}version: (\\d+)$",
@@ -100,11 +100,12 @@ class BerryLockRegeneratorTest {
         String rest = "\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n" +
                       "  resolution: \"p@workspace:.\"\n  languageName: unknown\n  linkType: soft\n";
         for (String version : new String[]{"9", "10"}) {
-            BerryLockRegenerator regenerator = new BerryLockRegenerator(BerryLockRegenerator.Inputs.builder()
-                    .lock(header + version + rest)
-                    .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}\n")
-                    .now(Instant.EPOCH)
-                    .build());
+            YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(
+                    YarnBerryLockRegenerator.Inputs.builder()
+                            .lock(header + version + rest)
+                            .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}\n")
+                            .now(Instant.EPOCH)
+                            .build());
             Project project = regenerator.load(regenerator.release()).getProject();
             assertThat(project.lockfileNeedsRefresh).isFalse();
             assertThat(regenerator.write(project)).isEqualTo(header + "8" + rest);
@@ -125,8 +126,8 @@ class BerryLockRegeneratorTest {
                 scenario.has("refresh") ? BerryScenarios.Phase.REFRESH : BerryScenarios.Phase.AFTER;
         String written = scenario.file(seed ? "yarnrc-before.written" :
                 phase == BerryScenarios.Phase.REFRESH ? "yarnrc-refresh.written" : "yarnrc.written");
-        BerryLockRegenerator.Inputs recorded = scenario.inputs(phase, lock.getText());
-        BerryLockRegenerator regenerator = new BerryLockRegenerator(BerryLockRegenerator.Inputs.builder()
+        YarnBerryLockRegenerator.Inputs recorded = scenario.inputs(phase, lock.getText());
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock(recorded.getLock())
                 .manifests(recorded.getManifests())
                 .env(recorded.getEnv())
@@ -159,7 +160,7 @@ class BerryLockRegeneratorTest {
     }
 
     private static String release(@Nullable String packageManager, @Nullable String yarnrc, Map<String, String> env) {
-        BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder()
+        YarnBerryLockRegenerator.Inputs.InputsBuilder inputs = YarnBerryLockRegenerator.Inputs.builder()
                 .manifest("", packageManager == null ? "{\"name\": \"p\"}" :
                         "{\"name\": \"p\", \"packageManager\": \"" + packageManager + "\"}")
                 .env(env)
@@ -167,6 +168,6 @@ class BerryLockRegeneratorTest {
         if (yarnrc != null) {
             inputs.configFile(".yarnrc.yml", yarnrc);
         }
-        return new BerryLockRegenerator(inputs.build()).release().getVersion();
+        return new YarnBerryLockRegenerator(inputs.build()).release().getVersion();
     }
 }

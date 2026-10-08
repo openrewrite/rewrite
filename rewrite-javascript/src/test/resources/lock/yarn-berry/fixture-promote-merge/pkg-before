@@ -1,0 +1,8 @@
+{
+  "name": "bp",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.5.3",
+  "dependencies": {
+    "debug": "^4.3.4"
+  }
+}

@@ -260,7 +260,7 @@ class BerryDifferentialTest {
     void workspacesAreFoundAsYarnsBundleFindsThem() {
         List<String> differences = new ArrayList<>();
         for (String[] row : rows("glob-workspaces.tsv.gz")) {
-            BerryLockRegenerator.Inputs.InputsBuilder inputs = BerryLockRegenerator.Inputs.builder()
+            YarnBerryLockRegenerator.Inputs.InputsBuilder inputs = YarnBerryLockRegenerator.Inputs.builder()
                     .manifest("", "{\"private\": true, \"workspaces\": " + row[1] + "}")
                     .now(Instant.EPOCH);
             for (JsonNode directory : tree(row[0])) {
@@ -269,7 +269,7 @@ class BerryDifferentialTest {
             String actual;
             try {
                 List<String> members = new ArrayList<>();
-                for (Workspace workspace : new BerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3"))
+                for (Workspace workspace : new YarnBerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3"))
                         .getProject().workspaces) {
                     if (!".".equals(workspace.getRelativeCwd())) {
                         members.add(workspace.getRelativeCwd());

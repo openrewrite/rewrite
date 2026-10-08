@@ -32,7 +32,7 @@ interface Resolver {
     class ResolveOptions {
         Project project;
         Resolver resolver;
-        NpmHttpUtils.Registry registry;
+        RegistrySource registry;
     }
 
     /**

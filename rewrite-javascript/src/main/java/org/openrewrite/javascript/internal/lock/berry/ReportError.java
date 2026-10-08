@@ -26,9 +26,11 @@ final class ReportError extends RuntimeException {
     // a plain JavaScript error thrown during resolution
     static final int EXCEPTION = 1;
     static final int RESOLVER_NOT_FOUND = 10;
+    static final int FETCHER_NOT_FOUND = 11;
     static final int REMOTE_INVALID = 15;
     static final int REMOTE_NOT_FOUND = 16;
     static final int NETWORK_ERROR = 35;
+    static final int STACK_OVERFLOW_RESOLUTION = 45;
     static final int RESOLUTION_MISMATCH = 78;
     static final int RESOLUTION_FAILED = 82;
 

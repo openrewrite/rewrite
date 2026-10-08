@@ -18,16 +18,10 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openrewrite.javascript.internal.lock.npm.UriComponent;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Deque;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,14 +55,14 @@ class BerryLockRoundTripTest {
     @MethodSource("locks")
     void writesTheLockYarnWrites(String name, BerryScenarios.Lock lock) {
         String expect = lock.getScenario().expect();
-        BerryLockRegenerator regenerator = new BerryLockRegenerator(lock.inputs());
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(lock.inputs());
         YarnRelease release;
         try {
             release = regenerator.release();
         } catch (CannotKnow e) {
             release = YarnRelease.of(TARGET);
         }
-        BerryLockRegenerator.Loaded loaded;
+        YarnBerryLockRegenerator.Loaded loaded;
         try {
             loaded = regenerator.load(release);
         } catch (JsYaml.YamlException e) {
@@ -86,7 +80,7 @@ class BerryLockRoundTripTest {
             String before = scenario.file("before");
             assertThat("lock-seed".equals(lock.getFileName()) ? before : null)
                     .as("Yarn's migration of this Yarn 1 lock").isNotNull();
-            migratesAsYarnDoes(lock, loaded, before);
+            migratesAsYarnDoes(lock, before);
             return;
         }
         if (project.lockfileNeedsRefresh) {
@@ -122,83 +116,26 @@ class BerryLockRoundTripTest {
 
     /**
      * A lock older than version 8 under a Yarn 4 install that changes nothing else: every locked package is
-     * resolved again from the registry through the resolver chain (the lockfile resolver no longer answers for
-     * locators), the stored descriptors and checksums kept, the migration's {@code compressionLevel: mixed} in
-     * force; Yarn's recording of that install is the phase's lock.
+     * resolved again from the registry (the lockfile resolver no longer answers for locators), the stored
+     * descriptors and checksums kept, the migration's {@code compressionLevel: mixed} in force; Yarn's recording of
+     * that install is the phase's lock.
      */
     private static void refreshesAsYarnDoes(BerryScenarios.Lock lock, BerryScenarios.Phase phase, String expected) {
         BerryScenarios.Scenario scenario = lock.getScenario();
-        BerryLockRegenerator regenerator = new BerryLockRegenerator(scenario.inputs(phase, lock.getText()));
-        Project project = regenerator.load(regenerator.release()).getProject();
-        Resolver chain = chain();
-        Resolver resolver = new MultiResolver(new LockfileResolver(chain), chain);
-        Resolver.ResolveOptions opts = new Resolver.ResolveOptions(project, resolver, registry(scenario));
-        for (Package pkg : new ArrayList<>(project.originalPackages.values())) {
-            project.originalPackages.put(pkg.locatorHash, resolver.resolve(pkg, opts));
-        }
-        assertThat(regenerator.write(project)).isEqualTo(expected);
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(scenario.inputs(phase, lock.getText()),
+                scenario.registry());
+        assertThat(regenerator.install(lock.getText(), new LinkedHashMap<>())).isEqualTo(expected);
     }
 
     /**
-     * A Yarn 1 lock under a Yarn 4 install that changes nothing else: every descriptor from the workspaces down
-     * resolved through the chain {@code resolveEverything} builds (lockfile, legacy pins, resolvers), each package
-     * prepared and its dependencies followed, then each registry package's checksum from its tarball, as the fetch
-     * step stores it; Yarn's recording of that install is the phase's lock.
+     * A Yarn 1 lock under a Yarn 4 install that changes nothing else: every descriptor resolved through the lockfile,
+     * the legacy pins and the resolvers, then each registry package's checksum from its tarball; Yarn's recording
+     * of that install is the phase's lock.
      */
-    private static void migratesAsYarnDoes(BerryScenarios.Lock lock, BerryLockRegenerator.Loaded loaded,
-                                           String expected) {
+    private static void migratesAsYarnDoes(BerryScenarios.Lock lock, String expected) {
         BerryScenarios.Scenario scenario = lock.getScenario();
-        Project project = loaded.getProject();
-        Resolver chain = chain();
-        Resolver resolver = new MultiResolver(new LockfileResolver(chain), loaded.getLegacyMigrationResolver(),
-                chain);
-        Resolver.ResolveOptions opts = new Resolver.ResolveOptions(project, resolver, registry(scenario));
-        Map<String, Descriptor> allDescriptors = new LinkedHashMap<>();
-        Map<String, String> allResolutions = new LinkedHashMap<>();
-        Map<String, Package> originalPackages = new LinkedHashMap<>();
-        Deque<Descriptor> queue = new ArrayDeque<>();
-        for (Workspace workspace : project.workspaces) {
-            queue.add(workspace.getAnchoredDescriptor());
-        }
-        while (!queue.isEmpty()) {
-            Descriptor descriptor = queue.poll();
-            if (allDescriptors.put(descriptor.descriptorHash, descriptor) != null) {
-                continue;
-            }
-            Locator locator = resolver.getCandidates(descriptor, Collections.emptyMap(), opts).get(0);
-            allResolutions.put(descriptor.descriptorHash, locator.locatorHash);
-            if (!originalPackages.containsKey(locator.locatorHash)) {
-                Package originalPkg = resolver.resolve(locator, opts);
-                originalPackages.put(originalPkg.locatorHash, originalPkg);
-                queue.addAll(project.preparePackage(originalPkg, resolver, opts).dependencies.values());
-            }
-        }
-        project.storedDescriptors = allDescriptors;
-        project.storedResolutions = allResolutions;
-        project.originalPackages.clear();
-        project.originalPackages.putAll(originalPackages);
-        for (Package pkg : originalPackages.values()) {
-            if (pkg.reference.startsWith("npm:")) {
-                byte[] tgz = scenario.http(StructUtils.stringifyIdent(pkg) + "-" +
-                                           pkg.reference.substring("npm:".length()) + ".tgz");
-                assertThat(tgz).as("the tarball of " + StructUtils.stringifyLocator(pkg)).isNotNull();
-                project.storedChecksums.put(pkg.locatorHash, Cache.checksum(tgz, pkg,
-                        project.configuration.getOptions()));
-            }
-        }
-        assertThat(new BerryLockRegenerator(lock.inputs()).write(project)).isEqualTo(expected);
-    }
-
-    private static Resolver chain() {
-        return new MultiResolver(new WorkspaceResolver(), new NpmRemapResolver(), new NpmSemverResolver(),
-                new NpmTagResolver());
-    }
-
-    private static NpmHttpUtils.Registry registry(BerryScenarios.Scenario scenario) {
-        return (url, identUrl) -> {
-            byte[] packument = scenario.http(UriComponent.decodeURIComponent(identUrl.substring(1)));
-            return packument == null ? null : Js.jsonParse(new String(packument, StandardCharsets.UTF_8));
-        };
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(lock.inputs(), scenario.registry());
+        assertThat(regenerator.install(lock.getText(), new LinkedHashMap<>())).isEqualTo(expected);
     }
 
     // the edit is only the packageManager field: the after phase is a second Yarn over the same project

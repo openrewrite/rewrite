@@ -65,10 +65,6 @@ public class LockEditSet {
         @Nullable
         String newIntegrity;
 
-        /** Yarn Berry's {@code <cacheKey>/<hash>} checksum for the new version, derived from its tarball. */
-        @Nullable
-        String newBerryChecksum;
-
         /** The new version's {@code dependencies} (name → constraint). */
         @Nullable
         Map<String, String> newDependencies;
@@ -84,10 +80,6 @@ public class LockEditSet {
         /** Pre-edit constraint: the descriptor the entry is keyed by before the edit. */
         @Nullable
         String oldConstraint;
-
-        /** New declared range for a berry forced-move: the requirer's new constraint that re-heads the moved entry's descriptor. */
-        @Nullable
-        String newConstraint;
 
         /** pnpm's peer-suffixed form of {@link #newVersion} ({@code version(peer@version)…}) for snapshot keys and references. */
         @Nullable
@@ -109,9 +101,9 @@ public class LockEditSet {
 
         /**
          * ADD is a brand-new dependency. FORCED_MOVE is a transitive a bump pushes to a new version; CONTENT_FORK is
-         * pnpm's non-nesting fork; PROMOTION reuses an already-installed transitive.
+         * pnpm's non-nesting fork.
          */
-        public enum Kind { BUMP, ADD, PROMOTION, FORCED_MOVE, CONTENT_FORK }
+        public enum Kind { BUMP, ADD, FORCED_MOVE, CONTENT_FORK }
     }
 
     /**
