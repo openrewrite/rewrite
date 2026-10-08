@@ -85,6 +85,131 @@ class SyncGradleResolutionStrategyPinsWithBomKotlinTest implements RewriteTest {
         );
     }
 
+    // Kotlin `in listOf(...)` input, all share one target → rewrite the useVersion literal, keep listOf intact.
+    @Test
+    void upgradesInListOfWhenAllArtifactsShareOneBomVersion() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && requested.name in listOf("jackson-databind", "jackson-core")) {
+                          useVersion("2.12.5")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && requested.name in listOf("jackson-databind", "jackson-core")) {
+                          useVersion("2.17.2")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """
+          )
+        );
+    }
+
+    // Kotlin `in listOf(...)` input, divergent targets → split into filtered listOf(...) groups + collapses.
+    @Test
+    void splitsInListOfWhenBomDivergesFromPinForSomeArtifacts() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && requested.name in listOf("jackson-databind", "jackson-core", "jackson-fictional")) {
+                          useVersion("2.15.0")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && requested.name in listOf("jackson-databind", "jackson-core")) {
+                          useVersion("2.17.2")
+                      } else if (requested.group == "com.fasterxml.jackson.core" && requested.name == "jackson-fictional") {
+                          useVersion("2.15.0")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """
+          )
+        );
+    }
+
+    // Kotlin `||` chain input, all share one target.
+    @Test
+    void upgradesOrChainWhenAllArtifactsShareOneBomVersion() {
+        rewriteRun(
+          buildGradleKts(
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && (requested.name == "jackson-databind" || requested.name == "jackson-core")) {
+                          useVersion("2.12.5")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """,
+            """
+              plugins { id("java") }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency {
+                      if (requested.group == "com.fasterxml.jackson.core" && (requested.name == "jackson-databind" || requested.name == "jackson-core")) {
+                          useVersion("2.17.2")
+                      }
+                  }
+              }
+              dependencies {
+                  implementation(platform("org.springframework.boot:spring-boot-dependencies:3.3.3"))
+                  implementation("com.fasterxml.jackson.core:jackson-databind")
+                  implementation("com.fasterxml.jackson.core:jackson-core")
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void skipsBranchWithBecauseClause() {
         rewriteRun(

@@ -38,6 +38,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -255,72 +256,97 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
                 return literalRewritten.withIfCondition(cond.withTree(newPredicate));
             }
 
-            // Walk the predicate; find the subtree that is the name check (either `name == 'x'` or `name in [...]`)
-            // and swap it to match the given artifactIds (collapsing length-1 lists to `==`).
+            // Walk the top-level `group==g && <name-check>` predicate, locate the <name-check> sub-expression
+            // (the same one PredicateInfo.nameCheckExpr points to by reference), and swap it for a filtered
+            // version matching artifactIds. Reference-identity lookup lets us dispatch on any supported shape
+            // (==, Groovy `in`, Kotlin `in`, OR chain) without re-recognizing it here.
             private Expression replaceNameCheck(Expression predicate, PredicateInfo pred, List<String> artifactIds) {
                 return (Expression) new JavaIsoVisitor<Integer>() {
                     @Override
                     public J visit(@Nullable Tree tree, Integer p) {
-                        if (tree instanceof J.Binary) {
-                            J.Binary b = (J.Binary) tree;
-                            if (b.getOperator() == J.Binary.Type.Equal && isNameSide(b)) {
-                                return buildNameCheck(b, pred.wasNameCheckOnLeft, artifactIds);
-                            }
-                            if (b.getOperator() == J.Binary.Type.And) {
-                                return b.withLeft((Expression) visit(b.getLeft(), p))
-                                        .withRight((Expression) visit(b.getRight(), p));
-                            }
+                        if (tree == pred.nameCheckExpr) {
+                            return buildNameCheck((Expression) tree, false, artifactIds);
                         }
-                        if (tree instanceof G.Binary) {
-                            G.Binary gb = (G.Binary) tree;
-                            if ((gb.getOperator() == G.Binary.Type.In || gb.getOperator() == G.Binary.Type.NotIn) && isNameSide(gb)) {
-                                return buildNameCheck(gb, pred.wasNameCheckOnLeft, artifactIds);
-                            }
-                        }
-                        return (J) tree;
-                    }
-
-                    private boolean isNameSide(J.Binary b) {
-                        return "name".equals(fieldOf(b.getLeft())) || "name".equals(fieldOf(b.getRight()));
-                    }
-
-                    private boolean isNameSide(G.Binary b) {
-                        return "name".equals(fieldOf(b.getLeft()));
+                        return super.visit(tree, p);
                     }
                 }.visit(predicate, 0);
             }
 
-            // Build the replacement name-check. For size-1 artifact groups: `<name-access> == 'artifact'`.
-            // For size-2+ groups: filter the original `G.ListLiteral` to only the keep-set, preserving padding.
-            // (Reusing the original list literal avoids building commas/brackets from scratch.)
+            // Build the replacement name-check in the same shape as the original, filtered to just the kept
+            // artifacts. If only one artifact survives: always collapse to `<name-access> == '<v>'` for readability.
+            // Dispatch by original shape so that lists stay as lists and OR chains stay as OR chains.
+            // If the original was wrapped in parentheses, the replacement is re-wrapped in the same parens
+            // (preserving prefix/padding, and preserving operator precedence for OR chains).
+            @SuppressWarnings("unchecked")
             private Expression buildNameCheck(Expression original, boolean nameOnLeft, List<String> artifactIds) {
+                J.Parentheses<Expression> wrappingParens = null;
+                while (original instanceof J.Parentheses) {
+                    wrappingParens = (J.Parentheses<Expression>) original;
+                    original = (Expression) wrappingParens.getTree();
+                }
+                Expression inner = buildNameCheckInner(original, artifactIds);
+                // Only re-wrap in parens when the output is itself an OR chain, where the parens are needed
+                // for `&&`/`||` precedence. For `in [...]` or `==` outputs the parens are redundant noise.
+                boolean needsParens = wrappingParens != null
+                        && inner instanceof J.Binary
+                        && ((J.Binary) inner).getOperator() == J.Binary.Type.Or;
+                if (needsParens) {
+                    return wrappingParens.getPadding().withTree(
+                            wrappingParens.getPadding().getTree().withElement(inner));
+                }
+                // Collapsing to `==`: inherit the wrapping parens' prefix so the ` && ` space stays correct.
+                if (wrappingParens != null) {
+                    return inner.withPrefix(wrappingParens.getPrefix());
+                }
+                return inner;
+            }
+
+            private Expression buildNameCheckInner(Expression original, List<String> artifactIds) {
                 if (artifactIds.size() == 1) {
-                    String v = artifactIds.get(0);
-                    J.Literal lit = new J.Literal(
-                            Tree.randomId(),
-                            Space.format(" "),
-                            Markers.EMPTY,
-                            v, "'" + v + "'", null,
-                            JavaType.Primitive.String);
-                    Expression nameAccess = nameAccessOf(original);
-                    return new J.Binary(
-                            Tree.randomId(),
-                            original.getPrefix(),
-                            Markers.EMPTY,
-                            nameAccess,
-                            JLeftPadded.build(J.Binary.Type.Equal).withBefore(Space.format(" ")),
-                            lit,
-                            null);
+                    return buildSingleEquals(original, artifactIds.get(0));
                 }
-                // Multi-artifact: must originate from a `name in [...]` predicate.
-                if (!(original instanceof G.Binary)) {
-                    throw new IllegalStateException("Multi-artifact split expects an `in [...]` predicate; got " + original.getClass().getSimpleName());
+                if (original instanceof G.Binary) {
+                    G.Binary origIn = (G.Binary) original;
+                    if (origIn.getOperator() == G.Binary.Type.In && origIn.getRight() instanceof G.ListLiteral) {
+                        return filterGroovyListLiteral(origIn, (G.ListLiteral) origIn.getRight(), artifactIds);
+                    }
                 }
-                G.Binary origIn = (G.Binary) original;
-                if (origIn.getOperator() != G.Binary.Type.In || !(origIn.getRight() instanceof G.ListLiteral)) {
-                    throw new IllegalStateException("Multi-artifact split expects `in` operator with ListLiteral RHS");
+                if (original instanceof K.Binary) {
+                    K.Binary origContains = (K.Binary) original;
+                    if (origContains.getOperator() == K.Binary.Type.Contains
+                            && origContains.getRight() instanceof J.MethodInvocation) {
+                        return filterKotlinListOf(origContains, (J.MethodInvocation) origContains.getRight(), artifactIds);
+                    }
                 }
-                G.ListLiteral origList = (G.ListLiteral) origIn.getRight();
+                if (original instanceof J.Binary && ((J.Binary) original).getOperator() == J.Binary.Type.Or) {
+                    return filterOrChain((J.Binary) original, artifactIds);
+                }
+                throw new IllegalStateException("Unhandled name-check shape for multi-artifact split: " + original.getClass().getSimpleName());
+            }
+
+            // Collapse any shape to `<name-access> == '<v>'`. The quote style — single vs double — follows the
+            // DSL: Groovy inputs use `'...'`, Kotlin inputs use `"..."`. We detect by looking at the first
+            // String literal we can find in the original expression; this covers all input shapes we extract.
+            private Expression buildSingleEquals(Expression original, String artifact) {
+                String quote = quoteStyleOf(original);
+                J.Literal lit = new J.Literal(
+                        Tree.randomId(),
+                        Space.format(" "),
+                        Markers.EMPTY,
+                        artifact, quote + artifact + quote, null,
+                        JavaType.Primitive.String);
+                Expression nameAccess = nameAccessOf(original);
+                return new J.Binary(
+                        Tree.randomId(),
+                        original.getPrefix(),
+                        Markers.EMPTY,
+                        nameAccess,
+                        JLeftPadded.build(J.Binary.Type.Equal).withBefore(Space.format(" ")),
+                        lit,
+                        null);
+            }
+
+            private Expression filterGroovyListLiteral(G.Binary origIn, G.ListLiteral origList, List<String> artifactIds) {
                 List<Expression> filtered = new ArrayList<>();
                 for (Expression el : origList.getElements()) {
                     if (el instanceof J.Literal
@@ -329,21 +355,114 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
                         filtered.add(el);
                     }
                 }
-                // In the original list, element[0] has prefix "" (no leading comma to space over)
-                // while later elements have prefix " ". When we filter to a subset that doesn't include
-                // the original element[0], the new first element still carries its " " prefix and the list
-                // prints as `[ 'foo', 'bar']`. Reset to no-leading-space so output matches `['foo', 'bar']`.
+                // If the kept element[0] is not the original element[0], it carries its original
+                // "space after preceding comma" prefix (`" "`). Reset to EMPTY so the list prints as `[a, b]`
+                // and not `[ a, b]`.
                 if (!filtered.isEmpty() && filtered.get(0) != origList.getElements().get(0)) {
-                    Expression first = filtered.get(0);
-                    filtered.set(0, first.withPrefix(Space.EMPTY));
+                    filtered.set(0, filtered.get(0).withPrefix(Space.EMPTY));
                 }
                 return origIn.withRight(origList.withElements(filtered));
             }
 
-            // Pull the `requested.name` field access out of either side of the original binary.
+            private Expression filterKotlinListOf(K.Binary origContains, J.MethodInvocation origListOf, List<String> artifactIds) {
+                List<Expression> filtered = new ArrayList<>();
+                for (Expression arg : origListOf.getArguments()) {
+                    if (arg instanceof J.Literal
+                            && ((J.Literal) arg).getValue() instanceof String
+                            && artifactIds.contains(((J.Literal) arg).getValue())) {
+                        filtered.add(arg);
+                    }
+                }
+                // Same leading-space fixup as for the Groovy list literal: method arguments carry their
+                // post-comma space in `prefix`; the first kept argument has to have Space.EMPTY if we dropped
+                // whatever argument preceded it.
+                if (!filtered.isEmpty() && filtered.get(0) != origListOf.getArguments().get(0)) {
+                    filtered.set(0, filtered.get(0).withPrefix(Space.EMPTY));
+                }
+                return origContains.withRight(origListOf.withArguments(filtered));
+            }
+
+            // Filter the OR chain to just the leaves whose literal is in artifactIds, preserving left-to-right order.
+            // Rebuilds a left-associative Or chain: `((kept[0]) || kept[1]) || kept[2] ...`.
+            private Expression filterOrChain(J.Binary origOrRoot, List<String> artifactIds) {
+                List<J.Binary> allLeaves = new ArrayList<>();
+                collectOrLeaves(origOrRoot, allLeaves);
+                List<J.Binary> kept = new ArrayList<>();
+                for (J.Binary leaf : allLeaves) {
+                    String literal = nameEqualsLiteral(leaf);
+                    if (literal != null && artifactIds.contains(literal)) {
+                        kept.add(leaf);
+                    }
+                }
+                if (kept.size() == 1) {
+                    // Shouldn't happen (size==1 is handled by buildSingleEquals above) but defensively collapse.
+                    return kept.get(0).withPrefix(origOrRoot.getPrefix());
+                }
+                // Rebuild left-associative chain. First leaf keeps the root's prefix; subsequent leaves keep
+                // their own prefix (single space from `|| name == 'x'`).
+                Expression chain = kept.get(0).withPrefix(origOrRoot.getPrefix());
+                for (int i = 1; i < kept.size(); i++) {
+                    chain = new J.Binary(
+                            Tree.randomId(),
+                            origOrRoot.getPrefix(),
+                            Markers.EMPTY,
+                            chain,
+                            JLeftPadded.build(J.Binary.Type.Or).withBefore(Space.format(" ")),
+                            kept.get(i).withPrefix(Space.format(" ")),
+                            null);
+                }
+                return chain;
+            }
+
+            // Walks a J.Binary Or tree and appends every leaf (`name == 'x'`) J.Binary in left-to-right order.
+            private void collectOrLeaves(J.Binary or, List<J.Binary> out) {
+                for (Expression side : Arrays.asList(or.getLeft(), or.getRight())) {
+                    if (side instanceof J.Binary) {
+                        J.Binary b = (J.Binary) side;
+                        if (b.getOperator() == J.Binary.Type.Or) {
+                            collectOrLeaves(b, out);
+                        } else if (b.getOperator() == J.Binary.Type.Equal) {
+                            out.add(b);
+                        }
+                    }
+                }
+            }
+
+            // Find the first String literal under this expression (used only for quote-style detection).
+            // Returns "'" (Groovy convention) or "\"" (Kotlin convention), defaulting to Groovy.
+            private String quoteStyleOf(Expression e) {
+                String[] holder = new String[]{"'"};
+                try {
+                    new JavaIsoVisitor<Integer>() {
+                        @Override
+                        public J.Literal visitLiteral(J.Literal lit, Integer p) {
+                            if (lit.getValue() instanceof String && lit.getValueSource() != null && lit.getValueSource().length() >= 2) {
+                                holder[0] = lit.getValueSource().substring(0, 1);
+                                throw new RuntimeException("found");
+                            }
+                            return lit;
+                        }
+                    }.visit(e, 0);
+                } catch (RuntimeException ignored) {
+                    // intentional short-circuit once we find any literal
+                }
+                return holder[0];
+            }
+
+            // Pull the `requested.name` field access out of the original name-check expression. Falls through
+            // J.Binary (`==` / `||`), G.Binary (Groovy `in`), and K.Binary (Kotlin `in`) shapes. For an OR chain,
+            // reaches into the first leaf's `==` to grab its name access.
             private Expression nameAccessOf(Expression original) {
+                // Transparently unwrap any parentheses that might wrap the expression (e.g. `(a || b)`).
+                while (original instanceof J.Parentheses) {
+                    original = (Expression) ((J.Parentheses<?>) original).getTree();
+                }
                 if (original instanceof J.Binary) {
                     J.Binary b = (J.Binary) original;
+                    if (b.getOperator() == J.Binary.Type.Or) {
+                        // Recurse into the leftmost side until we find a non-Or binary.
+                        return nameAccessOf(b.getLeft());
+                    }
                     if ("name".equals(fieldOf(b.getLeft()))) return b.getLeft();
                     if ("name".equals(fieldOf(b.getRight()))) return b.getRight();
                 }
@@ -351,7 +470,11 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
                     G.Binary b = (G.Binary) original;
                     if ("name".equals(fieldOf(b.getLeft()))) return b.getLeft();
                 }
-                throw new IllegalStateException("Could not locate name field access on original predicate");
+                if (original instanceof K.Binary) {
+                    K.Binary b = (K.Binary) original;
+                    if ("name".equals(fieldOf(b.getLeft()))) return b.getLeft();
+                }
+                throw new IllegalStateException("Could not locate name field access on original predicate; shape=" + original.getClass().getSimpleName());
             }
 
             // Lookup the version a BOM/platform would resolve for this GA, with the resolution strategy constraint
@@ -392,7 +515,9 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
     static class PredicateInfo {
         String groupId;
         List<String> artifactIds;
-        boolean wasNameCheckOnLeft; // reserved for future formatting fidelity
+        // The original expression that matched name(s). Used by buildNameCheck to decide the output shape
+        // (name == 'x', name in [...], name in listOf(...), or `name == 'a' || name == 'b' || ...`).
+        Expression nameCheckExpr;
     }
 
     @Value
@@ -409,43 +534,123 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
         if (and.getOperator() != J.Binary.Type.And) {
             return null;
         }
-        AtomicReference<String> groupId = new AtomicReference<>();
-        AtomicReference<List<String>> artifactIds = new AtomicReference<>();
+        String groupId = null;
+        List<String> artifactIds = null;
+        Expression nameCheckExpr = null;
 
         for (Expression side : Arrays.asList(and.getLeft(), and.getRight())) {
-            if (side instanceof J.Binary) {
-                J.Binary b = (J.Binary) side;
-                if (b.getOperator() == J.Binary.Type.Equal) {
-                    String field = fieldOf(b.getLeft());
-                    String literal = literalOf(b.getRight());
-                    if (field == null) {
-                        field = fieldOf(b.getRight());
-                        literal = literalOf(b.getLeft());
-                    }
-                    if ("group".equals(field) && literal != null) {
-                        groupId.set(literal);
-                    } else if ("name".equals(field) && literal != null) {
-                        artifactIds.set(singletonList(literal));
-                    }
-                }
-            } else if (side instanceof G.Binary) {
-                G.Binary gb = (G.Binary) side;
-                if (gb.getOperator() == G.Binary.Type.In) {
-                    String field = fieldOf(gb.getLeft());
-                    if ("name".equals(field)) {
-                        List<String> literals = listLiteralsOf(gb.getRight());
-                        if (literals != null) {
-                            artifactIds.set(literals);
-                        }
-                    }
-                }
+            String maybeGroup = extractGroupEquals(side);
+            if (maybeGroup != null) {
+                groupId = maybeGroup;
+                continue;
+            }
+            List<String> names = extractNameMatch(side);
+            if (names != null) {
+                artifactIds = names;
+                nameCheckExpr = side;
             }
         }
 
-        if (groupId.get() == null || artifactIds.get() == null) {
+        if (groupId == null || artifactIds == null) {
             return null;
         }
-        return new PredicateInfo(groupId.get(), artifactIds.get(), false);
+        return new PredicateInfo(groupId, artifactIds, nameCheckExpr);
+    }
+
+    // `requested.group == 'g'` → "g". Else null.
+    private static @Nullable String extractGroupEquals(Expression side) {
+        if (!(side instanceof J.Binary)) {
+            return null;
+        }
+        J.Binary b = (J.Binary) side;
+        if (b.getOperator() != J.Binary.Type.Equal) {
+            return null;
+        }
+        String field = fieldOf(b.getLeft());
+        String literal = literalOf(b.getRight());
+        if (field == null) {
+            field = fieldOf(b.getRight());
+            literal = literalOf(b.getLeft());
+        }
+        return "group".equals(field) && literal != null ? literal : null;
+    }
+
+    // Pulls the artifact IDs out of a name-check expression, in whatever shape the author used:
+    //   `name == 'x'`                        → [x]
+    //   `name in ['a', 'b']`                 → [a, b]   (Groovy G.Binary with In op + G.ListLiteral)
+    //   `name in listOf("a", "b")`           → [a, b]   (Kotlin K.Binary with Contains op + listOf call)
+    //   `name == 'a' || name == 'b' || ...`  → [a, b, …] (J.Binary Or chain of == on name)
+    // Returns null if the expression doesn't fit one of these shapes.
+    private static @Nullable List<String> extractNameMatch(Expression side) {
+        // `(A || B)` and `((A || B))` come through as J.Parentheses; unwrap transparently.
+        while (side instanceof J.Parentheses) {
+            Expression inner = (Expression) ((J.Parentheses<?>) side).getTree();
+            side = inner;
+        }
+        if (side instanceof J.Binary) {
+            J.Binary b = (J.Binary) side;
+            if (b.getOperator() == J.Binary.Type.Equal) {
+                String literal = nameEqualsLiteral(b);
+                return literal == null ? null : singletonList(literal);
+            }
+            if (b.getOperator() == J.Binary.Type.Or) {
+                List<String> leaves = new ArrayList<>();
+                return collectOrChainNames(b, leaves) ? leaves : null;
+            }
+        }
+        if (side instanceof G.Binary) {
+            G.Binary gb = (G.Binary) side;
+            if (gb.getOperator() == G.Binary.Type.In && "name".equals(fieldOf(gb.getLeft()))) {
+                return listLiteralsOf(gb.getRight());
+            }
+        }
+        if (side instanceof K.Binary) {
+            K.Binary kb = (K.Binary) side;
+            if (kb.getOperator() == K.Binary.Type.Contains && "name".equals(fieldOf(kb.getLeft()))) {
+                return listOfLiteralsOf(kb.getRight());
+            }
+        }
+        return null;
+    }
+
+    // `name == 'x'` → "x". Any other shape → null. Works for both left and right side being the field.
+    private static @Nullable String nameEqualsLiteral(J.Binary b) {
+        if (b.getOperator() != J.Binary.Type.Equal) {
+            return null;
+        }
+        if ("name".equals(fieldOf(b.getLeft()))) {
+            return literalOf(b.getRight());
+        }
+        if ("name".equals(fieldOf(b.getRight()))) {
+            return literalOf(b.getLeft());
+        }
+        return null;
+    }
+
+    // Walks a J.Binary Or tree, collecting all leaf `name == 'x'` literals in left-to-right order.
+    // Returns true iff every leaf matched the expected shape (otherwise the chain mixes in something else
+    // we don't know how to handle and we should bail).
+    private static boolean collectOrChainNames(J.Binary or, List<String> out) {
+        for (Expression side : Arrays.asList(or.getLeft(), or.getRight())) {
+            if (side instanceof J.Binary) {
+                J.Binary b = (J.Binary) side;
+                if (b.getOperator() == J.Binary.Type.Or) {
+                    if (!collectOrChainNames(b, out)) {
+                        return false;
+                    }
+                    continue;
+                }
+                if (b.getOperator() == J.Binary.Type.Equal) {
+                    String literal = nameEqualsLiteral(b);
+                    if (literal != null) {
+                        out.add(literal);
+                        continue;
+                    }
+                }
+            }
+            return false;
+        }
+        return true;
     }
 
     static @Nullable ThenInfo extractThen(Statement thenPart) {
@@ -499,6 +704,26 @@ public class SyncGradleResolutionStrategyPinsWithBom extends Recipe {
                 return null;
             }
             out.add((String) ((J.Literal) el).getValue());
+        }
+        return out;
+    }
+
+    // `listOf("a", "b")` → ["a", "b"]. Anything else → null. The method invocation must be a bare call
+    // (no select) named "listOf" with all-String arguments.
+    private static @Nullable List<String> listOfLiteralsOf(Expression e) {
+        if (!(e instanceof J.MethodInvocation)) {
+            return null;
+        }
+        J.MethodInvocation m = (J.MethodInvocation) e;
+        if (!"listOf".equals(m.getSimpleName()) || m.getSelect() != null) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        for (Expression arg : m.getArguments()) {
+            if (!(arg instanceof J.Literal) || !(((J.Literal) arg).getValue() instanceof String)) {
+                return null;
+            }
+            out.add((String) ((J.Literal) arg).getValue());
         }
         return out;
     }

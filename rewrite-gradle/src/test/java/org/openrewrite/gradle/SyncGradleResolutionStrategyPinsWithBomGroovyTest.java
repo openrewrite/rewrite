@@ -380,6 +380,90 @@ class SyncGradleResolutionStrategyPinsWithBomGroovyTest implements RewriteTest {
         );
     }
 
+    // `||` chain input, all leaves share one target → rewrite just the useVersion literal, keep the chain.
+    @Test
+    void upgradesOrChainWhenAllArtifactsShareOneBomVersion() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && (details.requested.name == 'jackson-databind' || details.requested.name == 'jackson-core')) {
+                          details.useVersion '2.12.5'
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+                  implementation 'com.fasterxml.jackson.core:jackson-core'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && (details.requested.name == 'jackson-databind' || details.requested.name == 'jackson-core')) {
+                          details.useVersion '2.17.2'
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+                  implementation 'com.fasterxml.jackson.core:jackson-core'
+              }
+              """
+          )
+        );
+    }
+
+    // `||` chain input, divergent targets → split into filtered `||` sub-chains and/or `==` collapses.
+    @Test
+    void splitsOrChainWhenBomDivergesFromPinForSomeArtifacts() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && (details.requested.name == 'jackson-databind' || details.requested.name == 'jackson-core' || details.requested.name == 'jackson-fictional')) {
+                          details.useVersion '2.15.0'
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+                  implementation 'com.fasterxml.jackson.core:jackson-core'
+              }
+              """,
+            """
+              plugins { id 'java' }
+              repositories { mavenCentral() }
+              configurations.all {
+                  resolutionStrategy.eachDependency { details ->
+                      if (details.requested.group == 'com.fasterxml.jackson.core' && (details.requested.name == 'jackson-databind' || details.requested.name == 'jackson-core')) {
+                          details.useVersion '2.17.2'
+                      } else if (details.requested.group == 'com.fasterxml.jackson.core' && details.requested.name == 'jackson-fictional') {
+                          details.useVersion '2.15.0'
+                      }
+                  }
+              }
+              dependencies {
+                  implementation platform('org.springframework.boot:spring-boot-dependencies:3.3.3')
+                  implementation 'com.fasterxml.jackson.core:jackson-databind'
+                  implementation 'com.fasterxml.jackson.core:jackson-core'
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void doesNothingWhenNoResolutionStrategyBlock() {
         rewriteRun(
