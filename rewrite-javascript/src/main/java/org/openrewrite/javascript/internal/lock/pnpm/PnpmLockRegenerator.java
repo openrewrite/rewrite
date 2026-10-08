@@ -213,6 +213,13 @@ public final class PnpmLockRegenerator {
             return new Failure(reason, null, prefix + PNPM_REJECTS + ": " + (code == null ? "" : "[" + code + "] ") +
                                              e.getMessage());
         }
+        // the lock and the env document catch their own; what reaches here is pnpm-workspace.yaml's
+        if (e instanceof JsYaml.YamlException) {
+            return new Failure(Reason.MALFORMED_MANIFEST, null, prefix + PNPM_REJECTS + ": " + e.getMessage());
+        }
+        if (e instanceof LockfileFormatConverters.TypeError) {
+            return new Failure(Reason.MALFORMED_LOCK, null, prefix + PNPM_REJECTS + ": TypeError: " + e.getMessage());
+        }
         throw e;
     }
 

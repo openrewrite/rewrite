@@ -1,0 +1,8 @@
+[ERROR] unexpected end of the stream within a flow collection (4:1)
+
+ 1 | autoInstallPeers: true
+ 2 | packages:
+ 3 |   - [packages/*
+ 4 | 
+-----^
+For help, run: pnpm help install
