@@ -24,8 +24,7 @@ import (
 )
 
 // AppendBatch appends a page's JSON encoding to dst, byte for byte as json.Marshal writes the
-// same batch. Reflection allocates for every value it boxes on the way out; the shape of a
-// message is known here, so the bytes go straight into the caller's buffer.
+// same batch, without the per-value allocation reflection costs.
 //
 // A value of a type this does not recognise goes to json.Marshal, so an unexpected one is slower
 // rather than wrong.
@@ -48,8 +47,7 @@ func AppendBatch(dst []byte, batch []RpcObjectData) ([]byte, error) {
 	return append(dst, ']'), nil
 }
 
-// Field order and the omission of an absent field follow the struct tags, which is what makes
-// this byte-identical rather than merely equivalent.
+// Field order and omission follow the struct tags: byte-identical, not merely equivalent.
 func appendMessage(dst []byte, m *RpcObjectData) ([]byte, error) {
 	dst = append(dst, `{"state":`...)
 	dst = appendJSONString(dst, m.State.String())
@@ -94,6 +92,11 @@ func appendValue(dst []byte, value any) ([]byte, error) {
 		}
 		return append(dst, v...), nil
 	case []any:
+		// A nil slice or map is null, not empty delimiters — the type assertion above matches a
+		// nil value of the type, so this cannot be left to the loop.
+		if v == nil {
+			return append(dst, "null"...), nil
+		}
 		dst = append(dst, '[')
 		for i, element := range v {
 			if i > 0 {
@@ -114,6 +117,9 @@ func appendValue(dst []byte, value any) ([]byte, error) {
 
 // Keys are sorted because json.Marshal sorts a map's keys, and a peer's wire test pins the order.
 func appendJSONObject(dst []byte, fields map[string]any) ([]byte, error) {
+	if fields == nil {
+		return append(dst, "null"...), nil
+	}
 	keys := make([]string, 0, len(fields))
 	for key := range fields {
 		keys = append(keys, key)
@@ -184,7 +190,7 @@ func appendJSONString(dst []byte, s string) []byte {
 		case r == utf8.RuneError && size == 1:
 			dst = append(dst, s[written:i]...)
 			dst = append(dst, '\\', 'u', 'f', 'f', 'f', 'd')
-		case r == ' ' || r == ' ':
+		case r == '\u2028' || r == '\u2029':
 			dst = append(dst, s[written:i]...)
 			dst = append(dst, '\\', 'u', '2', '0', '2', hexDigits[r&0xF])
 		default:

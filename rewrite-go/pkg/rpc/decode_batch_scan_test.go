@@ -52,9 +52,9 @@ func TestDecodeBatchReadsEveryEscapeEncodingJSONWrites(t *testing.T) {
 func TestDecodeBatchReadsSurrogatePairsAndLoneSurrogates(t *testing.T) {
 	for _, tc := range []struct{ literal, want string }{
 		{`"😀"`, "\U0001F600"},
-		{`"\uD83D"`, "�"},
-		{`"\uDE00"`, "�"},
-		{`"\uD83DA"`, "�A"},
+		{`"\uD83D"`, "\uFFFD"},
+		{`"\uDE00"`, "\uFFFD"},
+		{`"\uD83DA"`, "\uFFFDA"},
 		{`"\u0000"`, "\x00"},
 		{`"\/"`, "/"},
 	} {

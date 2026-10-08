@@ -88,9 +88,8 @@ func wireNumber(v any) any {
 	return json.Number(s)
 }
 
-// DecodeBatch reads a page of messages straight out of its bytes, building the values the rest of
-// this package expects: strings interned, numbers given the Go type their JSON shape implies,
-// objects as maps. A truncated page is an error rather than a short batch.
+// DecodeBatch reads a page of messages straight out of its bytes: strings interned, numbers
+// typed by their JSON shape, objects as maps. A truncated page is an error, not a short batch.
 func DecodeBatch(data []byte, intern map[string]string) ([]RpcObjectData, error) {
 	i := skipSpace(data, 0)
 	if i >= len(data) {
@@ -219,9 +218,7 @@ func scanMessage(data []byte, i int, tbl map[string]string) (RpcObjectData, int,
 	}
 }
 
-// scanValue builds the value the rest of this package expects: an object is a map with interned
-// keys, an array is always non-nil, a string is interned, and a number keeps the type its JSON
-// shape implies.
+// An array is always non-nil, which the receive queue relies on to tell empty from absent.
 func scanValue(data []byte, i int, tbl map[string]string) (any, int, error) {
 	switch data[i] {
 	case '{':
@@ -387,7 +384,6 @@ func hasLiteral(data []byte, i int, literal string) bool {
 	return i+len(literal) <= len(data) && string(data[i:i+len(literal)]) == literal
 }
 
-// describe names what was found, for an error that has to be readable without the input to hand.
 func describe(data []byte, i int) string {
 	if i >= len(data) {
 		return "end of input"
@@ -448,7 +444,6 @@ func isDigit(c byte) bool {
 	return c >= '0' && c <= '9'
 }
 
-// skipValue passes over a value without building it, for a member this reader does not know.
 func skipValue(data []byte, i int) (int, error) {
 	switch data[i] {
 	case '{', '[':
@@ -492,7 +487,6 @@ func skipValue(data []byte, i int) (int, error) {
 	}
 }
 
-// endOfString returns the index just past the closing quote.
 func endOfString(data []byte, i int) (int, error) {
 	if data[i] != '"' {
 		return 0, fmt.Errorf("expected a string, got %s", describe(data, i))
@@ -508,8 +502,7 @@ func endOfString(data []byte, i int) (int, error) {
 	return 0, fmt.Errorf("unterminated string at %s", describe(data, i))
 }
 
-// scanString reads a string and interns it. An unescaped string — most of them — becomes a Go
-// string straight from the bytes; anything carrying an escape is unescaped first.
+// Interns every string it returns.
 func scanString(data []byte, i int, tbl map[string]string) (string, int, error) {
 	end, err := endOfString(data, i)
 	if err != nil {
@@ -575,7 +568,7 @@ func unescape(body []byte) (string, error) {
 	return out.String(), nil
 }
 
-// unescapeRune reads \uXXXX at body[i] == 'u', joining a surrogate pair when one follows.
+// Expects body[i] == 'u'. Joins a surrogate pair when one follows.
 func unescapeRune(body []byte, i int) (rune, int, error) {
 	first, next, err := hex4(body, i+1)
 	if err != nil {

@@ -25,9 +25,8 @@ import (
 	"github.com/openrewrite/rewrite/rewrite-go/pkg/rpc"
 )
 
-// The encoder writes the whole frame body for a batch reply, envelope included, so the envelope
-// has to match what json.Marshal wrote for the same response down to the byte — including which
-// members are present and in what order.
+// The encoder writes the envelope too, so it must match json.Marshal byte for byte — including
+// which members are present and in what order.
 func TestAppendBatchResponseMatchesMarshal(t *testing.T) {
 	valueType := "org.openrewrite.java.tree.J$Identifier"
 	ref := 3

@@ -59,8 +59,7 @@ func BenchmarkEncodeBatch(b *testing.B) {
 	}
 }
 
-// The same page through the appender, into a buffer the caller keeps — which is how a framed
-// write uses it, and why the allocation figure is the one to read.
+// The same page through the appender, into a buffer the caller keeps, as a framed write does.
 func BenchmarkAppendBatch(b *testing.B) {
 	batch := benchBatch(2000)
 	buf := make([]byte, 0, 1<<18)

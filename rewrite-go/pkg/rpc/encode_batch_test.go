@@ -75,6 +75,9 @@ func TestAppendBatchMatchesMarshal(t *testing.T) {
 		[]any{}, []any{0, -1, 2}, []any{"a", nil, true, json.Number("1.0")},
 		[]any{[]any{}, map[string]any{}},
 		map[string]any{},
+		// A nil map or slice is null, not empty delimiters. The type switch matches a nil value
+		// of the type, so these only differ from the empty cases above if that is handled.
+		[]any(nil), map[string]any(nil),
 		map[string]any{"b": 1, "a": "x"},
 		map[string]any{"z": nil, "m": []any{1, 2}, "a": map[string]any{"deep": "\n"}},
 		map[string]any{"<&>": "\u2028", "": ""},
