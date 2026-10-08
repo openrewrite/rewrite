@@ -1,0 +1,1 @@
+Bump direct is-number 6.0.0 to 7.0.0 while is-odd@3.0.1 (is-number ^6.0.0) shares the locked 6.0.0: 7.0.0 is added beside the retained 6.0.0. Small form of bump-direct-keeps-transitive.

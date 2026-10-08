@@ -1,0 +1,8 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages are cloned from the content-addressable store to the virtual store.
+  Content-addressable store is at: /var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.L4rGEBcNGu/store/v11
+  Virtual store is at:             node_modules/.pnpm
+Progress: resolved 1, reused 0, downloaded 1, added 0
+Progress: resolved 2, reused 0, downloaded 1, added 0, done
+
+Done in 1.7s using pnpm v11.2.2

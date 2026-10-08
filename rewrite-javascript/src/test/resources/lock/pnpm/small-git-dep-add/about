@@ -1,0 +1,1 @@
+Add is-number from github:jonschlinkert/is-number#7.0.0: pnpm resolves the tag to a commit and downloads the codeload tarball (integrity, version and engines come from it).

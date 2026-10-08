@@ -1,0 +1,23 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+  peersSuffixMaxLength: 10
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-deps-c':
+        specifier: 2.0.0
+        version: 2.0.0
+
+packages:
+
+  '@isaacs/testing-peer-deps-c@2.0.0':
+    resolution: {integrity: sha512-ixTvB2pyv08B5pLskjuuM/w/+U6/oHFNtaZbnqbyl1HUZrm9LbBhL5rNCQCddXLwds0beiin9ue4dPyq9dUjDw==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-c@2.0.0': {}

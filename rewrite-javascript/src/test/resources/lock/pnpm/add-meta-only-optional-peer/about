@@ -1,0 +1,1 @@
+Add debug 4.3.1, which has peerDependenciesMeta (supports-color optional) but no peerDependencies.

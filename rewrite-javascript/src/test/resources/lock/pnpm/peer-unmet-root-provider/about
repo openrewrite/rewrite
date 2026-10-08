@@ -1,0 +1,1 @@
+Add b@2.0.1 (peer c 2) while the root pins c@1.2.3: pnpm warns (peer issues) and suffixes b with the non-satisfying c@1.2.3.

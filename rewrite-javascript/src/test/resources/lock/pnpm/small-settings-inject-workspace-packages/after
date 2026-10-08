@@ -1,0 +1,39 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+  injectWorkspacePackages: true
+
+importers:
+
+  .: {}
+
+  packages/a:
+    dependencies:
+      b:
+        specifier: workspace:*
+        version: link:../b
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+  packages/b:
+    dependencies:
+      '@isaacs/testing-peer-deps-c':
+        specifier: 2.0.0
+        version: 2.0.0
+
+packages:
+
+  '@isaacs/testing-peer-deps-c@2.0.0':
+    resolution: {integrity: sha512-ixTvB2pyv08B5pLskjuuM/w/+U6/oHFNtaZbnqbyl1HUZrm9LbBhL5rNCQCddXLwds0beiin9ue4dPyq9dUjDw==}
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-c@2.0.0': {}
+
+  wrappy@1.0.2: {}

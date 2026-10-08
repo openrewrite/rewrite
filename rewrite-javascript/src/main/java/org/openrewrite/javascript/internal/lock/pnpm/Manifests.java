@@ -1,0 +1,92 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.pnpm;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * @pnpm/workspace.project-manifest-reader {@code readJsonFile} (pnpm 11.2.2): a package.json without its byte order
+ * mark, parsed as {@code JSON.parse} would, into the values {@link Js} works over.
+ */
+final class Manifests {
+
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
+
+    private Manifests() {
+    }
+
+    /**
+     * @throws PnpmError {@code ERR_PNPM_JSON_PARSE} when the text is not JSON, or is JSON but not an object
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> parse(String text, String path) {
+        Object value;
+        try {
+            value = order(MAPPER.readValue(LockfileReader.stripBom(text), Object.class));
+        } catch (JsonProcessingException e) {
+            throw new PnpmError("JSON_PARSE", e.getOriginalMessage() + " in " + path);
+        }
+        if (!(value instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of " + path + " (JSON, but not an object)");
+        }
+        return (Map<String, @Nullable Object>) value;
+    }
+
+    /**
+     * {@code JSON.parse} of any JSON text.
+     */
+    static @Nullable Object parseValue(String text, String path) {
+        try {
+            return order(MAPPER.readValue(text, Object.class));
+        } catch (JsonProcessingException e) {
+            throw new PnpmError("JSON_PARSE", e.getOriginalMessage() + " in " + path);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object order(@Nullable Object value) {
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
+            for (String key : Js.keys(map)) {
+                ordered.put(key, order(map.get(key)));
+            }
+            return ordered;
+        }
+        if (value instanceof List) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object item : (List<Object>) value) {
+                list.add(order(item));
+            }
+            return list;
+        }
+        if (value instanceof Number && !(value instanceof Double)) {
+            return ((Number) value).doubleValue();
+        }
+        return value;
+    }
+}

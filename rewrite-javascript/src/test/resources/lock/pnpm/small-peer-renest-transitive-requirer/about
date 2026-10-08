@@ -1,0 +1,1 @@
+npm/small-peer-renest-transitive-requirer's manifests: @isaacs/testing-peer-deps@2 holds a@1.2.4 (peer b 1) and d@2 -> a@2 (peer b 2), so before no b is installed (disjoint ranges); adding root b "2" links both a's to b@2.0.1 (a@1.2.4 unmet, warning) and auto-installs c@2.0.0.

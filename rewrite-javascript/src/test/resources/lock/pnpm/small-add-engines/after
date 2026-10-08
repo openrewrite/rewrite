@@ -1,0 +1,40 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@tufjs/canonical-json':
+        specifier: 1.0.0
+        version: 1.0.0
+      tmpl:
+        specifier: 1.0.3
+        version: 1.0.3
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+packages:
+
+  '@tufjs/canonical-json@1.0.0':
+    resolution: {integrity: sha512-QTnf++uxunWvG2z3UFNzAoQPHxnSXOwtaI3iJ+AohhV+5vONuArPjJE7aPXPVXfXJsqrVbZBu9b81AJoSd09IQ==}
+    engines: {node: ^14.17.0 || ^16.13.0 || >=18.0.0}
+
+  tmpl@1.0.3:
+    resolution: {integrity: sha512-reGkNSkpa0maD0+QJcZFsz6DemFpX++DKIG0s089xxqE6R8dfF4XkZuq2932zbizcG+XgVY0rJ3NQF5D829i1A==}
+    engines: {node: 0.6.x}
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@tufjs/canonical-json@1.0.0': {}
+
+  tmpl@1.0.3: {}
+
+  wrappy@1.0.2: {}

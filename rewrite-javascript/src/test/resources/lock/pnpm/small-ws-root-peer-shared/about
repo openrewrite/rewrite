@@ -1,0 +1,1 @@
+Small form of ws-root-peer-shared: the root provides c@2.0.0; member a adds b@2.0.1 (peer c 2), which resolves to the root's c: b@2.0.1(c@2.0.0).

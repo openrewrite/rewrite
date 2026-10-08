@@ -209,6 +209,30 @@ public class NodeSemver {
     }
 
     /**
+     * node-semver's {@code minSatisfying}: the lowest version the range admits, the first of equal ones.
+     *
+     * @return {@code null} when no version satisfies the range or the range is invalid.
+     */
+    public static @Nullable String minSatisfying(Collection<String> versions, String range, Options options) {
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        if (r == null) {
+            return null;
+        }
+        String min = null;
+        ParsedVersion minVersion = null;
+        for (String version : versions) {
+            if (test(r, version, options)) {
+                ParsedVersion v = ParsedVersion.parseNode(version, options.loose);
+                if (minVersion == null || minVersion.comparePrecedence(v) > 0) {
+                    min = version;
+                    minVersion = v;
+                }
+            }
+        }
+        return min;
+    }
+
+    /**
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean intersects(String range1, String range2, Options options) {

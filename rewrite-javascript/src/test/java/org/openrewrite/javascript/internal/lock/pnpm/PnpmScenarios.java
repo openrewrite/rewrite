@@ -1,0 +1,473 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock.pnpm;
+
+import lombok.Getter;
+import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+
+/**
+ * The recorded pnpm scenarios a test can replay: every directory holding a pnpm-lock.yaml under {@code lock/pnpm/}
+ * on the test classpath (the in-repo fixtures and the downloaded ones merge there), and, when the environment
+ * variable {@code REWRITE_LOCK_SCENARIOS} names a directory, every one under its {@code pnpm} sibling, or under the
+ * directory itself when it holds pnpm scenarios. {@code REWRITE_LOCK_HTTP_CACHE} names a directory of registry
+ * responses a scenario's own {@code http/} falls back on.
+ * <p>
+ * The layout is the one {@code record-pnpm.sh} and {@code record-pnpm-open.sh} write: {@code pkg-before},
+ * {@code before}, {@code pkg}, {@code after}, a starting lock pnpm did not write {@code seed-lock} (then
+ * {@code before} is a copy), pnpm-workspace.yaml per phase ({@code workspace-before}, {@code workspace}: a phase
+ * without its own keeps the other's), the project config {@code npmrc} ({@code npmrc-before} for the first phase
+ * only), the project files {@code tree-before/} and {@code tree/} copied over it before each phase, the second
+ * phase's flags {@code args}, and {@code http/}. What pnpm writes on an install that changes nothing over a lock,
+ * when it differs, is {@code <lock>-again} ({@code again} for {@code after}), beside {@code pnpm-<lock>-again.log}
+ * ({@code pnpm-again.log} for {@code after}). The downloaded fixtures spell the edited manifest {@code pkg-after},
+ * a workspace's root {@code pkg-root}, its members {@code pkg-<name>}, {@code pkg-<name>-before} and
+ * {@code pkg-<name>-after} (placed at the importer whose last path segment is the name) and pnpm-workspace.yaml
+ * {@code workspace-yaml}.
+ */
+final class PnpmScenarios {
+
+    static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
+    static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
+
+    private static final List<String> LOCKS = Arrays.asList("before", "after", "seed-lock", "again");
+    private static final Pattern MEMBER_MANIFEST = Pattern.compile("^pkg-(.+?)(?:-(before|after))?$");
+    private static final Pattern PHASE_TIME = Pattern.compile("(before|after|again) at (\\S+?),?(?:\\s|$)");
+    private static final Pattern RECORDED_AT = Pattern.compile("^pnpm \\S+, node \\S+, (\\S+)");
+
+    private PnpmScenarios() {
+    }
+
+    /**
+     * One lock of a scenario with what pnpm had when it read or wrote it.
+     */
+    @Getter
+    static final class Lock {
+        private final Scenario scenario;
+        private final String fileName;
+        private final String text;
+        private final boolean before;
+
+        Lock(Scenario scenario, String fileName, String text) {
+            this.scenario = scenario;
+            this.fileName = fileName;
+            this.text = text;
+            this.before = fileName.startsWith("before") || fileName.startsWith("seed-lock");
+        }
+
+        Map<String, String> manifests() {
+            return scenario.manifests(before, text);
+        }
+
+        @Nullable
+        String workspaceManifest() {
+            return scenario.workspaceManifest(before);
+        }
+
+        @Nullable
+        String npmrc() {
+            return scenario.npmrc(before);
+        }
+
+        Map<String, String> tree() {
+            return scenario.tree(before);
+        }
+
+        Instant now() {
+            return scenario.phaseTime(before ? "before" : "after");
+        }
+
+        /**
+         * What pnpm writes on an install that changes nothing over this lock, when that differs from the lock.
+         */
+        @Nullable
+        String rewritten() {
+            return scenario.file("after".equals(fileName) ? "again" : fileName + "-again");
+        }
+
+        /**
+         * The log of pnpm's install that changes nothing over this lock, when one was recorded: the second install
+         * over {@code after}, an install over another lock, or the edit phase when it changed nothing.
+         */
+        @Nullable
+        String againLog() {
+            String log = scenario.file("pnpm-" + fileName + "-again.log");
+            if (log == null && "after".equals(fileName)) {
+                log = scenario.file("pnpm-again.log");
+            }
+            if (log == null && "before".equals(fileName) && scenario.editChangesNothing()) {
+                log = scenario.file("pnpm-after.log");
+            }
+            return log;
+        }
+
+        /**
+         * What that install wrote: the rewrite, the lock itself, or {@code after} when the edit phase changed
+         * nothing.
+         */
+        @Nullable
+        String againLock() {
+            String rewritten = rewritten();
+            if (rewritten != null) {
+                return rewritten;
+            }
+            if ("before".equals(fileName) && scenario.editChangesNothing() &&
+                scenario.file("pnpm-before-again.log") == null) {
+                return scenario.file("after");
+            }
+            return againLog() != null ? text : null;
+        }
+
+        @Override
+        public String toString() {
+            return scenario.getLabel() + "/" + fileName;
+        }
+    }
+
+    @Getter
+    static final class Scenario {
+        private final String name;
+        private final String label;
+        private final Path dir;
+        private final @Nullable Path httpCache;
+
+        Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
+            this.name = name;
+            this.label = label;
+            this.dir = dir;
+            this.httpCache = httpCache;
+        }
+
+        boolean has(String file) {
+            return Files.isRegularFile(dir.resolve(file));
+        }
+
+        @Nullable
+        String file(String file) {
+            return has(file) ? read(dir.resolve(file)) : null;
+        }
+
+        @Nullable
+        String expect() {
+            String expect = file("expect");
+            return expect == null ? null : expect.trim();
+        }
+
+        @Nullable
+        String recordedWith() {
+            return file("recorded-with");
+        }
+
+        /**
+         * The second phase's command-line flags ({@code --frozen-lockfile}), which a lock-only install does not take.
+         */
+        @Nullable
+        String args() {
+            String args = file("args");
+            return args == null ? null : args.trim();
+        }
+
+        /**
+         * Whether the second phase is a lock-only install over the same project files as the first: its log is
+         * then pnpm's install that changes nothing over {@code before}.
+         */
+        boolean editChangesNothing() {
+            return has("before") && has("pkg") && args() == null && !has("full-before") &&
+                   String.valueOf(file("pkg")).equals(file("pkg-before")) &&
+                   tree(true).equals(tree(false)) &&
+                   String.valueOf(workspaceManifest(true)).equals(String.valueOf(workspaceManifest(false))) &&
+                   String.valueOf(npmrc(true)).equals(String.valueOf(npmrc(false)));
+        }
+
+        /**
+         * When pnpm ran a phase ({@code phase times: before at ..., after at ...}), else when the scenario was
+         * recorded.
+         */
+        Instant phaseTime(String phase) {
+            String recorded = recordedWith();
+            if (recorded != null) {
+                Matcher m = PHASE_TIME.matcher(recorded);
+                while (m.find()) {
+                    if (phase.equals(m.group(1))) {
+                        return Instant.parse(m.group(2));
+                    }
+                }
+                Matcher at = RECORDED_AT.matcher(recorded);
+                if (at.find()) {
+                    return Instant.parse(at.group(1));
+                }
+            }
+            return Instant.parse("2026-10-07T00:00:00Z");
+        }
+
+        /**
+         * Every lock pnpm wrote or was given, and what it rewrote each to on an install that changes nothing.
+         */
+        List<Lock> locks() {
+            List<Lock> locks = new ArrayList<>();
+            for (String file : files()) {
+                boolean lock = LOCKS.contains(file) || file.endsWith("-again") && LOCKS.contains(
+                        file.substring(0, file.length() - "-again".length()));
+                if (!lock) {
+                    continue;
+                }
+                Lock candidate = new Lock(this, file, file(file));
+                boolean seen = false;
+                for (Lock other : locks) {
+                    // the recorder copies seed-lock to before; a rewrite can come back to a lock already held
+                    seen |= other.getText().equals(candidate.getText()) && other.isBefore() == candidate.isBefore();
+                }
+                if (!seen) {
+                    locks.add(candidate);
+                }
+            }
+            return locks;
+        }
+
+        /**
+         * The files of the project directory in a phase: {@code tree-before/}, then {@code tree/} over it after.
+         */
+        Map<String, String> tree(boolean before) {
+            Map<String, String> out = new TreeMap<>(tree("tree-before"));
+            if (!before) {
+                out.putAll(tree("tree"));
+            }
+            return out;
+        }
+
+        private Map<String, String> tree(String treeDir) {
+            Path root = dir.resolve(treeDir);
+            Map<String, String> out = new TreeMap<>();
+            if (!Files.isDirectory(root)) {
+                return out;
+            }
+            try (Stream<Path> walk = Files.walk(root)) {
+                walk.filter(Files::isRegularFile)
+                        .forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+            return out;
+        }
+
+        @Nullable
+        String workspaceManifest(boolean before) {
+            String fromTree = tree(before).get("pnpm-workspace.yaml");
+            if (fromTree != null) {
+                return fromTree;
+            }
+            if (before) {
+                return has("workspace-before") ? file("workspace-before") :
+                        has("workspace") ? file("workspace") : file("workspace-yaml");
+            }
+            return has("workspace") ? file("workspace") :
+                    has("workspace-before") ? file("workspace-before") : file("workspace-yaml");
+        }
+
+        @Nullable
+        String npmrc(boolean before) {
+            String fromTree = tree(before).get(".npmrc");
+            if (fromTree != null) {
+                return fromTree;
+            }
+            if (before && has("npmrc-before")) {
+                return file("npmrc-before");
+            }
+            return file("npmrc");
+        }
+
+        /**
+         * The project's manifests in a phase by location: {@code ""} the root, a member's path otherwise.
+         */
+        Map<String, String> manifests(boolean before, String lock) {
+            Map<String, String> manifests = new LinkedHashMap<>();
+            String root = before ? (has("pkg-before") ? file("pkg-before") : file("pkg-root")) :
+                    has("pkg") ? file("pkg") : has("pkg-after") ? file("pkg-after") : file("pkg-root");
+            if (root != null) {
+                manifests.put("", root);
+            }
+            for (Map.Entry<String, String> entry : tree(before).entrySet()) {
+                String path = entry.getKey();
+                if (path.endsWith("/package.json")) {
+                    manifests.put(path.substring(0, path.length() - "/package.json".length()), entry.getValue());
+                } else if ("package.json".equals(path) && !manifests.containsKey("")) {
+                    manifests.put("", entry.getValue());
+                }
+            }
+            Map<String, String> memberFiles = new LinkedHashMap<>();
+            for (String file : files()) {
+                Matcher m = MEMBER_MANIFEST.matcher(file);
+                if (!m.matches() || Arrays.asList("before", "after", "root").contains(m.group(1))) {
+                    continue;
+                }
+                String phase = m.group(2);
+                if (phase != null && !phase.equals(before ? "before" : "after")) {
+                    continue;
+                }
+                if (phase == null && memberFiles.containsKey(m.group(1))) {
+                    continue;
+                }
+                memberFiles.put(m.group(1), file);
+            }
+            if (!memberFiles.isEmpty()) {
+                for (String importer : importerIds(lock)) {
+                    String member = memberFiles.get(importer.substring(importer.lastIndexOf('/') + 1));
+                    if (member != null && !".".equals(importer)) {
+                        manifests.put(importer, file(member));
+                    }
+                }
+            }
+            return manifests;
+        }
+
+        @SuppressWarnings("unchecked")
+        private static List<String> importerIds(String lock) {
+            try {
+                Object file = JsYaml.load(lock);
+                if (file instanceof Map && ((Map<String, Object>) file).get("importers") instanceof Map) {
+                    return new ArrayList<>(((Map<String, Object>) ((Map<String, Object>) file).get("importers")).keySet());
+                }
+            } catch (RuntimeException ignored) {
+                // a lock that does not load places no member
+            }
+            return Collections.emptyList();
+        }
+
+        List<String> files() {
+            try (Stream<Path> list = Files.list(dir)) {
+                List<String> names = new ArrayList<>();
+                list.filter(Files::isRegularFile).forEach(p -> names.add(p.getFileName().toString()));
+                Collections.sort(names);
+                return names;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
+         * A recorded registry response: {@code http/<name>} (an abbreviated packument) or {@code http/<name>@full},
+         * from the scenario, else from the shared cache.
+         */
+        @Nullable
+        String http(String name) {
+            Path own = dir.resolve("http").resolve(name);
+            if (Files.isRegularFile(own)) {
+                return read(own);
+            }
+            if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
+                return read(httpCache.resolve(name));
+            }
+            return null;
+        }
+
+        @Override
+        public String toString() {
+            return name;
+        }
+    }
+
+    static List<Scenario> discover() {
+        Map<String, Scenario> found = new TreeMap<>();
+        List<Path> classpathRoots = new ArrayList<>();
+        try {
+            Enumeration<URL> roots = PnpmScenarios.class.getClassLoader().getResources("lock/pnpm");
+            while (roots.hasMoreElements()) {
+                URL url = roots.nextElement();
+                if ("file".equals(url.getProtocol())) {
+                    classpathRoots.add(Paths.get(url.toURI()));
+                }
+            }
+        } catch (IOException | URISyntaxException e) {
+            throw new IllegalStateException(e);
+        }
+        String cache = System.getenv(HTTP_CACHE_ENV);
+        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
+                Paths.get(cache) : null;
+        for (Path root : classpathRoots) {
+            collect(root, httpCache, found);
+        }
+        Path corpus = corpusRoot();
+        if (corpus != null) {
+            collect(corpus, httpCache, found);
+        }
+        return new ArrayList<>(found.values());
+    }
+
+    private static @Nullable Path corpusRoot() {
+        String corpus = System.getenv(SCENARIOS_ENV);
+        if (corpus == null || corpus.isEmpty() || !Files.isDirectory(Paths.get(corpus))) {
+            return null;
+        }
+        Path dir = Paths.get(corpus);
+        if ("pnpm".equals(String.valueOf(dir.getFileName()))) {
+            return dir;
+        }
+        Path sibling = dir.resolveSibling("pnpm");
+        return Files.isDirectory(sibling) ? sibling : null;
+    }
+
+    private static void collect(Path root, @Nullable Path httpCache, Map<String, Scenario> found) {
+        try (Stream<Path> walk = Files.walk(root, 1)) {
+            walk.filter(Files::isDirectory).forEach(dir -> {
+                if (dir.equals(root) || !isScenario(dir)) {
+                    return;
+                }
+                String name = root.relativize(dir).toString().replace('\\', '/');
+                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
+                found.put(label, new Scenario(name, label, dir, httpCache));
+            });
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static boolean isScenario(Path dir) {
+        for (String lock : LOCKS) {
+            if (Files.isRegularFile(dir.resolve(lock))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String read(Path path) {
+        try {
+            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+}

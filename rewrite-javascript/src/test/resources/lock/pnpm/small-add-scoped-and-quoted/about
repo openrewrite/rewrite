@@ -1,0 +1,1 @@
+Small form of add-scoped-and-quoted: adding @isaacs/testing-peer-deps-c "*" and wrappy ">=1.0.0 <1.0.2" to an empty importer: the quoted keys and specifiers, and the packages and snapshots sections appearing.

@@ -1,0 +1,1 @@
+Add a parent-scoped override is-odd>is-number 7.0.0 while is-number ^6 is also a direct dependency.

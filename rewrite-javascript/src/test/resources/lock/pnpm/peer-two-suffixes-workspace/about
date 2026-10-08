@@ -1,0 +1,1 @@
+Workspace: member a has b@1.2.3 + c@1.2.3; adding member b with b@1.2.3 + c@2.0.0 gives b two snapshot keys.

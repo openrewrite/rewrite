@@ -1,0 +1,5 @@
+Progress: resolved 1, reused 0, downloaded 0, added 0
+[WARN] deprecated mkdirp@0.5.1: Legacy versions of mkdirp are no longer supported. Please update to mkdirp 1.x. (Note that the API surface has changed to use Promises in 1.x.)
+Progress: resolved 3, reused 0, downloaded 0, added 0, done
+
+Done in 275ms using pnpm v11.2.2

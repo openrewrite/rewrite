@@ -1,0 +1,1 @@
+Small form of settings-change-relocks: the lock was written with autoInstallPeers false; removing the setting (no manifest edit) relocks: settings autoInstallPeers true, c@2.0.0 auto-installed, b suffixed.

@@ -1,0 +1,36 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+catalogs:
+  default:
+    wrappy:
+      specifier: 1.0.1
+      version: 1.0.1
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-deps-c':
+        specifier: 2.0.0
+        version: 2.0.0
+      wrappy:
+        specifier: 'catalog:'
+        version: 1.0.1
+
+packages:
+
+  '@isaacs/testing-peer-deps-c@2.0.0':
+    resolution: {integrity: sha512-ixTvB2pyv08B5pLskjuuM/w/+U6/oHFNtaZbnqbyl1HUZrm9LbBhL5rNCQCddXLwds0beiin9ue4dPyq9dUjDw==}
+
+  wrappy@1.0.1:
+    resolution: {integrity: sha512-42h1d25nW6G/N7l16Oz4vqCOLIFobFBOwZrBYlCxJ/QuS2o1Gdn1PzSoiYndbnL9rgGIGZ6Qn09AIpyhrkepfw==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-c@2.0.0': {}
+
+  wrappy@1.0.1: {}

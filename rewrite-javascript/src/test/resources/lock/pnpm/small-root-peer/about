@@ -1,0 +1,1 @@
+The root manifest adds peerDependencies {@isaacs/testing-peer-deps-c: "2"} and declares it nowhere else: auto-install-peers writes it under the importer's dependencies (specifier '2', version 2.0.0). Small form of root-peer.

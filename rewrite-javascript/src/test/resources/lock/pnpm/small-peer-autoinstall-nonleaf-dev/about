@@ -1,0 +1,1 @@
+npm/small-peer-autoinstall-nonleaf-dev's manifests: add better-opn@0.1.0 (peer opn ^5.3.0) as a devDependency: opn@5.5.0 and its dependency is-wsl@1.1.0 are auto-installed (packages and snapshots only), the importer records better-opn 0.1.0(opn@5.5.0). Small form of peer-autoinstall-nonleaf-dev.

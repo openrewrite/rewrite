@@ -1,0 +1,46 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-bundledeps':
+        specifier: 1.0.0
+        version: 1.0.0
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+packages:
+
+  '@isaacs/testing-bundledeps-b@1.0.0':
+    resolution: {integrity: sha512-UDbCq7GHRDb743m4VBpnsui6hNeB3o08qe/FRnX9JFo0VHnLoXkdtvm/WurwABLxL/xw5wP/tfN2jF90EjQehQ==}
+
+  '@isaacs/testing-bundledeps-c@2.0.0':
+    resolution: {integrity: sha512-nwGzs5eUI+0/+CB2oF7ce3Xu070w38pB//NoV9I9RedeT/+Y4fiOcIbLXYzt/yVJkZEOmTYXa1lVsrTypPvtlA==}
+
+  '@isaacs/testing-bundledeps@1.0.0':
+    resolution: {integrity: sha512-P8AF2FoTfHOPGY6W53FHVg9mza6ipzkppAwnbnNNkPaLQIEFTpx3U95ir1AKqmub7nTi115Qi6zHiqJzGe5Cqg==}
+    bundledDependencies:
+      - '@isaacs/testing-bundledeps-a'
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@isaacs/testing-bundledeps-b@1.0.0': {}
+
+  '@isaacs/testing-bundledeps-c@2.0.0':
+    dependencies:
+      '@isaacs/testing-bundledeps-b': 1.0.0
+
+  '@isaacs/testing-bundledeps@1.0.0':
+    dependencies:
+      '@isaacs/testing-bundledeps-c': 2.0.0
+
+  wrappy@1.0.2: {}

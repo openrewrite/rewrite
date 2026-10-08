@@ -1,0 +1,1 @@
+npm/small-peer-bump-provider-and-requirer's manifests: single-a 1.0.0 -> 2.0.0 and single-b 1.0.0 (peer single-a 1) -> 2.0.0 (peer single-a 2): both entries and the suffix move. Small form of peer-bump-provider-and-requirer.

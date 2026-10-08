@@ -1,0 +1,1 @@
+Small form of add-engines: adding @tufjs/canonical-json@1.0.0 and tmpl@1.0.3 writes their engines as plain flow scalars ({node: ^14.17.0 || ^16.13.0 || >=18.0.0}, {node: 0.6.x}).

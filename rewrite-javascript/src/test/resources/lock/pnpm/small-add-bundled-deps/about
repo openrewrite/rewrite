@@ -1,0 +1,1 @@
+Add @isaacs/testing-bundledeps@1.0.0 (dependencies a and c, bundleDependencies [a]): the bundled a is not resolved, c@2.0.0 and its b@1.0.0 are, and the entry records bundledDependencies. Small form of add-bundled-deps.

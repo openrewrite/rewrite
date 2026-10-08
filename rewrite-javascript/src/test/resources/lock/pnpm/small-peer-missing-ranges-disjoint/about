@@ -1,0 +1,1 @@
+b@1.2.4 (with c@1.2.3) is the auto-installed peer of @isaacs/testing-peer-deps-a@1.2.4; adding @isaacs/testing-peer-deps-d@2.0.0 (a@2 needs peer b 2): the missing ranges 1 and 2 do not intersect, so no b and no c is installed and a@1.2.4 loses its suffix (warning). Small form of peer-only-provider-fork.

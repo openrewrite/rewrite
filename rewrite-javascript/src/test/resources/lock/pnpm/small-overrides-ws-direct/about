@@ -1,0 +1,1 @@
+Small form of overrides-ws-direct: the override wrappy 1.0.1 applies to the importer, whose specifier is written as the override (1.0.1) although package.json asks for ^1.0.2.

@@ -1,0 +1,1 @@
+Small form of settings-exclude-links: with excludeLinksFromLockfile true, member a adding b by link:../b leaves the lock byte-identical.

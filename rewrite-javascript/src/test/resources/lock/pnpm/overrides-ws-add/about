@@ -1,0 +1,1 @@
+Add overrides is-number 7.0.0 in pnpm-workspace.yaml under is-odd@3.0.1 (is-number ^6): overrides block and retargeted edge.

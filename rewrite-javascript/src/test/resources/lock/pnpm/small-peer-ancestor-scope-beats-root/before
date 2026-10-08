@@ -1,0 +1,59 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-deps':
+        specifier: 3.0.0
+        version: 3.0.0(@isaacs/testing-peer-deps-c@2.0.0)
+
+packages:
+
+  '@isaacs/testing-peer-deps-a@2.0.0':
+    resolution: {integrity: sha512-jpHyXoPZrCrwuiZjZPd5PU0tsgVAnpCVGpR772ZhF5B93GGfTlhKdi06Ev7gVaqQnTkV9gk6xKS/loJfRmAzTw==}
+    peerDependencies:
+      '@isaacs/testing-peer-deps-b': '2'
+
+  '@isaacs/testing-peer-deps-b@2.0.1':
+    resolution: {integrity: sha512-sgYGXt0YwVLZ31DZKgoQm7JHEETS71GE2x9g1RIqQ1xarGFfGyor2sF3ekxUOeaE/4FInrh+K+nUP5YgPXLBQQ==}
+    peerDependencies:
+      '@isaacs/testing-peer-deps-c': '2'
+
+  '@isaacs/testing-peer-deps-c@2.0.0':
+    resolution: {integrity: sha512-ixTvB2pyv08B5pLskjuuM/w/+U6/oHFNtaZbnqbyl1HUZrm9LbBhL5rNCQCddXLwds0beiin9ue4dPyq9dUjDw==}
+
+  '@isaacs/testing-peer-deps-d@2.0.0':
+    resolution: {integrity: sha512-uVdlNNBv6K1Cqo9NeCCX6Byv5WobrWpAgW3I9FnyVb3w2M7Q7kds+zvcXn5tDY+VzKUqFH/JcrKmSXRo7Jt2xQ==}
+
+  '@isaacs/testing-peer-deps@3.0.0':
+    resolution: {integrity: sha512-/lC3hic8anGX83/GHeC0lNr2QRsiYQ4/xguLRxHu2XXtJ36WJ6zOAZzoZIhMLuM/BoLDeewtE2Z0lsXUqhr/jg==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-a@2.0.0(@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0))':
+    dependencies:
+      '@isaacs/testing-peer-deps-b': 2.0.1(@isaacs/testing-peer-deps-c@2.0.0)
+
+  '@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0)':
+    dependencies:
+      '@isaacs/testing-peer-deps-c': 2.0.0
+
+  '@isaacs/testing-peer-deps-c@2.0.0': {}
+
+  '@isaacs/testing-peer-deps-d@2.0.0(@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0))':
+    dependencies:
+      '@isaacs/testing-peer-deps-a': 2.0.0(@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0))
+    transitivePeerDependencies:
+      - '@isaacs/testing-peer-deps-b'
+
+  '@isaacs/testing-peer-deps@3.0.0(@isaacs/testing-peer-deps-c@2.0.0)':
+    dependencies:
+      '@isaacs/testing-peer-deps-b': 2.0.1(@isaacs/testing-peer-deps-c@2.0.0)
+      '@isaacs/testing-peer-deps-d': 2.0.0(@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0))
+    transitivePeerDependencies:
+      - '@isaacs/testing-peer-deps-c'

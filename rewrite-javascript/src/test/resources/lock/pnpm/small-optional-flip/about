@@ -1,0 +1,1 @@
+Small form of optional-flip: wrappy is reachable only through optional once@1.4.0 (optional: true); declaring it as a dependency (^1.0.0) clears its optional flag.

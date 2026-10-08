@@ -1,0 +1,1 @@
+Add testing-peer-deps@3.0.0 (b@2 peer c, d@2 -> a@2 peer b) under a root that provides c: peers resolved from above suffix the parents.

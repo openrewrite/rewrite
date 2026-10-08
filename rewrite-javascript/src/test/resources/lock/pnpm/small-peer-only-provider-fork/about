@@ -1,0 +1,1 @@
+npm/small-peer-only-provider-fork's manifests: b@1.2.4 was the auto-installed peer of @isaacs/testing-peer-deps-a@1.2.4; adding @isaacs/testing-peer-deps@3 (dependency b@2.0.1) re-points a@1.2.4's peer to the known b@2.0.1 although it does not satisfy "1" (warning), drops b@1.2.4 and keeps c@1.2.3 for b's peer c "2".

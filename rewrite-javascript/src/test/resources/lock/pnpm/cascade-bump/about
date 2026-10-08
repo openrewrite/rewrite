@@ -1,0 +1,1 @@
+Bump is-odd 2.0.0 to 3.0.1, whose dependency moves from is-number ^4 to ^6: the private transitive moves.

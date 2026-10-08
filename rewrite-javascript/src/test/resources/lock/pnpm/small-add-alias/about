@@ -1,0 +1,1 @@
+Small form of add-alias: adding w2: npm:wrappy@1.0.1 beside wrappy@1.0.2 records version wrappy@1.0.1 under the alias; packages and snapshots use the real name.

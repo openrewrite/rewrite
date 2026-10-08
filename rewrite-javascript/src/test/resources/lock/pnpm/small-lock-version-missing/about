@@ -1,0 +1,1 @@
+Hand-made input: small-lock-control's lock without its lockfileVersion line; pnpm warns "not compatible with current pnpm", resolves from scratch and writes abbrev 1.1.1.

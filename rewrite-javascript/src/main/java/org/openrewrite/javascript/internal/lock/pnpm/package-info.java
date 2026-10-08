@@ -1,0 +1,87 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+/**
+ * pnpm's lockfile model and resolver, ported from pnpm 11.2.2 (pnpm/pnpm, tag v11.2.2): lockfile/types,
+ * lockfile/fs (read, write, the format converters, sortLockfileKeys, the env document), lockfile/merger,
+ * lockfile/settings-checker, lockfile/verification, lockfile/preferred-versions, deps/path, object/key-sorting,
+ * config/reader (the defaults and the settings pnpm-workspace.yaml gives), config/parse-overrides, catalogs/*,
+ * workspace/workspace-manifest-reader, workspace/projects-reader, resolving/resolver-base,
+ * resolving/parse-wanted-dependency, resolving/npm-resolver (pickPackage, pickPackageFromMeta),
+ * crypto/object-hasher, crypto/hash and installing/deps-installer (the lock-only install). pnpm is distributed under
+ * the MIT License:
+ * <pre>
+ * Copyright (c) 2015-2016 Rico Sta. Cruz and other contributors
+ * Copyright (c) 2016-2026 Zoltan Kochan and other contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * </pre>
+ * The same license covers what pnpm 11.2.2 bundles and this package ports: {@code JsYaml} and
+ * {@code JsYamlDumper}, @zkochan/js-yaml 0.0.11 (Copyright (C) 2011-2015 by Vitaly Puzrin); {@code KeySorting},
+ * sort-keys 6.0.0 and is-plain-obj 4.1.0 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
+ * (https://sindresorhus.com)) with @pnpm/util.lex-comparator 3.0.2 and comver-to-semver 2.0.0 (Copyright (c)
+ * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
+ * and version-selector-type 3.0.0 (Copyright (c) 2016-2026 Zoltan Kochan).
+ * <p>
+ * The compatibility database pnpm applies, {@code compat-db.json}, is generated from @yarnpkg/extensions 2.0.6,
+ * distributed under the BSD 2-Clause License:
+ * <pre>
+ * Copyright (c) 2016-present, Yarn Contributors.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * </pre>
+ */
+@NullMarked
+@NonNullFields
+package org.openrewrite.javascript.internal.lock.pnpm;
+
+import org.jspecify.annotations.NullMarked;
+import org.openrewrite.internal.lang.NonNullFields;

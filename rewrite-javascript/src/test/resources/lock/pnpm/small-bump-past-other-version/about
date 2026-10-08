@@ -1,0 +1,1 @@
+Bump direct is-number 4.0.0 to 7.0.0 while is-odd@3.0.1 keeps is-number@6.0.0: the new key sorts after 6.0.0 and 4.0.0 goes. Small form of bump-past-other-version.

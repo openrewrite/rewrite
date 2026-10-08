@@ -1,0 +1,1 @@
+Small form of settings-resolution-mode-lowest-direct: resolutionMode lowest-direct under the default minimumReleaseAge: adding once ^1.3.0 still picks the highest (1.4.0).

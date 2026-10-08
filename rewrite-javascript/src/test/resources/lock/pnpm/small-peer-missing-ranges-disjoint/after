@@ -1,0 +1,43 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-deps-a':
+        specifier: 1.2.4
+        version: 1.2.4
+      '@isaacs/testing-peer-deps-d':
+        specifier: 2.0.0
+        version: 2.0.0
+
+packages:
+
+  '@isaacs/testing-peer-deps-a@1.2.4':
+    resolution: {integrity: sha512-AZh6hYg/RYoS8Ea59JUOxYKS8Tg/95kW5hiZHyhpB/eg4hDllp6dAedxTvZzJN68aKpvA4YYuqodMtdzUinNPQ==}
+    peerDependencies:
+      '@isaacs/testing-peer-deps-b': '1'
+
+  '@isaacs/testing-peer-deps-a@2.0.0':
+    resolution: {integrity: sha512-jpHyXoPZrCrwuiZjZPd5PU0tsgVAnpCVGpR772ZhF5B93GGfTlhKdi06Ev7gVaqQnTkV9gk6xKS/loJfRmAzTw==}
+    peerDependencies:
+      '@isaacs/testing-peer-deps-b': '2'
+
+  '@isaacs/testing-peer-deps-d@2.0.0':
+    resolution: {integrity: sha512-uVdlNNBv6K1Cqo9NeCCX6Byv5WobrWpAgW3I9FnyVb3w2M7Q7kds+zvcXn5tDY+VzKUqFH/JcrKmSXRo7Jt2xQ==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-a@1.2.4': {}
+
+  '@isaacs/testing-peer-deps-a@2.0.0': {}
+
+  '@isaacs/testing-peer-deps-d@2.0.0':
+    dependencies:
+      '@isaacs/testing-peer-deps-a': 2.0.0
+    transitivePeerDependencies:
+      - '@isaacs/testing-peer-deps-b'

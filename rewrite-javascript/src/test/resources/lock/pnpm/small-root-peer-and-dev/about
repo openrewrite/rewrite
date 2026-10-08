@@ -1,0 +1,1 @@
+The root manifest adds a peer (@isaacs/testing-peer-deps-c "2") and the same package as a devDependency (2.0.0): it stays under devDependencies. Small form of root-peer-and-dev.

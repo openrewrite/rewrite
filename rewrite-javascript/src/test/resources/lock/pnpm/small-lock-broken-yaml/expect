@@ -1,0 +1,1 @@
+malformed lock is not YAML (pnpm ignores the lock and resolves from scratch)

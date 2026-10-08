@@ -1,0 +1,1 @@
+Small form of catalog-to-explicit: switching wrappy from catalog: (1.0.1) to an explicit ^1.0.2 removes the catalogs block and resolves 1.0.2.

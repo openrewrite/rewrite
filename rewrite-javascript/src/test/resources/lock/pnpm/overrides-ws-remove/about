@@ -1,0 +1,1 @@
+Remove the override is-number 7.0.0: the edge goes back to what is-odd asks for.

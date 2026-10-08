@@ -1,0 +1,1 @@
+Add @isaacs/testing-peer-deps-b@2.0.0 at the root beside @isaacs/testing-peer-deps@3.0.0: a@2 (under d@2) keeps its peer b at @isaacs/testing-peer-deps's own b@2.0.1, the root gets b@2.0.0(c@2.0.0); the auto-installed c@2.0.0 serves both.

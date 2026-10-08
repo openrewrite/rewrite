@@ -1,0 +1,1 @@
+Small form of npmrc-settings-ignored: auto-install-peers=false in the project .npmrc is not read by pnpm 11; adding b@2.0.1 still auto-installs c@2.0.0.

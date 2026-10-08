@@ -1,0 +1,30 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-fail-postinstall':
+        specifier: 1.0.0
+        version: 1.0.0
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+packages:
+
+  '@isaacs/testing-fail-postinstall@1.0.0':
+    resolution: {integrity: sha512-dOoHClc0+gQ+GYiFLinkdH6G7mfSdjex+iiDhN26/h/WA+t7rax4Vg+TOB/VXjIuHawfiS5RllIxtPt7Fyqv+g==}
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@isaacs/testing-fail-postinstall@1.0.0': {}
+
+  wrappy@1.0.2: {}

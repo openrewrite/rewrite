@@ -1,0 +1,1 @@
+Override is-number to - (remove the dependency) under is-odd.

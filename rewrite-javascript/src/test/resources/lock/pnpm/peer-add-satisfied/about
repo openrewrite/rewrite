@@ -1,0 +1,1 @@
+Add testing-peer-deps-b@2.0.1 (peer c 2) while the root provides c@2.0.0: the snapshot key carries the peer suffix.

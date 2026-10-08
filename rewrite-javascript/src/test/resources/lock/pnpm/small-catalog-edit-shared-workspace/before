@@ -1,0 +1,47 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+catalogs:
+  default:
+    wrappy:
+      specifier: 1.0.1
+      version: 1.0.1
+  legacy:
+    is-number:
+      specifier: ^6.0.0
+      version: 6.0.0
+
+importers:
+
+  .:
+    dependencies:
+      wrappy:
+        specifier: 'catalog:'
+        version: 1.0.1
+
+  packages/a:
+    dependencies:
+      is-number:
+        specifier: catalog:legacy
+        version: 6.0.0
+      wrappy:
+        specifier: 'catalog:'
+        version: 1.0.1
+
+packages:
+
+  is-number@6.0.0:
+    resolution: {integrity: sha512-Wu1VHeILBK8KAWJUAiSZQX94GmOE45Rg6/538fKwiloUu21KncEkYGPqob2oSZ5mUT73vLGrHQjKw3KMPwfDzg==}
+    engines: {node: '>=0.10.0'}
+
+  wrappy@1.0.1:
+    resolution: {integrity: sha512-42h1d25nW6G/N7l16Oz4vqCOLIFobFBOwZrBYlCxJ/QuS2o1Gdn1PzSoiYndbnL9rgGIGZ6Qn09AIpyhrkepfw==}
+
+snapshots:
+
+  is-number@6.0.0: {}
+
+  wrappy@1.0.1: {}

@@ -1,0 +1,1 @@
+Small form of add-dedupes-existing: adding once@1.4.0 (wrappy "1") while wrappy is locked at 1.0.1 reuses 1.0.1 although latest is 1.0.2 (the lock's preferred version beats latest).

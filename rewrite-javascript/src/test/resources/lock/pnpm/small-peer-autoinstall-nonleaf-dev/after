@@ -1,0 +1,49 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      abbrev:
+        specifier: 1.1.1
+        version: 1.1.1
+    devDependencies:
+      better-opn:
+        specifier: 0.1.0
+        version: 0.1.0(opn@5.5.0)
+
+packages:
+
+  abbrev@1.1.1:
+    resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
+
+  better-opn@0.1.0:
+    resolution: {integrity: sha512-QSKWYBHz7+AcQkgwfExX+GrkAA9C47GsJC2Tmok8V7KPADfOKQuGyZ+2AV+eZPxYKpFtyPvnR5F6/y91vnlPZA==}
+    peerDependencies:
+      opn: ^5.3.0
+
+  is-wsl@1.1.0:
+    resolution: {integrity: sha512-gfygJYZ2gLTDlmbWMI0CE2MwnFzSN/2SZfkMlItC4K/JBlsWVDB0bO6XhqcY13YXE7iMcAJnzTCJjPiTeJJ0Mw==}
+    engines: {node: '>=4'}
+
+  opn@5.5.0:
+    resolution: {integrity: sha512-PqHpggC9bLV0VeWcdKhkpxY+3JTzetLSqTCWL/z/tFIbI6G8JCjondXklT1JinczLz2Xib62sSp0T/gKT4KksA==}
+    engines: {node: '>=4'}
+
+snapshots:
+
+  abbrev@1.1.1: {}
+
+  better-opn@0.1.0(opn@5.5.0):
+    dependencies:
+      opn: 5.5.0
+
+  is-wsl@1.1.0: {}
+
+  opn@5.5.0:
+    dependencies:
+      is-wsl: 1.1.0

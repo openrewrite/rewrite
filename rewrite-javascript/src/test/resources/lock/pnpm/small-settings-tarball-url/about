@@ -1,0 +1,1 @@
+Small form of settings-tarball-url: with lockfileIncludeTarballUrl true, adding c ^2.0.0 writes resolution {integrity, tarball} for it, as the lock already holds for wrappy.

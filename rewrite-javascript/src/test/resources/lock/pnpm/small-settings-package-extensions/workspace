@@ -1,0 +1,4 @@
+packageExtensions:
+  "@isaacs/testing-peer-deps-c@2":
+    dependencies:
+      wrappy: 1.0.2

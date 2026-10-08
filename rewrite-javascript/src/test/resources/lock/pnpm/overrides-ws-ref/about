@@ -1,0 +1,1 @@
+Override with a $ reference (is-number: $is-number) to the root direct dependency is-number 7.0.0.

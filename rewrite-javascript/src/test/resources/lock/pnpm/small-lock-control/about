@@ -1,0 +1,1 @@
+Control for the small-lock-* inputs: widen abbrev 1.0.9 to ^1.0.9 and add wrappy@1.0.2; the honored lock keeps abbrev 1.0.9 (1.1.1 is latest).

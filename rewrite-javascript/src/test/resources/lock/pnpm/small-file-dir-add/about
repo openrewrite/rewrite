@@ -1,0 +1,1 @@
+Add local from file:./local (its package.json depends on wrappy@1.0.2): locked as local@file:local with a directory resolution and the directory manifest's dependencies.

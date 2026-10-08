@@ -1,0 +1,1 @@
+Bump @isaacs/testing-peer-deps 2.0.0 (a@1.2.4, d@2) to 3.0.0 (b@2, d@2) beside root c@2.0.0: a@1.2.4 is dropped, b@2.0.1(c@2.0.0) added, and the peer suffixes of d, a@2 and the bumped package follow. Small form of bump-reshapes-closure.

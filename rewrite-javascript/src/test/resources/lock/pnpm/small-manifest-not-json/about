@@ -1,0 +1,1 @@
+The edited package.json is not JSON (closing brace missing): Node's module loader fails while pnpm starts (ERR_INVALID_PACKAGE_CONFIG), exit 1.

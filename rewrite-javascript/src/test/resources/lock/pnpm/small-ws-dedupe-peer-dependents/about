@@ -1,0 +1,1 @@
+Workspace: member a has b-x@1.0.0 (optional peer b-y 2) and b-y@2.0.0; member b adds b-x alone and gets b-x@1.0.0(b-y@2.0.0) too, the optional peer hoisted from the version known in the install. Small form of ws-dedupe-peer-dependents.

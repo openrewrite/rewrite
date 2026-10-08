@@ -1,0 +1,1 @@
+Hand-made input: small-lock-control's lock cut inside a flow mapping; pnpm warns "Ignoring broken lockfile" (not an error), resolves from scratch and writes abbrev 1.1.1.

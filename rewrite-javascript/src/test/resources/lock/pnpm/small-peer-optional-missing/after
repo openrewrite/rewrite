@@ -1,0 +1,35 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-optional-conflict-b-x':
+        specifier: 1.0.0
+        version: 1.0.0
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+packages:
+
+  '@isaacs/testing-peer-optional-conflict-b-x@1.0.0':
+    resolution: {integrity: sha512-19feHJAqq5HG2RrN2zHXiPXujXqHgJuGyZaKFolghgYKyncZYRpBwxboSDgMp8SxyrGx9EF74x6yarrVXRo9hw==}
+    peerDependencies:
+      '@isaacs/testing-peer-optional-conflict-b-y': '2'
+    peerDependenciesMeta:
+      '@isaacs/testing-peer-optional-conflict-b-y':
+        optional: true
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@isaacs/testing-peer-optional-conflict-b-x@1.0.0': {}
+
+  wrappy@1.0.2: {}

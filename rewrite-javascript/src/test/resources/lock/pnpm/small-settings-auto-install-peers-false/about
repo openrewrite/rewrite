@@ -1,0 +1,1 @@
+Small form of settings-auto-install-peers-false: with autoInstallPeers false, adding b@2.0.1 (peer c 2) without c leaves the peer missing and b unsuffixed.

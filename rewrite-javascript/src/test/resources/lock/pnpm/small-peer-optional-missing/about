@@ -1,0 +1,1 @@
+Add @isaacs/testing-peer-optional-conflict-b-x@1.0.0 (optional peer b-y 2) with no b-y anywhere: no suffix, the entry records peerDependencies and peerDependenciesMeta, b-y is not requested. Small form of peer-optional-missing.

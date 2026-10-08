@@ -1,0 +1,1 @@
+strictPeerDependencies true: add b@2.0.1 (peer c 2) while the root pins c@1.2.3; pnpm fails instead of warning.

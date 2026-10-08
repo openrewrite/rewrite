@@ -1,0 +1,1 @@
+Remove direct is-number 6.0.0 while is-odd@3.0.1 still needs it: only the importer entry goes. Small form of remove-still-transitive.

@@ -1,0 +1,1 @@
+Small form of add-beside-incompatible: adding is-odd@3.0.1 (is-number ^6.0.0) while direct is-number is 7.0.0 adds a second version, is-number@6.0.0.

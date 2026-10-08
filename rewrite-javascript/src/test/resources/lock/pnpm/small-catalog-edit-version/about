@@ -1,0 +1,1 @@
+Small form of catalog-edit-version: editing the default catalog wrappy 1.0.1 -> ^1.0.2 (used) and is-number ^7.0.0 -> ^7.0.1 (unused) with package.json unchanged moves wrappy to 1.0.2; the unused entry never appears.

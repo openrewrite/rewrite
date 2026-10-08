@@ -1,0 +1,1 @@
+npm/small-peer-fork-edit-beside's manifests: swap abbrev for wrappy beside root @isaacs/testing-peer-deps-b@1.2.4(c@1.2.3) and d@2 -> a@2 (peer b 2), which pnpm links to the root's unsatisfying b@1.2.4 (warning): only the swapped entries change.

@@ -1,0 +1,7 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+? Verifying lockfile against supply-chain policies (2 entries)...
+✓ Lockfile passes supply-chain policies (2 entries in 56ms)
+Done in 223ms using pnpm v11.2.2
+pnpm 11.2.2, node v24.19.0, 2026-10-07T01:23:50Z
+exit=0
+lock unchanged

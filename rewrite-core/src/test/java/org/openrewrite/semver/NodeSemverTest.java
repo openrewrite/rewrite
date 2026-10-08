@@ -256,6 +256,18 @@ class NodeSemverTest {
         assertThat(NodeSemver.maxSatisfying(emptyList(), "some frogs and sneks-v2.5.6", Options.DEFAULT)).isNull();
     }
 
+    // test/ranges/min-satisfying.js
+    @Test
+    void minSatisfying() {
+        assertThat(NodeSemver.minSatisfying(asList("1.2.3", "1.2.4"), "1.2", Options.DEFAULT)).isEqualTo("1.2.3");
+        assertThat(NodeSemver.minSatisfying(asList("1.2.4", "1.2.3"), "1.2", Options.DEFAULT)).isEqualTo("1.2.3");
+        assertThat(NodeSemver.minSatisfying(asList("1.2.3", "1.2.4", "1.2.5", "1.2.6"), "~1.2.3", Options.DEFAULT))
+                .isEqualTo("1.2.3");
+        assertThat(NodeSemver.minSatisfying(asList("1.1.0", "1.2.0", "1.2.1", "1.3.0", "2.0.0b1", "2.0.0b2", "2.0.0b3",
+                "2.0.0", "2.1.0"), "~2.0.0", Options.LOOSE)).isEqualTo("2.0.0");
+        assertThat(NodeSemver.minSatisfying(emptyList(), "some frogs and sneks-v2.5.6", Options.DEFAULT)).isNull();
+    }
+
     // test/functions/compare-build.js
     @Test
     void compareBuild() {

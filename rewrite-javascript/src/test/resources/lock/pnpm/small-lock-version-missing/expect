@@ -1,0 +1,1 @@
+malformed lock has no lockfileVersion (pnpm ignores the lock and resolves from scratch)

@@ -1,0 +1,11 @@
+[WARN] Ignoring broken lockfile at /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.SpccOfo2L8/project: The lockfile at "/private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.SpccOfo2L8/project/pnpm-lock.yaml" is broken: unexpected end of the stream within a flow collection (19:1)
+
+ 16 | 
+ 17 |   abbrev@1.0.9:
+ 18 |     resolution: {integrity: sha ...
+ 19 | 
+------^
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 2, reused 0, downloaded 0, added 0, done
+
+Done in 237ms using pnpm v11.2.2

@@ -1,0 +1,1 @@
+The lock holds is-number from github:jonschlinkert/is-number#7.0.0; adding wrappy beside it reuses the git entry without resolving or downloading it (resolved 0, reused 1, downloaded 0).

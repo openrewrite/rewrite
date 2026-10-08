@@ -1,0 +1,1 @@
+Adding @isaacs/test-package-with-shrinkwrap@1.0.0 (ships an npm-shrinkwrap.json pinning abbrev 1.1.1): pnpm downloads nothing (downloaded 0) and resolves its abbrev ^1.1.1 from the registry (1.1.1, the shrinkwrap's version too).

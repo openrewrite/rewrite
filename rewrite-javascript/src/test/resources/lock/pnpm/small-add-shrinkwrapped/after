@@ -1,0 +1,37 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/test-package-with-shrinkwrap':
+        specifier: 1.0.0
+        version: 1.0.0
+      wrappy:
+        specifier: 1.0.2
+        version: 1.0.2
+
+packages:
+
+  '@isaacs/test-package-with-shrinkwrap@1.0.0':
+    resolution: {integrity: sha512-GDiKNO3uSliDRlGtwzg+QR23XrnkmReMqlca0njWJ9t6Cd7+2MRJqaYYScnYbv1OFnUZgfVg7W/gBo5s6bzu0g==}
+
+  abbrev@1.1.1:
+    resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==}
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  '@isaacs/test-package-with-shrinkwrap@1.0.0':
+    dependencies:
+      abbrev: 1.1.1
+
+  abbrev@1.1.1: {}
+
+  wrappy@1.0.2: {}

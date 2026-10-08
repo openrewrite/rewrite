@@ -1,0 +1,61 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/peer-dep-cycle':
+        specifier: 1.0.0
+        version: 1.0.0(@isaacs/peer-dep-cycle-b@1.0.0)
+      ms:
+        specifier: 2.1.3
+        version: 2.1.3
+
+packages:
+
+  '@isaacs/peer-dep-cycle-a@1.0.0':
+    resolution: {integrity: sha512-TrtKy03X2HSESjcRbWGIpCJWLZifvW6aViaOnWXjZ7xC2bhuWT/ZSpvE5weStWZRQZIfAO9dmG7EK3D9TbauUg==}
+    peerDependencies:
+      '@isaacs/peer-dep-cycle-b': '1'
+
+  '@isaacs/peer-dep-cycle-b@1.0.0':
+    resolution: {integrity: sha512-lRSvQ4sIRhXjMBcn9z8wCxNTySpCvMyDJvQfAGrE9FsAhmugJRRDYcCHTEpTMRqYJQR0Rn97Np5P7QbiBuH1aQ==}
+    peerDependencies:
+      '@isaacs/peer-dep-cycle-c': '1'
+
+  '@isaacs/peer-dep-cycle-c@1.0.0':
+    resolution: {integrity: sha512-mE1f1QdCY1+hMkdlGruWYauq8wZaUJ5uA9U8vc2LBs0pPdq9cPESLk6NY7n338WTiZkuqdh3+ooIjTzgR9IGiQ==}
+    peerDependencies:
+      '@isaacs/peer-dep-cycle-a': '1'
+
+  '@isaacs/peer-dep-cycle@1.0.0':
+    resolution: {integrity: sha512-VpDmOiv9MGcPlt5F6x8mCqQvactg+BOufGTwyvQWxoqKoScZA5CimqjbWS8yDkGYXi5nKQNSgZ/zbWAo7lAxBQ==}
+
+  ms@2.1.3:
+    resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
+
+snapshots:
+
+  '@isaacs/peer-dep-cycle-a@1.0.0(@isaacs/peer-dep-cycle-b@1.0.0)':
+    dependencies:
+      '@isaacs/peer-dep-cycle-b': 1.0.0(@isaacs/peer-dep-cycle-c@1.0.0)
+
+  '@isaacs/peer-dep-cycle-b@1.0.0(@isaacs/peer-dep-cycle-c@1.0.0)':
+    dependencies:
+      '@isaacs/peer-dep-cycle-c': 1.0.0(@isaacs/peer-dep-cycle-a@1.0.0)
+
+  '@isaacs/peer-dep-cycle-c@1.0.0(@isaacs/peer-dep-cycle-a@1.0.0)':
+    dependencies:
+      '@isaacs/peer-dep-cycle-a': 1.0.0(@isaacs/peer-dep-cycle-b@1.0.0)
+
+  '@isaacs/peer-dep-cycle@1.0.0(@isaacs/peer-dep-cycle-b@1.0.0)':
+    dependencies:
+      '@isaacs/peer-dep-cycle-a': 1.0.0(@isaacs/peer-dep-cycle-b@1.0.0)
+    transitivePeerDependencies:
+      - '@isaacs/peer-dep-cycle-b'
+
+  ms@2.1.3: {}

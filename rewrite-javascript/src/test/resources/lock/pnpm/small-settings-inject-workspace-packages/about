@@ -1,0 +1,1 @@
+Small form of settings-inject-workspace-packages: with injectWorkspacePackages true, member a adding workspace:* b still records link:../b; settings records injectWorkspacePackages: true.

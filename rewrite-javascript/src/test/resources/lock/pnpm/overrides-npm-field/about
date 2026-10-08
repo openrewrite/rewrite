@@ -1,0 +1,1 @@
+Add an npm-style overrides field (is-number 7.0.0) in package.json: pnpm 11 ignores it without a warning; the lock is unchanged.

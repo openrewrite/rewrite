@@ -1,0 +1,1 @@
+Small form of bump-direct-ranged-dependent: bumping direct wrappy 1.0.1 to 1.0.2 while once@1.4.0 (wrappy 1) shares the locked 1.0.1: 1.0.2 is added for the root and once keeps 1.0.1 (no dedupe).

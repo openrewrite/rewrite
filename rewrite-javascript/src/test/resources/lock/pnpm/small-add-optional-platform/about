@@ -1,0 +1,1 @@
+Add optionalDependency @napi-rs/nice-linux-x64-musl@1.1.1 (os linux, cpu x64, libc musl, engines '>= 10') on a darwin arm64 host: it is locked anyway, libc read from the full packument, flow-style platform fields, snapshot optional: true. Small form of add-optional-platform.

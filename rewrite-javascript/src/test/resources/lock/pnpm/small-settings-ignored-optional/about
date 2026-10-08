@@ -1,0 +1,1 @@
+Small form of settings-ignored-optional: ignoredOptionalDependencies ["@isaacs/testing-peer-deps-c"] drops the optional dependency and records the list between packages and snapshots.

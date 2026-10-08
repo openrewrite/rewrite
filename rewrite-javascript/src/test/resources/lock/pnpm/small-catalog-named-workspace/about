@@ -1,0 +1,1 @@
+Small form of catalog-named-workspace: member a switches is-number from catalog:legacy (^6.0.0) to catalog:modern (^7.0.0): the catalogs block, a's specifier and version move to 7.0.0.

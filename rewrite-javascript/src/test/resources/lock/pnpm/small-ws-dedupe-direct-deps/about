@@ -1,0 +1,1 @@
+Small form of ws-dedupe-direct-deps: with dedupeDirectDeps true, member a adding wrappy 1.0.2 (which the root has) is written like any importer dependency.

@@ -1,0 +1,1 @@
+Small form of catalog-default-add: a default catalog (wrappy 1.0.1, is-number ^7.0.0 unused); adding wrappy as catalog: writes the catalogs block with the used entry only.

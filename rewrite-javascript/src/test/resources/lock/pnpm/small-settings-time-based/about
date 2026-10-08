@@ -1,0 +1,1 @@
+resolutionMode time-based with minimumReleaseAge 0: adding is-odd ^3.0.0 picks the lowest 3.0.0 (is-number 6.0.0) and the time block lists is-odd and wrappy; pnpm reads full packuments for every package. Small form of settings-time-based.

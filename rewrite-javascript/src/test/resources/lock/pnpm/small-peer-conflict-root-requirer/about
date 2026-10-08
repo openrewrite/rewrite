@@ -1,0 +1,1 @@
+Root holds @isaacs/testing-peer-deps-b@1.2.4 (peer c 1) and c@1.2.3; bumping c to 2.0.0 keys b as b@1.2.4(c@2.0.0) with a peer warning; the second install accepts the lock. Small form of peer-conflict-root-requirer.

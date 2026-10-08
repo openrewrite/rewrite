@@ -1,0 +1,1 @@
+peersSuffixMaxLength 10: a peer suffix longer than that is replaced by a hash.

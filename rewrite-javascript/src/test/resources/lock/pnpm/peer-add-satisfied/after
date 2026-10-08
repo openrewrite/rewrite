@@ -1,0 +1,34 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-deps-b':
+        specifier: 2.0.1
+        version: 2.0.1(@isaacs/testing-peer-deps-c@2.0.0)
+      '@isaacs/testing-peer-deps-c':
+        specifier: 2.0.0
+        version: 2.0.0
+
+packages:
+
+  '@isaacs/testing-peer-deps-b@2.0.1':
+    resolution: {integrity: sha512-sgYGXt0YwVLZ31DZKgoQm7JHEETS71GE2x9g1RIqQ1xarGFfGyor2sF3ekxUOeaE/4FInrh+K+nUP5YgPXLBQQ==}
+    peerDependencies:
+      '@isaacs/testing-peer-deps-c': '2'
+
+  '@isaacs/testing-peer-deps-c@2.0.0':
+    resolution: {integrity: sha512-ixTvB2pyv08B5pLskjuuM/w/+U6/oHFNtaZbnqbyl1HUZrm9LbBhL5rNCQCddXLwds0beiin9ue4dPyq9dUjDw==}
+
+snapshots:
+
+  '@isaacs/testing-peer-deps-b@2.0.1(@isaacs/testing-peer-deps-c@2.0.0)':
+    dependencies:
+      '@isaacs/testing-peer-deps-c': 2.0.0
+
+  '@isaacs/testing-peer-deps-c@2.0.0': {}

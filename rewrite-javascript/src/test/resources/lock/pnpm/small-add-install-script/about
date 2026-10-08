@@ -1,0 +1,1 @@
+Adding @isaacs/testing-fail-postinstall@1.0.0 (hasInstallScript in the packument; its postinstall fails) writes a plain entry: no hasInstallScript or requiresBuild in the v9 lock, no script run.

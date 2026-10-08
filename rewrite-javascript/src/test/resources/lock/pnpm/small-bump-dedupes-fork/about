@@ -1,0 +1,1 @@
+The lock holds is-number@4.0.0 (for is-odd@2.0.0) and is-number@6.0.0 (direct); bumping is-odd to 3.0.1 (is-number ^6.0.0) reuses the locked 6.0.0 and prunes 4.0.0. Small form of bump-dedupes-fork.
