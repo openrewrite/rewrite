@@ -27,6 +27,7 @@ final class JsError extends RuntimeException {
     static final String TYPE_ERROR = "TypeError";
     static final String RANGE_ERROR = "RangeError";
     static final String SYNTAX_ERROR = "SyntaxError";
+    static final String URI_ERROR = "URIError";
 
     private final String name;
 

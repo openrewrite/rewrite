@@ -1,0 +1,1 @@
+The edit adds a resolution to a patch: whose path holds a malformed percent escape (x%zz.patch): parseRange decodes it with decodeURIComponent and Yarn fails YN0001 URIError (the verifier's vfy-patch-uri-malformed).

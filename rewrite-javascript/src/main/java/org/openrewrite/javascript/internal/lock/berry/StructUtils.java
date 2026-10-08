@@ -280,7 +280,7 @@ final class StructUtils {
     }
 
     /**
-     * @throws IllegalArgumentException where Yarn throws, a malformed percent escape included (URIError).
+     * @throws JsError where Yarn throws, a malformed percent escape included (URIError).
      */
     static Range parseRange(String range, RangeOptions opts) {
         Matcher match = RANGE_REGEX.matcher(range);
@@ -294,12 +294,12 @@ final class StructUtils {
         } else if (opts.requireProtocol != null && protocol == null) {
             throw new JsError(JsError.ERROR, "Missing protocol (" + protocol + ")");
         }
-        String source = match.group(3) != null ? UriComponent.decodeURIComponent(match.group(2)) : null;
+        String source = match.group(3) != null ? decodeURIComponent(match.group(2)) : null;
         if (opts.requireSource && source == null) {
             throw new JsError(JsError.ERROR, "Missing source (" + range + ")");
         }
-        String rawSelector = match.group(3) != null ? UriComponent.decodeURIComponent(match.group(3)) :
-                UriComponent.decodeURIComponent(match.group(2));
+        String rawSelector = match.group(3) != null ? decodeURIComponent(match.group(3)) :
+                decodeURIComponent(match.group(2));
         Map<String, Object> selectorParams = opts.parseSelector ? QueryString.parse(rawSelector) : null;
         Map<String, Object> params = match.group(4) != null ? QueryString.parse(match.group(4)) : null;
         if (opts.requireBindings && params == null) {
@@ -313,6 +313,14 @@ final class StructUtils {
             return parseRange(range, opts);
         } catch (RuntimeException e) {
             return null;
+        }
+    }
+
+    private static String decodeURIComponent(String s) {
+        try {
+            return UriComponent.decodeURIComponent(s);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.URI_ERROR, e.getMessage());
         }
     }
 
