@@ -149,12 +149,10 @@ fields kept for back-compat). Reasons: `REGISTRY_UNREACHABLE`, `AUTH_FAILED`, `P
 package manager rejects the edit, or would write a lock its next install rejects; the detail names both
 sides as npm's message does). Every detail says which kind the failure is: the package manager rejects
 the edit (with its error code), or the engine cannot know something (a tarball's contents, a manifest
-outside the registry, the filesystem, the host). `RESOLUTION_REQUIRED` for a shape the proof cannot
-express is a pnpm failure only; on the npm, Bun, Yarn classic and Yarn Berry routes the kinds are those of
-ADR 0013, and a
-lock npm's next install would reject is `PEER_CONFLICT`. Recipes surface failures via the
-existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table (source path, package,
-reason, detail) for fleet aggregation. On failure the old lock is untouched.
+outside the registry, the filesystem, the host). A shape the proof cannot express is no longer a failure on
+any route: the kinds are those of ADR 0013, and a lock npm's next install would reject is `PEER_CONFLICT`.
+Recipes surface failures via the existing `Markup.warn` plus a new `NodeLockRegenerationFailures` data table
+(source path, package, reason, detail) for fleet aggregation. On failure the old lock is untouched.
 
 The shell-out path is deleted; `PackageManagerExecutor` survives only for `DependencyWorkspace`
 (type attribution), which is out of scope.
