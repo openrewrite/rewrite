@@ -926,7 +926,7 @@ final class ResolveDependencies {
         }
         Map<String, MissingPeerInfo> merged = new LinkedHashMap<>();
         for (Map.Entry<String, List<String>> entry : ranges.entrySet()) {
-            String intersection = SemverRangeIntersect.intersect(entry.getValue());
+            String intersection = safeIntersect(entry.getValue());
             if (intersection != null) {
                 merged.put(entry.getKey(), new MissingPeerInfo(intersection, optionals.get(entry.getKey())));
             } else if (autoInstallPeersFromHighestMatch) {
@@ -935,6 +935,15 @@ final class ResolveDependencies {
             }
         }
         return merged;
+    }
+
+    // mergePeers.ts safeIntersect
+    static @Nullable String safeIntersect(List<String> ranges) {
+        try {
+            return SemverRangeIntersect.intersect(ranges);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private static DependencyResolution resolveDependenciesOfDependency(ResolutionContext ctx,
