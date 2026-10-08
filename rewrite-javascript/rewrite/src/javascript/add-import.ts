@@ -288,22 +288,34 @@ function hasTopLevelAwait(cu: JS.CompilationUnit): boolean {
     return found;
 }
 
-/** Whether the file binds its modules with `require`, which decides whether a create is possible. */
+/** Whether the file is a CommonJS module, which binds a module it gains with `require`. */
 export function isCommonJs(cu: JS.CompilationUnit): boolean {
     if (cu.sourcePath.endsWith(".cjs") || cu.sourcePath.endsWith(".cts")) {
         return true;
     }
-    // Node treats these as ES modules regardless of what they contain, the same way
-    // `determineImportStyle` reads them as ES6-preferring; `.js`/`.ts`/`.tsx` stay ambiguous and
-    // fall through to the statements below.
+    // Node treats these as ES modules regardless of what they contain. `.js`/`.ts`/`.tsx` stay
+    // ambiguous and fall through to the statements below.
     if (cu.sourcePath.endsWith(".mjs") || cu.sourcePath.endsWith(".mts")) {
         return false;
     }
     if (hasEsmSyntax(cu)) {
         return false;
     }
-    return cu.statements.some(stmt =>
-        declarationsOf(stmt.element).some(d => requiredModuleOfDeclaration(d) !== undefined));
+    // A `require` call or an `exports` access marks the file at any depth, inside a function too.
+    let found = false;
+    walk(cu.statements, node => {
+        found ||= node.kind === J.Kind.MethodInvocation && isRequireCall(node as J.MethodInvocation) ||
+            node.kind === J.Kind.FieldAccess && isExportsAccess(node as J.FieldAccess);
+        return !found;
+    });
+    return found;
+}
+
+/** `exports.x` or `module.exports`, where a CommonJS module publishes what it exports. */
+function isExportsAccess(access: J.FieldAccess): boolean {
+    const target = access.target;
+    return isIdentifier(target) && (target.simpleName === 'exports' ||
+        target.simpleName === 'module' && access.name.element.simpleName === 'exports');
 }
 
 /** The module a `const X = require('m')` declaration names, for the one variable it declares. */
@@ -645,7 +657,7 @@ function detectSemi(cu: JS.CompilationUnit): boolean {
 
 /**
  * Whether a brace list added to `cu` is written `{ x }` rather than `{x}`. A Prettier configuration
- * settles it; short of one, the file's own single-line import lists, then the style in force.
+ * settles it. Short of one, the file's own single-line import and `require` lists decide, then the style in force.
  */
 function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
     const bracketSpacing = prettierOption(cu, 'bracketSpacing', true);
@@ -657,10 +669,11 @@ function detectBraceSpacing(cu: JS.CompilationUnit): boolean {
         const namedBindings = statement.element?.kind === JS.Kind.Import
             ? (statement.element as JS.Import).importClause?.namedBindings
             : undefined;
-        if (namedBindings?.kind !== JS.Kind.NamedImports) {
-            continue;
-        }
-        const first = (namedBindings as JS.NamedImports).elements.elements[0]?.element;
+        const declaration = requireDeclarationOf(statement.element);
+        const pattern = declaration && requirePattern(declaration);
+        const first = namedBindings?.kind === JS.Kind.NamedImports
+            ? (namedBindings as JS.NamedImports).elements.elements[0]?.element
+            : isObjectBindingPattern(pattern) ? pattern.bindings.elements[0]?.element : undefined;
         // A list laid out one per line says nothing about how a one-line list is spaced.
         if (first && !first.prefix.whitespace.includes('\n')) {
             score += first.prefix.whitespace.length > 0 ? 1 : -1;
@@ -760,172 +773,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     }
 
 
-    /**
-     * Determine the appropriate import style based on file type and existing imports
-     */
-    private determineImportStyle(compilationUnit: JS.CompilationUnit): ImportStyle {
-        // If style was explicitly provided, use it
-        if (this.style !== undefined) {
-            return this.style;
-        }
-
-        // Check the file extension from sourcePath
-        const sourcePath = compilationUnit.sourcePath;
-        const isTypeScript = sourcePath.endsWith('.ts') ||
-                            sourcePath.endsWith('.tsx') ||
-                            sourcePath.endsWith('.mts') ||
-                            sourcePath.endsWith('.cts');
-
-        // Check for .cjs extension - must use CommonJS
-        if (sourcePath.endsWith('.cjs')) {
-            return ImportStyle.CommonJS;
-        }
-
-        // First, check if there's already an import from the same module
-        // and match that style
-        const existingStyleForModule = this.findExistingImportStyleForModule(compilationUnit);
-        if (existingStyleForModule !== null) {
-            return existingStyleForModule;
-        }
-
-        // For .mjs or TypeScript, prefer ES6
-        if (sourcePath.endsWith('.mjs') || isTypeScript) {
-            // If we're importing a member (but not 'default'), use named imports
-            if (this.member !== undefined && this.member !== 'default') {
-                return ImportStyle.ES6Named;
-            }
-            // Otherwise default import
-            return ImportStyle.ES6Default;
-        }
-
-        // For .js files, check what style is predominantly being used
-        let hasNamedImports = false;
-        let hasNamespaceImports = false;
-        let hasDefaultImports = false;
-        let hasCommonJSRequires = false;
-
-        for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
-            // Check for ES6 imports
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
-                const importClause = jsImport.importClause;
-
-                if (importClause) {
-                    // Check for named bindings
-                    if (importClause.namedBindings) {
-                        if (importClause.namedBindings.kind === JS.Kind.NamedImports) {
-                            hasNamedImports = true;
-                        } else if (importClause.namedBindings.kind === J.Kind.Identifier ||
-                                   importClause.namedBindings.kind === JS.Kind.Alias) {
-                            // import * as x from 'module'
-                            hasNamespaceImports = true;
-                        }
-                    }
-
-                    // Check for default import
-                    if (importClause.name) {
-                        hasDefaultImports = true;
-                    }
-                }
-            }
-
-            // Check for CommonJS requires
-            if (statement?.kind === J.Kind.VariableDeclarations) {
-                const varDecl = statement as J.VariableDeclarations;
-                if (varDecl.variables.length === 1) {
-                    const namedVar = varDecl.variables[0].element;
-                    const initializer = namedVar?.initializer?.element;
-                    if (initializer?.kind === J.Kind.MethodInvocation &&
-                        isRequireCall(initializer as J.MethodInvocation)) {
-                        hasCommonJSRequires = true;
-                    }
-                }
-            }
-        }
-
-        // Prefer matching the predominant style
-        // If file uses CommonJS, stick with it
-        if (hasCommonJSRequires && !hasNamedImports && !hasNamespaceImports && !hasDefaultImports) {
-            return ImportStyle.CommonJS;
-        }
-
-        // If importing a member (but not 'default'), prefer named imports if they exist in the file
-        if (this.member !== undefined && this.member !== 'default') {
-            if (hasNamedImports) {
-                return ImportStyle.ES6Named;
-            }
-            if (hasNamespaceImports) {
-                return ImportStyle.ES6Namespace;
-            }
-        }
-
-        // For default/whole module imports
-        if (this.member === undefined || this.member === 'default') {
-            if (hasNamespaceImports) {
-                return ImportStyle.ES6Namespace;
-            }
-            if (hasDefaultImports) {
-                return ImportStyle.ES6Default;
-            }
-        }
-
-        // Default to named imports for members (except 'default'), default imports for modules
-        return (this.member !== undefined && this.member !== 'default')
-            ? ImportStyle.ES6Named
-            : ImportStyle.ES6Default;
-    }
-
-    /**
-     * Find the import style used for an existing import from the same module
-     */
-    private findExistingImportStyleForModule(compilationUnit: JS.CompilationUnit): ImportStyle | null {
-        for (const stmt of compilationUnit.statements) {
-            const statement = stmt.element;
-
-            // Check ES6 imports
-            if (statement?.kind === JS.Kind.Import) {
-                const jsImport = statement as JS.Import;
-                const moduleSpecifier = jsImport.moduleSpecifier?.element;
-
-                if (moduleSpecifier) {
-                    const moduleName = this.getModuleName(moduleSpecifier);
-
-                    if (moduleName !== undefined && sameModule(moduleName, this.module)) {
-                        const importClause = jsImport.importClause;
-                        if (importClause?.namedBindings) {
-                            if (importClause.namedBindings.kind === JS.Kind.NamedImports) {
-                                return ImportStyle.ES6Named;
-                            } else {
-                                return ImportStyle.ES6Namespace;
-                            }
-                        }
-                        if (importClause?.name) {
-                            return ImportStyle.ES6Default;
-                        }
-                    }
-                }
-            }
-
-            // Check CommonJS requires
-            if (statement?.kind === J.Kind.VariableDeclarations) {
-                const varDecl = statement as J.VariableDeclarations;
-                if (varDecl.variables.length === 1) {
-                    const namedVar = varDecl.variables[0].element;
-                    const initializer = namedVar?.initializer?.element;
-
-                    const required = requiredModule(initializer);
-                    if (required !== undefined && sameModule(required, this.module)) {
-                        return ImportStyle.CommonJS;
-                    }
-                }
-            }
-        }
-
-        return null;
-    }
-
     override async visitJsCompilationUnit(compilationUnit: JS.CompilationUnit, p: P): Promise<J | undefined> {
         // First, check if the import already exists
         const hasImport = await this.checkImportExists(compilationUnit);
@@ -957,8 +804,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             }
         }
 
-        // Determine the appropriate import style
-        const importStyle = this.determineImportStyle(compilationUnit);
+        // An `import` would make a file that binds its modules with `require` an ES module and change
+        // how everything in it loads. An explicit `style` overrides, which is how a caller converting
+        // the file to ESM asks for an import.
+        if (this.style === undefined ? isCommonJs(compilationUnit) : this.style === ImportStyle.CommonJS) {
+            // A `require` binds values only.
+            return this.typeOnly ? compilationUnit : this.addRequire(compilationUnit);
+        }
 
         // For named imports, check if we can merge into an existing import from the same module
         // This handles both:
@@ -970,14 +822,6 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
             if (mergedCu !== compilationUnit) {
                 return mergedCu;
             }
-        }
-
-        // TODO: create a `require` here. Until then the request goes unserved, since `import` would
-        // make a file that binds its modules with `require` an ES module and change how everything
-        // in it loads — `maybeBind` refuses it for the same reason. An explicit ES6 `style`
-        // overrides, which is how a caller converting the file to ESM asks for one.
-        if (importStyle === ImportStyle.CommonJS && isCommonJs(compilationUnit)) {
-            return compilationUnit;
         }
 
         // Add ES6 import (handles ES6Named, ES6Namespace, ES6Default)
@@ -1542,21 +1386,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         // Whitespace throughout follows the parser's placement, so that formatting the result is a
         // no-op where the file's style already agrees with it.
         // Note: value is the unquoted module name; valueSource and unicodeEscapes are its printed form
-        let valueSource = this.moduleValueSource;
-        if (valueSource === undefined) {
-            const quote = await detectQuote(compilationUnit, this.quoteStyle);
-            valueSource = `${quote}${this.module}${quote}`;
-        }
-        const moduleSpecifier: J.Literal = {
-            id: randomId(),
-            kind: J.Kind.Literal,
-            prefix: singleSpace,
-            markers: emptyMarkers,
-            value: this.module,
-            valueSource,
-            unicodeEscapes: this.moduleUnicodeEscapes,
-            type: undefined
-        };
+        const moduleSpecifier = {...await this.moduleSpecifier(compilationUnit), prefix: singleSpace};
 
         let importClause: JS.ImportClause | undefined;
 
@@ -1681,6 +1511,102 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         };
 
         return jsImport;
+    }
+
+    /** The module specifier, printed as the caller supplied it or quoted to match the file. */
+    private async moduleSpecifier(compilationUnit: JS.CompilationUnit): Promise<J.Literal> {
+        let valueSource = this.moduleValueSource;
+        if (valueSource === undefined) {
+            const quote = await detectQuote(compilationUnit, this.quoteStyle);
+            valueSource = `${quote}${this.module}${quote}`;
+        }
+        return {
+            id: randomId(),
+            kind: J.Kind.Literal,
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            value: this.module,
+            valueSource,
+            unicodeEscapes: this.moduleUnicodeEscapes,
+            type: undefined
+        };
+    }
+
+    /**
+     * Binds the request with `require`. A member joins a top-level `const` destructuring `require` of
+     * the module where one can take it, and otherwise gets a statement of its own.
+     */
+    private async addRequire(compilationUnit: JS.CompilationUnit): Promise<JS.CompilationUnit> {
+        const call: J.MethodInvocation = {
+            kind: J.Kind.MethodInvocation,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            name: newIdentifier('require'),
+            arguments: {
+                kind: J.Kind.Container,
+                before: emptySpace,
+                elements: [rightPadded(await this.moduleSpecifier(compilationUnit), emptySpace)],
+                markers: emptyMarkers
+            },
+            methodType: undefined
+        };
+        if (this.sideEffectOnly) {
+            return withRequireStatement(compilationUnit, call);
+        }
+
+        const key = memberName(this.member);
+        let pattern: J.VariableDeclarations.NamedVariable["name"] = newIdentifier(this.bindingName!);
+        if (key !== undefined && key !== '*') {
+            const element = movedBinding(pattern, -1, key, this.bindingName!) as JS.BindingElement;
+            const target = compilationUnit.statements.find(s => {
+                const declaration = requireDeclarationOf(s.element);
+                return declaration !== undefined && joins(declaration, this.module, 'const');
+            })?.element;
+            if (target !== undefined) {
+                return placeRequired(compilationUnit, {binding: element, mergeInto: target.id});
+            }
+            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
+            pattern = {
+                kind: JS.Kind.ObjectBindingPattern,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                leadingAnnotations: [],
+                modifiers: [],
+                bindings: {
+                    kind: J.Kind.Container,
+                    before: emptySpace,
+                    elements: [rightPadded({...element, prefix: braceSpace}, braceSpace)],
+                    markers: emptyMarkers
+                }
+            } as JS.ObjectBindingPattern;
+        }
+        return withRequireStatement(compilationUnit, {
+            kind: J.Kind.VariableDeclarations,
+            id: randomId(),
+            prefix: emptySpace,
+            markers: emptyMarkers,
+            leadingAnnotations: [],
+            modifiers: [{
+                kind: J.Kind.Modifier,
+                id: randomId(),
+                prefix: emptySpace,
+                markers: emptyMarkers,
+                annotations: [],
+                keyword: 'const',
+                type: J.ModifierType.Final
+            }],
+            variables: [rightPadded({
+                kind: J.Kind.NamedVariable,
+                id: randomId(),
+                prefix: singleSpace,
+                markers: emptyMarkers,
+                name: pattern,
+                dimensionsAfterName: [],
+                initializer: {kind: J.Kind.LeftPadded, before: singleSpace, element: {...call, prefix: singleSpace}, markers: emptyMarkers}
+            }, emptySpace)]
+        } as J.VariableDeclarations);
     }
 
     /**
@@ -1812,6 +1738,72 @@ export function requireDeclarationOf(statement: J | undefined): J.VariableDeclar
         : undefined;
 }
 
+/** A top-level statement that loads a module with `require`, binding it or not. */
+function isRequireStatement(statement: J | undefined): boolean {
+    return statement?.kind === J.Kind.MethodInvocation
+        ? isRequireCall(statement as J.MethodInvocation)
+        : declarationsOf(statement).some(d => d.variables.some(v => requiredModule(v.element.initializer?.element) !== undefined));
+}
+
+function newIdentifier(name: string): J.Identifier {
+    return {
+        kind: J.Kind.Identifier,
+        id: randomId(),
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        annotations: [],
+        simpleName: name,
+        type: undefined,
+        fieldType: undefined
+    };
+}
+
+function isUseStrict(statement: J | undefined): boolean {
+    const expression = statement?.kind === JS.Kind.ExpressionStatement ? (statement as JS.ExpressionStatement).expression : statement;
+    return expression?.kind === J.Kind.Literal && (expression as J.Literal).value === 'use strict';
+}
+
+/**
+ * `cu` with `statement` after its last top-level `require`. A file with none takes it first,
+ * after a `'use strict'` directive, which has to open the file to apply.
+ */
+function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.CompilationUnit {
+    const statements = cu.statements;
+    const padded = rightPadded(statement, emptySpace,
+        detectSemi(cu) ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers);
+    let last = -1;
+    statements.forEach((s, i) => {
+        if (isRequireStatement(s.element)) {
+            last = i;
+        }
+    });
+    if (last >= 0) {
+        return {
+            ...cu,
+            statements: [
+                ...statements.slice(0, last + 1),
+                {...padded, element: {...statement, prefix: space("\n")}},
+                ...statements.slice(last + 1)
+            ]
+        };
+    }
+    const at = isUseStrict(statements[0]?.element) ? 1 : 0;
+    const next = statements[at]?.element;
+    if (next === undefined) {
+        return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
+    }
+    // The new statement takes the place of the one it goes before, which gets a blank line of its own.
+    return {
+        ...cu,
+        statements: [
+            ...statements.slice(0, at),
+            {...padded, element: {...statement, prefix: space(next.prefix.whitespace)}},
+            {...statements[at], element: {...next, prefix: {...next.prefix, whitespace: "\n\n"}}},
+            ...statements.slice(at + 1)
+        ]
+    };
+}
+
 function requirePattern(declaration: J.VariableDeclarations): J {
     return declaration.variables[0].element.name;
 }
@@ -1840,6 +1832,20 @@ function requireBinds(
         return undefined;
     }
     return requireBindings(pattern, required).find(b => b.member === key)?.name;
+}
+
+function keywordsOf(declaration: J.VariableDeclarations): string {
+    return declaration.modifiers.map(m => m.keyword).join(' ');
+}
+
+/**
+ * Whether a new element can join `declaration`, a destructuring require of `module`. It declares with
+ * `keywords`, so the element binds as it would alone, and has no rest element, which must stay last.
+ */
+function joins(declaration: J.VariableDeclarations, module: string, keywords: string): boolean {
+    const pattern = requirePattern(declaration);
+    return isObjectBindingPattern(pattern) && !hasRest(pattern) && keywordsOf(declaration) === keywords &&
+        sameModule(requiredModuleOfDeclaration(declaration)!, module);
 }
 
 function hasRest(pattern: J): boolean {
@@ -2321,19 +2327,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     /**
      * A destructuring require of the target that `source`'s binding can join.
      * It comes first, since a `const` is unreadable above its declaration.
-     * It declares with the same keywords, and has no rest element, which must stay last.
      */
     private joinableRequire(source: J.VariableDeclarations): J.VariableDeclarations | undefined {
-        const keywords = (d: J.VariableDeclarations) => d.modifiers.map(m => m.keyword).join(' ');
         for (const stmt of this.cu!.statements) {
             const other = requireDeclarationOf(stmt.element);
             if (other === source) {
                 return undefined;
             }
-            const pattern = other && requirePattern(other);
-            if (other !== undefined && isObjectBindingPattern(pattern) && !hasRest(pattern) &&
-                sameModule(requiredModuleOfDeclaration(other)!, this.to.module) &&
-                keywords(other) === keywords(source)) {
+            if (other !== undefined && joins(other, this.to.module, keywordsOf(source))) {
                 return other;
             }
         }

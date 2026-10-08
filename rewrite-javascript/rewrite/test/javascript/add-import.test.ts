@@ -847,7 +847,7 @@ describe('AddImport visitor', () => {
             );
         });
 
-        test('a CommonJS file gains no import, unlike one that merely requires alongside its imports', async () => {
+        test('a CommonJS file gains a require, unlike one that merely requires alongside its imports', async () => {
             const addReadFile = () => fromVisitor(
                 new AddImport({module: 'fs', member: 'readFile', onlyIfReferenced: false}));
 
@@ -858,6 +858,12 @@ describe('AddImport visitor', () => {
                 javascript(
                     `
                         const other = require('other');
+
+                        readFile('test.txt');
+                    `,
+                    `
+                        const other = require('other');
+                        const {readFile} = require('fs');
 
                         readFile('test.txt');
                     `
@@ -1569,9 +1575,7 @@ describe('AddImport visitor', () => {
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
 
-        test('a file that binds its modules with require gains no side-effect import', async () => {
-            // A side-effect import binds no name, but `import` still makes the file an ES module,
-            // where its own `require` calls do not resolve.
+        test('a file that binds its modules with require gains a side-effect require', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: 'core-js/stable', sideEffectOnly: true}));
 
@@ -1580,6 +1584,10 @@ describe('AddImport visitor', () => {
                 javascript(
                     `
                         const other = require('other');
+                    `,
+                    `
+                        const other = require('other');
+                        require('core-js/stable');
                     `
                 )
             );

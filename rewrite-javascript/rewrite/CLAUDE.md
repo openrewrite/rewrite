@@ -308,12 +308,21 @@ binds other names too. A move within one module renames the element in place. An
 
 A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
 
+### A `require` that `maybeBind` creates
+
+A `.cjs` or `.cts` file is CommonJS. So is a file without ES module syntax that calls `require` or
+reads `exports` or `module.exports` anywhere, inside a function too. There `maybeBind` binds with
+`require`, since an `import` would make the file an ES module. A member joins a top-level `const`
+destructuring `require` of its module without a rest element, or else gets `const {m} = require('mod')`
+of its own. A whole
+module gets `const name = require('mod')`. A new statement goes after the file's last top-level
+`require`. A file with none takes it first, after a `'use strict'` directive.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
-- the file binds its modules with `require` and one would have to be created (`ImportStyle.CommonJS`
-  has no add path), which covers an existing `require` shadowed where the caller asked
+- the file is CommonJS and the request is `typeOnly`, which a `require` cannot bind
 - no legal identifier can be derived from the module's last path segment and no `preferredName`
   or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
 - a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller

@@ -728,43 +728,6 @@ describe("maybeBind", () => {
         expect(bound.name).toBe("Elem");
     });
 
-    test("a CommonJS file refuses rather than gain an import", async () => {
-        const spec = new RecipeSpec();
-        const bound: {name?: string} = {};
-        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
-        await spec.rewriteRun(javascript(
-            `const other = require("a/Other");\n\ntarget();`
-        ));
-        expect(bound.name).toBeUndefined();
-    });
-
-    test("a member request refuses on a CommonJS file but still creates on an ESM file", async () => {
-        const memberBind = (bound: {value?: string}) => new class extends JavaScriptVisitor<any> {
-            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.value = maybeBind(this, {module: "fs", member: "readFile", onlyIfReferenced: false});
-                return super.visitJsCompilationUnit(cu, p);
-            }
-        };
-
-        const onCommonJs = new RecipeSpec();
-        const commonJsName: {value?: string} = {};
-        onCommonJs.recipe = fromVisitor(memberBind(commonJsName));
-        await onCommonJs.rewriteRun(javascript(
-            `const other = require("a/Other");\n\ntarget();`
-        ));
-
-        const onEsm = new RecipeSpec();
-        const esmName: {value?: string} = {};
-        onEsm.recipe = fromVisitor(memberBind(esmName));
-        await onEsm.rewriteRun(typescript(
-            `target();`,
-            `import {readFile} from 'fs';\n\ntarget();`
-        ));
-
-        expect(commonJsName.value).toBeUndefined();
-        expect(esmName.value).toBe("readFile");
-    });
-
     test("a .mjs file with a require call still creates an import", async () => {
         const spec = new RecipeSpec();
         const bound: {name?: string} = {};
@@ -2376,5 +2339,66 @@ describe("maybeRebind on a require", () => {
             javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`)
         );
         expect(bound).toEqual([undefined, undefined]);
+    });
+});
+
+describe("maybeBind on a CommonJS file", () => {
+    const bindWith = async (options: MaybeBindOptions, before: string, after?: string, path?: string) => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind(options, bound));
+        await spec.rewriteRun({...javascript(before, after), ...(path ? {path} : {})});
+        return bound.name;
+    };
+
+    test("a member gets a require of its own after the file's requires", async () => {
+        expect(await bindWith({module: "node:fs/promises", member: "rm"},
+            `const { mkdirp } = require('fs-extra');\n\ntarget();`,
+            `const { mkdirp } = require('fs-extra');\nconst { rm } = require('node:fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+    });
+
+    test("a member joins a const destructuring require of its module that has no rest element", async () => {
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {readFile} = require('node:fs/promises');\n\ntarget();`,
+            `const {readFile, rm} = require('node:fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {a, ...rest} = require('fs/promises');\nlet {b} = require('fs/promises');\n\ntarget();`,
+            `const {a, ...rest} = require('fs/promises');\nlet {b} = require('fs/promises');\nconst {rm} = require('fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+    });
+
+    test("a whole module binds a name, first or after 'use strict' in a file without top-level requires", async () => {
+        expect(await bindWith({module: "path"},
+            `'use strict';\n\nmodule.exports = target();`,
+            `'use strict';\n\nconst path = require('path');\n\nmodule.exports = path.target();`
+        )).toBe("path");
+        expect(await bindWith({module: "path", member: "*", preferredName: "p"},
+            `exports.f = target();`,
+            `const p = require('path');\n\nexports.f = p.target();`
+        )).toBe("p");
+        expect(await bindWith({module: "path"},
+            `function f() {\n    return require('fs');\n}\ntarget();`,
+            `const path = require('path');\n\nfunction f() {\n    return require('fs');\n}\npath.target();`
+        )).toBe("path");
+    });
+
+    test("a taken name is deconflicted and an alias is bound verbatim", async () => {
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {mkdirp} = require('fs-extra');\nconst rm = 1;\n\ntarget();`,
+            `const {mkdirp} = require('fs-extra');\nconst {rm: rm_1} = require('fs/promises');\nconst rm = 1;\n\nrm_1.target();`
+        )).toBe("rm_1");
+        expect(await bindWith({module: "fs/promises", member: "rm", alias: "remove"},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`,
+            `const {mkdirp} = require('fs-extra');\nconst {rm: remove} = require('fs/promises');\n\nremove.target();`
+        )).toBe("remove");
+    });
+
+    test("a type-only request refuses, since a require binds values only", async () => {
+        expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`
+        )).toBeUndefined();
     });
 });

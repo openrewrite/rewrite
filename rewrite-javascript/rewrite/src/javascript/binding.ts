@@ -83,7 +83,7 @@ export interface ModuleBindings {
 
     /**
      * The lane these bindings come from, and the one `maybeBind` would use. `"none"` is a
-     * plain script — no import, export, `require` binding, or enclosing AMD block — which
+     * plain script — no import, export, `require` call, `exports` access, or enclosing AMD block — which
      * `maybeBind` still turns into a module on request; a caller that must not do that checks
      * for `"none"` itself.
      */
@@ -285,7 +285,7 @@ export function maybeBind(
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
     // refusal here only has to gate the point where it would create a new one.
-    const refuseCreate = cu !== undefined && isCommonJs(cu);
+    const refuseCreate = cu !== undefined && (options.typeOnly ?? false) && isCommonJs(cu);
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)
