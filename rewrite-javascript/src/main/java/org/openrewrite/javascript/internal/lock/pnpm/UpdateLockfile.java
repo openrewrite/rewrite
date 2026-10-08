@@ -151,6 +151,9 @@ final class UpdateLockfile {
         if (resolved.isHasBin()) {
             result.setHasBin(true);
         }
+        if (resolved.getPatch() != null) {
+            result.setPatched(true);
+        }
         return result;
     }
 

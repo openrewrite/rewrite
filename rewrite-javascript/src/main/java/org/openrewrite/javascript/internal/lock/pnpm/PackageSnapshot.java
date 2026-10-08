@@ -64,6 +64,8 @@ final class PackageSnapshot {
 
     private @Nullable Object optional;
 
+    private @Nullable Boolean patched;
+
     /**
      * {@code {...snapshot}}: a shallow copy.
      */
@@ -86,6 +88,7 @@ final class PackageSnapshot {
         copy.optionalDependencies = optionalDependencies;
         copy.transitivePeerDependencies = transitivePeerDependencies;
         copy.optional = optional;
+        copy.patched = patched;
         return copy;
     }
 }

@@ -23,9 +23,11 @@ import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -86,12 +88,9 @@ final class PickPackageFromMeta {
             }
         }
         if (name != null && !name.isEmpty()) {
-            String type = Verification.versionSelectorType(bareSpecifier);
-            if (type != null) {
-                String normalized = "version".equals(type) ? NodeSemver.valid(bareSpecifier, NodeSemver.Options.LOOSE) :
-                        "range".equals(type) ? NodeSemver.validRange(bareSpecifier, NodeSemver.Options.LOOSE) :
-                                bareSpecifier;
-                return new RegistryPackageSpec(type, name, normalized, null);
+            RegistryPackageSpec spec = selectorSpec(name, bareSpecifier);
+            if (spec != null) {
+                return spec;
             }
         }
         if (bareSpecifier.startsWith(registry)) {
@@ -101,6 +100,94 @@ final class PickPackageFromMeta {
             }
         }
         return null;
+    }
+
+    // version-selector-type's {type, normalized} for a package name
+    private static @Nullable RegistryPackageSpec selectorSpec(String name, String selector) {
+        String type = Verification.versionSelectorType(selector);
+        if (type == null) {
+            return null;
+        }
+        String normalized = "version".equals(type) ? NodeSemver.valid(selector, NodeSemver.Options.LOOSE) :
+                "range".equals(type) ? NodeSemver.validRange(selector, NodeSemver.Options.LOOSE) : selector;
+        return new RegistryPackageSpec(type, name, normalized, null);
+    }
+
+    static final Map<String, String> BUILTIN_NAMED_REGISTRIES =
+            Collections.singletonMap("gh", "https://npm.pkg.github.com/");
+
+    @Value
+    static class JsrRegistryPackageSpec {
+        RegistryPackageSpec spec;
+        String jsrPkgName;
+    }
+
+    @Value
+    static class NamedRegistryPackageSpec {
+        RegistryPackageSpec spec;
+        String registryName;
+    }
+
+    static @Nullable JsrRegistryPackageSpec parseJsrSpecifierToRegistryPackageSpec(String rawSpecifier,
+                                                                                   @Nullable String alias,
+                                                                                   String defaultTag) {
+        JsrSpecifierParser.JsrSpec spec = JsrSpecifierParser.parseJsrSpecifier(rawSpecifier, alias);
+        if (spec == null || !Js.truthy(spec.getNpmPkgName())) {
+            return null;
+        }
+        RegistryPackageSpec selector = selectorSpec(spec.getNpmPkgName(),
+                spec.getVersionSelector() != null ? spec.getVersionSelector() : defaultTag);
+        return selector == null ? null : new JsrRegistryPackageSpec(selector, spec.getJsrPkgName());
+    }
+
+    static @Nullable NamedRegistryPackageSpec parseNamedRegistrySpecifierToRegistryPackageSpec(
+            String rawSpecifier, Set<String> knownRegistryNames, @Nullable String packageAlias, String defaultTag) {
+        int colon = rawSpecifier.indexOf(':');
+        if (colon <= 0) {
+            return null;
+        }
+        String registryName = rawSpecifier.substring(0, colon);
+        if (!knownRegistryNames.contains(registryName)) {
+            return null;
+        }
+        String body = rawSpecifier.substring(colon + 1);
+        String pkgName;
+        String versionSelector = null;
+        if (ResolveDependencies.validRange(body) != null) {
+            if (!Js.truthy(packageAlias)) {
+                return null;
+            }
+            pkgName = packageAlias;
+            versionSelector = body;
+        } else if (!body.isEmpty() && body.charAt(0) == '@') {
+            int index = body.lastIndexOf('@');
+            if (index == 0) {
+                pkgName = body;
+            } else {
+                pkgName = body.substring(0, index);
+                versionSelector = body.substring(index + 1);
+            }
+            if (pkgName.indexOf('/') == -1 || pkgName.endsWith("/")) {
+                throw new PnpmError("INVALID_NAMED_REGISTRY_PACKAGE_NAME", "The package name '" + pkgName +
+                        "' in named registry '" + registryName + ":' is invalid");
+            }
+        } else if (packageAlias != null && packageAlias.startsWith("@")) {
+            pkgName = packageAlias;
+            versionSelector = body;
+        } else {
+            int index = body.lastIndexOf('@');
+            if (index < 1) {
+                pkgName = body;
+            } else {
+                pkgName = body.substring(0, index);
+                versionSelector = body.substring(index + 1);
+            }
+            if (pkgName.isEmpty()) {
+                return null;
+            }
+        }
+        RegistryPackageSpec selector = selectorSpec(pkgName, versionSelector != null ? versionSelector : defaultTag);
+        return selector == null ? null : new NamedRegistryPackageSpec(selector, registryName);
     }
 
     // parse-npm-tarball-url 5.0.0: the name and version a registry tarball URL names, null for another URL

@@ -56,6 +56,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
         try {
             return client.getDocumentText(target(registry, name), name, version, url);
         } catch (NodeRegistryException e) {
+            // fetchAttestationPublishedAt answers undefined for any failure, and pnpm reads the full document instead
             return null;
         }
     }

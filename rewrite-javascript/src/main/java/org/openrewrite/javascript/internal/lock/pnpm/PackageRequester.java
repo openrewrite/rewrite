@@ -91,6 +91,8 @@ final class PackageRequester {
         boolean preferWorkspacePackages;
         @Nullable String projectDir;
         @Nullable String trustPolicy;
+        @Nullable Function<String, Object> trustPolicyExclude;
+        @Nullable Double trustPolicyIgnoreAfter;
         @Nullable String update;
         @Nullable Map<String, Map<String, Verification.Project>> workspacePackages;
         boolean injectWorkspacePackages;
@@ -247,10 +249,11 @@ final class PackageRequester {
         if (result != null) {
             return result;
         }
-        String bareSpecifier = wantedDependency.getBareSpecifier();
-        if (bareSpecifier != null && bareSpecifier.startsWith("jsr:")) {
-            throw new CannotKnow("what " + bareSpecifier + " resolves to (the jsr resolver is not ported)");
+        result = npmResolver.resolveJsr(wantedDependency, options, preferredVersions);
+        if (result != null) {
+            return result;
         }
+        String bareSpecifier = wantedDependency.getBareSpecifier();
         if (bareSpecifier != null && !bareSpecifier.isEmpty()) {
             result = resolveFromGit(bareSpecifier, options, currentPkg);
             if (result == null) {
@@ -268,16 +271,15 @@ final class PackageRequester {
         if (result != null) {
             return result;
         }
+        if (bareSpecifier != null && bareSpecifier.startsWith("runtime:")) {
+            throw new CannotKnow("the " + wantedDependency.getAlias() + " runtime " + bareSpecifier +
+                                 " (pnpm reads its release index and checksums from the runtime's own site)");
+        }
+        result = npmResolver.resolveFromNamedRegistry(wantedDependency, options, preferredVersions);
+        if (result != null) {
+            return result;
+        }
         if (bareSpecifier != null && !bareSpecifier.isEmpty()) {
-            if (bareSpecifier.startsWith("runtime:")) {
-                throw new CannotKnow("the " + wantedDependency.getAlias() + " runtime " + bareSpecifier +
-                                     " (pnpm reads its release index and checksums from the runtime's own site)");
-            }
-            int colon = bareSpecifier.indexOf(':');
-            if (colon > 0 && bareSpecifier.substring(0, colon).equals("gh")) {
-                throw new CannotKnow("what " + bareSpecifier + " resolves to (the named-registry resolver is not " +
-                                     "ported)");
-            }
             result = resolveFromLocalPath(wantedDependency, options, currentPkg);
             if (result != null) {
                 return result;

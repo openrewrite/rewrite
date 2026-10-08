@@ -302,6 +302,111 @@ class NodeSemverTest {
         assertThat(list).containsExactly("5.9.6", "1.2.3+1", "1.2.3+0", "1.2.3", "0.1.2");
     }
 
+    // test/ranges/subset.js: sub, dom, expect, includePrerelease
+    static Stream<Arguments> subsets() {
+        Object[][] cases = {
+          {"1.2.3", "1.2.3", true, false},
+          {"1.2.3", "1.x", true, false},
+          {"1.2.3 1.2.4", "1.2.3", true, false},
+          {"1.2.3 1.2.4", "1.2.9", true, false},
+          {"1.2.3", ">1.2.0", true, false},
+          {"1.2.3 2.3.4 || 2.3.4", "3", false, false},
+          {"^1.2.3-pre.0", "1.x", false, false},
+          {"^1.2.3-pre.0", "1.x", true, true},
+          {">2 <1", "3", true, false},
+          {"1 || 2 || 3", ">=1.0.0", true, false},
+          {"1.2.3", "*", true, false},
+          {"^1.2.3", "*", true, false},
+          {"^1.2.3-pre.0", "*", false, false},
+          {"^1.2.3-pre.0", "*", true, true},
+          {"1 || 2 || 3", "*", true, false},
+          {"^1.2.3-pre.0", ">=1.0.0", false, false},
+          {"^1.2.3-pre.0", ">=1.0.0", true, true},
+          {"^1.2.3-pre.0", ">=1.2.3-pre.0", true, false},
+          {"^1.2.3-pre.0", ">=1.2.3-pre.0", true, true},
+          {"^10.2.0-beta.2", "^10.2.0-beta.1", true, false},
+          {">1.2.3-pre.0", ">=1.2.3-pre.0", true, false},
+          {">1.2.3-pre.0", ">1.2.3-pre.0 || 2", true, false},
+          {"1 >1.2.3-pre.0", ">1.2.3-pre.0", true, false},
+          {"1 <=1.2.3-pre.0", ">=1.0.0-0", false, false},
+          {"1 <=1.2.3-pre.0", ">=1.0.0-0", true, true},
+          {"1 <=1.2.3-pre.0", "<=1.2.3-pre.0", true, false},
+          {"1 <=1.2.3-pre.0", "<=1.2.3-pre.0", true, true},
+          {"<1.2.3-pre.0", "<=1.2.3-pre.0", true, false},
+          {"<1.2.3-pre.0", "<1.2.3-pre.0 || 2", true, false},
+          {"1 <1.2.3-pre.0", "<1.2.3-pre.0", true, false},
+          {"*", "*", true, false},
+          {"", "*", true, false},
+          {"*", "", true, false},
+          {"", "", true, false},
+          {"*", ">=0.0.0-0", true, true},
+          {"*", ">=0.0.0", true, false},
+          {"*", ">=0.0.0", false, true},
+          {"*", ">=0.0.0-0", true, false},
+          {"^2 || ^3 || ^4", ">=1", true, false},
+          {"^2 || ^3 || ^4", ">1", true, false},
+          {"^2 || ^3 || ^4", ">=2", true, false},
+          {"^2 || ^3 || ^4", ">=3", false, false},
+          {">=1", "^2 || ^3 || ^4", false, false},
+          {">1", "^2 || ^3 || ^4", false, false},
+          {">=2", "^2 || ^3 || ^4", false, false},
+          {">=3", "^2 || ^3 || ^4", false, false},
+          {"^1", "^2 || ^3 || ^4", false, false},
+          {"^2", "^2 || ^3 || ^4", true, false},
+          {"^3", "^2 || ^3 || ^4", true, false},
+          {"^4", "^2 || ^3 || ^4", true, false},
+          {"1.x", "^2 || ^3 || ^4", false, false},
+          {"2.x", "^2 || ^3 || ^4", true, false},
+          {"3.x", "^2 || ^3 || ^4", true, false},
+          {"4.x", "^2 || ^3 || ^4", true, false},
+          {">=1.0.0 <=1.0.0 || 2.0.0", "1.0.0 || 2.0.0", true, false},
+          {"<=1.0.0 >=1.0.0 || 2.0.0", "1.0.0 || 2.0.0", true, false},
+          {">=1.0.0", "1.0.0", false, false},
+          {">=1.0.0 <2.0.0", "<2.0.0", true, false},
+          {">=1.0.0 <2.0.0", ">0.0.0", true, false},
+          {">=1.0.0 <=1.0.0", "1.0.0", true, false},
+          {">=1.0.0 <=1.0.0", "2.0.0", false, false},
+          {"<2.0.0", ">=1.0.0 <2.0.0", false, false},
+          {">=1.0.0", ">=1.0.0 <2.0.0", false, false},
+          {">=1.0.0 <2.0.0", "<2.0.0", true, false},
+          {">=1.0.0 <2.0.0", ">=1.0.0", true, false},
+          {">=1.0.0 <2.0.0", ">1.0.0", false, false},
+          {">=1.0.0 <=2.0.0", "<2.0.0", false, false},
+          {">=1.0.0", "<1.0.0", false, false},
+          {"<=1.0.0", ">1.0.0", false, false},
+          {"<=1.0.0 >1.0.0", ">1.0.0", true, false},
+          {"1.0.0 >1.0.0", ">1.0.0", true, false},
+          {"1.0.0 <1.0.0", ">1.0.0", true, false},
+          {"<1 <2 <3", "<4", true, false},
+          {"<3 <2 <1", "<4", true, false},
+          {">1 >2 >3", ">0", true, false},
+          {">3 >2 >1", ">0", true, false},
+          {"<=1 <=2 <=3", "<4", true, false},
+          {"<=3 <=2 <=1", "<4", true, false},
+          {">=1 >=2 >=3", ">0", true, false},
+          {">=3 >=2 >=1", ">0", true, false},
+          {">=3 >=2 >=1", ">=3 >=2 >=1", true, false},
+          {">2.0.0", ">=2.0.0", true, false},
+        };
+        List<Arguments> rows = new ArrayList<>();
+        for (Object[] row : cases) {
+            rows.add(Arguments.of(row));
+        }
+        return rows.stream();
+    }
+
+    @ParameterizedTest
+    @MethodSource("subsets")
+    void subset(String sub, String dom, boolean expect, boolean includePrerelease) {
+        assertThat(NodeSemver.subset(sub, dom, Options.of(false, includePrerelease)))
+          .as("%s subset of %s", sub, dom).isEqualTo(expect);
+    }
+
+    @Test
+    void rangeIsASubsetOfItself() {
+        assertThat(NodeSemver.subset("^1", "^1", Options.DEFAULT)).isTrue();
+    }
+
     // satisfies catches what the Range constructor throws: `range.trim is not a function` for these
     @Test
     void rangeThatIsNotAString() {

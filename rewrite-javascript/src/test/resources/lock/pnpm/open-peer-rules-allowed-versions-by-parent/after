@@ -1,0 +1,34 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-dep-conflict-chain-single-a':
+        specifier: 2.0.0
+        version: 2.0.0
+      '@isaacs/testing-peer-dep-conflict-chain-single-b':
+        specifier: 1.0.0
+        version: 1.0.0(@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0)
+
+packages:
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0':
+    resolution: {integrity: sha512-EeEqcHtFFh8U7DBN3DF3sY0pTobDFMQdK/ld2dpP5FLjyqux4xJayaCCxgxOEAzuF/umuoLb5ctt4txWznEvqQ==}
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0':
+    resolution: {integrity: sha512-uYYhNcq5TAG/AAeWyx4+BTECo79HIHxZyr3TEiRI1LtKsI5jyBdvrAKsKRIhZxbzl28gLQIGhi1d+xfb2e8HEQ==}
+    peerDependencies:
+      '@isaacs/testing-peer-dep-conflict-chain-single-a': '1'
+
+snapshots:
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0': {}
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-b@1.0.0(@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0)':
+    dependencies:
+      '@isaacs/testing-peer-dep-conflict-chain-single-a': 2.0.0

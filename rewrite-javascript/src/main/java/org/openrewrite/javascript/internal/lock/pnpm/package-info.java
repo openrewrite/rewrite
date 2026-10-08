@@ -77,7 +77,7 @@
  * </pre>
  * <p>
  * The compatibility database pnpm applies, {@code compat-db.json}, is generated from @yarnpkg/extensions 2.0.6, and
- * {@code ResolvePeers} ports {@code satisfiesWithPrereleases} of @yarnpkg/core's semverUtils, both distributed under
+ * {@code SemverUtils} ports {@code satisfiesWithPrereleases} of @yarnpkg/core's semverUtils, both distributed under
  * the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors.

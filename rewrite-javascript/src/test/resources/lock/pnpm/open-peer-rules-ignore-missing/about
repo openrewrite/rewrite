@@ -1,0 +1,1 @@
+Add single-b@1.0.0 (peer single-a 1) with autoInstallPeers off under strictPeerDependencies, peerDependencyRules.ignoreMissing single-a.

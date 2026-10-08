@@ -40,9 +40,8 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 /**
- * Port of @pnpm/installing.deps-resolver src/resolvePeers.ts and src/linkPathToPeerVersion.ts (pnpm 11.2.2), with
- * @yarnpkg/core's {@code semverUtils.satisfiesWithPrereleases}; a promise is a {@link Deferred} settled through a
- * queue of reactions drained where the code awaits.
+ * Port of @pnpm/installing.deps-resolver src/resolvePeers.ts, src/mergePeers.ts and src/linkPathToPeerVersion.ts
+ * (pnpm 11.2.2).
  */
 final class ResolvePeers {
 
@@ -104,13 +103,50 @@ final class ResolvePeers {
         Map<String, PeerDependencyIssues> peerDependencyIssuesByProjects;
     }
 
+    @Value
+    static class ParentPackage {
+        String name;
+        String version;
+    }
+
+    @Value
+    static class MissingPeerIssue {
+        List<ParentPackage> parents;
+        boolean optional;
+        String wantedRange;
+    }
+
+    @Value
+    static class BadPeerIssue {
+        String foundVersion;
+        List<ParentPackage> resolvedFrom;
+        List<ParentPackage> parents;
+        boolean optional;
+        String wantedRange;
+    }
+
     /**
-     * The peers a project's packages miss or get at a version their range does not admit.
+     * The peers a project's packages miss or get at a version their range does not admit, with mergePeers' view of
+     * the missing ones.
      */
     @Getter
     static final class PeerDependencyIssues {
-        private final Map<String, List<Map<String, @Nullable Object>>> bad = new LinkedHashMap<>();
-        private final Map<String, List<Map<String, @Nullable Object>>> missing = new LinkedHashMap<>();
+        private final Map<String, List<BadPeerIssue>> bad;
+        private final Map<String, List<MissingPeerIssue>> missing;
+        private final List<String> conflicts;
+        private final Map<String, String> intersections;
+
+        PeerDependencyIssues() {
+            this(new LinkedHashMap<>(), new LinkedHashMap<>(), new ArrayList<>(), new LinkedHashMap<>());
+        }
+
+        PeerDependencyIssues(Map<String, List<BadPeerIssue>> bad, Map<String, List<MissingPeerIssue>> missing,
+                             List<String> conflicts, Map<String, String> intersections) {
+            this.bad = bad;
+            this.missing = missing;
+            this.conflicts = conflicts;
+            this.intersections = intersections;
+        }
     }
 
     /**
@@ -304,7 +340,7 @@ final class ResolvePeers {
             resolvePeersOfChildren(new LinkedHashMap<>(project.getDirectNodeIdsByAlias()), pkgsByName, ctx);
             ctx.drain();
             if (!peerDependencyIssues.getBad().isEmpty() || !peerDependencyIssues.getMissing().isEmpty()) {
-                peerDependencyIssuesByProjects.put(project.getId(), peerDependencyIssues);
+                peerDependencyIssuesByProjects.put(project.getId(), mergePeers(peerDependencyIssues));
             }
         }
         base.drain();
@@ -549,11 +585,9 @@ final class ResolvePeers {
         PeersCacheItem hit = findHit(ctx, parentPkgs, pkgIdWithPatchHash);
         if (hit != null) {
             for (Map.Entry<String, MissingPeerInfo> missing : hit.missingPeers.entrySet()) {
-                Map<String, @Nullable Object> issue = new LinkedHashMap<>();
-                issue.put("optional", missing.getValue().isOptional());
-                issue.put("wantedRange", missing.getValue().getRange());
                 ctx.peerDependencyIssues.getMissing().computeIfAbsent(missing.getKey(), k -> new ArrayList<>())
-                        .add(issue);
+                        .add(new MissingPeerIssue(getLocationFromParentNodeIds(ctx.dependenciesTree, parentNodeIds),
+                                missing.getValue().isOptional(), missing.getValue().getRange()));
             }
             ctx.pending[0]++;
             hit.depPath.then(depPath -> {
@@ -581,7 +615,7 @@ final class ResolvePeers {
         Map<String, NodeId> resolvedPeers = new LinkedHashMap<>();
         Map<String, MissingPeerInfo> missingPeers = new LinkedHashMap<>();
         if (!resolvedPackage.getPeerDependencies().isEmpty()) {
-            resolvePeers(ctx, resolvedPackage, parentPkgs, resolvedPeers, missingPeers);
+            resolvePeers(ctx, resolvedPackage, parentPkgs, parentNodeIds, resolvedPeers, missingPeers);
         }
         allResolvedPeers.putAll(resolvedPeers);
         allResolvedPeers.remove(resolvedPackage.getName());
@@ -952,7 +986,8 @@ final class ResolvePeers {
     }
 
     private static void resolvePeers(Ctx ctx, ResolvedPackage resolvedPackage, Map<String, ParentRef> parentPkgs,
-                                     Map<String, NodeId> resolvedPeers, Map<String, MissingPeerInfo> missingPeers) {
+                                     List<NodeId> parentNodeIds, Map<String, NodeId> resolvedPeers,
+                                     Map<String, MissingPeerInfo> missingPeers) {
         for (Map.Entry<String, PeerDependency> peer : resolvedPackage.getPeerDependencies().entrySet()) {
             String peerName = peer.getKey();
             String version = peer.getValue().getVersion();
@@ -962,23 +997,64 @@ final class ResolvePeers {
             boolean optionalPeer = Boolean.TRUE.equals(peer.getValue().getOptional());
             if (resolved == null) {
                 missingPeers.put(peerName, new MissingPeerInfo(version, optionalPeer));
-                Map<String, @Nullable Object> issue = new LinkedHashMap<>();
-                issue.put("optional", optionalPeer);
-                issue.put("wantedRange", peerVersionRange);
-                ctx.peerDependencyIssues.getMissing().computeIfAbsent(peerName, k -> new ArrayList<>()).add(issue);
+                ctx.peerDependencyIssues.getMissing().computeIfAbsent(peerName, k -> new ArrayList<>())
+                        .add(new MissingPeerIssue(getLocationFromParentNodeIds(ctx.dependenciesTree, parentNodeIds),
+                                optionalPeer, peerVersionRange));
                 continue;
             }
-            if (!satisfiesWithPrereleases(resolved.version, peerVersionRange)) {
-                Map<String, @Nullable Object> issue = new LinkedHashMap<>();
-                issue.put("foundVersion", resolved.version);
-                issue.put("optional", optionalPeer);
-                issue.put("wantedRange", peerVersionRange);
-                ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>()).add(issue);
+            if (!SemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true)) {
+                List<ParentPackage> peerLocation = resolved.nodeId == null ? new ArrayList<>() :
+                        getLocationFromParentNodeIds(ctx.dependenciesTree, resolved.parentNodeIds);
+                ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>())
+                        .add(new BadPeerIssue(resolved.version, peerLocation,
+                                getLocationFromParentNodeIds(ctx.dependenciesTree, parentNodeIds), optionalPeer,
+                                peerVersionRange));
             }
             if (resolved.nodeId != null) {
                 resolvedPeers.put(peerName, resolved.nodeId);
             }
         }
+    }
+
+    private static List<ParentPackage> getLocationFromParentNodeIds(Map<NodeId, DependenciesTreeNode> dependenciesTree,
+                                                                    List<NodeId> parentNodeIds) {
+        List<ParentPackage> parents = new ArrayList<>();
+        for (NodeId nodeId : parentNodeIds) {
+            ResolvedPackage pkg = dependenciesTree.get(nodeId).getResolvedPackage();
+            parents.add(new ParentPackage(pkg.getName(), pkg.getVersion()));
+        }
+        return parents;
+    }
+
+    // mergePeers.ts over a project's missing peers
+    private static PeerDependencyIssues mergePeers(PeerDependencyIssues issues) {
+        List<String> conflicts = new ArrayList<>();
+        Map<String, String> intersections = new LinkedHashMap<>();
+        for (Map.Entry<String, List<MissingPeerIssue>> peer : issues.getMissing().entrySet()) {
+            List<MissingPeerIssue> ranges = peer.getValue();
+            boolean allOptional = true;
+            for (MissingPeerIssue range : ranges) {
+                allOptional &= range.isOptional();
+            }
+            if (allOptional) {
+                continue;
+            }
+            if (ranges.size() == 1) {
+                intersections.put(peer.getKey(), ranges.get(0).getWantedRange());
+                continue;
+            }
+            List<String> wantedRanges = new ArrayList<>();
+            for (MissingPeerIssue range : ranges) {
+                wantedRanges.add(range.getWantedRange());
+            }
+            String intersection = ResolveDependencies.safeIntersect(wantedRanges);
+            if (intersection == null) {
+                conflicts.add(peer.getKey());
+            } else {
+                intersections.put(peer.getKey(), intersection);
+            }
+        }
+        return new PeerDependencyIssues(issues.getBad(), issues.getMissing(), conflicts, intersections);
     }
 
     private static DepPath.@Nullable PeerId peerNodeIdToPeerId(String alias, NodeId peerNodeId, Ctx ctx) {
@@ -1028,50 +1104,5 @@ final class ResolvePeers {
             return out.substring(0, end);
         }
         return relPath.isEmpty() ? "" : "+";
-    }
-
-    /**
-     * {@code satisfiesWithPrereleases(version, range, true)}: the range under includePrerelease, else with every
-     * prerelease dropped from the version and the comparators.
-     */
-    static boolean satisfiesWithPrereleases(@Nullable String version, String range) {
-        if (version == null || version.isEmpty()) {
-            return false;
-        }
-        String formatted;
-        try {
-            formatted = NodeSemver.validRange(range, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE);
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-        String valid = NodeSemver.valid(version, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE);
-        if (formatted == null || valid == null) {
-            return false;
-        }
-        if (NodeSemver.satisfies(valid, formatted, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE)) {
-            return true;
-        }
-        String release = withoutPrerelease(valid);
-        for (String set : formatted.split("\\|\\|")) {
-            List<String> comparators = new ArrayList<>();
-            for (String comparator : set.trim().split(" ")) {
-                int op = 0;
-                while (op < comparator.length() && "<>=".indexOf(comparator.charAt(op)) >= 0) {
-                    op++;
-                }
-                String v = comparator.substring(op);
-                comparators.add(v.isEmpty() || "*".equals(comparator) ? comparator :
-                        comparator.substring(0, op) + withoutPrerelease(v));
-            }
-            if (NodeSemver.satisfies(release, String.join(" ", comparators), NodeSemver.Options.LOOSE)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private static String withoutPrerelease(String version) {
-        int dash = version.indexOf('-');
-        return dash < 0 ? version : version.substring(0, dash);
     }
 }

@@ -1,0 +1,4 @@
+strictPeerDependencies: true
+peerDependencyRules:
+  allowedVersions:
+    '@isaacs/testing-peer-dep-conflict-chain-single-b@2>@isaacs/testing-peer-dep-conflict-chain-single-a': '2'

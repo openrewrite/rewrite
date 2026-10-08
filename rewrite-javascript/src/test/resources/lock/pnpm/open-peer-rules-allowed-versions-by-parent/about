@@ -1,0 +1,1 @@
+Add single-b@1.0.0 beside single-a@2.0.0 under strictPeerDependencies, peerDependencyRules.allowedVersions single-b@1>single-a 2.

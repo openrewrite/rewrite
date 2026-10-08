@@ -1,0 +1,1 @@
+Add is-odd@^3.0.1 under trustPolicy no-downgrade (the trust check while resolving, full metadata).

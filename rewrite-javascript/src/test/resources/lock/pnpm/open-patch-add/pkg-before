@@ -1,0 +1,7 @@
+{
+  "name": "open-patch-add",
+  "version": "1.0.0",
+  "dependencies": {
+    "debug": "4.4.3"
+  }
+}

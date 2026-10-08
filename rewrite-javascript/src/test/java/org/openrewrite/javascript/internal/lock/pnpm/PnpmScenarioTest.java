@@ -48,9 +48,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * with the edit phase's project files and clock, the registry served from the recording, and asserts the scenario's
  * {@code expect} line: {@code exact} (pnpm's {@code after} byte for byte; the default when {@code after} is
  * present), {@code cannot-know <what>} (every package, spec and URL it names), {@code malformed}, {@code pm-rejects
- * <code>} or {@code second-install-rejects <code>}. A fixture recorded elsewhere may lack registry responses: it is
- * replayed with its re-recording's when there is one, else when a cache fills them, and skipped when it cannot be
- * served. When
+ * <what>} (all of it in the failure) or {@code second-install-rejects <code>}. A fixture recorded elsewhere may lack
+ * registry responses: it is replayed with its re-recording's when there is one, else when a cache fills them, and
+ * skipped when it cannot be served or an in-repo scenario's {@code supersedes} names it. When
  * {@code REWRITE_LOCK_PNPM_SCENARIO_RESULTS} names a file, one line per edit is written there.
  */
 class PnpmScenarioTest {
@@ -148,10 +148,9 @@ class PnpmScenarioTest {
         String expect = scenario.expect();
         String kind = kind(expect);
         String after = scenario.file("after");
-        if (scenario.recordedWith() == null && after != null && !after.startsWith("lockfileVersion: '9.0'")) {
-            // pnpm 11 writes every lock as 9.0: a fixture recorded elsewhere with another is not its output
-            record(name, "skipped", "not pnpm 11 output");
-            assumeTrue(false, name + " was not written by pnpm 11");
+        if (scenario.getSupersededBy() != null) {
+            record(name, "skipped", "superseded by " + scenario.getSupersededBy().getName());
+            assumeTrue(false, name + " is superseded by " + scenario.getSupersededBy().getName());
         }
         Result result;
         try {
@@ -199,10 +198,11 @@ class PnpmScenarioTest {
                 ok = failure.getReason() == Reason.MALFORMED_LOCK;
                 break;
             case "pm-rejects":
-                ok = detail.startsWith(PnpmLockRegenerator.PNPM_REJECTS) && detail.contains(code);
+                ok = detail.startsWith(PnpmLockRegenerator.PNPM_REJECTS) && detail.contains(rest);
                 break;
             case "second-install-rejects":
-                ok = detail.startsWith(PnpmLockRegenerator.SECOND_INSTALL) && detail.contains(code);
+                ok = detail.startsWith(PnpmLockRegenerator.SECOND_INSTALL) && detail.contains(code) &&
+                     namesEvery(detail, rest);
                 break;
             default:
                 ok = false;

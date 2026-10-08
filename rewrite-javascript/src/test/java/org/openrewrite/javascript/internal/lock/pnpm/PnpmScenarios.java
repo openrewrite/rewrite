@@ -172,6 +172,11 @@ final class PnpmScenarios {
          */
         private @Nullable Scenario reRecording;
 
+        /**
+         * The in-repo scenario that re-records this downloaded fixture and names it in its {@code supersedes} file.
+         */
+        private @Nullable Scenario supersededBy;
+
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             this.name = name;
             this.label = label;
@@ -404,8 +409,8 @@ final class PnpmScenarios {
 
         /**
          * A packument as pnpm received it: {@code http/}, else pnpm's own metadata cache of the phase (then of the
-         * other phases) under {@code probes/<phase>-cache/}, else the shared cache. pnpm keeps the full document it
-         * fetched after an abbreviated one (for the release age) in the abbreviated mirror.
+         * other phases) under {@code probes/<phase>-cache/}, else the shared cache. A full document comes from the full
+         * mirrors, or from the abbreviated one where pnpm saved it after a release-age upgrade.
          */
         @Nullable
         String packument(String name, boolean full, String phase) {
@@ -416,7 +421,8 @@ final class PnpmScenarios {
             List<String> phases = new ArrayList<>(Arrays.asList("before", "after", "again"));
             phases.remove(phase);
             phases.add(0, phase);
-            for (String kind : full ? new String[]{"metadata-full", "metadata"} : new String[]{"metadata"}) {
+            for (String kind : full ? new String[]{"metadata-full", "metadata-full-filtered", "metadata"} :
+                    new String[]{"metadata"}) {
                 for (String p : phases) {
                     Path metadata = dir.resolve("probes").resolve(p + "-cache").resolve("v11").resolve(kind);
                     if (!Files.isDirectory(metadata)) {
@@ -427,7 +433,11 @@ final class PnpmScenarios {
                             Path mirror = registry.resolve(name + ".jsonl");
                             if (Files.isRegularFile(mirror)) {
                                 String jsonl = read(mirror);
-                                return jsonl.substring(jsonl.indexOf('\n') + 1);
+                                String document = jsonl.substring(jsonl.indexOf('\n') + 1);
+                                // pnpm keeps a full document in the abbreviated mirror only after a release-age upgrade
+                                if (!"metadata".equals(kind) || !full || isFull(document)) {
+                                    return document;
+                                }
                             }
                         }
                     } catch (IOException e) {
@@ -439,13 +449,20 @@ final class PnpmScenarios {
                     read(httpCache.resolve(full ? name + "@full" : name)) : null;
         }
 
+        // an abbreviated packument has no publish times
+        private static boolean isFull(String document) {
+            Object meta = Manifests.parseValue(document, "packument");
+            return meta instanceof Map && ((Map<?, ?>) meta).get("time") instanceof Map;
+        }
+
         /**
          * The registries pnpm fetched packuments from in a phase, as its metadata cache names them (the host, a port
-         * after a {@code +}); registry.npmjs.org for a recording without that cache.
+         * after a {@code +}); for a recording without that cache, registry.npmjs.org and the hosts its
+         * {@code registry-hosts} file lists.
          */
         Set<String> registryHosts(String phase) {
             Set<String> hosts = new TreeSet<>();
-            for (String kind : new String[]{"metadata", "metadata-full"}) {
+            for (String kind : new String[]{"metadata", "metadata-full", "metadata-full-filtered"}) {
                 Path metadata = dir.resolve("probes").resolve(phase + "-cache").resolve("v11").resolve(kind);
                 if (!Files.isDirectory(metadata)) {
                     continue;
@@ -458,6 +475,10 @@ final class PnpmScenarios {
             }
             if (hosts.isEmpty()) {
                 hosts.add("registry.npmjs.org");
+                String listed = file("registry-hosts");
+                if (listed != null) {
+                    hosts.addAll(Arrays.asList(listed.trim().split("\\s+")));
+                }
             }
             return hosts;
         }
@@ -496,6 +517,15 @@ final class PnpmScenarios {
             Scenario reRecording = found.get("fixture-" + scenario.getName());
             if (scenario.recordedWith() == null && reRecording != null && reRecording.recordedWith() != null) {
                 scenario.reRecording = reRecording;
+            }
+            String supersedes = scenario.file("supersedes");
+            if (supersedes != null) {
+                for (String name : supersedes.trim().split("\\s+")) {
+                    Scenario superseded = found.get(name);
+                    if (superseded != null && superseded.recordedWith() == null) {
+                        superseded.supersededBy = scenario;
+                    }
+                }
             }
         }
         return new ArrayList<>(found.values());

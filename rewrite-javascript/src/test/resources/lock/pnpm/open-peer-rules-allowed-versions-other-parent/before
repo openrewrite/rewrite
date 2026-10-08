@@ -1,0 +1,22 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      '@isaacs/testing-peer-dep-conflict-chain-single-a':
+        specifier: 2.0.0
+        version: 2.0.0
+
+packages:
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0':
+    resolution: {integrity: sha512-EeEqcHtFFh8U7DBN3DF3sY0pTobDFMQdK/ld2dpP5FLjyqux4xJayaCCxgxOEAzuF/umuoLb5ctt4txWznEvqQ==}
+
+snapshots:
+
+  '@isaacs/testing-peer-dep-conflict-chain-single-a@2.0.0': {}

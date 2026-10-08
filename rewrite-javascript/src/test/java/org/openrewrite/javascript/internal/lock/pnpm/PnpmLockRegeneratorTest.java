@@ -61,6 +61,30 @@ class PnpmLockRegeneratorTest {
         }
     };
 
+    // pnpm 9.15.0 and @pnpm/exe 9.15.0 alone, without dependencies
+    private static final RegistryMetadata PNPM_9_15_0 = new RegistryMetadata() {
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            if (!"pnpm".equals(name) && !"@pnpm/exe".equals(name)) {
+                return fail("fetched " + registry + name);
+            }
+            return "{\"name\":\"" + name + "\",\"dist-tags\":{\"latest\":\"9.15.0\"},\"versions\":{\"9.15.0\":" +
+                   "{\"name\":\"" + name + "\",\"version\":\"9.15.0\",\"dist\":{\"integrity\":\"sha512-AA==\"," +
+                   "\"tarball\":\"" + registry + name + "/-/" + name.substring(name.indexOf('/') + 1) +
+                   "-9.15.0.tgz\"}}}}";
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return fail("fetched the attestations of " + name + "@" + version);
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            return fail("fetched " + url);
+        }
+    };
+
     private static PnpmLockRegenerator.Install install(@Nullable String workspace, @Nullable String npmrc,
                                                        String... env) {
         Map<String, String> files = new LinkedHashMap<>();
@@ -137,7 +161,6 @@ class PnpmLockRegeneratorTest {
     @Test
     void anAddedConfigDependencyIsResolvedIntoTheEnvDocument() {
         PnpmLockRegenerator.Install install = edit("small-config-dependency-add");
-        assertThat(install.getConfigDependenciesToResolve()).isEmpty();
         assertThat(install.getResolution()).isNull();
         assertThat(install.getWritten()).isEqualTo(scenario("small-config-dependency-add").file("after"));
     }
@@ -223,7 +246,13 @@ class PnpmLockRegeneratorTest {
      */
     @Test
     void anotherPnpmReleaseTakesTheInstallOver() {
-        assertThatThrownBy(() -> withManifest(WITH + "\"packageManager\":\"pnpm@9.15.0\"}"))
+        assertThatThrownBy(() -> new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", WITH + "\"packageManager\":\"pnpm@9.15.0\"}")
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(Instant.parse("2026-10-08T00:00:00Z"))
+          .registry(PNPM_9_15_0)
+          .build()).install())
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("9.15.0"));
         assertThat(withManifest(WITH + "\"packageManager\":\"pnpm@11.2.2+sha512.0000\"}").getWritten())
           .isEqualTo(LOCK);
@@ -256,10 +285,6 @@ class PnpmLockRegeneratorTest {
 
     @Test
     void devEnginesPackageManager() {
-        PnpmLockRegenerator.Install exact = withManifest(WITH + "\"devEngines\":{\"packageManager\":{" +
-                                                         "\"name\":\"pnpm\",\"version\":\"11.2.2\"}}}");
-        assertThat(exact.getPackageManagerToResolve()).isEqualTo("11.2.2");
-        assertThat(exact.getWritten()).isNull();
         assertThatThrownBy(() -> withManifest(WITH + "\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"," +
                                               "\"version\":\">=12\",\"onFail\":\"error\"}}}"))
           .isInstanceOfSatisfying(PnpmError.class, e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_BAD_PM_VERSION"))

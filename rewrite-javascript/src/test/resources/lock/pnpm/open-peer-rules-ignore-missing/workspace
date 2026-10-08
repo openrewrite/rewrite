@@ -1,0 +1,5 @@
+autoInstallPeers: false
+strictPeerDependencies: true
+peerDependencyRules:
+  ignoreMissing:
+    - "@isaacs/testing-peer-dep-conflict-chain-single-a"

@@ -21,7 +21,9 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -251,6 +253,172 @@ public class NodeSemver {
             throw new IllegalArgumentException("Invalid SemVer Range: " + (r1 == null ? range1 : range2));
         }
         return r1.intersects(r2);
+    }
+
+    /**
+     * node-semver's {@code subset}: whether every version {@code sub} admits is one {@code dom} admits.
+     *
+     * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
+     */
+    public static boolean subset(String sub, String dom, Options options) {
+        if (sub.equals(dom)) {
+            return true;
+        }
+        UnionRange subRange = UnionRange.parse(sub, options.includePrerelease, options.loose, options.release);
+        UnionRange domRange = UnionRange.parse(dom, options.includePrerelease, options.loose, options.release);
+        if (subRange == null || domRange == null) {
+            throw new IllegalArgumentException("Invalid SemVer Range: " + (subRange == null ? sub : dom));
+        }
+        boolean sawNonNull = false;
+        outer:
+        for (List<NodeComparand> simpleSub : subRange.sets()) {
+            for (List<NodeComparand> simpleDom : domRange.sets()) {
+                Boolean isSub = simpleSubset(simpleSub, simpleDom, options);
+                sawNonNull = sawNonNull || isSub != null;
+                if (Boolean.TRUE.equals(isSub)) {
+                    continue outer;
+                }
+            }
+            if (sawNonNull) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // null is the null set
+    private static @Nullable Boolean simpleSubset(List<NodeComparand> sub, List<NodeComparand> dom, Options options) {
+        if (sub.size() == 1 && sub.get(0).isAny()) {
+            if (dom.size() == 1 && dom.get(0).isAny()) {
+                return true;
+            }
+            sub = Collections.singletonList(NodeComparand.parse(options.includePrerelease ? ">=0.0.0-0" : ">=0.0.0"));
+        }
+        if (dom.size() == 1 && dom.get(0).isAny()) {
+            if (options.includePrerelease) {
+                return true;
+            }
+            dom = Collections.singletonList(NodeComparand.GTE_ZERO);
+        }
+        List<NodeComparand> eqSet = new ArrayList<>();
+        NodeComparand gt = null;
+        NodeComparand lt = null;
+        for (NodeComparand c : sub) {
+            if (c.operator().startsWith(">")) {
+                gt = higherGT(gt, c);
+            } else if (c.operator().startsWith("<")) {
+                lt = lowerLT(lt, c);
+            } else {
+                eqSet.add(c);
+            }
+        }
+        if (eqSet.size() > 1) {
+            return null;
+        }
+        Integer gtltComp = null;
+        if (gt != null && lt != null) {
+            gtltComp = gt.getVersion().comparePrecedence(lt.getVersion());
+            if (gtltComp > 0) {
+                return null;
+            } else if (gtltComp == 0 && (!">=".equals(gt.operator()) || !"<=".equals(lt.operator()))) {
+                return null;
+            }
+        }
+        for (NodeComparand eq : eqSet) {
+            if (gt != null && !comparatorSatisfies(eq, gt, options)) {
+                return null;
+            }
+            if (lt != null && !comparatorSatisfies(eq, lt, options)) {
+                return null;
+            }
+            for (NodeComparand c : dom) {
+                if (!comparatorSatisfies(eq, c, options)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        boolean hasDomLT = false;
+        boolean hasDomGT = false;
+        ParsedVersion needDomLTPre = lt != null && !options.includePrerelease && lt.getVersion().hasPrerelease() ?
+                lt.getVersion() : null;
+        ParsedVersion needDomGTPre = gt != null && !options.includePrerelease && gt.getVersion().hasPrerelease() ?
+                gt.getVersion() : null;
+        if (needDomLTPre != null && needDomLTPre.strictPrerelease().size() == 1 && "<".equals(lt.operator()) &&
+                Long.valueOf(0).equals(needDomLTPre.strictPrerelease().get(0))) {
+            needDomLTPre = null;
+        }
+        for (NodeComparand c : dom) {
+            hasDomGT = hasDomGT || c.operator().startsWith(">");
+            hasDomLT = hasDomLT || c.operator().startsWith("<");
+            if (gt != null) {
+                if (needDomGTPre != null && sameTupleWithPrerelease(c, needDomGTPre)) {
+                    needDomGTPre = null;
+                }
+                if (c.operator().startsWith(">")) {
+                    NodeComparand higher = higherGT(gt, c);
+                    if (higher == c && higher != gt) {
+                        return false;
+                    }
+                } else if (">=".equals(gt.operator()) && !c.test(gt.getVersion())) {
+                    return false;
+                }
+            }
+            if (lt != null) {
+                if (needDomLTPre != null && sameTupleWithPrerelease(c, needDomLTPre)) {
+                    needDomLTPre = null;
+                }
+                if (c.operator().startsWith("<")) {
+                    NodeComparand lower = lowerLT(lt, c);
+                    if (lower == c && lower != lt) {
+                        return false;
+                    }
+                } else if ("<=".equals(lt.operator()) && !c.test(lt.getVersion())) {
+                    return false;
+                }
+            }
+            if (c.operator().isEmpty() && (lt != null || gt != null) && (gtltComp == null || gtltComp != 0)) {
+                return false;
+            }
+        }
+        if (gt != null && hasDomLT && lt == null && (gtltComp == null || gtltComp != 0)) {
+            return false;
+        }
+        if (lt != null && hasDomGT && gt == null && (gtltComp == null || gtltComp != 0)) {
+            return false;
+        }
+        return needDomGTPre == null && needDomLTPre == null;
+    }
+
+    private static boolean comparatorSatisfies(NodeComparand version, NodeComparand comparator, Options options) {
+        UnionRange range = UnionRange.parse(comparator.value(), options.includePrerelease, options.loose,
+                options.release);
+        return range != null && range.test(version.getVersion());
+    }
+
+    private static boolean sameTupleWithPrerelease(NodeComparand c, ParsedVersion v) {
+        return !c.isAny() && c.getVersion().hasPrerelease() &&
+               c.getVersion().strictMajor() == v.strictMajor() &&
+               c.getVersion().strictMinor() == v.strictMinor() &&
+               c.getVersion().strictPatch() == v.strictPatch();
+    }
+
+    // >=1.2.3 is lower than >1.2.3
+    private static NodeComparand higherGT(@Nullable NodeComparand a, NodeComparand b) {
+        if (a == null) {
+            return b;
+        }
+        int comp = a.getVersion().comparePrecedence(b.getVersion());
+        return comp > 0 ? a : comp < 0 ? b : ">".equals(b.operator()) && ">=".equals(a.operator()) ? b : a;
+    }
+
+    // <=1.2.3 is higher than <1.2.3
+    private static NodeComparand lowerLT(@Nullable NodeComparand a, NodeComparand b) {
+        if (a == null) {
+            return b;
+        }
+        int comp = a.getVersion().comparePrecedence(b.getVersion());
+        return comp < 0 ? a : comp > 0 ? b : "<".equals(b.operator()) && "<=".equals(a.operator()) ? b : a;
     }
 
     /**

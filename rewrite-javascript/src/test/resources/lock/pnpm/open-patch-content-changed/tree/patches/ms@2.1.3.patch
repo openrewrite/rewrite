@@ -1,0 +1,10 @@
+diff --git a/index.js b/index.js
+--- a/index.js
++++ b/index.js
+@@ -1,5 +1,5 @@
+ /**
+- * Helpers.
++ * Helpers (patched twice).
+  */
+ 
+ var s = 1000;

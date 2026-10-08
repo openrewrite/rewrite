@@ -149,6 +149,7 @@ final class ResolveDependencies {
         private boolean hasBundledDependencies;
         private boolean prepare;
         private String pkgIdWithPatchHash;
+        private PatchingConfig.@Nullable PatchInfo patch;
 
         /**
          * {@code additionalInfo}: deprecated, bundleDependencies, bundledDependencies, engines, cpu, os, libc.
@@ -490,9 +491,14 @@ final class ResolveDependencies {
         private boolean hoistPeers;
         private @Nullable Instant maximumPublishedBy;
         private @Nullable Function<String, @Nullable Object> publishedByExclude;
+        private @Nullable String trustPolicy;
+        private @Nullable Function<String, Object> trustPolicyExclude;
+        private @Nullable Double trustPolicyIgnoreAfter;
         private final List<PolicyViolation> resolutionPolicyViolations = new ArrayList<>();
         private boolean blockExoticSubdeps;
         private final Set<String> allPeerDepNames = new LinkedHashSet<>();
+        private @Nullable Map<String, PatchingConfig.PatchGroup> patchedDependencies;
+        private final Set<String> appliedPatches = new LinkedHashSet<>();
         private long nodeIdCounter;
 
         ResolutionContext(LockfileObject wantedLockfile, String lockfileDir, PackageRequester storeController) {
@@ -1272,6 +1278,9 @@ final class ResolveDependencies {
             request.defaultTag = ctx.getDefaultTag();
             request.publishedBy = options.publishedBy;
             request.publishedByExclude = ctx.getPublishedByExclude();
+            request.trustPolicy = ctx.getTrustPolicy();
+            request.trustPolicyExclude = ctx.getTrustPolicyExclude();
+            request.trustPolicyIgnoreAfter = ctx.getTrustPolicyIgnoreAfter();
             request.pickLowestVersion = options.pickLowestVersion;
             request.lockfileDir = ctx.getLockfileDir();
             request.preferredVersions = preferredVersions;
@@ -1365,6 +1374,12 @@ final class ResolveDependencies {
         String pkgName = Js.string(pkg.get("name"));
         String pkgIdWithPatchHash = pkgResponse.getId().startsWith(pkgName + "@") ? pkgResponse.getId() :
                 pkgName + "@" + pkgResponse.getId();
+        PatchingConfig.PatchInfo patch = PatchingConfig.getPatchInfo(ctx.getPatchedDependencies(), pkgName,
+                Js.string(pkg.get("version")));
+        if (patch != null) {
+            ctx.getAppliedPatches().add(patch.getKey());
+            pkgIdWithPatchHash = pkgIdWithPatchHash + "(patch_hash=" + patch.getHash() + ")";
+        }
 
         if (parentIdsContainSequence(options.parentIds, options.parentPkg.getPkgId(), pkgResponse.getId()) ||
             pkgResponse.getId().equals(options.parentPkg.getPkgId())) {
@@ -1405,8 +1420,8 @@ final class ResolveDependencies {
             if (Boolean.FALSE.equals(pkgResponse.getIsInstallable()) || !parentIsInstallable) {
                 ctx.getSkipped().add(pkgResponse.getId());
             }
-            ctx.getResolvedPkgsById().put(pkgResponse.getId(), getResolvedPackage(pkgIdWithPatchHash, hasBin, pkg,
-                    pkgResponse, prepare, wantedDependency, parentImporterId, currentIsOptional));
+            ctx.getResolvedPkgsById().put(pkgResponse.getId(), getResolvedPackage(pkgIdWithPatchHash, hasBin, patch,
+                    pkg, pkgResponse, prepare, wantedDependency, parentImporterId, currentIsOptional));
         } else {
             ResolvedPackage existing = ctx.getResolvedPkgsById().get(pkgResponse.getId());
             existing.setProd(existing.isProd() || !wantedDependency.isDev() && !wantedDependency.isOptional());
@@ -1515,6 +1530,7 @@ final class ResolveDependencies {
     }
 
     private static ResolvedPackage getResolvedPackage(String pkgIdWithPatchHash, boolean hasBin,
+                                                      PatchingConfig.@Nullable PatchInfo patch,
                                                       Map<String, @Nullable Object> pkg,
                                                       PackageRequester.PackageResponse pkgResponse, boolean prepare,
                                                       WantedDependency wantedDependency, String parentImporterId,
@@ -1538,6 +1554,7 @@ final class ResolveDependencies {
                                            pkg.get("bundleDependencies") != null);
         resolved.setOptional(optional);
         resolved.setOptionalDependencies(new LinkedHashSet<>(Js.ownKeys(pkg.get("optionalDependencies"))));
+        resolved.setPatch(patch);
         resolved.setPeerDependencies(peerDependenciesWithoutOwn(pkg));
         resolved.setPrepare(prepare);
         resolved.setProd(!wantedDependency.isDev() && !wantedDependency.isOptional());

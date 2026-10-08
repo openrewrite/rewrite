@@ -1,0 +1,1 @@
+Bump wrappy 1.0.1 -> 1.0.2 under devEngines.packageManager pnpm 11.2.2, whose env document already records the release.

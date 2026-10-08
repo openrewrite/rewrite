@@ -44,18 +44,52 @@ final class NpmResolver {
 
     private final RegistryMetadata registry;
     private final Map<String, String> registries;
+    private final Map<String, String> namedRegistries;
     private final @Nullable Object saveWorkspaceProtocol;
     private final boolean ignoreMissingTimeField;
     private final boolean fullMetadata;
+    private final Instant now;
     private final Map<String, Map<String, @Nullable Object>> metaCache = new LinkedHashMap<>();
 
-    NpmResolver(RegistryMetadata registry, Map<String, String> registries, @Nullable Object saveWorkspaceProtocol,
-                boolean ignoreMissingTimeField, boolean fullMetadata) {
+    /**
+     * @param namedRegistries the aliases {@link #mergeNamedRegistries} answers
+     * @param now             the clock {@code trustPolicyIgnoreAfter} counts from
+     */
+    NpmResolver(RegistryMetadata registry, Map<String, String> registries, Map<String, String> namedRegistries,
+                @Nullable Object saveWorkspaceProtocol, boolean ignoreMissingTimeField, boolean fullMetadata,
+                Instant now) {
         this.registry = registry;
         this.registries = registries;
+        this.namedRegistries = namedRegistries;
         this.saveWorkspaceProtocol = saveWorkspaceProtocol;
         this.ignoreMissingTimeField = ignoreMissingTimeField;
         this.fullMetadata = fullMetadata;
+        this.now = now;
+    }
+
+    /**
+     * {@code mergeNamedRegistries}: the built-in {@code gh} alias under the configured ones, each an http(s) URL.
+     */
+    static Map<String, String> mergeNamedRegistries(@Nullable Map<String, @Nullable Object> userDefined) {
+        Map<String, String> merged = new LinkedHashMap<>(PickPackageFromMeta.BUILTIN_NAMED_REGISTRIES);
+        if (userDefined == null) {
+            return merged;
+        }
+        for (String alias : Js.keys(userDefined)) {
+            Object url = userDefined.get(alias);
+            if (!(url instanceof String) || !isValidHttpUrl((String) url)) {
+                throw new PnpmError("INVALID_NAMED_REGISTRY_URL", "The named registry alias '" + alias +
+                        "' is mapped to '" + Js.string(url) + "', which is not a valid http(s) URL.",
+                        "Provide a URL that starts with http:// or https://, e.g. https://npm.pkg.example.com/");
+            }
+            merged.put(alias, (String) url);
+        }
+        return merged;
+    }
+
+    private static boolean isValidHttpUrl(String url) {
+        WhatwgUrl parsed = WhatwgUrl.tryParse(url);
+        return parsed != null && ("http:".equals(parsed.getProtocol()) || "https:".equals(parsed.getProtocol()));
     }
 
     /**
@@ -139,8 +173,8 @@ final class NpmResolver {
                                                        " while fetching it from " + registryUrl);
         }
         if ("no-downgrade".equals(opts.trustPolicy)) {
-            throw new CannotKnow("what trustPolicy no-downgrade makes of " + spec.getName() +
-                                 " (its attestations are not read while resolving)");
+            TrustChecks.failIfTrustDowngraded(meta, Js.string(pickedPackage.get("version")), opts.trustPolicyExclude,
+                    opts.trustPolicyIgnoreAfter, now);
         }
         String pickedName = Js.string(pickedPackage.get("name"));
         String pickedVersion = Js.string(pickedPackage.get("version"));
@@ -185,6 +219,119 @@ final class NpmResolver {
         result.policyViolation = detectMinReleaseAgeViolation(pickedName, pickedVersion, result.publishedAt,
                 opts.publishedBy, opts.publishedByExclude);
         return result;
+    }
+
+    @Nullable
+    ResolveResult resolveJsr(ResolveDependencies.WantedDependency wantedDependency,
+                             PackageRequester.RequestPackageOptions opts,
+                             PreferredVersions.@Nullable ByName preferredVersions) {
+        if (!Js.truthy(wantedDependency.getBareSpecifier())) {
+            return null;
+        }
+        PickPackageFromMeta.JsrRegistryPackageSpec spec = PickPackageFromMeta.parseJsrSpecifierToRegistryPackageSpec(
+                wantedDependency.getBareSpecifier(), wantedDependency.getAlias(),
+                opts.defaultTag == null ? "latest" : opts.defaultTag);
+        if (spec == null) {
+            return null;
+        }
+        ResolveResult picked = pickFromSimpleRegistry(wantedDependency, opts, preferredVersions, spec.getSpec(),
+                registries.get("@jsr"));
+        if (opts.calcSpecifier) {
+            picked.normalizedBareSpecifier = calcPrefixedSpecifier("jsr:", spec.getJsrPkgName(), wantedDependency,
+                    versionOf(picked), opts.pinnedVersion);
+        }
+        picked.resolvedVia = "jsr-registry";
+        picked.alias = spec.getJsrPkgName();
+        return picked;
+    }
+
+    @Nullable
+    ResolveResult resolveFromNamedRegistry(ResolveDependencies.WantedDependency wantedDependency,
+                                           PackageRequester.RequestPackageOptions opts,
+                                           PreferredVersions.@Nullable ByName preferredVersions) {
+        if (!Js.truthy(wantedDependency.getBareSpecifier())) {
+            return null;
+        }
+        PickPackageFromMeta.NamedRegistryPackageSpec spec =
+                PickPackageFromMeta.parseNamedRegistrySpecifierToRegistryPackageSpec(
+                        wantedDependency.getBareSpecifier(), namedRegistries.keySet(), wantedDependency.getAlias(),
+                        opts.defaultTag == null ? "latest" : opts.defaultTag);
+        if (spec == null) {
+            return null;
+        }
+        String registryUrl = namedRegistries.get(spec.getRegistryName());
+        if (!Js.truthy(registryUrl)) {
+            return null;
+        }
+        ResolveResult picked = pickFromSimpleRegistry(wantedDependency, opts, preferredVersions, spec.getSpec(),
+                registryUrl);
+        if (opts.calcSpecifier) {
+            picked.normalizedBareSpecifier = calcPrefixedSpecifier(spec.getRegistryName() + ":",
+                    spec.getSpec().getName(), wantedDependency, versionOf(picked), opts.pinnedVersion);
+        }
+        picked.resolvedVia = "named-registry";
+        picked.alias = spec.getSpec().getName();
+        return picked;
+    }
+
+    private static String versionOf(ResolveResult picked) {
+        return Js.string(picked.manifest == null ? null : picked.manifest.get("version"));
+    }
+
+    // the pick of the jsr and named-registry resolvers from one registry: no workspace or trust check
+    private ResolveResult pickFromSimpleRegistry(ResolveDependencies.WantedDependency wantedDependency,
+                                                 PackageRequester.RequestPackageOptions opts,
+                                                 PreferredVersions.@Nullable ByName preferredVersions,
+                                                 PickPackageFromMeta.RegistryPackageSpec spec, String registryUrl) {
+        PickPackage.PickerOptions pickerOpts = PickPackage.PickerOptions.builder()
+                .preferredVersionSelectors(preferredVersions == null ? null : preferredVersions.get(spec.getName()))
+                .publishedBy(opts.publishedBy)
+                .publishedByExclude(opts.publishedByExclude)
+                .pickLowestVersion(opts.pickLowestVersion)
+                .includeLatestTag("latest".equals(opts.update))
+                .ignoreMissingTimeField(ignoreMissingTimeField)
+                .build();
+        PickPackage.PickResult pickResult = PickPackage.pickPackage(metaCache, registry, spec, pickerOpts,
+                registryUrl, wantedDependency.isOptional(), fullMetadata);
+        Map<String, @Nullable Object> pickedPackage = pickResult.getPickedPackage();
+        Map<String, @Nullable Object> meta = pickResult.getMeta();
+        if (pickedPackage == null) {
+            String alias = wantedDependency.getAlias();
+            String bareSpecifier = wantedDependency.getBareSpecifier();
+            String dep = alias != null && !alias.isEmpty() ?
+                    alias + "@" + (bareSpecifier == null ? "" : bareSpecifier) : String.valueOf(bareSpecifier);
+            throw new PnpmError("NO_MATCHING_VERSION", "No matching version found for " + dep +
+                                                       " while fetching it from " + registryUrl);
+        }
+        String pickedName = Js.string(pickedPackage.get("name"));
+        String pickedVersion = Js.string(pickedPackage.get("version"));
+        ResolveResult result = new ResolveResult();
+        result.id = pickedName + "@" + pickedVersion;
+        Map<String, @Nullable Object> dist = ResolveDependencies.asMap(pickedPackage.get("dist"));
+        String integrity = getIntegrity(dist);
+        if (integrity != null) {
+            result.resolution.put("integrity", integrity);
+        }
+        result.resolution.put("tarball", normalizeRegistryUrl(Js.string(dist.get("tarball"))));
+        result.manifest = pickedPackage;
+        result.latest = latestOf(meta);
+        Object time = meta.get("time");
+        Object publishedAt = time instanceof Map ? ((Map<?, ?>) time).get(pickedVersion) : null;
+        result.publishedAt = publishedAt == null ? null : Js.string(publishedAt);
+        result.policyViolation = detectMinReleaseAgeViolation(pickedName, pickedVersion, result.publishedAt,
+                opts.publishedBy, opts.publishedByExclude);
+        return result;
+    }
+
+    static String calcPrefixedSpecifier(String prefix, String pkgName,
+                                        ResolveDependencies.WantedDependency wantedDependency, String version,
+                                        @Nullable String defaultPinnedVersion) {
+        String range = calcRange(version, wantedDependency, defaultPinnedVersion);
+        String alias = wantedDependency.getAlias();
+        if (alias == null || alias.isEmpty() || pkgName.equals(alias)) {
+            return prefix + range;
+        }
+        return prefix + pkgName + "@" + range;
     }
 
     private static @Nullable String latestOf(Map<String, @Nullable Object> meta) {

@@ -26,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * Port of @pnpm/installing.deps-resolver src/index.ts {@code resolveDependencies} (pnpm 11.2.2): the tree, its peers,
@@ -47,6 +48,8 @@ final class DepsResolver {
         boolean resolvePeersFromWorkspaceRoot;
         int peersSuffixMaxLength;
         Map<String, String> registries;
+        boolean allowUnusedPatches;
+        Consumer<List<ResolveDependencies.PolicyViolation>> handleResolutionPolicyViolations;
     }
 
     @Value
@@ -62,6 +65,16 @@ final class DepsResolver {
         ResolveDependencyTree.Result tree = ResolveDependencyTree.resolveDependencyTree(importers, ctx,
                 preferredVersions);
         LockfileObject wantedLockfile = ctx.getWantedLockfile();
+        if (!tree.getResolutionPolicyViolations().isEmpty()) {
+            opts.getHandleResolutionPolicyViolations().accept(tree.getResolutionPolicyViolations());
+        }
+        if (ctx.getPatchedDependencies() != null &&
+            (ctx.isForceFullResolution() || wantedLockfile.getPackages() == null ||
+             wantedLockfile.getPackages().isEmpty()) &&
+            wantedLockfile.getImporters().size() == importers.size()) {
+            PatchingConfig.verifyPatches(ctx.getPatchedDependencies(), ctx.getAppliedPatches(),
+                    opts.isAllowUnusedPatches());
+        }
 
         List<ResolvePeers.ProjectToResolve> projectsToLink = new ArrayList<>();
         for (ResolveDependencyTree.Importer project : importers) {
