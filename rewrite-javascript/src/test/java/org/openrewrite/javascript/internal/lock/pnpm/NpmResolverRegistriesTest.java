@@ -115,8 +115,8 @@ class NpmResolverRegistriesTest {
     @Test
     void resolveFromJsr() {
         FixtureRegistry registry = new FixtureRegistry()
-          .serve(JSR, "@jsr/rus__greet", "jsr-rus-greet.json")
-          .serve(JSR, "@jsr/luca__cases", "jsr-luca-cases.json");
+          .serve(JSR, "@jsr/rus__greet", "jsr-rus-greet")
+          .serve(JSR, "@jsr/luca__cases", "jsr-luca-cases");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveJsr(wanted("@rus/greet", "jsr:0.0.3"),
           calcSpecifier(true), null);
         assertThat(result).isNotNull();
@@ -132,7 +132,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromJsrWithAliasRenaming() {
-        FixtureRegistry registry = new FixtureRegistry().serve(JSR, "@jsr/rus__greet", "jsr-rus-greet.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(JSR, "@jsr/rus__greet", "jsr-rus-greet");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveJsr(wanted("greet", "jsr:@rus/greet@0.0.3"),
           calcSpecifier(false), null);
         assertThat(result).isNotNull();
@@ -153,7 +153,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromJsrFlagsAnImmaturePick() {
-        FixtureRegistry registry = new FixtureRegistry().serve(JSR, "@jsr/rus__greet", "jsr-rus-greet.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(JSR, "@jsr/rus__greet", "jsr-rus-greet");
         PackageRequester.RequestPackageOptions opts = calcSpecifier(false);
         opts.publishedBy = Instant.parse("2020-01-01T00:00:00Z");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveJsr(wanted("@rus/greet", "jsr:0.0.3"), opts,
@@ -168,7 +168,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromNamedRegistryWithTheBuiltInGhAlias() {
-        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveFromNamedRegistry(
           wanted("@acme/private", "gh:^2.0.0"), calcSpecifier(true), null);
         assertThat(result).isNotNull();
@@ -184,7 +184,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromNamedRegistryKeepsTheScopedNameUnderAnotherAlias() {
-        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveFromNamedRegistry(
           wanted("my-private", "gh:@acme/private@^1.0.0"), calcSpecifier(true), null);
         assertThat(result).isNotNull();
@@ -195,7 +195,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromNamedRegistryAsksTheNamedRegistry() {
-        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(GH, "@acme/private", "gh-acme-private");
         NpmResolver.ResolveResult result = resolver(registry, null).resolveFromNamedRegistry(
           wanted("@acme/private", "gh:2.0.0"), calcSpecifier(false), null);
         assertThat(registry.asked).containsExactly(GH + "@acme/private");
@@ -205,7 +205,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void resolveFromAUserDefinedNamedRegistry() {
-        FixtureRegistry registry = new FixtureRegistry().serve(ENTERPRISE, "@acme/private", "gh-acme-private.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(ENTERPRISE, "@acme/private", "gh-acme-private");
         NpmResolver.ResolveResult result = resolver(registry, Collections.singletonMap("work", ENTERPRISE))
           .resolveFromNamedRegistry(wanted("@acme/private", "work:^2.0.0"), calcSpecifier(true), null);
         assertThat(result).isNotNull();
@@ -216,7 +216,7 @@ class NpmResolverRegistriesTest {
 
     @Test
     void userConfigOverridesTheBuiltInGhAlias() {
-        FixtureRegistry registry = new FixtureRegistry().serve(ENTERPRISE, "@acme/private", "gh-acme-private.json");
+        FixtureRegistry registry = new FixtureRegistry().serve(ENTERPRISE, "@acme/private", "gh-acme-private");
         NpmResolver.ResolveResult result = resolver(registry, Collections.singletonMap("gh", ENTERPRISE))
           .resolveFromNamedRegistry(wanted("@acme/private", "gh:^2.0.0"), calcSpecifier(false), null);
         assertThat(result).isNotNull();

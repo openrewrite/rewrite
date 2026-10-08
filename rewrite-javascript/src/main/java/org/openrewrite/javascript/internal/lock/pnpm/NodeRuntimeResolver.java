@@ -211,7 +211,8 @@ final class NodeRuntimeResolver {
         return NodeSemver.maxSatisfying(versions, versionRange, NodeSemver.Options.LOOSE_INCLUDE_PRERELEASE);
     }
 
-    private static String[] parseNodeSpecifier(String specifier) {
+    // {releaseChannel, versionSpecifier}
+    static String[] parseNodeSpecifier(String specifier) {
         if (specifier.contains("/")) {
             String[] parts = specifier.split("/", -1);
             if (!RELEASE_CHANNELS.contains(parts[0])) {
@@ -236,13 +237,13 @@ final class NodeRuntimeResolver {
         return new String[]{"release", specifier};
     }
 
-    private static String getNodeMirror(@Nullable Map<String, @Nullable Object> mirrors, String releaseChannel) {
+    static String getNodeMirror(@Nullable Map<String, @Nullable Object> mirrors, String releaseChannel) {
         Object mirror = mirrors == null ? null : mirrors.get(releaseChannel);
         String nodeMirror = mirror != null ? Js.string(mirror) : "https://nodejs.org/download/" + releaseChannel + "/";
         return nodeMirror.endsWith("/") ? nodeMirror : nodeMirror + "/";
     }
 
-    private static String getNormalizedArch(String platform, String arch, String nodeVersion) {
+    static String getNormalizedArch(String platform, String arch, String nodeVersion) {
         String major = nodeVersion.split("\\.", -1)[0];
         if ("darwin".equals(platform) && "arm64".equals(arch) && major.matches("\\d+") &&
             Integer.parseInt(major) < 16) {

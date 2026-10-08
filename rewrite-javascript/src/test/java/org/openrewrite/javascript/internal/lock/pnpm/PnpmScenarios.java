@@ -449,10 +449,14 @@ final class PnpmScenarios {
                     read(httpCache.resolve(full ? name + "@full" : name)) : null;
         }
 
-        // an abbreviated packument has no publish times
+        // the registry leaves the publish times and the CouchDB id and revision out of an abbreviated packument
         private static boolean isFull(String document) {
             Object meta = Manifests.parseValue(document, "packument");
-            return meta instanceof Map && ((Map<?, ?>) meta).get("time") instanceof Map;
+            if (!(meta instanceof Map)) {
+                return false;
+            }
+            Map<?, ?> packument = (Map<?, ?>) meta;
+            return packument.containsKey("time") || packument.containsKey("_id") || packument.containsKey("_rev");
         }
 
         /**
