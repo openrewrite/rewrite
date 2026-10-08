@@ -402,6 +402,72 @@ class NodeSemverTest {
           .as("%s subset of %s", sub, dom).isEqualTo(expect);
     }
 
+    // test/ranges/min-version.js: range, minimum
+    static Stream<Arguments> minVersions() {
+        Object[][] cases = {
+          {"*", "0.0.0"},
+          {"* || >=2", "0.0.0"},
+          {">=2 || *", "0.0.0"},
+          {">2 || *", "0.0.0"},
+          {"1.0.0", "1.0.0"},
+          {"1.0", "1.0.0"},
+          {"1.0.x", "1.0.0"},
+          {"1.0.*", "1.0.0"},
+          {"1", "1.0.0"},
+          {"1.x.x", "1.0.0"},
+          {"1.x.x", "1.0.0"},
+          {"1.*.x", "1.0.0"},
+          {"1.x.*", "1.0.0"},
+          {"1.x", "1.0.0"},
+          {"1.*", "1.0.0"},
+          {"=1.0.0", "1.0.0"},
+          {"~1.1.1", "1.1.1"},
+          {"~1.1.1-beta", "1.1.1-beta"},
+          {"~1.1.1 || >=2", "1.1.1"},
+          {"^1.1.1", "1.1.1"},
+          {"^1.1.1-beta", "1.1.1-beta"},
+          {"^1.1.1 || >=2", "1.1.1"},
+          {"^2.16.2 ^2.16", "2.16.2"},
+          {"1.1.1 - 1.8.0", "1.1.1"},
+          {"1.1 - 1.8.0", "1.1.0"},
+          {"<2", "0.0.0"},
+          {"<0.0.0-beta", "0.0.0-0"},
+          {"<0.0.1-beta", "0.0.0"},
+          {"<2 || >4", "0.0.0"},
+          {">4 || <2", "0.0.0"},
+          {"<=2 || >=4", "0.0.0"},
+          {">=4 || <=2", "0.0.0"},
+          {"<0.0.0-beta >0.0.0-alpha", "0.0.0-alpha.0"},
+          {">0.0.0-alpha <0.0.0-beta", "0.0.0-alpha.0"},
+          {">=1.1.1 <2 || >=2.2.2 <2", "1.1.1"},
+          {">=2.2.2 <2 || >=1.1.1 <2", "1.1.1"},
+          {">1.0.0", "1.0.1"},
+          {">1.0.0-0", "1.0.0-0.0"},
+          {">1.0.0-beta", "1.0.0-beta.0"},
+          {">2 || >1.0.0", "1.0.1"},
+          {">2 || >1.0.0-0", "1.0.0-0.0"},
+          {">2 || >1.0.0-beta", "1.0.0-beta.0"},
+          {">4 <3", null},
+        };
+        List<Arguments> rows = new ArrayList<>();
+        for (Object[] row : cases) {
+            rows.add(Arguments.of(row));
+        }
+        return rows.stream();
+    }
+
+    @ParameterizedTest
+    @MethodSource("minVersions")
+    void minVersion(String range, String expected) {
+        assertThat(NodeSemver.minVersion(range, Options.DEFAULT)).as("minVersion(%s)", range).isEqualTo(expected);
+    }
+
+    @Test
+    void minVersionOfAnInvalidRange() {
+        assertThatThrownBy(() -> NodeSemver.minVersion("not a range", Options.DEFAULT))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+
     @Test
     void rangeIsASubsetOfItself() {
         assertThat(NodeSemver.subset("^1", "^1", Options.DEFAULT)).isTrue();

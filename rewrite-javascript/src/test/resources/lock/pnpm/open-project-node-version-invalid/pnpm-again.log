@@ -1,0 +1,4 @@
+[ERR_PNPM_INVALID_NODE_VERSION] The nodeVersion setting is "abc", which is not exact semver version
+pnpm 11.2.2, node v24.19.0, 2026-10-08T16:02:20Z
+exit=1
+no lock written

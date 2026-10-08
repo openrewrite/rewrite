@@ -1,0 +1,7 @@
+[WARN] Unsupported platform: wanted: {"cpu":["any"],"os":["win32"],"libc":["any"]} (current: {"os":"darwin","cpu":"arm64","libc":"unknown"})
+? Verifying lockfile against supply-chain policies (2 entries)...
+✓ Lockfile passes supply-chain policies (2 entries in 4.1s)
+Done in 4.2s using pnpm v11.2.2
+pnpm 11.2.2, node v24.19.0, 2026-10-08T16:01:34Z
+exit=0
+lock unchanged

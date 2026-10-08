@@ -1,0 +1,1 @@
+A single project adds abbrev, engines.pnpm ^9 and os win32: the platform error checkPackage finds first is only a warning, so engines.pnpm is never checked.

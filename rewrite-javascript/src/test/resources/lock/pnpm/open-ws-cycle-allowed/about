@@ -1,0 +1,1 @@
+Member b gains a workspace: dependency on a, which depends on b: a cycle pnpm only warns of.

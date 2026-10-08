@@ -27,9 +27,7 @@ final class SemverUtils {
     }
 
     /**
-     * The range under includePrerelease, else the version without its prerelease against each comparator set. The
-     * prerelease Yarn clears on a cached comparator never counts: the comparator's SemVer was parsed without
-     * includePrerelease, so {@code cmp} parses it again from its version string.
+     * The range under includePrerelease, else the version without its prerelease against each comparator set.
      */
     static boolean satisfiesWithPrereleases(@Nullable String version, String range, boolean loose) {
         if (version == null || version.isEmpty()) {

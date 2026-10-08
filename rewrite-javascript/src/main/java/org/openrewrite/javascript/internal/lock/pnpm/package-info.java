@@ -24,9 +24,11 @@
  * (pickPackage, pickPackageFromMeta, the resolution verifier, trustChecks), resolving/registry/pkg-metadata-filter,
  * crypto/object-hasher, crypto/hash, installing/env-installer, installing/deps-installer (the lock-only install and
  * the lockfile's verification), installing/deps-resolver, installing/package-requester, resolving/default-resolver
- * with the local, git and tarball resolvers' lock-only paths, engine/runtime/node-resolver, crypto/shasums-file,
- * lockfile/pruner, config/package-is-installable, workspace/range-resolver, workspace/spec-parser and the pnpm
- * command's own checks before an install. pnpm is distributed under the MIT License:
+ * with the local, git and tarball resolvers' lock-only paths, engine/runtime/node-resolver, deno-resolver and
+ * bun-resolver, crypto/shasums-file, lockfile/pruner, config/package-is-installable, cli/utils' packageIsInstallable,
+ * workspace/range-resolver, workspace/spec-parser, workspace/projects-graph, workspace/projects-sorter,
+ * deps/graph-sequencer and the pnpm command's own checks before an install. pnpm is distributed under the MIT
+ * License:
  * <pre>
  * Copyright (c) 2015-2016 Rico Sta. Cruz and other contributors
  * Copyright (c) 2016-2026 Zoltan Kochan and other contributors
@@ -58,11 +60,15 @@
  * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); get-npm-tarball-url 2.1.0
  * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); @pnpm/config.env-replace 4.1.0;
  * {@code SemverRangeIntersect}, semver-range-intersect 0.3.1 (Copyright (c) 2019 sounisi5011); {@code GraphCycles},
- * graph-cycles 3.0.0 and rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); and the {@code parseRange} of
+ * graph-cycles 3.0.0 and rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); {@code Tinyglobby},
+ * tinyglobby 0.2.16 (Copyright (c) 2024 Madeline Gurriarán); {@code Picomatch}, {@code PicomatchParse} and
+ * {@code PicomatchScan}, picomatch 4.0.4 (Copyright (c) 2017-present, Jon Schlinkert); and the {@code parseRange} of
  * semver-utils 1.1.4
  * (Copyright 2013 AJ ONeal, offered under the MIT License or Apache-2.0, used here under the MIT License).
  * <p>
- * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2, distributed under the ISC License:
+ * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2 (Copyright (c) 2015, npm, Inc), and
+ * {@code ProjectsGraph} parts of @pnpm/npm-package-arg 2.0.0 (Copyright (c) Isaac Z. Schlueter) and of
+ * hosted-git-info 4.1.0 (Copyright (c) 2015, Rebecca Turner), each distributed under the ISC License:
  * <pre>
  * Copyright (c) 2015, npm, Inc
  *

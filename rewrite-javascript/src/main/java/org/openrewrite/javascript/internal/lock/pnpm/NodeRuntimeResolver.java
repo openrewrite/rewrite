@@ -18,10 +18,8 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
-import java.io.ByteArrayOutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +27,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/engine.runtime.node-resolver (pnpm 11.2.2) with @pnpm/crypto.shasums-file: a {@code node} dependency of
+ * Port of @pnpm/engine.runtime.node-resolver (pnpm 11.2.2): a {@code node} dependency of
  * {@code runtime:} resolved from the Node.js release index and each release's SHASUMS256.txt.
  */
 final class NodeRuntimeResolver {
@@ -104,20 +102,11 @@ final class NodeRuntimeResolver {
     private static List<Object> readNodeAssetsFromMirror(RegistryMetadata fetch, String nodeMirrorBaseUrl,
                                                          String version, boolean muslOnly) {
         String integritiesFileUrl = nodeMirrorBaseUrl + "v" + version + "/SHASUMS256.txt";
-        String body = fetch.document(integritiesFileUrl);
-        if (body == null) {
-            throw new PnpmError("FAILED_DOWNLOAD_SHASUM_FILE", "Failed to fetch integrity file: " +
-                                                               integritiesFileUrl);
-        }
         Pattern pattern = Pattern.compile("^node-v" + Pattern.quote(version) +
                                           "-([^-.]+)-([^.-]+)(-musl)?\\.(?:tar\\.gz|zip)$");
         List<Object> assets = new ArrayList<>();
-        for (String line : body.split("\n", -1)) {
-            if (line.isEmpty()) {
-                continue;
-            }
-            String[] fields = line.trim().split("\\s+");
-            String fileName = fields.length > 1 ? fields[1] : "undefined";
+        for (ShasumsFile.Item item : ShasumsFile.fetchShasumsFile(fetch, integritiesFileUrl)) {
+            String fileName = item.getFileName() == null ? "undefined" : item.getFileName();
             Matcher match = pattern.matcher(fileName);
             if (!match.matches()) {
                 continue;
@@ -139,7 +128,7 @@ final class NodeRuntimeResolver {
             resolution.put("type", "binary");
             resolution.put("archive", ".zip".equals(extname) ? "zip" : "tarball");
             resolution.put("bin", nodeBins(platform));
-            resolution.put("integrity", "sha256-" + Base64.getEncoder().encodeToString(hex(fields[0])));
+            resolution.put("integrity", item.getIntegrity());
             resolution.put("url", nodeMirrorBaseUrl + "v" + version + "/" + basename + extname);
             if (".zip".equals(extname)) {
                 resolution.put("prefix", basename);
@@ -158,20 +147,6 @@ final class NodeRuntimeResolver {
             assets.add(asset);
         }
         return assets;
-    }
-
-    // Buffer.from(hex, 'hex'): stops at the first pair that is not hex
-    private static byte[] hex(String hex) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        for (int i = 0; i + 1 < hex.length(); i += 2) {
-            int hi = Character.digit(hex.charAt(i), 16);
-            int lo = Character.digit(hex.charAt(i + 1), 16);
-            if (hi < 0 || lo < 0) {
-                break;
-            }
-            bytes.write(hi << 4 | lo);
-        }
-        return bytes.toByteArray();
     }
 
     private static @Nullable String resolveNodeVersion(RegistryMetadata fetch, String versionSpec,

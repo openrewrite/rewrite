@@ -61,7 +61,8 @@ class PnpmLockRoundTripTest {
           .manifests(lock.manifests())
           .files(files)
           .now(lock.now())
-          .registry(new ScenarioRegistry(lock.getScenario(), lock.phase()));
+          .registry(new ScenarioRegistry(lock.getScenario(), lock.phase()))
+          .host(PnpmScenarioTest.host(lock.getScenario().recordedWith()));
         if (lock.getScenario().recordedWith() == null) {
             // a downloaded fixture records no clock and no publish times, so its lock cannot be checked for maturity
             inputs.env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"));

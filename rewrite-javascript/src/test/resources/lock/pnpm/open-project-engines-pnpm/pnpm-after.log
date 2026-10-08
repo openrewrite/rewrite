@@ -1,0 +1,12 @@
+[ERR_PNPM_UNSUPPORTED_ENGINE] Unsupported environment (bad pnpm and/or Node.js version)
+
+Your pnpm version is incompatible with "/private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.UJ7yZkkGfb/project".
+
+Expected version: ^9
+Got: 11.2.2
+
+This is happening because the package's manifest has an engines.pnpm field specified.
+To fix this issue, install the required pnpm version globally.
+
+To install the latest version of pnpm, run "pnpm i -g pnpm".
+To check your pnpm version, run "pnpm -v".

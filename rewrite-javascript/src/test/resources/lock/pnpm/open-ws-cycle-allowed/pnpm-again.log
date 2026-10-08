@@ -1,0 +1,8 @@
+Scope: all 3 workspace projects
+[WARN] There are cyclic workspace dependencies: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.dqh3QNpPXl/project/packages/a, /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.dqh3QNpPXl/project/packages/b
+? Verifying lockfile against supply-chain policies (1 entry)...
+✓ Lockfile passes supply-chain policies (1 entry in 3.5s)
+Done in 3.7s using pnpm v11.2.2
+pnpm 11.2.2, node v24.19.0, 2026-10-08T16:02:39Z
+exit=0
+lock unchanged

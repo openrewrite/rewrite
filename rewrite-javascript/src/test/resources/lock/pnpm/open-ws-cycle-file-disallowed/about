@@ -1,0 +1,1 @@
+Under disallowWorkspaceCycles member b gains a file:../a dependency on a, which depends on b through workspace: (a directory is an edge).

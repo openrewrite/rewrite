@@ -1,0 +1,7 @@
+[WARN] Unsupported engine: wanted: {"node":"<10"} (current: {"node":"v24.19.0","pnpm":"11.2.2"})
+? Verifying lockfile against supply-chain policies (2 entries)...
+✓ Lockfile passes supply-chain policies (2 entries in 6.9s)
+Done in 7.1s using pnpm v11.2.2
+pnpm 11.2.2, node v24.19.0, 2026-10-08T16:01:56Z
+exit=0
+lock unchanged

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.semver.NodeSemver;
 
@@ -159,32 +160,43 @@ final class ReadPackageHook {
         }
     }
 
+    @Value
+    private static class PackageExtension {
+        @Nullable
+        Object extension;
+
+        @Nullable
+        String range;
+    }
+
     // createPackageExtender: extensions by package name, each with its range
     @SuppressWarnings("unchecked")
     private static Hook createPackageExtender(Map<String, @Nullable Object> packageExtensions) {
-        Map<@Nullable String, List<Object[]>> extensionsByPkgName = new LinkedHashMap<>();
+        Map<@Nullable String, List<PackageExtension>> extensionsByPkgName = new LinkedHashMap<>();
         for (String selector : Js.keys(packageExtensions)) {
             Object packageExtension = packageExtensions.get(selector);
             ParseOverrides.ParsedWantedDependency wanted = ParseOverrides.parseWantedDependency(selector);
             extensionsByPkgName.computeIfAbsent(wanted.getAlias(), a -> new ArrayList<>())
-                    .add(new Object[]{packageExtension, wanted.getBareSpecifier()});
+                    .add(new PackageExtension(packageExtension, wanted.getBareSpecifier()));
         }
         return (manifest, dir) -> {
             Object name = manifest.get("name");
-            List<Object[]> extensions = extensionsByPkgName.get(name instanceof String ? (String) name : null);
+            List<PackageExtension> extensions = extensionsByPkgName.get(name instanceof String ? (String) name :
+                    null);
             if (extensions == null) {
                 return manifest;
             }
-            for (Object[] extension : extensions) {
-                String range = (String) extension[1];
+            for (PackageExtension extension : extensions) {
+                String range = extension.getRange();
                 if (range != null &&
                     !NodeSemver.satisfies(manifest.get("version"), range, NodeSemver.Options.DEFAULT)) {
                     continue;
                 }
-                if (!(extension[0] instanceof Map)) {
+                if (!(extension.getExtension() instanceof Map)) {
                     continue;
                 }
-                Map<String, @Nullable Object> packageExtension = (Map<String, @Nullable Object>) extension[0];
+                Map<String, @Nullable Object> packageExtension =
+                        (Map<String, @Nullable Object>) extension.getExtension();
                 for (String field : new String[]{"dependencies", "optionalDependencies", "peerDependencies",
                         "peerDependenciesMeta"}) {
                     Object fromExtension = packageExtension.get(field);

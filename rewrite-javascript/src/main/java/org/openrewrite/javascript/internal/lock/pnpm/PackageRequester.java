@@ -19,15 +19,11 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
-import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -35,7 +31,7 @@ import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/installing.package-requester's {@code resolveAndFetch} (pnpm 11.2.2) over
- * @pnpm/resolving.default-resolver's chain, with @pnpm/config.package-is-installable.
+ * @pnpm/resolving.default-resolver's chain.
  */
 final class PackageRequester {
 
@@ -46,7 +42,6 @@ final class PackageRequester {
     private static final Pattern GIT_URL_SUFFIX = Pattern.compile("\\.git(?:#|$)");
     private static final Pattern IS_FILENAME = Pattern.compile("\\.(?:tgz|tar.gz|tar)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern IS_FILESPEC = Pattern.compile("^(?:[./]|~/|[a-z]:)", Pattern.CASE_INSENSITIVE);
-    private static final String PNPM_VERSION = "11.2.2";
 
     private final NpmResolver npmResolver;
 
@@ -57,17 +52,27 @@ final class PackageRequester {
 
     private final Host host;
     private final boolean engineStrict;
+    private final boolean force;
+
+    /**
+     * The {@code nodeVersion} setting; null for the host's.
+     */
+    private final @Nullable String nodeVersion;
+
     private final @Nullable Map<String, @Nullable Object> supportedArchitectures;
     private final RegistryMetadata fetch;
     private final @Nullable Map<String, @Nullable Object> nodeDownloadMirrors;
 
     PackageRequester(NpmResolver npmResolver, Map<String, String> files, Host host, boolean engineStrict,
+                     boolean force, @Nullable String nodeVersion,
                      @Nullable Map<String, @Nullable Object> supportedArchitectures, RegistryMetadata fetch,
                      @Nullable Map<String, @Nullable Object> nodeDownloadMirrors) {
         this.npmResolver = npmResolver;
         this.files = files;
         this.host = host;
         this.engineStrict = engineStrict;
+        this.force = force;
+        this.nodeVersion = nodeVersion;
         this.supportedArchitectures = supportedArchitectures;
         this.fetch = fetch;
         this.nodeDownloadMirrors = nodeDownloadMirrors;
@@ -269,9 +274,15 @@ final class PackageRequester {
         if (result != null) {
             return result;
         }
-        if (bareSpecifier != null && bareSpecifier.startsWith("runtime:")) {
-            throw new CannotKnow("the " + wantedDependency.getAlias() + " runtime " + bareSpecifier +
-                                 " (pnpm reads its release index and checksums from the runtime's own site)");
+        result = DenoRuntimeResolver.resolveDenoRuntime(fetch, npmResolver, wantedDependency, currentPkg,
+                options.update, host.getOs());
+        if (result != null) {
+            return result;
+        }
+        result = BunRuntimeResolver.resolveBunRuntime(fetch, npmResolver, wantedDependency, currentPkg,
+                options.update, host.getOs());
+        if (result != null) {
+            return result;
         }
         result = npmResolver.resolveFromNamedRegistry(wantedDependency, options, preferredVersions);
         if (result != null) {
@@ -437,126 +448,9 @@ final class PackageRequester {
         return text == null ? null : Manifests.readProjectManifest(text, path);
     }
 
-    // packageIsInstallable: a warning for what the host does not run, an error under engineStrict
     private @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> manifest,
                                                    boolean optional) {
-        PnpmError warn = checkPlatform(pkgId, manifest);
-        if (warn == null) {
-            warn = checkEngine(pkgId, ResolveDependencies.asMap(manifest.get("engines")));
-        }
-        if (warn == null) {
-            return true;
-        }
-        if (optional) {
-            return false;
-        }
-        if (engineStrict) {
-            throw warn;
-        }
-        return null;
-    }
-
-    private @Nullable PnpmError checkEngine(String pkgId, Map<String, @Nullable Object> engines) {
-        if (engines.isEmpty()) {
-            return null;
-        }
-        Map<String, String> unsatisfied = new LinkedHashMap<>();
-        Object node = engines.get("node");
-        String nodeVersion = host.getNodeVersion();
-        if (Js.truthy(node) && nodeVersion != null &&
-            !satisfies(nodeVersion.startsWith("v") ? nodeVersion.substring(1) : nodeVersion, Js.string(node))) {
-            unsatisfied.put("node", Js.string(node));
-        }
-        Object pnpm = engines.get("pnpm");
-        if (Js.truthy(pnpm) && !satisfies(PNPM_VERSION, Js.string(pnpm))) {
-            unsatisfied.put("pnpm", Js.string(pnpm));
-        }
-        if (unsatisfied.isEmpty()) {
-            return null;
-        }
-        Map<String, @Nullable Object> current = new LinkedHashMap<>();
-        current.put("node", nodeVersion);
-        current.put("pnpm", PNPM_VERSION);
-        return new PnpmError("UNSUPPORTED_ENGINE", "Unsupported engine for " + pkgId + ": wanted: " +
-                                                   Js.jsonStringify(unsatisfied) + " (current: " +
-                                                   Js.jsonStringify(current) + ")");
-    }
-
-    private @Nullable PnpmError checkPlatform(String pkgId, Map<String, @Nullable Object> manifest) {
-        boolean osOk = checkList(current("os", host.getOs()), manifest.get("os"));
-        boolean cpuOk = checkList(current("cpu", host.getCpu()), manifest.get("cpu"));
-        boolean libcOk = host.getLibc() == null || checkList(current("libc", host.getLibc()), manifest.get("libc"));
-        if (osOk && cpuOk && libcOk) {
-            return null;
-        }
-        return new PnpmError("UNSUPPORTED_PLATFORM", "Unsupported platform for " + pkgId);
-    }
-
-    private @Nullable List<String> current(String key, @Nullable String hostValue) {
-        Object supported = supportedArchitectures == null ? null : supportedArchitectures.get(key);
-        List<String> values = new ArrayList<>();
-        if (supported instanceof List) {
-            for (Object value : (List<?>) supported) {
-                String v = Js.string(value);
-                if ("current".equals(v)) {
-                    if (hostValue == null) {
-                        return null;
-                    }
-                    values.add(hostValue);
-                } else {
-                    values.add(v);
-                }
-            }
-            return values;
-        }
-        return hostValue == null ? null : Collections.singletonList(hostValue);
-    }
-
-    private static boolean checkList(@Nullable List<String> values, @Nullable Object wanted) {
-        if (values == null || wanted == null || wanted == JsYaml.UNDEFINED) {
-            return true;
-        }
-        List<String> list = new ArrayList<>();
-        if (wanted instanceof String) {
-            list.add((String) wanted);
-        } else if (wanted instanceof List) {
-            for (Object item : (List<?>) wanted) {
-                if (item instanceof String) {
-                    list.add((String) item);
-                }
-            }
-        }
-        if (list.size() == 1 && "any".equals(list.get(0))) {
-            return true;
-        }
-        boolean match = false;
-        for (String value : values) {
-            for (String entry : list) {
-                if (entry.startsWith("!")) {
-                    if (entry.substring(1).equals(value)) {
-                        return false;
-                    }
-                } else {
-                    match |= entry.equals(value);
-                }
-            }
-        }
-        if (match) {
-            return true;
-        }
-        for (String entry : list) {
-            if (!entry.startsWith("!")) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static boolean satisfies(String version, String range) {
-        try {
-            return NodeSemver.satisfies(version, range, NodeSemver.Options.INCLUDE_PRERELEASE);
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
+        return force ? Boolean.TRUE : PackageIsInstallable.packageIsInstallable(pkgId, manifest, engineStrict,
+                nodeVersion, optional, supportedArchitectures, host);
     }
 }

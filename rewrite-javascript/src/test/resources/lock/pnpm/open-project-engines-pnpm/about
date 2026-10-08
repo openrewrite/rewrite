@@ -1,0 +1,1 @@
+A single project adds abbrev and engines.pnpm ^9, which pnpm 11.2.2 does not satisfy (cli.utils packageIsInstallable throws for an engines.pnpm, strict or not).

@@ -1,0 +1,1 @@
+Workspace patterns packages/+(a|aa) and packages/b: picomatch 4.0.4 reads the repeated extglob whose branches overlap as literal text, so packages/a and packages/aa are not projects; b gains abbrev.

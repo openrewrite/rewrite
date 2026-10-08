@@ -160,6 +160,9 @@ final class PnpmOptions {
             }
         }
         config.put("registries", new LinkedHashMap<>(registriesFromNpmrc));
+        if (rootManifest != null && config.get("nodeVersion") == null) {
+            config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest));
+        }
 
         Map<String, @Nullable Map<String, @Nullable Object>> catalogs = new LinkedHashMap<>();
         List<String> patterns = null;
@@ -255,6 +258,47 @@ final class PnpmOptions {
             }
         }
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager);
+    }
+
+    @SuppressWarnings("unchecked")
+    static @Nullable String getNodeVersionFromEnginesRuntime(Map<String, @Nullable Object> manifest) {
+        for (String enginesFieldName : new String[]{"devEngines", "engines"}) {
+            Object engines = manifest.get(enginesFieldName);
+            Object enginesRuntime = engines instanceof Map ? ((Map<String, @Nullable Object>) engines).get("runtime") :
+                    null;
+            if (enginesRuntime == null || enginesRuntime == JsYaml.UNDEFINED) {
+                continue;
+            }
+            List<@Nullable Object> runtimes = enginesRuntime instanceof List ? (List<@Nullable Object>) enginesRuntime :
+                    Collections.singletonList(enginesRuntime);
+            Object nodeRuntime = null;
+            for (Object runtime : runtimes) {
+                if (runtime == null || runtime == JsYaml.UNDEFINED) {
+                    throw new JsError("Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
+                }
+                if (runtime instanceof Map && "node".equals(((Map<String, @Nullable Object>) runtime).get("name"))) {
+                    nodeRuntime = runtime;
+                    break;
+                }
+            }
+            Object version = nodeRuntime == null ? null : ((Map<String, @Nullable Object>) nodeRuntime).get("version");
+            if (version == null || version == JsYaml.UNDEFINED) {
+                continue;
+            }
+            if (!(version instanceof String)) {
+                throw new JsError("range.trim is not a function");
+            }
+            String minVersion;
+            try {
+                minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.DEFAULT);
+            } catch (IllegalArgumentException e) {
+                throw new JsError("Invalid SemVer Range: " + Js.trim((String) version));
+            }
+            if (minVersion != null) {
+                return minVersion;
+            }
+        }
+        return null;
     }
 
     static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest) {

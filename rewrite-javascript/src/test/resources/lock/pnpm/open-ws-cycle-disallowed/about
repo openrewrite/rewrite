@@ -1,0 +1,1 @@
+Under disallowWorkspaceCycles member b gains a workspace: dependency on a, which depends on b.

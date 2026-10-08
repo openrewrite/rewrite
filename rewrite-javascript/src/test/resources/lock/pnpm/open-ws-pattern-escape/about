@@ -1,0 +1,1 @@
+Workspace pattern packages/\\(x\\) names the directory packages/(x) with escaped parentheses; the member gains abbrev.

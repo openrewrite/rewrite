@@ -29,9 +29,8 @@ import java.util.Map;
 import java.util.StringJoiner;
 
 /**
- * node-semver's functions with its {@code loose} and {@code includePrerelease} options, exactly as
- * npm evaluates them. Unlike {@link Semver#validate(String, String, Semver.Ecosystem)} with
- * {@link Semver.Ecosystem#NODE}, no {@code latest.*} selector keywords are recognized.
+ * node-semver's functions with its {@code loose} and {@code includePrerelease} options, as npm evaluates them;
+ * unlike {@link Semver.Ecosystem#NODE} validation, no {@code latest.*} selectors.
  */
 @UtilityClass
 public class NodeSemver {
@@ -244,6 +243,57 @@ public class NodeSemver {
     }
 
     /**
+     * node-semver's {@code minVersion}: the lowest version the range admits, or {@code null} when it admits none.
+     *
+     * @throws IllegalArgumentException when the range is invalid, as node-semver throws.
+     */
+    public static @Nullable String minVersion(String range, Options options) {
+        UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
+        if (r == null) {
+            throw new IllegalArgumentException("Invalid SemVer Range: " + range);
+        }
+        for (String lowest : new String[]{"0.0.0", "0.0.0-0"}) {
+            if (r.test(ParsedVersion.parseNode(lowest, false))) {
+                return lowest;
+            }
+        }
+        ParsedVersion minver = null;
+        for (List<NodeComparand> comparators : r.sets()) {
+            ParsedVersion setMin = null;
+            for (NodeComparand comparator : comparators) {
+                if (comparator.isAny()) {
+                    continue;
+                }
+                ParsedVersion compver = comparator.getVersion();
+                String operator = comparator.operator();
+                if (">".equals(operator)) {
+                    String base = compver.strictMajor() + "." + compver.strictMinor() + ".";
+                    compver = ParsedVersion.parseNode(compver.hasPrerelease() ?
+                            base + compver.strictPatch() + "-" + join(compver.strictPrerelease()) + ".0" :
+                            base + (compver.strictPatch() + 1), false);
+                } else if (!operator.isEmpty() && !">=".equals(operator)) {
+                    continue;
+                }
+                if (setMin == null || compver.comparePrecedence(setMin) > 0) {
+                    setMin = compver;
+                }
+            }
+            if (setMin != null && (minver == null || minver.comparePrecedence(setMin) > 0)) {
+                minver = setMin;
+            }
+        }
+        return minver != null && r.test(minver) ? minver.nodeVersion() : null;
+    }
+
+    private static String join(List<Object> identifiers) {
+        StringJoiner joined = new StringJoiner(".");
+        for (Object identifier : identifiers) {
+            joined.add(String.valueOf(identifier));
+        }
+        return joined.toString();
+    }
+
+    /**
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean intersects(String range1, String range2, Options options) {
@@ -452,8 +502,7 @@ public class NodeSemver {
     }
 
     /**
-     * node-semver's {@code rsort}: the list sorted in place from the highest version down by {@code compareBuild},
-     * stable as {@code Array.prototype.sort} is.
+     * node-semver's {@code rsort}: sorted in place, highest first by {@code compareBuild}, stably.
      *
      * @throws IllegalArgumentException when a version it compares is invalid, as node-semver throws.
      */

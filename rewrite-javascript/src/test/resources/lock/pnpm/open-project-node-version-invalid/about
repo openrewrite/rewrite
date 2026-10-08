@@ -1,0 +1,1 @@
+Under nodeVersion abc a project adds abbrev and engines.node >=20: checkEngine throws INVALID_NODE_VERSION, strict or not.

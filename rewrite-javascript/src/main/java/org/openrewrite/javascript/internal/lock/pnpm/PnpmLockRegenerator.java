@@ -253,9 +253,7 @@ public final class PnpmLockRegenerator {
     }
 
     /**
-     * The rest of {@code _install} once the lock needs resolving: each project's wanted dependencies with the lock's
-     * resolutions of changed specifiers forgotten, then {@code _installInContext}'s resolution, its write, and the
-     * checks after it.
+     * The rest of {@code _install} once the lock needs resolving: {@code _installInContext}'s resolution and write.
      */
     String resolve(Install install) {
         PnpmOptions options = install.getOptions();
@@ -308,12 +306,9 @@ public final class PnpmLockRegenerator {
         Map<String, @Nullable Object> supportedArchitectures = options.get("supportedArchitectures") instanceof Map ?
                 (Map<String, @Nullable Object>) options.get("supportedArchitectures") : null;
         NpmResolver npmResolver = storeResolver(options, registries);
-        Host host = inputs.getHost();
-        if (Js.truthy(options.get("nodeVersion"))) {
-            host = host.toBuilder().nodeVersion(Js.string(options.get("nodeVersion"))).build();
-        }
-        PackageRequester requester = new PackageRequester(npmResolver, files, host, options.isTrue("engineStrict"),
-                supportedArchitectures, inputs.getRegistry(), nodeDownloadMirrors(options));
+        PackageRequester requester = new PackageRequester(npmResolver, files, inputs.getHost(),
+                options.isTrue("engineStrict"), options.isTrue("force"), nodeVersion(options), supportedArchitectures,
+                inputs.getRegistry(), nodeDownloadMirrors(options));
 
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(wantedLockfile, "",
                 requester);
@@ -549,7 +544,8 @@ public final class PnpmLockRegenerator {
         }
         Map<String, String> registries = options.getRegistries();
         PackageRequester requester = new PackageRequester(storeResolver(options, registries), new LinkedHashMap<>(),
-                inputs.getHost(), false, null, inputs.getRegistry(), nodeDownloadMirrors(options));
+                inputs.getHost(), options.isTrue("engineStrict"), options.isTrue("force"), nodeVersion(options), null,
+                inputs.getRegistry(), nodeDownloadMirrors(options));
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(emptyLockfile, "",
                 requester);
         ctx.setForceFullResolution(true);
@@ -748,12 +744,26 @@ public final class PnpmLockRegenerator {
             }
         }
         loadHooks(options, configDependencies);
+        boolean workspace = options.getWorkspacePackagePatterns() != null;
+        List<Verification.Project> projectManifests = workspace ? projects(options, true) : null;
+        ProjectsGraph.Result projectsGraph = projectManifests == null ? null :
+                ProjectsGraph.createProjectsGraph(projectManifests, false, Js.truthy(options.get(
+                        "linkWorkspacePackages")));
         // installDeps creates its store controller, whose npm resolver checks the named registries
         NpmResolver.mergeNamedRegistries(namedRegistries(options));
 
-        boolean workspace = options.getWorkspacePackagePatterns() != null;
-        List<Verification.Project> projectManifests = projects(options, workspace);
-        if (!workspace) {
+        if (projectManifests == null) {
+            projectManifests = projects(options, false);
+        }
+        Object runtimeOnFail = options.get("runtimeOnFail");
+        if (Js.truthy(runtimeOnFail)) {
+            for (Verification.Project project : projectManifests) {
+                PkgManifestUtils.applyRuntimeOnFailOverride(project.getManifest(), runtimeOnFail);
+            }
+        }
+        if (projectsGraph != null) {
+            checkWorkspaceCycles(options, projectsGraph);
+        } else {
             agent(options);
         }
         if (!options.isTrue("useLockfile")) {
@@ -865,7 +875,8 @@ public final class PnpmLockRegenerator {
                 options, projects, false, lockText, readPackageHook, patchHashes(patchedDependencies));
     }
 
-    // installDeps: each project's manifest as read, under the runtimeOnFail setting
+    // main.ts' findWorkspaceProjects or installDeps' tryReadProjectManifest: each project's manifest as read, which
+    // cli.utils' packageIsInstallable checks
     private List<Verification.Project> projects(PnpmOptions options, boolean workspace) {
         List<String> dirs = new ArrayList<>();
         if (workspace) {
@@ -874,7 +885,6 @@ public final class PnpmLockRegenerator {
         } else {
             dirs.add("");
         }
-        Object runtimeOnFail = options.get("runtimeOnFail");
         List<Verification.Project> projects = new ArrayList<>();
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
@@ -886,12 +896,51 @@ public final class PnpmLockRegenerator {
             }
             Map<String, @Nullable Object> manifest = Manifests.readProjectManifest(text,
                     dir.isEmpty() ? "package.json" : dir + "/package.json");
-            if (Js.truthy(runtimeOnFail)) {
-                PkgManifestUtils.applyRuntimeOnFailOverride(manifest, runtimeOnFail);
-            }
             projects.add(new Verification.Project(dir, FindPackages.getLockfileImporterId(dir), manifest));
         }
+        for (Verification.Project project : projects) {
+            PackageIsInstallable.projectIsInstallable(project.getId(), project.getManifest(),
+                    options.isTrue("engineStrict"), nodeVersion(options),
+                    workspace ? null : options.get("supportedArchitectures"), inputs.getHost());
+        }
         return projects;
+    }
+
+    // installDeps: projects that depend on each other in a cycle, an error under disallowWorkspaceCycles
+    private static void checkWorkspaceCycles(PnpmOptions options, ProjectsGraph.Result projectsGraph) {
+        if (options.isTrue("ignoreWorkspaceCycles") || !options.isTrue("disallowWorkspaceCycles")) {
+            return;
+        }
+        GraphSequencer.Result<String> sequencedGraph = GraphSequencer.sequenceGraph(projectsGraph.getGraph());
+        if (!sequencedGraph.isSafe()) {
+            List<String> cycles = new ArrayList<>();
+            for (List<String> cycle : sequencedGraph.getCycles()) {
+                List<String> ids = new ArrayList<>();
+                for (String dir : cycle) {
+                    ids.add(FindPackages.getLockfileImporterId(dir));
+                }
+                cycles.add(String.join(", ", ids));
+            }
+            throw new PnpmError("DISALLOW_WORKSPACE_CYCLES", "There are cyclic workspace dependencies" +
+                                                             (cycles.isEmpty() ? "" : ": " + String.join("; ", cycles)));
+        }
+        if (!projectsGraph.getUnknown().isEmpty()) {
+            throw new CannotKnow("whether " + projectsGraph.getUnknown().get(0) + " names a project of the " +
+                                 "workspace, which disallowWorkspaceCycles checks for cycles");
+        }
+    }
+
+    // the nodeVersion setting; null for the host's Node.js
+    private static @Nullable String nodeVersion(PnpmOptions options) {
+        Object nodeVersion = options.get("nodeVersion");
+        if (nodeVersion == null || nodeVersion == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(nodeVersion instanceof String)) {
+            throw new CannotKnow("what pnpm makes of nodeVersion (" + Js.typeOf(nodeVersion) +
+                                 ", where pnpm reads a string)");
+        }
+        return (String) nodeVersion;
     }
 
     // main.ts' package manager check: the lock text after switchCliVersion or syncEnvLockfile wrote pnpm's release

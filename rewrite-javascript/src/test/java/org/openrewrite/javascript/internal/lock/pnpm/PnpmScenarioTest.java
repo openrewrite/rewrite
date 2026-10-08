@@ -48,10 +48,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * with the edit phase's project files and clock, the registry served from the recording, and asserts the scenario's
  * {@code expect} line: {@code exact} (pnpm's {@code after} byte for byte; the default when {@code after} is
  * present), {@code cannot-know <what>} (every package, spec and URL it names), {@code malformed}, {@code pm-rejects
- * <what>} (all of it in the failure) or {@code second-install-rejects <code>}. A fixture recorded elsewhere may lack
- * registry responses: it is replayed with its re-recording's when there is one, else when a cache fills them, and
- * skipped when it cannot be served or an in-repo scenario's {@code supersedes} names it. When
- * {@code REWRITE_LOCK_PNPM_SCENARIO_RESULTS} names a file, one line per edit is written there.
+ * <what>} (all of it in the failure) or {@code second-install-rejects <code>}. A fixture recorded elsewhere is
+ * replayed with its re-recording's registry, else its own and the cache; one an in-repo scenario's {@code supersedes}
+ * names is skipped. When {@code REWRITE_LOCK_PNPM_SCENARIO_RESULTS} names a file, one line per edit is written there.
  */
 class PnpmScenarioTest {
 
@@ -116,7 +115,7 @@ class PnpmScenarioTest {
         return scenario.getReRecording() != null ? scenario.getReRecording() : scenario;
     }
 
-    private static Host host(@Nullable String recordedWith) {
+    static Host host(@Nullable String recordedWith) {
         if (recordedWith == null) {
             return Host.UNKNOWN;
         }
@@ -156,10 +155,6 @@ class PnpmScenarioTest {
         try {
             result = new PnpmLockRegenerator(inputs(scenario, scenario.file("before"))).regenerate();
         } catch (ScenarioRegistry.RouteNotRecorded e) {
-            if (recording(scenario).recordedWith() == null && scenario.getHttpCache() == null) {
-                record(name, "skipped", "not served offline: " + e.getMessage());
-                assumeTrue(false, name + " cannot be replayed offline: " + e.getMessage());
-            }
             record(name, "failed", e.getMessage());
             fail(name + ": " + e.getMessage());
             return;

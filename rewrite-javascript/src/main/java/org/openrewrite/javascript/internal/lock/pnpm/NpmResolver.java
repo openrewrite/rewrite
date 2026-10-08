@@ -403,7 +403,7 @@ final class NpmResolver {
         }
     }
 
-    private static @Nullable String resolveWorkspaceRange(String range, List<String> versions) {
+    static @Nullable String resolveWorkspaceRange(String range, List<String> versions) {
         if ("*".equals(range) || "^".equals(range) || "~".equals(range) || range.isEmpty()) {
             return NodeSemver.maxSatisfying(versions, "*", NodeSemver.Options.INCLUDE_PRERELEASE);
         }

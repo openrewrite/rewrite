@@ -1,0 +1,1 @@
+Workspace patterns with extglobs (packages/@(a|c), packages/!(c|d)): member b gains abbrev; tinyglobby 0.2.16 with picomatch 4.0.4 decides which directories are projects.

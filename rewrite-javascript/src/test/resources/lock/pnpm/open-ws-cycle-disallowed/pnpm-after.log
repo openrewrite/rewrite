@@ -1,0 +1,2 @@
+Scope: all 3 workspace projects
+[ERR_PNPM_DISALLOW_WORKSPACE_CYCLES] There are cyclic workspace dependencies: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.vUGrOAQiUs/project/packages/a, /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.vUGrOAQiUs/project/packages/b

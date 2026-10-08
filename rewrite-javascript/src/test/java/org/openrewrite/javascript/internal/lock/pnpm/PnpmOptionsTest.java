@@ -35,7 +35,7 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
  * config/reader/test/getOptionsFromRootManifest.test.ts, env.test.ts, parseCreds.test.ts, getNetworkConfigs.test.ts and
- * the registry, .npmrc and minimumReleaseAgeStrict cases of index.ts, and @pnpm/config.env-replace 4.1.0's
+ * the registry, .npmrc, nodeVersion and minimumReleaseAgeStrict cases of index.ts, and @pnpm/config.env-replace 4.1.0's
  * env-replace.spec.ts, of pnpm 11.2.2.
  * Not ported from index.ts: the cases of a CLI option other than {@code --lockfile-only} and of the user's own config
  * files (~/.npmrc, auth.ini, config.yaml), which are the host's.
@@ -268,6 +268,27 @@ class PnpmOptionsTest {
     // index.ts
 
     // upstream reads these from a userconfig; the project's .npmrc gives the same registries
+    @Test
+    void nodeVersionHasNoDefault() {
+        assertThat(PnpmOptions.load(null, null, obj("{}"), env()).get("nodeVersion")).isNull();
+    }
+
+    @Test
+    void nodeVersionIsTheMinimumVersionOfTheNodeRuntime() {
+        String[][] cases = {
+          {"devEngines", "22.20.0", "download", "22.20.0"},
+          {"devEngines", "22.20.0", "error", "22.20.0"},
+          {"devEngines", "^22.0.0", "download", "22.0.0"},
+          {"engines", "22.20.0", "download", "22.20.0"},
+        };
+        for (String[] c : cases) {
+            Map<String, @Nullable Object> manifest = obj("{'" + c[0] + "':{'runtime':{'name':'node','version':'" +
+                                                         c[1] + "','onFail':'" + c[2] + "'}}}");
+            assertThat(PnpmOptions.load(null, null, manifest, env()).get("nodeVersion"))
+              .as("%s %s %s", (Object[]) c).isEqualTo(c[3]);
+        }
+    }
+
     @Test
     void registriesOfScopedPackagesAreReadAndNormalized() {
         String npmrc = "@foo:registry=https://foo.com\n@bar:registry=https://bar.com\n" +

@@ -1,0 +1,1 @@
+Under engineStrict a project with devEngines.runtime node 18.0.0 (onFail ignore) adds abbrev and engines.node >=20: nodeVersion is the runtime's minimum version, not the host's.
