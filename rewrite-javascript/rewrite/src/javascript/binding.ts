@@ -361,7 +361,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         return undefined;
     }
     // `RebindImport` replaces an import it cannot rewrite in place, and a CommonJS file can gain no import.
-    if (isCommonJs(cu) && !existing.required &&
+    if (isCommonJs(cu) && !existing.viaRequire &&
         (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
@@ -412,8 +412,8 @@ function reusesTargetImport(
 ): boolean {
     const target = existingImportBinding(cu, to.module, to.member);
     // An import and a require of one module are separate declarations of the name.
-    return target?.localName === name && target.required === moved.required && bindingShape(to.member) === "named" &&
-        !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
+    return target?.localName === name && target.viaRequire === moved.viaRequire &&
+        bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
 }
 
 /**

@@ -296,15 +296,15 @@ renames only the types naming its own member, so a later rebind still finds its 
 
 ### A rebind of a `require`
 
-Only a top-level `const … = require('m')` declaration binds a module for a rebind. A `require` nested
-in a function or used inline binds nothing it can move. The file stays CommonJS, so a move never
-creates an import. A whole module binds as a name and a member as a destructured element, so
-`const D = require('_stream_duplex')` moved to `stream`'s `Duplex` becomes
-`const {Duplex: D} = require('stream')`. The moved element joins a destructuring `require` of the
-target that comes before it, declares with the same keywords, and has no rest element. Otherwise it
-takes over its own statement, or gets a `require` of its own right after it where that statement
-binds other names too. A move within one module renames the element in place. An import and a
-`require` of one module are separate declarations, so neither counts as the other's merge target.
+Only a top-level `const … = require('m')` declaration binds a module for a rebind, and the file stays
+CommonJS. A binding that has its statement to itself is rewritten in place, changing shape as needed:
+
+```js
+const D = require('_stream_duplex');   →   const {Duplex: D} = require('stream');
+```
+
+A binding leaving a statement that binds other names is placed the way `maybeBind` places a new
+`require`, as is one that a `require` of the target before it can take.
 
 A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
 
@@ -313,10 +313,10 @@ A target that is a built-in keeps the `node:` scheme the source spelled, on eith
 A `.cjs` or `.cts` file is CommonJS. So is a file without ES module syntax that calls `require` or
 reads `exports` or `module.exports` anywhere, inside a function too. There `maybeBind` binds with
 `require`, since an `import` would make the file an ES module. A member joins a top-level `const`
-destructuring `require` of its module without a rest element, or else gets `const {m} = require('mod')`
-of its own. A whole
-module gets `const name = require('mod')`. A new statement goes after the file's last top-level
-`require`. A file with none takes it first, after a `'use strict'` directive.
+destructuring `require` of its module without a rest element, or else gets
+`const {m} = require('mod')` of its own. A whole module gets `const name = require('mod')`. A new
+statement goes after the file's last top-level `require`. A file with none takes it first, after a
+`'use strict'` directive.
 
 ### When `maybeBind` returns `undefined`
 
@@ -337,6 +337,7 @@ The four above that still apply, plus these:
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out
+- `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
 - the file binds its modules with `require`, `from` is an ES import, and the move would need a new

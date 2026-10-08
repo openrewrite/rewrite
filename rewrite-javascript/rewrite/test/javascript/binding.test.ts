@@ -2331,14 +2331,16 @@ describe("maybeRebind on a require", () => {
                 `const {a} = require('m');\nconst {b} = require('n');\n\na(b);`));
     });
 
-    test("a require nested in a function, or beside a rest element, binds nothing a rebind moves", async () => {
+    test("a require nested in a function, beside a rest element, or in a let destructuring binds nothing a rebind moves", async () => {
         const bound: (string | undefined)[] = [];
         await rebind({module: "_stream_duplex", member: "Duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
             javascript(`function f() {\n    const {Duplex} = require('_stream_duplex');\n    return new Duplex();\n}`),
             // `rest` would gain the property the move takes out.
-            javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`)
+            javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`),
+            // A new require of the target is a `const`, which would forbid the reassignment.
+            javascript(`let {Duplex, x} = require('_stream_duplex');\n\nDuplex = x;`)
         );
-        expect(bound).toEqual([undefined, undefined]);
+        expect(bound).toEqual([undefined, undefined, undefined]);
     });
 });
 

@@ -1559,12 +1559,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         let pattern: J.VariableDeclarations.NamedVariable["name"] = newIdentifier(this.bindingName!);
         if (key !== undefined && key !== '*') {
             const element = movedBinding(pattern, -1, key, this.bindingName!) as JS.BindingElement;
-            const target = compilationUnit.statements.find(s => {
-                const declaration = requireDeclarationOf(s.element);
-                return declaration !== undefined && joins(declaration, this.module, 'const');
-            })?.element;
+            const target = compilationUnit.statements
+                .map(s => requireDeclarationOf(s.element))
+                .find(declaration => declaration !== undefined && joins(declaration, this.module, 'const'));
             if (target !== undefined) {
-                return placeRequired(compilationUnit, {binding: element, mergeInto: target.id});
+                return joinedRequire(compilationUnit, target, element);
             }
             const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
             pattern = {
@@ -1804,6 +1803,10 @@ function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.
     };
 }
 
+function requiredLiteral(declaration: J.VariableDeclarations): J | undefined {
+    return (declaration.variables[0].element.initializer?.element as J.MethodInvocation).arguments.elements[0].element;
+}
+
 function requirePattern(declaration: J.VariableDeclarations): J {
     return declaration.variables[0].element.name;
 }
@@ -1992,7 +1995,7 @@ export interface ExistingImportBinding {
     typeOnly: boolean;
 
     /** Whether a top-level `require` declaration binds it rather than an import. */
-    required: boolean;
+    viaRequire: boolean;
 }
 
 /**
@@ -2008,13 +2011,14 @@ export function existingImportBinding(
         const element = stmt.element;
         const declaration = requireDeclarationOf(element);
         const required = declaration && requireBinds(declaration, module, member);
-        if (required !== undefined) {
+        // A binding leaving a `let` or `var` destructuring would land in a `const` require.
+        if (required !== undefined && (isOnlyRequired(declaration!) || keywordsOf(declaration!) === 'const')) {
             return {
                 localName: required,
                 onlyMemberOfStatement: isOnlyRequired(declaration!),
                 aliased: required !== memberName(member),
                 typeOnly: false,
-                required: true
+                viaRequire: true
             };
         }
         if (element?.kind !== JS.Kind.Import) {
@@ -2027,7 +2031,7 @@ export function existingImportBinding(
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
                 aliased: localName !== memberName(member),
                 typeOnly: bindsTypeOnly(element as JS.Import, member),
-                required: false
+                viaRequire: false
             };
         }
     }
@@ -2189,7 +2193,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private fromModule?: string;
     private movedTypes!: MovedTypes;
 
-    private required?: GivenUp;
+    private viaRequire = false;
 
     private get renaming(): boolean {
         return this.boundName !== this.localName;
@@ -2225,9 +2229,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
         }
-        if (this.required !== undefined) {
-            return placeRequired(visited, this.required);
-        }
         if (!this.transformedInPlace) {
             bindImport(this, {
                 module: this.fromModule === undefined ? this.to.module : spelledLike(this.to.module, this.fromModule),
@@ -2236,8 +2237,8 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
                 typeOnly: this.typeOnly,
                 onlyIfReferenced: false,
                 quoteStyle: this.droppedQuote,
-                // The binding was an ES import, though the file may no longer read as a module without it.
-                style: esmStyle[bindingShape(this.to.member)]
+                // The binding keeps its lane, though the file may read otherwise without the statement it left.
+                style: this.viaRequire ? ImportStyle.CommonJS : esmStyle[bindingShape(this.to.member)]
             });
         }
         return visited;
@@ -2292,8 +2293,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             visited?.kind !== J.Kind.VariableDeclarations) {
             return visited;
         }
-        // Whatever happens to the statement, it stays a `require`, so no import is bound for it.
-        this.transformedInPlace = true;
         const rebound = visited as J.VariableDeclarations;
         const pattern = requirePattern(rebound);
         const original = requirePattern(declaration);
@@ -2302,43 +2301,40 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             ? original.bindings.elements.findIndex(e => bindingNames(e.element).some(b => b.name === this.localName))
             : -1;
         const binding = movedBinding(pattern, index, declaredMember(this.to), this.boundName);
-        const required = requiredModuleOfDeclaration(declaration)!;
-        if (isObjectBindingPattern(pattern) && !isIdentifier(binding) && sameModule(required, this.to.module)) {
+        const sourceModule = requiredModuleOfDeclaration(declaration)!;
+        this.viaRequire = true;
+        this.fromModule = sourceModule;
+        this.droppedQuote = quoteOf(requiredLiteral(declaration));
+        if (isObjectBindingPattern(pattern) && !isIdentifier(binding) && sameModule(sourceModule, this.to.module)) {
+            this.transformedInPlace = true;
             return withPattern(rebound, withElementAt(pattern, index, binding));
         }
-        const target = isIdentifier(binding) ? undefined : this.joinableRequire(declaration);
-        const module = spelledLike(this.to.module, required);
-        const only = isOnlyRequired(declaration);
-        if (target !== undefined) {
-            this.required = {binding: binding as JS.BindingElement, mergeInto: target.id};
-            if (only) {
-                this.dropped = rebound.id;
-                return rebound;
-            }
-        } else if (only) {
-            return withRequire(rebound, module, holding(pattern, binding));
-        } else {
-            const copy = withFreshIds(withRequire(rebound, module, holding(pattern, binding)));
-            this.required = {binding: binding as JS.BindingElement, split: {after: rebound.id, declaration: copy}};
+        if (!isOnlyRequired(declaration)) {
+            return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
         }
-        return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
+        if (!isIdentifier(binding) && this.joinsEarlierRequire(declaration)) {
+            this.dropped = rebound.id;
+            return rebound;
+        }
+        this.transformedInPlace = true;
+        return withRequire(rebound, spelledLike(this.to.module, sourceModule), holding(pattern, binding));
     }
 
     /**
-     * A destructuring require of the target that `source`'s binding can join.
-     * It comes first, since a `const` is unreadable above its declaration.
+     * Whether a destructuring `require` of the target before `source` can take its binding, which
+     * `AddImport` then merges there. One after it would leave the binding unreadable where it was declared.
      */
-    private joinableRequire(source: J.VariableDeclarations): J.VariableDeclarations | undefined {
+    private joinsEarlierRequire(source: J.VariableDeclarations): boolean {
         for (const stmt of this.cu!.statements) {
             const other = requireDeclarationOf(stmt.element);
             if (other === source) {
-                return undefined;
+                return false;
             }
-            if (other !== undefined && joins(other, this.to.module, keywordsOf(source))) {
-                return other;
+            if (other !== undefined && keywordsOf(source) === 'const' && joins(other, this.to.module, 'const')) {
+                return true;
             }
         }
-        return undefined;
+        return false;
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
@@ -2611,45 +2607,15 @@ function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElemen
     };
 }
 
-/** Every node of `tree` under a new id, for a statement copied beside its original. Types and markers are shared. */
-function withFreshIds<T>(tree: T): T {
-    if (Array.isArray(tree)) {
-        return tree.map(withFreshIds) as T;
-    }
-    if (tree === null || typeof tree !== 'object') {
-        return tree;
-    }
-    const copy: any = {};
-    for (const [key, value] of Object.entries(tree)) {
-        copy[key] = key === 'id' ? randomId() : sharedKeys.has(key) ? value : withFreshIds(value);
-    }
-    return copy;
-}
-
-const sharedKeys = new Set(['markers', 'type', 'fieldType', 'methodType', 'variableType', 'javaType']);
-
-/** The binding a `require` gave up, for the target's require to take in or a new statement after its own. */
-interface GivenUp {
-    binding: JS.BindingElement;
-    mergeInto?: UUID;
-    split?: {after: UUID; declaration: J.VariableDeclarations};
-}
-
-/** `cu` with the binding a require gave up placed in its new home. */
-function placeRequired(cu: JS.CompilationUnit, required: GivenUp): JS.CompilationUnit {
-    const statements = cu.statements.flatMap(stmt => {
-        const element = stmt.element;
-        if (element?.id === required.mergeInto) {
-            const declaration = element as J.VariableDeclarations;
-            const pattern = requirePattern(declaration) as JS.ObjectBindingPattern;
-            return [{...stmt, element: withPattern(declaration, withElement(pattern, required.binding))}];
-        }
-        if (element?.id === required.split?.after) {
-            return [stmt, {...stmt, element: {...required.split!.declaration, prefix: space("\n")}}];
-        }
-        return [stmt];
-    });
-    return {...cu, statements} as JS.CompilationUnit;
+/** `cu` with `binding` joining the destructuring require `target`. */
+function joinedRequire(
+    cu: JS.CompilationUnit,
+    target: J.VariableDeclarations,
+    binding: JS.BindingElement
+): JS.CompilationUnit {
+    const pattern = requirePattern(target) as JS.ObjectBindingPattern;
+    const joined = withPattern(target, withElement(pattern, binding));
+    return {...cu, statements: cu.statements.map(s => s.element === target ? {...s, element: joined} : s)};
 }
 
 /** Rewrites a file's attribution onto the module and member a binding moved to. */
