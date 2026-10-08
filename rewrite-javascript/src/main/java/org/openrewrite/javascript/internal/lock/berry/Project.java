@@ -497,20 +497,27 @@ final class Project {
             pass.resolutionQueue.add(Collections.singletonList(workspace.getAnchoredDescriptor()));
         }
         CannotKnow unknown = null;
-        while (!pass.resolutionQueue.isEmpty()) {
-            List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
-            pass.resolutionQueue.clear();
-            for (List<Descriptor> dependencies : copy) {
-                for (Descriptor descriptor : dependencies) {
-                    try {
-                        pass.scheduleDescriptorResolution(descriptor);
-                    } catch (CannotKnow e) {
-                        if (unknown == null) {
-                            unknown = e;
+        try {
+            while (!pass.resolutionQueue.isEmpty()) {
+                List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
+                pass.resolutionQueue.clear();
+                for (List<Descriptor> dependencies : copy) {
+                    for (Descriptor descriptor : dependencies) {
+                        try {
+                            pass.scheduleDescriptorResolution(descriptor);
+                        } catch (CannotKnow e) {
+                            if (unknown == null) {
+                                unknown = e;
+                            }
                         }
                     }
                 }
             }
+        } catch (StackOverflowError e) {
+            // Yarn defers each scheduled descriptor on a promise, so a schedule without end exhausts its heap instead
+            throw new YarnBerryLockRegenerator.Rejected(Reason.RESOLUTION_REQUIRED,
+                    YarnBerryLockRegenerator.YARN_REJECTS + ": crash: JavaScript heap out of memory in the " +
+                    "resolution step");
         }
         if (unknown != null) {
             throw unknown;
