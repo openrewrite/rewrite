@@ -54,6 +54,11 @@ class PnpmLockRegeneratorTest {
         public @Nullable String attestations(String registry, String name, String version) {
             return fail("fetched the attestations of " + name + "@" + version);
         }
+
+        @Override
+        public @Nullable String document(String url) {
+            return fail("fetched " + url);
+        }
     };
 
     private static PnpmLockRegenerator.Install install(@Nullable String workspace, @Nullable String npmrc,

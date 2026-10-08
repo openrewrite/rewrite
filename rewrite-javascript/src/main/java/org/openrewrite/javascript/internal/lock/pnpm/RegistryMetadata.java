@@ -35,4 +35,11 @@ public interface RegistryMetadata {
      */
     @Nullable
     String attestations(String registry, String name, String version);
+
+    /**
+     * {@code GET <url>} of a document outside the npm registry (a Node.js release index or its checksums); null when
+     * the server answers with an error.
+     */
+    @Nullable
+    String document(String url);
 }

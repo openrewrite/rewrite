@@ -221,6 +221,7 @@ public final class PnpmLockRegenerator {
             case "ERR_PNPM_NO_MATCHING_VERSION":
             case "ERR_PNPM_NO_MATURE_MATCHING_VERSION":
             case "ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE":
+            case "ERR_PNPM_NODEJS_VERSION_NOT_FOUND":
                 return Reason.VERSION_NOT_FOUND;
             case "ERR_PNPM_FETCH_404":
             case "ERR_PNPM_WORKSPACE_PKG_NOT_FOUND":
@@ -350,8 +351,11 @@ public final class PnpmLockRegenerator {
         if (Js.truthy(options.get("nodeVersion"))) {
             host = host.toBuilder().nodeVersion(Js.string(options.get("nodeVersion"))).build();
         }
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> nodeDownloadMirrors = options.get("nodeDownloadMirrors") instanceof Map ?
+                (Map<String, @Nullable Object>) options.get("nodeDownloadMirrors") : null;
         PackageRequester requester = new PackageRequester(npmResolver, files, host, options.isTrue("engineStrict"),
-                supportedArchitectures);
+                supportedArchitectures, inputs.getRegistry(), nodeDownloadMirrors);
 
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(wantedLockfile, "",
                 requester);

@@ -51,6 +51,11 @@ class NpmResolutionVerifierTest {
         public @Nullable String attestations(String registry, String name, String version) {
             return attestations.get(name + "@" + version);
         }
+
+        @Override
+        public @Nullable String document(String url) {
+            return documents.get(url);
+        }
     }
 
     private static NpmResolutionVerifier.Options.OptionsBuilder makeVerifierOpts(RegistryMetadata registry) {

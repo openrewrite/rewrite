@@ -17,7 +17,9 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -25,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.zip.GZIPInputStream;
 
 /**
  * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked in
@@ -70,6 +73,33 @@ final class ScenarioRegistry implements RegistryMetadata {
     @Override
     public @Nullable String attestations(String registry, String name, String version) {
         return null;
+    }
+
+    // a document outside the registry, at http-url/<host><path> (gzipped when it ends .gz)
+    @Override
+    public @Nullable String document(String url) {
+        URI uri = URI.create(url);
+        Path file = scenario.getDir().resolve("http-url").resolve(uri.getHost() + uri.getPath());
+        Path gz = file.resolveSibling(file.getFileName() + ".gz");
+        try {
+            if (Files.isRegularFile(file)) {
+                return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+            }
+            if (Files.isRegularFile(gz)) {
+                try (InputStream in = new GZIPInputStream(Files.newInputStream(gz))) {
+                    ByteArrayOutputStream out = new ByteArrayOutputStream();
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) >= 0) {
+                        out.write(buf, 0, n);
+                    }
+                    return new String(out.toByteArray(), StandardCharsets.UTF_8);
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        throw new RouteNotRecorded("GET " + url);
     }
 
     private boolean answered404(String registry, String name) {

@@ -60,14 +60,19 @@ final class PackageRequester {
     private final Host host;
     private final boolean engineStrict;
     private final @Nullable Map<String, @Nullable Object> supportedArchitectures;
+    private final RegistryMetadata fetch;
+    private final @Nullable Map<String, @Nullable Object> nodeDownloadMirrors;
 
     PackageRequester(NpmResolver npmResolver, Map<String, String> files, Host host, boolean engineStrict,
-                     @Nullable Map<String, @Nullable Object> supportedArchitectures) {
+                     @Nullable Map<String, @Nullable Object> supportedArchitectures, RegistryMetadata fetch,
+                     @Nullable Map<String, @Nullable Object> nodeDownloadMirrors) {
         this.npmResolver = npmResolver;
         this.files = files;
         this.host = host;
         this.engineStrict = engineStrict;
         this.supportedArchitectures = supportedArchitectures;
+        this.fetch = fetch;
+        this.nodeDownloadMirrors = nodeDownloadMirrors;
     }
 
     /**
@@ -257,6 +262,13 @@ final class PackageRequester {
             if (result != null) {
                 return result;
             }
+        }
+        result = NodeRuntimeResolver.resolveNodeRuntime(fetch, wantedDependency, currentPkg, options.update,
+                nodeDownloadMirrors, host.getOs());
+        if (result != null) {
+            return result;
+        }
+        if (bareSpecifier != null && !bareSpecifier.isEmpty()) {
             if (bareSpecifier.startsWith("runtime:")) {
                 throw new CannotKnow("the " + wantedDependency.getAlias() + " runtime " + bareSpecifier +
                                      " (pnpm reads its release index and checksums from the runtime's own site)");

@@ -60,6 +60,20 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
         }
     }
 
+    @Override
+    public @Nullable String document(String url) {
+        NodeRegistry anonymous = new NodeRegistry(null, url, null, null, null, null, false, null, true, false);
+        try {
+            return client.getDocumentText(anonymous, url, null, url);
+        } catch (NodeRegistryException e) {
+            if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND ||
+                e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
     private NodeRegistry target(String registry, String name) {
         NodeRegistry configured = registries.registryFor(name);
         return trimSlash(configured.getUrl()).equals(trimSlash(registry)) ? configured :
