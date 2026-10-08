@@ -642,7 +642,7 @@ public class YamlParser implements org.openrewrite.Parser {
         StringBuilder postFix = new StringBuilder();
         for (int i = 0; i < whitespaceAndScalar.length(); i++) {
             char c = whitespaceAndScalar.charAt(i);
-            if (c != ' ' && c != '\t') {
+            if (c != ' ' && c != '\t' && !(isForScalar && (c == '\n' || c == '\r'))) {
                 break;
             }
             postFix.append(c);
