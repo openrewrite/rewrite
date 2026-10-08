@@ -811,6 +811,44 @@ export class JavaScriptTypeMapping {
             declaration : undefined;
     }
 
+    /** The namespace whose body holds a declaration, as `namespace moment` holds `function utc`. */
+    private enclosingNamespace(declaration: ts.Node | undefined): ts.Symbol | undefined {
+        const body = declaration?.parent;
+        return body && ts.isModuleBlock(body) && ts.isIdentifier(body.parent.name) ?
+            this.checker.getSymbolAtLocation(body.parent.name) : undefined;
+    }
+
+    /**
+     * A namespace is named as written, without the `declare module` that holds it. One in a parsed
+     * module is qualified by that module, as its other top-level declarations are.
+     */
+    private namespaceName(namespace: ts.Symbol): string {
+        const name = this.checker.getFullyQualifiedName(namespace).replace(/^".*"\./, '');
+        const file = namespace.declarations?.[0]?.getSourceFile();
+        return file && !file.isDeclarationFile && ts.isExternalModule(file) ?
+            `${this.sourceModuleName(file)}.${name}` : name;
+    }
+
+    private functionOwner(declaration: ts.FunctionDeclaration): Type.FullyQualified {
+        const namespace = this.enclosingNamespace(declaration);
+        return namespace ?
+            this.moduleType(this.namespaceName(namespace)) :
+            this.sourceModuleType(declaration.getSourceFile());
+    }
+
+    /** A function declared at the top level of a module or namespace is static, as is a class's static method. */
+    private isStatic(signature: ts.Signature): boolean {
+        const declaration = signature.getDeclaration();
+        if (!declaration) {
+            return false;
+        }
+        if (ts.isFunctionDeclaration(declaration)) {
+            return ts.isSourceFile(declaration.parent) || ts.isModuleBlock(declaration.parent);
+        }
+        return ts.isMethodDeclaration(declaration) &&
+            !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
+    }
+
     private moduleType(module: string): Type.FullyQualified {
         return {
             kind: Type.Kind.Class,
@@ -866,7 +904,8 @@ export class JavaScriptTypeMapping {
         // (e.g., util.isString(): any vs util.isArray(): any)
         const declaringTypeSig = Type.signature(declaringType);
         const signatureStr = this.checker.signatureToString(signature);
-        const cacheKey = `${declaringTypeSig}#${name}${signatureStr}`;
+        const isStatic = this.isStatic(signature);
+        const cacheKey = `${isStatic ? 'static ' : ''}${declaringTypeSig}#${name}${signatureStr}`;
         const cached = this.methodCache.get(cacheKey);
         if (cached) {
             return cached;
@@ -886,7 +925,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Method object
         const method = {
             kind: Type.Kind.Method,
-            flags: 0, // FIXME - determine flags
+            flags: isStatic ? Type.Flag.Static : 0,
             declaringType: declaringType,
             name: name,
             returnType: this.getType(returnType),
@@ -996,6 +1035,7 @@ export class JavaScriptTypeMapping {
             }
 
             let symbol = this.checker.getSymbolAtLocation(node.expression);
+            const declaringNamespace = this.enclosingNamespace(signature.getDeclaration());
 
 
             if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
@@ -1063,6 +1103,9 @@ export class JavaScriptTypeMapping {
                 const declaringClass = this.declaringClassOf(symbol);
                 if (declaringClass) {
                     declaringType = declaringClass;
+                } else if (declaringNamespace) {
+                    // A callable module's receiver is typed as its function, which names no declaration
+                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
                 } else if (receiverBinding?.namespace && anonymous) {
                     declaringType = this.moduleType(receiverBinding.module);
                     if (methodName === 'default') {
@@ -1133,8 +1176,8 @@ export class JavaScriptTypeMapping {
                         if (aliasedParentSymbol && aliasedParentSymbol.declarations?.[0] &&
                             ts.isModuleDeclaration(aliasedParentSymbol.declarations[0]) &&
                             ts.isIdentifier(aliasedParentSymbol.declarations[0].name)) {
-                            // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
-                            moduleSpecifier = aliasedParentSymbol.name;
+                            // For namespace imports, use the namespace as the module specifier (e.g. `React` instead of `react`)
+                            moduleSpecifier = this.namespaceName(aliasedParentSymbol);
                         } else {
                             moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
@@ -1143,7 +1186,7 @@ export class JavaScriptTypeMapping {
 
                 const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
                 if (declared) {
-                    declaringType = this.sourceModuleType(declared.getSourceFile());
+                    declaringType = this.functionOwner(declared);
                     methodName = declared.name ? declared.name.text : "<anonymous>";
                 } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
@@ -1169,6 +1212,10 @@ export class JavaScriptTypeMapping {
                     // `const m = require('m'); m()` calls the module's default export.
                     declaringType = this.moduleType(this.requiredModuleOfExpression(node.expression)!);
                     methodName = '<default>';
+                } else if (declaringNamespace) {
+                    // A local holding a namespace's function, as `const utc = moment.utc`, calls that function
+                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
+                    methodName = ts.getNameOfDeclaration(signature.getDeclaration())?.getText() ?? methodName;
                 } else {
                     // Fall back to the original logic for non-imported functions
                     const exprType = this.checker.getTypeAtLocation(node.expression);
@@ -1266,7 +1313,9 @@ export class JavaScriptTypeMapping {
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
 
-            declaringType = this.sourceModuleType(node.getSourceFile());
+            declaringType = ts.isFunctionDeclaration(node) ?
+                this.functionOwner(node) :
+                this.sourceModuleType(node.getSourceFile());
 
             // Get type parameters from node
             if (node.typeParameters) {
