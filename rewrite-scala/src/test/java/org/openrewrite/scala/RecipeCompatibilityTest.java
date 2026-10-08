@@ -15,15 +15,27 @@
  */
 package org.openrewrite.scala;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.ChangeMethodName;
 import org.openrewrite.java.ChangeType;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.OrderImports;
 import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.scala.tree.S;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.scala.Assertions.sbt;
 import static org.openrewrite.scala.Assertions.scala;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 /**
  * Tests that common OpenRewrite Java recipes work correctly on Scala LSTs.
@@ -268,5 +280,111 @@ class RecipeCompatibilityTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Nested
+    class ExpressionReplacingStatement implements RewriteTest {
+
+        @Override
+        public void defaults(RecipeSpec spec) {
+            spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+                @Override
+                public J visitUnary(J.Unary unary, ExecutionContext ctx) {
+                    J j = super.visitUnary(unary, ctx);
+                    if (j instanceof J.Unary u && u.getOperator() == J.Unary.Type.Not &&
+                        u.getExpression() instanceof J.Parentheses<?> parens &&
+                        parens.getTree() instanceof J.Binary b && b.getOperator() == J.Binary.Type.Equal) {
+                        return b.withOperator(J.Binary.Type.NotEqual).withPrefix(u.getPrefix());
+                    }
+                    return j;
+                }
+            }));
+        }
+
+        @Test
+        void isWrapped() {
+            rewriteRun(
+              scala(
+                """
+                  class Demo {
+                    def a(a: Int, b: Int): Boolean = !(a == b)
+
+                    def b(a: Int, b: Int): Unit = {
+                      !(a == b)
+                      if (a > b) !(a == b) else !(b == a)
+                      while (a > b) !(a == b)
+                    }
+                  }
+                  """,
+                """
+                  class Demo {
+                    def a(a: Int, b: Int): Boolean = a != b
+
+                    def b(a: Int, b: Int): Unit = {
+                      a != b
+                      if (a > b) a != b else b != a
+                      while (a > b) a != b
+                    }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> assertThat(notEqualsWrappedInExpressionStatement(cu))
+                  .containsExactly(true, true, true, true, true))
+              )
+            );
+        }
+
+        @Test
+        void topLevelIsWrapped() {
+            rewriteRun(
+              sbt(
+                """
+                  val a = 1
+                  val b = 2
+                  !(a == b)
+                  """,
+                """
+                  val a = 1
+                  val b = 2
+                  a != b
+                  """,
+                spec -> spec.afterRecipe(cu -> assertThat(notEqualsWrappedInExpressionStatement(cu))
+                  .containsExactly(true))
+              )
+            );
+        }
+
+        @Test
+        void methodArgumentIsNotWrapped() {
+            rewriteRun(
+              scala(
+                """
+                  class Demo {
+                    def a(a: Int, b: Int): Unit = println(!(a == b))
+                  }
+                  """,
+                """
+                  class Demo {
+                    def a(a: Int, b: Int): Unit = println(a != b)
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> assertThat(notEqualsWrappedInExpressionStatement(cu))
+                  .containsExactly(false))
+              )
+            );
+        }
+
+        private List<Boolean> notEqualsWrappedInExpressionStatement(S.CompilationUnit cu) {
+            List<Boolean> wrapped = new ArrayList<>();
+            new ScalaIsoVisitor<Integer>() {
+                @Override
+                public J.Binary visitBinary(J.Binary binary, Integer p) {
+                    if (binary.getOperator() == J.Binary.Type.NotEqual) {
+                        wrapped.add(getCursor().getParentTreeCursor().getValue() instanceof S.ExpressionStatement);
+                    }
+                    return super.visitBinary(binary, p);
+                }
+            }.visit(cu, 0);
+            return wrapped;
+        }
     }
 }
