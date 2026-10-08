@@ -104,6 +104,12 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+
+def _is_module_function(descriptor: Dict[str, Any]) -> bool:
+    """Whether ty describes a function declared outside any class, at module level or nested."""
+    return descriptor.get('kind') == 'function' and 'declaringClassId' not in descriptor
+
+
 # `os.path` binds whichever of these the running platform provides, so a symbol
 # defined in one has no portable defining name. `os.path` names the same module
 # object on every platform, so it is the one to key them by.
@@ -1340,7 +1346,7 @@ class PythonTypeMapping:
                 ret_id = descriptor.get('returnType')
                 if params is not None or ret_id is not None:
                     return self._method_from_function_descriptor(
-                        descriptor, node.name)
+                        descriptor, node.name, self._is_static_declaration(node, descriptor))
 
         # Fallback: build from individual parameter/return annotation types
         param_names: List[str] = []
@@ -1369,7 +1375,7 @@ class PythonTypeMapping:
             return None
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_declaration(node, None) else 0,
             _declaring_type=None,
             _name=node.name,
             _return_type=return_type,
@@ -1378,8 +1384,16 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    @staticmethod
+    def _is_static_declaration(node: ast.FunctionDef, descriptor: Optional[Dict[str, Any]]) -> bool:
+        """A function declared outside a class is static, as is a static method or a classmethod."""
+        if descriptor is not None and _is_module_function(descriptor):
+            return True
+        return any(isinstance(d, ast.Name) and d.id in ('staticmethod', 'classmethod')
+                   for d in node.decorator_list)
+
     def _method_from_function_descriptor(
-            self, descriptor: Dict[str, Any], name: str
+            self, descriptor: Dict[str, Any], name: str, static: bool
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
         param_names, param_types = self._process_method_params(
@@ -1393,7 +1407,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if static else 0,
             _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
@@ -2052,7 +2066,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if _is_module_function(descriptor) else 0,
             _declaring_type=declaring_type,
             _name=name,
             _return_type=return_type,
