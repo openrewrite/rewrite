@@ -251,12 +251,8 @@ public class ExcludeDependency extends Recipe {
         J.Lambda freshLambda = parseFreshLambda(kotlinDsl, effG, effA, ctx);
         List<Expression> args = m.getArguments();
         if (!kotlinDsl) {
-            // In Groovy's parens-less form (`implementation 'g:a:v'`), each existing arg carries an
-            // OmitParentheses marker that tells the printer to skip the method's parens entirely.
-            // Keeping those would print as `implementation 'g:a:v', { ... }`; stripping them restores
-            // `implementation('g:a:v') { ... }`. The new trailing-closure lambda keeps its own marker.
-            // The first arg's leading space (from the parens-less form) also has to be cleared so the
-            // reinstated parens don't print as `implementation( 'g:a:v')`.
+            // Reinstate parens on Groovy's parens-less invocation form (strip OmitParentheses + leading
+            // space on existing args) so the trailing-closure lambda prints correctly.
             args = ListUtils.map(args, (idx, a) -> {
                 Expression stripped = a.withMarkers(a.getMarkers()
                         .removeByType(OmitParentheses.class)
