@@ -73,6 +73,7 @@ public class RemoteFile implements Remote {
                 if (response.isSuccessful()) {
                     return response.getBody();
                 } else {
+                    response.close();
                     throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
                 }
             }, ctx.getOnError());

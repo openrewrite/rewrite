@@ -166,6 +166,7 @@ public class RemoteArchive implements Remote {
         //noinspection resource
         HttpSender.Response response = RemoteDownload.get(httpSender, uri, ctx);
         if (!response.isSuccessful()) {
+            response.close();
             throw new IllegalStateException("Failed to download " + uri + " to artifact cache got an " + response.getCode());
         }
         InputStream body = response.getBody();
