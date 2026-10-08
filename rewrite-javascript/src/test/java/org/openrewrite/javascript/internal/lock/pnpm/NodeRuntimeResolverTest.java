@@ -84,7 +84,8 @@ class NodeRuntimeResolverTest {
     void getNodeMirrorDefaults() {
         assertThat(NodeRuntimeResolver.getNodeMirror(Collections.emptyMap(), "release"))
           .isEqualTo("https://nodejs.org/download/release/");
-        assertThat(NodeRuntimeResolver.getNodeMirror(null, "release")).isEqualTo("https://nodejs.org/download/release/");
+        assertThat(NodeRuntimeResolver.getNodeMirror(null, "release"))
+          .isEqualTo("https://nodejs.org/download/release/");
         assertThat(NodeRuntimeResolver.getNodeMirror(Collections.singletonMap("release",
           "http://test.mirror.localhost"), "release")).isEqualTo("http://test.mirror.localhost/");
     }

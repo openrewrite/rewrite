@@ -23,8 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Yarn's packages/yarnpkg-core/tests/semverUtils.test.ts {@code satisfiesWithPrereleases} cases, and what the function
- * pnpm 11.2.2 bundles answers under node over semver 7.8.0 for a version whose prerelease the fallback drops
- * ({@code .lockwork/bin/pcf-swp-probe.js}).
+ * pnpm 11.2.2 bundles answers, run under node over semver 7.8.0, for a version whose prerelease the fallback drops.
  */
 class SemverUtilsTest {
 
