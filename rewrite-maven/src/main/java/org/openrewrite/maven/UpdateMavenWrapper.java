@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -38,6 +37,9 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -140,18 +142,27 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         return validated;
     }
 
-    @NonFinal
-    @Nullable
-    transient MavenWrapper mavenWrapper;
-
-    private MavenWrapper getMavenWrapper(ExecutionContext ctx) {
-        if (mavenWrapper == null) {
-            mavenWrapper = MavenWrapper.create(wrapperVersion, wrapperDistribution, distributionVersion, repositoryUrl, ctx);
+    private MavenWrapper getMavenWrapper(MavenWrapperState acc, ExecutionContext ctx) {
+        synchronized (acc) {
+            if (acc.mavenWrapperFailure != null) {
+                throw acc.mavenWrapperFailure;
+            }
+            if (acc.mavenWrapper == null) {
+                try {
+                    acc.mavenWrapper = MavenWrapper.create(wrapperVersion, wrapperDistribution, distributionVersion, repositoryUrl, ctx);
+                } catch (RuntimeException e) {
+                    acc.mavenWrapperFailure = e;
+                    throw e;
+                }
+            }
+            return acc.mavenWrapper;
         }
-        return mavenWrapper;
     }
 
     static class MavenWrapperState {
+        @Nullable MavenWrapper mavenWrapper;
+        @Nullable RuntimeException mavenWrapperFailure;
+
         boolean mavenProject = false;
         boolean needsWrapperUpdate = false;
 
@@ -195,7 +206,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             return false;
                         }
 
-                        MavenWrapper mavenWrapper = getMavenWrapper(ctx);
+                        MavenWrapper mavenWrapper = getMavenWrapper(acc, ctx);
 
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
                         int compare = versionComparator.compare(null, currentVersion, mavenWrapper.getDistributionVersion());
@@ -223,7 +234,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
 
                     @Override
                     public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-                        MavenWrapper mavenWrapper = getMavenWrapper(ctx);
+                        MavenWrapper mavenWrapper = getMavenWrapper(acc, ctx);
                         if ("distributionUrl".equals(entry.getKey())) {
                             // Typical example: https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
                             String currentDistributionUrl = entry.getValue().getText();
@@ -251,18 +262,16 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                             acc.mavenProject = true;
                         }
 
-                        MavenWrapper mavenWrapper = getMavenWrapper(ctx);
-
                         if (sourceFile instanceof Quark || sourceFile instanceof Remote) {
                             if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                                 acc.addMavenWrapperJar = false;
-                                if (mavenWrapper.getWrapperDistributionType() != DistributionType.Bin) {
+                                if (getMavenWrapper(acc, ctx).getWrapperDistributionType() != DistributionType.Bin) {
                                     acc.needsWrapperUpdate = true;
                                 }
                                 return true;
                             } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_DOWNLOADER_LOCATION)) {
                                 acc.addMavenWrapperDownloader = false;
-                                if (mavenWrapper.getWrapperDistributionType() != DistributionType.Source) {
+                                if (getMavenWrapper(acc, ctx).getWrapperDistributionType() != DistributionType.Source) {
                                     acc.needsWrapperUpdate = true;
                                 }
                                 return true;
@@ -295,7 +304,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             return emptyList();
         }
 
-        MavenWrapper mavenWrapper = getMavenWrapper(ctx);
+        MavenWrapper mavenWrapper = getMavenWrapper(acc, ctx);
         if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
             if (!(acc.addMavenWrapperJar || acc.addMavenWrapperProperties || acc.addMavenBatchScript || acc.addMavenShellScript)) {
                 return emptyList();
@@ -356,9 +365,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin && acc.addMavenWrapperJar) {
-            mavenWrapperFiles.add(mavenWrapper.wrapperJar());
+            mavenWrapperFiles.add(downloaded(mavenWrapper.wrapperJar(), ctx));
         } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.Source && acc.addMavenWrapperDownloader) {
-            mavenWrapperFiles.add(mavenWrapper.wrapperDownloader());
+            mavenWrapperFiles.add(downloaded(mavenWrapper.wrapperDownloader(), ctx));
         }
 
         return mavenWrapperFiles;
@@ -396,7 +405,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     }
                 }
 
-                MavenWrapper mavenWrapper = getMavenWrapper(ctx);
+                MavenWrapper mavenWrapper = getMavenWrapper(acc, ctx);
 
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
                     String mvnwText = unixScript(mavenWrapper, ctx);
@@ -420,7 +429,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                 }
                 if (mavenWrapper.getWrapperDistributionType() == DistributionType.Bin) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperJar(sourceFile);
+                        return downloaded(mavenWrapper.wrapperJar(sourceFile), ctx);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
@@ -428,7 +437,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     }
                 } else if (mavenWrapper.getWrapperDistributionType() == DistributionType.Source) {
                     if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH)) {
-                        return mavenWrapper.wrapperDownloader(sourceFile);
+                        return downloaded(mavenWrapper.wrapperDownloader(sourceFile), ctx);
                     }
 
                     if (PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
@@ -473,6 +482,19 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
             return sourceFile.withFileAttributes(attributes.withExecutable(true));
         }
         return sourceFile;
+    }
+
+    /**
+     * Downloads the remote into the {@link org.openrewrite.remote.RemoteArtifactCache} on disk while the credentials
+     * registered on this context are available, so that results written out with another context on this machine
+     * are served from the cache.
+     */
+    private static Remote downloaded(Remote remote, ExecutionContext ctx) {
+        try (InputStream ignored = remote.getInputStream(ctx)) {
+            return remote;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private String unixScript(MavenWrapper mavenWrapper, ExecutionContext ctx) {
