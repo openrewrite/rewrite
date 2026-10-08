@@ -17,11 +17,12 @@
  * pnpm's lockfile model and resolver, ported from pnpm 11.2.2 (pnpm/pnpm, tag v11.2.2): lockfile/types,
  * lockfile/fs (read, write, the format converters, sortLockfileKeys, the env document), lockfile/merger,
  * lockfile/settings-checker, lockfile/verification, lockfile/preferred-versions, deps/path, object/key-sorting,
- * config/reader (the defaults and the settings pnpm-workspace.yaml gives), config/parse-overrides, catalogs/*,
- * workspace/workspace-manifest-reader, workspace/projects-reader, resolving/resolver-base,
- * resolving/parse-wanted-dependency, resolving/npm-resolver (pickPackage, pickPackageFromMeta),
- * crypto/object-hasher, crypto/hash and installing/deps-installer (the lock-only install). pnpm is distributed under
- * the MIT License:
+ * config/reader (the .npmrc, pnpm-workspace.yaml and environment settings), config/matcher, config/version-policy,
+ * config/pick-registry-for-package, config/parse-overrides, catalogs/*, workspace/workspace-manifest-reader,
+ * workspace/projects-reader, resolving/resolver-base, resolving/parse-wanted-dependency, resolving/npm-resolver
+ * (pickPackage, pickPackageFromMeta, the resolution verifier, trustChecks), resolving/registry/pkg-metadata-filter,
+ * crypto/object-hasher, crypto/hash and installing/deps-installer (the lock-only install and the lockfile's
+ * verification). pnpm is distributed under the MIT License:
  * <pre>
  * Copyright (c) 2015-2016 Rico Sta. Cruz and other contributors
  * Copyright (c) 2016-2026 Zoltan Kochan and other contributors
@@ -49,7 +50,22 @@
  * sort-keys 6.0.0 and is-plain-obj 4.1.0 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
  * (https://sindresorhus.com)) with @pnpm/util.lex-comparator 3.0.2 and comver-to-semver 2.0.0 (Copyright (c)
  * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
- * and version-selector-type 3.0.0 (Copyright (c) 2016-2026 Zoltan Kochan).
+ * version-selector-type 3.0.0 (Copyright (c) 2017-2020 Zoltan Kochan &lt;z@kochan.io&gt;); parse-npm-tarball-url
+ * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); and @pnpm/config.env-replace 4.1.0.
+ * <p>
+ * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2, distributed under the ISC License:
+ * <pre>
+ * Copyright (c) 2015, npm, Inc
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby
+ * granted, provided that the above copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
+ * </pre>
  * <p>
  * The compatibility database pnpm applies, {@code compat-db.json}, is generated from @yarnpkg/extensions 2.0.6,
  * distributed under the BSD 2-Clause License:

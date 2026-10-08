@@ -23,14 +23,14 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
 /**
  * The data model of @pnpm/installing.deps-resolver src/resolveDependencies.ts and src/getNonDevWantedDependencies.ts
- * (pnpm 11.2.2): the dependencies a manifest wants, the package each resolves to, the edge that reached it, and the
- * dependency tree they form before peers are resolved.
+ * (pnpm 11.2.2).
  */
 final class ResolveDependencies {
 
@@ -156,6 +156,36 @@ final class ResolveDependencies {
         private boolean dev;
         private @Nullable Map<String, @Nullable Object> resolution;
         private @Nullable String name;
+    }
+
+    /**
+     * {@code PendingNode}: a node whose children are resolved after its siblings, with the package ids above it.
+     */
+    @Value
+    static class PendingNode {
+        String alias;
+        NodeId nodeId;
+        ResolvedPackage resolvedPackage;
+        int depth;
+        boolean installable;
+        List<String> parentIds;
+    }
+
+    /**
+     * {@code MissingPeersOfChildren}: the peers a node's children miss, settled once its children are resolved.
+     */
+    @Getter
+    @Setter
+    static final class MissingPeersOfChildren {
+        private @Nullable Map<String, PeerDependency> missingPeers;
+        private @Nullable RuntimeException error;
+        private boolean resolved;
+    }
+
+    /**
+     * {@code ParentPkgAliases}: the aliases above a node, each the edge that resolved it or {@code true}.
+     */
+    static final class ParentPkgAliases extends LinkedHashMap<String, Object> {
     }
 
     /**

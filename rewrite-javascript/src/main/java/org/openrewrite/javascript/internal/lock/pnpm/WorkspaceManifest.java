@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/workspace.workspace-manifest-reader src/index.ts and src/catalogs.ts (pnpm 11.2.2): pnpm-workspace.yaml
- * read and validated. The manifest is the JavaScript object read, the settings pnpm takes from it among its keys.
+ * Port of @pnpm/workspace.workspace-manifest-reader src/index.ts and src/catalogs.ts
+ * (pnpm 11.2.2).
  */
 final class WorkspaceManifest {
 

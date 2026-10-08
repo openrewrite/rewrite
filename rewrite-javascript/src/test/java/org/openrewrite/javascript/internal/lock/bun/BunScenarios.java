@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  * itself when it holds Bun scenarios. {@code REWRITE_LOCK_HTTP_CACHE} names a directory of registry responses a
  * scenario's own {@code http/} falls back on.
  * <p>
- * The layout is the one {@code record-bun.sh} writes: {@code pkg-before}, {@code before}, {@code pkg},
+ * The layout: {@code pkg-before}, {@code before}, {@code pkg},
  * {@code after}, {@code fresh}, a hand-made starting lock {@code lock-before} (copied to {@code before}), the project
  * config {@code npmrc} and {@code bunfig} (with {@code npmrc-before} and {@code bunfig-before} for the first phase),
  * the project files {@code tree-before/} and {@code tree/} copied over it before each phase, and {@code http/}.

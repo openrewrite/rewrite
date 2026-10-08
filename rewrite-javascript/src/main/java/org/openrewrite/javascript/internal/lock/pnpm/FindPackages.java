@@ -15,43 +15,49 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/workspace.projects-reader src/index.ts {@code findWorkspaceProjectsNoCheck} and src/findPackages.ts
- * (pnpm 11.2.2), with @pnpm/lockfile.fs {@code getLockfileImporterId}: the workspace's projects among the
- * package.json files the project holds, as directories relative to the lock's.
- * <p>
- * tinyglobby 0.2.16 and picomatch 4 are not ported: the patterns are matched with a subset of their syntax
- * ({@code *}, {@code **}, {@code ?}, {@code [...]}, {@code {a,b}}, a leading {@code !} as an ignore, dot files not
- * matched by wildcards); a pattern beyond it is cannot-know.
+ * (pnpm 11.2.2), with @pnpm/lockfile.fs {@code getLockfileImporterId}, over the directories holding a package.json.
  */
 final class FindPackages {
 
+    private static final List<String> DEFAULT_IGNORE = Arrays.asList("**/node_modules/**", "**/bower_components/**",
+            "**/test/**", "**/tests/**");
     private static final List<String> IGNORE = Arrays.asList("**/node_modules/**", "**/bower_components/**");
 
     private FindPackages() {
     }
 
     /**
-     * The directories of the workspace's projects, sorted as pnpm sorts them ({@code ""} is the root).
+     * {@code findWorkspaceProjectsNoCheck}: the directories of the workspace's projects, sorted as pnpm sorts them
+     * ({@code ""} is the root).
      *
      * @param manifestDirs the directories holding a package.json
      */
     static List<String> findWorkspaceProjects(Collection<String> manifestDirs, List<String> patterns) {
-        List<String> normalized = new ArrayList<>();
-        for (String pattern : patterns) {
-            normalized.add(pattern.replaceFirst("/?\\z", "/package.{json,yaml,json5}"));
-        }
+        List<String> projects = findPackages(manifestDirs, patterns, IGNORE, true);
+        projects.sort(KeySorting::lexCompare);
+        return projects;
+    }
+
+    /**
+     * {@code findPackages}: the directories whose package.json the patterns match, deduplicated, by directory.
+     */
+    static List<String> findPackages(Collection<String> manifestDirs, @Nullable List<String> patterns,
+                                     @Nullable List<String> ignorePatterns, boolean includeRoot) {
+        List<String> normalized = normalizePatterns(patterns == null ? Arrays.asList(".", "**") : patterns);
         List<Pattern> include = new ArrayList<>();
         List<Pattern> ignore = new ArrayList<>();
-        for (String pattern : IGNORE) {
+        for (String pattern : ignorePatterns == null ? DEFAULT_IGNORE : ignorePatterns) {
             ignore.add(toRegex(pattern));
         }
         for (String pattern : normalized) {
@@ -61,17 +67,26 @@ final class FindPackages {
                 include.add(toRegex(pattern));
             }
         }
-        Set<String> found = new LinkedHashSet<>();
+        List<String> paths = new ArrayList<>();
         for (String dir : manifestDirs) {
             String manifestPath = dir.isEmpty() ? "package.json" : dir + "/package.json";
             if (matchesAny(include, manifestPath) && !matchesAny(ignore, manifestPath)) {
-                found.add(dir);
+                paths.add(dir);
             }
         }
-        found.add("");
-        List<String> projects = new ArrayList<>(found);
-        projects.sort(KeySorting::lexCompare);
-        return projects;
+        if (includeRoot && manifestDirs.contains("")) {
+            paths.add("");
+        }
+        paths.sort(KeySorting::lexCompare);
+        return new ArrayList<>(new LinkedHashSet<>(paths));
+    }
+
+    private static List<String> normalizePatterns(List<String> patterns) {
+        List<String> normalized = new ArrayList<>();
+        for (String pattern : patterns) {
+            normalized.add(pattern.replaceFirst("/?\\z", "/package.{json,yaml,json5}"));
+        }
+        return normalized;
     }
 
     /**
@@ -92,10 +107,13 @@ final class FindPackages {
 
     static Pattern toRegex(String glob) {
         String pattern = glob.startsWith("./") ? glob.substring(2) : glob;
-        if (pattern.startsWith("../") || pattern.startsWith("/") ||
-            pattern.matches(".*[@!+*?]\\(.*") || pattern.contains("\\")) {
-            throw new CannotKnow("the projects the workspace pattern \"" + glob + "\" matches " +
-                                 "(tinyglobby is not ported beyond *, **, ?, [...] and {a,b})");
+        if (pattern.startsWith("../") || pattern.startsWith("/")) {
+            throw new CannotKnow("the projects the workspace pattern \"" + glob + "\" matches (paths outside the " +
+                                 "project)");
+        }
+        if (pattern.matches(".*[@!+*?]\\(.*") || pattern.contains("\\")) {
+            throw new CannotKnow("the projects the workspace pattern \"" + glob + "\" matches (an extglob or " +
+                                 "escape, which this port of tinyglobby 0.2.16 does not match)");
         }
         StringBuilder regex = new StringBuilder();
         String[] segments = pattern.split("/", -1);

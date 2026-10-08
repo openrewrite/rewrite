@@ -29,10 +29,9 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Port of @pnpm/resolving.npm-resolver src/pickPackageFromMeta.ts and src/parseBareSpecifier.ts, with
- * @pnpm/resolving.registry.pkg-metadata-filter and parse-npm-tarball-url 5.0.0 (pnpm 11.2.2): which version of a
- * packument a registry specifier selects, the preferred versions ranked by weight, the versions published after a
- * cutoff left out.
+ * Port of @pnpm/resolving.npm-resolver src/pickPackageFromMeta.ts and src/parseBareSpecifier.ts
+ * (pnpm 11.2.2), with @pnpm/resolving.registry.pkg-metadata-filter and parse-npm-tarball-url
+ * 5.0.0.
  */
 final class PickPackageFromMeta {
 

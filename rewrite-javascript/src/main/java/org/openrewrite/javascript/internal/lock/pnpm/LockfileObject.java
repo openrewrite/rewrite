@@ -23,11 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Port of @pnpm/lockfile.types {@code LockfileObject} (pnpm 11.2.2): the lock as pnpm holds it in memory, the
- * file's {@code packages} and {@code snapshots} merged per dependency path and each importer's specifiers split
- * out. Every other top-level key ({@code lockfileVersion}, {@code settings}, {@code catalogs}, {@code overrides},
- * the checksums, {@code patchedDependencies}, {@code ignoredOptionalDependencies}, {@code time}, and any key pnpm
- * does not know) is held as the JavaScript value read, as the spread in {@code convertToLockfileObject} holds it.
+ * Port of @pnpm/lockfile.types {@code LockfileObject} (pnpm 11.2.2), every top-level key but the
+ * importers and packages held as the value read.
  */
 @Getter
 @Setter

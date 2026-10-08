@@ -23,11 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/lockfile.types {@code PackageSnapshot} (pnpm 11.2.2): a {@code packages} entry and a
- * {@code snapshots} entry of the file merged, one per dependency path. The fields pnpm takes from a package's
- * manifest ({@code resolution}, {@code engines}, {@code cpu}, {@code os}, {@code libc}, {@code deprecated},
- * {@code hasBin}, {@code bundledDependencies}, {@code peerDependencies}, {@code peerDependenciesMeta},
- * {@code optional}) are the JavaScript values read; the references and names pnpm writes itself are typed.
+ * Port of @pnpm/lockfile.types {@code PackageSnapshot} (pnpm 11.2.2): a packages entry and its
+ * snapshots entry merged.
  */
 @Getter
 @Setter

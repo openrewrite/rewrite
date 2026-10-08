@@ -28,10 +28,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/config.parse-overrides src/index.ts, @pnpm/resolving.parse-wanted-dependency src/index.ts and
- * validate-npm-package-name 7.0.2's {@code validForOldPackages} (pnpm 11.2.2): the {@code overrides} of
- * pnpm-workspace.yaml as selectors, and {@code createOverridesMapFromParsed} of
- * @pnpm/lockfile.settings-checker.
+ * Port of @pnpm/config.parse-overrides src/index.ts and @pnpm/resolving.parse-wanted-dependency
+ * (pnpm 11.2.2), with validate-npm-package-name 7.0.2's {@code validForOldPackages}.
  */
 final class ParseOverrides {
 

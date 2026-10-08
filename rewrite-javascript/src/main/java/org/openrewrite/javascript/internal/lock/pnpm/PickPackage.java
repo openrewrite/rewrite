@@ -26,10 +26,8 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Port of @pnpm/resolving.npm-resolver src/pickPackage.ts (pnpm 11.2.2), the pickers {@code pickPackage} runs over a
- * packument once it has one: {@code minimumReleaseAge} respected (the highest mature version, else the lowest of
- * any age) or not ({@code resolutionMode}'s lowest or highest), with the {@code latest} tag as a second candidate.
- * Fetching the packument (abbreviated, or full when the age policy needs {@code time}) is the resolver's.
+ * Port of @pnpm/resolving.npm-resolver src/pickPackage.ts (pnpm 11.2.2), the pickers it runs over a
+ * packument.
  */
 final class PickPackage {
 

@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @pnpm/lockfile.verification (pnpm 11.2.2): {@code satisfiesPackageManifest},
- * {@code allProjectsAreUpToDate} with {@code linkedPackagesAreUpToDate} and {@code localTarballDepsAreUpToDate},
- * {@code allCatalogsAreUpToDate} and {@code diffFlatRecords}; with @pnpm/lockfile.utils {@code refIsLocalDirectory}
- * and {@code refIsLocalTarball}, and version-selector-type 3.0.0.
+ * Port of @pnpm/lockfile.verification (pnpm 11.2.2), with @pnpm/lockfile.utils' refIsLocalDirectory
+ * and refIsLocalTarball and version-selector-type 3.0.0.
  */
 final class Verification {
 

@@ -25,10 +25,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Port of @pnpm/lockfile.preferred-versions src/index.ts and the version selector types of
- * @pnpm/resolving.resolver-base (pnpm 11.2.2): the versions a resolution prefers, by package name then selector,
- * each with the weight that ranks it. Every version the lock holds weighs {@link #EXISTING_VERSION_SELECTOR_WEIGHT},
- * every specifier of a manifest {@link #DIRECT_DEP_SELECTOR_WEIGHT}.
+ * Port of @pnpm/lockfile.preferred-versions src/index.ts and resolver-base's version selector
+ * types (pnpm 11.2.2).
  */
 final class PreferredVersions {
 

@@ -28,12 +28,8 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/lockfile.fs src/lockfileFormatConverters.ts (pnpm 11.2.2): the file form of the lock (the
- * JavaScript values js-yaml reads and writes) to {@link LockfileObject} and back.
- * <p>
- * The object form is typed where pnpm writes the values itself (references, specifiers, names, versions); a
- * file holding another type there (a number, a null) is not a lock pnpm writes, and what pnpm makes of it
- * depends on JavaScript coercions this port does not model: the reader reports that as cannot-know.
+ * Port of @pnpm/lockfile.fs src/lockfileFormatConverters.ts (pnpm 11.2.2); a value of a type
+ * pnpm does not write is cannot-know.
  */
 final class LockfileFormatConverters {
 

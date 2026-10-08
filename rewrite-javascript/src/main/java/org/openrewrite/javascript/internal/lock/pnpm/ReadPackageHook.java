@@ -32,10 +32,7 @@ import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Port of @pnpm/hooks.read-package-hook (pnpm 11.2.2), with @pnpm/config.matcher and @pnpm/deps.peer-range: the
- * manifest rewriting pnpm applies to every manifest it reads, importers included, in its order: the compatibility
- * database (@yarnpkg/extensions 2.0.6, {@code compat-db.json.gz}), {@code packageExtensions}, {@code overrides},
- * {@code ignoredOptionalDependencies}. A {@code .pnpmfile} hook is JavaScript the engine does not run.
+ * Port of @pnpm/hooks.read-package-hook (pnpm 11.2.2), with @pnpm/deps.peer-range.
  */
 final class ReadPackageHook {
 
