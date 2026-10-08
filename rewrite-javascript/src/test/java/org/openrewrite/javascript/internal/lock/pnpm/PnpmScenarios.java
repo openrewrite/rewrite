@@ -166,6 +166,12 @@ final class PnpmScenarios {
         private final Path dir;
         private final @Nullable Path httpCache;
 
+        /**
+         * A downloaded fixture's re-recording with pnpm 11.2.2 ({@code fixture-<name>}): the same locks and
+         * manifests, with the registry documents, clock and host the fixture does not record.
+         */
+        private @Nullable Scenario reRecording;
+
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             this.name = name;
             this.label = label;
@@ -485,6 +491,12 @@ final class PnpmScenarios {
         Path corpus = corpusRoot();
         if (corpus != null) {
             collect(corpus, httpCache, found);
+        }
+        for (Scenario scenario : found.values()) {
+            Scenario reRecording = found.get("fixture-" + scenario.getName());
+            if (scenario.recordedWith() == null && reRecording != null && reRecording.recordedWith() != null) {
+                scenario.reRecording = reRecording;
+            }
         }
         return new ArrayList<>(found.values());
     }

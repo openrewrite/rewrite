@@ -49,7 +49,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * {@code expect} line: {@code exact} (pnpm's {@code after} byte for byte; the default when {@code after} is
  * present), {@code cannot-know <what>} (every package, spec and URL it names), {@code malformed}, {@code pm-rejects
  * <code>} or {@code second-install-rejects <code>}. A fixture recorded elsewhere may lack registry responses: it is
- * replayed when a cache fills them and skipped when it cannot be served. When
+ * replayed with its re-recording's when there is one, else when a cache fills them, and skipped when it cannot be
+ * served. When
  * {@code REWRITE_LOCK_PNPM_SCENARIO_RESULTS} names a file, one line per edit is written there.
  */
 class PnpmScenarioTest {
@@ -96,18 +97,23 @@ class PnpmScenarioTest {
         if (npmrc != null) {
             files.put(".npmrc", npmrc);
         }
+        PnpmScenarios.Scenario recording = recording(scenario);
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock)
           .manifests(scenario.manifests(false, lock))
           .files(files)
-          .now(scenario.phaseTime("after"))
-          .registry(new ScenarioRegistry(scenario, "after"))
-          .host(host(scenario.recordedWith()));
-        if (scenario.recordedWith() == null) {
+          .now(recording.phaseTime("after"))
+          .registry(new ScenarioRegistry(recording, "after"))
+          .host(host(recording.recordedWith()));
+        if (recording.recordedWith() == null) {
             // a downloaded fixture records no clock and no publish times
             inputs.env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"));
         }
         return inputs.build();
+    }
+
+    private static PnpmScenarios.Scenario recording(PnpmScenarios.Scenario scenario) {
+        return scenario.getReRecording() != null ? scenario.getReRecording() : scenario;
     }
 
     private static Host host(@Nullable String recordedWith) {
@@ -151,7 +157,7 @@ class PnpmScenarioTest {
         try {
             result = new PnpmLockRegenerator(inputs(scenario, scenario.file("before"))).regenerate();
         } catch (ScenarioRegistry.RouteNotRecorded e) {
-            if (scenario.recordedWith() == null && scenario.getHttpCache() == null) {
+            if (recording(scenario).recordedWith() == null && scenario.getHttpCache() == null) {
                 record(name, "skipped", "not served offline: " + e.getMessage());
                 assumeTrue(false, name + " cannot be replayed offline: " + e.getMessage());
             }
