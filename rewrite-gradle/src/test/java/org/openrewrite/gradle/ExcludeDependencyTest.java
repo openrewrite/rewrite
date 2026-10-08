@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.buildGradleKts;
 import static org.openrewrite.gradle.toolingapi.Assertions.withToolingApi;
@@ -502,6 +503,124 @@ class ExcludeDependencyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    void groupOnlyInputEmitsGroupOnlyExclude() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("commons-logging", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moduleOnlyInputEmitsModuleOnlyExclude() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("*", "commons-logging", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude module: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslGroupOnlyInputEmitsGroupOnlyExclude() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("commons-logging", null, null)),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
+              }
+              """,
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "commons-logging")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void validationFailsWhenBothCoordinatesAreOmitted() {
+        assertThat(new ExcludeDependency(null, null, null).validate().isValid()).isFalse();
+        assertThat(new ExcludeDependency("*", "*", null).validate().isValid()).isFalse();
+        assertThat(new ExcludeDependency("", "", null).validate().isValid()).isFalse();
     }
 
     @Test

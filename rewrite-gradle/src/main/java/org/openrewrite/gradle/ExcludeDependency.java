@@ -26,6 +26,7 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.Validated;
 import org.openrewrite.gradle.trait.GradleDependency;
 import org.openrewrite.groovy.marker.OmitParentheses;
 import org.openrewrite.groovy.tree.G;
@@ -48,13 +49,19 @@ import static java.util.Collections.singletonList;
 public class ExcludeDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
-            example = "com.google.guava")
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. " +
+                    "If omitted (or `*`), the exclude targets every group containing the given artifact.",
+            example = "com.google.guava",
+            required = false)
+    @Nullable
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
-            example = "guava")
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. " +
+                    "If omitted (or `*`), the exclude targets every artifact in the given group.",
+            example = "guava",
+            required = false)
+    @Nullable
     String artifactId;
 
     @Option(displayName = "Configuration",
@@ -72,7 +79,9 @@ public class ExcludeDependency extends Recipe {
 
     @Override
     public String getInstanceNameSuffix() {
-        return String.format("`%s:%s`", groupId, artifactId);
+        return String.format("`%s:%s`",
+                groupId == null ? "*" : groupId,
+                artifactId == null ? "*" : artifactId);
     }
 
     @Override
@@ -83,7 +92,22 @@ public class ExcludeDependency extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return super.validate().and(Validated.test(
+                "coordinates",
+                "At least one of `groupId` or `artifactId` must be provided (and not `*`)",
+                this,
+                r -> effective(r.groupId) != null || effective(r.artifactId) != null));
+    }
+
+    private static @Nullable String effective(@Nullable String v) {
+        return (v == null || v.isEmpty() || "*".equals(v)) ? null : v;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        String effG = effective(groupId);
+        String effA = effective(artifactId);
         return Preconditions.check(new IsBuildGradle<>(),
                 new GradleDependency.Matcher()
                         .configuration(configuration)
@@ -95,23 +119,26 @@ public class ExcludeDependency extends Recipe {
                                 return m;
                             }
 
-                            // If the direct dep itself is g:a, leave it alone — RemoveDependency's job.
-                            if (groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId())) {
+                            // If the direct dep itself matches the exclusion target, leave it alone —
+                            // that's RemoveDependency's job.
+                            boolean groupMatchesDirect = effG == null || effG.equals(dep.getGroupId());
+                            boolean artifactMatchesDirect = effA == null || effA.equals(dep.getArtifactId());
+                            if (groupMatchesDirect && artifactMatchesDirect) {
                                 return m;
                             }
 
-                            // Transitive match? Exact comparison, no glob.
-                            if (dep.getResolvedDependency().findDependency(groupId, artifactId) == null) {
+                            // Transitive match (null side = match anything).
+                            if (dep.getResolvedDependency().findDependency(effG, effA) == null) {
                                 return m;
                             }
 
                             boolean kotlinDsl = dep.getCursor().firstEnclosing(K.CompilationUnit.class) != null;
 
-                            if (alreadyExcludedBy(m, kotlinDsl)) {
+                            if (alreadyExcludedBy(m, kotlinDsl, effG, effA)) {
                                 return m;
                             }
 
-                            return attachExclude(m, kotlinDsl, ctx);
+                            return attachExclude(m, kotlinDsl, effG, effA, ctx);
                         }));
     }
 
@@ -127,7 +154,8 @@ public class ExcludeDependency extends Recipe {
         return false;
     }
 
-    private boolean alreadyExcludedBy(J.MethodInvocation m, boolean kotlinDsl) {
+    private boolean alreadyExcludedBy(J.MethodInvocation m, boolean kotlinDsl,
+                                      @Nullable String effG, @Nullable String effA) {
         J.Lambda lambda = trailingLambda(m);
         if (lambda == null || !(lambda.getBody() instanceof J.Block)) {
             return false;
@@ -144,11 +172,13 @@ public class ExcludeDependency extends Recipe {
             if (!"exclude".equals(stmt.getSimpleName())) {
                 continue;
             }
-            String g = extractNamedArg(stmt, "group", kotlinDsl);
-            String a = extractNamedArg(stmt, "module", kotlinDsl);
-            boolean groupCovers = g == null || Objects.equals(g, groupId);
-            boolean moduleCovers = a == null || Objects.equals(a, artifactId);
-            if (groupCovers && moduleCovers && (g != null || a != null)) {
+            String existingG = extractNamedArg(stmt, "group", kotlinDsl);
+            String existingA = extractNamedArg(stmt, "module", kotlinDsl);
+            // Existing covers target if its filter is broader than or equal to ours.
+            // null on existing = "any", so always covers; non-null existing must match target exactly.
+            boolean groupCovers = existingG == null || Objects.equals(existingG, effG);
+            boolean moduleCovers = existingA == null || Objects.equals(existingA, effA);
+            if (groupCovers && moduleCovers && (existingG != null || existingA != null)) {
                 return true;
             }
         }
@@ -204,10 +234,11 @@ public class ExcludeDependency extends Recipe {
         return null;
     }
 
-    private J.MethodInvocation attachExclude(J.MethodInvocation m, boolean kotlinDsl, ExecutionContext ctx) {
+    private J.MethodInvocation attachExclude(J.MethodInvocation m, boolean kotlinDsl,
+                                             @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
         J.Lambda existingLambda = trailingLambda(m);
         if (existingLambda != null && existingLambda.getBody() instanceof J.Block) {
-            Statement excludeStmt = parseExcludeStatement(kotlinDsl, ctx);
+            Statement excludeStmt = parseExcludeStatement(kotlinDsl, effG, effA, ctx);
             J.Block body = (J.Block) existingLambda.getBody();
             Space indentPrefix = body.getStatements().isEmpty() ?
                     Space.format("\n    ") :
@@ -217,7 +248,7 @@ public class ExcludeDependency extends Recipe {
             J.Lambda newLambda = existingLambda.withBody(newBody);
             return m.withArguments(ListUtils.map(m.getArguments(), a -> a == existingLambda ? newLambda : a));
         }
-        J.Lambda freshLambda = parseFreshLambda(kotlinDsl, ctx);
+        J.Lambda freshLambda = parseFreshLambda(kotlinDsl, effG, effA, ctx);
         List<Expression> args = m.getArguments();
         if (!kotlinDsl) {
             // In Groovy's parens-less form (`implementation 'g:a:v'`), each existing arg carries an
@@ -253,36 +284,54 @@ public class ExcludeDependency extends Recipe {
         return null;
     }
 
-    private Statement parseExcludeStatement(boolean kotlinDsl, ExecutionContext ctx) {
-        J.Lambda stubLambda = parseStubLambda(kotlinDsl, ctx);
+    private Statement parseExcludeStatement(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+        J.Lambda stubLambda = parseStubLambda(kotlinDsl, effG, effA, ctx);
         return unwrapReturn(((J.Block) stubLambda.getBody()).getStatements().get(0));
     }
 
-    private J.Lambda parseFreshLambda(boolean kotlinDsl, ExecutionContext ctx) {
-        return parseStubLambda(kotlinDsl, ctx).withPrefix(Space.format(" "));
+    private J.Lambda parseFreshLambda(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
+        return parseStubLambda(kotlinDsl, effG, effA, ctx).withPrefix(Space.format(" "));
     }
 
-    private J.Lambda parseStubLambda(boolean kotlinDsl, ExecutionContext ctx) {
+    private static String groovyExcludeSyntax(@Nullable String g, @Nullable String a) {
+        if (g != null && a != null) {
+            return "exclude group: '" + g + "', module: '" + a + "'";
+        }
+        if (g != null) {
+            return "exclude group: '" + g + "'";
+        }
+        return "exclude module: '" + a + "'";
+    }
+
+    private static String kotlinExcludeSyntax(@Nullable String g, @Nullable String a) {
+        if (g != null && a != null) {
+            return "exclude(group = \"" + g + "\", module = \"" + a + "\")";
+        }
+        if (g != null) {
+            return "exclude(group = \"" + g + "\")";
+        }
+        return "exclude(module = \"" + a + "\")";
+    }
+
+    private J.Lambda parseStubLambda(boolean kotlinDsl, @Nullable String effG, @Nullable String effA, ExecutionContext ctx) {
         if (kotlinDsl) {
-            String snippet = String.format(
+            String snippet =
                     "dependencies {\n" +
                             "    implementation(\"x:x:1\") {\n" +
-                            "        exclude(group = \"%s\", module = \"%s\")\n" +
+                            "        " + kotlinExcludeSyntax(effG, effA) + "\n" +
                             "    }\n" +
-                            "}",
-                    groupId, artifactId);
+                            "}";
             J.MethodInvocation deps = (J.MethodInvocation) ((J.Block) parseKotlin(snippet, ctx).getStatements().get(0)).getStatements().get(0);
             J.Lambda depsLambda = (J.Lambda) deps.getArguments().get(deps.getArguments().size() - 1);
             J.MethodInvocation stub = (J.MethodInvocation) unwrapReturn(((J.Block) depsLambda.getBody()).getStatements().get(0));
             return (J.Lambda) stub.getArguments().get(stub.getArguments().size() - 1);
         }
-        String snippet = String.format(
+        String snippet =
                 "dependencies {\n" +
                         "    implementation('x:x:1') {\n" +
-                        "        exclude group: '%s', module: '%s'\n" +
+                        "        " + groovyExcludeSyntax(effG, effA) + "\n" +
                         "    }\n" +
-                        "}",
-                groupId, artifactId);
+                        "}";
         J.MethodInvocation deps = (J.MethodInvocation) parseGroovy(snippet, ctx).getStatements().get(0);
         J.Lambda depsLambda = (J.Lambda) deps.getArguments().get(deps.getArguments().size() - 1);
         J.MethodInvocation stub = (J.MethodInvocation) unwrapReturn(((J.Block) depsLambda.getBody()).getStatements().get(0));
