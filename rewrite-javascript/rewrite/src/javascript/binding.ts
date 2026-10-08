@@ -411,8 +411,9 @@ function reusesTargetImport(
     moved: ExistingImportBinding
 ): boolean {
     const target = existingImportBinding(cu, to.module, to.member);
-    return target?.localName === name && bindingShape(to.member) === "named" && !target.typeOnly &&
-        !moved.typeOnly && onlyReferences(cu, name);
+    // An import and a require of one module are separate declarations of the name.
+    return target?.localName === name && target.required === moved.required && bindingShape(to.member) === "named" &&
+        !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
 }
 
 /**

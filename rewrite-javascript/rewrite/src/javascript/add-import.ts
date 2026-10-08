@@ -1835,7 +1835,16 @@ function requireBinds(
     if (key === undefined || key === '*') {
         return isIdentifier(pattern) ? pattern.simpleName : undefined;
     }
+    // Taking a member out from beside a rest element would add it to the rest object.
+    if (hasRest(pattern)) {
+        return undefined;
+    }
     return requireBindings(pattern, required).find(b => b.member === key)?.name;
+}
+
+function hasRest(pattern: J): boolean {
+    return isObjectBindingPattern(pattern) && pattern.bindings.elements.some(e =>
+        e.element.kind === JS.Kind.BindingElement && (e.element as JS.BindingElement).name.kind === JS.Kind.Spread);
 }
 
 function isOnlyRequired(declaration: J.VariableDeclarations): boolean {
@@ -2171,7 +2180,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private cu?: JS.CompilationUnit;
     private dropped?: UUID;
     private droppedQuote?: QuoteChar;
-    private droppedModule?: string;
+    private fromModule?: string;
     private movedTypes!: MovedTypes;
 
     private required?: GivenUp;
@@ -2215,9 +2224,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         }
         if (!this.transformedInPlace) {
             bindImport(this, {
-                module: this.droppedModule === undefined
-                    ? this.to.module
-                    : spelledLike(this.to.module, this.droppedModule),
+                module: this.fromModule === undefined ? this.to.module : spelledLike(this.to.module, this.fromModule),
                 member: this.to.member,
                 alias: this.boundName,
                 typeOnly: this.typeOnly,
@@ -2243,6 +2250,7 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         }
         // The replacement takes the moved binding's `type` marking to stay type-safe.
         this.typeOnly = bindsTypeOnly(imp, this.from.member);
+        this.fromModule = importedModule(imp);
 
         if (!isOnlyMember(imp)) {
             return removeBinding(imp, this.from.member);
@@ -2250,7 +2258,6 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
             this.dropped = imp.id;
             this.droppedQuote = quoteOf(imp.moduleSpecifier?.element);
-            this.droppedModule = importedModule(imp);
             return imp;
         }
 
@@ -2289,13 +2296,12 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             ? original.bindings.elements.findIndex(e => bindingNames(e.element).some(b => b.name === this.localName))
             : -1;
         const binding = movedBinding(pattern, index, declaredMember(this.to), this.boundName);
-        const target = isIdentifier(binding) ? undefined : this.cu.statements.find(s => {
-            const other = requireDeclarationOf(s.element);
-            return other !== undefined && other !== declaration &&
-                sameModule(requiredModuleOfDeclaration(other)!, this.to.module) &&
-                isObjectBindingPattern(requirePattern(other));
-        })?.element;
-        const module = spelledLike(this.to.module, requiredModuleOfDeclaration(declaration)!);
+        const required = requiredModuleOfDeclaration(declaration)!;
+        if (isObjectBindingPattern(pattern) && !isIdentifier(binding) && sameModule(required, this.to.module)) {
+            return withPattern(rebound, withElementAt(pattern, index, binding));
+        }
+        const target = isIdentifier(binding) ? undefined : this.joinableRequire(declaration);
+        const module = spelledLike(this.to.module, required);
         const only = isOnlyRequired(declaration);
         if (target !== undefined) {
             this.required = {binding: binding as JS.BindingElement, mergeInto: target.id};
@@ -2310,6 +2316,28 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             this.required = {binding: binding as JS.BindingElement, split: {after: rebound.id, declaration: copy}};
         }
         return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
+    }
+
+    /**
+     * A destructuring require of the target that `source`'s binding can join.
+     * It comes first, since a `const` is unreadable above its declaration.
+     * It declares with the same keywords, and has no rest element, which must stay last.
+     */
+    private joinableRequire(source: J.VariableDeclarations): J.VariableDeclarations | undefined {
+        const keywords = (d: J.VariableDeclarations) => d.modifiers.map(m => m.keyword).join(' ');
+        for (const stmt of this.cu!.statements) {
+            const other = requireDeclarationOf(stmt.element);
+            if (other === source) {
+                return undefined;
+            }
+            const pattern = other && requirePattern(other);
+            if (other !== undefined && isObjectBindingPattern(pattern) && !hasRest(pattern) &&
+                sameModule(requiredModuleOfDeclaration(other)!, this.to.module) &&
+                keywords(other) === keywords(source)) {
+                return other;
+            }
+        }
+        return undefined;
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
@@ -2548,6 +2576,16 @@ function withoutElement(pattern: JS.ObjectBindingPattern, index: number): JS.Obj
     return {...pattern, bindings: {...pattern.bindings, elements: kept}};
 }
 
+function withElementAt(
+    pattern: JS.ObjectBindingPattern,
+    index: number,
+    binding: JS.BindingElement
+): JS.ObjectBindingPattern {
+    const elements = pattern.bindings.elements.map((e, i) =>
+        i === index ? {...e, element: {...binding, prefix: e.element.prefix}} : e);
+    return {...pattern, bindings: {...pattern.bindings, elements}};
+}
+
 /** `pattern` with `binding` appended, unless it already binds that member under that name. */
 function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElement): JS.ObjectBindingPattern {
     const bound = bindingNames(binding)[0];
@@ -2556,7 +2594,9 @@ function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElemen
     }
     const elements = pattern.bindings.elements;
     const last = elements[elements.length - 1];
-    const prefix = elements.length > 1 ? elements[1].element.prefix : singleSpace;
+    const first = elements[0].element.prefix;
+    const prefix = elements.length > 1 ? elements[1].element.prefix
+        : first.whitespace.includes('\n') ? first : singleSpace;
     return {
         ...pattern,
         bindings: {

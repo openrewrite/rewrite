@@ -2261,6 +2261,17 @@ describe("a node: specifier and the bare name of its built-in", () => {
             `import D from 'node:_stream_duplex';\nimport tlsWrap from 'node:_tls_wrap';\n\nnew D(tlsWrap);`,
             `import tlsWrap from 'node:tls';\nimport {Duplex as D} from 'node:stream';\n\nnew D(tlsWrap);`
         ));
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "_stream_duplex", member: "Duplex"}, to: {module: "stream", member: "Duplex"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {Duplex, x} from 'node:_stream_duplex';\n\nnew Duplex(x);`,
+            `import {x} from 'node:_stream_duplex';\nimport {Duplex} from 'node:stream';\n\nnew Duplex(x);`
+        ));
     });
 });
 
@@ -2303,9 +2314,11 @@ describe("maybeRebind on a require", () => {
             javascript(`const {extend} = require('lodash');\n\nextend({}, {});`,
                 `const {assign} = require('lodash');\n\nassign({}, {});`),
             javascript(`const {extend: ext} = require('lodash');\n\next({}, {});`,
-                `const {assign: ext} = require('lodash');\n\next({}, {});`)
+                `const {assign: ext} = require('lodash');\n\next({}, {});`),
+            javascript(`const {extend, map} = require('lodash');\n\nextend(map);`,
+                `const {assign, map} = require('lodash');\n\nassign(map);`)
         );
-        expect(bound).toEqual(["assign", "ext"]);
+        expect(bound).toEqual(["assign", "ext", "assign"]);
     });
 
     test("a move merges into an existing require of the target", async () => {
@@ -2318,8 +2331,35 @@ describe("maybeRebind on a require", () => {
                 `const {b} = require('n');\n\nb(b);`));
 
         await rebind({module: "m", member: "b"}, {module: "n", member: "b"}).rewriteRun(
-            javascript(`const {a, b} = require('m');\nconst {c} = require('n');\n\na(b, c);`,
-                `const {a} = require('m');\nconst {c, b} = require('n');\n\na(b, c);`));
+            javascript(`const {c} = require('n');\nconst {a, b} = require('m');\n\na(b, c);`,
+                `const {c, b} = require('n');\nconst {a} = require('m');\n\na(b, c);`));
+
+        await rebind({module: "m", member: "a"}, {module: "n", member: "a"}).rewriteRun(
+            javascript(`const {\n    c,\n} = require('n');\nconst {a} = require('m');\n\nc(a);`,
+                `const {\n    c,\n    a,\n} = require('n');\n\nc(a);`));
+    });
+
+    test("a binding moves into its own statement where the target's require cannot take it", async () => {
+        const spec = rebind({module: "m", member: "a"}, {module: "n", member: "a"});
+        await spec.rewriteRun(
+            // Joining a later declaration would leave the first use before it.
+            javascript(`const {a} = require('m');\na();\nconst {c} = require('n');`,
+                `const {a} = require('n');\na();\nconst {c} = require('n');`),
+            javascript(`const {c, ...rest} = require('n');\nconst {a} = require('m');\n\na(c, rest);`,
+                `const {c, ...rest} = require('n');\nconst {a} = require('n');\n\na(c, rest);`),
+            javascript(`let {c} = require('n');\nconst {a} = require('m');\n\na(c);`,
+                `let {c} = require('n');\nconst {a} = require('n');\n\na(c);`)
+        );
+    });
+
+    test("a require and an import of the target are two bindings, so a move across them keeps its name", async () => {
+        const spec = rebind({module: "m", member: "a"}, {module: "n", member: "b"});
+        await spec.rewriteRun(
+            typescript(`import {a} from 'm';\nconst {b} = require('n');\n\nb(a);`,
+                `import {b as a} from 'n';\nconst {b} = require('n');\n\nb(a);`),
+            typescript(`import {b} from 'n';\nconst {a} = require('m');\n\nb(a);`,
+                `import {b} from 'n';\nconst {b: a} = require('n');\n\nb(a);`)
+        );
     });
 
     test("a member leaving a destructuring that binds others gets a require of its own", async () => {
@@ -2328,11 +2368,13 @@ describe("maybeRebind on a require", () => {
                 `const {a} = require('m');\nconst {b} = require('n');\n\na(b);`));
     });
 
-    test("a require nested in a function binds nothing a rebind moves", async () => {
+    test("a require nested in a function, or beside a rest element, binds nothing a rebind moves", async () => {
         const bound: (string | undefined)[] = [];
-        await rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
-            javascript(`function f() {\n    const Duplex = require('_stream_duplex');\n    return new Duplex();\n}`)
+        await rebind({module: "_stream_duplex", member: "Duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
+            javascript(`function f() {\n    const {Duplex} = require('_stream_duplex');\n    return new Duplex();\n}`),
+            // `rest` would gain the property the move takes out.
+            javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`)
         );
-        expect(bound).toEqual([undefined]);
+        expect(bound).toEqual([undefined, undefined]);
     });
 });

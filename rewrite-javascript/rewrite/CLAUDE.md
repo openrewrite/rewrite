@@ -301,8 +301,10 @@ in a function or used inline binds nothing it can move. The file stays CommonJS,
 creates an import. A whole module binds as a name and a member as a destructured element, so
 `const D = require('_stream_duplex')` moved to `stream`'s `Duplex` becomes
 `const {Duplex: D} = require('stream')`. The moved element joins a destructuring `require` of the
-target where there is one. Otherwise it takes over its own statement, or gets a `require` of its own
-right after it where that statement binds other names too.
+target that comes before it, declares with the same keywords, and has no rest element. Otherwise it
+takes over its own statement, or gets a `require` of its own right after it where that statement
+binds other names too. A move within one module renames the element in place. An import and a
+`require` of one module are separate declarations, so neither counts as the other's merge target.
 
 A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
 
@@ -325,6 +327,7 @@ The four above that still apply, plus these:
 - nothing binds `from`
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
+- `from` is destructured beside a rest element, which would gain the property the move takes out
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
 - the file binds its modules with `require`, `from` is an ES import, and the move would need a new
