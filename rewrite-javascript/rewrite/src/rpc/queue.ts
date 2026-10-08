@@ -113,6 +113,10 @@ export class RpcCodecs {
         return this.nonTreeCodecs.get(type);
     }
 
+    static isSourceFileType(type: string): boolean {
+        return this.treeCodecs.has(type);
+    }
+
     static registerValueCodec(type: string, codec: RpcValueCodec<any>): void {
         this.valueCodecs.set(type, codec);
     }
@@ -425,9 +429,10 @@ export class RpcReceiveQueue {
     private batchIndex = 0;
     private sinceYield = 0;
     private recorded: number[] = [];
+    private rootReceived = false;
 
     constructor(private readonly refs: Map<number, any>,
-                private readonly sourceFileType: string | undefined,
+                private sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean,
@@ -521,6 +526,14 @@ export class RpcReceiveQueue {
         const taken = this.take();
         const message = taken instanceof Promise ? await taken : taken;
         RpcObjectData.logTrace(message, this.trace, this.logger);
+        if (!this.rootReceived) {
+            this.rootReceived = true;
+            // A recipe may change the source file type
+            if (message.state === RpcObjectState.ADD && message.valueType &&
+                RpcCodecs.isSourceFileType(message.valueType)) {
+                this.sourceFileType = message.valueType;
+            }
+        }
         let ref: number | undefined;
         switch (message.state) {
             case RpcObjectState.NO_CHANGE:
