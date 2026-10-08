@@ -34,7 +34,7 @@ class ExcludeDependencyTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void addsConfigurationsAllBlockWhenNoneExists() {
+    void attachesExcludeToDeclarationThatTransitivelyIncludesTarget() {
         rewriteRun(
           buildGradle(
             """
@@ -59,12 +59,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'commons-logging', module: 'commons-logging'
-              }
-
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
               }
               """
           )
@@ -72,7 +70,7 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void mergesIntoExistingConfigurationsAllBlock() {
+    void appendsExcludeToExistingClosure() {
         rewriteRun(
           buildGradle(
             """
@@ -84,12 +82,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'org.apache.httpcomponents', module: 'httpcore'
-              }
-
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'org.apache.httpcomponents', module: 'httpcore'
+                  }
               }
               """,
             """
@@ -101,13 +97,11 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'org.apache.httpcomponents', module: 'httpcore'
-                  exclude group: 'commons-logging', module: 'commons-logging'
-              }
-
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'org.apache.httpcomponents', module: 'httpcore'
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
               }
               """
           )
@@ -127,12 +121,79 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'commons-logging', module: 'commons-logging'
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentWhenGroupOnlyExcludeCoversTarget() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
               }
 
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentWhenModuleOnlyExcludeCoversTarget() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude module: 'commons-logging'
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void idempotentWhenTransitiveFalse() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      transitive = false
+                  }
               }
               """
           )
@@ -161,9 +222,8 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void expandsGlobsAgainstTheResolvedDependencyGraph() {
+    void noOpOnDirectDeclarationOfExcludedTarget() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-*", "commons-*", null)),
           buildGradle(
             """
               plugins {
@@ -175,6 +235,28 @@ class ExcludeDependencyTest implements RewriteTest {
               }
 
               dependencies {
+                  implementation 'commons-logging:commons-logging:1.2'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void attachesToOtherDeclarationsEvenWhenTargetAlsoDeclaredDirectly() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation 'commons-logging:commons-logging:1.2'
                   implementation 'org.apache.httpcomponents:httpclient:4.5.13'
               }
               """,
@@ -187,13 +269,11 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'commons-logging', module: 'commons-logging'
-                  exclude group: 'commons-codec', module: 'commons-codec'
-              }
-
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation 'commons-logging:commons-logging:1.2'
+                  implementation('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
               }
               """
           )
@@ -201,9 +281,9 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void bareGroupWildcardEmitsModuleOnlyExclude() {
+    void configurationFilterLimitsWhichDeclarationsAreTouched() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("*", "commons-logging", null)),
+          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", "api")),
           buildGradle(
             """
               plugins {
@@ -215,6 +295,7 @@ class ExcludeDependencyTest implements RewriteTest {
               }
 
               dependencies {
+                  api 'org.apache.httpcomponents:httpclient:4.5.13'
                   implementation 'org.apache.httpcomponents:httpclient:4.5.13'
               }
               """,
@@ -227,11 +308,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude module: 'commons-logging'
-              }
-
               dependencies {
+                  api('org.apache.httpcomponents:httpclient:4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
                   implementation 'org.apache.httpcomponents:httpclient:4.5.13'
               }
               """
@@ -240,9 +320,34 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void bareArtifactWildcardEmitsGroupOnlyExclude() {
+    void noOpInBuildscriptClasspath() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-logging", "*", null)),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      mavenCentral()
+                  }
+                  dependencies {
+                      classpath 'org.apache.httpcomponents:httpclient:4.5.13'
+                  }
+              }
+
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mapNotationDeclarationGroovy() {
+        rewriteRun(
           buildGradle(
             """
               plugins {
@@ -254,7 +359,7 @@ class ExcludeDependencyTest implements RewriteTest {
               }
 
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13'
               }
               """,
             """
@@ -266,106 +371,20 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude group: 'commons-logging'
-              }
-
               dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
+                  implementation(group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13') {
+                      exclude group: 'commons-logging', module: 'commons-logging'
+                  }
               }
               """
           )
         );
     }
 
-    @Test
-    void bareGroupAndArtifactWildcardIsNoOp() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("*", "*", null)),
-          buildGradle(
-            """
-              plugins {
-                  id 'java-library'
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-              }
-              """
-          )
-        );
-    }
+    // ------------- Kotlin DSL -------------
 
     @Test
-    void existingGroupOnlyExcludeCoversSpecificTarget() {
-        rewriteRun(
-          buildGradle(
-            """
-              plugins {
-                  id 'java-library'
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              configurations.all {
-                  exclude group: 'commons-logging'
-              }
-
-              dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void kotlinDslBareGroupWildcardEmitsModuleOnlyExclude() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("*", "commons-logging", null)),
-          buildGradleKts(
-            """
-              plugins {
-                  `java-library`
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
-              }
-              """,
-            """
-              plugins {
-                  `java-library`
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              configurations.all {
-                  exclude(module = "commons-logging")
-              }
-
-              dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void kotlinDslAddsConfigurationsAllBlockWhenNoneExists() {
+    void kotlinDslAttachesExcludeToDeclaration() {
         rewriteRun(
           buildGradleKts(
             """
@@ -390,12 +409,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude(group = "commons-logging", module = "commons-logging")
-              }
-
               dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "commons-logging", module = "commons-logging")
+                  }
               }
               """
           )
@@ -403,7 +420,7 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void kotlinDslMergesIntoExistingConfigurationsAllBlock() {
+    void kotlinDslAppendsExcludeToExistingClosure() {
         rewriteRun(
           buildGradleKts(
             """
@@ -415,12 +432,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude(group = "org.apache.httpcomponents", module = "httpcore")
-              }
-
               dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "org.apache.httpcomponents", module = "httpcore")
+                  }
               }
               """,
             """
@@ -432,13 +447,11 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude(group = "org.apache.httpcomponents", module = "httpcore")
-                  exclude(group = "commons-logging", module = "commons-logging")
-              }
-
               dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "org.apache.httpcomponents", module = "httpcore")
+                      exclude(group = "commons-logging", module = "commons-logging")
+                  }
               }
               """
           )
@@ -458,12 +471,10 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.all {
-                  exclude(group = "commons-logging", module = "commons-logging")
-              }
-
               dependencies {
-                  implementation("org.apache.httpcomponents:httpclient:4.5.13")
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "commons-logging", module = "commons-logging")
+                  }
               }
               """
           )
@@ -471,9 +482,8 @@ class ExcludeDependencyTest implements RewriteTest {
     }
 
     @Test
-    void kotlinDslUsesNamedForSpecificConfiguration() {
+    void kotlinDslIdempotentWhenIsTransitiveFalse() {
         rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", "runtimeClasspath")),
           buildGradleKts(
             """
               plugins {
@@ -485,6 +495,31 @@ class ExcludeDependencyTest implements RewriteTest {
               }
 
               dependencies {
+                  implementation("org.apache.httpcomponents:httpclient:4.5.13") {
+                      isTransitive = false
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void kotlinDslConfigurationFilter() {
+        rewriteRun(
+          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", "api")),
+          buildGradleKts(
+            """
+              plugins {
+                  `java-library`
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  api("org.apache.httpcomponents:httpclient:4.5.13")
                   implementation("org.apache.httpcomponents:httpclient:4.5.13")
               }
               """,
@@ -497,51 +532,11 @@ class ExcludeDependencyTest implements RewriteTest {
                   mavenCentral()
               }
 
-              configurations.named("runtimeClasspath") {
-                  exclude(group = "commons-logging", module = "commons-logging")
-              }
-
               dependencies {
+                  api("org.apache.httpcomponents:httpclient:4.5.13") {
+                      exclude(group = "commons-logging", module = "commons-logging")
+                  }
                   implementation("org.apache.httpcomponents:httpclient:4.5.13")
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void addsNamedConfigurationBlockWhenConfigurationSpecified() {
-        rewriteRun(
-          spec -> spec.recipe(new ExcludeDependency("commons-logging", "commons-logging", "runtimeClasspath")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java-library'
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-              }
-              """,
-            """
-              plugins {
-                  id 'java-library'
-              }
-
-              repositories {
-                  mavenCentral()
-              }
-
-              configurations.runtimeClasspath {
-                  exclude group: 'commons-logging', module: 'commons-logging'
-              }
-
-              dependencies {
-                  implementation 'org.apache.httpcomponents:httpclient:4.5.13'
               }
               """
           )
