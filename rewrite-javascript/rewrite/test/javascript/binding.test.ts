@@ -1470,7 +1470,7 @@ describe("maybeRebind", () => {
         const named: (string | undefined)[] = [];
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                maybeRebind(this, {from: {module: "events"}, to: {module: "node:events"}});
+                maybeRebind(this, {from: {module: "events"}, to: {module: "node:stream"}});
                 return super.visitJsCompilationUnit(cu, p);
             }
         });
@@ -1478,7 +1478,7 @@ describe("maybeRebind", () => {
             await spec.rewriteRun(npm(repo.path, {
                 ...typescript(
                     `import ev from 'events';\n\nconst e = new ev();\n`,
-                    `import ev from 'node:events';\n\nconst e = new ev();\n`),
+                    `import ev from 'node:stream';\n\nconst e = new ev();\n`),
                 afterRecipe: async (cu: any) => {
                     await new class extends JavaScriptVisitor<any> {
                         override async visitNewClass(nc: J.NewClass, p: any): Promise<J | undefined> {
@@ -1490,7 +1490,7 @@ describe("maybeRebind", () => {
                 }
             } as any, packageJson(`{"name":"t","dependencies":{"@types/node":"^20.0.0"}}`)));
         }, {unsafeCleanup: true});
-        expect(named).toEqual(["node:events"]);
+        expect(named).toEqual(["stream"]);
     }, 30000);
 
     test("a constructed reference's attribution moves with the binding", async () => {
@@ -1500,7 +1500,7 @@ describe("maybeRebind", () => {
             override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
                 maybeRebind(this, {
                     from: {module: "events", member: "EventEmitter"},
-                    to: {module: "node:events", member: "EventEmitter"}
+                    to: {module: "node:stream", member: "Stream"}
                 });
                 return super.visitJsCompilationUnit(cu, p);
             }
@@ -1509,7 +1509,7 @@ describe("maybeRebind", () => {
             await spec.rewriteRun(npm(repo.path, {
                 ...typescript(
                     `import { EventEmitter } from 'events';\n\nconst e = new EventEmitter();\n`,
-                    `import { EventEmitter } from 'node:events';\n\nconst e = new EventEmitter();\n`),
+                    `import { Stream } from 'node:stream';\n\nconst e = new Stream();\n`),
                 afterRecipe: async (cu: any) => {
                     await new class extends JavaScriptVisitor<any> {
                         override async visitNewClass(nc: J.NewClass, p: any): Promise<J | undefined> {
@@ -1521,7 +1521,7 @@ describe("maybeRebind", () => {
                 }
             } as any, packageJson(`{"name":"t","dependencies":{"lodash":"^4.17.21","lodash-es":"^4.17.21","@types/lodash":"^4.14.202","@types/lodash-es":"^4.17.12","@types/node":"^20.0.0"}}`)));
         }, {unsafeCleanup: true});
-        expect(declaring).toEqual(["node:events"]);
+        expect(declaring).toEqual(["stream"]);
     });
 
     test("an optionally called reference's attribution moves with the binding", async () => {
@@ -2194,6 +2194,57 @@ describe("maybeRebind JSX", () => {
         await spec.rewriteRun(tsx(
             `import { Old } from "m";\n\nconst e = <div Old="x">{Old}</div>;`,
             `import { New } from "m2";\n\nconst e = <div Old="x">{New}</div>;`
+        ));
+    });
+});
+
+describe("a node: specifier and the bare name of its built-in", () => {
+    test("name one module to maybeUnbind, unless the built-in has no bare name", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeUnbind(this, {module: "util", member: "isArray"});
+                maybeUnbind(this, {module: "node:util", member: "log"});
+                maybeUnbind(this, {module: "test", member: "it"});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {isArray} from 'node:util';\nimport {log} from 'util';\nimport {it} from 'node:test';\n\nconsole.log(1);`,
+            `import {it} from 'node:test';\n\nconsole.log(1);`
+        ));
+    });
+
+    test("name one module to maybeBind, which keeps the spelling the file uses", async () => {
+        const spec = new RecipeSpec();
+        const bound: (string | undefined)[] = [];
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.push(maybeBind(this, {module: "util", member: "promisify"}));
+                bound.push(maybeBind(this, {module: "util", member: "*"}));
+                bound.push(moduleBindings(this).bindingOf("util"));
+                bound.push(maybeBind(this, {module: "util", member: "inspect", onlyIfReferenced: false}));
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import * as u from 'node:util';\nimport {promisify as p} from 'node:util';\n\np(u);`,
+            `import * as u from 'node:util';\nimport {inspect, promisify as p} from 'node:util';\n\np(u);`
+        ));
+        expect(bound).toEqual(["p", "u", "u", "inspect"]);
+    });
+
+    test("name one module to maybeRebind's from", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "util", member: "isArray"}, to: {module: "lodash", member: "isArray"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {isArray} from 'node:util';\n\nisArray([]);`,
+            `import {isArray} from 'lodash';\n\nisArray([]);`
         ));
     });
 });

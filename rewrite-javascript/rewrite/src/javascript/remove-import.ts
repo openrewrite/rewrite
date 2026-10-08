@@ -1,6 +1,7 @@
 import {JavaScriptVisitor} from "./visitor";
 import {J} from "../java";
 import {bindingNames, namesReferencedWithin} from "./scope";
+import {sameModule} from "./package-name";
 import {JS, JSX} from "./tree";
 import {mapAsync, updateIfChanged} from "../util";
 import {ElementRemovalFormatter} from "../java";
@@ -394,7 +395,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
      * Check if the module name matches the target module
      */
     private matchesTargetModule(moduleName: string): boolean {
-        return moduleName === this.module;
+        return sameModule(moduleName, this.module);
     }
 
     /**
@@ -666,7 +667,7 @@ export class RemoveImport<P> extends JavaScriptVisitor<P> {
         const moduleName = literal.value?.toString().replace(/['"`]/g, '');
 
         // Match the module name
-        return moduleName === this.module;
+        return moduleName !== undefined && sameModule(moduleName, this.module);
     }
 
 }
