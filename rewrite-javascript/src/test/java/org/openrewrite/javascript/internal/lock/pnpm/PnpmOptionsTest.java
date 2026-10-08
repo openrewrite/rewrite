@@ -309,6 +309,19 @@ class PnpmOptionsTest {
         assertThat(options.get("packages")).isNull();
     }
 
+    /**
+     * A token pnpm substitutes from the environment reaches no lock; a registry it substitutes does.
+     */
+    @Test
+    void anEnvironmentTheHostDoesNotKnow() {
+        PnpmOptions options = PnpmOptions.load(null, "//registry.npmjs.org/:_authToken=${NPM_TOKEN}\n", null, null);
+        assertThat(options.getRegistries().get("default")).isEqualTo("https://registry.npmjs.org/");
+        assertThatThrownBy(() -> PnpmOptions.load(null, "registry=${REGISTRY}\n", null, null))
+          .isInstanceOf(CannotKnow.class);
+        assertThat(PnpmOptions.load(null, "registry=${REGISTRY}\n", null, env("REGISTRY", "https://r.example.com"))
+          .getRegistries().get("default")).isEqualTo("https://r.example.com/");
+    }
+
     @Test
     void minimumReleaseAgeStrictDefaultsToTrueWhenMinimumReleaseAgeIsSetInPnpmWorkspaceYaml() {
         PnpmOptions options = PnpmOptions.load("minimumReleaseAge: 60\n", null, null, env());

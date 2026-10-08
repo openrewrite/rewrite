@@ -274,12 +274,25 @@ final class PnpmOptions {
         for (String rawKey : Js.keys(raw)) {
             Object rawValue = raw.get(rawKey);
             String key = envReplaceLossy(rawKey, env);
-            Object value = rawValue instanceof String ? envReplaceLossy((String) rawValue, env) : rawValue;
+            Object value = rawValue;
+            if (rawValue instanceof String) {
+                // a credential or network value reaches no lock, so an environment the host does not know is no matter
+                value = env == null && !readByALockOnlyInstall(key) ? rawValue :
+                        envReplaceLossy((String) rawValue, env);
+            }
             if (isNpmrcReadableKey(key)) {
                 result.put(key, value);
             }
         }
         return result;
+    }
+
+    private static final Pattern UNREAD_VALUE = Pattern.compile(
+            "(?:^|:)(?:_authToken|email|ca|cert|key|https-proxy|proxy|no-proxy|http-proxy|local-address|" +
+            "strict-ssl)$");
+
+    private static boolean readByALockOnlyInstall(String key) {
+        return !UNREAD_VALUE.matcher(key).find();
     }
 
     private static final List<String> NPM_AUTH_SETTINGS = Arrays.asList("ca", "cafile", "cert", "key", "registry",
