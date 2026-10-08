@@ -149,15 +149,6 @@ public class MavenWrapper {
                         .snapshots(true)
                         .build();
 
-        MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
-        MavenSettings settings = mctx.getSettings();
-        MavenRepository fetchRepository = MavenRepositoryCredentials.apply(mctx.getCredentials(settings),
-                MavenRepositoryMirror.apply(mctx.getMirrors(settings), repository));
-        MavenRepositoryRemoteAuthenticator authenticator = MavenRepositoryRemoteAuthenticator.forRepository(fetchRepository, settings);
-        if (authenticator != null) {
-            RemoteExecutionContextView.view(ctx).addAuthenticator(authenticator);
-        }
-
         List<MavenRepository> repositories = singletonList(repository);
         try {
             MavenMetadata wrapperMetadata = pomDownloader.downloadMetadata(WRAPPER_DISTRIBUTION_GROUP_ARTIFACT, null, repositories);
@@ -179,7 +170,19 @@ public class MavenWrapper {
                     .orElseThrow(() -> new IllegalStateException("Expected to find at least one Maven distribution version to select from."));
             String resolvedDistributionUri = getDownloadUriFor(repository.getUri(), DISTRIBUTION_GROUP_ARTIFACT, resolvedDistributionVersion, "bin", "zip");
 
-            String fetchRepositoryUri = fetchRepository.getUri().equals(repository.getUri()) ? null : fetchRepository.getUri();
+            MavenExecutionContextView mctx = MavenExecutionContextView.view(ctx);
+            MavenSettings settings = mctx.getSettings();
+            MavenRepository fetchRepository = pomDownloader.normalizeRepository(repository, mctx, null);
+            if (fetchRepository == null) {
+                fetchRepository = MavenRepositoryCredentials.apply(mctx.getCredentials(settings),
+                        MavenRepositoryMirror.apply(mctx.getMirrors(settings), repository));
+            }
+            MavenRepositoryRemoteAuthenticator authenticator = MavenRepositoryRemoteAuthenticator.forRepository(fetchRepository, settings);
+            if (authenticator != null) {
+                RemoteExecutionContextView.view(ctx).addAuthenticator(authenticator);
+            }
+            String mirrorUri = withoutTrailingSlash(fetchRepository.getUri());
+            String fetchRepositoryUri = mirrorUri.equals(withoutTrailingSlash(repository.getUri())) ? null : mirrorUri;
             Checksum wrapperJarChecksum = retrieveChecksumUsingCache(URI.create(resolvedWrapperUri),
                     Remote.builder(WRAPPER_JAR_LOCATION).build(fetchUri(fetchRepositoryUri, resolvedWrapperUri,
                             WRAPPER_GROUP_ARTIFACT, resolvedWrapperVersion, null, "jar")), ctx);
@@ -269,10 +272,11 @@ public class MavenWrapper {
         if (fetchRepositoryUri == null) {
             return URI.create(canonicalUri);
         }
-        String repositoryUri = fetchRepositoryUri.endsWith("/") ?
-                fetchRepositoryUri.substring(0, fetchRepositoryUri.length() - 1) :
-                fetchRepositoryUri;
-        return URI.create(getDownloadUriFor(repositoryUri, ga, version, classifier, extension));
+        return URI.create(getDownloadUriFor(withoutTrailingSlash(fetchRepositoryUri), ga, version, classifier, extension));
+    }
+
+    private static String withoutTrailingSlash(String uri) {
+        return uri.endsWith("/") ? uri.substring(0, uri.length() - 1) : uri;
     }
 
     private static String getDownloadUriFor(String repositoryUri, GroupArtifact ga, String version, @Nullable String classifier, String extension) {
