@@ -545,6 +545,53 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void updatesAnchorAliasedFromNestedSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("versions", "2.0", "1.0", null, null, null)),
+          yaml(
+            """
+              base: &v 1.0
+              versions: [[*v, 3.0]]
+              """,
+            """
+              base: &v 2.0
+              versions: [[*v, 3.0]]
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotRenameAnchoredKey() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", null, null, null, null)),
+          yaml(
+            """
+              &k version: x
+              app:
+                version: *k
+              """
+          )
+        );
+    }
+
+    @Test
+    void doesNotInlineMultilineAnchoredValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("app.version", "X", "one", true, null, null)),
+          yaml(
+            """
+              defaults: &v one
+                two
+              app:
+                version: *v
+              lib: *v
+              """
+          )
+        );
+    }
+
+    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
         assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
     }

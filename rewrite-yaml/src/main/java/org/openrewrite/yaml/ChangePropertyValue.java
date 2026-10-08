@@ -138,7 +138,7 @@ public class ChangePropertyValue extends Recipe {
                 new YamlIsoVisitor<Integer>() {
                     @Override
                     public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
-                        if (scalar.getAnchor() != null) {
+                        if (scalar.getAnchor() != null && !isMappingKey(getCursor())) {
                             anchored.put(scalar.getAnchor().getId(), scalar);
                             if (isValueOfMatchingKey(getCursor(), keyMatcher)) {
                                 definedUnderMatchingKey.add(scalar.getAnchor().getId());
@@ -166,7 +166,7 @@ public class ChangePropertyValue extends Recipe {
                     }
                     if (!aliasedElsewhere.contains(id)) {
                         anchorsToUpdate.add(id);
-                    } else if (scalar.getStyle() != Yaml.Scalar.Style.LITERAL && scalar.getStyle() != Yaml.Scalar.Style.FOLDED) {
+                    } else if (isSingleLine(scalar)) {
                         aliasesToInline.put(id, scalar);
                     }
                 }
@@ -175,17 +175,24 @@ public class ChangePropertyValue extends Recipe {
     }
 
     private static boolean isValueOfMatchingKey(Cursor cursor, NameCaseConvention.Compiled keyMatcher) {
-        Cursor parent = cursor.getParentTreeCursor();
-        if (parent.getValue() instanceof Yaml.Sequence.Entry) {
-            parent = parent.getParentTreeCursor().getParentTreeCursor();
-            if (!(parent.getValue() instanceof Yaml.Mapping.Entry)) {
-                return false;
-            }
-        } else if (!(parent.getValue() instanceof Yaml.Mapping.Entry) ||
-                   ((Yaml.Mapping.Entry) parent.getValue()).getValue() != cursor.getValue()) {
-            return false;
+        Cursor value = cursor;
+        Cursor parent = value.getParentTreeCursor();
+        while (parent.getValue() instanceof Yaml.Sequence.Entry) {
+            value = parent.getParentTreeCursor();
+            parent = value.getParentTreeCursor();
         }
-        return keyMatcher.matchesGlob(getProperty(parent));
+        return parent.getValue() instanceof Yaml.Mapping.Entry &&
+               ((Yaml.Mapping.Entry) parent.getValue()).getValue() == value.getValue() &&
+               keyMatcher.matchesGlob(getProperty(parent));
+    }
+
+    private static boolean isMappingKey(Cursor cursor) {
+        Object parent = cursor.getParentTreeCursor().getValue();
+        return parent instanceof Yaml.Mapping.Entry && ((Yaml.Mapping.Entry) parent).getKey() == cursor.getValue();
+    }
+
+    private static boolean isSingleLine(Yaml.Scalar scalar) {
+        return scalar.getValue().indexOf('\n') == -1 && scalar.getValue().indexOf('\r') == -1;
     }
 
     // returns null if value should not change
