@@ -1,0 +1,1 @@
+Yarn 4.5.3 has no catalog support: the edit adds a .yarnrc.yml catalog setting beside an ms 2.1.2 to 2.1.3 bump, an unknown setting, and the install fails (catalog-rejected-by-4.5.3 as an edit over a lock).

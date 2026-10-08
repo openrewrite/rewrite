@@ -1,0 +1,1 @@
+A locked portal: dependency whose target package.json gains ms 2.1.3 beside an ms 2.1.2 to 2.1.3 bump: Yarn re-reads the target and rewrites the portal entry.
