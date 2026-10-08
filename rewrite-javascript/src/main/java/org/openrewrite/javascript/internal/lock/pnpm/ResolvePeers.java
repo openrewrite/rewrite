@@ -265,7 +265,8 @@ final class ResolvePeers {
     }
 
     static Result resolvePeers(Set<String> allPeerDepNames, List<ProjectToResolve> projects,
-                               Map<NodeId, DependenciesTreeNode> dependenciesTree, boolean resolvePeersFromWorkspaceRoot,
+                               Map<NodeId, DependenciesTreeNode> dependenciesTree,
+                               boolean resolvePeersFromWorkspaceRoot,
                                boolean dedupePeerDependents, boolean dedupePeers, boolean dedupeInjectedDeps,
                                int peersSuffixMaxLength, String lockfileDir,
                                Map<String, ResolveDependencyTree.ResolvedImporter> resolvedImporters,

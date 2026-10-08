@@ -145,7 +145,8 @@ final class PickPackage {
                                   String registryUrl, boolean optional, boolean filterMetadata) {
         String name = spec.getName();
         if (name.contains("/") && name.charAt(0) != '@') {
-            throw new PnpmError("INVALID_PACKAGE_NAME", "Package name " + name + " is invalid, it should have a @scope");
+            throw new PnpmError("INVALID_PACKAGE_NAME",
+                    "Package name " + name + " is invalid, it should have a @scope");
         }
         boolean fullMetadata = optional || filterMetadata;
         String cacheKey = fullMetadata ? name + ":full" : name;
@@ -187,8 +188,9 @@ final class PickPackage {
     }
 
     private static final String[] VERSION_FIELDS = {"name", "version", "bin", "directories", "devDependencies",
-            "optionalDependencies", "dependencies", "peerDependencies", "dist", "engines", "peerDependenciesMeta", "cpu",
-            "os", "libc", "deprecated", "bundleDependencies", "bundledDependencies", "hasInstallScript", "_npmUser"};
+            "optionalDependencies", "dependencies", "peerDependencies", "dist", "engines", "peerDependenciesMeta",
+            "cpu", "os", "libc", "deprecated", "bundleDependencies", "bundledDependencies", "hasInstallScript",
+            "_npmUser"};
 
     // clearMeta: the abbreviated document's fields of each version, with libc
     private static Map<String, @Nullable Object> clearMeta(Map<String, @Nullable Object> pkg) {

@@ -40,7 +40,8 @@ final class NodeRuntimeResolver {
     private static final List<String> RELEASE_CHANNELS = Arrays.asList("nightly", "rc", "test", "v8-canary",
             "release");
     private static final Pattern STABLE = Pattern.compile("^\\d+\\.\\d+\\.\\d+$");
-    private static final Pattern PRERELEASE_CHANNEL = Pattern.compile("^\\d+\\.\\d+\\.\\d+-(nightly|rc|test|v8-canary)");
+    private static final Pattern PRERELEASE_CHANNEL =
+            Pattern.compile("^\\d+\\.\\d+\\.\\d+-(nightly|rc|test|v8-canary)");
 
     private NodeRuntimeResolver() {
     }

@@ -404,7 +404,8 @@ public final class PnpmLockRegenerator {
         Object peersSuffixMaxLength = options.get("peersSuffixMaxLength");
         DepsResolver.Options resolverOptions = new DepsResolver.Options(autoInstallPeers,
                 options.isTrue("dedupePeerDependents"), options.isTrue("dedupePeers"),
-                options.isTrue("dedupeInjectedDeps"), options.isTrue("excludeLinksFromLockfile"), options.isTrue("lockfileIncludeTarballUrl"),
+                options.isTrue("dedupeInjectedDeps"), options.isTrue("excludeLinksFromLockfile"),
+                options.isTrue("lockfileIncludeTarballUrl"),
                 options.isTrue("resolvePeersFromWorkspaceRoot"),
                 peersSuffixMaxLength instanceof Number ? ((Number) peersSuffixMaxLength).intValue() : 1000,
                 registries);
@@ -449,7 +450,8 @@ public final class PnpmLockRegenerator {
                     false));
             envLockfile.packages().put(pkgKey, entry);
             Map<String, @Nullable Object> optionalSubdeps = new LinkedHashMap<>();
-            Map<String, @Nullable Object> optionalDeps = ResolveDependencies.asMap(manifest.get("optionalDependencies"));
+            Map<String, @Nullable Object> optionalDeps =
+                    ResolveDependencies.asMap(manifest.get("optionalDependencies"));
             for (String subdepName : Js.keys(optionalDeps)) {
                 String subdepSpec = Js.string(optionalDeps.get(subdepName));
                 if (NodeSemver.valid(subdepSpec, NodeSemver.Options.DEFAULT) == null) {
@@ -512,8 +514,8 @@ public final class PnpmLockRegenerator {
         file.put("importers", importers);
         file.put("packages", envLockfile.packages());
         file.put("snapshots", envLockfile.snapshots());
-        LockfileObject pruned = UpdateLockfile.pruneSharedLockfile(LockfileFormatConverters.convertToLockfileObject(file),
-                null);
+        LockfileObject pruned = UpdateLockfile.pruneSharedLockfile(
+                LockfileFormatConverters.convertToLockfileObject(file), null);
         Map<String, @Nullable Object> prunedFile = LockfileFormatConverters.convertToLockfileFile(pruned);
         Object packages = prunedFile.get("packages");
         Object snapshots = prunedFile.get("snapshots");
@@ -532,10 +534,9 @@ public final class PnpmLockRegenerator {
     }
 
     // forgetResolutionsOfPrevWantedDeps: a specifier that changed re-resolves
-    private static void forgetResolutionsOfPrevWantedDeps(ProjectSnapshot importer,
-                                                          List<ResolveDependencies.WantedDependency> wantedDeps,
-                                                          @Nullable Object prevCatalogs,
-                                                          Map<String, @Nullable Map<String, @Nullable Object>> catalogs) {
+    private static void forgetResolutionsOfPrevWantedDeps(
+            ProjectSnapshot importer, List<ResolveDependencies.WantedDependency> wantedDeps,
+            @Nullable Object prevCatalogs, Map<String, @Nullable Map<String, @Nullable Object>> catalogs) {
         if (importer.getDependencies() == null) {
             importer.setDependencies(new LinkedHashMap<>());
         }
@@ -775,8 +776,8 @@ public final class PnpmLockRegenerator {
         }
         boolean envResolves = packageManagerToResolve != null || !configDependenciesToResolve.isEmpty();
         return new Install(envResolves ? null : LockfileWriter.writeWantedLockfile(wantedLockfile, lockText), null,
-                packageManagerToResolve, configDependenciesToResolve, wantedLockfile, options, projects, false, lockText,
-                readPackageHook);
+                packageManagerToResolve, configDependenciesToResolve, wantedLockfile, options, projects, false,
+                lockText, readPackageHook);
     }
 
     // installDeps: each project's manifest as read, under the runtimeOnFail setting

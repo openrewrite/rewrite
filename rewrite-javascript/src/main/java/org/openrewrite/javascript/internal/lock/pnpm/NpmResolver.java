@@ -133,8 +133,8 @@ final class NpmResolver {
                     // pnpm reports that no version matches
                 }
             }
-            String dep = alias != null && !alias.isEmpty() ? alias + "@" + (bareSpecifier == null ? "" : bareSpecifier) :
-                    String.valueOf(bareSpecifier);
+            String dep = alias != null && !alias.isEmpty() ?
+                    alias + "@" + (bareSpecifier == null ? "" : bareSpecifier) : String.valueOf(bareSpecifier);
             throw new PnpmError("NO_MATCHING_VERSION", "No matching version found for " + dep +
                                                        " while fetching it from " + registryUrl);
         }
@@ -154,8 +154,9 @@ final class NpmResolver {
                 return local;
             }
             String localVersion = pickMatchingLocalVersionOrNull(workspacePkgsMatchingName, spec);
-            if (localVersion != null && (NodeSemver.compare(localVersion, pickedVersion, NodeSemver.Options.DEFAULT) > 0 ||
-                                         opts.preferWorkspacePackages)) {
+            if (localVersion != null &&
+                (NodeSemver.compare(localVersion, pickedVersion, NodeSemver.Options.DEFAULT) > 0 ||
+                 opts.preferWorkspacePackages)) {
                 ResolveResult local = resolveFromLocalPackage(workspacePkgsMatchingName.get(localVersion), spec,
                         wantedDependency, opts);
                 local.latest = latestOf(meta);
@@ -454,7 +455,8 @@ final class NpmResolver {
         return alias != null ? "npm:" + alias + "@" + versionPart : versionPart;
     }
 
-    private static final Pattern WORKSPACE_SPEC = Pattern.compile("^workspace:(?:([^._/][^@]*)@)?(.*)$", Pattern.DOTALL);
+    private static final Pattern WORKSPACE_SPEC = Pattern.compile("^workspace:(?:([^._/][^@]*)@)?(.*)$",
+            Pattern.DOTALL);
 
     private static @Nullable String getIntegrity(Map<String, @Nullable Object> dist) {
         if (Js.truthy(dist.get("integrity"))) {

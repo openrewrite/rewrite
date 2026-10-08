@@ -56,9 +56,10 @@
  * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
  * version-selector-type 3.0.0 (Copyright (c) 2017-2020 Zoltan Kochan &lt;z@kochan.io&gt;); parse-npm-tarball-url
  * 5.0.0 and normalize-registry-url 2.0.1 (Copyright (c) 2017-2026 Zoltan Kochan); get-npm-tarball-url 2.1.0
- * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); @pnpm/config.env-replace 4.1.0; {@code SemverRangeIntersect},
- * semver-range-intersect 0.3.1 (Copyright (c) 2019 sounisi5011); {@code GraphCycles}, graph-cycles 3.0.0 and
- * rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); and the {@code parseRange} of semver-utils 1.1.4
+ * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); @pnpm/config.env-replace 4.1.0;
+ * {@code SemverRangeIntersect}, semver-range-intersect 0.3.1 (Copyright (c) 2019 sounisi5011); {@code GraphCycles},
+ * graph-cycles 3.0.0 and rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); and the {@code parseRange} of
+ * semver-utils 1.1.4
  * (Copyright 2013 AJ ONeal, offered under the MIT License or Apache-2.0, used here under the MIT License).
  * <p>
  * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2, distributed under the ISC License:

@@ -104,8 +104,9 @@ final class DepsResolver {
                             continue;
                         }
                         @SuppressWarnings("unchecked")
-                        Map<String, @Nullable Object> dependencies = updatedManifest.get("dependencies") instanceof Map ?
-                                (Map<String, @Nullable Object>) updatedManifest.get("dependencies") : null;
+                        Map<String, @Nullable Object> dependencies =
+                                updatedManifest.get("dependencies") instanceof Map ?
+                                        (Map<String, @Nullable Object>) updatedManifest.get("dependencies") : null;
                         if (dependencies == null) {
                             dependencies = new LinkedHashMap<>();
                             updatedManifest.put("dependencies", dependencies);

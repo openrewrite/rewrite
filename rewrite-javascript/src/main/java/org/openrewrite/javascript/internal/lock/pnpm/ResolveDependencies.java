@@ -1299,8 +1299,8 @@ final class ResolveDependencies {
         if (ctx.isBlockExoticSubdeps() && options.currentDepth > 0 && pkgResponse.getResolvedVia() != null &&
             !NON_EXOTIC_RESOLVED_VIA.contains(pkgResponse.getResolvedVia())) {
             throw new PnpmError("EXOTIC_SUBDEP", "Exotic dependency \"" + wantedDependency.getAlias() +
-                                                 "\" (resolved via " + pkgResponse.getResolvedVia() +
-                                                 ") is not allowed in subdependencies when blockExoticSubdeps is enabled");
+                                                 "\" (resolved via " + pkgResponse.getResolvedVia() + ") is not " +
+                                                 "allowed in subdependencies when blockExoticSubdeps is enabled");
         }
         if (pkgResponse.getUnknownManifest() != null) {
             throw pkgResponse.getUnknownManifest();
@@ -1382,7 +1382,8 @@ final class ResolveDependencies {
         if (dependencyLockfile != null && dependencyLockfile.getHasBin() != null && !Js.truthy(bin)) {
             hasBin = Js.truthy(dependencyLockfile.getHasBin());
         } else {
-            boolean binPresent = Js.truthy(bin) && !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
+            boolean binPresent = Js.truthy(bin) &&
+                                 !("".equals(bin) || bin instanceof Map && ((Map<?, ?>) bin).isEmpty());
             hasBin = binPresent || Js.truthy(asMap(pkg.get("directories")).get("bin"));
         }
 
