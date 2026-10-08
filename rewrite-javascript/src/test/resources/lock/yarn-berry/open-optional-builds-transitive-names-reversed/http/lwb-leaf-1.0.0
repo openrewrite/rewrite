@@ -1,0 +1,9 @@
+{
+  "name": "lwb-leaf",
+  "version": "1.0.0",
+  "dist": {
+    "shasum": "fe802957f0842069b55cc5e539609bfbc6526317",
+    "integrity": "sha512-QsXtbvtJIi3+jg/qXRWSvlNW+RsKGHWNp/M5Ki4bXx5l2VGauJgKLW/5hVbF+DbaN0uZbqm6rldg64pPSnfoFQ==",
+    "tarball": "https://registry.npmjs.org/lwb-leaf/-/lwb-leaf-1.0.0.tgz"
+  }
+}

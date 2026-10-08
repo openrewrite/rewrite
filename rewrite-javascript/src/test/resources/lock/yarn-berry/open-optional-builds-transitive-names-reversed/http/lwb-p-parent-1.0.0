@@ -1,0 +1,13 @@
+{
+  "name": "lwb-p-parent",
+  "version": "1.0.0",
+  "dependencies": {
+    "lwb-z-opt": "1.0.0",
+    "lwb-b-hard": "1.0.0"
+  },
+  "dist": {
+    "shasum": "5dcebbc4e5779bc405931c38396d56a403027d19",
+    "integrity": "sha512-P/HaeTmsZkaaP/Czz/pkzqSOqmrXDxWsjNbru6vUzgsxGCZ3XTrYo62Am48vJ0wflAPKbQgU3BeU6hJJPcGWHw==",
+    "tarball": "https://registry.npmjs.org/lwb-p-parent/-/lwb-p-parent-1.0.0.tgz"
+  }
+}

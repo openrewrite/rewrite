@@ -1,0 +1,4 @@
+yarn 4.10.3 then 4.10.3 (corepack 0.35.0), node v24.19.0, Darwin x86_64 (node darwin-arm64), 2026-10-07
+before exit=0, after exit=0
+again exit=0 changed=no; immutable exit=0; fresh exit=0
+registry: yarn-berry-registry.js on 127.0.0.1:<free port> via the scratch home .yarnrc.yml, overlay.json documents first

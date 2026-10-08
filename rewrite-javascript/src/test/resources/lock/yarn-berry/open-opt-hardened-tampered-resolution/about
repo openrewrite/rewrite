@@ -1,0 +1,1 @@
+enableHardenedMode over a lock whose ms@npm:^2.1.3 descriptor resolves to 2.1.2 (lock-seed: leaf-bump/before with the key and the workspace range edited by hand); the edit adds is-number.

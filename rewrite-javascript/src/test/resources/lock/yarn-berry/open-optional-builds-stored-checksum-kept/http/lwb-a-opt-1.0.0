@@ -1,0 +1,12 @@
+{
+  "name": "lwb-a-opt",
+  "version": "1.0.0",
+  "optionalDependencies": {
+    "lwb-x-mid": "1.0.0"
+  },
+  "dist": {
+    "shasum": "f3e22fc4301ed3a0565cd3781c9eb97492088ea8",
+    "integrity": "sha512-I8ycJuSlHX+rALdXk1guzINjNFhz3wBMiFdUk3YBoWCDCMs/ps36mDXqPNlJlHNeQFc3ZbUVweJBDDgbAEtyWA==",
+    "tarball": "https://registry.npmjs.org/lwb-a-opt/-/lwb-a-opt-1.0.0.tgz"
+  }
+}

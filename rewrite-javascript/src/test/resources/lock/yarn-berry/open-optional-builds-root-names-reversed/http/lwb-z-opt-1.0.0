@@ -1,0 +1,12 @@
+{
+  "name": "lwb-z-opt",
+  "version": "1.0.0",
+  "optionalDependencies": {
+    "lwb-x-mid": "1.0.0"
+  },
+  "dist": {
+    "shasum": "d47f2ce781f473b5a94265a142da9d1fdea35d8e",
+    "integrity": "sha512-EP+c6eV+tW2bqYxErQouv1KnGmPKlBQQqW2DJHKex6Ee13DmzLekgIyyFOqBzt2pyllqYNkhYn91ZVBqHCkpTQ==",
+    "tarball": "https://registry.npmjs.org/lwb-z-opt/-/lwb-z-opt-1.0.0.tgz"
+  }
+}

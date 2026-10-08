@@ -1,0 +1,20 @@
+{
+  "name": "lwb-b-hard",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-b-hard",
+      "version": "1.0.0",
+      "dependencies": {
+        "lwb-x-mid": "1.0.0"
+      },
+      "dist": {
+        "shasum": "f94b6f7866a3bda5d5edd78288faa89400fc9464",
+        "integrity": "sha512-ybBrvT1ENWPbJiFhj6KNhz794qzTQdoneN5t9D0EYRHr5NYUbsk5HAMwIxv5zH7rVCN7vT7mv32KCEY61TyXJA==",
+        "tarball": "https://registry.npmjs.org/lwb-b-hard/-/lwb-b-hard-1.0.0.tgz"
+      }
+    }
+  }
+}

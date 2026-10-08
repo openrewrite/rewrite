@@ -1,0 +1,12 @@
+{
+  "name": "lwb-y-cond",
+  "version": "1.0.0",
+  "os": [
+    "linux"
+  ],
+  "dist": {
+    "shasum": "1d0fb0f20411bb5c1c1abb43c5f30583eca80441",
+    "integrity": "sha512-1rXxsGVMe6FpMoyhEkDZyQx//Z21PqBpA5XyijHpcP+hDsjYqViUiEX3gKueJ0wL+bvQzWgSpMoClZW8AvZIeA==",
+    "tarball": "https://registry.npmjs.org/lwb-y-cond/-/lwb-y-cond-1.0.0.tgz"
+  }
+}

@@ -1,0 +1,8 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0078: │ Invalid resolution ms@npm:^2.1.3 → npm:2.1.2
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 67ms
+over=before
+exit=1
+no lock written

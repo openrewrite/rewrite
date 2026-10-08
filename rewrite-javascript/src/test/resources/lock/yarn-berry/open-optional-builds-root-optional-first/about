@@ -1,0 +1,1 @@
+lwb-y-cond (os linux) is a hard dependency of lwb-x-mid, which the root reaches through lwb-a-opt (optional) and lwb-b-hard (hard); the root lists lwb-a-opt first: is lwb-y-cond conditional (no checksum).

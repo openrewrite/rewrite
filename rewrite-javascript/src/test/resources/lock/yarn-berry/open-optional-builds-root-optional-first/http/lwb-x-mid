@@ -1,0 +1,20 @@
+{
+  "name": "lwb-x-mid",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-x-mid",
+      "version": "1.0.0",
+      "dependencies": {
+        "lwb-y-cond": "1.0.0"
+      },
+      "dist": {
+        "shasum": "8f91461e4ba278b59b6887713269684d4844e6a1",
+        "integrity": "sha512-GF8X19f6N71f+tO9sMpe3s5beVVJJruPq6jjY5r49dphWADhKBv05cmHQo2pHM49j/9bAO50ciRLkneyuqQMVg==",
+        "tarball": "https://registry.npmjs.org/lwb-x-mid/-/lwb-x-mid-1.0.0.tgz"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+lwb-q-parent lists lwb-b-hard (hard path) before lwb-a-opt (optional path, sorts first) in its registry manifest: manifest order says hard first, name order says optional first.

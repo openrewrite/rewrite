@@ -1,0 +1,21 @@
+{
+  "name": "lwb-q-parent",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwb-q-parent",
+      "version": "1.0.0",
+      "dependencies": {
+        "lwb-b-hard": "1.0.0",
+        "lwb-a-opt": "1.0.0"
+      },
+      "dist": {
+        "shasum": "26d828a00b82dac573e4ae9a3c30fcd2e6ce981d",
+        "integrity": "sha512-CHHQdvK5kMTgJe13QNxD7nHKmH3IR/nNo0Zb+TPXJFlJbulQdhcNPRu7cETfgVk1X82dASnbg6/0l/gA7MyUog==",
+        "tarball": "https://registry.npmjs.org/lwb-q-parent/-/lwb-q-parent-1.0.0.tgz"
+      }
+    }
+  }
+}
