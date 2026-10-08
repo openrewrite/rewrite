@@ -29,31 +29,60 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the pnpm regenerator takes it: the manifests and package-manager files under the lock's
- * directory by path from it, and the paths the project holds there; the project's {@code .npmrc} from the marker when
- * the host did not hand the file.
+ * A recipe's request as the pnpm regenerator takes it, by path from the workspace directory pnpm finds from the lock's
+ * (the nearest holding a pnpm-workspace.yaml, else the lock's own); the marker's {@code .npmrc} when the host has none.
  */
 final class PnpmInputs {
+
+    private static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
+
+    /**
+     * For a walk that reads no registry document.
+     */
+    static final RegistryMetadata NO_REGISTRY = new RegistryMetadata() {
+        @Override
+        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String attestations(String registry, String name, String version) {
+            return null;
+        }
+
+        @Override
+        public @Nullable String document(String url) {
+            return null;
+        }
+    };
 
     private PnpmInputs() {
     }
 
     static Inputs from(Request request, Host host, Instant now, RegistryMetadata registry) {
-        String rootDir = NpmInputs.rootDirectory(request);
+        String lockDir = NpmInputs.rootDirectory(request);
+        String rootDir = workspaceDir(request, lockDir);
         Map<String, String> manifests = new LinkedHashMap<>();
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
+            String path = underRoot(file.getKey(), rootDir);
+            if (path == null) {
+                continue;
+            }
+            if ("package.json".equals(path)) {
+                manifests.put("", file.getValue());
+            } else if (path.endsWith("/package.json")) {
+                manifests.put(path.substring(0, path.length() - "/package.json".length()), file.getValue());
+            } else {
+                files.put(path, file.getValue());
+            }
+        }
         for (Map.Entry<String, String> manifest : NpmInputs.manifests(request, rootDir).entrySet()) {
             if (!manifest.getKey().equals("..") && !manifest.getKey().startsWith("../")) {
                 manifests.put(manifest.getKey(), manifest.getValue());
             }
         }
-        Map<String, String> files = new LinkedHashMap<>();
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            String path = underRoot(file.getKey(), rootDir);
-            if (path != null) {
-                files.put(path, file.getValue());
-            }
-        }
-        if (!files.containsKey(".npmrc")) {
+        if (!files.containsKey(".npmrc") && rootDir.equals(lockDir)) {
             String npmrc = NpmInputs.projectNpmrc(request.getMarker());
             if (npmrc != null) {
                 files.put(".npmrc", npmrc);
@@ -61,6 +90,7 @@ final class PnpmInputs {
         }
         return Inputs.builder()
                 .lock(request.getLock())
+                .lockDir(NpmInputs.location(rootDir, lockDir))
                 .manifests(manifests)
                 .files(files)
                 .paths(paths(request, rootDir))
@@ -68,6 +98,20 @@ final class PnpmInputs {
                 .registry(registry)
                 .host(host)
                 .build();
+    }
+
+    // findWorkspaceDir from the lock's directory up, over the package-manager files the host handed
+    private static String workspaceDir(Request request, String lockDir) {
+        String found = null;
+        for (Path file : request.getPackageManagerFiles().keySet()) {
+            Path name = file.getFileName();
+            String dir = NpmInputs.directory(file);
+            if (name != null && WORKSPACE_MANIFEST.equals(name.toString()) && NpmInputs.up(lockDir, dir) != null &&
+                (found == null || dir.length() > found.length())) {
+                found = dir;
+            }
+        }
+        return found == null ? lockDir : found;
     }
 
     private static @Nullable Set<String> paths(Request request, String rootDir) {

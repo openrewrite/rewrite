@@ -107,6 +107,9 @@ public final class NativeLockEngine {
                 case YarnClassic:
                     return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
                             Instant.EPOCH));
+                case Pnpm:
+                    return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
+                            PnpmInputs.NO_REGISTRY));
                 default:
                     return 0;
             }

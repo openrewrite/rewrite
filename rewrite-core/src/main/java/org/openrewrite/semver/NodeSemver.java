@@ -250,7 +250,8 @@ public class NodeSemver {
     public static @Nullable String minVersion(String range, Options options) {
         UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
         if (r == null) {
-            throw new IllegalArgumentException("Invalid SemVer Range: " + range);
+            throw new IllegalArgumentException(UnionRange.invalidRangeMessage(range, options.includePrerelease,
+                    options.loose));
         }
         for (String lowest : new String[]{"0.0.0", "0.0.0-0"}) {
             if (r.test(ParsedVersion.parseNode(lowest, false))) {

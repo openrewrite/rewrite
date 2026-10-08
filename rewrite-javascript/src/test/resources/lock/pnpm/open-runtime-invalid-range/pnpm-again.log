@@ -1,0 +1,5 @@
+[ERROR] Invalid comparator: >=x.y
+For help, run: pnpm help install
+pnpm , node v24.19.0, 2026-10-08T18:57:04Z
+exit=1
+no lock written

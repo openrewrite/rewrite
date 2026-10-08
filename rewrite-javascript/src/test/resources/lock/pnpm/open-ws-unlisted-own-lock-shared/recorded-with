@@ -1,0 +1,7 @@
+pnpm 11.2.2, node v24.19.0, 2026-10-08T18:49:33Z
+before exit=0, after exit=0
+again exit=0
+phase times: before at 2026-10-08T18:49:23Z, after at 2026-10-08T18:49:26Z, again at 2026-10-08T18:49:29Z
+platform os=darwin cpu=arm64 libc=
+lock: tools/x/pnpm-lock.yaml
+pnpm run in: tools/x

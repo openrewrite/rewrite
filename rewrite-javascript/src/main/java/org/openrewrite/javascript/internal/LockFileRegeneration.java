@@ -81,7 +81,8 @@ public final class LockFileRegeneration {
      * project's package-manager files by path ({@code .npmrc}, {@code bunfig.toml}, {@code .yarnrc},
      * {@code .yarnrc.yml}, {@code pnpm-workspace.yaml}, {@code .pnpmfile.cjs}, {@code .pnpmfile.mjs}, the {@code .env}
      * files Bun loads, and the {@code .patch} files under the project), those of the repository's directories above
-     * the project too with their {@code package.json}, and every path the project holds and the directories above it
+     * the project too with their {@code package.json} and those of the workspace members they list, and every path the
+     * project holds and the directories above it
      * hold directly, when the host says. The working directory is where the package manager runs when that is not the
      * lock's directory: a workspace member with a lock of its own that the package manager passes over for the root's.
      */

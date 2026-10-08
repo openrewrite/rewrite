@@ -55,16 +55,16 @@ final class PackageRequester {
     private final boolean force;
 
     /**
-     * The {@code nodeVersion} setting; null for the host's.
+     * The {@code nodeVersion} setting as pnpm read it; null for the host's.
      */
-    private final @Nullable String nodeVersion;
+    private final @Nullable Object nodeVersion;
 
     private final @Nullable Map<String, @Nullable Object> supportedArchitectures;
     private final RegistryMetadata fetch;
     private final @Nullable Map<String, @Nullable Object> nodeDownloadMirrors;
 
     PackageRequester(NpmResolver npmResolver, Map<String, String> files, Host host, boolean engineStrict,
-                     boolean force, @Nullable String nodeVersion,
+                     boolean force, @Nullable Object nodeVersion,
                      @Nullable Map<String, @Nullable Object> supportedArchitectures, RegistryMetadata fetch,
                      @Nullable Map<String, @Nullable Object> nodeDownloadMirrors) {
         this.npmResolver = npmResolver;

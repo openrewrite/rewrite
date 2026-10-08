@@ -1,0 +1,5 @@
+packages:
+  - 'packages/*'
+sharedWorkspaceLockfile: false
+catalog:
+  abbrev: 1.0.9

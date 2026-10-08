@@ -57,7 +57,7 @@ class AllProjectsAreUpToDateTest {
                                                   Map<String, Map<String, Verification.Project>> workspacePackages,
                                                   Map<String, String> files) {
         return Verification.allProjectsAreUpToDate(projects, new LinkedHashMap<>(), false, false,
-          linkWorkspacePackages, lockfile(wantedLockfile), workspacePackages, files);
+          linkWorkspacePackages, lockfile(wantedLockfile), workspacePackages, files, "");
     }
 
     private static boolean allProjectsAreUpToDate(List<Verification.Project> projects, String wantedLockfile) {

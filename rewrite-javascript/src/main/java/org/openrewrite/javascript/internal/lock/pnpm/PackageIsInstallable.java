@@ -64,7 +64,7 @@ final class PackageIsInstallable {
      * under engineStrict.
      */
     static @Nullable Boolean packageIsInstallable(String pkgId, Map<String, @Nullable Object> pkg, boolean engineStrict,
-                                                  @Nullable String nodeVersion, boolean optional,
+                                                  @Nullable Object nodeVersion, boolean optional,
                                                   @Nullable Object supportedArchitectures, Host host) {
         PnpmError warn = checkPackage(pkgId, pkg, nodeVersion, null, supportedArchitectures, host);
         if (warn == null) {
@@ -84,7 +84,7 @@ final class PackageIsInstallable {
      * satisfy throws, and under engineStrict any engine; a platform never does.
      */
     static void projectIsInstallable(String pkgPath, Map<String, @Nullable Object> pkg, boolean engineStrict,
-                                     @Nullable String nodeVersion, @Nullable Object supportedArchitectures,
+                                     @Nullable Object nodeVersion, @Nullable Object supportedArchitectures,
                                      Host host) {
         PnpmError err = checkPackage(pkgPath, pkg, nodeVersion, PNPM_VERSION, supportedArchitectures, host);
         if (err instanceof UnsupportedEngineError &&
@@ -97,7 +97,7 @@ final class PackageIsInstallable {
      * index.ts {@code checkPackage}.
      */
     static @Nullable PnpmError checkPackage(String pkgId, Map<String, @Nullable Object> manifest,
-                                            @Nullable String nodeVersion, @Nullable String pnpmVersion,
+                                            @Nullable Object nodeVersion, @Nullable String pnpmVersion,
                                             @Nullable Object supportedArchitectures, Host host) {
         Map<String, @Nullable Object> wantedPlatform = new LinkedHashMap<>();
         wantedPlatform.put("cpu", orAny(manifest.get("cpu")));
@@ -119,19 +119,19 @@ final class PackageIsInstallable {
     }
 
     /**
-     * checkEngine.ts {@code checkEngine}; a null {@code node} is a version the host does not report.
+     * checkEngine.ts {@code checkEngine}; a null {@code node} is a version the host does not report, and one that is
+     * not a string is the nodeVersion setting as YAML gave it.
      */
     static @Nullable UnsupportedEngineError checkEngine(String packageId, @Nullable Object wantedEngine,
-                                                        @Nullable String node, @Nullable String pnpm) {
+                                                        @Nullable Object node, @Nullable String pnpm) {
         if (!Js.truthy(wantedEngine)) {
             return null;
         }
         Map<String, @Nullable Object> unsatisfiedWanted = new LinkedHashMap<>();
         Object wantedNode = property(wantedEngine, "node");
-        if (node != null && Js.truthy(wantedNode) &&
-            !NodeSemver.satisfies(node, wantedNode, NodeSemver.Options.INCLUDE_PRERELEASE)) {
-            if (NodeSemver.valid(node, NodeSemver.Options.DEFAULT) == null) {
-                throw new PnpmError("INVALID_NODE_VERSION", "The nodeVersion setting is \"" + node +
+        if (node != null && Js.truthy(wantedNode) && !satisfies(node, wantedNode)) {
+            if (!(node instanceof String) || NodeSemver.valid((String) node, NodeSemver.Options.DEFAULT) == null) {
+                throw new PnpmError("INVALID_NODE_VERSION", "The nodeVersion setting is \"" + Js.string(node) +
                                                             "\", which is not exact semver version");
             }
             unsatisfiedWanted.put("node", wantedNode);
@@ -150,6 +150,18 @@ final class PackageIsInstallable {
             current.put("pnpm", pnpm);
         }
         return new UnsupportedEngineError(packageId, unsatisfiedWanted, current);
+    }
+
+    // semver.satisfies: false for a range Range rejects; a version that is not a string throws semver's TypeError
+    private static boolean satisfies(Object version, Object range) {
+        if (!(range instanceof String)) {
+            return false;
+        }
+        try {
+            return NodeSemver.satisfies(version, (String) range, NodeSemver.Options.INCLUDE_PRERELEASE);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(e.getMessage());
+        }
     }
 
     /**

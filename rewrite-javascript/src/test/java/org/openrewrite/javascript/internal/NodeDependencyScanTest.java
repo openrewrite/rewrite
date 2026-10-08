@@ -120,6 +120,10 @@ class NodeDependencyScanTest {
     @CsvSource({"Npm, package-lock.json", "YarnClassic, yarn.lock", "Pnpm, pnpm-lock.yaml", "Bun, bun.lock"})
     void aMemberWithItsOwnLockRegeneratesTheWorkspaceRootsLock(PackageManager pm, String lockName) {
         NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(pm, pm, lockName, lockName);
+        if (pm == PackageManager.Pnpm) {
+            NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder()
+              .sourcePath(Paths.get("pnpm-workspace.yaml")).text("packages:\n  - 'packages/*'\n").build());
+        }
         Path rootLock = Paths.get(lockName);
         Path memberLock = Paths.get("packages/a/" + lockName);
 
@@ -190,6 +194,55 @@ class NodeDependencyScanTest {
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo(lock.getNameCount() == 1 ? "root lock" :
           "member lock");
         assertThat(NodeDependencyScan.lockImporters(acc, lock)).contains(MEMBER);
+    }
+
+    /**
+     * Which lock pnpm 11.2.2 writes run in a project below the root: the root's when pnpm-workspace.yaml lists it and
+     * the workspace shares one lock, else its own (as it is when unlisted); pnpm ignores package.json workspaces.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "packages/a | shared   | true  | pnpm-lock.yaml",
+      "packages/a | shared   | false | pnpm-lock.yaml",
+      "packages/a | unshared | true  | packages/a/pnpm-lock.yaml",
+      "packages/a | unshared | false |",
+      "packages/a | none     | true  | packages/a/pnpm-lock.yaml",
+      "tools/x    | shared   | true  | tools/x/pnpm-lock.yaml",
+      "tools/x    | unshared | true  | tools/x/pnpm-lock.yaml"
+    })
+    void aPnpmProjectGoesToTheLockItsWorkspaceInstallsItInto(String dir, String workspace, boolean ownLock,
+                                                            String written) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path project = Paths.get(dir + "/package.json");
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml"))
+          .text("root lock").build());
+        if (ownLock) {
+            NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(dir + "/pnpm-lock.yaml"))
+              .text("own lock").build());
+        }
+        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+          .text("{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
+            singletonList("packages/a/package.json")))))
+          .build();
+        NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(project,
+          k -> new NodeDependencyScan.ProjectState());
+        ps.capturedPackageJson = PlainText.builder().sourcePath(project)
+          .text("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+        if (!"none".equals(workspace)) {
+            NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder()
+              .sourcePath(Paths.get("pnpm-workspace.yaml"))
+              .text("packages:\n  - 'packages/*'\n" + ("unshared".equals(workspace) ?
+                "sharedWorkspaceLockfile: false\n" : "")).build());
+        }
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        Path lock = written == null ? null : Paths.get(written);
+        assertThat(NodeDependencyScan.lockFor(acc, project)).isEqualTo(lock);
+        assertThat(acc.projects.get(project).capturedLockContent).isEqualTo(lock == null ? null :
+          lock.getNameCount() == 1 ? "root lock" : "own lock");
     }
 
     /**

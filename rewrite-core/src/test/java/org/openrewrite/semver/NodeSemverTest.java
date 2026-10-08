@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.semver.NodeSemver.Options;
 
@@ -462,10 +463,21 @@ class NodeSemverTest {
         assertThat(NodeSemver.minVersion(range, Options.DEFAULT)).as("minVersion(%s)", range).isEqualTo(expected);
     }
 
-    @Test
-    void minVersionOfAnInvalidRange() {
-        assertThatThrownBy(() -> NodeSemver.minVersion("not a range", Options.DEFAULT))
-          .isInstanceOf(IllegalArgumentException.class);
+    // node-semver 7.8.4's TypeError, as minVersion threw it under node
+    @ParameterizedTest
+    @CsvSource(delimiterString = " -> ", value = {
+      "not a range -> Invalid comparator: not",
+      "foo -> Invalid comparator: foo",
+      ">=x.y -> Invalid comparator: >=x.y",
+      "^1.2.3.4 -> Invalid comparator: ^1.2.3.4",
+      "abc def -> Invalid comparator: abc",
+      "1.2.3 || foo -> Invalid comparator: foo",
+      ">=1 <x.y.z.w -> Invalid comparator: <x.y.z.w",
+      "1.x || >=2.0.0-beta.1 || bar -> Invalid comparator: bar"
+    })
+    void minVersionOfAnInvalidRange(String range, String message) {
+        assertThatThrownBy(() -> NodeSemver.minVersion(range, Options.DEFAULT))
+          .isInstanceOf(IllegalArgumentException.class).hasMessage(message);
     }
 
     @Test

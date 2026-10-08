@@ -82,6 +82,53 @@ class PnpmInputsTest {
         assertThat(inputs.getRegistry()).isSameAs(NO_REGISTRY);
     }
 
+    /**
+     * pnpm finds its workspace from the lock's directory up; a member's own lock is regenerated with the workspace's
+     * manifests, pnpm-workspace.yaml and .npmrc, at the member's place in it.
+     */
+    @Test
+    void aMembersOwnLockIsPlacedInTheWorkspaceAboveIt() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"b\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .lock("lockfileVersion: '9.0'\n")
+          .packageJsonPath(Paths.get("repo/packages/b/package.json"))
+          .manifest(Paths.get("repo/packages/b/package.json"), "{\"name\":\"b\"}")
+          .packageManagerFile(Paths.get("repo/pnpm-workspace.yaml"), "packages:\n  - packages/*\n")
+          .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://example.com/\n")
+          .packageManagerFile(Paths.get("repo/package.json"), "{\"name\":\"root\",\"private\":true}")
+          .packageManagerFile(Paths.get("repo/packages/a/package.json"), "{\"name\":\"a\"}")
+          .packageManagerFile(Paths.get("package.json"), "{\"name\":\"above\"}")
+          .marker(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(Collections.singletonList(
+            new Npmrc(NpmrcScope.Project, Collections.singletonMap("registry", "https://member.example/")))))
+          .build();
+
+        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+
+        assertThat(inputs.getLockDir()).isEqualTo("packages/b");
+        assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "packages/b");
+        assertThat(inputs.getManifests().get("packages/b"))
+          .isEqualTo("{\"name\":\"b\",\"dependencies\":{\"ms\":\"2.1.3\"}}");
+        assertThat(inputs.getFiles()).containsOnlyKeys("pnpm-workspace.yaml", ".npmrc");
+        assertThat(inputs.getFiles().get(".npmrc")).isEqualTo("registry=https://example.com/\n");
+    }
+
+    @Test
+    void withoutAWorkspaceAboveTheLockIsTheRoot() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"b\"}")
+          .lock("lockfileVersion: '9.0'\n")
+          .packageJsonPath(Paths.get("repo/packages/b/package.json"))
+          .packageManagerFile(Paths.get("repo/package.json"), "{\"name\":\"root\",\"workspaces\":[\"packages/*\"]}")
+          .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://example.com/\n")
+          .build();
+
+        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+
+        assertThat(inputs.getLockDir()).isEmpty();
+        assertThat(inputs.getManifests()).containsOnlyKeys("");
+        assertThat(inputs.getFiles()).isEmpty();
+    }
+
     @Test
     void thePathsUnderTheRootAreTheProjectsPaths() {
         Request request = Request.builder()

@@ -292,7 +292,7 @@ final class PnpmOptions {
             try {
                 minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.DEFAULT);
             } catch (IllegalArgumentException e) {
-                throw new JsError("Invalid SemVer Range: " + Js.trim((String) version));
+                throw new JsError(e.getMessage());
             }
             if (minVersion != null) {
                 return minVersion;

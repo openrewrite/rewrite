@@ -205,6 +205,15 @@ final class PnpmScenarios {
         }
 
         /**
+         * The directory of the lock the scenario's locks are ({@code lock-dir}): a workspace member's own lock beside
+         * the workspace root's manifests and files; {@code ""} the root's.
+         */
+        String lockDir() {
+            String lockDir = file("lock-dir");
+            return lockDir == null ? "" : lockDir.trim();
+        }
+
+        /**
          * The second phase's command-line flags ({@code --frozen-lockfile}), which a lock-only install does not take.
          */
         @Nullable

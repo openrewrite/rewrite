@@ -1,0 +1,1 @@
+pnpm-workspace.yaml sets nodeVersion to a YAML number and the edit adds a package without engines: nothing reads it.

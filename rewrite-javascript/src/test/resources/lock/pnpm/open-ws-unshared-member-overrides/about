@@ -1,0 +1,1 @@
+With sharedWorkspaceLockfile false and the workspace overriding wrappy, member b adds once: b's lock records the override.

@@ -1,0 +1,1 @@
+With sharedWorkspaceLockfile false and a config dependency, member b adds abbrev: pnpm installs the config dependency into the root's lock, b's holds none.

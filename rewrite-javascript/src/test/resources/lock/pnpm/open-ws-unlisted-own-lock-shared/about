@@ -1,0 +1,1 @@
+tools/x, which the workspace does not list, has a lock of its own and adds abbrev; pnpm run in tools/x installs the listed projects and leaves tools/x's lock as it is.

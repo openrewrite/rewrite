@@ -34,11 +34,8 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.json
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * config/reader/test/getOptionsFromRootManifest.test.ts, env.test.ts, parseCreds.test.ts, getNetworkConfigs.test.ts and
- * the registry, .npmrc, nodeVersion and minimumReleaseAgeStrict cases of index.ts, and @pnpm/config.env-replace 4.1.0's
- * env-replace.spec.ts, of pnpm 11.2.2.
- * Not ported from index.ts: the cases of a CLI option other than {@code --lockfile-only} and of the user's own config
- * files (~/.npmrc, auth.ini, config.yaml), which are the host's.
+ * pnpm 11.2.2's config/reader tests getOptionsFromRootManifest, env, parseCreds, getNetworkConfigs and the project
+ * config cases of index.ts, and @pnpm/config.env-replace 4.1.0's env-replace.spec.ts.
  */
 class PnpmOptionsTest {
 
@@ -287,6 +284,18 @@ class PnpmOptionsTest {
             assertThat(PnpmOptions.load(null, null, manifest, env()).get("nodeVersion"))
               .as("%s %s %s", (Object[]) c).isEqualTo(c[3]);
         }
+    }
+
+    // upstream sets it on the command line; pnpm-workspace.yaml is read after the manifest too, and the environment
+    // never sets it (envPnpmTypes omits node-version)
+    @Test
+    void nodeVersionFromConfigTakesPriorityOverDevEnginesRuntime() {
+        Map<String, @Nullable Object> manifest = obj("{'devEngines':{'runtime':{'name':'node','version':'22.20.0'," +
+                                                     "'onFail':'download'}}}");
+        assertThat(PnpmOptions.load("nodeVersion: 20.0.0\n", null, manifest, env()).get("nodeVersion"))
+          .isEqualTo("20.0.0");
+        assertThat(PnpmOptions.load(null, null, manifest, env("pnpm_config_node_version", "20.0.0"))
+          .get("nodeVersion")).isEqualTo("22.20.0");
     }
 
     @Test

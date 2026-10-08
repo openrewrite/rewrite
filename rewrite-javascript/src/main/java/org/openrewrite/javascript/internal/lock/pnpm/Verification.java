@@ -85,7 +85,7 @@ final class Verification {
                                           boolean autoInstallPeers, boolean excludeLinksFromLockfile,
                                           boolean linkWorkspacePackages, LockfileObject wantedLockfile,
                                           @Nullable Map<String, Map<String, Project>> workspacePackages,
-                                          Map<String, String> files) {
+                                          Map<String, String> files, String lockfileDir) {
         if (!allCatalogsAreUpToDate(catalogs, wantedLockfile.getCatalogs())) {
             return false;
         }
@@ -112,7 +112,7 @@ final class Verification {
                     .isSatisfies() ||
                 !localTarballDepsAreUpToDate(wantedLockfile.getPackages(), importer) ||
                 !linkedPackagesAreUpToDate(linkWorkspacePackages, manifestsByDir, workspacePackages,
-                        wantedLockfile.getPackages(), project, importer, files)) {
+                        wantedLockfile.getPackages(), project, importer, files, lockfileDir)) {
                 return false;
             }
         }
@@ -350,7 +350,7 @@ final class Verification {
                                                      @Nullable Map<String, Map<String, Project>> workspacePackages,
                                                      @Nullable Map<String, PackageSnapshot> lockfilePackages,
                                                      Project project, ProjectSnapshot snapshot,
-                                                     Map<String, String> files) {
+                                                     Map<String, String> files, String lockfileDir) {
         for (String depField : ProjectSnapshot.DEPENDENCIES_FIELDS) {
             Map<String, @Nullable String> lockfileDeps = snapshot.field(depField);
             Object manifestDeps = project.getManifest().get(depField);
@@ -375,7 +375,7 @@ final class Verification {
                     }
                     String depPath = DepPath.refToRelative(lockfileRef, depName);
                     if (depPath == null || !isLocalFileDepUpdated(lockfilePackages == null ? null :
-                            lockfilePackages.get(depPath), files)) {
+                            lockfilePackages.get(depPath), files, lockfileDir)) {
                         return false;
                     }
                     continue;
@@ -421,12 +421,14 @@ final class Verification {
     }
 
     @SuppressWarnings("unchecked")
-    private static boolean isLocalFileDepUpdated(@Nullable PackageSnapshot pkgSnapshot, Map<String, String> files) {
+    private static boolean isLocalFileDepUpdated(@Nullable PackageSnapshot pkgSnapshot, Map<String, String> files,
+                                                 String lockfileDir) {
         if (pkgSnapshot == null) {
             return false;
         }
         Object directory = pkgSnapshot.getResolution() == null ? null : pkgSnapshot.getResolution().get("directory");
-        Map<String, @Nullable Object> manifest = readPackageJson(files, PosixPaths.normalize(Js.string(directory)));
+        Map<String, @Nullable Object> manifest = readPackageJson(files,
+                PosixPaths.join(lockfileDir, Js.string(directory)));
         if (manifest == null) {
             return false;
         }

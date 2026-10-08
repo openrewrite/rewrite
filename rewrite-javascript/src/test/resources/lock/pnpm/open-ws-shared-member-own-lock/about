@@ -1,0 +1,1 @@
+Member a of a workspace sharing one lock has a stale lock of its own and adds abbrev; pnpm run in packages/a writes the root's lock and leaves a's as it is.

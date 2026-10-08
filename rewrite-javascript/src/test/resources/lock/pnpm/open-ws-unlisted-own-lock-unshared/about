@@ -1,0 +1,1 @@
+With sharedWorkspaceLockfile false, tools/x, which the workspace does not list, has a lock of its own and adds abbrev; pnpm run in tools/x leaves its lock as it is.

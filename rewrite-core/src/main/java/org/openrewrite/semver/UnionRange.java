@@ -146,29 +146,7 @@ class UnionRange implements VersionComparator {
     // Port of node-semver classes/range.js parseRange; null when a comparator is invalid. 5.5.0 keeps duplicate,
     // `>=0.0.0` and empty comparators and writes no `-0` on the upper bounds it derives.
     private static @Nullable List<NodeComparand> parseRange(String range, boolean incPre, boolean loose, boolean v5) {
-        range = BUILD_STRIP.matcher(range).replaceAll("");
-        range = v5 ? withoutDerivedPrerelease(range, HyphenRange.hyphenReplace(range, incPre, loose)) :
-                HyphenRange.hyphenReplace(range, incPre, loose);
-        range = COMPARATOR_TRIM.matcher(range).replaceAll("$1$2$3");
-        range = TILDE_TRIM.matcher(range).replaceAll("$1~");
-        range = CARET_TRIM.matcher(range).replaceAll("$1^");
-
-        String[] comps = range.split(" ", -1);
-        StringBuilder joined = new StringBuilder();
-        for (int i = 0; i < comps.length; i++) {
-            if (i > 0) {
-                joined.append(' ');
-            }
-            joined.append(parseComparator(comps[i], incPre, loose, v5));
-        }
-        List<String> rangeList = new ArrayList<>();
-        for (String comp : joined.toString().split("\\s+", -1)) {
-            rangeList.add(v5 ? comp.trim() : (incPre ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
-        }
-        if (loose) {
-            rangeList.removeIf(comp -> !NodeComparand.COMPARATOR_LOOSE.matcher(comp).find());
-        }
-
+        List<String> rangeList = comparators(range, incPre, loose, v5);
         if (v5) {
             List<NodeComparand> comparands = new ArrayList<>();
             for (String comp : rangeList) {
@@ -197,6 +175,48 @@ class UnionRange implements VersionComparator {
             rangeMap.remove("");
         }
         return new ArrayList<>(rangeMap.values());
+    }
+
+    /**
+     * The TypeError node-semver 7.x's Range constructor throws for a range {@link #parse} rejects.
+     */
+    static String invalidRangeMessage(String range, boolean includePrerelease, boolean loose) {
+        String raw = range.trim().replaceAll("\\s+", " ");
+        for (String group : raw.split("\\|\\|", -1)) {
+            for (String comp : comparators(group.trim(), includePrerelease, loose, false)) {
+                if (NodeComparand.parse(comp, loose) == null) {
+                    return "Invalid comparator: " + comp;
+                }
+            }
+        }
+        return "Invalid SemVer Range: " + raw;
+    }
+
+    // the comparator strings parseRange makes of one group, before it parses them
+    private static List<String> comparators(String range, boolean incPre, boolean loose, boolean v5) {
+        range = BUILD_STRIP.matcher(range).replaceAll("");
+        range = v5 ? withoutDerivedPrerelease(range, HyphenRange.hyphenReplace(range, incPre, loose)) :
+                HyphenRange.hyphenReplace(range, incPre, loose);
+        range = COMPARATOR_TRIM.matcher(range).replaceAll("$1$2$3");
+        range = TILDE_TRIM.matcher(range).replaceAll("$1~");
+        range = CARET_TRIM.matcher(range).replaceAll("$1^");
+
+        String[] comps = range.split(" ", -1);
+        StringBuilder joined = new StringBuilder();
+        for (int i = 0; i < comps.length; i++) {
+            if (i > 0) {
+                joined.append(' ');
+            }
+            joined.append(parseComparator(comps[i], incPre, loose, v5));
+        }
+        List<String> rangeList = new ArrayList<>();
+        for (String comp : joined.toString().split("\\s+", -1)) {
+            rangeList.add(v5 ? comp.trim() : (incPre ? GTE0_PRE : GTE0).matcher(comp.trim()).replaceFirst(""));
+        }
+        if (loose) {
+            rangeList.removeIf(comp -> !NodeComparand.COMPARATOR_LOOSE.matcher(comp).find());
+        }
+        return rangeList;
     }
 
     private static String parseComparator(String comp, boolean incPre, boolean loose, boolean v5) {

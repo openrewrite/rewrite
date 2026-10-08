@@ -1,0 +1,5 @@
+packages:
+  - 'packages/*'
+sharedWorkspaceLockfile: false
+overrides:
+  wrappy: 1.0.1

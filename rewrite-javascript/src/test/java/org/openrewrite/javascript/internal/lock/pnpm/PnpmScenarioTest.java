@@ -44,13 +44,8 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Replays every recorded edit {@link PnpmScenarios} finds through {@link PnpmLockRegenerator}, from {@code before}
- * with the edit phase's project files and clock, the registry served from the recording, and asserts the scenario's
- * {@code expect} line: {@code exact} (pnpm's {@code after} byte for byte; the default when {@code after} is
- * present), {@code cannot-know <what>} (every package, spec and URL it names), {@code malformed}, {@code pm-rejects
- * <what>} (all of it in the failure) or {@code second-install-rejects <code>}. A fixture recorded elsewhere is
- * replayed with its re-recording's registry, else its own and the cache; one an in-repo scenario's {@code supersedes}
- * names is skipped. When {@code REWRITE_LOCK_PNPM_SCENARIO_RESULTS} names a file, one line per edit is written there.
+ * Replays every edit {@link PnpmScenarios} finds through {@link PnpmLockRegenerator} with the edit phase's inputs and
+ * asserts the scenario's {@code expect} line, {@code exact} when it has none and {@code after} is present.
  */
 class PnpmScenarioTest {
 
@@ -99,6 +94,7 @@ class PnpmScenarioTest {
         PnpmScenarios.Scenario recording = recording(scenario);
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock)
+          .lockDir(scenario.lockDir())
           .manifests(scenario.manifests(false, lock))
           .files(files)
           .now(recording.phaseTime("after"))

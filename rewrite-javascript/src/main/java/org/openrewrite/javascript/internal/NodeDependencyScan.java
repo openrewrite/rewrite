@@ -61,7 +61,7 @@ public final class NodeDependencyScan {
         public final Map<Path, String> packageManagerFiles = new HashMap<>();
         /** Every file the scan visited: what the host holds of the repository. */
         public final Set<Path> paths = new HashSet<>();
-        /** The package.json each {@link #lockFor} walk from a package.json with its own lock ended at. */
+        /** The package.json each {@link #lockFor} walk from one with its own lock, or a pnpm one, ended at. */
         final Map<Path, Path> installRoots = new HashMap<>();
     }
 
@@ -132,20 +132,18 @@ public final class NodeDependencyScan {
 
     /**
      * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. A package with a
-     * lock of its own: the lock of the workspace root the package manager's own walk installs at, when regenerating
-     * that lock reproduces the install, else its own, whose regeneration reports what the package manager does
-     * (pnpm's walk is not ported: the nearest root listing the package stands in). Without one: the lock of the
-     * nearest workspace root that lists the package.
+     * lock of its own, and any pnpm package: the lock of the workspace root the package manager's own walk installs
+     * at, when regenerating that lock reproduces the install, else its own, whose regeneration reports what the
+     * package manager does. Without one: the lock of the nearest workspace root that lists the package.
      */
     public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);
-        NodeResolutionResult marker = ps == null || ps.capturedPackageJson == null ? null :
-                ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+        NodeResolutionResult marker = marker(ps);
         PackageManager pm = marker == null ? null : marker.getPackageManager();
         LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(pm);
         Path own = lockBeside(acc, packageJsonPath, regeneration);
         Path root;
-        if (own == null || regeneration == null || pm == PackageManager.Pnpm) {
+        if (regeneration == null || own == null && pm != PackageManager.Pnpm) {
             root = nearestListingRoot(acc, packageJsonPath);
         } else {
             Path walked = acc.installRoots.computeIfAbsent(packageJsonPath,
@@ -156,14 +154,19 @@ public final class NodeDependencyScan {
         return rootLock == null ? own : rootLock;
     }
 
+    private static @Nullable NodeResolutionResult marker(@Nullable ProjectState ps) {
+        return ps == null || ps.capturedPackageJson == null ? null :
+                ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
+    }
+
     // the package.json of the directory the package manager installs at when run beside packageJsonPath
-    private static Path installRoot(Accumulator acc, Path packageJsonPath, ProjectState ps, Path lock,
+    private static Path installRoot(Accumulator acc, Path packageJsonPath, ProjectState ps, @Nullable Path lock,
                                     NodeResolutionResult marker, LockFileRegeneration regeneration) {
         String manifest = print(null, packageJsonPath, ps);
         ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest), null);
         int depth = regeneration.installRoot(LockFileRegeneration.Request.builder()
                 .packageJson(manifest)
-                .lock(acc.locks.get(lock))
+                .lock(lock == null ? null : acc.locks.get(lock))
                 .marker(marker)
                 .packageJsonPath(packageJsonPath)
                 .manifests(files.getManifests())
@@ -245,15 +248,17 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * {@link #projectManifests}, the package-manager files beside any of them or in a directory above them, the
-     * package.json of each directory above the project, and the paths under them or directly in a directory above;
-     * the edited package's directory when the package manager run there installs at a workspace root's lock.
+     * {@link #projectManifests}, the package-manager files beside or above them, the package.json of each directory
+     * above and of the members those list, the paths under or directly above them; the edited package's directory
+     * when the package manager run there installs at a workspace root's lock (pnpm's runs alike from anywhere in it).
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
         Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
         Path lock = lockFor(acc, packageJsonPath);
+        NodeResolutionResult marker = marker(acc.projects.get(packageJsonPath));
         boolean walkedToRoot = acc.installRoots.containsKey(packageJsonPath) && lock != null &&
-                               !packageJsonPath.equals(acc.lockToPackage.get(lock));
+                               !packageJsonPath.equals(acc.lockToPackage.get(lock)) &&
+                               (marker == null || marker.getPackageManager() != PackageManager.Pnpm);
         return projectFiles(acc, ctx, packageJsonPath, manifests, walkedToRoot ? directory(packageJsonPath) : null);
     }
 
@@ -275,9 +280,15 @@ public final class NodeDependencyScan {
         Path root = directory(manifests.isEmpty() ? packageJsonPath : manifests.keySet().iterator().next());
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             Path dir = directory(project.getKey());
-            if (project.getValue().capturedPackageJson != null && !dir.equals(root) &&
-                above(dir, Collections.singleton(root))) {
+            SourceFile captured = project.getValue().capturedPackageJson;
+            if (captured != null && !dir.equals(root) && above(dir, Collections.singleton(root))) {
                 files.put(project.getKey(), print(ctx, project.getKey(), project.getValue()));
+                for (Path member : PackageJsonHelper.workspaceMemberPaths(captured)) {
+                    ProjectState memberPs = acc.projects.get(member);
+                    if (memberPs != null && memberPs.capturedPackageJson != null && !manifests.containsKey(member)) {
+                        files.put(member, print(ctx, member, memberPs));
+                    }
+                }
             }
         }
         Set<Path> paths = new LinkedHashSet<>();

@@ -58,6 +58,7 @@ class PnpmLockRoundTripTest {
         }
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock.getText())
+          .lockDir(lock.getScenario().lockDir())
           .manifests(lock.manifests())
           .files(files)
           .now(lock.now())

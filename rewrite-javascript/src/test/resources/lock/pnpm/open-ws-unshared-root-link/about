@@ -1,0 +1,1 @@
+With sharedWorkspaceLockfile false, the root on workspace:* member b adds abbrev: the root's lock links b, not b's dependencies.
