@@ -212,6 +212,29 @@ final class ResolvePeers {
         @Nullable Integer occurrence;
     }
 
+    @Value
+    private static class ParentPkgNode {
+        String alias;
+        DependenciesTreeNode node;
+        NodeId nodeId;
+        List<NodeId> parentNodeIds;
+    }
+
+    @Value
+    private static class PendingPeer {
+        String alias;
+        NodeId nodeId;
+    }
+
+    /**
+     * {@code PeersResolution}: the peers resolved for the children, by alias, and those they miss.
+     */
+    @Value
+    private static class PeersResolution {
+        Map<String, NodeId> resolvedPeers;
+        Map<String, MissingPeerInfo> missingPeers;
+    }
+
     private static final class PeersCacheItem {
         final Deferred depPath;
         final Map<String, NodeId> resolvedPeers;
@@ -490,10 +513,10 @@ final class ResolvePeers {
     private static Map<String, ParentRef> createPkgsByName(Map<NodeId, DependenciesTreeNode> dependenciesTree,
                                                            Map<String, NodeId> directNodeIdsByAlias,
                                                            List<TopParent> topParents) {
-        List<Object[]> nodes = new ArrayList<>();
+        List<ParentPkgNode> nodes = new ArrayList<>();
         for (Map.Entry<String, NodeId> direct : directNodeIdsByAlias.entrySet()) {
-            nodes.add(new Object[]{direct.getKey(), dependenciesTree.get(direct.getValue()), direct.getValue(),
-                    Collections.<NodeId>emptyList()});
+            nodes.add(new ParentPkgNode(direct.getKey(), dependenciesTree.get(direct.getValue()), direct.getValue(),
+                    Collections.emptyList()));
         }
         Map<String, ParentRef> parentRefs = toPkgByName(nodes);
         for (TopParent topParent : topParents) {
@@ -507,15 +530,13 @@ final class ResolvePeers {
         return parentRefs;
     }
 
-    // nodes: [alias, DependenciesTreeNode, nodeId, parentNodeIds]
-    @SuppressWarnings("unchecked")
-    private static Map<String, ParentRef> toPkgByName(List<Object[]> nodes) {
+    private static Map<String, ParentRef> toPkgByName(List<ParentPkgNode> nodes) {
         Map<String, ParentRef> pkgsByName = new LinkedHashMap<>();
-        for (Object[] entry : nodes) {
-            String alias = (String) entry[0];
-            DependenciesTreeNode node = (DependenciesTreeNode) entry[1];
-            ParentRef pkg = new ParentRef(node.getResolvedPackage().getVersion(), node.getDepth(), (NodeId) entry[2],
-                    alias, 0, (List<NodeId>) entry[3]);
+        for (ParentPkgNode entry : nodes) {
+            String alias = entry.getAlias();
+            DependenciesTreeNode node = entry.getNode();
+            ParentRef pkg = new ParentRef(node.getResolvedPackage().getVersion(), node.getDepth(), entry.getNodeId(),
+                    alias, 0, entry.getParentNodeIds());
             updateParentRefs(pkgsByName, alias, pkg);
             if (!alias.equals(node.getResolvedPackage().getName())) {
                 updateParentRefs(pkgsByName, node.getResolvedPackage().getName(), pkg);
@@ -562,11 +583,11 @@ final class ResolvePeers {
             parentPkgs = parentParentPkgs;
         } else {
             parentPkgs = new LinkedHashMap<>(parentParentPkgs);
-            List<Object[]> parentPkgNodes = new ArrayList<>();
+            List<ParentPkgNode> parentPkgNodes = new ArrayList<>();
             for (Map.Entry<String, NodeId> child : children.entrySet()) {
                 if (ctx.allPeerDepNames.contains(child.getKey())) {
-                    parentPkgNodes.add(new Object[]{child.getKey(), ctx.dependenciesTree.get(child.getValue()),
-                            child.getValue(), parentNodeIds});
+                    parentPkgNodes.add(new ParentPkgNode(child.getKey(), ctx.dependenciesTree.get(child.getValue()),
+                            child.getValue(), parentNodeIds));
                 }
             }
             Map<String, ParentRef> newParentPkgs = toPkgByName(parentPkgNodes);
@@ -605,12 +626,10 @@ final class ResolvePeers {
             chain = new ArrayList<>(chain);
             chain.add(pkgIdWithPatchHash);
         }
-        Object[] childrenResult = resolvePeersOfChildren(children, parentPkgs, ctx.with(parentNodeIds, chain));
+        PeersResolution childrenResult = resolvePeersOfChildren(children, parentPkgs, ctx.with(parentNodeIds, chain));
         ctx.drain();
-        @SuppressWarnings("unchecked")
-        Map<String, NodeId> allResolvedPeers = (Map<String, NodeId>) childrenResult[0];
-        @SuppressWarnings("unchecked")
-        Map<String, MissingPeerInfo> missingPeersOfChildren = (Map<String, MissingPeerInfo>) childrenResult[1];
+        Map<String, NodeId> allResolvedPeers = childrenResult.getResolvedPeers();
+        Map<String, MissingPeerInfo> missingPeersOfChildren = childrenResult.getMissingPeers();
 
         Map<String, NodeId> resolvedPeers = new LinkedHashMap<>();
         Map<String, MissingPeerInfo> missingPeers = new LinkedHashMap<>();
@@ -640,13 +659,13 @@ final class ResolvePeers {
             addDepPathToGraph.accept(pkgIdWithPatchHash);
         } else {
             List<DepPath.PeerId> peerIds = new ArrayList<>();
-            List<Object[]> pendingPeers = new ArrayList<>();
+            List<PendingPeer> pendingPeers = new ArrayList<>();
             for (Map.Entry<String, NodeId> peer : allResolvedPeers.entrySet()) {
                 DepPath.PeerId peerId = peerNodeIdToPeerId(peer.getKey(), peer.getValue(), ctx);
                 if (peerId != null) {
                     peerIds.add(peerId);
                 } else {
-                    pendingPeers.add(new Object[]{peer.getKey(), peer.getValue()});
+                    pendingPeers.add(new PendingPeer(peer.getKey(), peer.getValue()));
                 }
             }
             if (pendingPeers.isEmpty()) {
@@ -661,7 +680,7 @@ final class ResolvePeers {
     }
 
     private static void calculateDepPath(Ctx ctx, String currentAlias, String pkgIdWithPatchHash,
-                                         List<DepPath.PeerId> peerIds, List<Object[]> pendingPeerNodes,
+                                         List<DepPath.PeerId> peerIds, List<PendingPeer> pendingPeerNodes,
                                          List<List<String>> cycles, Consumer<String> addDepPathToGraph) {
         Set<String> cyclicPeerAliases = new LinkedHashSet<>();
         for (List<String> cycle : cycles) {
@@ -673,8 +692,8 @@ final class ResolvePeers {
         List<Deferred> awaited = new ArrayList<>();
         List<Integer> awaitedAt = new ArrayList<>();
         for (int i = 0; i < pendingPeerNodes.size(); i++) {
-            String alias = (String) pendingPeerNodes.get(i)[0];
-            NodeId peerNodeId = (NodeId) pendingPeerNodes.get(i)[1];
+            String alias = pendingPeerNodes.get(i).getAlias();
+            NodeId peerNodeId = pendingPeerNodes.get(i).getNodeId();
             if (cyclicPeerAliases.contains(alias)) {
                 ResolvedPackage peer = ctx.dependenciesTree.get(peerNodeId).getResolvedPackage();
                 String id = peer.getName() + "@" + peer.getVersion();
@@ -896,9 +915,8 @@ final class ResolvePeers {
         return allChildren;
     }
 
-    // [resolvedPeers not among the children, missingPeers]
-    private static Object[] resolvePeersOfChildren(Map<String, NodeId> children, Map<String, ParentRef> parentPkgs,
-                                                   Ctx ctx) {
+    private static PeersResolution resolvePeersOfChildren(Map<String, NodeId> children,
+                                                          Map<String, ParentRef> parentPkgs, Ctx ctx) {
         Map<String, NodeId> allResolvedPeers = new LinkedHashMap<>();
         Map<String, MissingPeerInfo> allMissingPeers = new LinkedHashMap<>();
         List<Map.Entry<String, NodeId>> repeated = new ArrayList<>();
@@ -973,7 +991,7 @@ final class ResolvePeers {
                 unknownResolvedPeersOfChildren.put(peer.getKey(), peer.getValue());
             }
         }
-        return new Object[]{unknownResolvedPeersOfChildren, allMissingPeers};
+        return new PeersResolution(unknownResolvedPeersOfChildren, allMissingPeers);
     }
 
     private static void addEdgesToGraph(Map<String, List<String>> graph, String pkgName, List<String> edges) {

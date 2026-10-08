@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 /**
  * Port of pnpm 11.2.2's installing/deps-resolver/test/hoistPeers.test.ts.
@@ -36,20 +37,20 @@ class HoistPeersTest {
     @Test
     void picksAnAlreadyAvailablePrereleaseVersion() {
         assertThat(hoistPeers(false, preferred("foo", "1.0.0-beta.0", Selector.of("version")), "foo", "*"))
-          .containsExactly(Map.entry("foo", "1.0.0-beta.0"));
+          .containsExactly(entry("foo", "1.0.0-beta.0"));
     }
 
     @Test
     void respectsPeerDepRangeWhenPreferredVersionsExist() {
         Map<String, Map<String, Selector>> preferred = preferred("chai", "5.2.1", Selector.of("version"));
         preferred.get("chai").put("4.3.0", Selector.of("version"));
-        assertThat(hoistPeers(true, preferred, "chai", "4.3.0")).containsExactly(Map.entry("chai", "4.3.0"));
+        assertThat(hoistPeers(true, preferred, "chai", "4.3.0")).containsExactly(entry("chai", "4.3.0"));
     }
 
     @Test
     void fallsBackToRangeWhenNoPreferredVersionSatisfiesIt() {
         assertThat(hoistPeers(true, preferred("chai", "5.2.1", Selector.of("version")), "chai", "4.3.0"))
-          .containsExactly(Map.entry("chai", "4.3.0"));
+          .containsExactly(entry("chai", "4.3.0"));
     }
 
     @Test
@@ -57,31 +58,31 @@ class HoistPeersTest {
         Map<String, Map<String, Selector>> preferred = preferred("foo", "2.0.0", Selector.of("version"));
         preferred.get("foo").put("2.1.0", Selector.of("version"));
         preferred.get("foo").put("3.0.0", Selector.of("version"));
-        assertThat(hoistPeers(true, preferred, "foo", "^2.0.0")).containsExactly(Map.entry("foo", "3.0.0"));
+        assertThat(hoistPeers(true, preferred, "foo", "^2.0.0")).containsExactly(entry("foo", "3.0.0"));
     }
 
     @Test
     void reusesHigherPreferredVersionWhenRangeIsNotExact() {
         assertThat(hoistPeers(true, preferred("foo", "2.0.0", Selector.of("version")), "foo", "1"))
-          .containsExactly(Map.entry("foo", "2.0.0"));
+          .containsExactly(entry("foo", "2.0.0"));
     }
 
     @Test
     void returnsValidSpecifierWhenGivenOnlyRangePreferredVersionSelectors() {
         assertThat(hoistPeers(true, preferred("foo", "^2.0.0", Selector.of("range")), "foo", "2"))
-          .containsExactly(Map.entry("foo", "^2.0.0"));
+          .containsExactly(entry("foo", "^2.0.0"));
     }
 
     @Test
     void handlesWorkspaceProtocolRangeWithoutThrowing() {
         assertThat(hoistPeers(true, preferred("foo", "1.0.0", Selector.of("version")), "foo", "workspace:*"))
-          .containsExactly(Map.entry("foo", "1.0.0"));
+          .containsExactly(entry("foo", "1.0.0"));
     }
 
     @Test
     void handlesVersionSelectorWithWeight() {
         assertThat(hoistPeers(true, preferred("foo", "1.0.0", Selector.of("version", 1)), "foo", "1"))
-          .containsExactly(Map.entry("foo", "1.0.0"));
+          .containsExactly(entry("foo", "1.0.0"));
     }
 
     @Test
@@ -92,7 +93,7 @@ class HoistPeersTest {
         }
         assertThat(ResolveDependencies.getHoistableOptionalPeers(
           Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
-          .containsExactly(Map.entry("foo", "2.1.0"));
+          .containsExactly(entry("foo", "2.1.0"));
     }
 
     @Test
@@ -101,7 +102,7 @@ class HoistPeersTest {
         preferred.get("foo").put("2.1.1", Selector.of("version"));
         assertThat(ResolveDependencies.getHoistableOptionalPeers(
           Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
-          .containsExactly(Map.entry("foo", "2.1.1"));
+          .containsExactly(entry("foo", "2.1.1"));
     }
 
     private static Map<String, Map<String, Selector>> preferred(String name, String spec, Selector selector) {

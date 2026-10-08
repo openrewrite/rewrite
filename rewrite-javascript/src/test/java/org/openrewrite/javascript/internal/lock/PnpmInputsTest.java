@@ -27,9 +27,9 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -88,8 +88,8 @@ class PnpmInputsTest {
           .packageJson("{\"name\":\"p\"}")
           .lock("lockfileVersion: '9.0'\n")
           .packageJsonPath(Paths.get("repo/package.json"))
-          .projectPaths(Set.of(Paths.get("repo/package.json"), Paths.get("repo/pnpm-lock.yaml"),
-            Paths.get("repo/local/package.json"), Paths.get("other/package.json")))
+          .projectPaths(new LinkedHashSet<>(Arrays.asList(Paths.get("repo/package.json"),
+            Paths.get("repo/pnpm-lock.yaml"), Paths.get("repo/local/package.json"), Paths.get("other/package.json"))))
           .build();
 
         Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
@@ -104,9 +104,9 @@ class PnpmInputsTest {
         Request request = Request.builder()
           .packageJson("{}")
           .lock("lockfileVersion: '9.0'\n")
-          .marker(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(List.of(
-            new Npmrc(NpmrcScope.User, Map.of("registry", "https://user.example/")),
-            new Npmrc(NpmrcScope.Project, Map.of("registry", "https://project.example/")))))
+          .marker(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(Arrays.asList(
+            new Npmrc(NpmrcScope.User, Collections.singletonMap("registry", "https://user.example/")),
+            new Npmrc(NpmrcScope.Project, Collections.singletonMap("registry", "https://project.example/")))))
           .build();
 
         Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);

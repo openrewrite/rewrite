@@ -151,14 +151,12 @@ final class ResolveDependencyTree {
     }
 
     /**
-     * toResolveImporter.ts over a project installed as it stands: its wanted dependencies at update depth -1 (0 for a
-     * local tarball).
+     * validatePeerDependencies.ts: each of a project's peer ranges is a semver range, a workspace: or a catalog: spec.
      */
-    private static void validatePeerDependencies(Importer project) {
-        Map<String, @Nullable Object> peerDependencies =
-                ResolveDependencies.asMap(project.getManifest().get("peerDependencies"));
-        Object name = project.getManifest().get("name");
-        String projectId = name != null ? Js.string(name) : project.getRootDir();
+    static void validatePeerDependencies(String rootDir, Map<String, @Nullable Object> manifest) {
+        Map<String, @Nullable Object> peerDependencies = ResolveDependencies.asMap(manifest.get("peerDependencies"));
+        Object name = manifest.get("name");
+        String projectId = name != null ? Js.string(name) : rootDir;
         for (String depName : Js.keys(peerDependencies)) {
             String version = Js.string(peerDependencies.get(depName));
             if (!ReadPackageHook.isValidPeerRange(version)) {
@@ -174,7 +172,7 @@ final class ResolveDependencyTree {
                                         PreferredVersions.ByName preferredVersions) {
         List<ResolveDependencies.ImporterToResolve> resolveArgs = new ArrayList<>();
         for (Importer importer : importers) {
-            validatePeerDependencies(importer);
+            validatePeerDependencies(importer.getRootDir(), importer.getManifest());
             List<WantedDependency> wantedDependencies = new ArrayList<>();
             for (WantedDependency dep : importer.getWantedDependencies()) {
                 String spec = dep.getBareSpecifier();
@@ -265,15 +263,16 @@ final class ResolveDependencyTree {
     }
 
     private static Map<String, NodeId> buildTree(ResolutionContext ctx, String parentId, List<String> parentIds,
-                                                 @Nullable List<String[]> children, int depth, boolean installable) {
+                                                 @Nullable List<ResolveDependencies.ChildId> children, int depth,
+                                                 boolean installable) {
         Map<String, NodeId> childrenNodeIds = new LinkedHashMap<>();
         if (children == null) {
             return childrenNodeIds;
         }
         boolean installableSoFar = installable;
-        for (String[] child : children) {
-            String alias = child[0];
-            String id = child[1];
+        for (ResolveDependencies.ChildId child : children) {
+            String alias = child.getAlias();
+            String id = child.getId();
             if (id.startsWith("link:")) {
                 childrenNodeIds.put(alias, NodeId.of(id));
                 continue;

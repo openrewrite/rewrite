@@ -47,7 +47,6 @@ final class GraphCycles {
             List<String> to = start.getValue();
             int nodeNextIndex = 0;
             while (true) {
-                // testNode
                 String leaf = path.get(path.size() - 1);
                 boolean stop = false;
                 if (!createdCycle && cycleNodes.contains(leaf)) {
@@ -61,7 +60,6 @@ final class GraphCycles {
                     stop = true;
                 }
                 if (!stop && nodeNextIndex < to.size()) {
-                    // walkDown
                     visited.add(leaf);
                     String nextLeaf = to.get(nodeNextIndex);
                     path.add(nextLeaf);
@@ -70,7 +68,6 @@ final class GraphCycles {
                     nodeNextIndex = 0;
                     continue;
                 }
-                // walkUp, recursing while the parent has no next child
                 boolean done = false;
                 while (true) {
                     if (path.size() == 1) {

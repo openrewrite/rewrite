@@ -22,7 +22,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of pnpm 11.2.2's resolving/npm-resolver/test/whichVersionIsPinned.test.ts and workspacePrefToNpm.test.ts.
+ * Port of pnpm 11.2.2's resolving/npm-resolver/test/whichVersionIsPinned.test.ts, workspacePrefToNpm.test.ts and
+ * normalizeRegistryUrl.test.ts.
  */
 class NpmResolverTest {
 
@@ -43,6 +44,22 @@ class NpmResolverTest {
     })
     void whichVersionIsPinned(String spec, String expected) {
         assertThat(NpmResolver.whichVersionIsPinned(spec)).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "https://registry.example.com:443/package.tgz, https://registry.example.com/package.tgz",
+      "http://registry.example.com:80/package.tgz, http://registry.example.com/package.tgz",
+      "https://registry.example.com:8443/package.tgz, https://registry.example.com:8443/package.tgz",
+      "http://registry.example.com:8080/package.tgz, http://registry.example.com:8080/package.tgz",
+      "https://registry.example.com/package.tgz, https://registry.example.com/package.tgz",
+      "http://registry.example.com/package.tgz, http://registry.example.com/package.tgz",
+      "https://artifactory:443/api/npm/npm-virtual/uuid/-/uuid-9.0.1.tgz, " +
+      "https://artifactory/api/npm/npm-virtual/uuid/-/uuid-9.0.1.tgz",
+      "invalid-url, invalid-url"
+    })
+    void normalizeRegistryUrl(String input, String expected) {
+        assertThat(NpmResolver.normalizeRegistryUrl(input)).isEqualTo(expected);
     }
 
     @Test

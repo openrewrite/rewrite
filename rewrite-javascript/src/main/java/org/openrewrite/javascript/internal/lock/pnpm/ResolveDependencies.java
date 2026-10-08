@@ -34,9 +34,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * Port of @pnpm/installing.deps-resolver src/resolveDependencies.ts (pnpm 11.2.2) with getNonDevWantedDependencies,
- * hoistPeers, getExactSinglePreferredVersions, replaceVersionInBareSpecifier, parentIdsContainSequence,
- * unwrapPackageName and wantedDepIsLocallyAvailable.
+ * Port of @pnpm/installing.deps-resolver src/resolveDependencies.ts (pnpm 11.2.2) with the small modules it calls:
+ * getNonDevWantedDependencies, hoistPeers, replaceVersionInBareSpecifier, unwrapPackageName and their siblings.
  */
 final class ResolveDependencies {
 
@@ -230,6 +229,39 @@ final class ResolveDependencies {
             }
             return value;
         }
+    }
+
+    /**
+     * {@code missingPeersOfChildrenByPkgId}'s entry: the depth a package was first reached at, and its children's
+     * missing peers.
+     */
+    @Value
+    static class MissingPeersOfChildrenAtDepth {
+        int depth;
+        MissingPeersOfChildren missingPeersOfChildren;
+    }
+
+    /**
+     * {@code ChildrenByParentId}'s entry: a child's alias and package id.
+     */
+    @Value
+    static class ChildId {
+        String alias;
+        String id;
+    }
+
+    /**
+     * What resolveDependenciesOfImporters returns.
+     */
+    @Value
+    static class ImportersResolution {
+        List<PkgAddressesByImporter> pkgAddressesByImportersWithoutPeers;
+
+        @Nullable
+        Instant publishedBy;
+
+        @Nullable
+        Map<String, String> time;
     }
 
     @Value
@@ -472,7 +504,7 @@ final class ResolveDependencies {
         private boolean forceFullResolution;
         private final Map<String, ResolvedPackage> resolvedPkgsById = new LinkedHashMap<>();
         private boolean resolvePeersFromWorkspaceRoot;
-        private final Map<String, List<String[]>> childrenByParentId = new LinkedHashMap<>();
+        private final Map<String, List<ChildId>> childrenByParentId = new LinkedHashMap<>();
         private final List<PendingNode> pendingNodes = new ArrayList<>();
         private LockfileObject wantedLockfile;
         private boolean injectWorkspacePackages;
@@ -487,7 +519,8 @@ final class ResolveDependencies {
         private List<String> namedRegistryPrefixes = new ArrayList<>();
         private @Nullable String resolutionMode;
         private @Nullable Map<String, Map<String, Verification.Project>> workspacePackages;
-        private final Map<String, Object[]> missingPeersOfChildrenByPkgId = new LinkedHashMap<>();
+        private final Map<String, MissingPeersOfChildrenAtDepth> missingPeersOfChildrenByPkgId =
+                new LinkedHashMap<>();
         private boolean hoistPeers;
         private @Nullable Instant maximumPublishedBy;
         private @Nullable Function<String, @Nullable Object> publishedByExclude;
@@ -519,12 +552,10 @@ final class ResolveDependencies {
         } else if (ctx.isHoistPeers()) {
             ctx.setAllPreferredVersions(new LinkedHashMap<>());
         }
-        Object[] ofImporters = resolveDependenciesOfImporters(ctx, importers);
-        @SuppressWarnings("unchecked")
-        List<PkgAddressesByImporter> byImporters = (List<PkgAddressesByImporter>) ofImporters[0];
-        Instant publishedBy = (Instant) ofImporters[1];
-        @SuppressWarnings("unchecked")
-        Map<String, String> time = (Map<String, String>) ofImporters[2];
+        ImportersResolution ofImporters = resolveDependenciesOfImporters(ctx, importers);
+        List<PkgAddressesByImporter> byImporters = ofImporters.getPkgAddressesByImportersWithoutPeers();
+        Instant publishedBy = ofImporters.getPublishedBy();
+        Map<String, String> time = ofImporters.getTime();
         if (!ctx.isHoistPeers()) {
             return new RootResult(addressesOf(byImporters), time);
         }
@@ -638,8 +669,8 @@ final class ResolveDependencies {
         return out;
     }
 
-    // [pkgAddressesByImportersWithoutPeers, publishedBy, time]
-    private static Object[] resolveDependenciesOfImporters(ResolutionContext ctx, List<ImporterToResolve> importers) {
+    private static ImportersResolution resolveDependenciesOfImporters(ResolutionContext ctx,
+                                                                      List<ImporterToResolve> importers) {
         boolean pickLowestVersion = "time-based".equals(ctx.getResolutionMode()) ||
                                     "lowest-direct".equals(ctx.getResolutionMode());
         List<List<DependencyResolution>> resolveResults = new ArrayList<>();
@@ -770,7 +801,7 @@ final class ResolveDependencies {
             out.add(new PkgAddressesByImporter(pkgAddresses,
                     mergePkgsDeps(missing, ctx.isAutoInstallPeersFromHighestMatch()), resolvedPeers));
         }
-        return new Object[]{out, publishedBy, time};
+        return new ImportersResolution(out, publishedBy, time);
     }
 
     private static DependencyResolution resolveDependenciesOfImporterDependency(
@@ -1092,10 +1123,10 @@ final class ResolveDependencies {
         options.setParentIds(parentIds);
         ResolvedDependenciesResult result = resolveDependencies(ctx, opts.getPreferredVersions(),
                 wantedDependencies, options);
-        List<String[]> children = new ArrayList<>();
+        List<ChildId> children = new ArrayList<>();
         Map<String, NodeId> childNodeIds = new LinkedHashMap<>();
         for (PkgAddress child : result.getPkgAddresses()) {
-            children.add(new String[]{child.getAlias(), child.getPkgId()});
+            children.add(new ChildId(child.getAlias(), child.getPkgId()));
             childNodeIds.put(child.getAlias(), child.getNodeId() != null ? child.getNodeId() :
                     NodeId.of(child.getPkgId()));
         }
@@ -1443,16 +1474,16 @@ final class ResolveDependencies {
                 options.prefix;
         MissingPeersOfChildren missingPeersOfChildren = null;
         if (ctx.isHoistPeers() && !options.parentIds.contains(pkgResponse.getId())) {
-            Object[] existing = ctx.getMissingPeersOfChildrenByPkgId().get(pkgResponse.getId());
+            MissingPeersOfChildrenAtDepth existing = ctx.getMissingPeersOfChildrenByPkgId().get(pkgResponse.getId());
             if (existing != null) {
-                MissingPeersOfChildren known = (MissingPeersOfChildren) existing[1];
-                if ((Integer) existing[0] >= options.currentDepth || known.isResolved()) {
-                    missingPeersOfChildren = known;
+                if (existing.getDepth() >= options.currentDepth ||
+                    existing.getMissingPeersOfChildren().isResolved()) {
+                    missingPeersOfChildren = existing.getMissingPeersOfChildren();
                 }
             } else {
                 missingPeersOfChildren = new MissingPeersOfChildren();
                 ctx.getMissingPeersOfChildrenByPkgId().put(pkgResponse.getId(),
-                        new Object[]{options.currentDepth, missingPeersOfChildren});
+                        new MissingPeersOfChildrenAtDepth(options.currentDepth, missingPeersOfChildren));
             }
         }
 
@@ -1487,9 +1518,9 @@ final class ResolveDependencies {
         return at == null ? null : Js.string(at);
     }
 
-    private static Map<String, @Nullable Object> getManifestFromResponse(PackageRequester.PackageResponse pkgResponse,
-                                                                         WantedDependency wantedDependency,
-                                                                         @Nullable InfoFromLockfile currentPkg) {
+    static Map<String, @Nullable Object> getManifestFromResponse(PackageRequester.PackageResponse pkgResponse,
+                                                                 WantedDependency wantedDependency,
+                                                                 @Nullable InfoFromLockfile currentPkg) {
         if (pkgResponse.getManifest() != null) {
             return pkgResponse.getManifest();
         }

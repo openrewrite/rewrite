@@ -34,10 +34,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/installing.package-requester src/packageRequester.ts {@code resolveAndFetch} as a lock-only install
- * runs it (nothing fetched for a package whose manifest the registry serves) over the resolver chain of
- * @pnpm/resolving.default-resolver: the npm, git, tarball and local resolvers, with
- * @pnpm/config.package-is-installable.
+ * Port of @pnpm/installing.package-requester's {@code resolveAndFetch} (pnpm 11.2.2) over
+ * @pnpm/resolving.default-resolver's chain, with @pnpm/config.package-is-installable.
  */
 final class PackageRequester {
 
