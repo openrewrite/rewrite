@@ -1529,7 +1529,7 @@ class PythonTypeMapping:
                 type_param_names = self._extract_type_param_names(func_desc)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_call(node) else 0,
             _declaring_type=declaring_type,
             _name=method_name,
             _return_type=return_type,
@@ -1537,6 +1537,27 @@ class PythonTypeMapping:
             _parameter_types=param_types if param_types else None,
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def _is_static_call(self, node: ast.Call) -> bool:
+        """Whether the call's receiver, if spelled, is a module or a class. ty types a module
+        function, a static method and a method looked up on its class as a plain ``function``.
+        A classmethod counts too, so a pattern on a class also matches calls on its subclasses.
+        Without a callee type, an import naming the receiver names a module.
+        """
+        callee = self._descriptor_of(node.func)
+        kind = callee.get('kind')
+        if kind == 'function':
+            return True
+        if kind == 'boundMethod':
+            params = callee.get('parameters') or [{}]
+            bound_id = params[0].get('typeId')
+            bound = self._type_registry.get(bound_id) if bound_id is not None else None
+            return bound is not None and bound.get('kind') == 'subclassOf'
+        if kind in (None, 'dynamic'):
+            if isinstance(node.func, ast.Attribute):
+                return self._import_binding_fqn(node.func.value) is not None
+            return self._bound_from_import_member(node.func) is not None
+        return False
 
     def _callee_declared_name(self, node: ast.Call) -> Optional[str]:
         """The name the callee carries where it is defined. Its owner is read off the

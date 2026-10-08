@@ -1033,6 +1033,7 @@ class TestLayer2TypeAwareness:
         declaring_type = JavaType.Class()
         declaring_type._fully_qualified_name = "os.path"
         method_type = JavaType.Method(
+            _flags_bit_map=JavaType.Flag.Static,
             _declaring_type=declaring_type, _name="join"
         )
 
