@@ -231,8 +231,8 @@ final class BerryScenarios {
         }
 
         /**
-         * What Yarn had in a phase: the phase's manifests and {@code .yarnrc.yml}, the recorder's environment, the
-         * machine and the day.
+         * What Yarn had in a phase: the phase's manifests, {@code .yarnrc.yml} and patch files, the recorder's
+         * environment, the machine and the day.
          */
         YarnBerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
@@ -248,10 +248,17 @@ final class BerryScenarios {
                     env.put("YARN_NPM_REGISTRY_SERVER", registry);
                 }
             }
+            Map<String, String> patchFiles = new LinkedHashMap<>();
+            for (Map.Entry<String, String> file : tree(phase).entrySet()) {
+                if (file.getKey().endsWith(".patch")) {
+                    patchFiles.put(file.getKey(), file.getValue());
+                }
+            }
             return YarnBerryLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))
                     .configFiles(configFiles)
+                    .files(patchFiles)
                     .paths(paths(phase, yarnrc != null))
                     .env(env)
                     .host(host())

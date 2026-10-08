@@ -1,0 +1,19 @@
+diff --git a/index.js b/index.js
+index 7229750..43fd6a3 100644
+--- a/index.js
++++ b/index.js
+@@ -2,6 +2,7 @@
+  * Helpers.
+  */
+ 
++var patched = "a";
+ var s = 1000;
+ var m = s * 60;
+ var h = m * 60;
+semver exclusivity ^3.0.0
+diff --git a/readme.md b/readme.md
+--- a/readme.md
++++ b/readme.md
+@@ -1,1 +1,1 @@
+-# ms
++# ms 3

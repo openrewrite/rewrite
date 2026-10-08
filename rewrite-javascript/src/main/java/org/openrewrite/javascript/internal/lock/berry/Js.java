@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -254,5 +255,118 @@ final class Js {
 
     static boolean isInteger(double d) {
         return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
+    }
+
+    /**
+     * {@code Number.prototype.toString()}.
+     */
+    static String numberToString(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return Double.isNaN(d) ? "NaN" : d > 0 ? "Infinity" : "-Infinity";
+        }
+        if (d == 0) {
+            return "0";
+        }
+        BigDecimal shortest = new BigDecimal(Double.toString(d)).stripTrailingZeros();
+        String digits = shortest.unscaledValue().abs().toString();
+        int n = digits.length() - shortest.scale();
+        String sign = d < 0 ? "-" : "";
+        if (n >= -5 && n <= 21) {
+            return sign + shortest.abs().toPlainString();
+        }
+        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
+        return sign + mantissa + "e" + (n - 1 >= 0 ? "+" : "-") + Math.abs(n - 1);
+    }
+
+    /**
+     * {@code JSON.stringify} of the values a parsed object holds: maps in their order, lists, strings, numbers,
+     * booleans and null.
+     */
+    static String jsonStringify(@Nullable Object value) {
+        StringBuilder out = new StringBuilder();
+        stringify(value, out);
+        return out.toString();
+    }
+
+    private static void stringify(@Nullable Object value, StringBuilder out) {
+        if (value == null) {
+            out.append("null");
+        } else if (value instanceof String) {
+            quote((String) value, out);
+        } else if (value instanceof Boolean) {
+            out.append(value);
+        } else if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            out.append(Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d));
+        } else if (value instanceof Map) {
+            out.append('{');
+            boolean first = true;
+            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
+                if (entry.getValue() == Syml.UNDEFINED) {
+                    continue;
+                }
+                if (!first) {
+                    out.append(',');
+                }
+                first = false;
+                quote(String.valueOf(entry.getKey()), out);
+                out.append(':');
+                stringify(entry.getValue(), out);
+            }
+            out.append('}');
+        } else if (value instanceof List) {
+            out.append('[');
+            List<?> list = (List<?>) value;
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) {
+                    out.append(',');
+                }
+                Object item = list.get(i);
+                stringify(item == Syml.UNDEFINED ? null : item, out);
+            }
+            out.append(']');
+        } else {
+            throw new IllegalArgumentException("not a JSON value: " + value.getClass());
+        }
+    }
+
+    private static void quote(String s, StringBuilder out) {
+        out.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '\b':
+                    out.append("\\b");
+                    break;
+                case '\f':
+                    out.append("\\f");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    boolean loneSurrogate = Character.isHighSurrogate(c) ?
+                            i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1)) :
+                            Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1)));
+                    if (c < 0x20 || loneSurrogate) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+        out.append('"');
     }
 }

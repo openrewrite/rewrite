@@ -1,0 +1,12 @@
+diff --git a/index.js b/index.js
+index 7229750..43fd6a3 100644
+--- a/index.js
++++ b/index.js
+@@ -2,6 +2,7 @@
+  * Helpers.
+  */
+ 
++var patched = true;
+ var s = 1000;
+ var m = s * 60;
+ var h = m * 60;

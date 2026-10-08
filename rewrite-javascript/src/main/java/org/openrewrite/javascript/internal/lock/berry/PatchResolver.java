@@ -15,14 +15,14 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-patch sources/PatchResolver.ts (Yarn 4.10.3). A locator's {@code hash=} is made from the
- * patch files' text, which for a builtin patch ships inside the release: a builtin patch descriptor the lockfile
- * resolved, over the same source, keeps the locator it had; any other patch is something the engine cannot know.
+ * Port of @yarnpkg/plugin-patch sources/PatchResolver.ts (Yarn 4.10.3).
  */
 final class PatchResolver implements Resolver {
 
@@ -58,23 +58,48 @@ final class PatchResolver implements Resolver {
     public Map<String, Descriptor> getResolutionDependencies(Descriptor descriptor, ResolveOptions opts) {
         PatchUtils.Spec<Descriptor> spec = PatchUtils.parseDescriptor(descriptor);
         Descriptor sourceDescriptor = opts.getProject().configuration.normalizeDependency(spec.getSourceItem());
-        for (String patchPath : spec.getPatchPaths()) {
-            if (PatchUtils.builtinName(patchPath) == null) {
-                throw new CannotKnow("the hash of the patch " + patchPath + " of " +
-                                     StructUtils.stringifyDescriptor(sourceDescriptor) + " (Yarn hashes the patch " +
-                                     "file on every install)");
+        if (shipsBuiltin(spec, opts)) {
+            for (String patchPath : spec.getPatchPaths()) {
+                if (!PatchUtils.isShippedBuiltin(patchPath, opts.getProject().configuration.getRelease())) {
+                    throw new CannotKnow("the hash of the patches " + String.join(" & ", spec.getPatchPaths()) +
+                                         " of " + StructUtils.stringifyDescriptor(sourceDescriptor) + " (it covers " +
+                                         "the text of a builtin patch the Yarn release ships)");
+                }
+            }
+            if (!opts.getProject().lockfileLocators.containsKey(descriptor.descriptorHash)) {
+                throw new CannotKnow("the builtin compat patch of " +
+                                     StructUtils.stringifyDescriptor(sourceDescriptor) + " (its hash= and checksum " +
+                                     "need the patch text the Yarn release ships)");
             }
         }
-        if (!opts.getProject().lockfileLocators.containsKey(descriptor.descriptorHash)) {
-            throw new CannotKnow("the builtin compat patch of " + StructUtils.stringifyDescriptor(sourceDescriptor) +
-                                 " (its hash= and checksum need the patch text the Yarn release ships)");
-        }
         return Collections.singletonMap(SOURCE_DESCRIPTOR, sourceDescriptor);
+    }
+
+    // the release's own patch text is not data the engine holds: an unchanged one keeps the locator it had
+    private static boolean shipsBuiltin(PatchUtils.Spec<?> spec, ResolveOptions opts) {
+        for (String patchPath : spec.getPatchPaths()) {
+            if (PatchUtils.isShippedBuiltin(patchPath, opts.getProject().configuration.getRelease())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
+        PatchUtils.Spec<Descriptor> parsed = PatchUtils.parseDescriptor(descriptor);
+        if (!shipsBuiltin(parsed, opts)) {
+            List<@Nullable Object> patchFiles = PatchUtils.loadPatchFiles(parsed.getParentLocator(),
+                    parsed.getPatchPaths(), opts.getProject());
+            Package sourcePackage = dependencies.get(SOURCE_DESCRIPTOR);
+            if (sourcePackage == null) {
+                throw new JsError(JsError.ERROR, "Assertion failed: The dependency should have been resolved");
+            }
+            String patchHash = PatchUtils.makePatchHash(patchFiles, sourcePackage.version);
+            return Collections.singletonList(PatchUtils.makeLocator(descriptor, parsed.getParentLocator(),
+                    sourcePackage, parsed.getPatchPaths(), patchHash));
+        }
         Package sourcePackage = dependencies.get(SOURCE_DESCRIPTOR);
         if (sourcePackage == null) {
             throw new JsError(JsError.ERROR, "Assertion failed: The dependency should have been resolved");

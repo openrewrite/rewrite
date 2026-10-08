@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -27,12 +28,15 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/plugin-patch sources/patchUtils.ts (Yarn 4.10.3): the spec of a {@code patch:} range. The patch
- * files are not read: a builtin patch's text ships inside the release.
+ * Port of @yarnpkg/plugin-patch sources/patchUtils.ts and constants.ts (Yarn 4.10.3).
  */
 final class PatchUtils {
 
     static final String PROTOCOL = "patch:";
+
+    private static final String CACHE_VERSION = "3";
+    private static final String COMPAT_TAG = "compat/";
+    private static final Pattern CRLF = Pattern.compile("\\r\\n?");
 
     private static final Pattern BUILTIN_REGEXP = Pattern.compile("^builtin<([^>]+)>$");
 
@@ -97,8 +101,114 @@ final class PatchUtils {
      * {@code isParentRequired}: a relative path is read through the package that depends on the patch.
      */
     static boolean isParentRequired(String patchPath) {
+        return builtinName(patchPath) == null && !withoutFlags(patchPath).startsWith("~/") &&
+               !withoutFlags(patchPath).startsWith("/");
+    }
+
+    private static String withoutFlags(String patchPath) {
         int flagIndex = patchPath.lastIndexOf('!');
-        String path = flagIndex != -1 ? patchPath.substring(flagIndex + 1) : patchPath;
-        return builtinName(patchPath) == null && !path.startsWith("~/") && !path.startsWith("/");
+        return flagIndex != -1 ? patchPath.substring(flagIndex + 1) : patchPath;
+    }
+
+    /**
+     * Whether a patch path is a builtin patch the release ships, whose text the engine does not hold.
+     */
+    static boolean isShippedBuiltin(String patchPath, YarnRelease release) {
+        String name = builtinName(patchPath);
+        if (name == null || !name.startsWith(COMPAT_TAG)) {
+            return false;
+        }
+        Ident ident = StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
+        return release.getPatches().contains(StructUtils.stringifyIdent(ident));
+    }
+
+    /**
+     * {@code loadPatchFiles} where no path is a builtin the release ships: each file's text with its line endings
+     * made LF, {@code null} for an unknown {@code compat/} builtin and {@link Syml#UNDEFINED} for another builtin.
+     *
+     * @throws CannotKnow for a file outside the project or one read through a package that is not a workspace
+     */
+    static List<@Nullable Object> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
+                                                 Project project) {
+        Workspace parent = null;
+        if (parentLocator != null) {
+            parent = project.tryWorkspaceByLocator(parentLocator);
+            if (parent == null) {
+                throw new CannotKnow("the patch files " + String.join(", ", patchPaths) + " inside " +
+                                     StructUtils.stringifyLocator(parentLocator) + " (Yarn reads them from its archive)");
+            }
+        }
+        List<@Nullable Object> sources = new ArrayList<>();
+        for (String patchPath : patchPaths) {
+            String name = builtinName(patchPath);
+            String path = withoutFlags(patchPath);
+            Object source;
+            if (name != null) {
+                if (!name.startsWith(COMPAT_TAG)) {
+                    source = Syml.UNDEFINED;
+                } else {
+                    StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
+                    source = null;
+                }
+            } else if (path.startsWith("~/")) {
+                source = project.readFile(projectPath(".", path.substring(2), patchPath));
+            } else if (path.startsWith("/")) {
+                throw new CannotKnow("the patch file " + path + " (a path outside the project)");
+            } else {
+                if (parent == null) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: The parent locator should have been fetched");
+                }
+                source = project.readFile(projectPath(parent.getRelativeCwd(), path, patchPath));
+            }
+            sources.add(source instanceof String ? CRLF.matcher((String) source).replaceAll("\n") : source);
+        }
+        return sources;
+    }
+
+    private static String projectPath(String cwd, String path, String patchPath) {
+        String resolved = PortablePath.normalize(".".equals(cwd) ? path : cwd + "/" + path);
+        if ("..".equals(resolved) || resolved.startsWith("../")) {
+            throw new CannotKnow("the patch file " + patchPath + " (a path outside the project)");
+        }
+        return resolved;
+    }
+
+    /**
+     * {@code makePatchHash}: the parsed effects of each file the source version is not excluded from, hashed.
+     */
+    static String makePatchHash(List<@Nullable Object> patchFiles, @Nullable String sourceVersion) {
+        List<String> parts = new ArrayList<>();
+        parts.add(CACHE_VERSION);
+        for (Object source : patchFiles) {
+            if (source == null) {
+                continue;
+            }
+            if (!(source instanceof String)) {
+                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of undefined (reading 'split')");
+            }
+            for (Map<String, Object> effect : PatchParse.parsePatchFile((String) source)) {
+                Object semverExclusivity = effect.get("semverExclusivity");
+                if (semverExclusivity != null && sourceVersion != null &&
+                    !SemverUtils.satisfiesWithPrereleases(sourceVersion, (String) semverExclusivity)) {
+                    continue;
+                }
+                Map<String, Object> effectWithoutRange = new LinkedHashMap<>(effect);
+                effectWithoutRange.remove("semverExclusivity");
+                parts.add(Js.jsonStringify(effectWithoutRange));
+            }
+        }
+        return HashUtils.makeHash(parts.toArray(new String[0])).substring(0, 6);
+    }
+
+    static Locator makeLocator(Ident ident, @Nullable Locator parentLocator, Package sourcePackage,
+                               List<String> patchPaths, String patchHash) {
+        Map<String, @Nullable Object> params = new LinkedHashMap<>();
+        params.put("version", sourcePackage.version);
+        params.put("hash", patchHash);
+        if (parentLocator != null) {
+            params.put("locator", StructUtils.stringifyLocator(parentLocator));
+        }
+        return StructUtils.makeLocator(ident, StructUtils.makeRange(PROTOCOL, StructUtils.stringifyLocator(sourcePackage),
+                String.join("&", patchPaths), params));
     }
 }

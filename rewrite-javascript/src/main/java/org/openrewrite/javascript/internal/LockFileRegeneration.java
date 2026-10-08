@@ -79,10 +79,9 @@ public final class LockFileRegeneration {
      * What one regeneration is given: the edited manifest, the lock it updates, the project's other
      * manifests as edited so far (a workspace root and the members the recipe has), by path, and the
      * project's package-manager files by path ({@code .npmrc}, {@code bunfig.toml}, {@code .yarnrc},
-     * {@code .yarnrc.yml}, {@code pnpm-workspace.yaml}, and the {@code .patch} files
-     * {@code patchedDependencies} names), those of the repository's directories above the project too with their
-     * {@code package.json}, and every path the project holds and the directories above it hold directly, when the
-     * host says. The working directory is where the package manager runs when that is not the lock's directory: a
+     * {@code .yarnrc.yml}, {@code pnpm-workspace.yaml}, and the {@code .patch} files under the project), those of the
+     * repository's directories above the project too with their {@code package.json}, and every path the project
+     * holds and the directories above it hold directly, when the host says. The working directory is where the package manager runs when that is not the lock's directory: a
      * workspace member with a lock of its own that the package manager passes over for the root's.
      */
     @Value

@@ -28,8 +28,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the Yarn Berry regenerator takes it: the manifests and paths under the lock's directory, and
- * the {@code .yarnrc.yml} of that directory and of each directory above it.
+ * A recipe's request as the Yarn Berry regenerator takes it: the manifests, paths and package-manager files (the
+ * patch files) under the lock's directory, and the {@code .yarnrc.yml} of that directory and of each directory above
+ * it.
  */
 final class YarnBerryInputs {
 
@@ -50,6 +51,7 @@ final class YarnBerryInputs {
                 .lock(request.getLock())
                 .manifests(manifests)
                 .configFiles(configFiles(request, rootDir))
+                .files(files(request, rootDir))
                 .paths(paths(request, rootDir))
                 .host(host)
                 .now(now)
@@ -68,19 +70,36 @@ final class YarnBerryInputs {
         return files;
     }
 
+    private static Map<String, String> files(Request request, String rootDir) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
+            String path = underRoot(file.getKey(), rootDir);
+            if (path != null) {
+                files.put(path, file.getValue());
+            }
+        }
+        return files;
+    }
+
     private static @Nullable Set<String> paths(Request request, String rootDir) {
         if (request.getProjectPaths() == null) {
             return null;
         }
         Set<String> paths = new LinkedHashSet<>();
         for (Path file : request.getProjectPaths()) {
-            String path = file.normalize().toString().replace('\\', '/');
-            if (rootDir.isEmpty()) {
+            String path = underRoot(file, rootDir);
+            if (path != null) {
                 paths.add(path);
-            } else if (path.startsWith(rootDir + "/")) {
-                paths.add(path.substring(rootDir.length() + 1));
             }
         }
         return paths;
+    }
+
+    private static @Nullable String underRoot(Path file, String rootDir) {
+        String path = file.normalize().toString().replace('\\', '/');
+        if (rootDir.isEmpty()) {
+            return path;
+        }
+        return path.startsWith(rootDir + "/") ? path.substring(rootDir.length() + 1) : null;
     }
 }

@@ -1,0 +1,1 @@
+a project patch file (resolutions, ~/ path) is hashed again on every install: unchanged, the patched entry keeps its hash= and checksum beside an added dependency

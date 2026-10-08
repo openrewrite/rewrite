@@ -1,0 +1,10 @@
+{
+  "name": "p",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "ms": "2.1.3"
+  },
+  "resolutions": {
+    "ms@npm:2.1.3": "patch:ms@npm%3A2.1.3#~/.yarn/patches/missing.patch"
+  }
+}

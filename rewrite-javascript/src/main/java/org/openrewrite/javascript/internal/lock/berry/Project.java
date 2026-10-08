@@ -86,6 +86,11 @@ final class Project {
     Set<String> paths;
 
     /**
+     * The text of the files the host read, by path from the root: the patch files.
+     */
+    Map<String, String> files = Collections.emptyMap();
+
+    /**
      * {@code __metadata.version} as the lockfile spells it ({@code "8"}), {@code -1} for a Yarn 1 lockfile, null
      * for none.
      */
@@ -447,6 +452,27 @@ final class Project {
             throw new CannotKnow(cwd + "/package.json (the host gave no view of the project's files)");
         }
         return manifest;
+    }
+
+    /**
+     * {@code xfs.readFilePromise(path, 'utf8')} of a file relative to the root.
+     *
+     * @throws CannotKnow for a file the host holds unread, or any file it did not read when it says nothing of the
+     *                    project's files
+     * @throws JsError    Node's ENOENT for a file the project does not hold
+     */
+    String readFile(String path) {
+        String text = files.get(path);
+        if (text != null) {
+            return text;
+        }
+        if (paths == null) {
+            throw new CannotKnow(path + " (the host gave no view of the project's files)");
+        }
+        if (paths.contains(path)) {
+            throw new CannotKnow(path + " (its contents were not read)");
+        }
+        throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" + path + "'");
     }
 
     /**

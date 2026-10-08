@@ -1,0 +1,1 @@
+Yarn reads a patch file with CRLF line endings as LF before hashing and applying it

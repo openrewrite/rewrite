@@ -76,6 +76,12 @@ public final class YarnBerryLockRegenerator {
         Set<String> paths;
 
         /**
+         * The text of the project's patch files by path from the root.
+         */
+        @Singular
+        Map<String, String> files;
+
+        /**
          * The rc files by path from the root: {@code .yarnrc.yml}, and {@code ../.yarnrc.yml} for a directory above.
          */
         @Singular
@@ -313,6 +319,7 @@ public final class YarnBerryLockRegenerator {
         Project project = new Project(configuration);
         project.now = inputs.getNow();
         project.paths = inputs.getPaths();
+        project.files = inputs.getFiles();
         project.setupResolutions(inputs.getLock());
         List<String> directories = new ArrayList<>();
         for (String location : inputs.getManifests().keySet()) {
