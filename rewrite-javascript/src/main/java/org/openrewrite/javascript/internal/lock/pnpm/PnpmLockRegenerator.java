@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Port of pnpm 11.2.2's {@code pnpm install --lockfile-only} up to the resolution: pnpm/src main.ts and getConfig.ts
@@ -130,7 +131,8 @@ public final class PnpmLockRegenerator {
         PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"),
                 inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
         String lockText = inputs.getLock();
-        String packageManagerToResolve = checkWantedPackageManager(options, EnvLockfile.readEnvLockfile(lockText));
+        String packageManagerToResolve = checkWantedPackageManager(options,
+                () -> EnvLockfile.readEnvLockfile(inputs.getLock()));
 
         Object configDependencies = options.get("configDependencies");
         Map<String, String> configDependenciesToResolve = Collections.emptyMap();
@@ -297,9 +299,9 @@ public final class PnpmLockRegenerator {
         return projects;
     }
 
-    // main.ts: the wanted package manager is checked before anything else, and a pnpm release other than this one
-    // takes the install over; what pnpm resolves into the env document's packageManagerDependencies, or null
-    private @Nullable String checkWantedPackageManager(PnpmOptions options, @Nullable EnvLockfile envLockfile) {
+    // main.ts' package manager check: what pnpm resolves into packageManagerDependencies, or null
+    private @Nullable String checkWantedPackageManager(PnpmOptions options,
+                                                       Supplier<@Nullable EnvLockfile> envLockfile) {
         PnpmOptions.WantedPackageManager pm = options.getWantedPackageManager();
         if (pm == null || "ignore".equals(pm.getOnFail())) {
             return null;
@@ -313,7 +315,7 @@ public final class PnpmLockRegenerator {
     }
 
     private static @Nullable String switchCliVersion(PnpmOptions.WantedPackageManager pm,
-                                                     @Nullable EnvLockfile envLockfile) {
+                                                     Supplier<@Nullable EnvLockfile> envLockfile) {
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null) {
             return null;
         }
@@ -322,7 +324,7 @@ public final class PnpmLockRegenerator {
         if (!persistLockfile && PNPM_VERSION.equals(version)) {
             return null;
         }
-        EnvLockfile locked = persistLockfile ? envLockfile : null;
+        EnvLockfile locked = persistLockfile ? envLockfile.get() : null;
         Object pmVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
                 "pnpm");
         if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
@@ -376,7 +378,8 @@ public final class PnpmLockRegenerator {
         }
     }
 
-    static @Nullable String syncEnvLockfile(PnpmOptions.WantedPackageManager pm, @Nullable EnvLockfile envLockfile) {
+    static @Nullable String syncEnvLockfile(PnpmOptions.WantedPackageManager pm,
+                                            Supplier<@Nullable EnvLockfile> envLockfile) {
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null || !shouldPersistLockfile(pm)) {
             return null;
         }
@@ -384,8 +387,9 @@ public final class PnpmLockRegenerator {
         if (!NodeSemver.satisfies(PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             return null;
         }
-        Object lockedVersion = EnvInstaller.lockedVersion(envLockfile == null ? null :
-                envLockfile.packageManagerDependencies(), "pnpm");
+        EnvLockfile locked = envLockfile.get();
+        Object lockedVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
+                "pnpm");
         if (lockedVersion != null && lockedVersion != JsYaml.UNDEFINED &&
             NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             return null;

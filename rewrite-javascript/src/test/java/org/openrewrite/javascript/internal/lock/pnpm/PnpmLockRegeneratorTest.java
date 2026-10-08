@@ -281,15 +281,17 @@ class PnpmLockRegeneratorTest {
     @Test
     void syncEnvLockfile() {
         assertThat(PnpmLockRegenerator.syncEnvLockfile(new PnpmOptions.WantedPackageManager("yarn", "4.0.0", null,
-          true), null)).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.0.0", false), staleEnvLockfile("9.0.0"))).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("0.0.1", true), staleEnvLockfile("9.0.0"))).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), null)).isEqualTo("11.2.2");
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), EnvLockfile.readEnvLockfile(
+          true), () -> null)).isNull();
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.0.0", false), () -> staleEnvLockfile("9.0.0")))
+          .isNull();
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("0.0.1", true), () -> staleEnvLockfile("9.0.0"))).isNull();
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> null)).isEqualTo("11.2.2");
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> EnvLockfile.readEnvLockfile(
           "---\nlockfileVersion: '9.0'\nimporters:\n  '.':\n    configDependencies: {}\npackages: {}\n" +
           "snapshots: {}\n\n---\n"))).isEqualTo("11.2.2");
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), staleEnvLockfile("11.2.2"))).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), staleEnvLockfile("9.0.0")))
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> staleEnvLockfile("11.2.2")))
+          .isNull();
+        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> staleEnvLockfile("9.0.0")))
           .isEqualTo("11.2.2");
     }
 
