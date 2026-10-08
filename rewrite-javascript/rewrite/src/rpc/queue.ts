@@ -108,7 +108,8 @@ export class RpcCodecs {
     static forType(type: string, sourceFileType?: string): RpcCodec<any> | undefined {
         if (sourceFileType) {
             const treeCodec = this.treeCodecs.get(sourceFileType)?.get(type);
-            return treeCodec || this.nonTreeCodecs.get(type);
+            const replacementCodec = this.treeCodecs.get(type)?.get(type);
+            return treeCodec || replacementCodec || this.nonTreeCodecs.get(type);
         }
         return this.nonTreeCodecs.get(type);
     }
