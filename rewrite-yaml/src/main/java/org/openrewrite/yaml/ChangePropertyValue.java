@@ -30,6 +30,8 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
+import static java.util.Collections.unmodifiableMap;
+import static java.util.Collections.unmodifiableSet;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -160,19 +162,21 @@ public class ChangePropertyValue extends Recipe {
                     }
                 }.visit(documents, 0);
 
-                anchorsToUpdate = new HashSet<>();
-                aliasesToInline = new HashMap<>();
+                Set<UUID> toUpdate = new HashSet<>();
+                Map<UUID, Yaml.Scalar> toInline = new HashMap<>();
                 for (Map.Entry<UUID, Yaml.Scalar> anchor : anchored.entrySet()) {
                     UUID id = anchor.getKey();
                     if (!aliasedFromMatchingKey.contains(id)) {
                         continue;
                     }
                     if (!aliasedElsewhere.contains(id)) {
-                        anchorsToUpdate.add(id);
+                        toUpdate.add(id);
                     } else if (!StringUtils.hasLineBreak(anchor.getValue().getValue())) {
-                        aliasesToInline.put(id, anchor.getValue());
+                        toInline.put(id, anchor.getValue());
                     }
                 }
+                anchorsToUpdate = unmodifiableSet(toUpdate);
+                aliasesToInline = unmodifiableMap(toInline);
             }
         });
     }
