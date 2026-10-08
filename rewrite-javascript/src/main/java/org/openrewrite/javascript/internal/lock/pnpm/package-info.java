@@ -24,9 +24,9 @@
  * (pickPackage, pickPackageFromMeta, the resolution verifier, trustChecks), resolving/registry/pkg-metadata-filter,
  * crypto/object-hasher, crypto/hash, installing/env-installer, installing/deps-installer (the lock-only install and
  * the lockfile's verification), installing/deps-resolver, installing/package-requester, resolving/default-resolver
- * with the local, git and tarball resolvers' lock-only paths, lockfile/pruner, config/package-is-installable,
- * workspace/range-resolver, workspace/spec-parser and the pnpm command's own checks before an install. pnpm is
- * distributed under the MIT License:
+ * with the local, git and tarball resolvers' lock-only paths, engine/runtime/node-resolver, crypto/shasums-file,
+ * lockfile/pruner, config/package-is-installable, workspace/range-resolver, workspace/spec-parser and the pnpm
+ * command's own checks before an install. pnpm is distributed under the MIT License:
  * <pre>
  * Copyright (c) 2015-2016 Rico Sta. Cruz and other contributors
  * Copyright (c) 2016-2026 Zoltan Kochan and other contributors
