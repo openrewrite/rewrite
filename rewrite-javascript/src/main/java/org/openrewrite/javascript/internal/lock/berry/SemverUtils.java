@@ -84,7 +84,11 @@ final class SemverUtils {
      * {@code new SemVer(a).compare(b)}.
      */
     static int compare(String a, String b) {
-        return NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT);
+        try {
+            return NodeSemver.compare(a, b, NodeSemver.Options.DEFAULT);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+        }
     }
 
     /**

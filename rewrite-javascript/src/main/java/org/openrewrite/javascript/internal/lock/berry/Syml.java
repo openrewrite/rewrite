@@ -165,7 +165,7 @@ final class Syml {
             String joined = fields.length() == 0 ? "\n" : fields.toString();
             return newLineIfObject ? "\n" + joined : joined;
         }
-        throw new IllegalArgumentException("Unsupported value type (" + value + ")");
+        throw new JsError(JsError.ERROR, "Unsupported value type (" + value + ")");
     }
 
     /**
@@ -182,12 +182,12 @@ final class Syml {
             return new LinkedHashMap<>();
         }
         if (value instanceof String) {
-            throw new IllegalStateException("Expected an indexed object, got a string instead. " +
-                                            "Does your file follow Yaml's rules?");
+            throw new JsError(JsError.ERROR, "Expected an indexed object, got a string instead. " +
+                                             "Does your file follow Yaml's rules?");
         }
         if (value instanceof List) {
-            throw new IllegalStateException("Expected an indexed object, got an array instead. " +
-                                            "Does your file follow Yaml's rules?");
+            throw new JsError(JsError.ERROR, "Expected an indexed object, got an array instead. " +
+                                             "Does your file follow Yaml's rules?");
         }
         return (Map<String, @Nullable Object>) value;
     }

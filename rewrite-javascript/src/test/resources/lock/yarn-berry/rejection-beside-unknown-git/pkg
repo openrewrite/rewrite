@@ -1,0 +1,8 @@
+{
+  "name": "p",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "is-even": "git+https://github.com/jonschlinkert/is-even.git",
+    "ms": "^99.0.0"
+  }
+}

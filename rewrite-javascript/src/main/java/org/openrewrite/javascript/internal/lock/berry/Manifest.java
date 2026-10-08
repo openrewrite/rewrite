@@ -114,7 +114,7 @@ final class Manifest {
     @SuppressWarnings("unchecked")
     void load(@Nullable Object data, boolean yamlCompatibilityMode) {
         if (!(data instanceof Map) && !(data instanceof List)) {
-            throw new IllegalArgumentException("Utterly invalid manifest data (" + Js.string(data) + ")");
+            throw new JsError(JsError.ERROR, "Utterly invalid manifest data (" + Js.string(data) + ")");
         }
         this.raw = data;
         List<String> errors = new ArrayList<>();
@@ -124,7 +124,7 @@ final class Manifest {
         if (name instanceof String) {
             try {
                 this.name = StructUtils.parseIdent((String) name);
-            } catch (IllegalArgumentException e) {
+            } catch (JsError e) {
                 errors.add("Parsing failed for the 'name' field");
             }
         }
@@ -189,7 +189,7 @@ final class Manifest {
                 Ident ident;
                 try {
                     ident = StructUtils.parseIdent(entry.getKey());
-                } catch (IllegalArgumentException e) {
+                } catch (JsError e) {
                     errors.add("Parsing failed for the dependency name '" + entry.getKey() + "'");
                     continue;
                 }
@@ -283,7 +283,7 @@ final class Manifest {
                 try {
                     this.resolutions.add(new ResolutionEntry(Resolution.parseResolution(entry.getKey()),
                             (String) entry.getValue()));
-                } catch (IllegalArgumentException e) {
+                } catch (JsError e) {
                     errors.add(e.getMessage());
                 }
             }
@@ -299,7 +299,7 @@ final class Manifest {
                 Ident ident;
                 try {
                     ident = StructUtils.parseIdent(entry.getKey());
-                } catch (IllegalArgumentException e) {
+                } catch (JsError e) {
                     errors.add("Parsing failed for the dependency name '" + entry.getKey() + "'");
                     continue;
                 }
@@ -341,7 +341,7 @@ final class Manifest {
             Ident ident;
             try {
                 ident = StructUtils.parseIdent(entry.getKey());
-            } catch (IllegalArgumentException e) {
+            } catch (JsError e) {
                 errors.add("Parsing failed for the dependency name '" + entry.getKey() + "'");
                 continue;
             }
@@ -379,8 +379,8 @@ final class Manifest {
 
     Map<String, Object> ensureDependencyMeta(Descriptor descriptor) {
         if (!"unknown".equals(descriptor.range) && !SemverUtils.valid(descriptor.range)) {
-            throw new IllegalArgumentException("Invalid meta field range for '" +
-                                               StructUtils.stringifyDescriptor(descriptor) + "'");
+            throw new JsError(JsError.ERROR, "Invalid meta field range for '" +
+                                             StructUtils.stringifyDescriptor(descriptor) + "'");
         }
         String identString = StructUtils.stringifyIdent(descriptor);
         String range = !"unknown".equals(descriptor.range) ? descriptor.range : null;
@@ -390,8 +390,8 @@ final class Manifest {
 
     Map<String, Object> ensurePeerDependencyMeta(Descriptor descriptor) {
         if (!"unknown".equals(descriptor.range)) {
-            throw new IllegalArgumentException("Invalid meta field range for '" +
-                                               StructUtils.stringifyDescriptor(descriptor) + "'");
+            throw new JsError(JsError.ERROR, "Invalid meta field range for '" +
+                                             StructUtils.stringifyDescriptor(descriptor) + "'");
         }
         return peerDependenciesMeta.computeIfAbsent(StructUtils.stringifyIdent(descriptor),
                 k -> new LinkedHashMap<>());

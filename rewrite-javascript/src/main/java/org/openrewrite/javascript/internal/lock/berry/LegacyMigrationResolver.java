@@ -148,8 +148,8 @@ final class LegacyMigrationResolver implements Resolver {
 
     @Override
     public boolean shouldPersistResolution(Locator locator, ResolveOptions opts) {
-        throw new IllegalStateException("Assertion failed: This resolver doesn't support resolving locators to " +
-                                        "packages");
+        throw new JsError(JsError.ERROR, "Assertion failed: This resolver doesn't support resolving locators to " +
+                                         "packages");
     }
 
     @Override
@@ -166,11 +166,11 @@ final class LegacyMigrationResolver implements Resolver {
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
         if (resolutions == null) {
-            throw new IllegalStateException("Assertion failed: The resolution store should have been setup");
+            throw new JsError(JsError.ERROR, "Assertion failed: The resolution store should have been setup");
         }
         Locator resolution = resolutions.get(descriptor.descriptorHash);
         if (resolution == null) {
-            throw new IllegalStateException("Assertion failed: The resolution should have been registered");
+            throw new JsError(JsError.ERROR, "Assertion failed: The resolution should have been registered");
         }
         Descriptor importedDescriptor = StructUtils.convertLocatorToDescriptor(resolution);
         Descriptor normalizedDescriptor = opts.getProject().configuration.normalizeDependency(importedDescriptor);
@@ -192,7 +192,7 @@ final class LegacyMigrationResolver implements Resolver {
 
     @Override
     public Package resolve(Locator locator, ResolveOptions opts) {
-        throw new IllegalStateException("Assertion failed: This resolver doesn't support resolving locators to " +
-                                        "packages");
+        throw new JsError(JsError.ERROR, "Assertion failed: This resolver doesn't support resolving locators to " +
+                                         "packages");
     }
 }

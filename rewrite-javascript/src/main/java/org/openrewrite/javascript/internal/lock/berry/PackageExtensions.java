@@ -77,8 +77,8 @@ final class PackageExtensions {
     private static void register(Map<String, List<RangeExtensions>> packageExtensions, Descriptor descriptor,
                                  Map<String, @Nullable Object> extensionData) {
         if (SemverUtils.validRange(descriptor.range) == null) {
-            throw new IllegalArgumentException("Only semver ranges are allowed as keys for the packageExtensions " +
-                                               "setting");
+            throw new JsError(JsError.ERROR, "Only semver ranges are allowed as keys for the packageExtensions " +
+                                             "setting");
         }
         Manifest extension = new Manifest();
         extension.load(extensionData, true);
@@ -137,7 +137,7 @@ final class PackageExtensions {
                             break;
                         }
                         default:
-                            throw new IllegalStateException("Assertion failed: " + extension.type);
+                            throw new JsError(JsError.ERROR, "Assertion failed: " + extension.type);
                     }
                 }
             }

@@ -149,15 +149,15 @@ final class Project {
                 }
                 Object data = parsed.get(key);
                 if (data == null) {
-                    throw new IllegalStateException("TypeError: Cannot read properties of null (reading 'resolution')");
+                    throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of null (reading 'resolution')");
                 }
                 Object resolution = Js.get(data, "resolution");
                 if (resolution == Syml.UNDEFINED) {
-                    throw new IllegalStateException("Assertion failed: Expected the lockfile entry to have a " +
-                                                    "resolution field (" + key + ")");
+                    throw new JsError(JsError.ERROR, "Assertion failed: Expected the lockfile entry to have a " +
+                                                     "resolution field (" + key + ")");
                 }
                 if (!(resolution instanceof String)) {
-                    throw new IllegalStateException("TypeError: string.match is not a function");
+                    throw new JsError(JsError.TYPE_ERROR, "string.match is not a function");
                 }
                 Locator locator = StructUtils.parseLocator((String) resolution, true);
 
@@ -169,9 +169,9 @@ final class Project {
                         manifest.languageName : defaultLanguageName;
                 Object rawLinkType = Js.get(data, "linkType");
                 if (!(rawLinkType instanceof String)) {
-                    throw new IllegalStateException(rawLinkType == Syml.UNDEFINED || rawLinkType == null ?
-                            "TypeError: Cannot read properties of " + (rawLinkType == null ? "null" : "undefined") +
-                            " (reading 'toUpperCase')" : "TypeError: data.linkType.toUpperCase is not a function");
+                    throw new JsError(JsError.TYPE_ERROR, rawLinkType == Syml.UNDEFINED || rawLinkType == null ?
+                            "Cannot read properties of " + (rawLinkType == null ? "null" : "undefined") +
+                            " (reading 'toUpperCase')" : "data.linkType.toUpperCase is not a function");
                 }
                 String linkType = ((String) rawLinkType).toUpperCase(Locale.ROOT);
                 Object conditions = Js.get(data, "conditions");
@@ -275,9 +275,9 @@ final class Project {
     private void addWorkspace(Workspace workspace) {
         Workspace dup = workspacesByIdent.get(workspace.getAnchoredLocator().identHash);
         if (dup != null) {
-            throw new IllegalStateException("Duplicate workspace name " +
-                                            StructUtils.stringifyIdent(workspace.getAnchoredLocator()) + ": " +
-                                            workspace.getRelativeCwd() + " conflicts with " + dup.getRelativeCwd());
+            throw new JsError(JsError.ERROR, "Duplicate workspace name " +
+                                             StructUtils.stringifyIdent(workspace.getAnchoredLocator()) + ": " +
+                                             workspace.getRelativeCwd() + " conflicts with " + dup.getRelativeCwd());
         }
         workspaces.add(workspace);
         workspacesByCwd.put(workspace.getRelativeCwd(), workspace);
@@ -297,7 +297,7 @@ final class Project {
     Workspace getWorkspaceByCwd(String workspaceCwd) {
         Workspace workspace = tryWorkspaceByCwd(workspaceCwd);
         if (workspace == null) {
-            throw new IllegalStateException("Workspace not found (" + workspaceCwd + ")");
+            throw new JsError(JsError.ERROR, "Workspace not found (" + workspaceCwd + ")");
         }
         return workspace;
     }
@@ -329,8 +329,8 @@ final class Project {
     Workspace getWorkspaceByDescriptor(Descriptor descriptor) {
         Workspace workspace = tryWorkspaceByDescriptor(descriptor);
         if (workspace == null) {
-            throw new IllegalStateException("Workspace not found (" + StructUtils.stringifyDescriptor(descriptor) +
-                                            ")");
+            throw new JsError(JsError.ERROR, "Workspace not found (" + StructUtils.stringifyDescriptor(descriptor) +
+                                             ")");
         }
         return workspace;
     }
@@ -432,8 +432,8 @@ final class Project {
             Descriptor descriptor = entry.getValue();
             Descriptor dependency = configuration.reduceDependency(descriptor, this, pkg, resolver, opts);
             if (!StructUtils.areIdentsEqual(descriptor, dependency)) {
-                throw new IllegalStateException("Assertion failed: The descriptor ident cannot be changed through " +
-                                                "aliases");
+                throw new JsError(JsError.ERROR, "Assertion failed: The descriptor ident cannot be changed through " +
+                                                 "aliases");
             }
             entry.setValue(resolver.bindDescriptor(dependency, pkg, opts));
         }
@@ -476,12 +476,11 @@ final class Project {
     }
 
     /**
-     * {@code resolveEverything} of an install that is not lockfile-only: the transient resolutions forgotten,
-     * every workspace's descriptor resolved through the lockfile, the legacy pins and the resolvers, each package
-     * prepared and its dependencies scheduled, wave after wave; then the virtual pass, and the new maps stored.
+     * {@code resolveEverything} of an install that is not lockfile-only.
      *
      * @param checkResolutions whether each resolution must satisfy its descriptor without the lockfile (hardened
      *                         mode)
+     * @throws CannotKnow only when no wave holds a resolution Yarn rejects whatever the unknown ones resolve to
      */
     void resolveEverything(LegacyMigrationResolver legacyMigrationResolver, RegistrySource registry,
                            boolean checkResolutions) {
@@ -497,14 +496,24 @@ final class Project {
         for (Workspace workspace : workspaces) {
             pass.resolutionQueue.add(Collections.singletonList(workspace.getAnchoredDescriptor()));
         }
+        CannotKnow unknown = null;
         while (!pass.resolutionQueue.isEmpty()) {
             List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
             pass.resolutionQueue.clear();
             for (List<Descriptor> dependencies : copy) {
                 for (Descriptor descriptor : dependencies) {
-                    pass.scheduleDescriptorResolution(descriptor);
+                    try {
+                        pass.scheduleDescriptorResolution(descriptor);
+                    } catch (CannotKnow e) {
+                        if (unknown == null) {
+                            unknown = e;
+                        }
+                    }
                 }
             }
+        }
+        if (unknown != null) {
+            throw unknown;
         }
 
         Set<String> volatileDescriptors = new LinkedHashSet<>();
@@ -539,8 +548,7 @@ final class Project {
     }
 
     /**
-     * The scheduling of {@code resolveEverything}: a descriptor or package is resolved once, a package's
-     * dependencies wait for the next wave, and the first failure in schedule order is the one Yarn reports.
+     * {@code resolveEverything}'s scheduling, a wave of dependencies at a time.
      */
     private final class ResolutionPass {
         final Resolver.ResolveOptions opts;
@@ -667,15 +675,8 @@ final class Project {
         if (e instanceof JsError) {
             return new JsError(((JsError) e).getName(), what + ": " + e.getMessage());
         }
-        if (e instanceof IllegalStateException || e instanceof IllegalArgumentException) {
-            Matcher named = JS_ERROR_NAME.matcher(String.valueOf(e.getMessage()));
-            return named.matches() ? new JsError(named.group(1), what + ": " + named.group(2)) :
-                    new JsError(JsError.ERROR, what + ": " + e.getMessage());
-        }
         return e;
     }
-
-    private static final Pattern JS_ERROR_NAME = Pattern.compile("([A-Z][A-Za-z]*Error): (.*)", Pattern.DOTALL);
 
     private static String prettyResolution(Descriptor descriptor, Locator resolution) {
         Descriptor devirtualized = StructUtils.isVirtualDescriptor(descriptor) ?
@@ -686,9 +687,7 @@ final class Project {
     }
 
     /**
-     * {@code applyVirtualResolutionMutations}, as far as the lockfile sees it: which packages are reached only
-     * through optional edges, and the descriptor a package installed under an alias provides itself to its peers
-     * by. Peer requirements and their warnings are not kept.
+     * {@code applyVirtualResolutionMutations} without the peer requirements and warnings, which the lockfile omits.
      */
     private final class VirtualPass {
         final Map<String, Descriptor> allDescriptors;
@@ -957,8 +956,7 @@ final class Project {
     }
 
     /**
-     * {@code fetchEverything} of an install that only updates the lockfile: each locator the lockfile has no
-     * checksum for is fetched, in locator order, and its checksum stored, or dropped when the fetch reports none.
+     * {@code fetchEverything} of an install that only updates the lockfile.
      *
      * @throws CannotKnow naming every checksum the engine cannot compute, when Yarn's own fetches all succeed
      */
@@ -1030,7 +1028,7 @@ final class Project {
             for (String descriptorHash : entry.getValue()) {
                 Descriptor descriptor = storedDescriptors.get(descriptorHash);
                 if (descriptor == null) {
-                    throw new IllegalStateException("Assertion failed: The descriptor should have been registered");
+                    throw new JsError(JsError.ERROR, "Assertion failed: The descriptor should have been registered");
                 }
                 descriptors.add(StructUtils.stringifyDescriptor(descriptor));
             }

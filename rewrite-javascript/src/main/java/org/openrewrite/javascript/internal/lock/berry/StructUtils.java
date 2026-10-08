@@ -47,7 +47,7 @@ final class StructUtils {
 
     static Ident makeIdent(@Nullable String scope, String name) {
         if (scope != null && scope.startsWith("@")) {
-            throw new IllegalArgumentException("Invalid scope: don't prefix it with '@'");
+            throw new JsError(JsError.ERROR, "Invalid scope: don't prefix it with '@'");
         }
         return new Ident(HashUtils.makeHash(scope, name), scope, name);
     }
@@ -110,14 +110,14 @@ final class StructUtils {
 
     static Descriptor virtualizeDescriptor(Descriptor descriptor, String entropy) {
         if (entropy.contains("#")) {
-            throw new IllegalArgumentException("Invalid entropy");
+            throw new JsError(JsError.ERROR, "Invalid entropy");
         }
         return makeDescriptor(descriptor, "virtual:" + entropy + "#" + descriptor.range);
     }
 
     static Package virtualizePackage(Package pkg, String entropy) {
         if (entropy.contains("#")) {
-            throw new IllegalArgumentException("Invalid entropy");
+            throw new JsError(JsError.ERROR, "Invalid entropy");
         }
         return renamePackage(pkg, makeLocator(pkg, "virtual:" + entropy + "#" + pkg.reference));
     }
@@ -132,14 +132,14 @@ final class StructUtils {
 
     static Descriptor devirtualizeDescriptor(Descriptor descriptor) {
         if (!isVirtualDescriptor(descriptor)) {
-            throw new IllegalArgumentException("Not a virtual descriptor");
+            throw new JsError(JsError.ERROR, "Not a virtual descriptor");
         }
         return makeDescriptor(descriptor, VIRTUAL_PREFIX_REGEXP.matcher(descriptor.range).replaceFirst(""));
     }
 
     static Locator devirtualizeLocator(Locator locator) {
         if (!isVirtualLocator(locator)) {
-            throw new IllegalArgumentException("Not a virtual descriptor");
+            throw new JsError(JsError.ERROR, "Not a virtual descriptor");
         }
         return makeLocator(locator, VIRTUAL_PREFIX_REGEXP.matcher(locator.reference).replaceFirst(""));
     }
@@ -173,7 +173,7 @@ final class StructUtils {
     static Ident parseIdent(String string) {
         Ident ident = tryParseIdent(string);
         if (ident == null) {
-            throw new IllegalArgumentException("Invalid ident (" + string + ")");
+            throw new JsError(JsError.ERROR, "Invalid ident (" + string + ")");
         }
         return ident;
     }
@@ -193,7 +193,7 @@ final class StructUtils {
     static Descriptor parseDescriptor(String string, boolean strict) {
         Descriptor descriptor = tryParseDescriptor(string, strict);
         if (descriptor == null) {
-            throw new IllegalArgumentException("Invalid descriptor (" + string + ")");
+            throw new JsError(JsError.ERROR, "Invalid descriptor (" + string + ")");
         }
         return descriptor;
     }
@@ -209,7 +209,7 @@ final class StructUtils {
         }
         String range = match.group(3);
         if ("unknown".equals(range)) {
-            throw new IllegalArgumentException("Invalid range (" + string + ")");
+            throw new JsError(JsError.ERROR, "Invalid range (" + string + ")");
         }
         return makeDescriptor(makeIdent(match.group(1), match.group(2)), range != null ? range : "unknown");
     }
@@ -221,7 +221,7 @@ final class StructUtils {
     static Locator parseLocator(String string, boolean strict) {
         Locator locator = tryParseLocator(string, strict);
         if (locator == null) {
-            throw new IllegalArgumentException("Invalid locator (" + string + ")");
+            throw new JsError(JsError.ERROR, "Invalid locator (" + string + ")");
         }
         return locator;
     }
@@ -233,7 +233,7 @@ final class StructUtils {
         }
         String reference = match.group(3);
         if ("unknown".equals(reference)) {
-            throw new IllegalArgumentException("Invalid reference (" + string + ")");
+            throw new JsError(JsError.ERROR, "Invalid reference (" + string + ")");
         }
         return makeLocator(makeIdent(match.group(1), match.group(2)), reference != null ? reference : "unknown");
     }
@@ -285,25 +285,25 @@ final class StructUtils {
     static Range parseRange(String range, RangeOptions opts) {
         Matcher match = RANGE_REGEX.matcher(range);
         if (!match.find()) {
-            throw new IllegalArgumentException("Invalid range (" + range + ")");
+            throw new JsError(JsError.ERROR, "Invalid range (" + range + ")");
         }
         String protocol = match.group(1);
         if (opts.requireProtocol != null && !opts.requireProtocol.isEmpty() &&
             !opts.requireProtocol.equals(protocol)) {
-            throw new IllegalArgumentException("Invalid protocol (" + protocol + ")");
+            throw new JsError(JsError.ERROR, "Invalid protocol (" + protocol + ")");
         } else if (opts.requireProtocol != null && protocol == null) {
-            throw new IllegalArgumentException("Missing protocol (" + protocol + ")");
+            throw new JsError(JsError.ERROR, "Missing protocol (" + protocol + ")");
         }
         String source = match.group(3) != null ? UriComponent.decodeURIComponent(match.group(2)) : null;
         if (opts.requireSource && source == null) {
-            throw new IllegalArgumentException("Missing source (" + range + ")");
+            throw new JsError(JsError.ERROR, "Missing source (" + range + ")");
         }
         String rawSelector = match.group(3) != null ? UriComponent.decodeURIComponent(match.group(3)) :
                 UriComponent.decodeURIComponent(match.group(2));
         Map<String, Object> selectorParams = opts.parseSelector ? QueryString.parse(rawSelector) : null;
         Map<String, Object> params = match.group(4) != null ? QueryString.parse(match.group(4)) : null;
         if (opts.requireBindings && params == null) {
-            throw new IllegalArgumentException("Missing bindings (" + range + ")");
+            throw new JsError(JsError.ERROR, "Missing bindings (" + range + ")");
         }
         return new Range(protocol, source, rawSelector, selectorParams, params);
     }

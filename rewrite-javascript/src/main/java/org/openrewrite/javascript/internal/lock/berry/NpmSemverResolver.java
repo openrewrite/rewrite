@@ -67,8 +67,8 @@ final class NpmSemverResolver implements Resolver {
                                        ResolveOptions opts) {
         SemverUtils.Range range = SemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
         if (range == null) {
-            throw new IllegalStateException("Expected a valid range, got " +
-                                            descriptor.range.substring(PROTOCOL.length()));
+            throw new JsError(JsError.ERROR, "Expected a valid range, got " +
+                                             descriptor.range.substring(PROTOCOL.length()));
         }
         Project project = opts.getProject();
         Map<String, @Nullable Object> registryData = NpmHttpUtils.getPackageMetadata(descriptor, project,
@@ -108,8 +108,8 @@ final class NpmSemverResolver implements Resolver {
                                     List<Locator> locators, ResolveOptions opts) {
         SemverUtils.Range range = SemverUtils.validRange(descriptor.range.substring(PROTOCOL.length()));
         if (range == null) {
-            throw new IllegalStateException("Expected a valid range, got " +
-                                            descriptor.range.substring(PROTOCOL.length()));
+            throw new JsError(JsError.ERROR, "Expected a valid range, got " +
+                                             descriptor.range.substring(PROTOCOL.length()));
         }
         List<Locator> results = new ArrayList<>();
         List<String> versions = new ArrayList<>();
@@ -123,7 +123,7 @@ final class NpmSemverResolver implements Resolver {
                 continue;
             }
             if (!SemverUtils.valid(parsedRange.getSelector())) {
-                throw new IllegalArgumentException("TypeError: Invalid Version: " + parsedRange.getSelector());
+                throw new JsError(JsError.TYPE_ERROR, "Invalid Version: " + parsedRange.getSelector());
             }
             if (!range.test(parsedRange.getSelector())) {
                 continue;

@@ -63,9 +63,10 @@ class BerryOptionsTest {
 
     @Test
     void rejectsAValueItsDefinitionDoesNotAllow() {
+        // Yarn 4.10.3 prints "Internal Error: Invalid value, expected one of mixed, 0, ..., 9 in <path>/.yarnrc.yml"
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 10\n"),
                 Collections.emptyMap()))
-                .isInstanceOf(BerryOptions.UsageError.class)
+                .isInstanceOf(JsError.class)
                 .hasMessageContaining("Invalid value, expected one of mixed, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9");
     }
 
@@ -163,7 +164,7 @@ class BerryOptionsTest {
         }
         for (String rejected : new String[]{"\"0x\"", "\"-0x3\""}) {
             assertThatThrownBy(() -> options("compressionLevel: " + rejected + "\n")).as(rejected)
-                    .isInstanceOf(BerryOptions.UsageError.class)
+                    .isInstanceOf(JsError.class)
                     .hasMessageContaining("Invalid value, expected one of mixed, 0, 1");
         }
         assertThat(BerryOptions.load(Collections.emptyMap(), Collections.singletonMap("YARN_COMPRESSION_LEVEL", "0x5"))

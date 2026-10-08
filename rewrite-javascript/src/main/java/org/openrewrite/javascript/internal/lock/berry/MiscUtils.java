@@ -84,7 +84,7 @@ final class MiscUtils {
             Boolean.FALSE.equals(value)) {
             return false;
         }
-        throw new IllegalArgumentException("Couldn't parse \"" + value + "\" as a boolean");
+        throw new JsError(JsError.ERROR, "Couldn't parse \"" + value + "\" as a boolean");
     }
 
     /**
@@ -97,7 +97,7 @@ final class MiscUtils {
         }
         try {
             return parseBoolean(value);
-        } catch (IllegalArgumentException e) {
+        } catch (JsError e) {
             return null;
         }
     }
@@ -120,7 +120,7 @@ final class MiscUtils {
             } else if (m.group("fallback") != null) {
                 replacement = m.group("fallback");
             } else {
-                throw new IllegalArgumentException("Environment variable not found (" + variableName + ")");
+                throw new BerryOptions.UsageError("Environment variable not found (" + variableName + ")");
             }
             m.appendReplacement(out, Matcher.quoteReplacement(replacement == null ? "undefined" : replacement));
         }

@@ -34,8 +34,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Port of @yarnpkg/plugin-essentials sources/commands/install.ts, {@code --mode=update-lockfile} (Yarn 4.10.3).
@@ -47,7 +45,6 @@ public final class YarnBerryLockRegenerator {
     static final String SECOND_INSTALL = "a second yarn install over the lock written for this edit";
 
     private static final String MERGE_CONFLICT_START = "<<<<<<<";
-    private static final Pattern JS_ERROR_NAME = Pattern.compile("([A-Z][A-Za-z]*Error): (.*)", Pattern.DOTALL);
 
     /**
      * What the engine is given for a Yarn Berry project.
@@ -214,7 +211,12 @@ public final class YarnBerryLockRegenerator {
         if (rootManifest != null && rootManifest.packageManager != null) {
             parseSpec(rootManifest.packageManager);
         }
-        Loaded loaded = load(release(), settings);
+        YarnRelease release = release();
+        if (options().getThirdPartyPlugin() != null) {
+            throw new CannotKnow("what the plugin " + options().getThirdPartyPlugin() + " does to the lock (Yarn " +
+                                 "runs its code)");
+        }
+        Loaded loaded = load(release, settings);
         Project project = loaded.getProject();
         if (project.lockfileLastVersion == null) {
             throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": " + (lock.trim().isEmpty() ?
@@ -386,12 +388,6 @@ public final class YarnBerryLockRegenerator {
         if (e instanceof JsError) {
             return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + YARN_REJECTS + ": YN0001 " + e);
         }
-        if (e instanceof IllegalStateException || e instanceof IllegalArgumentException) {
-            Matcher named = JS_ERROR_NAME.matcher(String.valueOf(e.getMessage()));
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + YARN_REJECTS + ": YN0001 " +
-                                                                 (named.matches() ? e.getMessage() :
-                                                                         "Error: " + e.getMessage()));
-        }
         throw e;
     }
 
@@ -426,9 +422,14 @@ public final class YarnBerryLockRegenerator {
         return "the line endings change";
     }
 
+    // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
     private BerryOptions options() {
         if (options == null) {
-            options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+            try {
+                options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+            } catch (JsError e) {
+                throw new Rejected(Reason.RESOLUTION_REQUIRED, YARN_REJECTS + ": Internal Error: " + e.getMessage());
+            }
         }
         return options;
     }

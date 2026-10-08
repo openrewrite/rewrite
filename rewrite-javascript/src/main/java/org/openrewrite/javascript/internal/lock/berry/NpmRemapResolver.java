@@ -40,7 +40,7 @@ final class NpmRemapResolver implements Resolver {
 
     @Override
     public boolean shouldPersistResolution(Locator locator, ResolveOptions opts) {
-        throw new IllegalStateException("Unreachable");
+        throw new JsError(JsError.ERROR, "Unreachable");
     }
 
     @Override
@@ -72,6 +72,6 @@ final class NpmRemapResolver implements Resolver {
 
     @Override
     public Package resolve(Locator locator, ResolveOptions opts) {
-        throw new IllegalStateException("Unreachable");
+        throw new JsError(JsError.ERROR, "Unreachable");
     }
 }

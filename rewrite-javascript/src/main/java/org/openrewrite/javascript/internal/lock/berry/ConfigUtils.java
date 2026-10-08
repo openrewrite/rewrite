@@ -201,7 +201,7 @@ final class ConfigUtils {
             }
             return new Resolved(source, result);
         }
-        throw new IllegalStateException("Assertion failed: Non-extendable value type");
+        throw new JsError(JsError.ERROR, "Assertion failed: Non-extendable value type");
     }
 
     /**

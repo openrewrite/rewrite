@@ -48,9 +48,9 @@ class Resolution {
     static Resolution parseResolution(String source) {
         Matcher legacy = LEGACY_RESOLUTION.matcher(source);
         if (legacy.find()) {
-            throw new IllegalArgumentException("The override for '" + source + "' includes a glob pattern. Glob " +
-                                               "patterns have been removed since their behaviours don't match what " +
-                                               "you'd expect. Set the override to '" + legacy.group(1) + "' instead.");
+            throw new JsError(JsError.ERROR, "The override for '" + source + "' includes a glob pattern. Glob " +
+                                             "patterns have been removed since their behaviours don't match what " +
+                                             "you'd expect. Set the override to '" + legacy.group(1) + "' instead.");
         }
         int slash = specifierEnd(source, 0);
         if (slash < source.length() && source.charAt(slash) == '/') {
@@ -64,7 +64,7 @@ class Resolution {
         if (end == source.length() && end > 0) {
             return new Resolution(null, specifier(source));
         }
-        throw new IllegalArgumentException("Expected a resolution, got \"" + source + "\"");
+        throw new JsError(JsError.ERROR, "Expected a resolution, got \"" + source + "\"");
     }
 
     // where `specifier` stops matching from `start`: fullName ("@" ident "/" ident, or ident) then "@" [^/]+

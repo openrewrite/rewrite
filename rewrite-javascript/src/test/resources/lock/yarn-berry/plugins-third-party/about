@@ -1,0 +1,1 @@
+a project plugin file Yarn loads and runs: this one has no hooks, but the engine cannot run a plugin

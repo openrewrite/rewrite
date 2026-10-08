@@ -49,8 +49,8 @@ final class LockfileResolver implements Resolver {
 
     @Override
     public boolean shouldPersistResolution(Locator locator, ResolveOptions opts) {
-        throw new IllegalStateException("The shouldPersistResolution method shouldn't be called on the lockfile " +
-                                        "resolver, which would always answer yes");
+        throw new JsError(JsError.ERROR, "The shouldPersistResolution method shouldn't be called on the lockfile " +
+                                         "resolver, which would always answer yes");
     }
 
     @Override
@@ -79,7 +79,7 @@ final class LockfileResolver implements Resolver {
         if (originalPkg != null) {
             return Collections.singletonList(originalPkg);
         }
-        throw new IllegalStateException("Resolution expected from the lockfile data");
+        throw new JsError(JsError.ERROR, "Resolution expected from the lockfile data");
     }
 
     @Override
@@ -99,8 +99,8 @@ final class LockfileResolver implements Resolver {
     public Package resolve(Locator locator, ResolveOptions opts) {
         Package pkg = opts.getProject().originalPackages.get(locator.locatorHash);
         if (pkg == null) {
-            throw new IllegalStateException("The lockfile resolver isn't meant to resolve packages - they should " +
-                                            "already have been stored into a cache");
+            throw new JsError(JsError.ERROR, "The lockfile resolver isn't meant to resolve packages - they should " +
+                                             "already have been stored into a cache");
         }
         return pkg;
     }

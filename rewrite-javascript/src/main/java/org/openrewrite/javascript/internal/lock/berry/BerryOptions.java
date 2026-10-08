@@ -53,6 +53,11 @@ public final class BerryOptions {
             "binFolder", "version", "flags", "profile", "gpg", "ignoreNode", "wrapOutput", "home", "confDir",
             "registry", "ignoreCwd"));
 
+    private static final Set<String> LEGACY_PLUGINS = new LinkedHashSet<>(Arrays.asList(
+            "@yarnpkg/plugin-constraints", "@yarnpkg/plugin-exec", "@yarnpkg/plugin-interactive-tools",
+            "@yarnpkg/plugin-stage", "@yarnpkg/plugin-typescript", "@yarnpkg/plugin-version",
+            "@yarnpkg/plugin-workspace-tools"));
+
     private enum Type {
         ANY, BOOLEAN, ABSOLUTE_PATH, NUMBER, STRING, SECRET, SHAPE, MAP
     }
@@ -152,6 +157,12 @@ public final class BerryOptions {
 
     private final Map<String, String> env;
 
+    /**
+     * The first plugin the sources name that is not one the CLI bundles, with its source; Yarn runs its code.
+     */
+    @Getter
+    private @Nullable String thirdPartyPlugin;
+
     private BerryOptions(Map<String, String> env) {
         this.env = env;
         for (Map.Entry<String, Definition> definition : DEFINITIONS.entrySet()) {
@@ -167,6 +178,7 @@ public final class BerryOptions {
         copy.values.putAll(values);
         copy.sources.putAll(sources);
         copy.keySources.putAll(keySources);
+        copy.thirdPartyPlugin = thirdPartyPlugin;
         return copy;
     }
 
@@ -218,7 +230,32 @@ public final class BerryOptions {
         if (resolvedRcFile != null) {
             options.use(resolvedRcFile.getSource(), asMap(resolvedRcFile.getValue()));
         }
+        options.thirdPartyPlugin = thirdPartyPlugin(environmentSettings, rcFiles);
         return options;
+    }
+
+    // Configuration.find's third-party plugin pass, up to the first plugin it would run
+    private static @Nullable String thirdPartyPlugin(Map<String, @Nullable Object> environmentSettings,
+                                                     List<Object[]> rcFiles) {
+        Object fromEnvironment = environmentSettings.get("plugins");
+        if (Js.truthy(fromEnvironment)) {
+            return Js.string(fromEnvironment).split(";", -1)[0] + " (<environment>)";
+        }
+        for (Object[] rcFile : rcFiles) {
+            Object plugins = Js.get(rcFile[1], "plugins");
+            if (!(plugins instanceof List)) {
+                continue;
+            }
+            for (Object entry : (List<?>) plugins) {
+                Object path = entry instanceof String ? entry : Js.read(entry, "path");
+                Object spec = entry instanceof Map ? Js.get(entry, "spec") : Syml.UNDEFINED;
+                if (spec != null && spec != Syml.UNDEFINED && LEGACY_PLUGINS.contains(Js.string(spec))) {
+                    continue;
+                }
+                return Js.string(path) + " (" + rcFile[0] + ")";
+            }
+        }
+        return null;
     }
 
     /**
@@ -321,8 +358,10 @@ public final class BerryOptions {
             Object parsed;
             try {
                 parsed = parseValue(key, value, definition);
-            } catch (UsageError | IllegalArgumentException e) {
+            } catch (UsageError e) {
                 throw new UsageError(e.getMessage() + " in " + source);
+            } catch (JsError e) {
+                throw new JsError(e.getName(), e.getMessage() + " in " + source);
             }
             if ("enableStrictSettings".equals(key) && !"<environment>".equals(source)) {
                 continue;
@@ -380,8 +419,8 @@ public final class BerryOptions {
             return out;
         }
         if (value instanceof List) {
-            throw new IllegalArgumentException("Non-array configuration settings \"" + path +
-                                               "\" cannot be an array");
+            throw new JsError(JsError.ERROR, "Non-array configuration settings \"" + path +
+                                             "\" cannot be an array");
         }
         return parseSingleValue(path, valueBase, definition);
     }
@@ -399,8 +438,8 @@ public final class BerryOptions {
                 break;
         }
         if (value == null && definition.defaultValue != null) {
-            throw new IllegalArgumentException("Non-nullable configuration settings \"" + path +
-                                               "\" cannot be set to null");
+            throw new JsError(JsError.ERROR, "Non-nullable configuration settings \"" + path +
+                                             "\" cannot be set to null");
         }
         if (definition.values != null && definition.values.contains(value)) {
             return value;
@@ -410,8 +449,8 @@ public final class BerryOptions {
             interpreted = MiscUtils.parseBoolean(value);
         } else {
             if (!(value instanceof String)) {
-                throw new IllegalArgumentException("Expected configuration setting \"" + path +
-                                                   "\" to be a string, got " + typeOf(value));
+                throw new JsError(JsError.ERROR, "Expected configuration setting \"" + path +
+                                                 "\" to be a string, got " + typeOf(value));
             }
             String replaced = MiscUtils.replaceEnvVariables((String) value, env);
             switch (definition.type) {
@@ -430,7 +469,7 @@ public final class BerryOptions {
             for (Object v : definition.values) {
                 expected.add(String.valueOf(v));
             }
-            throw new IllegalArgumentException("Invalid value, expected one of " + String.join(", ", expected));
+            throw new JsError(JsError.ERROR, "Invalid value, expected one of " + String.join(", ", expected));
         }
         return interpreted;
     }
@@ -548,7 +587,7 @@ public final class BerryOptions {
     @Nullable
     Object get(String key) {
         if (!values.containsKey(key)) {
-            throw new IllegalArgumentException("Couldn't find a configuration settings named \"" + key + "\"");
+            throw new UsageError("Couldn't find a configuration settings named \"" + key + "\"");
         }
         return values.get(key);
     }
