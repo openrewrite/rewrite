@@ -1015,8 +1015,9 @@ final class Project {
         }
         Map<String, Object> optimizedLockfile = new LinkedHashMap<>();
         Map<String, Object> metadata = new LinkedHashMap<>();
+        String cacheKey = Cache.getCacheKey(configuration.getOptions());
         metadata.put("version", LOCKFILE_VERSION);
-        metadata.put("cacheKey", Cache.getCacheKey(configuration.getOptions()));
+        metadata.put("cacheKey", cacheKey);
         optimizedLockfile.put("__metadata", metadata);
 
         for (Map.Entry<String, Set<String>> entry : reverseLookup.entrySet()) {
@@ -1048,6 +1049,16 @@ final class Project {
             lockEntry.put("linkType", pkg.linkType.toLowerCase(Locale.ROOT));
             lockEntry.put("resolution", StructUtils.stringifyLocator(pkg));
             String checksum = storedChecksums.get(pkg.locatorHash);
+            if (checksum != null && configuration.getRelease().isChecksumWithoutCacheKey()) {
+                int cacheKeyIndex = checksum.indexOf('/');
+                if (cacheKeyIndex == -1) {
+                    throw new JsError(JsError.ERROR, "Assertion failed: Expected the checksum to reference its " +
+                                                     "cache key");
+                }
+                if (checksum.substring(0, cacheKeyIndex).equals(cacheKey)) {
+                    checksum = checksum.substring(cacheKeyIndex + 1);
+                }
+            }
             lockEntry.put("checksum", checksum != null ? checksum : Syml.UNDEFINED);
             lockEntry.put("conditions", Js.truthy(pkg.conditions) ? pkg.conditions : Syml.UNDEFINED);
             optimizedLockfile.put(key, lockEntry);

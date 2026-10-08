@@ -71,11 +71,16 @@ final class YarnRelease {
      */
     private final boolean jsrScope;
 
+    /**
+     * Whether {@code generateLockfile} writes a checksum without its cache key when the key is the lockfile's.
+     */
+    private final boolean checksumWithoutCacheKey;
+
     private final Set<String> settings;
 
     private YarnRelease(String version, List<Map.Entry<String, Map<String, @Nullable Object>>> packageExtensions,
                         List<String> patches, Pattern nodeGypMatch, String nodeGypRange, List<String> plugins,
-                        boolean jsrScope, Set<String> settings) {
+                        boolean jsrScope, boolean checksumWithoutCacheKey, Set<String> settings) {
         this.version = version;
         this.packageExtensions = packageExtensions;
         this.patches = patches;
@@ -83,6 +88,7 @@ final class YarnRelease {
         this.nodeGypRange = nodeGypRange;
         this.plugins = plugins;
         this.jsrScope = jsrScope;
+        this.checksumWithoutCacheKey = checksumWithoutCacheKey;
         this.settings = settings;
     }
 
@@ -113,7 +119,8 @@ final class YarnRelease {
                 Collections.unmodifiableList((List<String>) Js.get(release, "patches")),
                 Pattern.compile(jsRegExp((String) nodeGyp.get("pattern"))), (String) nodeGyp.get("range"),
                 Collections.unmodifiableList((List<String>) tables.get((String) Js.get(release, "plugins"))),
-                Boolean.TRUE.equals(Js.get(release, "jsrScope")), Collections.unmodifiableSet(settings));
+                Boolean.TRUE.equals(Js.get(release, "jsrScope")),
+                Boolean.TRUE.equals(Js.get(release, "checksumWithoutCacheKey")), Collections.unmodifiableSet(settings));
     }
 
     /**
