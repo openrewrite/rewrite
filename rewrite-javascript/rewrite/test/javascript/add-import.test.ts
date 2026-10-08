@@ -2985,12 +2985,12 @@ describe('AddImport visitor', () => {
             await spec.rewriteRun(
                 typescript(
                     `
-                        import {readFile} from 'node:fs';
+                        import {readFile} from 'fs-extra';
 
                         readFile('x');
                     `,
                     `
-                        import {readFile} from 'node:fs';
+                        import {readFile} from 'fs-extra';
                         import {readFile as readFile_1} from 'fs';
 
                         readFile('x');
