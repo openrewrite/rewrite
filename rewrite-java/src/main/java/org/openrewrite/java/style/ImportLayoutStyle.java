@@ -622,8 +622,9 @@ public class ImportLayoutStyle implements JavaStyle {
 
             for (JRightPadded<J.Import> anImport : originalImports) {
                 checkPackageForClasses.add(packageOrOuterClassName(anImport));
-                nameToPackages.computeIfAbsent(anImport.getElement().getClassName(), p -> new HashSet<>(3))
-                                .add(anImport.getElement().getPackageName());
+                nameToPackages.computeIfAbsent(importedName(anImport), p -> new HashSet<>(3))
+                        .add(anImport.getElement().isStatic() ?
+                                packageOrOuterClassName(anImport) : anImport.getElement().getPackageName());
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
@@ -767,13 +768,13 @@ public class ImportLayoutStyle implements JavaStyle {
                         J.Identifier name = qualid.getName();
 
                         Set<String> typeNamesInThisGroup = importGroup.stream()
-                                .map(im -> im.getElement().getClassName())
+                                .map(ImportLayoutStyle::importedName)
                                 .collect(toSet());
 
                         Optional<String> oneOfTheTypesIsInAnotherGroupToo = groupedImports.values().stream()
                                 .filter(group -> group != importGroup)
                                 .flatMap(group -> group.stream()
-                                        .filter(im -> typeNamesInThisGroup.contains(im.getElement().getClassName())))
+                                        .filter(im -> typeNamesInThisGroup.contains(importedName(im))))
                                 .map(im -> im.getElement().getTypeName())
                                 .findAny();
 
@@ -861,10 +862,18 @@ public class ImportLayoutStyle implements JavaStyle {
         return s.toString();
     }
 
+    private static String importedName(JRightPadded<J.Import> anImport) {
+        return anImport.getElement().isStatic() ?
+                anImport.getElement().getQualid().getSimpleName() : anImport.getElement().getClassName();
+    }
+
     private static String packageOrOuterClassName(JRightPadded<J.Import> anImport) {
         String typeName = anImport.getElement().getTypeName();
         if (anImport.getElement().isStatic()) {
-            return typeName;
+            // A statically imported nested type and its members have different owners (#9108).
+            JavaType.FullyQualified owner = TypeUtils.asFullyQualified(
+                    anImport.getElement().getQualid().getTarget().getType());
+            return owner == null ? typeName : owner.getFullyQualifiedName();
         } else {
             if (typeName.contains("$")) {
                 return typeName.substring(0, typeName.lastIndexOf('$')).replace('$', '.');

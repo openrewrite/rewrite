@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -443,6 +445,192 @@ class OrderImportsTest implements RewriteTest {
               import static java.util.Collections.*;
               import static java.util.GregorianCalendar.*;
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void staticImportOfNestedTypeAndItsMembers(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.ASSEMBLER;
+              import static a.Rel.Kind.COBOL;
+
+              class User {
+                  Kind typeOf(boolean b) {
+                      return b ? ASSEMBLER : COBOL;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void foldStaticMembersOfNestedType(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              // Nested type
+              import static a.Rel.Kind;
+              // Enum constants
+              import static a.Rel.Kind.ASSEMBLER;
+              import static a.Rel.Kind.COBOL;
+              import static a.Rel.Kind.JCL;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """,
+            """
+              package b;
+
+              // Nested type
+              import static a.Rel.Kind;
+              // Enum constants
+              import static a.Rel.Kind.*;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void staticImportOfNestedTypeAndWildcard(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public enum Kind { ASSEMBLER, COBOL, JCL }
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.Kind;
+              import static a.Rel.Kind.*;
+
+              class User {
+                  Kind[] kinds = {ASSEMBLER, COBOL, JCL};
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void foldStaticImportsOfNestedTypes(boolean removeUnused) {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(removeUnused, null)),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public static class A {}
+                  public static class B {}
+                  public static class C {}
+              }
+              """
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.A;
+              import static a.Rel.B;
+              import static a.Rel.C;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+              }
+              """,
+            """
+              package b;
+
+              import static a.Rel.*;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/9108")
+    @Test
+    void doNotFoldNestedTypeConflictingWithJavaLang() {
+        rewriteRun(
+          spec -> spec.beforeRecipe(addTypesToSourceSet("main")),
+          srcMainJava(
+            java(
+              """
+                package a;
+                public class Rel {
+                    public static class A {}
+                    public static class B {}
+                    public static class String {}
+                }
+                """
+            ),
+            java(
+              """
+                package b;
+
+                import static a.Rel.A;
+                import static a.Rel.B;
+                import static a.Rel.String;
+
+                class User {
+                    A a;
+                    B b;
+                    String s;
+                }
+                """
+            )
           )
         );
     }
