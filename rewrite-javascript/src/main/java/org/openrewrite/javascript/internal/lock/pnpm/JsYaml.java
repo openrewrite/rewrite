@@ -82,7 +82,8 @@ final class JsYaml {
             }
             Instant instant = Instant.ofEpochMilli((long) time);
             int year = instant.atZone(ZoneOffset.UTC).getYear();
-            String rest = DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC).format(instant);
+            String rest = DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
+                    .format(instant);
             if (year >= 0 && year <= 9999) {
                 return String.format("%04d", year) + rest;
             }
@@ -128,7 +129,8 @@ final class JsYaml {
             "|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?" +
             "|[-+]?\\.(?:inf|Inf|INF)" +
             "|\\.(?:nan|NaN|NAN))\\z");
-    private static final Pattern YAML_DATE_REGEXP = Pattern.compile("^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])\\z");
+    private static final Pattern YAML_DATE_REGEXP = Pattern.compile(
+            "^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])\\z");
     private static final Pattern YAML_TIMESTAMP_REGEXP = Pattern.compile(
             "^([0-9][0-9][0-9][0-9])" +
             "-([0-9][0-9]?)" +
@@ -219,7 +221,7 @@ final class JsYaml {
             if (last != '\n' && last != '\r') {
                 input += "\n";
             }
-            if (input.charAt(0) == '﻿') {
+            if (input.charAt(0) == '\uFEFF') {
                 input = input.substring(1);
             }
         }
@@ -344,7 +346,8 @@ final class JsYaml {
         }
 
         @SuppressWarnings("unchecked")
-        void mergeMappings(Map<String, @Nullable Object> destination, @Nullable Object source, Set<String> overridableKeys) {
+        void mergeMappings(Map<String, @Nullable Object> destination, @Nullable Object source,
+                           Set<String> overridableKeys) {
             if (!(source instanceof Map) && !(source instanceof List) && !(source instanceof Timestamp) &&
                 !(source instanceof byte[])) {
                 throw error("cannot merge mappings; the provided source object is unacceptable");

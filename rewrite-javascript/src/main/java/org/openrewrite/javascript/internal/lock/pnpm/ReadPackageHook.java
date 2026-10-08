@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +81,18 @@ final class ReadPackageHook {
             hooks.add(createOptionalDependenciesRemover(toBeRemoved));
         }
         return hooks.isEmpty() ? null : new ReadPackageHook(hooks);
+    }
+
+    static ReadPackageHook packageExtender(Map<String, @Nullable Object> packageExtensions) {
+        return new ReadPackageHook(Collections.singletonList(createPackageExtender(packageExtensions)));
+    }
+
+    static ReadPackageHook versionsOverrider(List<ParseOverrides.VersionOverride> overrides, String rootDir) {
+        return new ReadPackageHook(Collections.singletonList(createVersionsOverrider(overrides, rootDir)));
+    }
+
+    static ReadPackageHook optionalDependenciesRemover(List<String> toBeRemoved) {
+        return new ReadPackageHook(Collections.singletonList(createOptionalDependenciesRemover(toBeRemoved)));
     }
 
     /**
@@ -168,7 +181,8 @@ final class ReadPackageHook {
             }
             for (Object[] extension : extensions) {
                 String range = (String) extension[1];
-                if (range != null && !NodeSemver.satisfies(manifest.get("version"), range, NodeSemver.Options.DEFAULT)) {
+                if (range != null &&
+                    !NodeSemver.satisfies(manifest.get("version"), range, NodeSemver.Options.DEFAULT)) {
                     continue;
                 }
                 if (!(extension[0] instanceof Map)) {
@@ -280,15 +294,18 @@ final class ReadPackageHook {
         };
     }
 
-    private static void overrideDeps(List<VersionOverride> versionOverrides, List<VersionOverride> genericVersionOverrides,
+    private static void overrideDeps(List<VersionOverride> versionOverrides,
+                                     List<VersionOverride> genericVersionOverrides,
                                      @Nullable String dir, Map<String, @Nullable Object> deps,
                                      @Nullable Map<String, @Nullable Object> peerDeps) {
         Map<String, @Nullable Object> source = peerDeps != null ? peerDeps : deps;
         for (String name : new ArrayList<>(Js.keys(source))) {
             String bareSpecifier = Js.string(source.get(name));
-            VersionOverride versionOverride = pickMostSpecificVersionOverride(matching(versionOverrides, name, bareSpecifier));
+            VersionOverride versionOverride = pickMostSpecificVersionOverride(
+                    matching(versionOverrides, name, bareSpecifier));
             if (versionOverride == null) {
-                versionOverride = pickMostSpecificVersionOverride(matching(genericVersionOverrides, name, bareSpecifier));
+                versionOverride = pickMostSpecificVersionOverride(
+                        matching(genericVersionOverrides, name, bareSpecifier));
             }
             if (versionOverride == null) {
                 continue;
@@ -368,9 +385,10 @@ final class ReadPackageHook {
             if (!(optionalDependencies instanceof Map)) {
                 return manifest;
             }
-            for (String optionalDependency : new ArrayList<>(Js.keys((Map<String, @Nullable Object>) optionalDependencies))) {
+            Map<String, @Nullable Object> optional = (Map<String, @Nullable Object>) optionalDependencies;
+            for (String optionalDependency : new ArrayList<>(Js.keys(optional))) {
                 if (matches(matchers, optionalDependency)) {
-                    ((Map<String, @Nullable Object>) optionalDependencies).remove(optionalDependency);
+                    optional.remove(optionalDependency);
                     Object dependencies = manifest.get("dependencies");
                     if (dependencies instanceof Map) {
                         ((Map<String, @Nullable Object>) dependencies).remove(optionalDependency);

@@ -65,8 +65,8 @@ final class Catalogs {
         Object named = workspaceManifest.get("catalogs");
         if (catalog != null && named instanceof Map && ((Map<String, Object>) named).get("default") != null) {
             throw new PnpmError("INVALID_CATALOGS_CONFIGURATION",
-                    "The 'default' catalog was defined multiple times. Use the 'catalog' field or 'catalogs.default', " +
-                    "but not both.");
+                    "The 'default' catalog was defined multiple times. " +
+                    "Use the 'catalog' field or 'catalogs.default', but not both.");
         }
         catalogs.put("default", (Map<String, @Nullable Object>) catalog);
         if (named instanceof Map) {
@@ -119,7 +119,8 @@ final class Catalogs {
             return new Resolution("misconfiguration", catalogName, null, new PnpmError(
                     "CATALOG_ENTRY_INVALID_SPEC",
                     "The entry for '" + alias + "' in catalog '" + catalogName + "' declares a dependency using the '" +
-                    protocolOfLookup + "' protocol. This is not yet supported, but may be in a future version of pnpm."));
+                    protocolOfLookup + "' protocol. " +
+                    "This is not yet supported, but may be in a future version of pnpm."));
         }
         return new Resolution("found", catalogName, lookup, null);
     }

@@ -78,7 +78,8 @@ final class LockfileReader {
                 hadConflicts = false;
             } catch (JsYaml.YamlException | LockfileFormatConverters.TypeError e) {
                 if (!isDiff(lockfileRawContent)) {
-                    throw new IgnoredLockfile("The lockfile at \"" + WANTED_LOCKFILE + "\" is broken: " + e.getMessage());
+                    throw new IgnoredLockfile("The lockfile at \"" + WANTED_LOCKFILE + "\" is broken: " +
+                                              e.getMessage());
                 }
                 hadConflicts = true;
                 lockfile = autofixMergeConflicts(lockfileRawContent);
@@ -117,7 +118,7 @@ final class LockfileReader {
     }
 
     static String stripBom(String s) {
-        return !s.isEmpty() && s.charAt(0) == '﻿' ? s.substring(1) : s;
+        return !s.isEmpty() && s.charAt(0) == '\uFEFF' ? s.substring(1) : s;
     }
 
     /**

@@ -176,7 +176,8 @@ public final class PnpmLockRegenerator {
         }
 
         boolean pruneLockfileImporters = workspace;
-        Map<String, Map<String, Verification.Project>> workspacePackages = workspace ? workspacePackages(projects) : null;
+        Map<String, Map<String, Verification.Project>> workspacePackages = workspace ?
+                workspacePackages(projects) : null;
         String reason = null;
         if (read.isHadConflicts()) {
             reason = "merge conflicts";
@@ -224,7 +225,8 @@ public final class PnpmLockRegenerator {
     }
 
     // arrayOfWorkspacePackagesToMap: each project by name, then version
-    private static Map<String, Map<String, Verification.Project>> workspacePackages(List<Verification.Project> projects) {
+    private static Map<String, Map<String, Verification.Project>> workspacePackages(
+            List<Verification.Project> projects) {
         Map<String, Map<String, Verification.Project>> packages = new LinkedHashMap<>();
         for (Verification.Project project : projects) {
             Object name = project.getManifest().get("name");

@@ -91,7 +91,8 @@ final class SettingsChecker {
                 sorted(settings.getIgnoredOptionalDependencies()))) {
             return "ignoredOptionalDependencies";
         }
-        if (!Js.equals(orEmptyObject(lockfile.getPatchedDependencies()), orEmptyObject(settings.getPatchedDependencies()))) {
+        if (!Js.equals(orEmptyObject(lockfile.getPatchedDependencies()),
+                orEmptyObject(settings.getPatchedDependencies()))) {
             return "patchedDependencies";
         }
         Object lockSettings = lockfile.getSettings();
@@ -107,7 +108,8 @@ final class SettingsChecker {
             return "settings.excludeLinksFromLockfile";
         }
         Object peersSuffixMaxLength = setting(lockSettings, "peersSuffixMaxLength");
-        if (peersSuffixMaxLength != null && !Js.strictEquals(peersSuffixMaxLength, settings.getPeersSuffixMaxLength()) ||
+        if (peersSuffixMaxLength != null &&
+            !Js.strictEquals(peersSuffixMaxLength, settings.getPeersSuffixMaxLength()) ||
             peersSuffixMaxLength == null && !Js.strictEquals(settings.getPeersSuffixMaxLength(), 1000.0)) {
             return "settings.peersSuffixMaxLength";
         }

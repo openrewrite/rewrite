@@ -278,6 +278,107 @@ final class Js {
     }
 
     /**
+     * {@code JSON.stringify} without indentation; {@code "undefined"} for a value it does not serialize, as a
+     * template literal prints its result.
+     */
+    static String jsonStringify(@Nullable Object value) {
+        if (value == JsYaml.UNDEFINED) {
+            return "undefined";
+        }
+        StringBuilder out = new StringBuilder();
+        stringify(value, out);
+        return out.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void stringify(@Nullable Object value, StringBuilder out) {
+        if (value == null) {
+            out.append("null");
+        } else if (value instanceof String) {
+            quote((String) value, out);
+        } else if (value instanceof Boolean) {
+            out.append(value);
+        } else if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            out.append(Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d));
+        } else if (value instanceof JsYaml.Timestamp) {
+            quote(((JsYaml.Timestamp) value).toIsoString(), out);
+        } else if (value instanceof List) {
+            out.append('[');
+            List<?> list = (List<?>) value;
+            for (int i = 0; i < list.size(); i++) {
+                if (i > 0) {
+                    out.append(',');
+                }
+                Object item = list.get(i);
+                stringify(item == JsYaml.UNDEFINED ? null : item, out);
+            }
+            out.append(']');
+        } else if (value instanceof Map) {
+            out.append('{');
+            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) value;
+            boolean first = true;
+            for (String key : keys(map)) {
+                Object member = map.get(key);
+                if (member == JsYaml.UNDEFINED) {
+                    continue;
+                }
+                if (!first) {
+                    out.append(',');
+                }
+                first = false;
+                quote(key, out);
+                out.append(':');
+                stringify(member, out);
+            }
+            out.append('}');
+        } else {
+            out.append("{}");
+        }
+    }
+
+    private static void quote(String s, StringBuilder out) {
+        out.append('"');
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"':
+                    out.append("\\\"");
+                    break;
+                case '\\':
+                    out.append("\\\\");
+                    break;
+                case '\b':
+                    out.append("\\b");
+                    break;
+                case '\f':
+                    out.append("\\f");
+                    break;
+                case '\n':
+                    out.append("\\n");
+                    break;
+                case '\r':
+                    out.append("\\r");
+                    break;
+                case '\t':
+                    out.append("\\t");
+                    break;
+                default:
+                    boolean loneSurrogate = Character.isHighSurrogate(c) &&
+                                            (i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1))) ||
+                                            Character.isLowSurrogate(c) &&
+                                            (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1)));
+                    if (c < 0x20 || loneSurrogate) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+            }
+        }
+        out.append('"');
+    }
+
+    /**
      * {@code typeof}.
      */
     static String typeOf(@Nullable Object value) {

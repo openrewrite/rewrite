@@ -357,8 +357,9 @@ final class PnpmScenarios {
         private static List<String> importerIds(String lock) {
             try {
                 Object file = JsYaml.load(lock);
-                if (file instanceof Map && ((Map<String, Object>) file).get("importers") instanceof Map) {
-                    return new ArrayList<>(((Map<String, Object>) ((Map<String, Object>) file).get("importers")).keySet());
+                Object importers = file instanceof Map ? ((Map<String, Object>) file).get("importers") : null;
+                if (importers instanceof Map) {
+                    return new ArrayList<>(((Map<String, Object>) importers).keySet());
                 }
             } catch (RuntimeException ignored) {
                 // a lock that does not load places no member

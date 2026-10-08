@@ -37,7 +37,8 @@ import java.util.regex.Pattern;
  */
 final class LockfileFormatConverters {
 
-    private static final Pattern LOCAL_TARBALL_RE = Pattern.compile("\\.(?:tgz|tar\\.gz|tar)\\z", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LOCAL_TARBALL_RE = Pattern.compile("\\.(?:tgz|tar\\.gz|tar)\\z",
+            Pattern.CASE_INSENSITIVE);
 
     private static final List<String> SNAPSHOT_KEYS = Arrays.asList("dependencies", "optionalDependencies",
             "transitivePeerDependencies", "optional", "id");
@@ -217,7 +218,8 @@ final class LockfileFormatConverters {
                     throw new TypeError("Cannot convert undefined or null to object");
                 }
                 String pkgId = DepPath.removeSuffix(depPath);
-                Object info = filePackages instanceof Map ? ((Map<String, @Nullable Object>) filePackages).get(pkgId) : null;
+                Object info = filePackages instanceof Map ?
+                        ((Map<String, @Nullable Object>) filePackages).get(pkgId) : null;
                 PackageSnapshot snapshot = new PackageSnapshot();
                 assign(snapshot, objectAt(pkg, "snapshots." + depPath), "snapshots." + depPath);
                 if (info != null) {
@@ -306,7 +308,8 @@ final class LockfileFormatConverters {
         return result;
     }
 
-    private static Map<String, @Nullable Object> convertProjectSnapshotToInlineSpecifiersFormat(ProjectSnapshot projectSnapshot) {
+    private static Map<String, @Nullable Object> convertProjectSnapshotToInlineSpecifiersFormat(
+            ProjectSnapshot projectSnapshot) {
         Map<String, @Nullable Object> rest = new LinkedHashMap<>();
         if (projectSnapshot.getDependenciesMeta() != null) {
             rest.put("dependenciesMeta", projectSnapshot.getDependenciesMeta());

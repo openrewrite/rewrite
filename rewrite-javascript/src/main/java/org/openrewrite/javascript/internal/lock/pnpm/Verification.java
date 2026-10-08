@@ -68,7 +68,8 @@ final class Verification {
             if (!(catalog.getValue() instanceof Map)) {
                 continue;
             }
-            for (Map.Entry<String, @Nullable Object> entry : ((Map<String, @Nullable Object>) catalog.getValue()).entrySet()) {
+            Map<String, @Nullable Object> entries = (Map<String, @Nullable Object>) catalog.getValue();
+            for (Map.Entry<String, @Nullable Object> entry : entries.entrySet()) {
                 Object specifier = entry.getValue() instanceof Map ?
                         ((Map<String, @Nullable Object>) entry.getValue()).get("specifier") : null;
                 Map<String, @Nullable Object> config = catalogsConfig.get(catalog.getKey());
@@ -81,7 +82,8 @@ final class Verification {
         return true;
     }
 
-    static boolean allProjectsAreUpToDate(List<Project> projects, Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
+    static boolean allProjectsAreUpToDate(List<Project> projects,
+                                          Map<String, @Nullable Map<String, @Nullable Object>> catalogs,
                                           boolean autoInstallPeers, boolean excludeLinksFromLockfile,
                                           boolean linkWorkspacePackages, LockfileObject wantedLockfile,
                                           @Nullable Map<String, Map<String, Project>> workspacePackages,
@@ -154,15 +156,21 @@ final class Verification {
                                         specsDiff.display());
         }
         Object publishConfig = pkg.get("publishConfig");
-        Object directory = publishConfig instanceof Map ? ((Map<String, @Nullable Object>) publishConfig).get("directory") :
-                null;
+        Object directory = publishConfig instanceof Map ?
+                ((Map<String, @Nullable Object>) publishConfig).get("directory") : null;
         if (!Js.strictEquals(importer.getPublishDirectory(), directory)) {
-            return new Satisfies(false, "\"publishDirectory\" in the lockfile doesn't match \"publishConfig.directory\"");
+            return new Satisfies(false, "\"publishDirectory\" in the lockfile (" +
+                                        orUndefined(importer.getPublishDirectory()) +
+                                        ") doesn't match \"publishConfig.directory\" in package.json (" +
+                                        orUndefined(directory) + ")");
         }
         Object dependenciesMeta = pkg.get("dependenciesMeta");
         if (!Js.equals(dependenciesMeta == null ? new LinkedHashMap<>() : dependenciesMeta,
                 importer.getDependenciesMeta() == null ? new LinkedHashMap<>() : importer.getDependenciesMeta())) {
-            return new Satisfies(false, "importer dependencies meta doesn't match package manifest dependencies meta");
+            return new Satisfies(false, "importer dependencies meta (" + Js.jsonStringify(
+                    importer.getDependenciesMeta() == null ? JsYaml.UNDEFINED : importer.getDependenciesMeta()) +
+                    ") doesn't match package manifest dependencies meta (" +
+                    Js.jsonStringify(dependenciesMeta == null ? JsYaml.UNDEFINED : dependenciesMeta) + ")");
         }
         for (String depField : ProjectSnapshot.DEPENDENCIES_FIELDS) {
             Map<String, @Nullable String> importerDeps = importer.field(depField) == null ? new LinkedHashMap<>() :
@@ -184,14 +192,15 @@ final class Verification {
                 pkgDepNames.add(depName);
             }
             if (pkgDepNames.size() != importerDeps.size() && pkgDepNames.size() != countOfNonLinkedDeps(importerDeps)) {
-                return new Satisfies(false, "\"" + depField + "\" in the lockfile doesn't match the same field in " +
-                                            "package.json");
+                return new Satisfies(false, "\"" + depField + "\" in the lockfile (" + Js.jsonStringify(importerDeps) +
+                                            ") doesn't match the same field in package.json (" +
+                                            Js.jsonStringify(pkgDeps) + ")");
             }
             for (String depName : pkgDepNames) {
                 String specifier = importer.getSpecifiers().get(depName);
                 if (!Js.truthy(importerDeps.get(depName)) || !Js.strictEquals(specifier, pkgDeps.get(depName))) {
-                    return new Satisfies(false, "importer " + depField + "." + depName + " specifier " + specifier +
-                                                " don't match package manifest specifier (" +
+                    return new Satisfies(false, "importer " + depField + "." + depName + " specifier " +
+                                                orUndefined(specifier) + " don't match package manifest specifier (" +
                                                 Js.string(pkgDeps.get(depName)) + ")");
                 }
                 if (specifier == null || NodeSemver.validRange(specifier, NodeSemver.Options.DEFAULT) == null) {
@@ -207,6 +216,10 @@ final class Verification {
             }
         }
         return new Satisfies(true, null);
+    }
+
+    private static String orUndefined(@Nullable Object value) {
+        return value == null ? "undefined" : Js.string(value);
     }
 
     private static int countOfNonLinkedDeps(Map<String, @Nullable String> lockfileDeps) {
@@ -354,7 +367,8 @@ final class Verification {
                 String currentSpec = Js.string(currentSpecValue);
                 String lockfileRef = lockfileDeps.get(depName);
                 if (lockfileRef == null) {
-                    throw new LockfileFormatConverters.TypeError("Cannot read properties of undefined (reading 'startsWith')");
+                    throw new LockfileFormatConverters.TypeError(
+                            "Cannot read properties of undefined (reading 'startsWith')");
                 }
                 String specifier = snapshot.getSpecifiers().get(depName);
                 if (specifier != null && refIsLocalDirectory(specifier)) {

@@ -94,8 +94,8 @@ final class FindPackages {
         String pattern = glob.startsWith("./") ? glob.substring(2) : glob;
         if (pattern.startsWith("../") || pattern.startsWith("/") ||
             pattern.matches(".*[@!+*?]\\(.*") || pattern.contains("\\")) {
-            throw new CannotKnow("the projects the workspace pattern \"" + glob + "\" matches (tinyglobby is not ported " +
-                                 "beyond *, **, ?, [...] and {a,b})");
+            throw new CannotKnow("the projects the workspace pattern \"" + glob + "\" matches " +
+                                 "(tinyglobby is not ported beyond *, **, ?, [...] and {a,b})");
         }
         StringBuilder regex = new StringBuilder();
         String[] segments = pattern.split("/", -1);

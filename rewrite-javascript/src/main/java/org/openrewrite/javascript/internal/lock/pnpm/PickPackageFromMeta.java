@@ -74,7 +74,8 @@ final class PickPackageFromMeta {
         String name = alias;
         if (bareSpecifier.startsWith("npm:")) {
             bareSpecifier = bareSpecifier.substring(4);
-            if (alias != null && !alias.isEmpty() && NodeSemver.validRange(bareSpecifier, NodeSemver.Options.DEFAULT) != null) {
+            if (alias != null && !alias.isEmpty() &&
+                NodeSemver.validRange(bareSpecifier, NodeSemver.Options.DEFAULT) != null) {
                 name = alias;
             } else {
                 int index = bareSpecifier.lastIndexOf('@');
@@ -152,7 +153,8 @@ final class PickPackageFromMeta {
             @Nullable Instant publishedBy, @Nullable Function<String, @Nullable Object> publishedByExclude,
             Map<String, @Nullable Object> meta, RegistryPackageSpec spec) {
         if (publishedBy != null) {
-            Object excludeResult = publishedByExclude == null ? null : publishedByExclude.apply(Js.string(meta.get("name")));
+            Object excludeResult = publishedByExclude == null ? null :
+                    publishedByExclude.apply(Js.string(meta.get("name")));
             if (!Boolean.TRUE.equals(excludeResult)) {
                 if (meta.get("time") != null) {
                     assertMetaHasTime(meta);
@@ -170,7 +172,8 @@ final class PickPackageFromMeta {
         if ((!(versions instanceof Map) || ((Map<?, ?>) versions).isEmpty()) && publishedBy == null) {
             Object time = meta.get("time");
             Object unpublished = time instanceof Map ? ((Map<String, Object>) time).get("unpublished") : null;
-            Object unpublishedVersions = unpublished instanceof Map ? ((Map<String, Object>) unpublished).get("versions") : null;
+            Object unpublishedVersions = unpublished instanceof Map ?
+                    ((Map<String, Object>) unpublished).get("versions") : null;
             if (unpublishedVersions instanceof List && !((List<?>) unpublishedVersions).isEmpty()) {
                 throw new PnpmError("UNPUBLISHED_PKG", "No versions available for " + spec.getName() +
                                                        " because it was unpublished");
@@ -253,8 +256,8 @@ final class PickPackageFromMeta {
     static @Nullable String pickLowestVersionByVersionRange(VersionRangeOptions options) {
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
-            for (List<String> preferredVersions : prioritizePreferredVersions(options.getMeta(), options.getVersionRange(),
-                    selectors)) {
+            for (List<String> preferredVersions : prioritizePreferredVersions(options.getMeta(),
+                    options.getVersionRange(), selectors)) {
                 String preferredVersion = NodeSemver.minSatisfying(preferredVersions, options.getVersionRange(),
                         NodeSemver.Options.LOOSE);
                 if (preferredVersion != null) {
@@ -279,7 +282,8 @@ final class PickPackageFromMeta {
         Map<String, PreferredVersions.Selector> selectors = options.getPreferredVersionSelectors();
         if (selectors != null && !selectors.isEmpty()) {
             for (List<String> preferredVersions : prioritizePreferredVersions(meta, versionRange, selectors)) {
-                if (latest != null && preferredVersions.contains(latest) && semverSatisfiesLoose(latest, versionRange)) {
+                if (latest != null && preferredVersions.contains(latest) &&
+                    semverSatisfiesLoose(latest, versionRange)) {
                     return latest;
                 }
                 String preferredVersion = NodeSemver.maxSatisfying(preferredVersions, versionRange,
@@ -319,8 +323,9 @@ final class PickPackageFromMeta {
     }
 
     @SuppressWarnings("unchecked")
-    static List<List<String>> prioritizePreferredVersions(Map<String, @Nullable Object> meta, String versionRange,
-                                                          Map<String, PreferredVersions.Selector> preferredVerSelectors) {
+    static List<List<String>> prioritizePreferredVersions(
+            Map<String, @Nullable Object> meta, String versionRange,
+            Map<String, PreferredVersions.Selector> preferredVerSelectors) {
         Map<String, Long> versionsPrioritizer = new LinkedHashMap<>();
         for (String version : versionKeys(meta)) {
             if (semverSatisfiesLoose(version, versionRange)) {
@@ -419,7 +424,8 @@ final class PickPackageFromMeta {
             for (String candidate : Js.keys(versionsWithinDate)) {
                 String parsed = NodeSemver.valid(candidate, NodeSemver.Options.LOOSE);
                 if (parsed == null ||
-                    !"latest".equals(tag) && Long.parseLong(parsed.substring(0, parsed.indexOf('.'))) != originalMajor ||
+                    !"latest".equals(tag) &&
+                    Long.parseLong(parsed.substring(0, parsed.indexOf('.'))) != originalMajor ||
                     parsed.contains("-") != originalIsPrerelease) {
                     continue;
                 }

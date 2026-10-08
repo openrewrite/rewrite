@@ -96,7 +96,8 @@ final class PickPackage {
     }
 
     static @Nullable Map<String, @Nullable Object> pickRespectingMinReleaseAge(
-            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec, Map<String, @Nullable Object> meta) {
+            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
+            Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> {
             Map<String, @Nullable Object> highest = pickHighest(pickerOpts.getPreferredVersionSelectors(),
                     pickerOpts.getPublishedBy(), pickerOpts.getPublishedByExclude(), meta, targetSpec);
@@ -108,7 +109,8 @@ final class PickPackage {
     }
 
     static @Nullable Map<String, @Nullable Object> pickIgnoringReleaseAge(
-            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec, Map<String, @Nullable Object> meta) {
+            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
+            Map<String, @Nullable Object> meta) {
         return runPicker(pickerOpts, spec, targetSpec -> pickerOpts.isPickLowestVersion() ?
                 pickLowest(pickerOpts.getPreferredVersionSelectors(), pickerOpts.getPublishedBy(),
                         pickerOpts.getPublishedByExclude(), meta, targetSpec) :
@@ -117,7 +119,8 @@ final class PickPackage {
     }
 
     static @Nullable Map<String, @Nullable Object> pickMatchingVersionFast(
-            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec, Map<String, @Nullable Object> meta) {
+            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
+            Map<String, @Nullable Object> meta) {
         return pickerOpts.getPublishedBy() != null ? pickRespectingMinReleaseAge(pickerOpts, spec, meta) :
                 pickIgnoringReleaseAge(pickerOpts, spec, meta);
     }
@@ -127,7 +130,8 @@ final class PickPackage {
      * {@code minimumReleaseAgeIgnoreMissingTime}, the age policy is skipped (pnpm warns).
      */
     static @Nullable Map<String, @Nullable Object> pickMatchingVersionFinal(
-            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec, Map<String, @Nullable Object> meta) {
+            PickerOptions pickerOpts, PickPackageFromMeta.RegistryPackageSpec spec,
+            Map<String, @Nullable Object> meta) {
         try {
             return pickMatchingVersionFast(pickerOpts, spec, meta);
         } catch (PnpmError e) {

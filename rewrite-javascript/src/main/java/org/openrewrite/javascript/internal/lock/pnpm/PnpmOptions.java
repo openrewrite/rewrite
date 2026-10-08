@@ -133,9 +133,9 @@ final class PnpmOptions {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, @Nullable Object> getOptionsFromPnpmSettings(Map<String, @Nullable Object> pnpmSettings,
-                                                                          @Nullable Map<String, @Nullable Object> manifest,
-                                                                          @Nullable Map<String, String> env) {
+    private static Map<String, @Nullable Object> getOptionsFromPnpmSettings(
+            Map<String, @Nullable Object> pnpmSettings, @Nullable Map<String, @Nullable Object> manifest,
+            @Nullable Map<String, String> env) {
         Map<String, @Nullable Object> settings = new LinkedHashMap<>();
         for (String key : Js.keys(pnpmSettings)) {
             Object value = pnpmSettings.get(key);
@@ -204,7 +204,7 @@ final class PnpmOptions {
             return Js.string(newSpec);
         }
         throw new PnpmError("CANNOT_RESOLVE_OVERRIDE_VERSION", "Cannot resolve version " + spec +
-                                                               " in overrides. The direct dependencies don't have dependency \"" + dependencyName + "\".");
+                " in overrides. The direct dependencies don't have dependency \"" + dependencyName + "\".");
     }
 
     /**

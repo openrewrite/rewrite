@@ -100,7 +100,8 @@ class PnpmLockRoundTripTest {
               .isEqualTo(lock.getText());
             return;
         }
-        boolean resolves = log != null && (log.contains("Progress: resolved") || log.contains("Merge conflict detected"));
+        boolean resolves = log != null &&
+                           (log.contains("Progress: resolved") || log.contains("Merge conflict detected"));
         if (resolves) {
             assertThat(install.getResolution()).as("pnpm resolves on this install").isNotNull();
             if (!install.isLockfileHadConflicts()) {
@@ -145,7 +146,8 @@ class PnpmLockRoundTripTest {
         for (String line : log.split("\n")) {
             Matcher m = IGNORED.matcher(line);
             if (m.find()) {
-                return m.group(2).replace(m.group(1) + "/" + LockfileReader.WANTED_LOCKFILE, LockfileReader.WANTED_LOCKFILE);
+                return m.group(2).replace(m.group(1) + "/" + LockfileReader.WANTED_LOCKFILE,
+                        LockfileReader.WANTED_LOCKFILE);
             }
         }
         return null;

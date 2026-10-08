@@ -79,7 +79,8 @@ final class ParseOverrides {
         for (String selector : Js.keys(overrides)) {
             String newBareSpecifier = overrides.get(selector);
             PackageSelector[] result = parsePkgAndParentSelector(selector);
-            Catalogs.Resolution resolution = Catalogs.resolveFromCatalog(catalogs, result[1].getName(), newBareSpecifier);
+            Catalogs.Resolution resolution = Catalogs.resolveFromCatalog(catalogs, result[1].getName(),
+                    newBareSpecifier);
             String resolvedCatalog;
             switch (resolution.getType()) {
                 case "found":

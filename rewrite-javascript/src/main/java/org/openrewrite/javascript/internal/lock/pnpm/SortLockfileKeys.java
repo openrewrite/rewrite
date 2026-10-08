@@ -64,7 +64,8 @@ final class SortLockfileKeys {
         for (String section : new String[]{"packages", "snapshots"}) {
             Object entries = lockfile.get(section);
             if (entries instanceof Map) {
-                Map<String, @Nullable Object> sorted = KeySorting.sortDirectKeys((Map<String, @Nullable Object>) entries);
+                Map<String, @Nullable Object> sorted =
+                        KeySorting.sortDirectKeys((Map<String, @Nullable Object>) entries);
                 for (String pkgId : Js.keys(sorted)) {
                     sorted.put(pkgId, sortByPriority(ORDERED_KEYS, sorted.get(pkgId)));
                 }
