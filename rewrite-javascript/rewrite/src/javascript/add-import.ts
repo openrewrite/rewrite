@@ -1,10 +1,10 @@
 import {JavaScriptVisitor} from "./visitor";
 import {ElementRemovalFormatter, emptySpace, isIdentifier, J, NameTree, rightPadded, singleSpace, space, Statement, TrailingComma, Type} from "../java";
-import {JS, JSX} from "./tree";
+import {isObjectBindingPattern, JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
-import {moduleName, packageNameOf, sameModule} from "./package-name";
+import {moduleName, packageNameOf, sameModule, spelledLike} from "./package-name";
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
@@ -1804,6 +1804,45 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
 }
 
+/** A top-level `const … = require('m')` statement, which binds its module the way an import does. */
+export function requireDeclarationOf(statement: J | undefined): J.VariableDeclarations | undefined {
+    return statement?.kind === J.Kind.VariableDeclarations &&
+        requiredModuleOfDeclaration(statement as J.VariableDeclarations) !== undefined
+        ? statement as J.VariableDeclarations
+        : undefined;
+}
+
+function requirePattern(declaration: J.VariableDeclarations): J {
+    return declaration.variables[0].element.name;
+}
+
+/**
+ * The local name `declaration` binds `member` of `module` to, as {@link importBinds} reads an
+ * import. A whole-module require answers both a default and a namespace member, since CommonJS
+ * has no such split.
+ */
+function requireBinds(
+    declaration: J.VariableDeclarations,
+    module: string,
+    member: string | undefined
+): string | undefined {
+    const required = requiredModuleOfDeclaration(declaration);
+    if (required === undefined || !sameModule(required, module)) {
+        return undefined;
+    }
+    const pattern = requirePattern(declaration);
+    const key = memberName(member);
+    if (key === undefined || key === '*') {
+        return isIdentifier(pattern) ? pattern.simpleName : undefined;
+    }
+    return requireBindings(pattern, required).find(b => b.member === key)?.name;
+}
+
+function isOnlyRequired(declaration: J.VariableDeclarations): boolean {
+    const pattern = requirePattern(declaration);
+    return isIdentifier(pattern) || (isObjectBindingPattern(pattern) && pattern.bindings.elements.length === 1);
+}
+
 /**
  * The local name `jsImport` binds `member` of `module` to, or `undefined` where it binds
  * something else. `'default'` and an absent `member` both mean the default import, matching
@@ -1936,11 +1975,14 @@ export interface ExistingImportBinding {
 
     /** Whether the clause or the specifier itself is marked `type`. */
     typeOnly: boolean;
+
+    /** Whether a top-level `require` declaration binds it rather than an import. */
+    required: boolean;
 }
 
 /**
- * The existing binding for `member` of `module`, read from `cu`'s own import statements — what
- * `maybeRebind` reads before committing to a `RebindImport` edit.
+ * The existing binding for `member` of `module`, read from `cu`'s own import statements and
+ * top-level `require` declarations — what `maybeRebind` reads before committing to a `RebindImport` edit.
  */
 export function existingImportBinding(
     cu: JS.CompilationUnit,
@@ -1949,6 +1991,17 @@ export function existingImportBinding(
 ): ExistingImportBinding | undefined {
     for (const stmt of cu.statements) {
         const element = stmt.element;
+        const declaration = requireDeclarationOf(element);
+        const required = declaration && requireBinds(declaration, module, member);
+        if (required !== undefined) {
+            return {
+                localName: required,
+                onlyMemberOfStatement: isOnlyRequired(declaration!),
+                aliased: required !== memberName(member),
+                typeOnly: false,
+                required: true
+            };
+        }
         if (element?.kind !== JS.Kind.Import) {
             continue;
         }
@@ -1958,7 +2011,8 @@ export function existingImportBinding(
                 localName,
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
                 aliased: localName !== memberName(member),
-                typeOnly: bindsTypeOnly(element as JS.Import, member)
+                typeOnly: bindsTypeOnly(element as JS.Import, member),
+                required: false
             };
         }
     }
@@ -2117,7 +2171,10 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
     private cu?: JS.CompilationUnit;
     private dropped?: UUID;
     private droppedQuote?: QuoteChar;
+    private droppedModule?: string;
     private movedTypes!: MovedTypes;
+
+    private required?: GivenUp;
 
     private get renaming(): boolean {
         return this.boundName !== this.localName;
@@ -2128,28 +2185,39 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const imports = cu.statements
             .filter(s => s.element?.kind === JS.Kind.Import)
             .map(s => s.element as JS.Import);
+        const requires = cu.statements.flatMap(s => requireDeclarationOf(s.element) ?? []);
         const ofModule = imports.filter(imp => {
             const module = importedModule(imp);
             return module !== undefined && sameModule(module, this.from.module);
         });
+        const requiresOfModule = requires.filter(d => sameModule(requiredModuleOfDeclaration(d)!, this.from.module));
         const fromPackage = packageOf(this.from.module);
         const member = declaredMember(this.from);
         this.movedTypes = new MovedTypes(this.from, this.to, {
-            module: ofModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)),
+            module: ofModule.length + requiresOfModule.length > 1 || ofModule.some(imp => !isOnlyMember(imp)) ||
+                requiresOfModule.some(d => !isOnlyRequired(d)),
             // Same-named classes from two subpaths of one package share a name.
             className: member !== undefined && imports.filter(imp => {
                 const module = importedModule(imp);
                 return module !== undefined && packageOf(module) === fromPackage &&
                     importBinds(imp, module, member) !== undefined;
+            }).length + requires.filter(d => {
+                const module = requiredModuleOfDeclaration(d)!;
+                return packageOf(module) === fromPackage && requireBinds(d, module, member) !== undefined;
             }).length > 1
         });
         let visited = await super.visitJsCompilationUnit(cu, p) as JS.CompilationUnit;
         if (this.dropped !== undefined) {
             visited = withoutStatement(visited, this.dropped);
         }
+        if (this.required !== undefined) {
+            return placeRequired(visited, this.required);
+        }
         if (!this.transformedInPlace) {
             bindImport(this, {
-                module: this.to.module,
+                module: this.droppedModule === undefined
+                    ? this.to.module
+                    : spelledLike(this.to.module, this.droppedModule),
                 member: this.to.member,
                 alias: this.boundName,
                 typeOnly: this.typeOnly,
@@ -2182,17 +2250,14 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (replacesStatement(cu, jsImport, this.from, this.to, this.typeOnly)) {
             this.dropped = imp.id;
             this.droppedQuote = quoteOf(imp.moduleSpecifier?.element);
+            this.droppedModule = importedModule(imp);
             return imp;
         }
 
         this.transformedInPlace = true;
         return produce(imp, draft => {
             const literal = draft.moduleSpecifier!.element as Draft<J.Literal>;
-            literal.value = this.to.module;
-            const originalSource = literal.valueSource || `"${this.from.module}"`;
-            const quoteChar = originalSource.startsWith("'") ? "'" : '"';
-            literal.valueSource = `${quoteChar}${this.to.module}${quoteChar}`;
-            literal.unicodeEscapes = undefined;
+            respecify(literal, spelledLike(this.to.module, String(literal.value)));
 
             // A default or namespace import carries its local name on the clause itself; a named
             // one states the member alongside it, in the specifier.
@@ -2204,6 +2269,47 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
             }
             rewriteNamedSpecifier(draft.importClause, key, memberName(this.to.member) ?? key, this.boundName);
         });
+    }
+
+    override async visitVariableDeclarations(declaration: J.VariableDeclarations, p: P): Promise<J | undefined> {
+        const visited = await super.visitVariableDeclarations(declaration, p);
+        if (requireDeclarationOf(declaration) === undefined ||
+            requireBinds(declaration, this.from.module, this.from.member) !== this.localName ||
+            !this.cu?.statements.some(s => s.element === declaration) ||
+            visited?.kind !== J.Kind.VariableDeclarations) {
+            return visited;
+        }
+        // Whatever happens to the statement, it stays a `require`, so no import is bound for it.
+        this.transformedInPlace = true;
+        const rebound = visited as J.VariableDeclarations;
+        const pattern = requirePattern(rebound);
+        const original = requirePattern(declaration);
+        // `localName` was read from the original, so the binding is found there and taken by position.
+        const index = isObjectBindingPattern(original)
+            ? original.bindings.elements.findIndex(e => bindingNames(e.element).some(b => b.name === this.localName))
+            : -1;
+        const binding = movedBinding(pattern, index, declaredMember(this.to), this.boundName);
+        const target = isIdentifier(binding) ? undefined : this.cu.statements.find(s => {
+            const other = requireDeclarationOf(s.element);
+            return other !== undefined && other !== declaration &&
+                sameModule(requiredModuleOfDeclaration(other)!, this.to.module) &&
+                isObjectBindingPattern(requirePattern(other));
+        })?.element;
+        const module = spelledLike(this.to.module, requiredModuleOfDeclaration(declaration)!);
+        const only = isOnlyRequired(declaration);
+        if (target !== undefined) {
+            this.required = {binding: binding as JS.BindingElement, mergeInto: target.id};
+            if (only) {
+                this.dropped = rebound.id;
+                return rebound;
+            }
+        } else if (only) {
+            return withRequire(rebound, module, holding(pattern, binding));
+        } else {
+            const copy = withFreshIds(withRequire(rebound, module, holding(pattern, binding)));
+            this.required = {binding: binding as JS.BindingElement, split: {after: rebound.id, declaration: copy}};
+        }
+        return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
@@ -2329,6 +2435,180 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         }
         return super.visitPropertyAssignment(propertyAssignment, p);
     }
+}
+
+/** Points `literal` at `module`, keeping its quotes. */
+function respecify(literal: Draft<J.Literal>, module: string): void {
+    const quoteChar = (literal.valueSource ?? '"').startsWith("'") ? "'" : '"';
+    literal.value = module;
+    literal.valueSource = `${quoteChar}${module}${quoteChar}`;
+    literal.unicodeEscapes = undefined;
+}
+
+function withPattern(declaration: J.VariableDeclarations, pattern: J): J.VariableDeclarations {
+    return produce(declaration, draft => {
+        draft.variables[0].element.name = pattern as Draft<J.VariableDeclarations.NamedVariable["name"]>;
+    });
+}
+
+/** `declaration` requiring `module` into `pattern`. */
+function withRequire(declaration: J.VariableDeclarations, module: string, pattern: J): J.VariableDeclarations {
+    return produce(withPattern(declaration, pattern), draft => {
+        const call = draft.variables[0].element.initializer!.element as Draft<J.MethodInvocation>;
+        respecify(call.arguments.elements[0].element as Draft<J.Literal>, module);
+    });
+}
+
+/**
+ * The binding a require's `pattern` gives up, shaped for `member` of its target under `boundName`:
+ * a name for a whole module, a destructured element for a member. An element keeps a default it has.
+ */
+function movedBinding(
+    pattern: J,
+    index: number,
+    member: string | undefined,
+    boundName: string
+): J.Identifier | JS.BindingElement {
+    const element = isObjectBindingPattern(pattern)
+        ? pattern.bindings.elements[index].element as JS.BindingElement
+        : undefined;
+    const name = {...(element?.name ?? pattern) as J.Identifier, simpleName: boundName};
+    if (member === undefined) {
+        return name;
+    }
+    const base: JS.BindingElement = element ?? {
+        kind: JS.Kind.BindingElement,
+        id: randomId(),
+        prefix: emptySpace,
+        markers: emptyMarkers,
+        name
+    };
+    if (member === boundName) {
+        return {...base, propertyName: undefined, name: {...name, prefix: emptySpace}};
+    }
+    // A property name stands for no binding, so a new one carries no attribution.
+    const propertyName = base.propertyName?.element ??
+        {...name, id: randomId(), prefix: emptySpace, type: undefined, fieldType: undefined};
+    return {
+        ...base,
+        propertyName: rightPadded({...propertyName, simpleName: member} as J.Identifier,
+            base.propertyName?.after ?? emptySpace),
+        name: {...name, prefix: base.propertyName ? name.prefix : singleSpace}
+    };
+}
+
+/** `pattern`, the binding a require declares, reduced to `binding` alone in its place. */
+function holding(pattern: J, binding: J.Identifier | JS.BindingElement): J {
+    if (isIdentifier(binding)) {
+        return {...binding, prefix: pattern.prefix};
+    }
+    if (isObjectBindingPattern(pattern)) {
+        const elements = pattern.bindings.elements;
+        const last = elements[elements.length - 1];
+        return {
+            ...pattern,
+            bindings: {
+                ...pattern.bindings,
+                elements: [{...last, element: {...binding, prefix: elements[0].element.prefix}}]
+            }
+        } as JS.ObjectBindingPattern;
+    }
+    return {
+        kind: JS.Kind.ObjectBindingPattern,
+        id: randomId(),
+        prefix: pattern.prefix,
+        markers: emptyMarkers,
+        leadingAnnotations: [],
+        modifiers: [],
+        bindings: {
+            kind: J.Kind.Container,
+            before: emptySpace,
+            elements: [rightPadded(binding, emptySpace)],
+            markers: emptyMarkers
+        }
+    } as JS.ObjectBindingPattern;
+}
+
+/** `pattern` without its element at `index`, the space before `}` and a trailing comma carried onto the new last. */
+function withoutElement(pattern: JS.ObjectBindingPattern, index: number): JS.ObjectBindingPattern {
+    const elements = pattern.bindings.elements;
+    const formatter = new ElementRemovalFormatter<J>();
+    const kept: J.RightPadded<J>[] = [];
+    elements.forEach((entry, i) => {
+        if (i === index) {
+            formatter.markRemoved(entry.element);
+        } else {
+            kept.push({...entry, element: formatter.processKept(entry.element)});
+        }
+    });
+    if (index === elements.length - 1) {
+        const removed = elements[index];
+        kept[kept.length - 1] = {...kept[kept.length - 1], after: removed.after, markers: removed.markers};
+    }
+    return {...pattern, bindings: {...pattern.bindings, elements: kept}};
+}
+
+/** `pattern` with `binding` appended, unless it already binds that member under that name. */
+function withElement(pattern: JS.ObjectBindingPattern, binding: JS.BindingElement): JS.ObjectBindingPattern {
+    const bound = bindingNames(binding)[0];
+    if (bindingNames(pattern).some(b => b.name === bound.name && b.member === bound.member)) {
+        return pattern;
+    }
+    const elements = pattern.bindings.elements;
+    const last = elements[elements.length - 1];
+    const prefix = elements.length > 1 ? elements[1].element.prefix : singleSpace;
+    return {
+        ...pattern,
+        bindings: {
+            ...pattern.bindings,
+            elements: [
+                ...elements.slice(0, -1),
+                {...last, after: emptySpace, markers: emptyMarkers},
+                {...last, element: {...binding, prefix}}
+            ]
+        }
+    };
+}
+
+/** Every node of `tree` under a new id, for a statement copied beside its original. Types and markers are shared. */
+function withFreshIds<T>(tree: T): T {
+    if (Array.isArray(tree)) {
+        return tree.map(withFreshIds) as T;
+    }
+    if (tree === null || typeof tree !== 'object') {
+        return tree;
+    }
+    const copy: any = {};
+    for (const [key, value] of Object.entries(tree)) {
+        copy[key] = key === 'id' ? randomId() : sharedKeys.has(key) ? value : withFreshIds(value);
+    }
+    return copy;
+}
+
+const sharedKeys = new Set(['markers', 'type', 'fieldType', 'methodType', 'variableType', 'javaType']);
+
+/** The binding a `require` gave up, for the target's require to take in or a new statement after its own. */
+interface GivenUp {
+    binding: JS.BindingElement;
+    mergeInto?: UUID;
+    split?: {after: UUID; declaration: J.VariableDeclarations};
+}
+
+/** `cu` with the binding a require gave up placed in its new home. */
+function placeRequired(cu: JS.CompilationUnit, required: GivenUp): JS.CompilationUnit {
+    const statements = cu.statements.flatMap(stmt => {
+        const element = stmt.element;
+        if (element?.id === required.mergeInto) {
+            const declaration = element as J.VariableDeclarations;
+            const pattern = requirePattern(declaration) as JS.ObjectBindingPattern;
+            return [{...stmt, element: withPattern(declaration, withElement(pattern, required.binding))}];
+        }
+        if (element?.id === required.split?.after) {
+            return [stmt, {...stmt, element: {...required.split!.declaration, prefix: space("\n")}}];
+        }
+        return [stmt];
+    });
+    return {...cu, statements} as JS.CompilationUnit;
 }
 
 /** Rewrites a file's attribution onto the module and member a binding moved to. */

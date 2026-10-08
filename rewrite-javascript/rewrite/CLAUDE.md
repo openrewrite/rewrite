@@ -294,6 +294,18 @@ sees what the rebinds before it left: a statement another rebind emptied, or an 
 target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
 renames only the types naming its own member, so a later rebind still finds its own.
 
+### A rebind of a `require`
+
+Only a top-level `const … = require('m')` declaration binds a module for a rebind. A `require` nested
+in a function or used inline binds nothing it can move. The file stays CommonJS, so a move never
+creates an import. A whole module binds as a name and a member as a destructured element, so
+`const D = require('_stream_duplex')` moved to `stream`'s `Duplex` becomes
+`const {Duplex: D} = require('stream')`. The moved element joins a destructuring `require` of the
+target where there is one. Otherwise it takes over its own statement, or gets a `require` of its own
+right after it where that statement binds other names too.
+
+A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
@@ -315,8 +327,8 @@ The four above that still apply, plus these:
   parameter's own name
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
-- the file binds its modules with `require` and the move would need a new import, because `from`'s
-  statement binds something else too or the two differ in default/namespace/named shape
+- the file binds its modules with `require`, `from` is an ES import, and the move would need a new
+  import, because that import binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.

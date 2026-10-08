@@ -2247,4 +2247,92 @@ describe("a node: specifier and the bare name of its built-in", () => {
             `import {isArray} from 'lodash';\n\nisArray([]);`
         ));
     });
+
+    test("a binding moved to another built-in keeps the node: scheme its import spelled", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "_stream_duplex"}, to: {module: "stream", member: "Duplex"}});
+                maybeRebind(this, {from: {module: "_tls_wrap"}, to: {module: "tls"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import D from 'node:_stream_duplex';\nimport tlsWrap from 'node:_tls_wrap';\n\nnew D(tlsWrap);`,
+            `import tlsWrap from 'node:tls';\nimport {Duplex as D} from 'node:stream';\n\nnew D(tlsWrap);`
+        ));
+    });
+});
+
+describe("maybeRebind on a require", () => {
+    function rebind(from: {module: string; member?: string}, to: {module: string; member?: string}, bound: (string | undefined)[] = []) {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.push(maybeRebind(this, {from, to}));
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        return spec;
+    }
+
+    test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
+        const bound: (string | undefined)[] = [];
+        const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        await spec.rewriteRun(
+            javascript(`const Duplex = require('_stream_duplex');\n\nnew Duplex();`,
+                `const {Duplex} = require('stream');\n\nnew Duplex();`),
+            javascript(`const D = require('node:_stream_duplex');\n\nnew D();`,
+                `const {Duplex: D} = require('node:stream');\n\nnew D();`)
+        );
+        expect(bound).toEqual(["Duplex", "D"]);
+    });
+
+    test("a whole module moves to a whole module, and a member to a member", async () => {
+        await rebind({module: "_tls_wrap"}, {module: "tls"}).rewriteRun(
+            javascript(`const tlsWrap = require('_tls_wrap');\n\ntlsWrap.connect();`,
+                `const tlsWrap = require('tls');\n\ntlsWrap.connect();`));
+        await rebind({module: "_tls_wrap", member: "TLSSocket"}, {module: "tls", member: "TLSSocket"}).rewriteRun(
+            javascript(`const {TLSSocket} = require('_tls_wrap');\n\nnew TLSSocket();`,
+                `const {TLSSocket} = require('tls');\n\nnew TLSSocket();`));
+    });
+
+    test("an unaliased member follows the new member's name, while an aliased one keeps its alias", async () => {
+        const bound: (string | undefined)[] = [];
+        await rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound).rewriteRun(
+            javascript(`const {extend} = require('lodash');\n\nextend({}, {});`,
+                `const {assign} = require('lodash');\n\nassign({}, {});`),
+            javascript(`const {extend: ext} = require('lodash');\n\next({}, {});`,
+                `const {assign: ext} = require('lodash');\n\next({}, {});`)
+        );
+        expect(bound).toEqual(["assign", "ext"]);
+    });
+
+    test("a move merges into an existing require of the target", async () => {
+        await rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}).rewriteRun(
+            javascript(`const {Readable} = require('stream');\nconst Duplex = require('_stream_duplex');\n\nnew Duplex(Readable);`,
+                `const {Readable, Duplex} = require('stream');\n\nnew Duplex(Readable);`));
+        // The target already binds the member under the name the move takes, so only the source goes.
+        await rebind({module: "m", member: "a"}, {module: "n", member: "b"}).rewriteRun(
+            javascript(`const {b} = require('n');\nconst {a} = require('m');\n\nb(a);`,
+                `const {b} = require('n');\n\nb(b);`));
+
+        await rebind({module: "m", member: "b"}, {module: "n", member: "b"}).rewriteRun(
+            javascript(`const {a, b} = require('m');\nconst {c} = require('n');\n\na(b, c);`,
+                `const {a} = require('m');\nconst {c, b} = require('n');\n\na(b, c);`));
+    });
+
+    test("a member leaving a destructuring that binds others gets a require of its own", async () => {
+        await rebind({module: "m", member: "b"}, {module: "n", member: "b"}).rewriteRun(
+            javascript(`const {a, b} = require('m');\n\na(b);`,
+                `const {a} = require('m');\nconst {b} = require('n');\n\na(b);`));
+    });
+
+    test("a require nested in a function binds nothing a rebind moves", async () => {
+        const bound: (string | undefined)[] = [];
+        await rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
+            javascript(`function f() {\n    const Duplex = require('_stream_duplex');\n    return new Duplex();\n}`)
+        );
+        expect(bound).toEqual([undefined]);
+    });
 });

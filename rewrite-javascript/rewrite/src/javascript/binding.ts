@@ -20,7 +20,7 @@ import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, s
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
-    memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
+    memberName, moduleNameOf, nameTaken, RebindImport, requireDeclarationOf, requiredModuleOfDeclaration
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {sameModule} from "./package-name";
@@ -360,8 +360,8 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (existing === undefined) {
         return undefined;
     }
-    // `RebindImport` replaces a statement it cannot rewrite in place, and a CommonJS file can gain no import.
-    if (isCommonJs(cu) &&
+    // `RebindImport` replaces an import it cannot rewrite in place, and a CommonJS file can gain no import.
+    if (isCommonJs(cu) && !existing.required &&
         (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
@@ -438,9 +438,10 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
         }
     };
     const root = new Cursor(cu);
-    // An import or an `export {…}` binds nothing the name could collide with.
+    // An import, a top-level require or an `export {…}` binds nothing the name could collide with.
     cu.statements
-        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration)
+        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration &&
+            requireDeclarationOf(s.element) === undefined)
         .forEach(s => visit(s, root));
     return references;
 }

@@ -31,6 +31,17 @@ export function sameModule(a: string, b: string): boolean {
 }
 
 /**
+ * `module` with the `node:` scheme where `like`, the specifier of another module, spells it.
+ * A file spelling one built-in as `node:x` would spell another the same way.
+ * A respelling of `like` itself is left as asked.
+ */
+export function spelledLike(module: string, like: string): string {
+    return like.startsWith('node:') && !module.startsWith('node:') && isBuiltin(module) && !sameModule(module, like)
+        ? `node:${module}`
+        : module;
+}
+
+/**
  * The package a bare module specifier, or a path below `node_modules`, names. Attribution names a
  * type declared in an installed package after it, so `@scope/pkg/sub` gives `@scope/pkg`.
  */
