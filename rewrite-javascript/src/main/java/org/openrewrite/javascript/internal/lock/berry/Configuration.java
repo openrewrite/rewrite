@@ -18,10 +18,15 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 /**
  * Port of @yarnpkg/core sources/Configuration.ts past loading, with its plugins' hooks (Yarn 4.10.3).
@@ -97,35 +102,82 @@ final class Configuration {
         return PackageExtensions.normalizePackage(this, original, getPackageExtensions());
     }
 
-    /**
-     * {@code makeResolver}: the virtual and workspace resolvers, then each plugin's in the order the CLI bundles
-     * the plugins.
-     */
     Resolver makeResolver() {
-        return new MultiResolver(new VirtualResolver(), new WorkspaceResolver(), new ExecResolver(),
-                new TarballFileResolver(), new FileResolver(), new GitResolver(), new TarballHttpResolver(),
-                new JsrResolver(), new LinkResolver(), new PortalResolver(), new NpmRemapResolver(),
-                new NpmSemverResolver(), new NpmTagResolver(), new PatchResolver());
+        List<Resolver> resolvers = new ArrayList<>();
+        resolvers.add(new VirtualResolver());
+        resolvers.add(new WorkspaceResolver());
+        for (String plugin : release.getPlugins()) {
+            resolvers.addAll(resolvers(plugin));
+        }
+        return new MultiResolver(resolvers.toArray(new Resolver[0]));
     }
 
     /**
-     * {@code makeFetcher}, as far as the fetchers that reach a lockfile: the workspace fetcher, then each plugin's in
-     * the order the CLI bundles the plugins.
+     * {@code makeFetcher}, as far as the fetchers that reach a lockfile.
      */
     Fetcher makeFetcher() {
-        return new MultiFetcher(new WorkspaceFetcher(), new GitFetcher(), new TarballHttpFetcher(), new JsrFetcher(),
-                new LinkFetcher(), new NpmHttpFetcher(), new NpmSemverFetcher(), new PatchFetcher());
+        List<Fetcher> fetchers = new ArrayList<>();
+        fetchers.add(new WorkspaceFetcher());
+        for (String plugin : release.getPlugins()) {
+            fetchers.addAll(fetchers(plugin));
+        }
+        return new MultiFetcher(fetchers.toArray(new Fetcher[0]));
+    }
+
+    private static List<Resolver> resolvers(String plugin) {
+        switch (plugin) {
+            case "@yarnpkg/plugin-exec":
+                return singletonList(new ExecResolver());
+            case "@yarnpkg/plugin-file":
+                return asList(new TarballFileResolver(), new FileResolver());
+            case "@yarnpkg/plugin-git":
+                return singletonList(new GitResolver());
+            case "@yarnpkg/plugin-http":
+                return singletonList(new TarballHttpResolver());
+            case "@yarnpkg/plugin-jsr":
+                return singletonList(new JsrResolver());
+            case "@yarnpkg/plugin-link":
+                return asList(new LinkResolver(), new PortalResolver());
+            case "@yarnpkg/plugin-npm":
+                return asList(new NpmRemapResolver(), new NpmSemverResolver(), new NpmTagResolver());
+            case "@yarnpkg/plugin-patch":
+                return singletonList(new PatchResolver());
+            default:
+                return emptyList();
+        }
+    }
+
+    private static List<Fetcher> fetchers(String plugin) {
+        switch (plugin) {
+            case "@yarnpkg/plugin-git":
+                return singletonList(new GitFetcher());
+            case "@yarnpkg/plugin-http":
+                return singletonList(new TarballHttpFetcher());
+            case "@yarnpkg/plugin-jsr":
+                return singletonList(new JsrFetcher());
+            case "@yarnpkg/plugin-link":
+                return singletonList(new LinkFetcher());
+            case "@yarnpkg/plugin-npm":
+                return asList(new NpmHttpFetcher(), new NpmSemverFetcher());
+            case "@yarnpkg/plugin-patch":
+                return singletonList(new PatchFetcher());
+            default:
+                return emptyList();
+        }
     }
 
     /**
-     * {@code reduceHook(hooks => hooks.reduceDependency, ...)} over the plugins in order.
+     * {@code reduceHook(hooks => hooks.reduceDependency, ...)} over the core plugin, then the bundled ones in order.
      */
     Descriptor reduceDependency(Descriptor dependency, Project project, Locator locator, Resolver resolver,
                                 Resolver.ResolveOptions opts) {
         Descriptor value = Resolutions.reduceDependency(dependency, project, locator, resolver, opts);
-        value = CompatPatches.reduceDependency(value, release);
-        if (release.isCatalogs()) {
-            value = Catalogs.reduceDependency(value, project, resolver, opts);
+        for (String plugin : release.getPlugins()) {
+            if ("@yarnpkg/plugin-compat".equals(plugin)) {
+                value = CompatPatches.reduceDependency(value, release);
+            } else if ("@yarnpkg/plugin-catalog".equals(plugin)) {
+                value = Catalogs.reduceDependency(value, project, resolver, opts);
+            }
         }
         return value;
     }

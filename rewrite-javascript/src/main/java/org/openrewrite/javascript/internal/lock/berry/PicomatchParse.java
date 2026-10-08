@@ -117,7 +117,14 @@ final class PicomatchParse {
      *                 member of {@code Object.prototype} raises
      */
     static State parse(String input, boolean dot, boolean fastpaths) {
-        return new Parser(input, dot, fastpaths).parse();
+        return parse(input, dot, fastpaths, true);
+    }
+
+    /**
+     * @param posix whether {@code [!} opens a negated class, as under fast-glob's {@code posix: true}
+     */
+    static State parse(String input, boolean dot, boolean fastpaths, boolean posix) {
+        return new Parser(input, dot, fastpaths, posix).parse();
     }
 
     static @Nullable String fastpaths(String input, boolean dot) {
@@ -193,6 +200,7 @@ final class PicomatchParse {
     private static final class Parser {
         private final boolean dot;
         private final boolean fastpaths;
+        private final boolean posix;
         private final State state = new State();
         private final List<Token> tokens = state.tokens;
         private final Token bos = new Token("bos", "", "");
@@ -206,9 +214,10 @@ final class PicomatchParse {
         private Token prev = bos;
         private String value = "";
 
-        Parser(String input, boolean dot, boolean fastpaths) {
+        Parser(String input, boolean dot, boolean fastpaths, boolean posix) {
             this.dot = dot;
             this.fastpaths = fastpaths;
+            this.posix = posix;
             this.nodot = dot ? "" : NO_DOT;
             this.qmarkNoDot = dot ? QMARK : QMARK_NO_DOT;
             String replaced = replacement(input);
@@ -298,7 +307,7 @@ final class PicomatchParse {
                     if ("]".equals(value) && ("[".equals(prev.value) || "[^".equals(prev.value))) {
                         value = "\\" + value;
                     }
-                    if ("!".equals(value) && "[".equals(prev.value)) {
+                    if (posix && "!".equals(value) && "[".equals(prev.value)) {
                         value = "^";
                     }
                     prev.value += value;
@@ -864,7 +873,7 @@ final class PicomatchParse {
                 }
                 String rest = remaining();
                 if (token.inner.contains("*") && !rest.isEmpty() && test(EXTENSION, rest)) {
-                    String expression = new Parser(rest, dot, false).parse().output;
+                    String expression = new Parser(rest, dot, false, posix).parse().output;
                     output = token.close = ")" + expression + ")" + extglobStar + ")";
                 }
             }

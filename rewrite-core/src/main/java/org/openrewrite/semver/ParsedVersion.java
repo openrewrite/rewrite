@@ -80,6 +80,7 @@ final class ParsedVersion {
 
     // Producer backpatches in the OSERA shape, e.g. 2.14.1.1-osera-00001 or 5.2.19.RELEASE-backpatch-00001.
     private static final Pattern BACKPATCH = Pattern.compile("(.+)-(?:osera|backpatch)-\\d+", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NUMERIC = Pattern.compile("[0-9]+");
 
     /**
      * Upper bound on retained entries. Comfortably larger than the distinct version-string working
@@ -396,6 +397,45 @@ final class ParsedVersion {
         }
         // All shared identifiers equal: the longer prerelease list is higher.
         return Integer.compare(strictPrerelease.size(), o.strictPrerelease.size());
+    }
+
+    /**
+     * node-semver's {@code SemVer.compareBuild}: the build identifiers in order, a missing one lowest, the first two
+     * that differ as strings deciding through {@code compareIdentifiers}.
+     */
+    int compareBuild(ParsedVersion o) {
+        for (int i = 0; ; i++) {
+            if (i >= strictBuild.size() && i >= o.strictBuild.size()) {
+                return 0;
+            }
+            if (i >= o.strictBuild.size()) {
+                return 1;
+            }
+            if (i >= strictBuild.size()) {
+                return -1;
+            }
+            String a = strictBuild.get(i);
+            String b = o.strictBuild.get(i);
+            if (!a.equals(b)) {
+                return compareStringIdentifiers(a, b);
+            }
+        }
+    }
+
+    // node-semver compareIdentifiers over two strings: numeric ones as numbers, below any other
+    private static int compareStringIdentifiers(String a, String b) {
+        boolean anum = NUMERIC.matcher(a).matches();
+        boolean bnum = NUMERIC.matcher(b).matches();
+        if (anum && bnum) {
+            return Double.compare(Double.parseDouble(a), Double.parseDouble(b));
+        }
+        if (anum) {
+            return -1;
+        }
+        if (bnum) {
+            return 1;
+        }
+        return a.compareTo(b) < 0 ? -1 : 1;
     }
 
     // node-semver compareIdentifiers: numeric < alphanumeric; numerics compare as numbers, others as ASCII.

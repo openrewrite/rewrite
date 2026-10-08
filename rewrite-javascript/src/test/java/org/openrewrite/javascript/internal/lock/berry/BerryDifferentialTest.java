@@ -196,7 +196,7 @@ class BerryDifferentialTest {
             boolean dot = "1".equals(row[1]);
             String actual;
             try {
-                actual = Picomatch.source(row[0], dot);
+                actual = Picomatch.source(row[0], dot, true);
             } catch (JsError e) {
                 actual = "!" + e;
             }

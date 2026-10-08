@@ -75,10 +75,10 @@ import static org.openrewrite.semver.Semver.Ecosystem.NODE;
  * {@link BunLockRegenerator}, the port of Bun's own install over its lockfile model, Yarn classic through
  * {@link YarnClassicLockRegenerator}, the port of yarn 1's, and Yarn Berry through {@link YarnBerryLockRegenerator},
  * the port of Yarn 4's. pnpm takes the per-dependency flow below until it follows its own resolver: diff the
- * pre-edit and post-edit {@code package.json}, prove each moving dependency leaves the resolved closure unchanged, resolve the target
- * version against the registry, and hand a proven {@link LockEditSet} to the format's {@link LockPatcher};
- * when that proof cannot be made, the whole closure is resolved instead, seeded by the existing lock, and
- * diffed into the same edits.
+ * pre-edit and post-edit {@code package.json}, prove each moving dependency leaves the resolved closure unchanged,
+ * resolve the target version against the registry, and hand a proven {@link LockEditSet} to the format's
+ * {@link LockPatcher}; when that proof cannot be made, the whole closure is resolved instead, seeded by the
+ * existing lock, and diffed into the same edits.
  * <p>
  * Whatever a route cannot express byte-exactly fails loud with a structured {@link Failure} and no lock; there
  * is no shell-out (it would leak registry credentials).

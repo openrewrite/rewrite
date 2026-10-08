@@ -23,8 +23,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/plugin-http sources/TarballHttpResolver.ts and urlUtils.ts (Yarn 4.10.3). A locked tarball
- * resolution persists; a new one needs the tarball.
+ * Port of @yarnpkg/plugin-http sources/TarballHttpResolver.ts and urlUtils.ts (Yarn 4.10.3).
  */
 final class TarballHttpResolver implements Resolver {
 

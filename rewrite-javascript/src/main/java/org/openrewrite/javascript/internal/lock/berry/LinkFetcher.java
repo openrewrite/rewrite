@@ -18,8 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of @yarnpkg/plugin-link sources/LinkFetcher.ts and PortalFetcher.ts (Yarn 4.10.3): a {@code link:} or
- * {@code portal:} package is its directory, with no checksum.
+ * Port of @yarnpkg/plugin-link sources/LinkFetcher.ts and PortalFetcher.ts (Yarn 4.10.3).
  */
 final class LinkFetcher implements Fetcher {
 

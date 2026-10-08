@@ -87,13 +87,29 @@ final class Picomatch {
      *                 {@code Object.prototype} raises in {@code parse}
      */
     static Pattern makeRe(String input, boolean dot) {
-        return toRegex(source(input, dot));
+        return toRegex(source(input, dot, true));
+    }
+
+    /**
+     * micromatch 4.0.5 {@code isMatch(str, pattern)} under its default options.
+     *
+     * @throws JsError picomatch's TypeError for an empty pattern, and {@link #makeRe}'s
+     */
+    static boolean isMatch(String str, String pattern) {
+        if (pattern.isEmpty()) {
+            throw new JsError(JsError.TYPE_ERROR, "Expected pattern to be a non-empty string");
+        }
+        Pattern regex = toRegex(source(pattern, false, false));
+        if (str.isEmpty()) {
+            return false;
+        }
+        return str.equals(pattern) || regex.matcher(str).find();
     }
 
     /**
      * The JavaScript source {@code makeRe} gives {@code new RegExp}.
      */
-    static String source(String input, boolean dot) {
+    static String source(String input, boolean dot, boolean posix) {
         if (input.isEmpty()) {
             throw new JsError(JsError.TYPE_ERROR, "Expected a non-empty string");
         }
@@ -103,7 +119,7 @@ final class Picomatch {
             output = PicomatchParse.fastpaths(input, dot);
         }
         if (output == null || output.isEmpty()) {
-            PicomatchParse.State state = PicomatchParse.parse(input, dot, true);
+            PicomatchParse.State state = PicomatchParse.parse(input, dot, true, posix);
             output = state.output;
             negated = state.negated;
         }

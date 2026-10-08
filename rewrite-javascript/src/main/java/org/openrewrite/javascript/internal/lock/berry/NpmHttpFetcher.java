@@ -20,8 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-npm sources/NpmHttpFetcher.ts (Yarn 4.10.3): an npm package whose tarball is not where
- * the registry's convention puts it.
+ * Port of @yarnpkg/plugin-npm sources/NpmHttpFetcher.ts (Yarn 4.10.3).
  */
 final class NpmHttpFetcher implements Fetcher {
 

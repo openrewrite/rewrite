@@ -238,6 +238,28 @@ public class NodeSemver {
         return a.comparePrecedence(b);
     }
 
+    /**
+     * node-semver's {@code compareBuild}: {@code compare}, then the build metadata.
+     *
+     * @throws IllegalArgumentException when either version is invalid, as node-semver throws.
+     */
+    public static int compareBuild(String v1, String v2, Options options) {
+        ParsedVersion a = semver(v1, options);
+        ParsedVersion b = semver(v2, options);
+        int c = a.comparePrecedence(b);
+        return c != 0 ? c : a.compareBuild(b);
+    }
+
+    /**
+     * node-semver's {@code rsort}: the list sorted in place from the highest version down by {@code compareBuild},
+     * stable as {@code Array.prototype.sort} is.
+     *
+     * @throws IllegalArgumentException when a version it compares is invalid, as node-semver throws.
+     */
+    public static void rsort(List<String> versions, Options options) {
+        versions.sort((a, b) -> compareBuild(b, a, options));
+    }
+
     private static ParsedVersion semver(@Nullable Object version, Options options) {
         if (!(version instanceof String)) {
             throw new IllegalArgumentException(notASemVer(version, options));

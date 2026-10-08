@@ -77,7 +77,7 @@ final class NpmSemverResolver implements Resolver {
         List<String> candidates = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
             if (SemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
-                NpmHttpUtils.isPackageApproved(project.configuration.getOptions())) {
+                NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
                 candidates.add(version.getKey());
             }
         }
@@ -93,7 +93,7 @@ final class NpmSemverResolver implements Resolver {
         for (String version : finalCandidates) {
             Locator versionLocator = StructUtils.makeLocator(descriptor, PROTOCOL + version);
             Object archiveUrl = Js.read(Js.read(Js.get(versions, version), "dist"), "tarball");
-            if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration.getOptions())) {
+            if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration)) {
                 out.add(versionLocator);
             } else {
                 out.add(StructUtils.bindLocator(versionLocator,

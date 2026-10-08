@@ -27,8 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NpmHttpUtilsTest {
 
-    private final BerryOptions configuration = BerryOptions.defaults();
-    private final String registry = configuration.getString("npmRegistryServer");
+    private final Configuration configuration = new Configuration(BerryOptions.defaults(), YarnRelease.of("4.10.3"));
+    private final String registry = configuration.getOptions().getString("npmRegistryServer");
 
     @Test
     void detectsAConventionalPath() {
@@ -77,10 +77,21 @@ class NpmHttpUtilsTest {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "npmRegistryServer: \"https://mirror.example\"\nnpmScopes:\n  corp:\n    npmAuthToken: x\n"),
                 Collections.emptyMap());
-        assertThat(NpmHttpUtils.getScopeRegistry(null, options)).isEqualTo("https://mirror.example");
-        assertThat(NpmHttpUtils.getScopeRegistry("corp", options)).isEqualTo("https://registry.yarnpkg.com");
-        assertThat(NpmHttpUtils.getScopeRegistry("jsr", options)).isEqualTo("https://npm.jsr.io");
+        Configuration configuration = new Configuration(options, YarnRelease.of("4.10.3"));
+        assertThat(NpmHttpUtils.getScopeRegistry(null, configuration)).isEqualTo("https://mirror.example");
+        assertThat(NpmHttpUtils.getScopeRegistry("corp", configuration)).isEqualTo("https://registry.yarnpkg.com");
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", configuration)).isEqualTo("https://npm.jsr.io");
         assertThat(NpmHttpUtils.getIdentUrl(StructUtils.makeIdent("types", "node"))).isEqualTo("/@types%2fnode");
+    }
+
+    @Test
+    void theJsrScopeIsTheProjectsRegistryBeforeYarn49() {
+        BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
+                "npmRegistryServer: \"https://mirror.example\"\n"), Collections.emptyMap());
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", new Configuration(options, YarnRelease.of("4.8.1"))))
+                .isEqualTo("https://mirror.example");
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", new Configuration(options, YarnRelease.of("4.9.0"))))
+                .isEqualTo("https://npm.jsr.io");
     }
 
     /**

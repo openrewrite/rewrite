@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -49,10 +50,11 @@ final class NpmHttpUtils {
      * {@code getScopeRegistry}: the scope's {@code npmScopes} entry, whose {@code npmRegistryServer} defaults to
      * the public registry and not to the project's own; else {@code npmRegistryServer}.
      */
-    static String getScopeRegistry(@Nullable String scope, BerryOptions options) {
+    static String getScopeRegistry(@Nullable String scope, Configuration configuration) {
+        BerryOptions options = configuration.getOptions();
         Object scopeConfiguration = scope == null ? null : options.getMap("npmScopes").get(scope);
         if (!(scopeConfiguration instanceof Map)) {
-            if ("jsr".equals(scope)) {
+            if ("jsr".equals(scope) && configuration.getRelease().isJsrScope()) {
                 return normalizeRegistry("https://npm.jsr.io/");
             }
             return normalizeRegistry(options.getString("npmRegistryServer"));
@@ -71,7 +73,7 @@ final class NpmHttpUtils {
      * @throws ReportError YN0035 when the registry has no such package
      */
     static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, RegistrySource registry) {
-        String registryUrl = getScopeRegistry(ident.scope, project.configuration.getOptions());
+        String registryUrl = getScopeRegistry(ident.scope, project.configuration);
         return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
             String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident));
             if (packument == null) {
@@ -87,7 +89,7 @@ final class NpmHttpUtils {
      * @throws ReportError YN0035 when the server does not have it
      */
     static byte[] get(String path, Locator locator, String version, Project project, RegistrySource registry) {
-        String registryUrl = getScopeRegistry(locator.scope, project.configuration.getOptions());
+        String registryUrl = getScopeRegistry(locator.scope, project.configuration);
         byte[] tarball = registry.tarball(path.startsWith("/") ? registryUrl + path : path,
                 StructUtils.stringifyIdent(locator), version);
         if (tarball == null) {
@@ -135,8 +137,8 @@ final class NpmHttpUtils {
      * {@code NpmSemverFetcher.isConventionalTarballUrl}: {@code <registry>/<name>/-/<name>-<version>.tgz}, the
      * npmjs and yarnpkg hosts taken as one.
      */
-    static boolean isConventionalTarballUrl(Locator locator, @Nullable Object url, BerryOptions options) {
-        String registry = getScopeRegistry(locator.scope, options);
+    static boolean isConventionalTarballUrl(Locator locator, @Nullable Object url, Configuration configuration) {
+        String registry = getScopeRegistry(locator.scope, configuration);
         String path = getLocatorUrl(locator);
         String u = String.valueOf(url).replaceAll("^https?:(//(?:[^/]+\\.)?npmjs.org(?:\\z|/))", "https:$1");
         registry = registry.replaceAll("^https://registry\\.npmjs\\.org(\\z|/)", "https://registry.yarnpkg.com$1");
@@ -154,14 +156,81 @@ final class NpmHttpUtils {
     }
 
     /**
-     * {@code isPackageApproved}: outside a minimal age gate, or preapproved. The gate is not ported: a project
-     * that sets one is something the engine cannot know yet.
+     * npmConfigUtils {@code isPackageApproved}: not quarantined by {@code npmMinimalAgeGate}, or preapproved.
      */
-    static boolean isPackageApproved(BerryOptions options) {
-        Object gate = options.get("npmMinimalAgeGate");
-        if (gate instanceof Number && ((Number) gate).doubleValue() != 0) {
-            throw new CannotKnow("which versions npmMinimalAgeGate " + Js.string(gate) + " quarantines");
+    static boolean isPackageApproved(Project project, Ident ident, @Nullable Object version,
+                                     @Nullable Object publishTimes) {
+        return !shouldBeQuarantined(project, ident, version, publishTimes) ||
+               isPreapproved(project.configuration, ident, version);
+    }
+
+    private static boolean shouldBeQuarantined(Project project, Ident ident, @Nullable Object version,
+                                               @Nullable Object publishTimes) {
+        Object minimalAgeGate = project.configuration.get("npmMinimalAgeGate");
+        if (!Js.truthy(minimalAgeGate)) {
+            return false;
         }
-        return true;
+        Object versionTime = Js.get(publishTimes, Js.string(version));
+        if (versionTime == Syml.UNDEFINED) {
+            return true;
+        }
+        double ageMinutes = (project.now.toEpochMilli() - getTime(versionTime, ident, version)) / 60 / 1000;
+        return ageMinutes < ((Number) minimalAgeGate).doubleValue();
+    }
+
+    // new Date(value).getTime()
+    private static double getTime(@Nullable Object value, Ident ident, @Nullable Object version) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value ? 1 : 0;
+        }
+        if (value instanceof Number) {
+            double time = ((Number) value).doubleValue();
+            return Math.abs(time) > 8.64e15 ? Double.NaN : time < 0 ? Math.ceil(time) : Math.floor(time);
+        }
+        String text = Js.string(value);
+        String what = "the publish time \"" + text + "\" of " + StructUtils.stringifyIdent(ident) + "@" +
+                      Js.string(version);
+        Double time = V8Date.parse(text);
+        if (time == null) {
+            throw new CannotKnow("the host's time zone (" + what + " names no offset)");
+        }
+        if (!V8Date.isDateTimeString(text) && !(value instanceof Map)) {
+            throw new CannotKnow("how V8's legacy date parser reads " + what);
+        }
+        return time;
+    }
+
+    private static boolean isPreapproved(Configuration configuration, Ident ident, @Nullable Object version) {
+        Object entries = configuration.get("npmPreapprovedPackages");
+        if (entries instanceof List) {
+            for (Object entry : (List<?>) entries) {
+                if (checkIdent(ident, version, Js.string(entry))) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean checkIdent(Ident ident, @Nullable Object version, String entry) {
+        Descriptor validator = StructUtils.tryParseDescriptor(entry);
+        if (validator == null) {
+            return false;
+        }
+        if (!validator.identHash.equals(ident.identHash) &&
+            !Picomatch.isMatch(StructUtils.stringifyIdent(ident), StructUtils.stringifyIdent(validator))) {
+            return false;
+        }
+        if ("unknown".equals(validator.range)) {
+            return true;
+        }
+        SemverUtils.Range validatorRange = SemverUtils.validRange(validator.range);
+        if (validatorRange == null) {
+            return false;
+        }
+        return version instanceof String && validatorRange.test((String) version);
     }
 }

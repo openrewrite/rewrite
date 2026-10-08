@@ -256,6 +256,26 @@ class NodeSemverTest {
         assertThat(NodeSemver.maxSatisfying(emptyList(), "some frogs and sneks-v2.5.6", Options.DEFAULT)).isNull();
     }
 
+    // test/functions/compare-build.js
+    @Test
+    void compareBuild() {
+        assertThat(NodeSemver.compareBuild("1.0.0", "1.0.0+0", Options.DEFAULT)).isEqualTo(-1);
+        assertThat(NodeSemver.compareBuild("1.0.0+0", "1.0.0+0", Options.DEFAULT)).isEqualTo(0);
+        assertThat(NodeSemver.compareBuild("1.0.0+0", "1.0.0", Options.DEFAULT)).isEqualTo(1);
+        assertThat(NodeSemver.compareBuild("1.0.0+0", "1.0.0+0.0", Options.DEFAULT)).isEqualTo(-1);
+        assertThat(NodeSemver.compareBuild("1.0.0+0", "1.0.0+1", Options.DEFAULT)).isEqualTo(-1);
+        assertThat(NodeSemver.compareBuild("1.0.0+1", "1.0.0+0", Options.DEFAULT)).isEqualTo(1);
+        assertThat(NodeSemver.compareBuild("1.0.0+1.0", "1.0.0+1", Options.DEFAULT)).isEqualTo(1);
+    }
+
+    // test/functions/rsort.js
+    @Test
+    void rsort() {
+        List<String> list = new ArrayList<>(asList("1.2.3+1", "1.2.3+0", "1.2.3", "5.9.6", "0.1.2"));
+        NodeSemver.rsort(list, Options.DEFAULT);
+        assertThat(list).containsExactly("5.9.6", "1.2.3+1", "1.2.3+0", "1.2.3", "0.1.2");
+    }
+
     // satisfies catches what the Range constructor throws: `range.trim is not a function` for these
     @Test
     void rangeThatIsNotAString() {

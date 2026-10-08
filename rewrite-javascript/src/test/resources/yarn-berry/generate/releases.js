@@ -15,9 +15,9 @@
  */
 // Writes yarn-releases.json.gz, the data each Yarn 4.x release ships that reaches a lock: the builtin package
 // extensions (packages/yarnpkg-extensions), the packages the compat plugin patches, the node-gyp rule of the npm
-// semver resolver, whether the CLI bundles the catalog plugin, and the names of the settings the release knows
-// (`yarn config --json` of the @yarnpkg/cli-dist bundle). Sources are read at each @yarnpkg/cli/<version> tag of
-// github.com/yarnpkg/berry; identical tables are stored once.
+// semver resolver, the plugins the CLI bundles, whether the npm plugin sends the jsr scope to npm.jsr.io, and the
+// names of the settings the release knows (`yarn config --json` of the @yarnpkg/cli-dist bundle). Sources are read
+// at each @yarnpkg/cli/<version> tag of github.com/yarnpkg/berry; identical tables are stored once.
 //
 // Usage: node releases.js <rewrite-javascript/src/main/resources/org/openrewrite/javascript/internal/lock/berry>
 'use strict';
@@ -102,9 +102,14 @@ async function nodeGypAt(sha) {
   return {pattern: pattern[1], range: range[1]};
 }
 
-async function catalogsAt(sha) {
+async function pluginsAt(sha) {
   const manifest = JSON.parse(await fetchText(`${RAW}/${sha}/packages/yarnpkg-cli/package.json`));
-  return manifest[`@yarnpkg/builder`].bundles.standard.includes('@yarnpkg/plugin-catalog');
+  return manifest[`@yarnpkg/builder`].bundles.standard;
+}
+
+async function jsrScopeAt(sha) {
+  const source = await fetchText(`${RAW}/${sha}/packages/plugin-npm/sources/npmConfigUtils.ts`);
+  return /if \(scope === `jsr`\)/.test(source);
 }
 
 function untar(tgz, wanted) {
@@ -164,7 +169,8 @@ async function main() {
       packageExtensions: store(tables, await extensionsAt(sha)),
       patches: await patchesAt(sha),
       nodeGyp: await nodeGypAt(sha),
-      catalogs: await catalogsAt(sha),
+      plugins: store(tables, await pluginsAt(sha)),
+      jsrScope: await jsrScopeAt(sha),
       settings: store(tables, await settingsOf(version)),
     };
   }

@@ -1,0 +1,37 @@
+{
+  "name": "@jsr/luca__flag",
+  "description": "I like flags!",
+  "dist-tags": {
+    "latest": "1.0.1"
+  },
+  "versions": {
+    "1.0.1": {
+      "name": "@jsr/luca__flag",
+      "version": "1.0.1",
+      "description": "I like flags!",
+      "dist": {
+        "tarball": "https://npm.jsr.io/~/11/@jsr/luca__flag/1.0.1.tgz",
+        "shasum": "AFF3C93BFA3B36207CB60B946A29F2182B27A144",
+        "integrity": "sha512-739AhIoEZZJQxfn1YpP8xq/M4S3J4em3JH2HRipaCGKwdySJIpKVuHixCIKmZGMeOuQi9u7GCN/gWhrQTXxLaQ=="
+      },
+      "dependencies": {}
+    },
+    "1.0.0": {
+      "name": "@jsr/luca__flag",
+      "version": "1.0.0",
+      "description": "I like flags!",
+      "dist": {
+        "tarball": "https://npm.jsr.io/~/11/@jsr/luca__flag/1.0.0.tgz",
+        "shasum": "1FB5138E5F1F21B91BE2B711F21EE87A8A5CFC9A",
+        "integrity": "sha512-IDdQhuDnB6kXgrtDGT4zguGf6MvrysF/ni7Yt93r4M7PIZacawJ9OaNCF6W5z0tJ0amuyPTWxgl6bc/kTNNrtg=="
+      },
+      "dependencies": {}
+    }
+  },
+  "time": {
+    "created": "2023-12-14T23:05:13.518Z",
+    "modified": "2024-05-03T15:20:30.960Z",
+    "1.0.1": "2024-01-26T19:05:08.325Z",
+    "1.0.0": "2023-12-15T11:19:06.411Z"
+  }
+}

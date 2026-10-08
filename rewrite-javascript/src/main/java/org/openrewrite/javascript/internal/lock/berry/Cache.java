@@ -20,8 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.function.Supplier;
 
 /**
- * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and {@code fetchPackageFromCache} as an install that
- * only updates the lockfile reaches it, with a fetched npm package's checksum (Yarn 4.10.3).
+ * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and {@code fetchPackageFromCache} (Yarn 4.10.3).
  */
 final class Cache {
 

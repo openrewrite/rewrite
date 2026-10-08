@@ -88,8 +88,8 @@ class BerryOptionsTest {
         assertThatThrownBy(() -> regenerator.load(release))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: catalog");
-        assertThat(regenerator.load(YarnRelease.of("4.10.3")).getProject().configuration.getRelease().isCatalogs())
-                .isTrue();
+        assertThat(regenerator.load(YarnRelease.of("4.10.3")).getProject().configuration.getRelease()
+                .hasPlugin("@yarnpkg/plugin-catalog")).isTrue();
     }
 
     @Test

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -73,13 +74,41 @@ final class NpmTagResolver implements Resolver {
         if (version == Syml.UNDEFINED) {
             throw new ReportError(ReportError.REMOTE_NOT_FOUND, "Registry failed to return tag \"" + tag + "\"");
         }
-        if ("latest".equals(tag)) {
-            NpmHttpUtils.isPackageApproved(project.configuration.getOptions());
+        Object times = registryData.get("time");
+        if ("latest".equals(tag) && !NpmHttpUtils.isPackageApproved(project, descriptor, version, times)) {
+            if (!(version instanceof String)) {
+                throw new JsError(JsError.TYPE_ERROR, "version.includes is not a function");
+            }
+            String latest = (String) version;
+            boolean toleratePrereleases = latest.contains("-");
+            List<String> versions = new ArrayList<>();
+            for (Map.Entry<String, @Nullable Object> entry : Js.entries(registryData.get("versions"))) {
+                versions.add(entry.getKey());
+            }
+            String nextVersion = null;
+            try {
+                NodeSemver.rsort(versions, NodeSemver.Options.DEFAULT);
+                for (String candidateVersion : versions) {
+                    if (NodeSemver.compare(candidateVersion, latest, NodeSemver.Options.DEFAULT) < 0 &&
+                        (toleratePrereleases || !candidateVersion.contains("-")) &&
+                        NpmHttpUtils.isPackageApproved(project, descriptor, candidateVersion, times)) {
+                        nextVersion = candidateVersion;
+                        break;
+                    }
+                }
+            } catch (IllegalArgumentException e) {
+                throw new JsError(JsError.TYPE_ERROR, e.getMessage());
+            }
+            if (nextVersion == null) {
+                throw new ReportError(ReportError.REMOTE_NOT_FOUND, "The version for tag \"" + tag + "\" is " +
+                                                                    "quarantined, and no lower version is available");
+            }
+            version = nextVersion;
         }
         Locator versionLocator = StructUtils.makeLocator(descriptor, PROTOCOL + Js.string(version));
         Object archiveUrl = Js.read(Js.read(Js.read(registryData.get("versions"), Js.string(version)), "dist"),
                 "tarball");
-        if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration.getOptions())) {
+        if (NpmHttpUtils.isConventionalTarballUrl(versionLocator, archiveUrl, project.configuration)) {
             return Collections.singletonList(versionLocator);
         }
         return Collections.singletonList(StructUtils.bindLocator(versionLocator,

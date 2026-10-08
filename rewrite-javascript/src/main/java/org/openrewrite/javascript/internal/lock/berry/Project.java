@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -92,6 +93,11 @@ final class Project {
     Object lockfileLastVersion;
 
     boolean lockfileNeedsRefresh;
+
+    /**
+     * {@code new Date()} while Yarn runs.
+     */
+    Instant now = Instant.EPOCH;
 
     /**
      * The yarn.lock Yarn read, null when the project has none.

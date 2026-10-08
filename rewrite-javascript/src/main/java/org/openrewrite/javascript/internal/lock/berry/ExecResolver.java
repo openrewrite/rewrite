@@ -20,8 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-exec sources/ExecResolver.ts (Yarn 4.10.3). The locator's {@code hash=} covers the
- * generator script, which Yarn runs on every install.
+ * Port of @yarnpkg/plugin-exec sources/ExecResolver.ts (Yarn 4.10.3).
  */
 final class ExecResolver implements Resolver {
 

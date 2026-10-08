@@ -20,8 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of @yarnpkg/plugin-link sources/PortalResolver.ts (Yarn 4.10.3), with the part of PortalFetcher.ts that finds
- * the target's package.json.
+ * Port of @yarnpkg/plugin-link sources/PortalResolver.ts and PortalFetcher.ts's manifest lookup (Yarn 4.10.3).
  */
 final class PortalResolver implements Resolver {
 

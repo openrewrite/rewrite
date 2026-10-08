@@ -60,19 +60,34 @@ final class YarnRelease {
     private final List<String> patches;
     private final Pattern nodeGypMatch;
     private final String nodeGypRange;
-    private final boolean catalogs;
+
+    /**
+     * The plugins the CLI bundles, in the order it activates them.
+     */
+    private final List<String> plugins;
+
+    /**
+     * Whether the npm plugin sends the {@code jsr} scope to npm.jsr.io when {@code npmScopes} does not name it.
+     */
+    private final boolean jsrScope;
+
     private final Set<String> settings;
 
     private YarnRelease(String version, List<Map.Entry<String, Map<String, @Nullable Object>>> packageExtensions,
-                        List<String> patches, Pattern nodeGypMatch, String nodeGypRange, boolean catalogs,
-                        Set<String> settings) {
+                        List<String> patches, Pattern nodeGypMatch, String nodeGypRange, List<String> plugins,
+                        boolean jsrScope, Set<String> settings) {
         this.version = version;
         this.packageExtensions = packageExtensions;
         this.patches = patches;
         this.nodeGypMatch = nodeGypMatch;
         this.nodeGypRange = nodeGypRange;
-        this.catalogs = catalogs;
+        this.plugins = plugins;
+        this.jsrScope = jsrScope;
         this.settings = settings;
+    }
+
+    boolean hasPlugin(String name) {
+        return plugins.contains(name);
     }
 
     /**
@@ -97,7 +112,8 @@ final class YarnRelease {
         return new YarnRelease(version, Collections.unmodifiableList(extensions),
                 Collections.unmodifiableList((List<String>) Js.get(release, "patches")),
                 Pattern.compile(jsRegExp((String) nodeGyp.get("pattern"))), (String) nodeGyp.get("range"),
-                Boolean.TRUE.equals(Js.get(release, "catalogs")), Collections.unmodifiableSet(settings));
+                Collections.unmodifiableList((List<String>) tables.get((String) Js.get(release, "plugins"))),
+                Boolean.TRUE.equals(Js.get(release, "jsrScope")), Collections.unmodifiableSet(settings));
     }
 
     /**

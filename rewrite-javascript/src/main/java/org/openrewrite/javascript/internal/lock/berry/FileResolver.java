@@ -21,8 +21,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/plugin-file sources/FileResolver.ts and constants.ts (Yarn 4.10.3). The locator's {@code hash=}
- * covers every file of the folder, which Yarn reads again on every install.
+ * Port of @yarnpkg/plugin-file sources/FileResolver.ts and constants.ts (Yarn 4.10.3).
  */
 final class FileResolver implements Resolver {
 

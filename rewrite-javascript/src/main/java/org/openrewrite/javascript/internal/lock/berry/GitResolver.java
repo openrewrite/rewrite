@@ -22,8 +22,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Port of @yarnpkg/plugin-git sources/GitResolver.ts and gitUtils.ts {@code isGitUrl} (Yarn 4.10.3). A locked git
- * resolution persists; a new one needs the repository.
+ * Port of @yarnpkg/plugin-git sources/GitResolver.ts and gitUtils.ts {@code isGitUrl} (Yarn 4.10.3).
  */
 final class GitResolver implements Resolver {
 

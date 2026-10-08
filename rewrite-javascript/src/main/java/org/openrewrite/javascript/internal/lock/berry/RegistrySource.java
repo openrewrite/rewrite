@@ -18,8 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What a Yarn Berry install reads from the network: full packuments ({@code GET <registry>/<name>} with no
- * abbreviated Accept header) and tarballs.
+ * What a Yarn Berry install reads from the network: full packuments and tarballs.
  */
 public interface RegistrySource {
 

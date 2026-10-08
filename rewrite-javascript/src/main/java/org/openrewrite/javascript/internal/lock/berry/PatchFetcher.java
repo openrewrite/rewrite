@@ -18,8 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of @yarnpkg/plugin-patch sources/PatchFetcher.ts (Yarn 4.10.3): the archive is the source's with the patch
- * applied.
+ * Port of @yarnpkg/plugin-patch sources/PatchFetcher.ts (Yarn 4.10.3).
  */
 final class PatchFetcher implements Fetcher {
 
