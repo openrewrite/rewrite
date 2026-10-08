@@ -23,6 +23,7 @@ import {
     memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
+import {sameModule} from "./package-name";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
     isBindableName, parameterNames, RebindAmdDependency, RemoveAmdDependency
@@ -119,7 +120,7 @@ export function moduleBindings(
             isCommonJs(cu) ? "commonjs" :
             hasEsmSyntax(cu) ? "esm" : "none",
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
-        bindingOf: module => bound.find(b => b.module === module)?.name
+        bindingOf: module => bound.find(b => sameModule(b.module, module))?.name
     };
 }
 
@@ -265,7 +266,7 @@ export function maybeBind(
     if (isWholeModule && cu) {
         const scope = scopeOf(cursorOf(visitor)!);
         const bound = moduleObjectBindings(cu).find(b =>
-            b.module === module && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
+            sameModule(b.module, module) && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
             // A pinned alias asks for a binding of that name, so another name for the same
             // module does not answer it; `bindImport`'s own lookup applies the same rule.
             (options.alias === undefined || b.name === options.alias) &&
@@ -302,7 +303,7 @@ export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbin
     }
     const callees = calleesOf(options);
     const queued = visitor.afterVisit || [];
-    if (!queued.some(v => v instanceof RemoveImport && v.module === options.module && v.member === options.member)) {
+    if (!queued.some(v => v instanceof RemoveImport && sameModule(v.module, options.module) && v.member === options.member)) {
         visitor.afterVisit.push(new RemoveImport(options.module, options.member));
     }
     // Both queue unconditionally so the caller need not know which lane the file uses: each
@@ -369,7 +370,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         return undefined;
     }
     if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport &&
-        v.from.module === options.from.module && v.from.member === options.from.member &&
+        sameModule(v.from.module, options.from.module) && v.from.member === options.from.member &&
         v.localName === existing.localName)) {
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
     }

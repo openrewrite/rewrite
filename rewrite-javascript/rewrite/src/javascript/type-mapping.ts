@@ -15,9 +15,8 @@
  */
 import ts from "typescript";
 import * as path from "path";
-import {isBuiltin} from "module";
 import {Type} from "../java";
-import {packageNameOf} from "./package-name";
+import {moduleName, packageNameOf} from "./package-name";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
@@ -37,16 +36,6 @@ function sortBySignature(bounds: Type[]): void {
 
 function typeSignatureToJSON(this: Type): string {
     return Type.signature(this);
-}
-
-/**
- * A module specifier with a redundant `node:` scheme removed.
- * `node:url` and `url` import the same built-in, which is named without the scheme.
- * A built-in such as `node:test` has no bare form, and `test` is another package, so it keeps it.
- */
-function moduleName(specifier: string): string {
-    const bare = specifier.substring('node:'.length);
-    return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
 }
 
 function isGlobalAugmentation(declaration: ts.Declaration): boolean {
