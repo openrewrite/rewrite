@@ -25,9 +25,12 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.trait.BlockScalar;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.Iterator;
-import java.util.Objects;
+import java.util.*;
 import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -92,40 +95,116 @@ public class ChangePropertyValue extends Recipe {
                 NameCaseConvention.EXACT).compile(propertyKey);
 
         return Preconditions.check(new FindSourceFiles(filePattern), new YamlIsoVisitor<ExecutionContext>() {
+            Set<UUID> anchorsToUpdate = emptySet();
+            Map<UUID, Yaml.Scalar> aliasesToInline = emptyMap();
+
+            @Override
+            public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
+                planAliasedValues(documents);
+                return super.visitDocuments(documents, ctx);
+            }
+
+            @Override
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext ctx) {
+                Yaml.Scalar s = super.visitScalar(scalar, ctx);
+                if (s.getAnchor() != null && anchorsToUpdate.contains(s.getAnchor().getId())) {
+                    Yaml.Scalar updated = updateScalar(s, getCursor().getParentOrThrow());
+                    if (updated != null) {
+                        s = updated;
+                    }
+                }
+                return s;
+            }
+
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 Yaml.Mapping.Entry e = super.visitMappingEntry(entry, ctx);
                 String prop = getProperty(getCursor());
-                if (keyMatcher.matchesGlob(prop) && matchesOldValue(e.getValue())) {
-                    Yaml.Block updatedValue = updateValue(e.getValue(), getCursor());
+                if (keyMatcher.matchesGlob(prop) && matchesOldValue(e.getValue(), aliasesToInline)) {
+                    Yaml.Block updatedValue = updateValue(e.getValue(), getCursor(), aliasesToInline);
                     if (updatedValue != null) {
                         e = e.withValue(updatedValue);
                     }
                 }
                 return e;
             }
+
+            // Change the anchor itself only when no other key aliases it; otherwise replace the matching aliases
+            private void planAliasedValues(Yaml.Documents documents) {
+                Map<UUID, Yaml.Scalar> anchored = new HashMap<>();
+                Set<UUID> definedUnderMatchingKey = new HashSet<>();
+                Set<UUID> aliasedFromMatchingKey = new HashSet<>();
+                Set<UUID> aliasedElsewhere = new HashSet<>();
+                new YamlIsoVisitor<Integer>() {
+                    @Override
+                    public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
+                        if (scalar.getAnchor() != null) {
+                            anchored.put(scalar.getAnchor().getId(), scalar);
+                            if (isValueOfMatchingKey(getCursor(), keyMatcher)) {
+                                definedUnderMatchingKey.add(scalar.getAnchor().getId());
+                            }
+                        }
+                        return super.visitScalar(scalar, p);
+                    }
+
+                    @Override
+                    public Yaml visitAlias(Yaml.Alias alias, Integer p) {
+                        (isValueOfMatchingKey(getCursor(), keyMatcher) ? aliasedFromMatchingKey : aliasedElsewhere)
+                                .add(alias.getAnchor().getId());
+                        return super.visitAlias(alias, p);
+                    }
+                }.visit(documents, 0);
+
+                anchorsToUpdate = new HashSet<>();
+                aliasesToInline = new HashMap<>();
+                for (Map.Entry<UUID, Yaml.Scalar> anchor : anchored.entrySet()) {
+                    UUID id = anchor.getKey();
+                    Yaml.Scalar scalar = anchor.getValue();
+                    if (!aliasedFromMatchingKey.contains(id) || definedUnderMatchingKey.contains(id) ||
+                        !matchesOldValue(scalar, emptyMap())) {
+                        continue;
+                    }
+                    if (!aliasedElsewhere.contains(id)) {
+                        anchorsToUpdate.add(id);
+                    } else if (scalar.getStyle() != Yaml.Scalar.Style.LITERAL && scalar.getStyle() != Yaml.Scalar.Style.FOLDED) {
+                        aliasesToInline.put(id, scalar);
+                    }
+                }
+            }
         });
     }
 
-    // returns null if value should not change
-    private Yaml.@Nullable Block updateValue(Yaml.Block value, Cursor parent) {
-        if (value instanceof Yaml.Scalar) {
-            Yaml.Scalar scalar = (Yaml.Scalar) value;
-            BlockScalar block = new BlockScalar.Matcher().get(scalar, parent).orElse(null);
-            String body = block != null ? block.getBody() : scalar.getValue();
-            String updatedBody = Boolean.TRUE.equals(regex) ?
-                    body.replaceAll(Objects.requireNonNull(oldValue), newValue) :
-                    newValue;
-            if (body.equals(updatedBody)) {
-                return null;
+    private static boolean isValueOfMatchingKey(Cursor cursor, NameCaseConvention.Compiled keyMatcher) {
+        Cursor parent = cursor.getParentTreeCursor();
+        if (parent.getValue() instanceof Yaml.Sequence.Entry) {
+            parent = parent.getParentTreeCursor().getParentTreeCursor();
+            if (!(parent.getValue() instanceof Yaml.Mapping.Entry)) {
+                return false;
             }
-            return block != null ? block.withBody(updatedBody) : scalar.withValue(updatedBody);
+        } else if (!(parent.getValue() instanceof Yaml.Mapping.Entry) ||
+                   ((Yaml.Mapping.Entry) parent.getValue()).getValue() != cursor.getValue()) {
+            return false;
+        }
+        return keyMatcher.matchesGlob(getProperty(parent));
+    }
+
+    // returns null if value should not change
+    private Yaml.@Nullable Block updateValue(Yaml.Block value, Cursor parent, Map<UUID, Yaml.Scalar> aliasesToInline) {
+        if (value instanceof Yaml.Scalar) {
+            return updateScalar((Yaml.Scalar) value, parent);
+        }
+        if (value instanceof Yaml.Alias) {
+            Yaml.Scalar target = aliasesToInline.get(((Yaml.Alias) value).getAnchor().getId());
+            return target == null ? null : updateScalar(target
+                    .withId(randomId())
+                    .withPrefix(value.getPrefix())
+                    .withAnchor(null), parent);
         }
         if (value instanceof Yaml.Sequence) {
             Yaml.Sequence sequence = (Yaml.Sequence) value;
             return sequence.withEntries(ListUtils.map(sequence.getEntries(), entry -> {
-                if (matchesOldValue(entry.getBlock())) {
-                    Yaml.Block updatedValue = updateValue(entry.getBlock(), parent);
+                if (matchesOldValue(entry.getBlock(), aliasesToInline)) {
+                    Yaml.Block updatedValue = updateValue(entry.getBlock(), parent, aliasesToInline);
                     if (updatedValue != null) {
                         return entry.withBlock(updatedValue);
                     }
@@ -136,16 +215,30 @@ public class ChangePropertyValue extends Recipe {
         return null;
     }
 
-    private boolean matchesOldValue(Yaml.Block value) {
+    private Yaml.@Nullable Scalar updateScalar(Yaml.Scalar scalar, Cursor parent) {
+        BlockScalar block = new BlockScalar.Matcher().get(scalar, parent).orElse(null);
+        String body = block != null ? block.getBody() : scalar.getValue();
+        String updatedBody = Boolean.TRUE.equals(regex) ?
+                body.replaceAll(Objects.requireNonNull(oldValue), newValue) :
+                newValue;
+        if (body.equals(updatedBody)) {
+            return null;
+        }
+        return block != null ? block.withBody(updatedBody) : scalar.withValue(updatedBody);
+    }
+
+    private boolean matchesOldValue(Yaml.Block value, Map<UUID, Yaml.Scalar> aliasesToInline) {
         if (value instanceof Yaml.Scalar) {
             Yaml.Scalar scalar = (Yaml.Scalar) value;
             return StringUtils.isNullOrEmpty(oldValue) ||
                    (Boolean.TRUE.equals(regex) ?
                            Pattern.compile(oldValue).matcher(scalar.getValue()).find() :
                            scalar.getValue().equals(oldValue));
+        } else if (value instanceof Yaml.Alias) {
+            return aliasesToInline.containsKey(((Yaml.Alias) value).getAnchor().getId());
         } else if (value instanceof Yaml.Sequence) {
             for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) value).getEntries()) {
-                if (matchesOldValue(entry.getBlock())) {
+                if (matchesOldValue(entry.getBlock(), aliasesToInline)) {
                     return true;
                 }
             }

@@ -435,6 +435,116 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
+    void updatesAnchorReferencedOnlyFromMatchingKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("**.SERVICE_API", "29-stable", "28-stable", null, null, null)),
+          yaml(
+            """
+              .service-version: &service-version
+                28-stable
+
+              deploy-job:
+                variables:
+                  SERVICE_API: *service-version
+              test-job:
+                variables:
+                  SERVICE_API: *service-version
+              """,
+            """
+              .service-version: &service-version
+                29-stable
+
+              deploy-job:
+                variables:
+                  SERVICE_API: *service-version
+              test-job:
+                variables:
+                  SERVICE_API: *service-version
+              """
+          )
+        );
+    }
+
+    @Test
+    void replacesAliasWhenAnchorIsSharedWithOtherKeys() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null)),
+          yaml(
+            """
+              defaults: &v 1.0
+              app:
+                version: *v
+              lib:
+                version: *v
+              """,
+            """
+              defaults: &v 1.0
+              app:
+                version: 2.0
+              lib:
+                version: *v
+              """
+          )
+        );
+    }
+
+    @Test
+    void leavesAliasAloneWhenAnchoredValueDoesNotMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("app.version", "2.0", "1.0", null, null, null)),
+          yaml(
+            """
+              defaults: &v 1.5
+              app:
+                version: *v
+              """
+          )
+        );
+    }
+
+    @Test
+    void anchorDefinedUnderMatchingKeyIsChangedOnce() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("*.version", "1.1", "1.0", null, null, null)),
+          yaml(
+            """
+              app:
+                version: &v 1.0
+              lib:
+                version: *v
+              """,
+            """
+              app:
+                version: &v 1.1
+              lib:
+                version: *v
+              """
+          )
+        );
+    }
+
+    @Test
+    void updatesAnchorAliasedFromSequence() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("versions", "2.0", "1.0", null, null, null)),
+          yaml(
+            """
+              base: &v 1.0
+              versions:
+                - *v
+                - 3.0
+              """,
+            """
+              base: &v 2.0
+              versions:
+                - *v
+                - 3.0
+              """
+          )
+        );
+    }
+
+    @Test
     void validatesThatOldValueIsRequiredIfRegexEnabled() {
         assertTrue(new ChangePropertyValue("my.prop", "bar", null, true, null, null).validate().isInvalid());
     }
