@@ -26,6 +26,7 @@ import {
     template,
     typescript,
     npm,
+    packageJson,
     sourceFileCache} from "../../../src/javascript";
 import { Expression, J } from "../../../src/java";
 import { castDraft, create as produce } from "mutative";
@@ -311,6 +312,49 @@ describe('match extraction', () => {
             .configure({context: [`import assert from 'node:assert';`]});
 
         expect(await matched(`import a from 'node:assert';\na.strictEqual(x, y);`, strictEqual)).toEqual([true]);
+    });
+
+    test('a static call matches every spelling of its receiver, and only that function', async () => {
+        const fromMoment = {
+            context: [`import moment from 'moment';`],
+            dependencies: {moment: '^2.30.0'},
+            lenientTypeMatching: false
+        };
+        const utc = pattern`moment.utc(${capture('s')})`.configure(fromMoment);
+        const unix = pattern`moment.unix(${capture('n')})`.configure(fromMoment);
+        const bareUtc = pattern`utc(${capture('s')})`.configure({...fromMoment, context: [`import {utc} from 'moment';`]});
+
+        const sources: Record<string, [string, Pattern[]]> = {
+            alias: [`import m from 'moment';\nm.utc('x');`, [utc, bareUtc]],
+            named: [`import {utc as u} from 'moment';\nu('x');`, [utc]],
+            dayjsDefault: [`import dayjs from 'dayjs';\ndayjs.unix(1);`, [unix]],
+            namespace: [`declare function tz(): void;\ndeclare namespace tz { function utc(s: string): void; }\ntz.utc('x');`, [utc, bareUtc]]
+        };
+        const results: Record<string, boolean[]> = {};
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitMethodInvocation(method: J.MethodInvocation, _p: any): Promise<J | undefined> {
+                const file = this.cursor.firstEnclosing((t: any): t is JS.CompilationUnit => t.kind === JS.Kind.CompilationUnit)!;
+                const name = file.sourcePath.replace(/\.ts$/, '');
+                results[name] = [];
+                for (const p of sources[name][1]) {
+                    results[name].push(!!await p.match(method, this.cursor));
+                }
+                return method;
+            }
+        });
+        await withDir(async repo => {
+            const files = Object.entries(sources).map(([name, [source]]) => ({...typescript(source), path: `${name}.ts`}));
+            await spec.rewriteRun(npm(repo.path,
+                packageJson(JSON.stringify({dependencies: {moment: '^2.30.0', dayjs: '^1.11.0'}})),
+                ...files));
+        }, {unsafeCleanup: true});
+
+        expect(results).toEqual({
+            alias: [true, true],
+            named: [true],
+            dayjsDefault: [false],
+            namespace: [false, false]
+        });
     });
 
     test('untyped imports from one module are not one declaration', async () => {

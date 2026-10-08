@@ -23,6 +23,11 @@ export namespace Type {
     export const FUNCTION_TYPE_NAME = '𝑓';
     export const OBJECT_TYPE_NAME = '{}';
 
+    /** Bits of a type's `flags`, the same as Java's `org.openrewrite.java.tree.Flag`. */
+    export const Flag = {
+        Static: 1 << 3,
+    }
+
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
