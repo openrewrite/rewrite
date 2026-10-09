@@ -24,6 +24,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.RecipeLoader;
+import org.openrewrite.marketplace.MarketplaceRecipeLoader;
 import org.openrewrite.style.NamedStyles;
 
 import java.io.*;
@@ -118,10 +119,27 @@ public class ClasspathScanningLoader implements ResourceLoader {
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(@Nullable Properties properties, ClassLoader classLoader) {
+        this(properties, classLoader, null);
+    }
+
+    /**
+     * Construct a ClasspathScanningLoader that scans the provided classloader for recipes, and
+     * resolves declarative {@code recipeList} entries the classloader cannot satisfy against a
+     * marketplace. That is what lets a recipe artifact from one package ecosystem name a recipe
+     * contributed by another.
+     *
+     * @param properties              YAML placeholder properties
+     * @param classLoader             Limit scan to classes loadable by this classloader
+     * @param marketplaceRecipeLoader Consulted only after the classloader lookup fails. Null keeps
+     *                                resolution classloader-only.
+     */
+    public ClasspathScanningLoader(@Nullable Properties properties, ClassLoader classLoader,
+                                   @Nullable MarketplaceRecipeLoader marketplaceRecipeLoader) {
         this.classLoader = classLoader;
         this.recipeLoader = new RecipeLoader(classLoader);
         this.performClassScan = () -> configureRecipesAndStyles(buildSuperclassMapFromClassLoader(classLoader), classLoader);
-        this.performYamlListing = () -> listYamlLoaders(listYamlResourcesFromClassLoader(classLoader), properties, emptyList(), classLoader);
+        this.performYamlListing = () -> listYamlLoaders(listYamlResourcesFromClassLoader(classLoader), properties,
+                emptyList(), classLoader, marketplaceRecipeLoader);
     }
 
     /**
@@ -561,9 +579,18 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private void listYamlLoaders(List<YamlResource> yamlResources, @Nullable Properties properties,
                                  Collection<? extends ResourceLoader> dependencyResourceLoaders,
                                  @Nullable ClassLoader classLoader) {
+        listYamlLoaders(yamlResources, properties, dependencyResourceLoaders, classLoader, null);
+    }
+
+    private void listYamlLoaders(List<YamlResource> yamlResources, @Nullable Properties properties,
+                                 Collection<? extends ResourceLoader> dependencyResourceLoaders,
+                                 @Nullable ClassLoader classLoader,
+                                 @Nullable MarketplaceRecipeLoader marketplaceRecipeLoader) {
         for (YamlResource resource : yamlResources) {
             try (InputStream input = resource.inputStreamSupplier.get()) {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, resource.uri, properties, classLoader, dependencyResourceLoaders));
+                yamlResourceLoaders.add(new YamlResourceLoader(input, resource.uri, properties, classLoader,
+                        dependencyResourceLoaders, jsonMapper -> {
+                }, marketplaceRecipeLoader));
             } catch (IOException ignored) {
             }
         }
