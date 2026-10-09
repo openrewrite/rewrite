@@ -3071,10 +3071,17 @@ def write_message(response: dict):
     Uses unbuffered binary I/O to avoid line-ending translation on Windows
     that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
     used by read_message() which uses os.read() on the read side.
+
+    Header and body go out as separate writes. Concatenating them copies the whole body to
+    prepend about twenty-six bytes, which costs in proportion to the message, where the extra
+    write costs a fixed syscall that does not. ``os.writev`` would avoid both but is absent on
+    Windows, and the saving over two writes measured below this machine's noise anyway.
     """
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
-    os.write(sys.stdout.fileno(), header + content_bytes)
+    fd = sys.stdout.fileno()
+    os.write(fd, header)
+    os.write(fd, content_bytes)
 
 
 def _error_response(request_id: Any, e: Exception) -> dict:
