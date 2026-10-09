@@ -79,14 +79,17 @@ class MavenDependencyFailuresTest implements RewriteTest {
     }
 
     @Test
-    @Disabled("2026-05-04 temporarily disabled after Artifactory introduction")
     void unresolvableMavenMetadata() {
         rewriteRun(
           spec -> spec
             .recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
             .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
               .setRepositories(List.of(MavenRepository.builder().id("jenkins").uri("https://repo.jenkins-ci.org/public").build())))
-            .recipeExecutionContext(new InMemoryExecutionContext())
+            // Pin the recipe context too: left as a bare context it picks up a mirror from
+            // ~/.m2/settings.xml, and the failed-repository URI asserted below becomes the
+            // mirror's rather than Maven Central's.
+            .recipeExecutionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setRepositories(List.of(MavenRepository.builder().id("central").uri("https://repo.maven.apache.org/maven2").knownToExist(true).build())))
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
