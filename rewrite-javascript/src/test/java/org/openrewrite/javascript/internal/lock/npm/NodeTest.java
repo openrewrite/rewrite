@@ -71,8 +71,8 @@ class NodeTest {
     class BasicInstantiation {
 
         private final OverrideSet overrides = new OverrideSet(obj("foo", "1"));
-        private final Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/root")
-          .realpath("/home/user/projects/root").overrides(overrides));
+        private final Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/root")
+          .realpath("/srv/user/projects/root").overrides(overrides));
 
         @Test
         void loneRoot() {
@@ -109,17 +109,17 @@ class NodeTest {
     @ValueSource(booleans = {false, true})
     void testingWithDepTree(boolean withMeta) {
         String at = withMeta ? "with meta: " : "";
-        Shrinkwrap rootMetadata = withMeta ? emptyLock("/home/user/projects/root") : null;
+        Shrinkwrap rootMetadata = withMeta ? emptyLock("/srv/user/projects/root") : null;
         Node root = node(opts()
           .pkg(obj("name", "root", "bundleDependencies", arr("bundled"),
             "dependencies", obj("prod", "1.x", "bundled", "", "missing", ""),
             "devDependencies", obj("dev", "", "overlap", ""),
             "optionalDependencies", obj("optional", "", "overlap", "", "optMissing", "")))
-          .realpath("/home/user/projects/root").path("/home/user/projects/root").meta(rootMetadata)
+          .realpath("/srv/user/projects/root").path("/srv/user/projects/root").meta(rootMetadata)
           .child(opts()
             .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies", obj("peer", "")))
-            .fsChild(opts().realpath("/home/user/projects/root/node_modules/prod/foo")
-              .path("/home/user/projects/root/node_modules/prod/foo").name("foo")
+            .fsChild(opts().realpath("/srv/user/projects/root/node_modules/prod/foo")
+              .path("/srv/user/projects/root/node_modules/prod/foo").name("foo")
               .pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("meta", ""))).build())
             .resolved("prod").integrity("prod").build()));
         assertThat(root.getRoot()).isSameAs(root);
@@ -133,15 +133,15 @@ class NodeTest {
         Node meta = node(opts()
           .pkg(obj("name", "meta", "version", "1.2.3", "devDependencies", obj("missing", ""),
             "dependencies", obj("bundled", ""), "_resolved", "meta", "_integrity", "meta"))
-          .path("/home/user/projects/root/node_modules/prod/node_modules/meta")
-          .realpath("/home/user/projects/root/node_modules/prod/node_modules/meta")
+          .path("/srv/user/projects/root/node_modules/prod/node_modules/meta")
+          .realpath("/srv/user/projects/root/node_modules/prod/node_modules/meta")
           .parent(prod));
         assertThat(meta.isDescendantOf(root)).isTrue();
         assertThat(meta.getRoot()).isSameAs(root);
 
         Node bundled = node(opts().pkg(obj("name", "bundled", "version", "1.2.3", "dependencies", obj("meta", "")))
           .resolved("bundled").integrity("bundled")
-          .path("/home/user/projects/root/node_modules/bundled").realpath("/home/user/projects/root/node_modules/bundled")
+          .path("/srv/user/projects/root/node_modules/bundled").realpath("/srv/user/projects/root/node_modules/bundled")
           .parent(root));
         assertThat(meta.isDescendantOf(bundled)).isFalse();
         assertThat(bundled.getRoot()).isSameAs(root);
@@ -228,7 +228,7 @@ class NodeTest {
             "dependencies", obj("prod", "1.x", "bundled", "", "missing", ""),
             "devDependencies", obj("dev", "", "overlap", ""),
             "optionalDependencies", obj("optional", "", "overlap", "", "optMissing", "")))
-          .realpath("/home/user/projects/root").path("/home/user/projects/root").meta(rootMetadata));
+          .realpath("/srv/user/projects/root").path("/srv/user/projects/root").meta(rootMetadata));
         root.replaceWith(root2);
         assertThat(root2.getRoot()).as("replacing root preserves self-rootedness").isSameAs(root2);
         root.replace(root2);
@@ -270,7 +270,7 @@ class NodeTest {
 
     private static Node top(Node root, String name, String resolved) {
         return node(opts().pkg(obj("name", name, "version", "1.2.3")).resolved(resolved).integrity(resolved)
-          .path("/home/user/projects/root/node_modules/" + name).realpath("/home/user/projects/root/node_modules/" + name)
+          .path("/srv/user/projects/root/node_modules/" + name).realpath("/srv/user/projects/root/node_modules/" + name)
           .parent(root));
     }
 
@@ -292,19 +292,19 @@ class NodeTest {
 
     @Test
     void edgeCasesForBranchCoverage() {
-        Node noPkg = node(opts().realpath("/home/user/projects/root").path("/home/user/projects/root"));
+        Node noPkg = node(opts().realpath("/srv/user/projects/root").path("/srv/user/projects/root"));
         assertThat(noPkg.getPackage()).as("default package is empty object").isEmpty();
         assertThat(noPkg.getName()).isEqualTo("root");
 
-        Node noPath = node(opts().realpath("/home/user/projects/root"));
+        Node noPath = node(opts().realpath("/srv/user/projects/root"));
         assertThat(noPath.getName()).as("pathless gets named for realpath").isEqualTo("root");
     }
 
     @Test
     void tracksTheLoadingErrorEncountered() {
         IllegalStateException error = new IllegalStateException("this is fine");
-        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/root")
-          .realpath("/home/user/projects/root").error(error));
+        Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/root")
+          .realpath("/srv/user/projects/root").error(error));
         assertThat(root.getErrors().get(0)).isSameAs(error);
     }
 
@@ -322,7 +322,7 @@ class NodeTest {
     @Test
     void loadWithAVirtualFilesystemParent() {
         Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "", "link3", "")))
-          .path("/home/user/projects/root").realpath("/home/user/projects/root"));
+          .path("/srv/user/projects/root").realpath("/srv/user/projects/root"));
         Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a"));
         Link link = link(opts().pkg(obj("name", "link", "version", "1.2.3", "dependencies", obj("a", "", "kid", "")))
           .realpath(root.getRealpath() + "/link-target").parent(root));
@@ -460,7 +460,7 @@ class NodeTest {
     @Test
     void childOfLinkTargetHasPathLikeParent() {
         Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/home/user/projects/root").realpath("/home/user/projects/root"));
+          .path("/srv/user/projects/root").realpath("/srv/user/projects/root"));
         node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a"));
         Link link = link(opts().pkg(obj("name", "link", "version", "1.2.3", "dependencies", obj("a", "", "kid", "")))
           .realpath(root.getRealpath() + "/link-target").parent(root).fsParent(root));
@@ -472,12 +472,12 @@ class NodeTest {
     @Test
     void changingRoot() {
         Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/home/user/projects/root").realpath("/home/user/projects/root").meta(emptyLock("/home/user/projects/root")));
+          .path("/srv/user/projects/root").realpath("/srv/user/projects/root").meta(emptyLock("/srv/user/projects/root")));
         Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a")
           .resolved("https://example.com/a-1.2.3.tgz").integrity("sha512-asdfasdfasdf"));
         Node b = node(opts().pkg(obj("name", "b", "version", "1.2.3")).parent(a).name("b"));
         Node root2 = node(opts().pkg(obj("name", "root2", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/home/user/projects/root2").realpath("/home/user/projects/root2").meta(emptyLock("/home/user/projects/root2")));
+          .path("/srv/user/projects/root2").realpath("/srv/user/projects/root2").meta(emptyLock("/srv/user/projects/root2")));
         assertThat(a.getRoot()).isSameAs(root);
         assertThat(b.getRoot()).isSameAs(root);
         assertTree("changing root: before, root", root);
@@ -557,8 +557,8 @@ class NodeTest {
 
     @Test
     void updateMetadataWhenMovingBetweenLinkedTopOfTreeParents() {
-        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/root").realpath("/home/user/projects/root")
-          .meta(emptyLock("/home/user/projects/root")));
+        Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/root").realpath("/srv/user/projects/root")
+          .meta(emptyLock("/srv/user/projects/root")));
         Node top1 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top1").realpath("/path/to/top1")
           .meta(emptyLock("/path/to/top1")));
         link(opts().name("link1").parent(root).realpath(top1.getPath()).target(top1));
@@ -640,23 +640,23 @@ class NodeTest {
     @Test
     void legacyPeerDependencies() {
         Node root = node(opts().pkg(obj("name", "root", "peerDependencies", obj("foo", "1.x")))
-          .path("/home/user/projects/root").realpath("/home/user/projects/root").legacyPeerDeps(true));
-        Node foo = node(opts().pkg(obj("name", "foo", "version", "1.2.3")).path("/home/user/projects/root/foo")
-          .realpath("/home/user/projects/root/foo").legacyPeerDeps(true).parent(root));
+          .path("/srv/user/projects/root").realpath("/srv/user/projects/root").legacyPeerDeps(true));
+        Node foo = node(opts().pkg(obj("name", "foo", "version", "1.2.3")).path("/srv/user/projects/root/foo")
+          .realpath("/srv/user/projects/root/foo").legacyPeerDeps(true).parent(root));
         assertThat(root.getChildren().get("foo")).as("should be a children").isSameAs(foo);
         assertThat(root.getEdgesOut().size()).as("should have no edges out").isZero();
     }
 
     @Test
     void setWorkspaces() {
-        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/home/user/projects/workspaces_root")
-          .realpath("/home/user/projects/workspaces_root"));
-        Link link = link(opts().parent(root).target(node(opts().path("/home/user/projects/workspaces_root/foo")
+        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/srv/user/projects/workspaces_root")
+          .realpath("/srv/user/projects/workspaces_root"));
+        Link link = link(opts().parent(root).target(node(opts().path("/srv/user/projects/workspaces_root/foo")
           .pkg(obj("name", "foo", "version", "1.2.3")))));
-        Link unknown = link(opts().parent(root).target(node(opts().path("/home/user/projects/workspaces_root/unknown")
+        Link unknown = link(opts().parent(root).target(node(opts().path("/srv/user/projects/workspaces_root/unknown")
           .pkg(obj("name", "unknown", "version", "1.2.3")))));
-        root.setWorkspaces(workspaces("foo", "/home/user/projects/workspaces_root/foo",
-          "bar", "/home/user/projects/workspaces_root/bar"));
+        root.setWorkspaces(workspaces("foo", "/srv/user/projects/workspaces_root/foo",
+          "bar", "/srv/user/projects/workspaces_root/bar"));
 
         assertThat(describe(root)).isEqualTo(treeDump("should setup edges out for each workspace"));
         assertThat(link.isWorkspace()).as("link node reports isWorkspace true").isTrue();
@@ -667,8 +667,8 @@ class NodeTest {
 
     @Test
     void getWorkspaces() {
-        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/home/user/projects/workspaces_root")
-          .realpath("/home/user/projects/workspaces_root"));
+        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/srv/user/projects/workspaces_root")
+          .realpath("/srv/user/projects/workspaces_root"));
         assertThat(root.getWorkspaces()).as("should default to null when no workspaces defined").isNull();
         Map<String, String> ws = new LinkedHashMap<>();
         root.setWorkspaces(ws);
@@ -677,10 +677,10 @@ class NodeTest {
 
     @Test
     void replaceWorkspaces() {
-        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/home/user/projects/workspaces_root")
-          .realpath("/home/user/projects/workspaces_root"));
-        root.setWorkspaces(workspaces("foo", "/home/user/projects/workspaces_root/foo",
-          "bar", "/home/user/projects/workspaces_root/bar"));
+        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/srv/user/projects/workspaces_root")
+          .realpath("/srv/user/projects/workspaces_root"));
+        root.setWorkspaces(workspaces("foo", "/srv/user/projects/workspaces_root/foo",
+          "bar", "/srv/user/projects/workspaces_root/bar"));
         Map<String, String> ws = new LinkedHashMap<>();
         root.setWorkspaces(ws);
         assertThat(root.getWorkspaces()).as("should remove previously set workspaces").isSameAs(ws);
@@ -688,11 +688,11 @@ class NodeTest {
 
     @Test
     void replaceWorkspacesKeepingExistingEdgesOut() {
-        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/home/user/projects/workspaces_root")
-          .realpath("/home/user/projects/workspaces_root"));
-        root.setWorkspaces(workspaces("foo", "/home/user/projects/workspaces_root/foo"));
-        Map<String, String> ws = workspaces("foo", "/home/user/projects/workspaces_root/foo",
-          "bar", "/home/user/projects/workspaces_root/bar");
+        Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/srv/user/projects/workspaces_root")
+          .realpath("/srv/user/projects/workspaces_root"));
+        root.setWorkspaces(workspaces("foo", "/srv/user/projects/workspaces_root/foo"));
+        Map<String, String> ws = workspaces("foo", "/srv/user/projects/workspaces_root/foo",
+          "bar", "/srv/user/projects/workspaces_root/bar");
         root.setWorkspaces(ws);
         assertThat(root.getWorkspaces()).as("should keep existing edges out").isSameAs(ws);
     }
@@ -1107,9 +1107,9 @@ class NodeTest {
 
         @Test
         void preferWorkspaceVersion() {
-            Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/home/user/projects/workspaces_root")
-              .realpath("/home/user/projects/workspaces_root"));
-            root.setWorkspaces(workspaces("foo", "/home/user/projects/workspaces_root/foo"));
+            Node root = node(opts().pkg(obj("name", "workspaces_root")).path("/srv/user/projects/workspaces_root")
+              .realpath("/srv/user/projects/workspaces_root"));
+            root.setWorkspaces(workspaces("foo", "/srv/user/projects/workspaces_root/foo"));
             root.setPackage(obj("name", "bar", "version", "1.2.3", "dependencies", obj("foo", "2.3.4")));
             assertThat(root.getEdgesOut().get("foo").getType()).as("keeps workspace edge").isEqualTo(Edge.Type.WORKSPACE);
         }

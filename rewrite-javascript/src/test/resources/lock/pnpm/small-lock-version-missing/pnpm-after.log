@@ -1,4 +1,4 @@
-[WARN] Ignoring broken lockfile at /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.50qo5xn7ox/project: Lockfile /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.50qo5xn7ox/project/pnpm-lock.yaml not compatible with current pnpm
+[WARN] Ignoring broken lockfile at <tmp>/project: Lockfile <tmp>/project/pnpm-lock.yaml not compatible with current pnpm
 Progress: resolved 1, reused 0, downloaded 0, added 0
 Progress: resolved 2, reused 0, downloaded 0, added 0, done
 

@@ -32,7 +32,7 @@ const json = v => JSON.stringify(npm.sortKeys(v))
 const out = {}
 
 {
-  const meta = new Shrinkwrap({ path: '/home/user/projects/root' })
+  const meta = new Shrinkwrap({ path: '/srv/user/projects/root' })
   meta.data = { lockfileVersion: 2, requires: true, dependencies: {}, packages: {} }
   const root = new Node({
     pkg: {
@@ -43,8 +43,8 @@ const out = {}
       peerDependencies: { peer: '' },
       scripts: { install: 'true' },
     },
-    path: '/home/user/projects/root',
-    realpath: '/home/user/projects/root',
+    path: '/srv/user/projects/root',
+    realpath: '/srv/user/projects/root',
     meta,
   })
   const peer = new Node({
@@ -79,7 +79,7 @@ const out = {}
       cpu: ['x64'],
       libc: ['glibc'],
     },
-    resolved: '/home/user/projects/root/archives/tarball.tgz',
+    resolved: '/srv/user/projects/root/archives/tarball.tgz',
     parent: root,
   })
   const tgzPkgResolved = new Node({
@@ -87,7 +87,7 @@ const out = {}
       name: 'tgz-pkg-resolved',
       version: '1.2.3',
       funding: { url: 'https://example.com/' },
-      _resolved: '/home/user/projects/root/archives/tarball-pkg-resolved.tgz',
+      _resolved: '/srv/user/projects/root/archives/tarball-pkg-resolved.tgz',
       _integrity: 'sha512-tarball/package/resolved/integrity',
     },
     parent: root,
@@ -99,27 +99,27 @@ const out = {}
     _resolved: 'github:isaacs/foobarbaz#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   })
   const link = new Link({
-    path: '/home/user/projects/root/node_modules/link',
-    realpath: '/home/user/projects/root/target',
+    path: '/srv/user/projects/root/node_modules/link',
+    realpath: '/srv/user/projects/root/target',
     parent: root,
     pkg: linkPkg('link'),
     target: new Node({
-      realpath: '/home/user/projects/root/target',
-      path: '/home/user/projects/root/target',
+      realpath: '/srv/user/projects/root/target',
+      path: '/srv/user/projects/root/target',
       root,
       pkg: linkPkg('link'),
     }),
   })
   const link3 = new Link({
     name: 'link3',
-    path: '/home/user/projects/root/node_modules/link3',
-    realpath: '/home/user/projects/root/realPkg',
+    path: '/srv/user/projects/root/node_modules/link3',
+    realpath: '/srv/user/projects/root/realPkg',
     parent: root,
     pkg: linkPkg('link3'),
     target: new Node({
       name: 'link3',
-      realpath: '/home/user/projects/root/realPkg',
-      path: '/home/user/projects/root/realPkg',
+      realpath: '/srv/user/projects/root/realPkg',
+      path: '/srv/user/projects/root/realPkg',
       root,
       pkg: linkPkg('link3'),
     }),

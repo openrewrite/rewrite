@@ -1,4 +1,4 @@
-[WARN] Ignoring broken lockfile at /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.SpccOfo2L8/project: The lockfile at "/private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.SpccOfo2L8/project/pnpm-lock.yaml" is broken: unexpected end of the stream within a flow collection (19:1)
+[WARN] Ignoring broken lockfile at <tmp>/project: The lockfile at "<tmp>/project/pnpm-lock.yaml" is broken: unexpected end of the stream within a flow collection (19:1)
 
  16 | 
  17 |   abbrev@1.0.9:

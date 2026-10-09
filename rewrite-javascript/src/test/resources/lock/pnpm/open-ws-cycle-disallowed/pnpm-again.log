@@ -1,5 +1,5 @@
 Scope: all 3 workspace projects
-[ERR_PNPM_DISALLOW_WORKSPACE_CYCLES] There are cyclic workspace dependencies: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.vUGrOAQiUs/project/packages/a, /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.vUGrOAQiUs/project/packages/b
+[ERR_PNPM_DISALLOW_WORKSPACE_CYCLES] There are cyclic workspace dependencies: <tmp>/project/packages/a, <tmp>/project/packages/b
 pnpm 11.2.2, node v24.19.0, 2026-10-08T16:02:29Z
 exit=1
 no lock written

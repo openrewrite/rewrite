@@ -2,7 +2,7 @@ node:internal/modules/package_json_reader:173
   const result = modulesBinding.getNearestParentPackageJSON(checkPath);
                                 ^
 
-Error: Invalid package config /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.YISftwrjF6/project/package.json.
+Error: Invalid package config <tmp>/project/package.json.
     at Object.getNearestParentPackageJSON (node:internal/modules/package_json_reader:173:33)
     at trySelf (node:internal/modules/cjs/loader:656:33)
     at Module._resolveFilename (node:internal/modules/cjs/loader:1493:24)

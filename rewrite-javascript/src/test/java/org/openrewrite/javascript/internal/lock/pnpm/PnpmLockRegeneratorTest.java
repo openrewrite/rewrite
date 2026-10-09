@@ -224,7 +224,7 @@ class PnpmLockRegeneratorTest {
     void aPnpmfileSettingRunsThatFile() {
         assertThatThrownBy(() -> install("pnpmfile: hooks/custom.cjs", null))
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("hooks/custom.cjs"));
-        assertThatThrownBy(() -> install("globalPnpmfile: /home/u/.pnpmfile.cjs", null))
+        assertThatThrownBy(() -> install("globalPnpmfile: /srv/u/.pnpmfile.cjs", null))
           .isInstanceOf(CannotKnow.class);
         assertThat(install("pnpmfile: hooks/missing.cjs\nignorePnpmfile: true", null).getWritten()).isEqualTo(LOCK);
         assertThat(install(LOCK, MANIFEST, "ignorePnpmfile: true",

@@ -1,4 +1,4 @@
-[31m[1mUsage Error[22m[39m: Unrecognized or legacy configuration settings found: catalog - run "yarn config -v" to see the list of settings supported in Yarn (in /var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.N2DQ9mxi2k/home/.yarnrc.yml, /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.N2DQ9mxi2k/project/.yarnrc.yml)
+[31m[1mUsage Error[22m[39m: Unrecognized or legacy configuration settings found: catalog - run "yarn config -v" to see the list of settings supported in Yarn (in <tmp>/home/.yarnrc.yml, <tmp>/project/.yarnrc.yml)
 
 [1m$ [22myarn install [--json] [--immutable] [--immutable-cache] [--refresh-lockfile] [--check-cache] [--check-resolutions] [--inline-builds] [--mode #0]
 over=before

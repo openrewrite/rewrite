@@ -110,9 +110,9 @@ class PnpmOptionsTest {
 
     // env.test.ts
 
-    private static final String HOME = "/home/fake-user";
+    private static final String HOME = "/srv/fake-user";
     private static final String PATH =
-      "/bin:/usr/bin:/usr/local/bin:/home/fake-user/.bin:/home/fake-user/share/local/bin";
+      "/bin:/usr/bin:/usr/local/bin:/srv/fake-user/.bin:/srv/fake-user/share/local/bin";
 
     private static Function<String, @Nullable Object> alwaysSchema(Object schema) {
         return key -> {
@@ -172,7 +172,7 @@ class PnpmOptionsTest {
           "pnpm_config_bar", "~/abc/def/ghi", "pnpm_config_baz", "~\\abc\\def\\ghi");
         env.put("pnpm_config_undefined_somehow", null);
         assertThat(pairsToObject(PnpmOptions.parseEnvVars(alwaysSchema(ConfigTypes.Type.PATH), env)))
-          .isEqualTo("{'foo':'abc/def/ghi','bar':'/home/fake-user/abc/def/ghi','baz':'/home/fake-user/abc\\def\\ghi'}");
+          .isEqualTo("{'foo':'abc/def/ghi','bar':'/srv/fake-user/abc/def/ghi','baz':'/srv/fake-user/abc\\def\\ghi'}");
 
         env = env("pnpm_config_foo", "abc/def/ghi", "pnpm_config_bar", "~/abc/def/ghi",
           "pnpm_config_baz", "~\\abc\\def\\ghi");

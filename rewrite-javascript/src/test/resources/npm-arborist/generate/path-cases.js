@@ -22,10 +22,10 @@ process.chdir('/')
 const calls = [
   ['resolve', ['/a/b', 'c']], ['resolve', ['/a/b', '../c']], ['resolve', ['/a/b', '/c', 'd']],
   ['resolve', ['a/b']], ['resolve', ['']], ['resolve', ['/']], ['resolve', ['/a/b/./c/..//d/']],
-  ['resolve', ['/home/user/projects/root', 'node_modules', 'foo']], ['resolve', ['/x', '..', '..']],
+  ['resolve', ['/srv/user/projects/root', 'node_modules', 'foo']], ['resolve', ['/x', '..', '..']],
   ['relative', ['/a/b/c', '/a/b/c/d/e']], ['relative', ['/a/b/c', '/a/x']], ['relative', ['/', '/foo']],
   ['relative', ['/foo/bar', '/']], ['relative', ['/foo', '/foo']], ['relative', ['/foo/bar', '/foo/barbaz']],
-  ['relative', ['/home/user/projects/some/kind/of/path', '/home/user/some/other/path']],
+  ['relative', ['/srv/user/projects/some/kind/of/path', '/srv/user/some/other/path']],
   ['relative', ['/x/y', '/x/z/y/a/b/c']], ['relative', ['/foo/bar/baz', '/foo/bar']],
   ['dirname', ['/a/b/c']], ['dirname', ['/a/b/c/']], ['dirname', ['/a']], ['dirname', ['/']], ['dirname', ['a']],
   ['dirname', ['//a']], ['dirname', ['']], ['dirname', ['a/b']],

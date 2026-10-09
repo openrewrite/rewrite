@@ -1,6 +1,6 @@
 yarn install v1.22.22
 warning package.json: No license field
-error SyntaxError: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.y1KfXrw810/repo/mid/package.json: Expected double-quoted property name in JSON at position 12 (line 1 column 13)
+error SyntaxError: <tmp>/repo/mid/package.json: Expected double-quoted property name in JSON at position 12 (line 1 column 13)
     at JSON.parse (<anonymous>)
     at <yarn>/lib/cli.js:1629:59
     at Generator.next (<anonymous>)

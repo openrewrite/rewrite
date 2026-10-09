@@ -55,11 +55,11 @@
  {
   "fn": "resolve",
   "args": [
-   "/home/user/projects/root",
+   "/srv/user/projects/root",
    "node_modules",
    "foo"
   ],
-  "result": "/home/user/projects/root/node_modules/foo"
+  "result": "/srv/user/projects/root/node_modules/foo"
  },
  {
   "fn": "resolve",
@@ -121,8 +121,8 @@
  {
   "fn": "relative",
   "args": [
-   "/home/user/projects/some/kind/of/path",
-   "/home/user/some/other/path"
+   "/srv/user/projects/some/kind/of/path",
+   "/srv/user/some/other/path"
   ],
   "result": "../../../../../some/other/path"
  },

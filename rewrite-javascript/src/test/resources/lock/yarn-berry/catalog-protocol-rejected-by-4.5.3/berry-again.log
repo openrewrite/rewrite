@@ -1,16 +1,16 @@
 ➤ YN0000: · Yarn 4.5.3
 ➤ YN0000: ┌ Resolution step
 ➤ YN0001: │ Error: ms@catalog: isn't supported by any available resolver
-    at Pg.getResolverByDescriptor ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:141:1698)
-    at Pg.bindDescriptor ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:141:1083)
-    at t.preparePackage ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:210:6173)
-    at async Z ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:210:7587)
+    at Pg.getResolverByDescriptor (<corepack>/v1/yarn/4.5.3/yarn.js:141:1698)
+    at Pg.bindDescriptor (<corepack>/v1/yarn/4.5.3/yarn.js:141:1083)
+    at t.preparePackage (<corepack>/v1/yarn/4.5.3/yarn.js:210:6173)
+    at async Z (<corepack>/v1/yarn/4.5.3/yarn.js:210:7587)
     at async Promise.allSettled (index 0)
-    at async Wc ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:140:53201)
-    at async $COREPACK_HOME/v1/yarn/4.5.3/yarn.js:210:9166
-    at async Lt.startProgressPromise ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:140:139272)
-    at async t.resolveEverything ($COREPACK_HOME/v1/yarn/4.5.3/yarn.js:210:7138)
-    at async $COREPACK_HOME/v1/yarn/4.5.3/yarn.js:213:2645
+    at async Wc (<corepack>/v1/yarn/4.5.3/yarn.js:140:53201)
+    at async <corepack>/v1/yarn/4.5.3/yarn.js:210:9166
+    at async Lt.startProgressPromise (<corepack>/v1/yarn/4.5.3/yarn.js:140:139272)
+    at async t.resolveEverything (<corepack>/v1/yarn/4.5.3/yarn.js:210:7138)
+    at async <corepack>/v1/yarn/4.5.3/yarn.js:213:2645
 ➤ YN0000: └ Completed
 ➤ YN0000: · Failed with errors in 0s 9ms
 over=before

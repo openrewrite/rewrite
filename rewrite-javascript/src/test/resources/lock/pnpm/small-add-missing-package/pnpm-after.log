@@ -1,7 +1,7 @@
 Progress: resolved 1, reused 0, downloaded 0, added 0
 [ERR_PNPM_FETCH_404] GET https://registry.npmjs.org/@isaacs%2Ftesting-peer-dep-conflict-chain-o: Not Found - 404
 
-This error happened while installing a direct dependency of /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.QU2pKpB0ng/project
+This error happened while installing a direct dependency of <tmp>/project
 
 @isaacs/testing-peer-dep-conflict-chain-o is not in the npm registry, or you have no permission to fetch it.
 

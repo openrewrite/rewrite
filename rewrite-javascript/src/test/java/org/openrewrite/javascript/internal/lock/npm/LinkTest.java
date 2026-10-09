@@ -39,10 +39,10 @@ class LinkTest {
 
     @Test
     void instantiate() {
-        Shrinkwrap meta = emptyLock("/home/user/projects/some/kind/of/path");
-        Node root = node(opts().pkg(obj("name", "root")).path("/home/user/projects/some/kind/of/path").meta(meta));
-        Link l1 = link(opts().pkg(obj("name", "root")).path("/home/user/some/other/path")
-          .realpath("/home/user/projects/some/kind/of/path").meta(meta));
+        Shrinkwrap meta = emptyLock("/srv/user/projects/some/kind/of/path");
+        Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/some/kind/of/path").meta(meta));
+        Link l1 = link(opts().pkg(obj("name", "root")).path("/srv/user/some/other/path")
+          .realpath("/srv/user/projects/some/kind/of/path").meta(meta));
         assertTree("instantiate without providing target", l1);
         assertThat(String.valueOf(meta.getTree() == l1.getTarget()))
           .isEqualTo(treeDump("instantiate without providing target / tree"));
@@ -51,7 +51,7 @@ class LinkTest {
         l1.getChildren().set("asdf", node(opts().path("/asdf")));
         assertThat(l1.getChildren().size()).as("children still empty after setting value").isZero();
 
-        Link l2 = link(opts().path("/home/user/some/other/path").target(root));
+        Link l2 = link(opts().path("/srv/user/some/other/path").target(root));
         assertTree("instantiate with target specified", l2.getRoot());
     }
 

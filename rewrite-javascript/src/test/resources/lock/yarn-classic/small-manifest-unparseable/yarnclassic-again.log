@@ -1,5 +1,5 @@
 yarn install v1.22.22
-error SyntaxError: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.m6AmKSyeIg/project/package.json: Expected double-quoted property name in JSON at position 63 (line 1 column 64)
+error SyntaxError: <tmp>/project/package.json: Expected double-quoted property name in JSON at position 63 (line 1 column 64)
     at JSON.parse (<anonymous>)
     at <yarn>/lib/cli.js:1629:59
     at Generator.next (<anonymous>)

@@ -83,14 +83,14 @@ const depTree = (prefix, rootMetadata) => {
   })
   const root = new Node({
     pkg: rootPkg(),
-    realpath: '/home/user/projects/root',
-    path: '/home/user/projects/root',
+    realpath: '/srv/user/projects/root',
+    path: '/srv/user/projects/root',
     meta: rootMetadata,
     children: [{
       pkg: { name: 'prod', version: '1.2.3', dependencies: { meta: '' }, peerDependencies: { peer: '' } },
       fsChildren: [{
-        realpath: '/home/user/projects/root/node_modules/prod/foo',
-        path: '/home/user/projects/root/node_modules/prod/foo',
+        realpath: '/srv/user/projects/root/node_modules/prod/foo',
+        path: '/srv/user/projects/root/node_modules/prod/foo',
         name: 'foo',
         pkg: { name: 'foo', version: '1.2.3', dependencies: { meta: '' } },
       }],
@@ -104,8 +104,8 @@ const depTree = (prefix, rootMetadata) => {
       name: 'meta', version: '1.2.3', devDependencies: { missing: '' }, dependencies: { bundled: '' },
       _resolved: 'meta', _integrity: 'meta',
     },
-    path: '/home/user/projects/root/node_modules/prod/node_modules/meta',
-    realpath: '/home/user/projects/root/node_modules/prod/node_modules/meta',
+    path: '/srv/user/projects/root/node_modules/prod/node_modules/meta',
+    realpath: '/srv/user/projects/root/node_modules/prod/node_modules/meta',
     parent: prod,
   })
   for (const [name, resolved] of [['bundled', 'bundled'], ['dev', 'dev'], ['optional', 'opt'], ['peer', 'peer'], ['extraneous', 'extraneous']]) {
@@ -113,8 +113,8 @@ const depTree = (prefix, rootMetadata) => {
       pkg: { name, version: '1.2.3', ...(name === 'bundled' ? { dependencies: { meta: '' } } : {}) },
       resolved,
       integrity: resolved,
-      path: '/home/user/projects/root/node_modules/' + name,
-      realpath: '/home/user/projects/root/node_modules/' + name,
+      path: '/srv/user/projects/root/node_modules/' + name,
+      realpath: '/srv/user/projects/root/node_modules/' + name,
       parent: root,
     })
   }
@@ -163,8 +163,8 @@ const depTree = (prefix, rootMetadata) => {
   newProd.canReplaceWith(prodV2)
   const root2 = new Node({
     pkg: rootPkg(),
-    realpath: '/home/user/projects/root',
-    path: '/home/user/projects/root',
+    realpath: '/srv/user/projects/root',
+    path: '/srv/user/projects/root',
     meta: rootMetadata,
   })
   root.replaceWith(root2)
@@ -188,14 +188,14 @@ const depTree = (prefix, rootMetadata) => {
   dumps[prefix + 'final / data'] = JSON.stringify(npm.sortKeys(rootMetadata.data))
 }
 depTree('', undefined)
-depTree('with meta: ', emptyLock('/home/user/projects/root'))
+depTree('with meta: ', emptyLock('/srv/user/projects/root'))
 
 // test/node.js: basic instantiation
 {
   const root = new Node({
     pkg: { name: 'root' },
-    path: '/home/user/projects/root',
-    realpath: '/home/user/projects/root',
+    path: '/srv/user/projects/root',
+    realpath: '/srv/user/projects/root',
     overrides: new OverrideSet({ overrides: { foo: '1' } }),
   })
   dump('just a lone root node', root)
@@ -205,9 +205,9 @@ depTree('with meta: ', emptyLock('/home/user/projects/root'))
 {
   const root = new Node({
     pkg: { name: 'root', dependencies: { a: '', link: '', link2: '' } },
-    path: '/home/user/projects/root',
-    realpath: '/home/user/projects/root',
-    meta: emptyLock('/home/user/projects/root'),
+    path: '/srv/user/projects/root',
+    realpath: '/srv/user/projects/root',
+    meta: emptyLock('/srv/user/projects/root'),
   })
   const a = new Node({
     pkg: { name: 'a', version: '1.2.3' },
@@ -219,9 +219,9 @@ depTree('with meta: ', emptyLock('/home/user/projects/root'))
   new Node({ pkg: { name: 'b', version: '1.2.3' }, parent: a, name: 'b' })
   const root2 = new Node({
     pkg: { name: 'root2', dependencies: { a: '', link: '', link2: '' } },
-    path: '/home/user/projects/root2',
-    realpath: '/home/user/projects/root2',
-    meta: emptyLock('/home/user/projects/root2'),
+    path: '/srv/user/projects/root2',
+    realpath: '/srv/user/projects/root2',
+    meta: emptyLock('/srv/user/projects/root2'),
   })
   dump('changing root: before, root', root)
   a.parent = root2
@@ -237,9 +237,9 @@ depTree('with meta: ', emptyLock('/home/user/projects/root'))
 {
   const root = new Node({
     pkg: { name: 'root' },
-    path: '/home/user/projects/root',
-    realpath: '/home/user/projects/root',
-    meta: emptyLock('/home/user/projects/root'),
+    path: '/srv/user/projects/root',
+    realpath: '/srv/user/projects/root',
+    meta: emptyLock('/srv/user/projects/root'),
   })
   const top1 = new Node({
     pkg: { name: 'top', version: '1.1.1' },
@@ -287,37 +287,37 @@ depTree('with meta: ', emptyLock('/home/user/projects/root'))
 {
   const root = new Node({
     pkg: { name: 'workspaces_root' },
-    path: '/home/user/projects/workspaces_root',
-    realpath: '/home/user/projects/workspaces_root',
+    path: '/srv/user/projects/workspaces_root',
+    realpath: '/srv/user/projects/workspaces_root',
   })
   new Link({
     parent: root,
-    target: new Node({ path: '/home/user/projects/workspaces_root/foo', pkg: { name: 'foo', version: '1.2.3' } }),
+    target: new Node({ path: '/srv/user/projects/workspaces_root/foo', pkg: { name: 'foo', version: '1.2.3' } }),
   })
   new Link({
     parent: root,
-    target: new Node({ path: '/home/user/projects/workspaces_root/unknown', pkg: { name: 'unknown', version: '1.2.3' } }),
+    target: new Node({ path: '/srv/user/projects/workspaces_root/unknown', pkg: { name: 'unknown', version: '1.2.3' } }),
   })
   root.workspaces = new Map([
-    ['foo', '/home/user/projects/workspaces_root/foo'],
-    ['bar', '/home/user/projects/workspaces_root/bar'],
+    ['foo', '/srv/user/projects/workspaces_root/foo'],
+    ['bar', '/srv/user/projects/workspaces_root/bar'],
   ])
   dump('should setup edges out for each workspace', root)
 }
 
 // test/link.js
 {
-  const meta = emptyLock('/home/user/projects/some/kind/of/path')
-  const root = new Node({ pkg: { name: 'root' }, path: '/home/user/projects/some/kind/of/path', meta })
+  const meta = emptyLock('/srv/user/projects/some/kind/of/path')
+  const root = new Node({ pkg: { name: 'root' }, path: '/srv/user/projects/some/kind/of/path', meta })
   const l1 = new Link({
     pkg: { name: 'root' },
-    path: '/home/user/some/other/path',
-    realpath: '/home/user/projects/some/kind/of/path',
+    path: '/srv/user/some/other/path',
+    realpath: '/srv/user/projects/some/kind/of/path',
     meta,
   })
   dump('instantiate without providing target', l1)
   dumps['instantiate without providing target / tree'] = String(meta.tree === l1.target)
-  const l2 = new Link({ path: '/home/user/some/other/path', target: root })
+  const l2 = new Link({ path: '/srv/user/some/other/path', target: root })
   dump('instantiate with target specified', l2.root)
 }
 

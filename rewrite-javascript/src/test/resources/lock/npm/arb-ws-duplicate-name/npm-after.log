@@ -1,6 +1,6 @@
 npm error code EDUPLICATEWORKSPACE
 npm error must not have multiple workspaces with the same name
 npm error package 'a' has conflicts in the following paths:
-npm error     /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.7bYBZd9jDH/packages/a
-npm error     /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.7bYBZd9jDH/packages/b
-npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T12_08_44_636Z-debug-0.log
+npm error     <tmp>/packages/a
+npm error     <tmp>/packages/b
+npm error A complete log of this run can be found in: <home>/.npm/_logs/2026-10-05T12_08_44_636Z-debug-0.log

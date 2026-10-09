@@ -95,7 +95,7 @@ class ShrinkwrapTest {
 
     @Test
     void constructMetadataFromNodeAndPackageData() {
-        String dir = "/home/user/projects/root";
+        String dir = "/srv/user/projects/root";
         Shrinkwrap meta = lock(dir, obj("lockfileVersion", 2, "requires", true, "dependencies", obj(), "packages",
                                         obj()));
         Node root = node(opts().pkg(obj("name", "root",
@@ -691,9 +691,9 @@ class ShrinkwrapTest {
 
     @Test
     void doNotAddMetadataIfVersionsMismatch() {
-        Shrinkwrap meta = lock("/home/user/projects/root",
+        Shrinkwrap meta = lock("/srv/user/projects/root",
           obj("lockfileVersion", 2, "requires", true, "dependencies", obj(), "packages", obj()));
-        Node root = node(opts().path("/home/usr/projects/root").meta(meta)
+        Node root = node(opts().path("/srv/usr/projects/root").meta(meta)
           .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "1")))
           .child(opts().name("foo").pkg(obj("name", "foo", "version", "1.0.0"))
             .resolved("https://registry.npmjs.org/foo-1.0.0.tgz").integrity("sha512-this is no sha of mine").build()));

@@ -1,24 +1,24 @@
 {
  "construct": {
   "flags": {
-   "/home/user/projects/root": "00000",
-   "/home/user/projects/root/node_modules/peer": "00010",
-   "/home/user/projects/root/node_modules/peer/node_modules/peerdep": "00010",
-   "/home/user/projects/root/node_modules/e": "10000",
-   "/home/user/projects/root/node_modules/tgz": "10000",
-   "/home/user/projects/root/node_modules/tgz-pkg-resolved": "10000",
-   "/home/user/projects/root/target": "00000",
-   "/home/user/projects/root/node_modules/link": "00000",
-   "/home/user/projects/root/realPkg": "00000",
-   "/home/user/projects/root/node_modules/link3": "00000",
-   "/home/user/projects/root/node_modules/a": "00000",
-   "/home/user/projects/root/node_modules/optin": "01000",
-   "/home/user/projects/root/node_modules/devit": "10000",
-   "/home/user/projects/root/node_modules/devo": "00100",
-   "/home/user/projects/root/node_modules/d": "10000",
-   "/home/user/projects/root/node_modules/d/node_modules/bundled": "10000",
-   "/home/user/projects/root/node_modules/d/node_modules/git-dep": "10000",
-   "/home/user/projects/root/node_modules/nopkg": "11111"
+   "/srv/user/projects/root": "00000",
+   "/srv/user/projects/root/node_modules/peer": "00010",
+   "/srv/user/projects/root/node_modules/peer/node_modules/peerdep": "00010",
+   "/srv/user/projects/root/node_modules/e": "10000",
+   "/srv/user/projects/root/node_modules/tgz": "10000",
+   "/srv/user/projects/root/node_modules/tgz-pkg-resolved": "10000",
+   "/srv/user/projects/root/target": "00000",
+   "/srv/user/projects/root/node_modules/link": "00000",
+   "/srv/user/projects/root/realPkg": "00000",
+   "/srv/user/projects/root/node_modules/link3": "00000",
+   "/srv/user/projects/root/node_modules/a": "00000",
+   "/srv/user/projects/root/node_modules/optin": "01000",
+   "/srv/user/projects/root/node_modules/devit": "10000",
+   "/srv/user/projects/root/node_modules/devo": "00100",
+   "/srv/user/projects/root/node_modules/d": "10000",
+   "/srv/user/projects/root/node_modules/d/node_modules/bundled": "10000",
+   "/srv/user/projects/root/node_modules/d/node_modules/git-dep": "10000",
+   "/srv/user/projects/root/node_modules/nopkg": "11111"
   },
   "gets": [
    [
@@ -58,22 +58,22 @@
    ],
    [
     "link metadata",
-    "/home/user/projects/root/node_modules/link",
+    "/srv/user/projects/root/node_modules/link",
     "{\"link\":true,\"resolved\":\"target\"}"
    ],
    [
     "link target metadata",
-    "/home/user/projects/root/target",
+    "/srv/user/projects/root/target",
     "{\"funding\":{\"url\":\"https://example.com/payme\"},\"name\":\"link\",\"resolved\":\"git+ssh://git@github.com/isaacs/foobarbaz.git#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"version\":\"1.2.3\"}"
    ],
    [
     "link metadata with same pkg name as link target",
-    "/home/user/projects/root/node_modules/link3",
+    "/srv/user/projects/root/node_modules/link3",
     "{\"link\":true,\"resolved\":\"realPkg\"}"
    ],
    [
     "link target metadata with same pkg name as link target",
-    "/home/user/projects/root/realPkg",
+    "/srv/user/projects/root/realPkg",
     "{\"funding\":{\"url\":\"https://example.com/payme\"},\"name\":\"link3\",\"resolved\":\"git+ssh://git@github.com/isaacs/foobarbaz.git#aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"version\":\"1.2.3\"}"
    ],
    [

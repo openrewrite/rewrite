@@ -2,7 +2,7 @@ yarn install v1.22.22
 warning package.json: No license field
 [1/4] Resolving packages...
 warning Using the "file:" protocol implicitly is deprecated. Please either prepend the protocol or prepend the path "lib" with "./".
-error Package "zz-openrewrite-absent-local-dep" refers to a non-existing file '"/private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.v0WaZHVGPW/again/lib"'.
+error Package "zz-openrewrite-absent-local-dep" refers to a non-existing file '"<tmp>/again/lib"'.
 info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
 over=before
 exit=1

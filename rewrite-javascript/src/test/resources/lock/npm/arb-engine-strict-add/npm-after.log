@@ -4,4 +4,4 @@ npm error engine Not compatible with your version of node/npm: engine-specifying
 npm error notsup Not compatible with your version of node/npm: engine-specifying-test-package@1.0.0
 npm error notsup Required: {"node":"8.17.0"}
 npm error notsup Actual:   {"node":"v24.19.0","npm":"11.17.0"}
-npm error A complete log of this run can be found in: /Users/jon/.npm/_logs/2026-10-05T12_06_36_303Z-debug-0.log
+npm error A complete log of this run can be found in: <home>/.npm/_logs/2026-10-05T12_06_36_303Z-debug-0.log
