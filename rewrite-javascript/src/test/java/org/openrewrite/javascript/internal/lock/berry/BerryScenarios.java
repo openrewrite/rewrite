@@ -20,21 +20,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,13 +44,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded Yarn Berry scenarios under {@code lock/yarn-berry/} on the test classpath and, when
- * {@code REWRITE_LOCK_SCENARIOS} names a directory, under its {@code yarn-berry} sibling or itself.
+ * The recorded Yarn Berry scenarios ({@link LockScenario#discover}) in the recorder's layout: each lock with the
+ * manifests, .yarnrc.yml, patches, environment, machine and day of its phase.
  */
 final class BerryScenarios {
 
-    static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
-    static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
     static final String FAMILY = "yarn-berry";
 
     /**
@@ -158,33 +154,9 @@ final class BerryScenarios {
         }
     }
 
-    @Getter
-    static final class Scenario {
-        private final String name;
-        private final String label;
-        private final Path dir;
-        private final @Nullable Path httpCache;
-
+    static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
-            this.name = name;
-            this.label = label;
-            this.dir = dir;
-            this.httpCache = httpCache;
-        }
-
-        boolean has(String file) {
-            return Files.isRegularFile(dir.resolve(file));
-        }
-
-        @Nullable
-        String file(String file) {
-            return has(file) ? read(dir.resolve(file)) : null;
-        }
-
-        @Nullable
-        String expect() {
-            String expect = file("expect");
-            return expect == null ? null : expect.trim();
+            super(name, label, dir, httpCache);
         }
 
         /**
@@ -201,12 +173,12 @@ final class BerryScenarios {
             if (given != null && !given.equals(file("before"))) {
                 locks.add(new Lock(this, "before-given", given, Phase.BEFORE));
             }
-            try (Stream<Path> files = Files.list(dir)) {
+            try (Stream<Path> files = Files.list(getDir())) {
                 files.map(f -> f.getFileName().toString())
                         .filter(f -> f.startsWith("before-") && !f.equals("before-given") &&
                                      !f.equals("before-commands") && !f.equals("before-again"))
                         .sorted()
-                        .forEach(f -> locks.add(new Lock(this, f, read(dir.resolve(f)), Phase.BEFORE)));
+                        .forEach(f -> locks.add(new Lock(this, f, read(getDir().resolve(f)), Phase.BEFORE)));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
@@ -345,14 +317,14 @@ final class BerryScenarios {
                 }
             }
             if (!has("recorded-with")) {
-                try (Stream<Path> files = Files.list(dir)) {
+                try (Stream<Path> files = Files.list(getDir())) {
                     files.map(f -> f.getFileName().toString())
                             .filter(f -> f.startsWith("pkg-") && !f.equals("pkg-before") && !f.equals("pkg-after") &&
                                          !f.equals("pkg-root") &&
                                          !f.endsWith(phase == Phase.AFTER ? "-before" : "-after"))
                             .sorted()
                             .forEach(f -> manifests.put("packages/" + f.substring(4).replaceAll("-(before|after)$", ""),
-                                    read(dir.resolve(f))));
+                                    read(getDir().resolve(f))));
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }
@@ -376,21 +348,6 @@ final class BerryScenarios {
             Map<String, String> out = new TreeMap<>(tree("tree-before"));
             if (phase == Phase.AFTER) {
                 out.putAll(tree("tree"));
-            }
-            return out;
-        }
-
-        private Map<String, String> tree(String treeDir) {
-            Path root = dir.resolve(treeDir);
-            Map<String, String> out = new TreeMap<>();
-            if (!Files.isDirectory(root)) {
-                return out;
-            }
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile)
-                        .forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
             }
             return out;
         }
@@ -422,60 +379,36 @@ final class BerryScenarios {
          */
         byte @Nullable [] cached(String name) {
             try {
-                Path file = httpCache == null ? null : httpCache.resolve(name);
+                Path file = getHttpCache() == null ? null : getHttpCache().resolve(name);
                 return file != null && Files.isRegularFile(file) ? Files.readAllBytes(file) : null;
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-        }
-
-        /**
-         * A recorded registry response from the scenario's {@code http/}, else the shared cache.
-         */
-        @Nullable
-        byte[] http(String name) {
-            Path own = dir.resolve("http").resolve(name);
-            try {
-                if (Files.isRegularFile(own)) {
-                    return Files.readAllBytes(own);
-                }
-                if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
-                    return Files.readAllBytes(httpCache.resolve(name));
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return null;
-        }
-
-        @Override
-        public String toString() {
-            return name;
         }
     }
 
     /**
      * {@link Scenario#registry()}, with every route it was asked for and does not have.
      */
-    static final class ScenarioRegistry implements RegistrySource {
+    static final class ScenarioRegistry extends RecordedRegistry implements RegistrySource {
         private static final ObjectMapper JSON = new ObjectMapper();
 
-        private final Scenario scenario;
-        final List<String> missing = new ArrayList<>();
+        private final Scenario recording;
 
         ScenarioRegistry(Scenario scenario) {
-            this.scenario = scenario;
+            super(scenario);
+            this.recording = scenario;
         }
 
         @Override
         public @Nullable String packument(String registry, String name) {
-            byte[] body = scenario.http(name);
+            byte[] body = scenario.httpBytes(name);
             if (body == null) {
                 missing.add(name);
                 return null;
             }
             String text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), false);
-            byte[] cached = scenario.getHttpCache() == null ? null : scenario.cached(name);
+            byte[] cached = scenario.getHttpCache() == null ? null : recording.cached(name);
             if (text == null && cached != null) {
                 text = withRecordedVersions(name, new String(cached, StandardCharsets.UTF_8), false);
             }
@@ -483,14 +416,14 @@ final class BerryScenarios {
                 missing.add(name + "-<version> for the versions recorded empty");
                 text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), true);
             }
-            String recording = scenario.recordingRegistry();
-            return recording == null ? text : text.replace(NPM_REGISTRY, recording + "/");
+            String recorded = recording.recordingRegistry();
+            return recorded == null ? text : text.replace(NPM_REGISTRY, recorded + "/");
         }
 
         @Override
         public byte @Nullable [] tarball(String url, String name, String version) {
             String file = name + "-" + version + ".tgz";
-            byte[] tgz = scenario.http(file);
+            byte[] tgz = scenario.httpBytes(file);
             if (tgz == null) {
                 missing.add(file);
             }
@@ -509,7 +442,7 @@ final class BerryScenarios {
             int unrecorded = 0;
             @SuppressWarnings("unchecked") Map<String, Object> byVersion = (Map<String, Object>) versions;
             for (Map.Entry<String, Object> entry : byVersion.entrySet()) {
-                byte[] manifest = scenario.http(name + "-" + entry.getKey());
+                byte[] manifest = scenario.httpBytes(name + "-" + entry.getKey());
                 if (manifest != null) {
                     entry.setValue(Js.jsonParse(new String(manifest, StandardCharsets.UTF_8)));
                     filled = true;
@@ -529,77 +462,14 @@ final class BerryScenarios {
                 throw new UncheckedIOException(e);
             }
         }
-
-        String describe() {
-            return missing.isEmpty() ? "" : " [routes not recorded: " + String.join(", ", missing) + "]";
-        }
     }
 
     static List<Scenario> discover() {
-        Map<String, Scenario> found = new TreeMap<>();
-        List<Path> classpathRoots = new ArrayList<>();
-        try {
-            Enumeration<URL> roots = BerryScenarios.class.getClassLoader().getResources("lock/" + FAMILY);
-            while (roots.hasMoreElements()) {
-                URL url = roots.nextElement();
-                if ("file".equals(url.getProtocol())) {
-                    classpathRoots.add(Paths.get(url.toURI()));
-                }
-            }
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException(e);
-        }
-        String cache = System.getenv(HTTP_CACHE_ENV);
-        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
-                Paths.get(cache) : null;
-        for (Path root : classpathRoots) {
-            collect(root, httpCache, found);
-        }
-        Path corpus = corpusRoot();
-        if (corpus != null) {
-            collect(corpus, httpCache, found);
-        }
-        return new ArrayList<>(found.values());
-    }
-
-    private static @Nullable Path corpusRoot() {
-        String corpus = System.getenv(SCENARIOS_ENV);
-        if (corpus == null || corpus.isEmpty() || !Files.isDirectory(Paths.get(corpus))) {
-            return null;
-        }
-        Path dir = Paths.get(corpus);
-        if (FAMILY.equals(String.valueOf(dir.getFileName()))) {
-            return dir;
-        }
-        Path sibling = dir.resolveSibling(FAMILY);
-        return Files.isDirectory(sibling) ? sibling : null;
-    }
-
-    private static void collect(Path root, @Nullable Path httpCache, Map<String, Scenario> found) {
-        try (Stream<Path> walk = Files.walk(root, 1)) {
-            walk.filter(Files::isDirectory).forEach(dir -> {
-                if (dir.equals(root) || !isScenario(dir)) {
-                    return;
-                }
-                String name = root.relativize(dir).toString().replace('\\', '/');
-                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
-                found.put(label, new Scenario(name, label, dir, httpCache));
-            });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return LockScenario.discover(FAMILY, BerryScenarios::isScenario, Scenario::new);
     }
 
     private static boolean isScenario(Path dir) {
         return Files.isRegularFile(dir.resolve("before")) || Files.isRegularFile(dir.resolve("after")) ||
                Files.isRegularFile(dir.resolve("before-given"));
-    }
-
-    static String read(Path path) {
-        try {
-            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 }

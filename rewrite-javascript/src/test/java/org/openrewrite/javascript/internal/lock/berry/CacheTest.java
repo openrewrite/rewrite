@@ -78,7 +78,7 @@ class CacheTest {
                         continue;
                     }
                     String version = locator.reference.substring("npm:".length());
-                    byte[] tgz = scenario.http(StructUtils.stringifyIdent(locator) + "-" + version + ".tgz");
+                    byte[] tgz = scenario.httpBytes(StructUtils.stringifyIdent(locator) + "-" + version + ".tgz");
                     if (tgz != null && seen.add(resolution + " " + checksum)) {
                         out.add(Arguments.of(scenario.getName() + " " + resolution, locator, tgz, checksum));
                     }
@@ -133,7 +133,7 @@ class CacheTest {
     @Test
     void writesTheArchiveYarnCaches() throws IOException {
         BerryScenarios.Scenario scenario = scenario("open-tar-entry-types");
-        byte[] tgz = scenario.http("lwb-tar-1.0.0.tgz");
+        byte[] tgz = scenario.httpBytes("lwb-tar-1.0.0.tgz");
         Path cached;
         try (Stream<Path> files = Files.list(scenario.getDir().resolve("cache-after"))) {
             cached = files.filter(f -> f.toString().endsWith(".zip")).findFirst()
