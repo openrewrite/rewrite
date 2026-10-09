@@ -1274,14 +1274,15 @@ public final class PnpmLockRegenerator {
         List<Verification.Project> projects = new ArrayList<>();
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
-            if (text == null) {
-                for (String other : OTHER_MANIFEST_NAMES) {
-                    String path = dir.isEmpty() ? other : dir + "/" + other;
-                    if (holds(inputs, path)) {
-                        throw new CannotKnow("the manifest pnpm reads from " + path + " (only package.json files " +
-                                             "are read)");
-                    }
+            for (String other : workspace ? OTHER_MANIFEST_NAMES : Collections.<String>emptyList()) {
+                String path = dir.isEmpty() ? other : dir + "/" + other;
+                if (holds(inputs, path)) {
+                    // findPackages lists each manifest file it finds, so a package.json beside it is a second project
+                    throw new CannotKnow("the manifest pnpm reads from " + path + " (only package.json files are " +
+                                         "read)");
                 }
+            }
+            if (text == null) {
                 if (missingManifest == null) {
                     missingManifest = dir;
                 }

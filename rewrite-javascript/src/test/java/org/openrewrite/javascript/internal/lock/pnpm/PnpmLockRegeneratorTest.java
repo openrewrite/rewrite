@@ -301,6 +301,9 @@ class PnpmLockRegeneratorTest {
           .isInstanceOfSatisfying(CannotKnow.class,
             e -> assertThat(e.getSubject()).contains("packages/b/package.yaml"));
         assertThat(installHolding("packages:\n  - '.'\n", "packages/b/package.json5").getWritten()).isEqualTo(LOCK);
+        assertThatThrownBy(() -> installHolding("packages:\n  - '.'\n", "package.json5"))
+          .isInstanceOf(CannotKnow.class);
+        assertThat(installHolding(null, "package.yaml").getWritten()).isEqualTo(LOCK);
     }
 
     private static PnpmLockRegenerator.Install installHolding(@Nullable String workspace, String... paths) {

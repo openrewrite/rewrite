@@ -1,0 +1,1 @@
+Member b holds package.yaml (on once) beside its package.json (on wrappy) in a shared workspace; b adds abbrev to package.json.
