@@ -37,3 +37,21 @@ def test_complement_is_tightened():
         python("y = ~ z", "y = ~z"),
         spec=_spaces()
     )
+
+
+def test_trailing_comma_takes_the_space_inside_its_brackets():
+    rewrite_run(
+        # language=python
+        python("a = (0, )", "a = (0,)"),
+        python("b: Dict[str, int, ] = {}", "b: Dict[str, int,] = {}"),
+        python("c = {0: 1, }", "c = {0: 1,}"),
+        spec=_spaces()
+    )
+
+    spaces = IntelliJ.spaces()
+    rewrite_run(
+        # language=python
+        python("d = [0,]", "d = [ 0, ]"),
+        spec=RecipeSpec().with_recipe(from_visitor(SpacesVisitor(
+            spaces.with_within(spaces.within.with_brackets(True)))))
+    )

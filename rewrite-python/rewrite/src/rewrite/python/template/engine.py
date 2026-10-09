@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 from .capture import Capture
 from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
+from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
@@ -453,7 +454,10 @@ class TemplateEngine:
             )
 
         if not format:
-            return result
+            return cls.unmark_substituted(result)
+
+        unformatted = _SubstitutedValues()
+        unformatted.visit(result, None)
 
         # Auto-format the result
         try:
@@ -467,7 +471,17 @@ class TemplateEngine:
             # No CompilationUnit in cursor ancestry — skip formatting
             pass
 
+        if unformatted.values:
+            result = _SubstitutedLayout(unformatted.values).visit(result, None)
+            from ..format import minimally_format
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None)
         return result
+
+    @classmethod
+    def unmark_substituted(cls, result: J) -> J:
+        unmarked = _SubstitutedLayout({}).visit(result, None)
+        assert unmarked is not None
+        return unmarked
 
     @classmethod
     def clear_cache(cls) -> None:
@@ -496,3 +510,38 @@ class _RetainIds(PythonVisitor[None]):
             self._seen.add(tree.id)
             return tree
         return tree.replace(_id=random_id())
+
+
+class _SubstitutedValues(PythonVisitor[None]):
+    """Collects each substituted value by the id of the `SubstitutedValue` marking it."""
+
+    def __init__(self):
+        super().__init__()
+        self.values: Dict[UUID, J] = {}
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is not None:
+            self.values[marker.id] = tree
+            self.stop_after_pre_visit()
+        return tree
+
+
+class _SubstitutedLayout(PythonVisitor[None]):
+    """Puts each substituted value back as `unformatted` holds it, under the prefix the formatter gave
+    it, and drops its `SubstitutedValue` marker."""
+
+    def __init__(self, unformatted: Dict[UUID, J]):
+        super().__init__()
+        self._unformatted = unformatted
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is None:
+            return tree
+        self.stop_after_pre_visit()
+        before = self._unformatted.get(marker.id)
+        if before is not None:
+            tree = before.replace(prefix=tree.prefix)
+        return tree.replace(markers=tree.markers.replace(
+            markers=[m for m in tree.markers.markers if m != marker]))
