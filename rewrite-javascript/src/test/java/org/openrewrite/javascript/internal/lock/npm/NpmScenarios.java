@@ -18,22 +18,18 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -50,9 +46,6 @@ import java.util.stream.Stream;
  * REWRITE_LOCK_SCENARIOS} names, in the recorder's layout; {@code REWRITE_LOCK_HTTP_CACHE} is the registry fallback.
  */
 final class NpmScenarios {
-
-    static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
-    static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
 
     private static final Pattern LOCK = Pattern.compile("^(?:before|after|fresh)(?:-(.+))?$");
     private static final Pattern LOCK_FILE = Pattern.compile("^(before|after|fresh|again)(?:-(.+))?$");
@@ -267,28 +260,17 @@ final class NpmScenarios {
         }
     }
 
-    @Getter
-    static final class Scenario {
-        private final String name;
-
-        /**
-         * The name, plus the root it came from when another root holds a scenario of the same name.
-         */
-        private final String label;
-        private final Path dir;
-        private final @Nullable Path httpCache;
+    static final class Scenario extends LockScenario {
 
         /**
          * Every root scenarios are discovered under: a scenario's registry responses may sit under its name in
          * another root ({@code <root>/<name>/http/}) when its own directory is read-only.
          */
+        @Getter
         private final List<Path> roots;
 
         Scenario(String name, String label, Path dir, @Nullable Path httpCache, List<Path> roots) {
-            this.name = name;
-            this.label = label;
-            this.dir = dir;
-            this.httpCache = httpCache;
+            super(name, label, dir, httpCache);
             this.roots = roots;
         }
 
@@ -365,78 +347,27 @@ final class NpmScenarios {
             return m.find() ? Instant.parse(m.group(1)) : null;
         }
 
-        boolean has(String file) {
-            return Files.isRegularFile(dir.resolve(file));
-        }
-
-        @Nullable
-        String file(String file) {
-            return has(file) ? read(dir.resolve(file)) : null;
-        }
-
-        /**
-         * The names of the regular files directly in the scenario directory, sorted.
-         */
-        List<String> files() {
-            try (Stream<Path> list = Files.list(dir)) {
-                List<String> names = new ArrayList<>();
-                list.filter(Files::isRegularFile).forEach(p -> names.add(p.getFileName().toString()));
-                Collections.sort(names);
-                return names;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        /**
-         * The files of a tree directory ({@code tree-before} or {@code tree}) by path relative to it.
-         */
-        Map<String, String> tree(String name) {
-            Path root = dir.resolve(name);
-            Map<String, String> out = new TreeMap<>();
-            if (!Files.isDirectory(root)) {
-                return out;
-            }
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile).forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'),
-                                                                       read(p)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return out;
-        }
-
         /**
          * A recorded registry response: {@code http/<name>} (an abbreviated packument), {@code http/<name>-<version>}
          * (a manifest) or {@code http/<name>@full}, from the scenario, else from the shared cache.
          */
-        @Nullable
-        String http(String name) {
-            Path own = dir.resolve("http").resolve(name);
+        @Override
+        public @Nullable String http(String name) {
+            Path own = getDir().resolve("http").resolve(name);
             if (Files.isRegularFile(own)) {
                 return read(own);
             }
             for (Path root : roots) {
-                Path sibling = root.resolve(this.name).resolve("http").resolve(name);
+                Path sibling = root.resolve(getName()).resolve("http").resolve(name);
                 if (Files.isRegularFile(sibling)) {
                     return read(sibling);
                 }
             }
-            if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
-                return read(httpCache.resolve(name));
+            Path cache = getHttpCache();
+            if (cache != null && Files.isRegularFile(cache.resolve(name))) {
+                return read(cache.resolve(name));
             }
             return null;
-        }
-
-        @Nullable
-        String expect() {
-            String expect = file("expect");
-            return expect == null ? null : expect.trim();
-        }
-
-        @Nullable
-        String recordedWith() {
-            return file("recorded-with");
         }
 
         /**
@@ -546,11 +477,25 @@ final class NpmScenarios {
             return new Lock(this, file, file(file), has(manifestFile) ? manifestFile : null, file(manifestFile), tree,
                             yarnLock, npmrc);
         }
+    }
 
-        @Override
-        public String toString() {
-            return name;
+    /**
+     * Every scenario on the classpath and under {@code REWRITE_LOCK_SCENARIOS}, by name, nested at any depth.
+     */
+    static List<Scenario> discover() {
+        Map<String, Scenario> found = new TreeMap<>();
+        List<Path> roots = LockScenario.classpathRoots("npm");
+        LockScenario.Factory<Scenario> factory = (name, label, dir, httpCache) ->
+                new Scenario(name, label, dir, httpCache, roots);
+        Path httpCache = LockScenario.httpCache();
+        for (Path root : roots) {
+            LockScenario.collect(root, true, NpmScenarios::isScenario, httpCache, factory, found);
         }
+        Path corpus = LockScenario.corpusDirectory();
+        if (corpus != null) {
+            LockScenario.collect(corpus, true, NpmScenarios::isScenario, httpCache, factory, found);
+        }
+        return new ArrayList<>(found.values());
     }
 
     private static @Nullable Object parse(String json) {
@@ -578,59 +523,6 @@ final class NpmScenarios {
         }
     }
 
-    private static String read(Path path) {
-        try {
-            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    /**
-     * Every scenario on the classpath and under {@code REWRITE_LOCK_SCENARIOS}, by name.
-     */
-    static List<Scenario> discover() {
-        Map<String, Scenario> found = new TreeMap<>();
-        List<Path> classpathRoots = new ArrayList<>();
-        try {
-            Enumeration<URL> roots = NpmScenarios.class.getClassLoader().getResources("lock/npm");
-            while (roots.hasMoreElements()) {
-                URL url = roots.nextElement();
-                if ("file".equals(url.getProtocol())) {
-                    classpathRoots.add(Paths.get(url.toURI()));
-                }
-            }
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException(e);
-        }
-        String cache = System.getenv(HTTP_CACHE_ENV);
-        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
-          Paths.get(cache) : null;
-        for (Path root : classpathRoots) {
-            collect(root, httpCache, classpathRoots, found);
-        }
-        String corpus = System.getenv(SCENARIOS_ENV);
-        if (corpus != null && !corpus.isEmpty() && Files.isDirectory(Paths.get(corpus))) {
-            collect(Paths.get(corpus), httpCache, classpathRoots, found);
-        }
-        return new ArrayList<>(found.values());
-    }
-
-    private static void collect(Path root, @Nullable Path httpCache, List<Path> roots, Map<String, Scenario> found) {
-        try (Stream<Path> walk = Files.walk(root)) {
-            walk.filter(Files::isDirectory).forEach(dir -> {
-                if (dir.equals(root) || !isScenario(dir) || inScenario(dir, root)) {
-                    return;
-                }
-                String name = root.relativize(dir).toString().replace('\\', '/');
-                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
-                found.put(label, new Scenario(name, label, dir, httpCache, roots));
-            });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     // a directory holding a lock: before, after, fresh, a variant of one, or a hand-shaped before-input
     private static boolean isScenario(Path dir) {
         try (Stream<Path> list = Files.list(dir)) {
@@ -641,14 +533,5 @@ final class NpmScenarios {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
-    }
-
-    private static boolean inScenario(Path dir, Path root) {
-        for (Path p = dir.getParent(); p != null && !p.equals(root); p = p.getParent()) {
-            if (isScenario(p)) {
-                return true;
-            }
-        }
-        return false;
     }
 }

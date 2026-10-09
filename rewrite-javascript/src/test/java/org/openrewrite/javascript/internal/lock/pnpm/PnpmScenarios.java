@@ -17,20 +17,16 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,13 +39,10 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded pnpm scenarios under {@code lock/pnpm/} on the test classpath and under {@code REWRITE_LOCK_SCENARIOS}'s
- * {@code pnpm} directory, with each lock's phase inputs; {@code REWRITE_LOCK_HTTP_CACHE} backs their {@code http/}.
+ * The recorded pnpm scenarios ({@link LockScenario#discover}) in the recorder's layout, with each lock's phase inputs
+ * and the registry documents pnpm received.
  */
 final class PnpmScenarios {
-
-    static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
-    static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
 
     private static final List<String> LOCKS = Arrays.asList("before", "after", "seed-lock", "again");
     private static final Pattern MEMBER_MANIFEST = Pattern.compile("^pkg-(.+?)(?:-(before|after))?$");
@@ -160,49 +153,17 @@ final class PnpmScenarios {
         }
     }
 
-    @Getter
-    static final class Scenario {
-        private final String name;
-        private final String label;
-        private final Path dir;
-        private final @Nullable Path httpCache;
+    static final class Scenario extends LockScenario {
 
         /**
          * A downloaded fixture's re-recording with pnpm 11.2.2 ({@code fixture-<name>}): the same locks and
          * manifests, with the registry documents, clock and host the fixture does not record.
          */
+        @Getter
         private @Nullable Scenario reRecording;
 
-        /**
-         * The in-repo scenario that re-records this downloaded fixture and names it in its {@code supersedes} file.
-         */
-        private @Nullable Scenario supersededBy;
-
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
-            this.name = name;
-            this.label = label;
-            this.dir = dir;
-            this.httpCache = httpCache;
-        }
-
-        boolean has(String file) {
-            return Files.isRegularFile(dir.resolve(file));
-        }
-
-        @Nullable
-        String file(String file) {
-            return has(file) ? read(dir.resolve(file)) : null;
-        }
-
-        @Nullable
-        String expect() {
-            String expect = file("expect");
-            return expect == null ? null : expect.trim();
-        }
-
-        @Nullable
-        String recordedWith() {
-            return file("recorded-with");
+            super(name, label, dir, httpCache);
         }
 
         /**
@@ -300,21 +261,6 @@ final class PnpmScenarios {
             return out;
         }
 
-        private Map<String, String> tree(String treeDir) {
-            Path root = dir.resolve(treeDir);
-            Map<String, String> out = new TreeMap<>();
-            if (!Files.isDirectory(root)) {
-                return out;
-            }
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile)
-                        .forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return out;
-        }
-
         @Nullable
         String workspaceManifest(boolean before) {
             String fromTree = tree(before).get("pnpm-workspace.yaml");
@@ -399,40 +345,13 @@ final class PnpmScenarios {
             return Collections.emptyList();
         }
 
-        List<String> files() {
-            try (Stream<Path> list = Files.list(dir)) {
-                List<String> names = new ArrayList<>();
-                list.filter(Files::isRegularFile).forEach(p -> names.add(p.getFileName().toString()));
-                Collections.sort(names);
-                return names;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        /**
-         * A recorded registry response: {@code http/<name>} (an abbreviated packument) or {@code http/<name>@full},
-         * from the scenario, else from the shared cache.
-         */
-        @Nullable
-        String http(String name) {
-            Path own = dir.resolve("http").resolve(name);
-            if (Files.isRegularFile(own)) {
-                return read(own);
-            }
-            if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
-                return read(httpCache.resolve(name));
-            }
-            return null;
-        }
-
         /**
          * A packument as pnpm received it: {@code http/}, else pnpm's metadata cache of a phase under {@code probes/},
          * else the shared cache; a full document from the full mirrors or a release-age upgrade's save.
          */
         @Nullable
         String packument(String name, boolean full, String phase) {
-            Path own = dir.resolve("http").resolve(full ? name + "@full" : name);
+            Path own = getDir().resolve("http").resolve(full ? name + "@full" : name);
             if (Files.isRegularFile(own)) {
                 return read(own);
             }
@@ -442,7 +361,7 @@ final class PnpmScenarios {
             for (String kind : full ? new String[]{"metadata-full", "metadata-full-filtered", "metadata"} :
                     new String[]{"metadata"}) {
                 for (String p : phases) {
-                    Path metadata = dir.resolve("probes").resolve(p + "-cache").resolve("v11").resolve(kind);
+                    Path metadata = getDir().resolve("probes").resolve(p + "-cache").resolve("v11").resolve(kind);
                     if (!Files.isDirectory(metadata)) {
                         continue;
                     }
@@ -463,8 +382,9 @@ final class PnpmScenarios {
                     }
                 }
             }
-            return httpCache != null && Files.isRegularFile(httpCache.resolve(full ? name + "@full" : name)) ?
-                    read(httpCache.resolve(full ? name + "@full" : name)) : null;
+            Path cache = getHttpCache();
+            return cache != null && Files.isRegularFile(cache.resolve(full ? name + "@full" : name)) ?
+                    read(cache.resolve(full ? name + "@full" : name)) : null;
         }
 
         // the registry leaves the publish times and the CouchDB id and revision out of an abbreviated packument
@@ -484,7 +404,7 @@ final class PnpmScenarios {
         Set<String> registryHosts(String phase) {
             Set<String> hosts = new TreeSet<>();
             for (String kind : new String[]{"metadata", "metadata-full", "metadata-full-filtered"}) {
-                Path metadata = dir.resolve("probes").resolve(phase + "-cache").resolve("v11").resolve(kind);
+                Path metadata = getDir().resolve("probes").resolve(phase + "-cache").resolve("v11").resolve(kind);
                 if (!Files.isDirectory(metadata)) {
                     continue;
                 }
@@ -503,11 +423,21 @@ final class PnpmScenarios {
             }
             return hosts;
         }
+    }
 
-        @Override
-        public String toString() {
-            return name;
+    static List<Scenario> discover() {
+        List<Scenario> found = LockScenario.discover("pnpm", PnpmScenarios::isScenario, Scenario::new);
+        Map<String, Scenario> byLabel = new LinkedHashMap<>();
+        for (Scenario scenario : found) {
+            byLabel.put(scenario.getLabel(), scenario);
         }
+        for (Scenario scenario : found) {
+            Scenario reRecording = byLabel.get("fixture-" + scenario.getName());
+            if (scenario.recordedWith() == null && reRecording != null && reRecording.recordedWith() != null) {
+                scenario.reRecording = reRecording;
+            }
+        }
+        return found;
     }
 
     /**
@@ -522,76 +452,6 @@ final class PnpmScenarios {
         return paths;
     }
 
-    static List<Scenario> discover() {
-        Map<String, Scenario> found = new TreeMap<>();
-        List<Path> classpathRoots = new ArrayList<>();
-        try {
-            Enumeration<URL> roots = PnpmScenarios.class.getClassLoader().getResources("lock/pnpm");
-            while (roots.hasMoreElements()) {
-                URL url = roots.nextElement();
-                if ("file".equals(url.getProtocol())) {
-                    classpathRoots.add(Paths.get(url.toURI()));
-                }
-            }
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException(e);
-        }
-        String cache = System.getenv(HTTP_CACHE_ENV);
-        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
-                Paths.get(cache) : null;
-        for (Path root : classpathRoots) {
-            collect(root, httpCache, found);
-        }
-        Path corpus = corpusRoot();
-        if (corpus != null) {
-            collect(corpus, httpCache, found);
-        }
-        for (Scenario scenario : found.values()) {
-            Scenario reRecording = found.get("fixture-" + scenario.getName());
-            if (scenario.recordedWith() == null && reRecording != null && reRecording.recordedWith() != null) {
-                scenario.reRecording = reRecording;
-            }
-            String supersedes = scenario.file("supersedes");
-            if (supersedes != null) {
-                for (String name : supersedes.trim().split("\\s+")) {
-                    Scenario superseded = found.get(name);
-                    if (superseded != null && superseded.recordedWith() == null) {
-                        superseded.supersededBy = scenario;
-                    }
-                }
-            }
-        }
-        return new ArrayList<>(found.values());
-    }
-
-    private static @Nullable Path corpusRoot() {
-        String corpus = System.getenv(SCENARIOS_ENV);
-        if (corpus == null || corpus.isEmpty() || !Files.isDirectory(Paths.get(corpus))) {
-            return null;
-        }
-        Path dir = Paths.get(corpus);
-        if ("pnpm".equals(String.valueOf(dir.getFileName()))) {
-            return dir;
-        }
-        Path sibling = dir.resolveSibling("pnpm");
-        return Files.isDirectory(sibling) ? sibling : null;
-    }
-
-    private static void collect(Path root, @Nullable Path httpCache, Map<String, Scenario> found) {
-        try (Stream<Path> walk = Files.walk(root, 1)) {
-            walk.filter(Files::isDirectory).forEach(dir -> {
-                if (dir.equals(root) || !isScenario(dir)) {
-                    return;
-                }
-                String name = root.relativize(dir).toString().replace('\\', '/');
-                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
-                found.put(label, new Scenario(name, label, dir, httpCache));
-            });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
     private static boolean isScenario(Path dir) {
         for (String lock : LOCKS) {
             if (Files.isRegularFile(dir.resolve(lock))) {
@@ -599,13 +459,5 @@ final class PnpmScenarios {
             }
         }
         return false;
-    }
-
-    private static String read(Path path) {
-        try {
-            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 }

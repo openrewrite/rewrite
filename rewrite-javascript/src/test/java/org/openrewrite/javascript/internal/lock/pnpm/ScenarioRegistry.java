@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -33,7 +34,7 @@ import java.util.zip.GZIPInputStream;
  * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked
  * then, with a 404 where pnpm's log reports one and a fixture's empty versions filled from its version documents.
  */
-final class ScenarioRegistry implements RegistryMetadata {
+final class ScenarioRegistry extends RecordedRegistry implements RegistryMetadata {
 
     /**
      * A document the recording does not hold.
@@ -44,21 +45,22 @@ final class ScenarioRegistry implements RegistryMetadata {
         }
     }
 
-    private final PnpmScenarios.Scenario scenario;
+    private final PnpmScenarios.Scenario recording;
     private final String phase;
 
     ScenarioRegistry(PnpmScenarios.Scenario scenario, String phase) {
-        this.scenario = scenario;
+        super(scenario);
+        this.recording = scenario;
         this.phase = phase;
     }
 
     @Override
     public @Nullable String packument(String registry, String name, boolean fullMetadata) {
-        Set<String> hosts = scenario.registryHosts(phase);
+        Set<String> hosts = recording.registryHosts(phase);
         if (!hosts.contains(cacheDirectory(registry))) {
             throw new RouteNotRecorded("GET " + registry + name + " (pnpm asked " + String.join(", ", hosts) + ")");
         }
-        String document = scenario.packument(name, fullMetadata, phase);
+        String document = recording.packument(name, fullMetadata, phase);
         if (document == null) {
             if (answered404(registry, name)) {
                 return null;

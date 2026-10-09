@@ -22,6 +22,7 @@ import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.NpmRegistryPackuments;
+import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
@@ -93,13 +94,11 @@ final class ScenarioReplay {
     /**
      * A registry answering from the scenario's recorded responses, reporting every route it lacks.
      */
-    static final class ScenarioRegistry implements HttpSender {
-        private final NpmScenarios.Scenario scenario;
-        final List<String> missing = new ArrayList<>();
+    static final class ScenarioRegistry extends RecordedRegistry implements HttpSender {
         final List<String> requests = new ArrayList<>();
 
         ScenarioRegistry(NpmScenarios.Scenario scenario) {
-            this.scenario = scenario;
+            super(scenario);
         }
 
         @Override
@@ -114,14 +113,6 @@ final class ScenarioReplay {
             return new Response(body == null ? 404 : 200,
               new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
             });
-        }
-
-        /**
-         * Whether a route the replay asked for is not recorded, for a scenario recorded elsewhere than by this
-         * module's recorder, with no cache to fill it from: the replay could not be served.
-         */
-        boolean unservedElsewhereRecording() {
-            return !missing.isEmpty() && scenario.recordedWith() == null && scenario.getHttpCache() == null;
         }
 
         private static @Nullable String header(Request request, String name) {
@@ -151,7 +142,7 @@ final class ScenarioReplay {
     }
 
     static String missing(ScenarioRegistry http) {
-        return http.missing.isEmpty() ? "" : " [routes not recorded: " + String.join(", ", http.missing) + "]";
+        return http.describe();
     }
 
     static PackumentSource registry(ScenarioRegistry http) {
