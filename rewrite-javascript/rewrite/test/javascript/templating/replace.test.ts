@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {capture, JavaScriptVisitor, JS, pattern, rewrite, template, typescript} from "../../../src/javascript";
+import {capture, JavaScriptVisitor, JS, pattern, rewrite, Template, template, typescript} from "../../../src/javascript";
 import {Expression, J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {findMarker, markers, produceAsync} from "../../../src";
@@ -284,17 +284,76 @@ describe('markers on a spliced capture', () => {
         );
     });
 
-    test('a marker the template writes wraps those parentheses', () => {
+    test('a marker the template writes wraps the parentheses its value needs, wherever the slot is', async () => {
         const arg = capture();
-        const rule = rewrite(() => ({before: pattern`f(${arg})`, after: template`${arg}!.m()`}));
+        const applying = (after: Template) => {
+            const rule = rewrite(() => ({before: pattern`f(${arg})`, after}));
+            return fromVisitor(new class extends JavaScriptVisitor<any> {
+                override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                    return await rule.tryOn(this.cursor, method) || method;
+                }
+            });
+        };
+
+        spec.recipe = applying(template`${arg}!.m()`);
+        //language=typescript
+        await spec.rewriteRun(typescript('f(a + b);', '(a + b)!.m();'));
+
+        // An argument accepts `a ?? b` bare, but the `!` after it does not
+        spec.recipe = applying(template`g(${arg}!)`);
+        //language=typescript
+        await spec.rewriteRun(typescript('f(a ?? b);', 'g((a ?? b)!);'));
+    });
+
+    test('the replaced node keeps the assertion and optional chain written after it, without doubling them', () => {
+        const rule = rewrite(() => ({before: pattern`o`, after: template`other`}))
+            .orElse(rewrite(() => ({before: pattern`n`, after: template`other!`})));
         spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
-            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
-                return await rule.tryOn(this.cursor, method) || method;
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
             }
         });
         return spec.rewriteRun(
             //language=typescript
-            typescript('f(a + b);', '(a + b)!.m();')
+            typescript(
+                `
+                    o!.p;
+                    o?.p;
+                    n!.p;
+                `,
+                `
+                    other!.p;
+                    other?.p;
+                    other!.p;
+                `
+            )
+        );
+    });
+
+    test('the replaced node\'s assertion wraps the parentheses a lower-precedence result needs', () => {
+        const rule = rewrite(() => ({before: pattern`o`, after: template`a ?? b`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('foo(o!);', 'foo((a ?? b)!);')
+        );
+    });
+
+    test('a replaced node the template splices back in keeps its assertion once', () => {
+        const x = capture({constraint: (n: J) => n.kind === J.Kind.Identifier && (n as J.Identifier).simpleName === 'o'});
+        const rule = rewrite(() => ({before: pattern`${x}`, after: template`String(${x})`}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=typescript
+            typescript('foo(o!);', 'foo(String(o!));')
         );
     });
 });

@@ -2,18 +2,19 @@ import {MethodMatcher} from "../../src/javascript/method-matcher";
 import {ExecutionContext, foundSearchResult, Recipe} from "../../src";
 import {JavaScriptVisitor, npm, packageJson, typescript} from "../../src/javascript";
 import {J} from "../../src/java";
-import {RecipeSpec} from "../../src/test";
+import {fromVisitor, RecipeSpec} from "../../src/test";
+import {usesMethod} from "../../src/javascript/preconditions";
 import {withDir} from "tmp-promise";
 
 describe('MethodMatcher', () => {
-    function markMatchedMethods(pattern: string): Recipe {
+    function markMatchedMethods(pattern: string, matchOverrides: boolean = false): Recipe {
         class MethodMatcherRecipe extends Recipe {
             name = 'Method matcher';
             displayName = 'Mark matched methods';
             description = 'Marks methods that match the pattern';
 
             async editor(): Promise<JavaScriptVisitor<ExecutionContext>> {
-                const matcher = new MethodMatcher(pattern);
+                const matcher = new MethodMatcher(pattern, matchOverrides);
                 return new class extends JavaScriptVisitor<ExecutionContext> {
                     async visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): Promise<J.MethodInvocation> {
                         const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
@@ -185,6 +186,39 @@ describe('MethodMatcher', () => {
         });
     });
 
+    describe('Pattern: Array indexOf(..)', () => {
+        test('a type without a package matches only the type of that name in no package', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Array indexOf(..)');
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        namespace NS {
+                            export class Array {
+                                indexOf(x: number): number { return x; }
+                            }
+                        }
+                        new NS.Array().indexOf(1);
+                        [1].indexOf(1);
+                    `,
+                    //@formatter:off
+                `
+                    namespace NS {
+                        export class Array {
+                            indexOf(x: number): number { return x; }
+                        }
+                    }
+                    new NS.Array().indexOf(1);
+                    /*~~>*/[1].indexOf(1);
+                `
+                //@formatter:on
+                )
+            );
+        });
+    });
+
     describe('Pattern: Math m*(..)', () => {
         test('should match Math methods starting with m', async () => {
             const spec = new RecipeSpec();
@@ -338,6 +372,130 @@ describe('MethodMatcher', () => {
                     )
                 );
             }, {unsafeCleanup: true});
+        });
+    });
+
+    test('a wildcard type pattern matches a call on an untyped receiver', async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = markMatchedMethods('*..* baz(..)');
+        //language=typescript
+        await spec.rewriteRun(
+            typescript(
+                `declare const a: any;\na.baz();`,
+                `declare const a: any;\n/*~~>*/a.baz();`
+            )
+        );
+    });
+
+    describe('matchOverrides', () => {
+        const hierarchy = `
+            interface Saver { save(): void }
+            interface Store extends Saver { save(): void }
+            class Base implements Saver { save(): void {} }
+            class Mid extends Base {}
+            class Leaf extends Mid { save(): void {} }
+            declare const store: Store;
+        `;
+
+        test('a pattern naming a superclass or superinterface matches a call declared on a subtype', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Base save()', true);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `${hierarchy}
+                    new Leaf().save();
+                    `,
+                    `${hierarchy}
+                    /*~~>*/new Leaf().save();
+                    `
+                )
+            );
+
+            spec.recipe = markMatchedMethods('Saver save()', true);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `${hierarchy}
+                    store.save();
+                    `,
+                    `${hierarchy}
+                    /*~~>*/store.save();
+                    `
+                ),
+                typescript(
+                    `${hierarchy}
+                    new Leaf().save();
+                    `,
+                    `${hierarchy}
+                    /*~~>*/new Leaf().save();
+                    `
+                )
+            );
+        });
+
+        test('walks up from the declaring type only, as in Java', async () => {
+            // `base.save()` is declared on `Base`, which no pattern naming `Leaf` reaches.
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Leaf save()', true);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `${hierarchy}
+                    const base: Base = new Leaf();
+                    base.save();
+                    `
+                )
+            );
+        });
+
+        test('terminates on heritage cycles TypeScript accepts', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = markMatchedMethods('Unrelated save()', true);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                    interface I extends B { save(): void }
+                    class B implements I { save(): void {} }
+                    new B().save();
+                    `
+                ),
+                typescript(
+                    `
+                    class D implements J { save(): void {} }
+                    class C extends D { save(): void {} }
+                    interface J extends C {}
+                    new C().save();
+                    `
+                )
+            );
+        });
+
+        test('usesMethod passes matchOverrides to its native visitor', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(usesMethod('Base save()', true).localVisitor!);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `${hierarchy}
+                    new Leaf().save();
+                    `,
+                    `${hierarchy}
+                    /*~~>*/new Leaf().save();
+                    `
+                )
+            );
+
+            spec.recipe = fromVisitor(usesMethod('Base save()').localVisitor!);
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `${hierarchy}
+                    new Leaf().save();
+                    `
+                )
+            );
         });
     });
 });

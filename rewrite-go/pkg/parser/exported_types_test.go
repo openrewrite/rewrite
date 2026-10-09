@@ -16,7 +16,17 @@
 
 package parser
 
-import "testing"
+import (
+	"go/constant"
+	"go/token"
+	"go/types"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/openrewrite/rewrite/rewrite-go/pkg/tree/java"
+)
 
 func TestGoBuildContextIsHostIndependent(t *testing.T) {
 	ctx := goBuildContext()
@@ -32,4 +42,20 @@ func TestGoBuildContextIsHostIndependent(t *testing.T) {
 	if ctx.CgoEnabled {
 		t.Error("CgoEnabled = true, want false")
 	}
+}
+
+func TestEnumeratePackageFlagsPackageLevelVariablesPublic(t *testing.T) {
+	pkg := types.NewPackage("example.com/p", "p")
+	pkg.Scope().Insert(types.NewVar(token.NoPos, pkg, "V", types.Typ[types.Int]))
+	pkg.Scope().Insert(types.NewConst(token.NoPos, pkg, "C", types.Typ[types.Int], constant.MakeInt64(1)))
+
+	var pkgClass *java.JavaTypeClass
+	enumeratePackage(pkg, "example.com/p", newTypeMapper(), func(c *java.JavaTypeClass) { pkgClass = c })
+
+	require.NotNil(t, pkgClass)
+	flags := map[string]int64{}
+	for _, member := range pkgClass.Members {
+		flags[member.Name] = member.FlagsBitMap
+	}
+	assert.Equal(t, map[string]int64{"V": 1, "C": 1}, flags)
 }

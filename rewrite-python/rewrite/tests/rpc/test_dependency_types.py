@@ -502,6 +502,7 @@ class TestExportedTypes:
                 f.write("")
             with open(os.path.join(pkg, "thing.py"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
+                        "    def __init__(self):\n        self._url = None\n"
                         "    def api(self):\n        return 0\n")
             with open(os.path.join(pkg, "thing.pyi"), "w", encoding="utf-8") as f:
                 f.write("class Thing:\n"
@@ -516,8 +517,9 @@ class TestExportedTypes:
             things = [k for k in by_fqn if k.endswith("thing.Thing")]
             assert len(things) == 1  # the .py and .pyi collapse to one entry
             thing = by_fqn[things[0]]
-            method_names = {m._name for m in (thing._methods or [])}
-            assert "api" in method_names
+            api = next(m for m in thing._methods or [] if m._name == "api")
+            # The runtime class's self-assigned `_url` makes it richer, yet the stub's signature wins.
+            assert api._return_type == JavaType.Primitive.Int
         finally:
             shutil.rmtree(root, ignore_errors=True)
 

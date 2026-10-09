@@ -202,10 +202,10 @@ func enumeratePackage(pkg *types.Package, importPath string, mapper *typeMapper,
 			pc.Methods = append(pc.Methods, mapper.mapSignature(sig, o.Name(), pc))
 		case *types.Var:
 			pc := pkgClassOf()
-			pc.Members = append(pc.Members, &java.JavaTypeVariable{Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
+			pc.Members = append(pc.Members, &java.JavaTypeVariable{FlagsBitMap: flagsForExported(o.Name()), Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
 		case *types.Const:
 			pc := pkgClassOf()
-			pc.Members = append(pc.Members, &java.JavaTypeVariable{Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
+			pc.Members = append(pc.Members, &java.JavaTypeVariable{FlagsBitMap: flagsForExported(o.Name()), Name: o.Name(), Owner: pc, Type: mapper.mapType(o.Type())})
 		}
 	}
 	collect(pkgClass)

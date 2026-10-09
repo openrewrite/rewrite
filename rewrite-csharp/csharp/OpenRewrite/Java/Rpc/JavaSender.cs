@@ -780,6 +780,7 @@ public class JavaSender : JavaVisitor<RpcSendQueue>
                 break;
 
             case JavaType.Variable variable:
+                q.GetAndSend(variable, v => v.FlagsBitMap);
                 q.GetAndSend(variable, v => v.Name);
                 q.GetAndSend(variable, v => AsRef(v.Owner),
                     t => VisitType(GetValueNonNull<JavaType>(t), q));

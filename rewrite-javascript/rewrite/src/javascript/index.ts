@@ -29,14 +29,17 @@ export * from "./method-matcher";
 export * from "./format";
 export * from "./autodetect";
 export * from "./tree-debug";
+// The comparator visitors stay internal so what they compare is free to change.
+export {isEqual} from "./comparator";
+export * from "./type-report";
 export * from "./project-parser";
 
-export type {Scope} from "./scope";
+export type {Scope, Meaning, Reference} from "./scope";
 // `cursorOf` is deliberately absent: a visitor of one's own reaches `this.cursor` directly, and
 // the free functions that have no visitor to reach it through are already in this list.
 export {
-    scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesReferencedWithin, bindingNames, deconflict,
-    isValueReference, declarationsOf, compilationUnitOf, walk
+    scopeOf, namesDeclaredIn, namesDeclaredWithin, namesUsedIn, namesUsedWithin, namesReferencedWithin, bindingNames,
+    deconflict, isReference, isValueReference, isWrite, resolve, referencesOf, declarationsOf, compilationUnitOf, walk
 } from "./scope";
 export type {QuoteChar, AddImportOptions} from "./add-import";
 export {ImportStyle, moduleNameOf, AddImport} from "./add-import";

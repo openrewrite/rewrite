@@ -2,7 +2,7 @@ __path__ = __import__('pkgutil').extend_path(__path__, __name__)
 
 from typing import Optional
 
-from .auto_format import AutoFormat, AutoFormatVisitor
+from .auto_format import AutoFormat, AutoFormatVisitor, minimally_format
 from .blank_lines import BlankLinesVisitor
 from .minimum_viable_spacing import MinimumViableSpacingVisitor
 from .normalize_format import NormalizeFormatVisitor
@@ -37,4 +37,5 @@ __all__ = [
     'TabsAndIndentsVisitor',
     'auto_format',
     'maybe_auto_format',
+    'minimally_format',
 ]

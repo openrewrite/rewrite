@@ -115,6 +115,8 @@ class PythonVisitor(JavaVisitor[P]):
         await_ = await_.replace(
             expression=self.visit_and_cast(await_.expression, Expression, p)
         )
+        if self._visits_types:
+            await_ = await_.replace(_type=self.visit_type(await_.type, p))
         return await_
 
     def visit_python_binary(self, binary: Binary, p: P) -> J:
@@ -140,6 +142,8 @@ class PythonVisitor(JavaVisitor[P]):
         binary = binary.replace(
             right=self.visit_and_cast(binary.right, Expression, p)
         )
+        if self._visits_types:
+            binary = binary.replace(_type=self.visit_type(binary.type, p))
         return binary
 
     def visit_chained_assignment(self, chained: ChainedAssignment, p: P) -> J:
@@ -161,6 +165,8 @@ class PythonVisitor(JavaVisitor[P]):
         chained = chained.replace(
             assignment=self.visit_and_cast(chained.assignment, Expression, p)
         )
+        if self._visits_types:
+            chained = chained.replace(_type=self.visit_type(chained.type, p))
         return chained
 
     def visit_collection_literal(self, collection: CollectionLiteral, p: P) -> J:
@@ -176,6 +182,8 @@ class PythonVisitor(JavaVisitor[P]):
         collection = collection.replace(
             elements=self.visit_container(collection.padding.elements, p)
         )
+        if self._visits_types:
+            collection = collection.replace(_type=self.visit_type(collection.type, p))
         return collection
 
     def visit_compilation_unit(self, cu: CompilationUnit, p: P) -> J:  # ty: ignore[invalid-method-override]
@@ -212,10 +220,12 @@ class PythonVisitor(JavaVisitor[P]):
         )
         comp = comp.replace(
             clauses=list_map(
-                lambda c: self.visit_comprehension_clause(c, p),
+                lambda c: cast('ComprehensionExpression.Clause', self.visit(c, p)),
                 comp.clauses
             )
         )
+        if self._visits_types:
+            comp = comp.replace(_type=self.visit_type(comp.type, p))
         return comp
 
     def visit_comprehension_clause(self, clause: ComprehensionExpression.Clause, p: P) -> ComprehensionExpression.Clause:
@@ -232,7 +242,7 @@ class PythonVisitor(JavaVisitor[P]):
         )
         clause = clause.replace(
             conditions=list_map(
-                lambda c: self.visit_comprehension_condition(c, p),
+                lambda c: cast('ComprehensionExpression.Condition', self.visit(c, p)),
                 clause.conditions
             )
         )
@@ -280,6 +290,8 @@ class PythonVisitor(JavaVisitor[P]):
         dict_lit = dict_lit.replace(
             elements=self.visit_container(dict_lit.padding.elements, p)
         )
+        if self._visits_types:
+            dict_lit = dict_lit.replace(_type=self.visit_type(dict_lit.type, p))
         return dict_lit
 
     def visit_error_from(self, error_from: ErrorFrom, p: P) -> J:
@@ -298,6 +310,8 @@ class PythonVisitor(JavaVisitor[P]):
         error_from = error_from.replace(
             from_=self.visit_left_padded(error_from.padding.from_, p)
         )
+        if self._visits_types:
+            error_from = error_from.replace(_type=self.visit_type(error_from.type, p))
         return error_from
 
     def visit_exception_type(self, exc_type: ExceptionType, p: P) -> J:
@@ -309,6 +323,8 @@ class PythonVisitor(JavaVisitor[P]):
         exc_type = exc_type.replace(
             expression=self.visit_and_cast(exc_type.expression, Expression, p)
         )
+        if self._visits_types:
+            exc_type = exc_type.replace(_type=self.visit_type(exc_type.type, p))
         return exc_type
 
     def visit_expression_statement(self, expr_stmt: ExpressionStatement, p: P) -> J:
@@ -357,6 +373,8 @@ class PythonVisitor(JavaVisitor[P]):
                 f_string.parts
             )
         )
+        if self._visits_types:
+            f_string = f_string.replace(_type=self.visit_type(f_string.type, p))
         return f_string
 
     def visit_formatted_string_value(self, value: FormattedString.Value, p: P) -> J:
@@ -396,6 +414,8 @@ class PythonVisitor(JavaVisitor[P]):
         kv = kv.replace(
             value=self.visit_and_cast(kv.value, Expression, p)
         )
+        if self._visits_types:
+            kv = kv.replace(_type=self.visit_type(kv.type, p))
         return kv
 
     def visit_literal_type(self, lit_type: LiteralType, p: P) -> J:
@@ -411,6 +431,8 @@ class PythonVisitor(JavaVisitor[P]):
         lit_type = lit_type.replace(
             literal=self.visit_and_cast(lit_type.literal, Expression, p)
         )
+        if self._visits_types:
+            lit_type = lit_type.replace(_type=self.visit_type(lit_type.type, p))
         return lit_type
 
     def visit_match_case(self, case: MatchCase, p: P) -> J:
@@ -424,12 +446,14 @@ class PythonVisitor(JavaVisitor[P]):
         case = temp_expr
         case = case.replace(markers=self.visit_markers(case.markers, p))
         case = case.replace(
-            pattern=self.visit_match_case_pattern(case.pattern, p)
+            pattern=cast('MatchCase.Pattern', self.visit(case.pattern, p))
         )
         if case.padding.guard is not None:
             case = case.padding.replace(
                 guard=self.visit_left_padded(case.padding.guard, p)
             )
+        if self._visits_types:
+            case = case.replace(_type=self.visit_type(case.type, p))
         return case
 
     def visit_match_case_pattern(self, pattern: MatchCase.Pattern, p: P) -> MatchCase.Pattern:
@@ -441,6 +465,8 @@ class PythonVisitor(JavaVisitor[P]):
         pattern = pattern.replace(
             children=self.visit_container(pattern.padding.children, p)
         )
+        if self._visits_types:
+            pattern = pattern.replace(_type=self.visit_type(pattern.type, p))
         return pattern
 
     def visit_multi_import(self, multi: MultiImport, p: P) -> J:
@@ -478,6 +504,8 @@ class PythonVisitor(JavaVisitor[P]):
         named = named.padding.replace(
             value=self.visit_left_padded(named.padding.value, p)
         )
+        if self._visits_types:
+            named = named.replace(_type=self.visit_type(named.type, p))
         return named
 
     def visit_pass(self, pass_: Pass, p: P) -> Optional[J]:
@@ -538,6 +566,8 @@ class PythonVisitor(JavaVisitor[P]):
             special = special.replace(
                 type_hint=self.visit_and_cast(special.type_hint, Any, p)
             )
+        if self._visits_types:
+            special = special.replace(_type=self.visit_type(special.type, p))
         return special
 
     def visit_star(self, star: Star, p: P) -> J:
@@ -553,6 +583,8 @@ class PythonVisitor(JavaVisitor[P]):
         star = star.replace(
             expression=self.visit_and_cast(star.expression, Expression, p)
         )
+        if self._visits_types:
+            star = star.replace(_type=self.visit_type(star.type, p))
         return star
 
     def visit_statement_expression(self, stmt_expr: StatementExpression, p: P) -> J:
@@ -607,6 +639,8 @@ class PythonVisitor(JavaVisitor[P]):
         alias = alias.padding.replace(
             value=self.visit_left_padded(alias.padding.value, p)
         )
+        if self._visits_types:
+            alias = alias.replace(_type=self.visit_type(alias.type, p))
         return alias
 
     def visit_type_hint(self, hint: TypeHint, p: P) -> J:
@@ -618,6 +652,8 @@ class PythonVisitor(JavaVisitor[P]):
         hint = hint.replace(
             type_tree=self.visit_and_cast(hint.type_tree, Expression, p)
         )
+        if self._visits_types:
+            hint = hint.replace(_type=self.visit_type(hint.type, p))
         return hint
 
     def visit_type_hinted_expression(self, hinted: TypeHintedExpression, p: P) -> J:
@@ -636,6 +672,8 @@ class PythonVisitor(JavaVisitor[P]):
         hinted = hinted.replace(
             type_hint=cast("TypeHint", self.visit(hinted.type_hint, p))
         )
+        if self._visits_types:
+            hinted = hinted.replace(_type=self.visit_type(hinted.type, p))
         return hinted
 
     def visit_union_type(self, union: UnionType, p: P) -> J:
@@ -654,6 +692,8 @@ class PythonVisitor(JavaVisitor[P]):
                 union.padding.types
             )
         )
+        if self._visits_types:
+            union = union.replace(_type=self.visit_type(union.type, p))
         return union
 
     def visit_variable_scope(self, scope: VariableScope, p: P) -> J:
@@ -687,6 +727,8 @@ class PythonVisitor(JavaVisitor[P]):
         yield_from = yield_from.replace(
             expression=self.visit_and_cast(yield_from.expression, Expression, p)
         )
+        if self._visits_types:
+            yield_from = yield_from.replace(_type=self.visit_type(yield_from.type, p))
         return yield_from
 
 
@@ -737,6 +779,10 @@ class _TreeVisitorAsPythonVisitor(PythonVisitor):
 
     def default_value(self, tree, p):
         return self._wrapped.default_value(tree, p)
+
+    def visit_type(self, java_type, p):
+        visit_type = getattr(self._wrapped, 'visit_type', None)
+        return java_type if visit_type is None else visit_type(java_type, p)
 
     def is_acceptable(self, source_file, p):
         return self._wrapped.is_acceptable(source_file, p)

@@ -24,6 +24,7 @@ import {mapAsync, trimIndent} from "../util";
 import {ParseErrorKind} from "../parse-error";
 import {MarkersKind, ParseExceptionResult} from "../markers";
 import {JavaScriptVisitor} from "../javascript";
+import {attributionHint, dumpTypesIfRequested} from "../javascript/type-report";
 import {J} from "../java";
 
 export interface SourceSpec<T extends SourceFile> {
@@ -117,6 +118,11 @@ export class RecipeSpec {
         RecipeSpec.live &&= [];
     }
 
+    /**
+     * Setting `REWRITE_JAVASCRIPT_DUMP_TYPES` prints each parsed file's type attribution, and a
+     * recipe that produces no change names the nodes that carry none. See the README section
+     * "Inspecting type attribution".
+     */
     async rewriteRun(...sourceSpecs: (SourceSpec<any> | Generator<SourceSpec<any>, void, unknown> | AsyncGenerator<SourceSpec<any>, void, unknown>)[]): Promise<void> {
         // Flatten generators into a list of sourceSpecs
         const flattenedSpecs: SourceSpec<any>[] = [];
@@ -152,6 +158,9 @@ export class RecipeSpec {
             const specs = specsByKind[kind];
             const parsed = await this.parse(specs);
             await this.expectNoParseFailures(parsed);
+            for (const [_, sourceFile] of parsed) {
+                await dumpTypesIfRequested(sourceFile);
+            }
             await this.expectWhitespaceNotToContainNonwhitespaceCharacters(parsed);
             this.checkParsePrintIdempotence && await this.expectParsePrintIdempotence(parsed);
             allParsed.push(...parsed);
@@ -245,7 +254,7 @@ export class RecipeSpec {
                     await spec.afterRecipe(matchingSpec![1]);
                 }
             } else {
-                await this.expectAfter(spec, after);
+                await this.expectAfter(spec, after, matchingSpec?.[1]);
             }
         }
     }
@@ -263,7 +272,7 @@ export class RecipeSpec {
         }
     }
 
-    private async expectAfter(spec: SourceSpec<any>, after?: SourceFile) {
+    private async expectAfter(spec: SourceSpec<any>, after?: SourceFile, before?: SourceFile) {
         if (!after) {
             throw new Error('Expected for recipe to have produced a change for file:\n' + trimIndent(spec.before))
         }
@@ -272,9 +281,11 @@ export class RecipeSpec {
         const afterSource = typeof spec.after === "function" ?
             (spec.after as (actual: string) => string)(actualAfter) : spec.after as string;
         if (actualAfter !== afterSource) {
+            // A tree the recipe returned unchanged usually means it never fired.
+            const hint = after === before ? await attributionHint(after) : "";
             throw new Error(
                 `Recipe output does not match expected.\n` +
-                `Expected:\n${afterSource}\n\nActual:\n${actualAfter}`
+                `Expected:\n${afterSource}\n\nActual:\n${actualAfter}${hint}`
             );
         }
         if (spec.afterRecipe) {

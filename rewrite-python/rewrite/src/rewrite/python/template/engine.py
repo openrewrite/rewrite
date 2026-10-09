@@ -21,19 +21,22 @@ import os
 import textwrap
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from uuid import UUID
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.python.visitor import PythonVisitor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
     from rewrite.visitor import Cursor
 
 from .capture import Capture
-from .placeholder import substitute_placeholders
+from .placeholder import substitute_placeholders, to_placeholder
 from .coordinates import PythonCoordinates, CoordinateMode
+from .replacement import substitution_marker
 
 # Wrapper function name used to make template code parseable
 WRAPPER_FUNCTION_NAME = "__WRAPPER__"
@@ -138,7 +141,7 @@ class TemplateEngine:
         is_expression = cls._is_expression(dedented)
 
         # Generate wrapper and parse
-        wrapper_code = cls._generate_wrapper(substituted_code, options)
+        wrapper_code = cls._generate_wrapper(substituted_code, options, captures)
         compilation_unit = cls._parse_code(wrapper_code, options)
 
         # Extract template content from wrapper
@@ -178,6 +181,22 @@ class TemplateEngine:
         return visitor.visit(template_tree, None)
 
     @classmethod
+    def retain_ids(cls, result: J, replaced: Optional[J]) -> J:
+        """Copy of ``result`` in which an id survives only at the first node carrying it, and only
+        if that id names a node of ``replaced``, the subtree the result takes the place of. Every
+        other node is minted a fresh id. The parsed template is shared by every application, and a
+        value spliced into two slots, or from somewhere that stays in the file, would otherwise put
+        one id in two places."""
+        retainable: Set[UUID] = set()
+        if replaced is not None:
+            collector = _TreeIds()
+            collector.visit(replaced, None)
+            retainable = collector.ids
+        retained = _RetainIds(retainable).visit(result, None)
+        assert retained is not None
+        return retained
+
+    @classmethod
     def _make_cache_key(
         cls,
         code: str,
@@ -185,7 +204,8 @@ class TemplateEngine:
         options: TemplateOptions
     ) -> str:
         """Generate a cache key from template components."""
-        capture_names = ",".join(sorted(captures.keys()))
+        capture_names = ",".join(
+            f"{name}:{cap.type_hint}" for name, cap in sorted(captures.items()))
         imports_key = ",".join(sorted(options.imports))
         context_key = ",".join(options.context)  # preserve order: context is order-dependent
         deps_key = ",".join(
@@ -194,13 +214,19 @@ class TemplateEngine:
         return f"{code}::{capture_names}::{imports_key}::{context_key}::{deps_key}"
 
     @classmethod
-    def _generate_wrapper(cls, code: str, options: TemplateOptions) -> str:
+    def _generate_wrapper(
+        cls,
+        code: str,
+        options: TemplateOptions,
+        captures: Dict[str, Capture],
+    ) -> str:
         """
         Generate a parseable Python wrapper for the template code.
 
         Args:
             code: Template code (with placeholders already substituted).
             options: Template options including imports.
+            captures: Captures whose ``type_hint`` declares their placeholder's type.
 
         Returns:
             Complete Python source that can be parsed.
@@ -214,6 +240,9 @@ class TemplateEngine:
         # Add context statements (general-purpose, may include imports or other code)
         for ctx in options.context:
             lines.append(ctx)
+
+        # After the context, so that a hint can name what the context imports.
+        lines.extend(cls._capture_preamble(captures))
 
         # Dedent the code to handle indented template strings
         dedented = textwrap.dedent(code).strip()
@@ -235,6 +264,11 @@ class TemplateEngine:
                 lines.append(f"    {line}")
 
         return '\n'.join(lines)
+
+    @classmethod
+    def _capture_preamble(cls, captures: Dict[str, Capture]) -> List[str]:
+        return [f"{to_placeholder(name)}: {cap.type_hint}"
+                for name, cap in captures.items() if cap.is_typed]
 
     @classmethod
     def _is_expression(cls, code: str) -> bool:
@@ -418,7 +452,10 @@ class TemplateEngine:
             )
 
         if not format:
-            return result
+            return cls.unmark_substituted(result)
+
+        unformatted = _SubstitutedValues()
+        unformatted.visit(result, None)
 
         # Auto-format the result
         try:
@@ -432,9 +469,77 @@ class TemplateEngine:
             # No CompilationUnit in cursor ancestry — skip formatting
             pass
 
+        if unformatted.values:
+            result = _SubstitutedLayout(unformatted.values).visit(result, None)
+            from ..format import minimally_format
+            result = minimally_format(result, None, cursor.parent if cursor is not None else None)
         return result
+
+    @classmethod
+    def unmark_substituted(cls, result: J) -> J:
+        unmarked = _SubstitutedLayout({}).visit(result, None)
+        assert unmarked is not None
+        return unmarked
 
     @classmethod
     def clear_cache(cls) -> None:
         """Clear the template cache."""
         cls._cache.clear()
+
+
+class _TreeIds(PythonVisitor[None]):
+    def __init__(self):
+        super().__init__()
+        self.ids: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        self.ids.add(tree.id)
+        return tree
+
+
+class _RetainIds(PythonVisitor[None]):
+    def __init__(self, retainable: Set[UUID]):
+        super().__init__()
+        self._retainable = retainable
+        self._seen: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        if tree.id in self._retainable and tree.id not in self._seen:
+            self._seen.add(tree.id)
+            return tree
+        return tree.replace(_id=random_id())
+
+
+class _SubstitutedValues(PythonVisitor[None]):
+    """Collects each substituted value by the id of the `SubstitutedValue` marking it."""
+
+    def __init__(self):
+        super().__init__()
+        self.values: Dict[UUID, J] = {}
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is not None:
+            self.values[marker.id] = tree
+            self.stop_after_pre_visit()
+        return tree
+
+
+class _SubstitutedLayout(PythonVisitor[None]):
+    """Puts each substituted value back as `unformatted` holds it, under the prefix the formatter gave
+    it, and drops its `SubstitutedValue` marker."""
+
+    def __init__(self, unformatted: Dict[UUID, J]):
+        super().__init__()
+        self._unformatted = unformatted
+
+    def pre_visit(self, tree: J, p: None) -> J:
+        marker = substitution_marker(tree)
+        if marker is None:
+            return tree
+        self.stop_after_pre_visit()
+        before = self._unformatted.get(marker.id)
+        if before is not None:
+            tree = before.replace(prefix=tree.prefix)
+        return tree.replace(markers=tree.markers.replace(
+            markers=[m for m in tree.markers.markers if m != marker]))

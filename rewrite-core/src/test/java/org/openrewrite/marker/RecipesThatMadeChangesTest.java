@@ -182,7 +182,7 @@ class RecipesThatMadeChangesTest {
           emptyList(), URI.create("test:rpc"));
         return RecipesThatMadeChanges.create(List.of(new ChangeText("hello"),
           new RpcRecipe(null, "remote-id", descriptor, "EditVisitor", precondition, "ScanVisitor",
-            null, List.of())));
+            null, List.of(), false)));
     }
 
     /** Serialized through the formatter {@code GetObject} responses actually use. */

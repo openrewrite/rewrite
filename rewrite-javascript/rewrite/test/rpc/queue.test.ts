@@ -1,5 +1,5 @@
 import {Json} from "../../src/json";
-import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
+import {asRef, ReferenceMap, RpcCodecs, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
 import {IntelliJ, JavaScriptParser, JS, sourceFileCache, SpacesStyleDetailKind, StyleKind} from "../../src/javascript";
 import {MarkersKind} from "../../src/markers";
@@ -135,6 +135,79 @@ describe("RPC queues", () => {
 
         expect(batch.map(d => d.state)).toEqual([
             RpcObjectState.NO_CHANGE, RpcObjectState.END_OF_OBJECT,
+        ]);
+    });
+
+    const document = "test.ReplacementDocument";
+    const leaf = "test.ReplacementLeaf";
+
+    function registerReplacementDocument() {
+        RpcCodecs.registerCodec(document, {
+            async rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, leaf: await q.receive(before.leaf)};
+            },
+            async rpcSend(after: any, q: RpcSendQueue) {
+                await q.getAndSend(after, d => d.leaf);
+            }
+        }, document);
+        RpcCodecs.registerCodec(leaf, {
+            async rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, text: await q.receive(before.text)};
+            },
+            async rpcSend(after: any, q: RpcSendQueue) {
+                await q.getAndSend(after, l => l.text);
+            }
+        }, document);
+    }
+
+    test("a source file of another type than requested is received with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: document},
+            {state: RpcObjectState.ADD, valueType: leaf},
+            {state: RpcObjectState.ADD, value: "Goodbye"},
+        ];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+
+        // when
+        const received = await q.receive<any>({kind: JS.Kind.CompilationUnit});
+
+        // then
+        expect(received).toEqual({kind: document, leaf: {kind: leaf, text: "Goodbye"}});
+    });
+
+    test("a changed source file of another type than requested is received with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.CHANGE},
+            {state: RpcObjectState.CHANGE},
+            {state: RpcObjectState.CHANGE, value: "Goodbye"},
+        ];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+
+        // when
+        const received = await q.receive<any>({kind: document, leaf: {kind: leaf, text: "Hello"}});
+
+        // then
+        expect(received).toEqual({kind: document, leaf: {kind: leaf, text: "Goodbye"}});
+    });
+
+    test("a source file of another type than requested is sent with its own codecs", async () => {
+        // given
+        registerReplacementDocument();
+        const q = new RpcSendQueue(new ReferenceMap(), JS.Kind.CompilationUnit, false);
+
+        // when
+        const batch = await q.generate({kind: document, leaf: {kind: leaf, text: "Goodbye"}}, {kind: JS.Kind.CompilationUnit});
+
+        // then
+        expect(batch).toEqual([
+            {state: RpcObjectState.ADD, valueType: document},
+            {state: RpcObjectState.ADD, valueType: leaf},
+            {state: RpcObjectState.ADD, valueType: undefined, value: "Goodbye"},
+            {state: RpcObjectState.END_OF_OBJECT},
         ]);
     });
 

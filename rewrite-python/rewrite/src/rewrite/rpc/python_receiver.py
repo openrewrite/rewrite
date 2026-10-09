@@ -1530,9 +1530,10 @@ def _receive_java_type_variable(variable, q: RpcReceiveQueue):
     from rewrite.java.support_types import JavaType as JT
 
     # Receive fields in the same order as JavaTypeSender.visitVariable:
-    # name, owner, type, annotations (no flags over RPC)
+    # flagsBitMap, name, owner, type, annotations
     return _unsafe_set(
         variable if isinstance(variable, JT.Variable) else JT.Variable(),
+        _flags_bit_map=q.receive(variable._flags_bit_map),
         _name=q.receive(variable._name),
         _owner=q.receive(variable._owner),
         _type=q.receive(variable._type),

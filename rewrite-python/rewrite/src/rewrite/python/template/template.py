@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 from rewrite.java import J
 from rewrite.visitor import TreeVisitor
 from .capture import Capture
-from .coordinates import PythonCoordinates
+from .coordinates import CoordinateMode, PythonCoordinates
 from .engine import TemplateEngine, TemplateOptions
 
 if TYPE_CHECKING:
@@ -191,6 +191,12 @@ class Template:
                 # Assume it's a MatchResult
                 values_dict = values.as_dict()
 
+        effective_coords = coordinates
+        if effective_coords is None and cursor is not None:
+            tree = cursor.value
+            if tree is not None:
+                effective_coords = PythonCoordinates.replace(tree)
+
         # Phase 1: placeholder substitution (no coordinates yet)
         if values_dict:
             result = TemplateEngine.apply_substitutions(
@@ -199,6 +205,11 @@ class Template:
             )
         else:
             result = template_tree
+        if result is not None:
+            replaced = effective_coords.tree \
+                if effective_coords is not None and effective_coords.mode == CoordinateMode.REPLACEMENT \
+                else None
+            result = TemplateEngine.retain_ids(result, replaced)
 
         # Phase 2: parenthesize the result for the slot it replaces, mirroring JavaTemplate.doApply().
         # This must happen before coordinates are applied, because
@@ -210,14 +221,10 @@ class Template:
                 result = maybe_parenthesize(enclosing_tree(cursor.parent), target.id, result)
 
         # Phase 3: apply coordinates (prefix preservation, statement wrapping, auto-format)
-        effective_coords = coordinates
-        if effective_coords is None and cursor is not None:
-            tree = cursor.value
-            if tree is not None:
-                effective_coords = PythonCoordinates.replace(tree)
-
         if effective_coords is not None and result is not None:
             result = TemplateEngine.apply_coordinates(result, cursor, effective_coords, format)
+        elif result is not None:
+            result = TemplateEngine.unmark_substituted(result)
 
         return result
 

@@ -113,6 +113,10 @@ export class RpcCodecs {
         return this.nonTreeCodecs.get(type);
     }
 
+    static isSourceFileType(type: string): boolean {
+        return this.treeCodecs.has(type);
+    }
+
     static registerValueCodec(type: string, codec: RpcValueCodec<any>): void {
         this.valueCodecs.set(type, codec);
     }
@@ -141,11 +145,16 @@ export class RpcSendQueue {
     private before?: any;
 
     constructor(private readonly refs: ReferenceMap,
-                private readonly sourceFileType: string | undefined,
+                private sourceFileType: string | undefined,
                 private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
+        // A recipe may change the source file type
+        const afterType = after?.kind;
+        if (typeof afterType === "string" && RpcCodecs.isSourceFileType(afterType)) {
+            this.sourceFileType = afterType;
+        }
         await this.send(after, before);
 
         const result = this.q;
@@ -425,9 +434,10 @@ export class RpcReceiveQueue {
     private batchIndex = 0;
     private sinceYield = 0;
     private recorded: number[] = [];
+    private rootReceived = false;
 
     constructor(private readonly refs: Map<number, any>,
-                private readonly sourceFileType: string | undefined,
+                private sourceFileType: string | undefined,
                 private readonly pull: () => Promise<RpcObjectData[]>,
                 private readonly logger: rpc.Logger | undefined,
                 private readonly trace: boolean,
@@ -521,6 +531,14 @@ export class RpcReceiveQueue {
         const taken = this.take();
         const message = taken instanceof Promise ? await taken : taken;
         RpcObjectData.logTrace(message, this.trace, this.logger);
+        if (!this.rootReceived) {
+            this.rootReceived = true;
+            // A recipe may change the source file type
+            const rootType = message.state === RpcObjectState.ADD ? message.valueType : (before as any)?.kind;
+            if (typeof rootType === "string" && RpcCodecs.isSourceFileType(rootType)) {
+                this.sourceFileType = rootType;
+            }
+        }
         let ref: number | undefined;
         switch (message.state) {
             case RpcObjectState.NO_CHANGE:

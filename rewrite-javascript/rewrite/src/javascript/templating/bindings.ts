@@ -13,23 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {J, Type} from '../../java';
+import {J, NameTree} from '../../java';
 import {JavaScriptVisitor} from '../visitor';
-import {isValueReference} from '../scope';
+import {isReference, scopeOf} from '../scope';
 
 /**
  * Renames the identifiers a template uses for its declared bindings to the names the file
  * actually binds. Runs before parameter substitution, so only the template's own code is in
  * scope and a caller's captured code is never rewritten.
  */
-export async function renameBindings<T extends J>(tree: T, renames: Record<string, string>, modules: Record<string, string>): Promise<T> {
-    return new RenameBindingsVisitor(renames, modules).visit(tree, undefined) as Promise<T>;
+export async function renameBindings<T extends J>(tree: T, renames: Record<string, string>): Promise<T> {
+    return new RenameBindingsVisitor(renames).visit(tree, undefined) as Promise<T>;
 }
 
 class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
-    constructor(private readonly renames: Record<string, string>,
-                private readonly modules: Record<string, string>) {
+    constructor(private readonly renames: Record<string, string>) {
         super();
+    }
+
+    // The class of `Mocked<T>` and a decorator's name sit behind this hook, which the base visitor holds closed
+    protected override async visitTypeName<N extends NameTree>(nameTree: N, p: undefined): Promise<N> {
+        return await this.visit(nameTree, p) as N;
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: undefined): Promise<J | undefined> {
@@ -38,39 +42,10 @@ class RenameBindingsVisitor extends JavaScriptVisitor<undefined> {
             return identifier;
         }
 
-        // Attribution settles it where the context import resolved. It is absent for a module the
-        // parse could not reach, and the identifier's position decides instead.
-        const resolved = resolvedModule(identifier);
-        const refersToBinding = resolved !== undefined
-            ? resolved === this.modules[identifier.simpleName]
-            : isValueReference(this.cursor, identifier);
+        // Only the context binds at module scope, so a reference nothing in the template rebinds reads it
+        const refersToBinding = isReference(this.cursor, identifier) &&
+            !scopeOf(this.cursor).declares(identifier.simpleName);
 
         return refersToBinding ? {...identifier, simpleName: renamed} as J.Identifier : identifier;
     }
-}
-
-/** The module an identifier's attribution traces back to, following the owning-class chain to its root. */
-function resolvedModule(identifier: J.Identifier): string | undefined {
-    const fieldType = identifier.fieldType;
-    if (fieldType?.kind === Type.Kind.Variable) {
-        const owner = (fieldType as Type.Variable).owner;
-        return owner && Type.isClass(owner) ? rootName(owner as Type.Class) : undefined;
-    }
-    const type = identifier.type;
-    if (type && Type.isMethod(type)) {
-        const declaring = (type as Type.Method).declaringType;
-        return declaring ? rootName(declaring as Type.Class) : undefined;
-    }
-    if (type && Type.isClass(type)) {
-        return rootName(type as Type.Class);
-    }
-    return undefined;
-}
-
-function rootName(classType: Type.Class): string {
-    let current: Type.Class = classType;
-    while (current.owningClass && Type.isClass(current.owningClass)) {
-        current = current.owningClass as Type.Class;
-    }
-    return Type.FullyQualified.getFullyQualifiedName(current);
 }

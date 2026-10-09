@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntFlag
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
@@ -237,6 +237,10 @@ if not TYPE_CHECKING:
 
 class JavaType:
     __slots__ = ()
+
+    class Flag(IntFlag):
+        """Bits of a type's ``flags_bit_map``, the same as Java's ``org.openrewrite.java.tree.Flag``."""
+        Static = 1 << 3
 
     class FullyQualified(JavaType):
         __slots__ = ()
@@ -732,13 +736,7 @@ class JContainer(Generic[J2]):
             return self._t._elements
 
         def replace(self, **kwargs) -> JContainer[J3]:
-            """Replace fields of the container using keyword arguments."""
-            if 'elements' in kwargs:
-                elements = kwargs['elements']
-                if self._t._elements is elements:
-                    return self._t
-                return JContainer(self._t._before, elements, self._t._markers)
-            return self._t
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 

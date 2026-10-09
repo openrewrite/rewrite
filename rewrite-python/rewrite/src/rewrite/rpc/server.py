@@ -875,7 +875,7 @@ def _richness(cls) -> int:
 
 def _artifact_files(path: Path) -> List[str]:
     """The package's own .py/.pyi sources, with each stub (.pyi) ordered ahead of
-    its runtime sibling (.py) so the stub wins same-id/same-richness dedup."""
+    its runtime sibling (.py)."""
     files = [f for f in path.rglob('*') if f.suffix in ('.py', '.pyi')]
     files.sort(key=lambda f: (str(f.with_suffix('')), f.suffix != '.pyi'))
     return [str(f) for f in files]
@@ -939,6 +939,10 @@ def _enumerate_artifact(artifact: str, root: str, client, by_fqn: Dict[str, Any]
 
     for fp in files:
         own_module = _module_name(fp, root)
+        # ty resolves a module with a stub to the stub, so the runtime file's
+        # classes are ones no consumer can reference.
+        if fp.endswith('.py') and os.path.exists(fp + 'i'):
+            continue
         try:
             with open(fp, 'r', encoding='utf-8') as fh:
                 source = fh.read()
@@ -1483,6 +1487,7 @@ def handle_install_recipes(params: dict) -> dict:
             - 'recipes': str - A local file path (installed into the recipe-install
               dir, with its dependencies, when one is configured)
             - 'recipes': {'packageName': str, 'version': str|None} - A package spec
+            - 'venv': str - Only in facade mode, a prebuilt venv to run a local path's bundle on
 
     Returns:
         Dict with:
@@ -1503,6 +1508,9 @@ def handle_install_recipes(params: dict) -> dict:
     installed_version = None
     package_name: Optional[str] = None
     recipes_added = 0
+
+    if params.get('venv'):
+        raise ValueError("Attaching a prebuilt venv needs facade mode (--recipe-install-dir)")
 
     if isinstance(recipes, str):
         # Local file path. When a recipe-install dir is configured, install the
@@ -1910,7 +1918,7 @@ def _get_visitor_registry() -> Dict[str, Any]:
     return _VISITOR_REGISTRY
 
 
-def _prepare_instance(recipe, marketplace) -> dict:
+def _prepare_instance(recipe, marketplace, accepts_causes_another_cycle: bool = False) -> dict:
     """Prepare a recipe instance and, recursively, its whole child tree — storing every node in
     _prepared_recipes and returning the response with ``recipeList`` populated, so the host builds
     the tree locally instead of a PrepareRecipe round trip per child.
@@ -1966,6 +1974,9 @@ def _prepare_instance(recipe, marketplace) -> dict:
         'scanVisitor': f'scan:{prepared_id}' if is_scanning else None,
         'scanPreconditions': _get_preconditions(recipe, 'scan') if is_scanning else [],
     }
+    # Older Java hosts reject unknown response fields, so this is only sent when asked.
+    if accepts_causes_another_cycle and getattr(recipe, 'causes_another_cycle', False):
+        response['causesAnotherCycle'] = True
 
     if is_delegating:
         response['delegatesTo'] = {
@@ -1999,7 +2010,7 @@ def _prepare_instance(recipe, marketplace) -> dict:
         else:
             if not marketplace.find_recipe(child.name):
                 marketplace.install(type(child), [])
-            child_responses.append(_prepare_instance(child, marketplace))
+            child_responses.append(_prepare_instance(child, marketplace, accepts_causes_another_cycle))
     response['recipeList'] = child_responses
 
     return response
@@ -2079,7 +2090,7 @@ def handle_prepare_recipe(params: dict) -> dict:
     # Instantiate the recipe with options, then prepare it and its whole child tree.
     recipe = recipe_class(**options) if options else recipe_class()
 
-    response = _prepare_instance(recipe, marketplace)
+    response = _prepare_instance(recipe, marketplace, params.get('acceptsCausesAnotherCycle') is True)
     logger.debug(f"PrepareRecipe response: {response}")
     return response
 

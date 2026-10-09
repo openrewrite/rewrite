@@ -128,6 +128,7 @@ public class JavaTypeSender extends JavaTypeVisitor<RpcSendQueue> {
 
     @Override
     public JavaType visitVariable(JavaType.Variable variable, RpcSendQueue q) {
+        q.getAndSend(variable, JavaType.Variable::getFlagsBitMap);
         q.getAndSend(variable, JavaType.Variable::getName);
         q.getAndSend(variable, v -> asRef(v.getOwner()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));
         q.getAndSend(variable, v -> asRef(v.getType()), t -> visit(Reference.<JavaType>getValueNonNull(t), q));

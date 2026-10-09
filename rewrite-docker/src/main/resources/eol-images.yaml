@@ -324,6 +324,11 @@
   eolDate: "2025-10-31"
   suggestedReplacement: 3.14 or 3.13
 
+- imageName: python
+  tagPatterns: ["3.10", "3.10.*", "3.10-*"]
+  eolDate: "2026-10-01"
+  suggestedReplacement: 3.14 or 3.13
+
 - imageName: node
   tagPatterns: ["4", "4-*", "4.*"]
   eolDate: "2018-04-30"

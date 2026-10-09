@@ -75,7 +75,8 @@ class TestTyTypesClient:
 
     def test_client_context_manager(self):
         """Test that TyTypesClient shuts down on context exit."""
-        with TyTypesClient() as client:
+        with TyTypesClient() as client, tempfile.TemporaryDirectory() as tmpdir:
+            assert client.initialize(tmpdir)
             assert client._process is not None
         assert client._process is None
 
@@ -983,25 +984,50 @@ class TestUnionTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_union_return_type(self):
-        """Function returning Optional[str] should have str or Unknown return type."""
+    def test_optional_keeps_none_as_a_union_member(self):
         source = '''
             from typing import Optional
-            def maybe_name() -> Optional[str]:
-                return "Alice"
+            def f(x: bool | None, o: Optional[int]) -> Optional[str]:
+                x
+                o
+                return None
 
-            maybe_name()
+            f(None, None)
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            call = tree.body[2].value  # maybe_name()
-            result = mapping.method_invocation_type(call)
-            assert result is not None
-            assert result._name == 'maybe_name'
-            # Return type should resolve to str (unwrapping Optional).
-            # May be Unknown if ty-types doesn't emit descriptors for union members.
-            if result._return_type is not None and not isinstance(result._return_type, JavaType.Unknown):
-                assert result._return_type == JavaType.Primitive.String
+            body = tree.body[1].body
+            for reference, member in ((body[0].value, JavaType.Primitive.Boolean),
+                                      (body[1].value, JavaType.Primitive.Int)):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Union)
+                assert set(result.bounds) == {member, JavaType.Primitive.Null}
+            returned = mapping.method_invocation_type(tree.body[2].value)._return_type
+            assert set(returned.bounds) == {JavaType.Primitive.String, JavaType.Primitive.Null}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_optional_of_an_unresolved_type_is_unknown_rather_than_none(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'None'}
+        mapping._type_registry[2] = {'kind': 'union', 'members': [999, 1]}
+        assert isinstance(mapping._resolve_type(2), JavaType.Unknown)
+
+    def test_bytes_is_a_class_distinct_from_str(self):
+        source = '''
+            def f(b: bytes):
+                b
+                inferred = b"x"
+                inferred
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            body = tree.body[0].body
+            for reference in (body[0].value, body[2].value):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Class)
+                assert result.fully_qualified_name == 'bytes'
+                assert result.supertype is not None
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1110,15 +1136,18 @@ class TestTupleElements:
         assert result._type_parameters == [JavaType.Primitive.Int,
                                            JavaType.Primitive.String]
 
-    def test_homogeneous_element_becomes_single_type_parameter(self):
+    def test_homogeneous_element_becomes_array_type_parameter(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        # tuple[*tuple[int, ...], int]
         mapping._type_registry[400] = self._tuple_descriptor(
-            [{'typeId': 1, 'kind': 'homogeneous'}], type_args=[1])
+            [{'typeId': 1, 'kind': 'homogeneous'}, {'typeId': 1, 'kind': 'fixed'}],
+            type_args=[1])
 
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Parameterized)
-        assert result._type_parameters == [JavaType.Primitive.Int]
+        assert result._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int),
+                                           JavaType.Primitive.Int]
 
     def test_type_var_tuple_element_resolves(self):
         mapping = PythonTypeMapping("", file_path=None)
@@ -1195,16 +1224,21 @@ class TestTupleElementsWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_homogeneous_tuple_has_one_element(self):
+    def test_homogeneous_tuple_differs_from_one_tuple(self):
         source = '''
             def homo() -> tuple[int, ...]: ...
+            def one() -> tuple[int]: ...
             homo()
+            one()
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            result = mapping.type(tree.body[1].value)
-            assert isinstance(result, JavaType.Parameterized)
-            assert result._type_parameters == [JavaType.Primitive.Int]
+            homo = mapping.type(tree.body[2].value)
+            one = mapping.type(tree.body[3].value)
+            assert isinstance(homo, JavaType.Parameterized)
+            assert homo._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int)]
+            assert isinstance(one, JavaType.Parameterized)
+            assert one._type_parameters == [JavaType.Primitive.Int]
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -2442,19 +2476,77 @@ class TestDeclarationDeclaringType:
         assert result._declaring_type is None
 
     @requires_ty_types_cli
-    def test_declaration_declaring_type_with_ty_types(self):
-        """With ty-types, a function declaration should get a declaring type from the descriptor."""
-        source = 'def greet(name: str) -> str:\n    return name\n'
+    def test_declaring_type_is_the_enclosing_class_else_the_module(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(x): ...
+                @classmethod
+                def c(cls, x): ...
+                class Inner:
+                    def i(self): ...
+
+            def top(x): ...
+
+            def outer():
+                class Local:
+                    def m(self): ...
+
+            Mine().warn("x")
+        '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            func_node = tree.body[0]
-            result = mapping.method_declaration_type(func_node)
-            assert result is not None
-            assert isinstance(result, JavaType.Method)
-            assert result._declaring_type is not None, \
-                "Declaration should have a declaring type, not None"
-            assert isinstance(result._declaring_type, JavaType.Class)
-            assert result._declaring_type._fully_qualified_name != "<unknown>"
+            declaring = {
+                node.name: mapping.method_declaration_type(node)._declaring_type.fully_qualified_name
+                for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+            }
+            assert declaring == {
+                'warn': 'test.Mine',
+                's': 'test.Mine',
+                'c': 'test.Mine',
+                'i': 'test.Mine.Inner',
+                'top': 'test',
+                'outer': 'test',
+                'm': "test.<locals of function 'outer'>.Local",
+            }
+            call = mapping.method_invocation_type(tree.body[-1].value)
+            assert call._declaring_type.fully_qualified_name == declaring['warn']
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    @requires_ty_types_cli
+    def test_every_declaration_but_an_instance_method_is_static(self):
+        source = '''
+            class Mine:
+                def warn(self, msg): ...
+                @staticmethod
+                def s(other: "Mine"): ...
+                @classmethod
+                def c(cls, x): ...
+
+            def top(x):
+                def nested(): ...
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            static = {
+                node.name for node in ast.walk(tree) if isinstance(node, ast.FunctionDef)
+                and mapping.method_declaration_type(node).flags_bit_map & JavaType.Flag.Static
+            }
+            assert static == {'s', 'c', 'top', 'nested'}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    @requires_ty_types_cli
+    def test_module_function_types_are_static(self):
+        source = '''
+            from helpers import util
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source, {'helpers.py': 'def util(x): ...\n'})
+        try:
+            alias = mapping.import_alias_type(tree.body[0].names[0])
+            assert alias.flags_bit_map & JavaType.Flag.Static
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -3352,6 +3444,21 @@ class TestSubprocessEnvVirtualEnv:
         )
         assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
+    def test_project_venv_outranks_inherited_environments_but_not_an_explicit_one(self, tmp_path):
+        venv = tmp_path / '.venv'
+        venv.mkdir()
+        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv'}
+
+        def subprocess_env(**kwargs):
+            return TyTypesClient._subprocess_env(base_env=inherited, project_root=str(tmp_path), **kwargs)
+
+        assert subprocess_env()['VIRTUAL_ENV'] == '/inherited/.venv'
+
+        (venv / 'pyvenv.cfg').write_text('home = /usr/bin\n')
+        assert subprocess_env(prefix='/dev/.venv', base_prefix='/usr')['VIRTUAL_ENV'] == str(venv)
+
+        assert subprocess_env(virtual_env='/tmp/ws/.venv')['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
     def test_no_virtual_env_keeps_existing_sys_prefix_behavior(self):
         env = TyTypesClient._subprocess_env(
             base_env={'PATH': '/usr/bin'},
@@ -3832,6 +3939,65 @@ class TestClassMembers:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    _HOOK = '''
+        class Hook:
+            count: int = 0
+            def __init__(self) -> None:
+                self.x = 1
+            def __setattr__(self, k: str, v: object) -> None: ...
+            @property
+            def y(self) -> int: return 1
+            def m(self) -> None:
+                self
+        h = Hook(); h.x; h.y
+    '''
+
+    @staticmethod
+    def _assert_hook_fields(cls):
+        by_name = {v._name: v for v in cls._members or []}
+        assert sorted(by_name) == ['count', 'x', 'y']
+        assert by_name['x']._type == JavaType.Primitive.Int
+        assert by_name['y']._type == JavaType.Primitive.Int
+
+    def test_properties_and_self_assigned_attributes_are_fields(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self._assert_hook_fields(mapping.type(tree.body[1].targets[0]))
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_self_assigned_attribute_is_a_field_whatever_its_value(self):
+        src = '''
+            import os
+            def f() -> int: return 1
+            class K: ...
+            class C:
+                def __init__(self) -> None:
+                    self.g = f
+                    self.k = K
+                    self.mod = os
+            c = C()
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(src)
+        try:
+            cls = mapping.type(tree.body[-1].targets[0])
+            assert [m._name for m in cls._methods or []] == ['__init__']
+            by_name = {v._name: v._type for v in cls._members or []}
+            assert by_name['g'] == JavaType.Primitive.Int
+            assert by_name['k'].fully_qualified_name == 'test.K'
+            assert by_name['mod'].fully_qualified_name == 'os'
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_fields_are_reachable_through_self(self):
+        mapping, tree, tmpdir, client = _make_mapping(self._HOOK)
+        try:
+            self_type = mapping.type(tree.body[0].body[-1].body[-1].value)
+            assert isinstance(self_type, JavaType.GenericTypeVariable)
+            self._assert_hook_fields(self_type._bounds[0])
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
 
 @requires_ty_types_cli
 class TestTypedDictMembers:
@@ -4079,6 +4245,43 @@ class TestSymbolTheStubsDoNotDeclare:
     def test_a_rebound_name_is_not_attributed_from_its_import(self):
         owner, _ = self._call_names('from lib import gone\ngone = None\ngone()\n', 2)
         assert owner is None, 'a name the file rebinds no longer names what it imported'
+
+    def _call_owners(self, source):
+        cu, tmpdir, client = _parse_with_types({'lib.py': self.LIB, 'm.py': source})
+        try:
+            return [getattr(c.method_type.declaring_type, 'fully_qualified_name', None)
+                    for c in _collect_method_invocations(cu)]
+        finally:
+            _cleanup_parse(tmpdir, client)
+
+    def test_a_name_another_scope_binds_keeps_its_import_here(self):
+        assert self._call_owners(
+            'from lib import gone\ngone()\n'
+            'class C:\n    def gone(self):\n        pass\n    def m(self):\n        gone()\n'
+            'def f(gone=None):\n    pass\n') == ['lib', 'lib'], \
+            'a class body is not visible to its methods, and a parameter only to its function'
+        assert self._call_owners(
+            'from lib import gone as g\ng()\nclass C:\n    def g(self):\n        pass\n') == ['lib']
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    return gone\n') == ['lib'], \
+            'a global declaration binds nothing until something assigns it'
+
+    def test_a_name_an_enclosing_scope_binds_is_not_attributed(self):
+        assert self._call_owners(
+            'from lib import gone\n'
+            'def f(gone):\n    def inner():\n        gone()\n'
+            'class C:\n    gone = None\n    gone()\n') == [None, None]
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f():\n    global gone\n    gone = None\n') == [None], \
+            'a global declaration binds at module scope'
+
+        assert self._call_owners(
+            'from lib import gone\ngone()\ndef f(a=(gone := 1)):\n    pass\n') == [None], \
+            'a default is evaluated in the scope around its function'
+        assert self._call_owners(
+            'from lib import gone\nclass C[gone]:\n    def m(self):\n        gone()\n') == [None], \
+            "a class's type parameters reach its methods"
 
     def test_an_import_in_a_function_does_not_bind_at_module_scope(self):
         owner, _ = self._call_names('def g():\n    from lib import gone\ngone()\n')

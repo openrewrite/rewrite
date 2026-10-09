@@ -1349,10 +1349,12 @@ public class RewriteRpcServer
     private static void CheckVersionCompatibility(Assembly pluginAssembly)
     {
         var hostAssembly = typeof(RewriteRpcServer).Assembly;
-        var hostVersion = hostAssembly.GetName().Version;
+        var hostName = hostAssembly.GetName();
+        var hostVersion = hostName.Version;
 
+        // Match on the host's assembly name (OpenRewrite), not the NuGet package id (OpenRewrite.CSharp).
         var openRewriteRef = pluginAssembly.GetReferencedAssemblies()
-            .FirstOrDefault(a => string.Equals(a.Name, "OpenRewrite.CSharp",
+            .FirstOrDefault(a => string.Equals(a.Name, hostName.Name,
                 StringComparison.OrdinalIgnoreCase));
 
         if (openRewriteRef?.Version == null || hostVersion == null)
@@ -1453,7 +1455,7 @@ public class RewriteRpcServer
             throw new InvalidOperationException($"Recipe {request.Id} has no live instance (installed without constructor)");
         }
 
-        return Task.FromResult(PrepareInstance(recipe, request.Options));
+        return Task.FromResult(PrepareInstance(recipe, request.Options, request.AcceptsCausesAnotherCycle == true));
     }
 
     /// <summary>
@@ -1462,7 +1464,8 @@ public class RewriteRpcServer
     /// A child that is <see cref="IDelegatesTo"/> carries only <c>DelegatesTo</c> and
     /// no children; all other children have their own <c>RecipeList</c> populated.
     /// </summary>
-    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options)
+    private PrepareRecipeResponse PrepareInstance(Recipe recipe, Dictionary<string, object?>? options,
+        bool acceptsCausesAnotherCycle)
     {
         // If options are provided, create a new instance with options applied.
         if (options is { Count: > 0 })
@@ -1470,12 +1473,15 @@ public class RewriteRpcServer
             recipe = InstantiateWithOptions(recipe.GetType(), options);
         }
 
-        // Validate required options on the instantiated recipe — the root against the caller's
-        // options, and every child against the values its parent set in GetRecipeList(). Because
-        // PrepareInstance recurses, this covers the whole tree, and it's the only place the C# tree
-        // gets validated: declarative recipes bundled in an artifact often ship without a test that
-        // runs validateAll, so this is the safety net against executing a broken recipe. Delegating
-        // recipes forward to a Java recipe that validates its own options, so they are skipped here.
+        // Validate required options and the recipe's own Validate() constraints on the instantiated
+        // recipe — the root against the caller's options, and every child against the values its
+        // parent set in GetRecipeList(). Because PrepareInstance recurses, this covers the whole
+        // tree, and it's the only place the C# tree gets validated: declarative recipes bundled in
+        // an artifact often ship without a test that runs validateAll, so this is the safety net
+        // against executing a broken recipe. It is also the only place that reports a bad option
+        // once: the visitor factories run per source file, so validating there turns one
+        // misconfiguration into one error per file. Delegating recipes forward to a Java recipe that
+        // validates its own options, so they are skipped here.
         if (recipe is not IDelegatesTo)
         {
             var descriptor = recipe.GetDescriptor();
@@ -1487,6 +1493,13 @@ public class RewriteRpcServer
                         $"Missing required option `{option.Name}` for recipe `{descriptor.Name}`.");
                 }
             }
+
+            var validationErrors = recipe.Validate().ToList();
+            if (validationErrors.Count > 0)
+            {
+                throw new ArgumentException(
+                    $"Invalid options for recipe `{descriptor.Name}`: {string.Join(" ", validationErrors)}");
+            }
         }
 
         var id = Tree.RandomId().ToString();
@@ -1497,7 +1510,8 @@ public class RewriteRpcServer
             Id = id,
             Descriptor = RecipeDescriptorDto.FromDescriptor(recipe.GetDescriptor()),
             EditVisitor = $"edit:{id}",
-            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null
+            ScanVisitor = recipe is IScanningRecipe ? $"scan:{id}" : null,
+            CausesAnotherCycle = acceptsCausesAnotherCycle && recipe.CausesAnotherCycle ? true : null
         };
 
         if (recipe is IDelegatesTo del)
@@ -1514,7 +1528,7 @@ public class RewriteRpcServer
             OptimizePreconditions(recipe, response);
             // Whole-tree preparation: children are real instances in this recipe's own ALC.
             response.RecipeList = recipe.GetRecipeList()
-                .Select(child => PrepareInstance(child, null))
+                .Select(child => PrepareInstance(child, null, acceptsCausesAnotherCycle))
                 .ToList();
         }
 
@@ -2660,6 +2674,9 @@ public class PrepareRecipeRequest
 {
     public string Id { get; set; } = "";
     public Dictionary<string, object?>? Options { get; set; }
+
+    // Older Java hosts reject unknown response fields, so CausesAnotherCycle is only sent when asked.
+    public bool? AcceptsCausesAnotherCycle { get; set; }
 }
 
 public class PrepareRecipeResponse
@@ -2672,6 +2689,7 @@ public class PrepareRecipeResponse
     public List<Precondition> ScanPreconditions { get; set; } = [];
     public DelegatesTo? DelegatesTo { get; set; }
     public List<PrepareRecipeResponse> RecipeList { get; set; } = [];
+    public bool? CausesAnotherCycle { get; set; }
 }
 
 public class DelegatesTo

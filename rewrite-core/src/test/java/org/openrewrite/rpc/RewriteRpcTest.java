@@ -45,6 +45,8 @@ import org.openrewrite.marketplace.*;
 import org.openrewrite.table.TextMatches;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.marker.RecipesThatMadeChanges;
+import org.openrewrite.rpc.request.GetObject;
+import org.openrewrite.rpc.request.GetObjectResponse;
 import org.openrewrite.rpc.request.Print;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -348,6 +350,33 @@ class RewriteRpcTest implements RewriteTest {
         assertThat(server.remoteObjects).doesNotContainKey(id);
     }
 
+    /**
+     * The sender can evict an object the receiver is still pulling, e.g. after the sender's own
+     * request timed out. The transfer must stop there rather than keep assigning refs the eviction
+     * rolled back, or hand the receiver the rest of an object the sender no longer tracks.
+     */
+    @Test
+    void evictCancelsATransferTheReceiverIsStillPulling() {
+        // given
+        PlainText original = PlainText.builder()
+          .sourcePath(Path.of("test.txt"))
+          .text("Hello")
+          .build();
+        String id = original.getId().toString();
+        GetObject nextPage = new GetObject(id, PlainText.class.getName());
+        int[] checkpoint = server.refCheckpoint();
+        server.localObjects.put(id, original);
+        client.send("GetObject", nextPage, GetObjectResponse.class);
+
+        // when
+        server.evict(id, checkpoint[0], checkpoint[1]);
+
+        // then
+        assertThatThrownBy(() -> client.send("GetObject", nextPage, GetObjectResponse.class))
+          .hasMessageContaining("was cancelled");
+        assertThat(server.localRefs).isEmpty();
+    }
+
     @DocumentExample
     @Test
     void sendReceiveIdempotence() {
@@ -537,6 +566,14 @@ class RewriteRpcTest implements RewriteTest {
             "hello"
           )
         );
+    }
+
+    @Test
+    void causesAnotherCycleCrossesRpc() {
+        Recipe recipe = client.prepareRecipe("org.openrewrite.rpc.RewriteRpcTest$CausesAnotherCycleRecipe", Map.of());
+        assertThat(recipe.causesAnotherCycle()).isTrue();
+        assertThat(recipe.getRecipeList()).singleElement()
+          .satisfies(child -> assertThat(child.causesAnotherCycle()).isFalse());
     }
 
     /**
@@ -885,6 +922,28 @@ class RewriteRpcTest implements RewriteTest {
         @Override
         public String getDescription() {
             return "To verify that it is possible for a recipe list to be called over RPC.";
+        }
+
+        @Override
+        public void buildRecipeList(RecipeList recipes) {
+            recipes.recipe(new org.openrewrite.text.ChangeText("hello"));
+        }
+    }
+
+    static class CausesAnotherCycleRecipe extends Recipe {
+        @Override
+        public String getDisplayName() {
+            return "A recipe that causes another cycle";
+        }
+
+        @Override
+        public String getDescription() {
+            return "To verify that causesAnotherCycle is carried over RPC.";
+        }
+
+        @Override
+        public boolean causesAnotherCycle() {
+            return true;
         }
 
         @Override
