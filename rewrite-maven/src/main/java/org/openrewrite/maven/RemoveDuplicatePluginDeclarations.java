@@ -20,6 +20,8 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Content;
@@ -27,6 +29,10 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 import java.util.function.BinaryOperator;
+import java.util.function.Function;
+
+import static java.util.Collections.emptySet;
+import static java.util.stream.Collectors.toList;
 
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
@@ -34,19 +40,42 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//build/pluginManagement/plugins");
     private static final XPathMatcher REPORTING_PLUGINS_MATCHER = new XPathMatcher("//reporting/plugins");
 
+    /**
+     * Plugins the Maven 3.9 super POM manages, which every POM's plugin management inherits.
+     */
+    private static final Set<String> SUPER_POM_MANAGED_PLUGINS = new HashSet<>(Arrays.asList(
+            "org.apache.maven.plugins:maven-antrun-plugin",
+            "org.apache.maven.plugins:maven-assembly-plugin",
+            "org.apache.maven.plugins:maven-dependency-plugin",
+            "org.apache.maven.plugins:maven-release-plugin"));
+
     @Getter
     final String displayName = "Remove duplicate plugin declarations";
 
     @Getter
     final String description = "Maven 3.10 and Maven 4 reject duplicate plugin declarations (same groupId and artifactId) " +
         "with an error, where Maven 3.9 and earlier only warned. This recipe collapses each set of duplicates into the " +
-        "position of the first declaration, preserving the effective model Maven 3 built from them: duplicate build " +
-        "plugins are merged with the later declaration taking precedence, the way Maven 3 merged them, and for plugin " +
-        "management the last declaration is kept, as that is the one Maven 3 applied.";
+        "position of the first declaration, preserving the effective model Maven 3 built from them. Maven 3 merged " +
+        "duplicates, with the later declaration taking precedence, whenever there was a declaration to merge them " +
+        "into: always for build plugins, and for plugins in a profile or in plugin management when the main build or " +
+        "a parent also declares the plugin. Otherwise it applied only the last declaration, which is then the one kept.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
+            @Nullable
+            Set<String> inheritedPlugins;
+
+            @Nullable
+            Set<String> inheritedPluginManagement;
+
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                inheritedPlugins = null;
+                inheritedPluginManagement = null;
+                return super.visitDocument(document, ctx);
+            }
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -56,14 +85,74 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 }
 
                 if (PLUGINS_MATCHER.matches(getCursor())) {
-                    return collapseDuplicates(t, (earlier, later) -> mergePlugin(later, earlier));
+                    boolean inProfile = isInsideProfile();
+                    return collapseDuplicates(t, key -> !inProfile || mainBuildKeys(false).contains(key) ||
+                                                        inheritedKeys(false, ctx).contains(key) ?
+                            MERGE : KEEP_LAST);
                 } else if (PLUGIN_MANAGEMENT_PLUGINS_MATCHER.matches(getCursor())) {
-                    return collapseDuplicates(t, (earlier, later) -> later);
+                    boolean inProfile = isInsideProfile();
+                    return collapseDuplicates(t, key -> SUPER_POM_MANAGED_PLUGINS.contains(key) ||
+                                                        inheritedKeys(true, ctx).contains(key) ||
+                                                        inProfile && mainBuildKeys(true).contains(key) ?
+                            MERGE : KEEP_LAST);
                 } else if (REPORTING_PLUGINS_MATCHER.matches(getCursor())) {
-                    return collapseDuplicates(t, (earlier, later) -> earlier);
+                    return collapseDuplicates(t, key -> (earlier, later) -> earlier);
                 }
 
                 return t;
+            }
+
+            private boolean isInsideProfile() {
+                return getCursor().getPathAsStream(o -> o instanceof Xml.Tag && "profile".equals(((Xml.Tag) o).getName()))
+                        .findAny()
+                        .isPresent();
+            }
+
+            private Set<String> mainBuildKeys(boolean management) {
+                Pom requested = getResolutionResult().getPom().getRequested();
+                return pluginKeys(management ? requested.getPluginManagement() : requested.getPlugins());
+            }
+
+            /**
+             * Plugins the parent's effective model declares, which Maven 3 merged a child's duplicates into while
+             * assembling inheritance, so the child's duplicates were merged rather than the last one winning.
+             */
+            private Set<String> inheritedKeys(boolean management, ExecutionContext ctx) {
+                if (management && inheritedPluginManagement != null) {
+                    return inheritedPluginManagement;
+                } else if (!management && inheritedPlugins != null) {
+                    return inheritedPlugins;
+                }
+                ResolvedPom parent = parentPom(ctx);
+                Set<String> keys = parent == null ? emptySet() :
+                        pluginKeys((management ? parent.getPluginManagement() : parent.getPlugins()).stream()
+                                .filter(p -> !"false".equals(p.getInherited()) || !p.getExecutions().isEmpty())
+                                .collect(toList()));
+                if (management) {
+                    inheritedPluginManagement = keys;
+                } else {
+                    inheritedPlugins = keys;
+                }
+                return keys;
+            }
+
+            private @Nullable ResolvedPom parentPom(ExecutionContext ctx) {
+                MavenResolutionResult mrr = getResolutionResult();
+                if (mrr.getParent() != null) {
+                    return mrr.getParent().getPom();
+                }
+                Parent parent = mrr.getPom().getRequested().getParent();
+                if (parent == null) {
+                    return null;
+                }
+                try {
+                    MavenPomDownloader downloader = new MavenPomDownloader(mrr.getProjectPoms(), ctx,
+                            MavenExecutionContextView.view(ctx).effectiveSettings(mrr), mrr.getActiveProfiles());
+                    return downloader.download(parent.getGav(), parent.getRelativePath(), mrr.getPom(), mrr.getPom().getRepositories())
+                            .resolve(mrr.getActiveProfiles(), downloader, ctx);
+                } catch (MavenDownloadingException e) {
+                    return null;
+                }
             }
 
             /**
@@ -79,7 +168,21 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         };
     }
 
-    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, BinaryOperator<Xml.Tag> combine) {
+    private static final List<String> COORDINATES_FIRST = Arrays.asList(
+            "groupId", "artifactId", "version", "extensions", "id", "phase");
+
+    private static final BinaryOperator<Xml.Tag> MERGE = (earlier, later) -> mergePlugin(later, earlier);
+    private static final BinaryOperator<Xml.Tag> KEEP_LAST = (earlier, later) -> later;
+
+    private static Set<String> pluginKeys(List<Plugin> plugins) {
+        Set<String> keys = new HashSet<>();
+        for (Plugin plugin : plugins) {
+            keys.add(plugin.getGroupId() + ":" + plugin.getArtifactId());
+        }
+        return keys;
+    }
+
+    private static Xml.Tag collapseDuplicates(Xml.Tag plugins, Function<String, BinaryOperator<Xml.Tag>> combineFor) {
         if (plugins.getContent() == null) {
             return plugins;
         }
@@ -114,16 +217,22 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 collapsed.add(content);
                 continue;
             }
+            BinaryOperator<Xml.Tag> combine = combineFor.apply(key);
             Xml.Tag result = duplicates.get(0);
             for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
                 result = combine.apply(result, later);
             }
+            String prefix = withIndent(content.getPrefix(), indentOf(result));
+            boolean ownComments = !comments.get(content).isEmpty();
             for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
                 for (Content comment : comments.get(later)) {
-                    collapsed.add(reindent(comment, later, result));
+                    Content moved = reindent(comment, later, result);
+                    collapsed.add((Content) moved.withPrefix(ownComments ? singleLine(moved.getPrefix()) : prefix));
+                    ownComments = true;
+                    prefix = singleLine(prefix);
                 }
             }
-            collapsed.add(result.withPrefix(withIndent(content.getPrefix(), indentOf(result))));
+            collapsed.add(result.withPrefix(prefix));
         }
         return plugins.withContent(collapsed);
     }
@@ -191,9 +300,13 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
                 content.add(c);
             } else {
                 moved.add(sameId);
-                moved.addAll(dominantComments.get(sameId));
-                content.addAll(dominantComments.get(sameId));
-                content.add(mergeExecution(sameId, (Xml.Tag) c).withPrefix(c.getPrefix()));
+                String prefix = withIndent(c.getPrefix(), indentOf(sameId));
+                for (Content comment : dominantComments.get(sameId)) {
+                    moved.add(comment);
+                    content.add((Content) comment.withPrefix(singleLine(comment.getPrefix())));
+                    prefix = singleLine(prefix);
+                }
+                content.add(mergeExecution(sameId, (Xml.Tag) c).withPrefix(prefix));
             }
         }
         for (Content c : contentOf(dominant)) {
@@ -316,8 +429,17 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         for (int i = at - 1; i >= 0; i--) {
             int index = lastIndexOfTag(content, siblings.get(i).getName());
             if (index >= 0) {
-                while (index + 1 < content.size() && content.get(index + 1) instanceof Xml.Comment &&
-                       !content.get(index + 1).getPrefix().contains("\n")) {
+                int rank = COORDINATES_FIRST.indexOf(recessiveChild.getName());
+                while (index + 1 < content.size()) {
+                    Content next = content.get(index + 1);
+                    boolean trailingComment = next instanceof Xml.Comment && !next.getPrefix().contains("\n");
+                    boolean conventionallyEarlier = next instanceof Xml.Tag &&
+                                                    !recessive.getChild(((Xml.Tag) next).getName()).isPresent() &&
+                                                    COORDINATES_FIRST.contains(((Xml.Tag) next).getName()) &&
+                                                    (rank < 0 || COORDINATES_FIRST.indexOf(((Xml.Tag) next).getName()) < rank);
+                    if (!trailingComment && !conventionallyEarlier) {
+                        break;
+                    }
                     index++;
                 }
                 return index + 1;
@@ -364,6 +486,11 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     private static String indentOf(Content content) {
         String prefix = content.getPrefix();
         return prefix.substring(prefix.lastIndexOf('\n') + 1);
+    }
+
+    private static String singleLine(String prefix) {
+        int newline = prefix.lastIndexOf('\n');
+        return newline < 0 ? prefix : prefix.substring(newline);
     }
 
     private static String withIndent(String prefix, String indent) {

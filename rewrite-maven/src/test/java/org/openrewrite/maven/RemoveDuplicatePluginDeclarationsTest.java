@@ -885,6 +885,11 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                   <version>1.0.0</version>
                   <build>
                       <plugins>
+                          <plugin>
+                              <artifactId>maven-jar-plugin</artifactId>
+                              <version>3.4.2</version>
+                          </plugin>
+
                           <!-- integration tests -->
                           <plugin>
                               <artifactId>maven-failsafe-plugin</artifactId>
@@ -901,10 +906,12 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                                   </execution>
                               </executions>
                           </plugin>
+
                           <!-- verify after integration tests -->
                           <plugin>
                               <artifactId>maven-failsafe-plugin</artifactId>
                               <executions>
+
                                   <!-- check the results -->
                                   <execution>
                                       <goals>
@@ -924,6 +931,11 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                   <version>1.0.0</version>
                   <build>
                       <plugins>
+                          <plugin>
+                              <artifactId>maven-jar-plugin</artifactId>
+                              <version>3.4.2</version>
+                          </plugin>
+
                           <!-- integration tests -->
                           <!-- verify after integration tests -->
                           <plugin>
@@ -1004,6 +1016,278 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
               \t\t\t</plugin>
               \t\t</plugins>
               \t</build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void lastProfilePluginWinsWhenTheMainBuildDoesNotDeclareIt() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <profiles>
+                      <profile>
+                          <id>dist</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-assembly-plugin</artifactId>
+                                      <version>2.4</version>
+                                      <configuration>
+                                          <descriptors>
+                                              <descriptor>assembly/bin.xml</descriptor>
+                                          </descriptors>
+                                      </configuration>
+                                  </plugin>
+                                  <plugin>
+                                      <artifactId>maven-assembly-plugin</artifactId>
+                                      <configuration>
+                                          <descriptorRefs>
+                                              <descriptorRef>jar-with-dependencies</descriptorRef>
+                                          </descriptorRefs>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <profiles>
+                      <profile>
+                          <id>dist</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-assembly-plugin</artifactId>
+                                      <configuration>
+                                          <descriptorRefs>
+                                              <descriptorRef>jar-with-dependencies</descriptorRef>
+                                          </descriptorRefs>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeProfilePluginsWhenTheMainBuildDeclaresThePlugin() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>ci</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <configuration>
+                                          <forkCount>2</forkCount>
+                                      </configuration>
+                                  </plugin>
+                                  <plugin>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <configuration>
+                                          <rerunFailingTestsCount>1</rerunFailingTestsCount>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+                  <profiles>
+                      <profile>
+                          <id>ci</id>
+                          <build>
+                              <plugins>
+                                  <plugin>
+                                      <artifactId>maven-surefire-plugin</artifactId>
+                                      <configuration>
+                                          <rerunFailingTestsCount>1</rerunFailingTestsCount>
+                                          <forkCount>2</forkCount>
+                                      </configuration>
+                                  </plugin>
+                              </plugins>
+                          </build>
+                      </profile>
+                  </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergePluginManagementWhenTheParentManagesThePlugin() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules>
+                      <module>child</module>
+                  </modules>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.5.2</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          ),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <configuration>
+                                      <skip>true</skip>
+                                  </configuration>
+                              </plugin>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.5.3</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                  </parent>
+                  <artifactId>child</artifactId>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.5.3</version>
+                                  <configuration>
+                                      <skip>true</skip>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            spec -> spec.path("child/pom.xml")
+          )
+        );
+    }
+
+    @Test
+    void mergePluginManagementOfPluginsTheSuperPomManages() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-dependency-plugin</artifactId>
+                                  <version>3.8.1</version>
+                              </plugin>
+                              <plugin>
+                                  <artifactId>maven-dependency-plugin</artifactId>
+                                  <configuration>
+                                      <silent>true</silent>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-dependency-plugin</artifactId>
+                                  <version>3.8.1</version>
+                                  <configuration>
+                                      <silent>true</silent>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
               </project>
               """
           )
