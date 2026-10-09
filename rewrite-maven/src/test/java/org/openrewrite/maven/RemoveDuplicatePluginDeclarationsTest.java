@@ -117,7 +117,6 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                   <build>
                       <plugins>
                           <plugin>
-                              <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
                               <version>3.11.0</version>
                           </plugin>
@@ -703,11 +702,11 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                               <version>3.13.0</version>
                               <configuration>
                                   <release>21</release>
+                                  <showWarnings>true</showWarnings>
                                   <compilerArgs combine.children="append">
                                       <arg>-Xlint:all</arg>
                                       <arg>-parameters</arg>
                                   </compilerArgs>
-                                  <showWarnings>true</showWarnings>
                               </configuration>
                           </plugin>
                       </plugins>
@@ -860,7 +859,6 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                   <build>
                       <plugins>
                           <plugin>
-                              <groupId> org.apache.maven.plugins </groupId>
                               <artifactId>
                                   maven-jar-plugin
                               </artifactId>
@@ -1288,6 +1286,121 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                           </plugins>
                       </pluginManagement>
                   </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepCommentsInsideMergedConfiguration() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <configuration>
+                                  <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                                  <includes>
+                                      <!-- Make sure both the Test/Tests.java files are included -->
+                                      <include>**/*Test*.java</include>
+                                  </includes>
+                              </configuration>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>2.12</version>
+                              <configuration>
+                                  <includes>
+                                      <include>**/*Test*.java</include>
+                                  </includes>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>2.12</version>
+                              <configuration>
+                                  <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                                  <includes>
+                                      <!-- Make sure both the Test/Tests.java files are included -->
+                                      <include>**/*Test*.java</include>
+                                  </includes>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void writeMergedPluginInTheIndentationOfItsSiblings() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-javadoc-plugin</artifactId>
+              \t\t\t\t<configuration>
+              \t\t\t\t\t<doclint>none</doclint>
+              \t\t\t\t</configuration>
+              \t\t\t</plugin>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-jar-plugin</artifactId>
+              \t\t\t</plugin>
+                          <plugin>
+                              <artifactId>maven-javadoc-plugin</artifactId>
+                              <version>3.2.0</version>
+                          </plugin>
+              \t\t</plugins>
+              \t</build>
+              </project>
+              """,
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-javadoc-plugin</artifactId>
+              \t\t\t\t<version>3.2.0</version>
+              \t\t\t\t<configuration>
+              \t\t\t\t\t<doclint>none</doclint>
+              \t\t\t\t</configuration>
+              \t\t\t</plugin>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-jar-plugin</artifactId>
+              \t\t\t</plugin>
+              \t\t</plugins>
+              \t</build>
               </project>
               """
           )
