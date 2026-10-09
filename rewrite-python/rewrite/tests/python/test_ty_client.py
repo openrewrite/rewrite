@@ -102,12 +102,22 @@ def test_round_trip(client):
 
 def test_failed_initialize_restarts_for_another_roots_venv(client, tmp_path, monkeypatch):
     monkeypatch.setenv("VIRTUAL_ENV", "/inherited/.venv")
-    project = tmp_path / "project"
-    (project / ".venv").mkdir(parents=True)
+    venv = tmp_path / "project" / ".venv"
+    venv.mkdir(parents=True)
+    (venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
 
     assert not client.initialize(str(tmp_path / "reject"))
-    assert client.initialize(str(project))
-    assert client.get_types(str(project / "app.py"))["virtualEnv"] is None
+    assert client.initialize(str(venv.parent))
+    assert client.get_types(str(venv.parent / "app.py"))["virtualEnv"] == str(venv)
+
+
+def test_restarted_session_drops_the_previous_sessions_types(client):
+    assert client.initialize("/some/project")
+    assert client.get_types("/some/project/app.py") is not None
+    client._kill()
+
+    assert client.initialize("/some/project")
+    assert client.session_types == {}
 
 
 def test_timeout_returns_none_then_recovers(client):

@@ -3412,24 +3412,19 @@ class TestSubprocessEnvVirtualEnv:
         assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
     def test_project_venv_outranks_inherited_environments_but_not_an_explicit_one(self, tmp_path):
-        (tmp_path / '.venv').mkdir()
-        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv', 'CONDA_PREFIX': '/conda/env'}
+        venv = tmp_path / '.venv'
+        venv.mkdir()
+        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv'}
 
-        env = TyTypesClient._subprocess_env(
-            base_env=inherited,
-            prefix='/dev/.venv',
-            base_prefix='/usr',
-            project_root=str(tmp_path),
-        )
-        assert 'VIRTUAL_ENV' not in env
-        assert 'CONDA_PREFIX' not in env
+        def subprocess_env(**kwargs):
+            return TyTypesClient._subprocess_env(base_env=inherited, project_root=str(tmp_path), **kwargs)
 
-        env = TyTypesClient._subprocess_env(
-            base_env=inherited,
-            virtual_env='/tmp/ws/.venv',
-            project_root=str(tmp_path),
-        )
-        assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+        assert subprocess_env()['VIRTUAL_ENV'] == '/inherited/.venv'
+
+        (venv / 'pyvenv.cfg').write_text('home = /usr/bin\n')
+        assert subprocess_env(prefix='/dev/.venv', base_prefix='/usr')['VIRTUAL_ENV'] == str(venv)
+
+        assert subprocess_env(virtual_env='/tmp/ws/.venv')['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
     def test_no_virtual_env_keeps_existing_sys_prefix_behavior(self):
         env = TyTypesClient._subprocess_env(

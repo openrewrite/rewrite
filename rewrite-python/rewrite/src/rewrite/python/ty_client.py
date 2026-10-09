@@ -62,7 +62,7 @@ def _ty_user_config_dir(python_version: str) -> str:
 class TyTypesClient:
     """Client for the ty-types CLI.
 
-    This client starts `ty-types --serve` as a subprocess and communicates via
+    ``initialize`` starts `ty-types --serve` as a subprocess, which communicates via
     line-delimited JSON-RPC over stdin/stdout. Create an instance per parse
     batch and close it when done.
 
@@ -82,8 +82,7 @@ class TyTypesClient:
             virtual_env: Optional path to a virtual environment whose
                 ``site-packages`` ty-types should use to resolve the project's
                 third-party dependencies. When provided it is exported as
-                ``VIRTUAL_ENV`` to the subprocess and takes precedence over a
-                ``.venv`` in the project root. The normal parse
+                ``VIRTUAL_ENV`` to the subprocess. The normal parse
                 path uses this to point ty-types at a dependency workspace built
                 from the project's ``pyproject.toml`` so that supertypes reaching
                 into installed dependencies (e.g. ``class User(BaseModel)``)
@@ -216,9 +215,8 @@ class TyTypesClient:
            project's dependencies installed, so ty must be pointed at a venv that
            does, otherwise imports like ``pydantic`` — and the supertypes
            reachable through them — resolve to ``Unknown``.
-        2. Otherwise, a ``.venv`` in ``project_root`` is the project's own
-           environment. ty discovers it once no inherited ``VIRTUAL_ENV`` or
-           ``CONDA_PREFIX`` outranks it.
+        2. Otherwise, a ``.venv`` in ``project_root`` holding a ``pyvenv.cfg``
+           is the project's own environment and is exported likewise.
         3. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
         4. Otherwise, when the interpreter running the parse is itself a virtual
            environment (``prefix`` differs from ``base_prefix``) — e.g. tests
@@ -245,11 +243,10 @@ class TyTypesClient:
             _point_at(virtual_env)
             return env
 
-        # 2. ty's own discovery accepts an empty or partial .venv, which an
-        #    exported VIRTUAL_ENV does not.
-        if project_root and os.path.isdir(os.path.join(project_root, '.venv')):
-            env.pop('VIRTUAL_ENV', None)
-            env.pop('CONDA_PREFIX', None)
+        # 2. ty fails to initialize on an exported VIRTUAL_ENV without a pyvenv.cfg.
+        project_venv = os.path.join(project_root, '.venv') if project_root else None
+        if project_venv and os.path.isfile(os.path.join(project_venv, 'pyvenv.cfg')):
+            _point_at(project_venv)
             return env
 
         prefix = sys.prefix if prefix is None else prefix
@@ -340,21 +337,20 @@ class TyTypesClient:
         """Initialize the ty-types session with a project root.
 
         If already initialized with the same project root, this is a no-op.
-        If initialized with a different root, shuts down and reinitializes.
+        Otherwise it starts a ty-types process for the root, replacing one that
+        serves another root or has been shut down.
         """
         if self._initialized and self._project_root == project_root:
             return True
 
-        if self._initialized:
-            self.shutdown()
-            # A different project root means a brand-new ty session whose type
-            # ids start over; drop the accumulated table so ids don't collide.
-            self.session_types.clear()
-            self.java_types.clear()
-        elif self._process is not None and self._process_root != project_root:
-            # Its environment was built for the other root's .venv.
+        # The process environment depends on the root's .venv.
+        if self._process is not None and (self._initialized or self._process_root != project_root):
             self.shutdown()
         if self._process is None:
+            # A new ty session numbers its type ids from scratch, so ids from an
+            # earlier session would collide.
+            self.session_types.clear()
+            self.java_types.clear()
             self._start_process(project_root)
 
         if self._try_initialize(project_root):
