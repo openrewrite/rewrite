@@ -15,7 +15,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import {Cursor, RecipeMarketplace, rootCursor} from "../../src";
+import {Cursor, JavaScript, Recipe, RecipeMarketplace, rootCursor} from "../../src";
 import {RewriteRpc} from "../../src/rpc/rewrite-rpc";
 import {PlainText, text} from "../../src/text";
 import {json, Json} from "../../src/json";
@@ -395,6 +395,37 @@ describe("Rewrite RPC", () => {
         expect(response.editPreconditions).toContainEqual(
             {visitorName: "org.openrewrite.text.Find", visitorOptions: {find: "gate"}}
         );
+    });
+
+    // Older Java hosts reject unknown response fields, so causesAnotherCycle is only sent when asked for.
+    describe("causesAnotherCycle", () => {
+        class CausesAnotherCycle extends Recipe {
+            name = "org.openrewrite.example.text.causes-another-cycle"
+            displayName = "Causes another cycle"
+            description = "Causes another cycle."
+            readonly causesAnotherCycle = true
+        }
+
+        const prepare = (request: PrepareRecipe): Promise<PrepareRecipeResponse> =>
+            (client as any).connection.sendRequest(
+                new rpc.RequestType<PrepareRecipe, PrepareRecipeResponse, Error>("PrepareRecipe"), request);
+
+        beforeEach(() => serverMarketplace.install(CausesAnotherCycle, JavaScript));
+
+        test("omitted for hosts that did not ask for it", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.causes-another-cycle"));
+            expect(response).not.toHaveProperty("causesAnotherCycle");
+        });
+
+        test("omitted when false", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.with-recipe-list", {}, true));
+            expect(response).not.toHaveProperty("causesAnotherCycle");
+        });
+
+        test("sent when requested", async () => {
+            const response = await prepare(new PrepareRecipe("org.openrewrite.example.text.causes-another-cycle", {}, true));
+            expect(response.causesAnotherCycle).toBe(true);
+        });
     });
 
     test("runRecipeWithCrossModuleRecipeList", async () => {

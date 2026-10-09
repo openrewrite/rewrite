@@ -21,11 +21,13 @@ import os
 import textwrap
 from collections import OrderedDict
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, Tuple, Union, TYPE_CHECKING
+from uuid import UUID
 
 from rewrite import random_id
 from rewrite.java import J, Expression, Statement
 from rewrite.java import tree as j
+from rewrite.python.visitor import PythonVisitor
 
 if TYPE_CHECKING:
     from rewrite.python.tree import CompilationUnit
@@ -176,6 +178,22 @@ class TemplateEngine:
         # Replace placeholders with actual values
         visitor = PlaceholderReplacementVisitor(values)
         return visitor.visit(template_tree, None)
+
+    @classmethod
+    def retain_ids(cls, result: J, replaced: Optional[J]) -> J:
+        """Copy of ``result`` in which an id survives only at the first node carrying it, and only
+        if that id names a node of ``replaced``, the subtree the result takes the place of. Every
+        other node is minted a fresh id. The parsed template is shared by every application, and a
+        value spliced into two slots, or from somewhere that stays in the file, would otherwise put
+        one id in two places."""
+        retainable: Set[UUID] = set()
+        if replaced is not None:
+            collector = _TreeIds()
+            collector.visit(replaced, None)
+            retainable = collector.ids
+        retained = _RetainIds(retainable).visit(result, None)
+        assert retained is not None
+        return retained
 
     @classmethod
     def _make_cache_key(
@@ -453,3 +471,26 @@ class TemplateEngine:
     def clear_cache(cls) -> None:
         """Clear the template cache."""
         cls._cache.clear()
+
+
+class _TreeIds(PythonVisitor[None]):
+    def __init__(self):
+        super().__init__()
+        self.ids: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        self.ids.add(tree.id)
+        return tree
+
+
+class _RetainIds(PythonVisitor[None]):
+    def __init__(self, retainable: Set[UUID]):
+        super().__init__()
+        self._retainable = retainable
+        self._seen: Set[UUID] = set()
+
+    def post_visit(self, tree: J, p: None) -> J:
+        if tree.id in self._retainable and tree.id not in self._seen:
+            self._seen.add(tree.id)
+            return tree
+        return tree.replace(_id=random_id())

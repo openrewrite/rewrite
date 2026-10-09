@@ -15,9 +15,8 @@
  */
 import ts from "typescript";
 import * as path from "path";
-import {isBuiltin} from "module";
 import {Type} from "../java";
-import {packageNameOf} from "./package-name";
+import {moduleName, packageNameOf} from "./package-name";
 import FUNCTION_TYPE_NAME = Type.FUNCTION_TYPE_NAME;
 import OBJECT_TYPE_NAME = Type.OBJECT_TYPE_NAME;
 
@@ -39,14 +38,8 @@ function typeSignatureToJSON(this: Type): string {
     return Type.signature(this);
 }
 
-/**
- * A module specifier with a redundant `node:` scheme removed.
- * `node:url` and `url` import the same built-in, which is named without the scheme.
- * A built-in such as `node:test` has no bare form, and `test` is another package, so it keeps it.
- */
-function moduleName(specifier: string): string {
-    const bare = specifier.substring('node:'.length);
-    return specifier.startsWith('node:') && isBuiltin(bare) ? bare : specifier;
+function isGlobalAugmentation(declaration: ts.Declaration): boolean {
+    return ts.isModuleDeclaration(declaration) && (declaration.flags & ts.NodeFlags.GlobalAugmentation) !== 0;
 }
 
 export class JavaScriptTypeMapping {
@@ -784,14 +777,17 @@ export class JavaScriptTypeMapping {
     }
 
     /**
-     * The module a function declared in a parsed source file belongs to, named after the file's
-     * path relative to the source root and without its extension (like Go's type_mapper.go).
-     * A declaration and a call of the function both take it, so a pattern written from one matches the other.
+     * A parsed file's module, named after its path relative to the source root without its extension,
+     * as TypeScript names the module of an export. A function declared in the file is declared on it.
      */
     private sourceModuleType(sourceFile: ts.SourceFile): Type.FullyQualified {
+        return this.moduleType(this.sourceModuleName(sourceFile));
+    }
+
+    private sourceModuleName(sourceFile: ts.SourceFile): string {
         const fileName = sourceFile.fileName;
         const relative = this.sourceRoot && path.isAbsolute(fileName) ? path.relative(this.sourceRoot, fileName) : fileName;
-        return this.moduleType(relative.replace(/\.[^/.]+$/, ''));
+        return relative.replace(/\.[^/.]+$/, '');
     }
 
     /**
@@ -802,6 +798,44 @@ export class JavaScriptTypeMapping {
         const declaration = symbol.valueDeclaration;
         return declaration && ts.isFunctionDeclaration(declaration) && !declaration.getSourceFile().isDeclarationFile ?
             declaration : undefined;
+    }
+
+    /** The namespace whose body holds a declaration, as `namespace moment` holds `function utc`. */
+    private enclosingNamespace(declaration: ts.Node | undefined): ts.Symbol | undefined {
+        const body = declaration?.parent;
+        return body && ts.isModuleBlock(body) && ts.isIdentifier(body.parent.name) ?
+            this.checker.getSymbolAtLocation(body.parent.name) : undefined;
+    }
+
+    /**
+     * A namespace is named as written, without the `declare module` that holds it. One in a parsed
+     * module is qualified by that module, as its other top-level declarations are.
+     */
+    private namespaceName(namespace: ts.Symbol): string {
+        const name = this.checker.getFullyQualifiedName(namespace).replace(/^".*"\./, '');
+        const file = namespace.declarations?.[0]?.getSourceFile();
+        return file && !file.isDeclarationFile && ts.isExternalModule(file) ?
+            `${this.sourceModuleName(file)}.${name}` : name;
+    }
+
+    private functionOwner(declaration: ts.FunctionDeclaration): Type.FullyQualified {
+        const namespace = this.enclosingNamespace(declaration);
+        return namespace ?
+            this.moduleType(this.namespaceName(namespace)) :
+            this.sourceModuleType(declaration.getSourceFile());
+    }
+
+    /** A function declared at the top level of a module or namespace is static, as is a class's static method. */
+    private isStatic(signature: ts.Signature): boolean {
+        const declaration = signature.getDeclaration();
+        if (!declaration) {
+            return false;
+        }
+        if (ts.isFunctionDeclaration(declaration)) {
+            return ts.isSourceFile(declaration.parent) || ts.isModuleBlock(declaration.parent);
+        }
+        return ts.isMethodDeclaration(declaration) &&
+            !!(ts.getCombinedModifierFlags(declaration) & ts.ModifierFlags.Static);
     }
 
     private moduleType(module: string): Type.FullyQualified {
@@ -859,7 +893,8 @@ export class JavaScriptTypeMapping {
         // (e.g., util.isString(): any vs util.isArray(): any)
         const declaringTypeSig = Type.signature(declaringType);
         const signatureStr = this.checker.signatureToString(signature);
-        const cacheKey = `${declaringTypeSig}#${name}${signatureStr}`;
+        const isStatic = this.isStatic(signature);
+        const cacheKey = `${isStatic ? 'static ' : ''}${declaringTypeSig}#${name}${signatureStr}`;
         const cached = this.methodCache.get(cacheKey);
         if (cached) {
             return cached;
@@ -879,7 +914,7 @@ export class JavaScriptTypeMapping {
         // Create the Type.Method object
         const method = {
             kind: Type.Kind.Method,
-            flags: 0, // FIXME - determine flags
+            flags: isStatic ? Type.Flag.Static : 0,
             declaringType: declaringType,
             name: name,
             returnType: this.getType(returnType),
@@ -910,6 +945,27 @@ export class JavaScriptTypeMapping {
             default:
                 return Type.unknownType as Type.FullyQualified;
         }
+    }
+
+    /**
+     * The class or interface that declares a member, which is a call's declaring type, as in Java.
+     * A union's member has one only when every member type inherits it from the same class.
+     */
+    private declaringClassOf(member: ts.Symbol): Type.FullyQualified | undefined {
+        let owner: ts.Type | undefined;
+        for (const declaration of member.declarations ?? []) {
+            const parent = declaration.parent;
+            if (!ts.isClassLike(parent) && !ts.isInterfaceDeclaration(parent)) {
+                return undefined;
+            }
+            const type = this.checker.getTypeAtLocation(parent);
+            if (owner && owner.symbol !== type.symbol) {
+                return undefined;
+            }
+            owner = type;
+        }
+        const declaringType = owner && this.declaringType(owner);
+        return declaringType === Type.unknownType ? undefined : declaringType;
     }
 
     private wrapperType(declaringType: (Type.FullyQualified & Type.Primitive) | Type.FullyQualified) {
@@ -968,6 +1024,7 @@ export class JavaScriptTypeMapping {
             }
 
             let symbol = this.checker.getSymbolAtLocation(node.expression);
+            const declaringNamespace = this.enclosingNamespace(signature.getDeclaration());
 
 
             if (!symbol && ts.isPropertyAccessExpression(node.expression)) {
@@ -1032,8 +1089,13 @@ export class JavaScriptTypeMapping {
                 const anonymous = !mappedType || mappedType.kind !== Type.Kind.Class ||
                     (mappedType as Type.Class).fullyQualifiedName.startsWith('{');
 
-                // Handle different types
-                if (receiverBinding?.namespace && anonymous) {
+                const declaringClass = this.declaringClassOf(symbol);
+                if (declaringClass) {
+                    declaringType = declaringClass;
+                } else if (declaringNamespace) {
+                    // A callable module's receiver is typed as its function, which names no declaration
+                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
+                } else if (receiverBinding?.namespace && anonymous) {
                     declaringType = this.moduleType(receiverBinding.module);
                     if (methodName === 'default') {
                         methodName = '<default>';
@@ -1103,8 +1165,8 @@ export class JavaScriptTypeMapping {
                         if (aliasedParentSymbol && aliasedParentSymbol.declarations?.[0] &&
                             ts.isModuleDeclaration(aliasedParentSymbol.declarations[0]) &&
                             ts.isIdentifier(aliasedParentSymbol.declarations[0].name)) {
-                            // For namespace imports, use the namespace symbol's `name` as the module specifier (e.g. `React` instead of `react`)
-                            moduleSpecifier = aliasedParentSymbol.name;
+                            // For namespace imports, use the namespace as the module specifier (e.g. `React` instead of `react`)
+                            moduleSpecifier = this.namespaceName(aliasedParentSymbol);
                         } else {
                             moduleSpecifier = this.importedModule(exprSymbol.declarations?.[0]);
                         }
@@ -1113,7 +1175,7 @@ export class JavaScriptTypeMapping {
 
                 const declared = this.parsedFunctionDeclaration(aliasedSymbol ?? symbol);
                 if (declared) {
-                    declaringType = this.sourceModuleType(declared.getSourceFile());
+                    declaringType = this.functionOwner(declared);
                     methodName = declared.name ? declared.name.text : "<anonymous>";
                 } else if (moduleSpecifier) {
                     // This is an imported function - use the module specifier as declaring type
@@ -1139,6 +1201,10 @@ export class JavaScriptTypeMapping {
                     // `const m = require('m'); m()` calls the module's default export.
                     declaringType = this.moduleType(this.requiredModuleOfExpression(node.expression)!);
                     methodName = '<default>';
+                } else if (declaringNamespace) {
+                    // A local holding a namespace's function, as `const utc = moment.utc`, calls that function
+                    declaringType = this.moduleType(this.namespaceName(declaringNamespace));
+                    methodName = ts.getNameOfDeclaration(signature.getDeclaration())?.getText() ?? methodName;
                 } else {
                     // Fall back to the original logic for non-imported functions
                     const exprType = this.checker.getTypeAtLocation(node.expression);
@@ -1236,7 +1302,9 @@ export class JavaScriptTypeMapping {
 
             methodName = node.name ? node.name.getText() : "<anonymous>";
 
-            declaringType = this.sourceModuleType(node.getSourceFile());
+            declaringType = ts.isFunctionDeclaration(node) ?
+                this.functionOwner(node) :
+                this.sourceModuleType(node.getSourceFile());
 
             // Get type parameters from node
             if (node.typeParameters) {
@@ -1289,10 +1357,14 @@ export class JavaScriptTypeMapping {
         // e.g., '"React"."Component"' -> 'React.Component'
         const tsQualifiedName = this.checker.getFullyQualifiedName(symbol);
         let cleanedName = moduleName(tsQualifiedName.replace(/"/g, ''));
+        const outermost = this.outermostDeclaration(symbol);
+        const sourceModule = outermost && this.sourceModuleOf(outermost);
 
-        // Check if this is a file path from node_modules (happens with some packages)
-        // TypeScript sometimes returns full paths instead of module names
-        if (cleanedName.includes('node_modules/')) {
+        if (sourceModule) {
+            cleanedName = `${sourceModule}.${cleanedName}`;
+        } else if (cleanedName.includes('node_modules/')) {
+            // Check if this is a file path from node_modules (happens with some packages)
+            // TypeScript sometimes returns full paths instead of module names
             // Extract the module name from the path
             // Example: /private/var/.../node_modules/react-spinners/src/index.ClipLoader
             // Should become: react-spinners.ClipLoader
@@ -1349,7 +1421,7 @@ export class JavaScriptTypeMapping {
             // Preserved as-is:
             //  - UMD globals (`export as namespace X`, e.g. React, lodash `_`, jQuery `$`): the
             //    namespace name is the conventional public identifier;
-            //  - `global.*` (TypeScript's marker for ambient globals);
+            //  - `global.*`, a `declare global` augmentation, whose prefix is dropped below;
             //  - namespaces that already match the package name, and any non-node_modules type.
             const namespaceName = cleanedName.substring(0, cleanedName.indexOf('.'));
             if (namespaceName !== 'global') {
@@ -1364,9 +1436,38 @@ export class JavaScriptTypeMapping {
             }
         }
 
+        // A `declare global` augmentation is in the same global scope as the built-ins, which have no prefix.
+        if (outermost && isGlobalAugmentation(outermost) && cleanedName.startsWith('global.')) {
+            cleanedName = cleanedName.substring('global.'.length);
+        }
+
         return cleanedName.endsWith('Constructor') ?
             cleanedName.substring(0, cleanedName.length - 'Constructor'.length) :
             cleanedName;
+    }
+
+    /**
+     * The project module whose top level holds a declaration local to it, such as a class it does not
+     * export. TypeScript names that as bare as a global, so a module's own `class Array` needs the module.
+     */
+    private sourceModuleOf(declaration: ts.Declaration): string | undefined {
+        if (!declaration.parent || !ts.isSourceFile(declaration.parent) || isGlobalAugmentation(declaration) ||
+            ts.isModuleDeclaration(declaration) && ts.isStringLiteral(declaration.name)) {
+            return undefined;
+        }
+        const sourceFile = declaration.parent;
+        const isModule = ts.isExternalModule(sourceFile) || (sourceFile as any).commonJsModuleIndicator !== undefined;
+        return isModule && !sourceFile.isDeclarationFile && !sourceFile.fileName.includes('node_modules/') ?
+            this.sourceModuleName(sourceFile) : undefined;
+    }
+
+    /** The declaration of the symbol a qualified name starts from, such as a class's namespace. */
+    private outermostDeclaration(symbol: ts.Symbol): ts.Declaration | undefined {
+        let outermost = symbol;
+        while ((outermost as any).parent) {
+            outermost = (outermost as any).parent;
+        }
+        return outermost.declarations?.[0];
     }
 
     /**
@@ -1421,12 +1522,42 @@ export class JavaScriptTypeMapping {
         } as Type.Class;
     }
 
+    private baseClass(classType: Type.Class, baseType: ts.Type): Type.Class | undefined {
+        const mapped = this.getType(baseType);
+        const base = Type.isParameterized(mapped) ? mapped.type : mapped;
+        // TypeScript accepts heritage cycles (`class A implements A`). Whichever edge closes one,
+        // in mapping order, is dropped.
+        return Type.isClass(base) && !this.inheritsFrom(base, classType, new Set()) ? base : undefined;
+    }
+
+    private inheritsFrom(type: Type.Class, ancestor: Type.Class, seen: Set<Type.Class>): boolean {
+        if (type === ancestor) {
+            return true;
+        }
+        if (seen.has(type)) {
+            return false;
+        }
+        seen.add(type);
+        return (type.supertype !== undefined && this.inheritsFrom(type.supertype, ancestor, seen)) ||
+            type.interfaces.some(i => this.inheritsFrom(i, ancestor, seen));
+    }
+
+    private addInterface(classType: Type.Class, baseType: ts.Type): void {
+        const iface = this.baseClass(classType, baseType);
+        if (iface && !classType.interfaces.includes(iface)) {
+            classType.interfaces.push(iface);
+        }
+    }
+
     /**
      * Populates the class type with members, methods, heritage, and type parameters
      * Since the shell is already in the cache, any recursive references will find it
      */
     private populateClassType(classType: Type.Class, type: ts.Type): void {
         const symbol = type.getSymbol?.();
+        const classSymbol = symbol && symbol.flags & ts.SymbolFlags.Alias ?
+            this.checker.getAliasedSymbol(symbol) : symbol;
+        const classDeclaration = classSymbol?.declarations?.find(ts.isClassLike);
 
         // Try to get base types using TypeScript's getBaseTypes API
         // This works for both local and external types (from node_modules)
@@ -1444,9 +1575,6 @@ export class JavaScriptTypeMapping {
             } else if (symbol) {
                 // For constructor functions or type references, we need to get the actual class type
                 // Try to get the type of the class itself (not the constructor or instance)
-                const classSymbol = symbol.flags & ts.SymbolFlags.Alias ?
-                    this.checker.getAliasedSymbol(symbol) : symbol;
-
                 if (classSymbol && classSymbol.flags & (ts.SymbolFlags.Class | ts.SymbolFlags.Interface)) {
                     // Get the type of the class declaration itself
                     const declaredType = this.checker.getDeclaredTypeOfSymbol(classSymbol);
@@ -1472,32 +1600,27 @@ export class JavaScriptTypeMapping {
             }
 
             if (baseTypes && baseTypes.length > 0) {
-                // For classes, the first base type is usually the superclass
-                // Additional base types are interfaces
-                if (classType.classKind === Type.Class.Kind.Class) {
-                    const firstBase = this.getType(baseTypes[0]);
-                    // Handle both Class and Parameterized (e.g., Component<Props>)
-                    if (Type.isClass(firstBase)) {
-                        (classType as any).supertype = firstBase;
-                    } else if (Type.isParameterized(firstBase)) {
-                        // For parameterized types, use the base class as the supertype
-                        (classType as any).supertype = (firstBase as Type.Parameterized).type;
+                // A merged interface's bases follow the class's, so the first is a superclass only beside `extends`
+                let interfaces = baseTypes;
+                if (classType.classKind === Type.Class.Kind.Class && (!classDeclaration ||
+                    classDeclaration.heritageClauses?.some(c => c.token === ts.SyntaxKind.ExtendsKeyword))) {
+                    const supertype = this.baseClass(classType, baseTypes[0]);
+                    if (supertype) {
+                        classType.supertype = supertype;
                     }
-                    // Rest are interfaces
-                    for (let i = 1; i < baseTypes.length; i++) {
-                        const interfaceType = this.getType(baseTypes[i]);
-                        if (Type.isClass(interfaceType)) {
-                            classType.interfaces.push(interfaceType);
-                        }
-                    }
-                } else {
-                    // For interfaces, all base types are extended interfaces
-                    for (const baseType of baseTypes) {
-                        const interfaceType = this.getType(baseType);
-                        if (Type.isClass(interfaceType)) {
-                            classType.interfaces.push(interfaceType);
-                        }
-                    }
+                    interfaces = baseTypes.slice(1);
+                }
+                for (const baseType of interfaces) {
+                    this.addInterface(classType, baseType);
+                }
+            }
+        }
+
+        // `getBaseTypes` omits a class's `implements` clause
+        for (const clause of classDeclaration?.heritageClauses ?? []) {
+            if (clause.token === ts.SyntaxKind.ImplementsKeyword) {
+                for (const implemented of clause.types) {
+                    this.addInterface(classType, this.checker.getTypeAtLocation(implemented));
                 }
             }
         }

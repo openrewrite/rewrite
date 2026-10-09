@@ -3,7 +3,7 @@ from __future__ import annotations
 import weakref
 from abc import abstractmethod, ABC
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import Enum, IntFlag
 from typing import List, Optional, TypeVar, Generic, ClassVar, Dict, Any, TYPE_CHECKING, Iterable, cast, Self
 from uuid import UUID
 
@@ -237,6 +237,10 @@ if not TYPE_CHECKING:
 
 class JavaType:
     __slots__ = ()
+
+    class Flag(IntFlag):
+        """Bits of a type's ``flags_bit_map``, the same as Java's ``org.openrewrite.java.tree.Flag``."""
+        Static = 1 << 3
 
     class FullyQualified(JavaType):
         __slots__ = ()

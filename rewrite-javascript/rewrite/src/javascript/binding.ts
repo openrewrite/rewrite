@@ -16,13 +16,14 @@
 import {J} from "../java";
 import {JS} from "./tree";
 import {JavaScriptVisitor} from "./visitor";
-import {compilationUnitOf, cursorOf, declarationsOf, isValueReference, namesUsedIn, scopeOf} from "./scope";
+import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
     memberName, moduleNameOf, nameTaken, RebindImport, requiredModuleOfDeclaration
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
+import {sameModule} from "./package-name";
 import {
     AmdCalleeOptions, amdBlockOf, bindAmd, calleesOf, dependencyNames, derivedBindingName, enclosingAmdBlock,
     isBindableName, parameterNames, RebindAmdDependency, RemoveAmdDependency
@@ -119,7 +120,7 @@ export function moduleBindings(
             isCommonJs(cu) ? "commonjs" :
             hasEsmSyntax(cu) ? "esm" : "none",
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
-        bindingOf: module => bound.find(b => b.module === module)?.name
+        bindingOf: module => bound.find(b => sameModule(b.module, module))?.name
     };
 }
 
@@ -230,7 +231,7 @@ function moduleObjectBindings(cu: JS.CompilationUnit): ModuleObjectBinding[] {
  * never a type-only import for a value, which erases and would leave the reference unbound.
  */
 function answersWholeModuleRequest(binding: ModuleObjectBinding, wantsNamespace: boolean, typeOnly: boolean): boolean {
-    return binding.typeOnly === typeOnly &&
+    return (typeOnly || !binding.typeOnly) &&
         (binding.shape === "require" || binding.shape === (wantsNamespace ? "namespace" : "default"));
 }
 
@@ -265,7 +266,7 @@ export function maybeBind(
     if (isWholeModule && cu) {
         const scope = scopeOf(cursorOf(visitor)!);
         const bound = moduleObjectBindings(cu).find(b =>
-            b.module === module && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
+            sameModule(b.module, module) && answersWholeModuleRequest(b, key === "*", options.typeOnly ?? false) &&
             // A pinned alias asks for a binding of that name, so another name for the same
             // module does not answer it; `bindImport`'s own lookup applies the same rule.
             (options.alias === undefined || b.name === options.alias) &&
@@ -275,9 +276,10 @@ export function maybeBind(
         }
     }
 
-    if (isWholeModule && options.preferredName === undefined && derivedBindingName(module) === undefined) {
-        // The module's last path segment is not a legal identifier, and the caller named no
-        // preference of its own — there is no name left to bind it to.
+    if (isWholeModule && options.alias === undefined && options.preferredName === undefined &&
+        derivedBindingName(module) === undefined) {
+        // The module's last path segment is not a legal identifier, and the caller named none
+        // of its own — there is no name left to bind it to.
         return undefined;
     }
 
@@ -301,7 +303,7 @@ export function maybeUnbind(visitor: JavaScriptVisitor<any>, options: MaybeUnbin
     }
     const callees = calleesOf(options);
     const queued = visitor.afterVisit || [];
-    if (!queued.some(v => v instanceof RemoveImport && v.module === options.module && v.member === options.member)) {
+    if (!queued.some(v => v instanceof RemoveImport && sameModule(v.module, options.module) && v.member === options.member)) {
         visitor.afterVisit.push(new RemoveImport(options.module, options.member));
     }
     // Both queue unconditionally so the caller need not know which lane the file uses: each
@@ -368,7 +370,7 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
         return undefined;
     }
     if (!(visitor.afterVisit || []).some(v => v instanceof RebindImport &&
-        v.from.module === options.from.module && v.from.member === options.from.member &&
+        sameModule(v.from.module, options.from.module) && v.from.member === options.from.member &&
         v.localName === existing.localName)) {
         visitor.afterVisit.push(new RebindImport(options.from, options.to, existing.localName, boundName));
     }
@@ -429,14 +431,17 @@ function onlyReferences(cu: JS.CompilationUnit, name: string): boolean {
         }
         const cursor = new Cursor(node, parent);
         if (node?.kind === J.Kind.Identifier && node.simpleName === name) {
-            references = isValueReference(cursor, node);
+            references = isReference(cursor, node);
         } else if (isTree(node) || node?.kind === J.Kind.RightPadded || node?.kind === J.Kind.LeftPadded ||
             node?.kind === J.Kind.Container) {
             Object.entries(node).forEach(([key, value]) => key !== 'markers' && visit(value, cursor));
         }
     };
     const root = new Cursor(cu);
-    cu.statements.filter(s => s.element?.kind !== JS.Kind.Import).forEach(s => visit(s, root));
+    // An import or an `export {…}` binds nothing the name could collide with.
+    cu.statements
+        .filter(s => s.element?.kind !== JS.Kind.Import && s.element?.kind !== JS.Kind.ExportDeclaration)
+        .forEach(s => visit(s, root));
     return references;
 }
 

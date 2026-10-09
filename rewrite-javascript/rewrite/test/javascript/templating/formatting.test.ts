@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 import {fromVisitor, RecipeSpec} from "../../../src/test";
-import {Autodetect, capture, javascript, JavaScriptVisitor, JS, JSX, tsx, pattern, rewrite, Template, template} from "../../../src/javascript";
+import {Autodetect, capture, javascript, JavaScriptVisitor, JS, JSX, tsx, pattern, rewrite, RewriteConfig, Template, template} from "../../../src/javascript";
 import {J} from "../../../src/java";
 import {create as produce} from "mutative";
 import {replaceMarkerByKind} from "../../../src/markers";
@@ -236,5 +236,50 @@ describe('template formatting', () => {
                 `const c = a <
   b;
 `));
+    });
+
+    /** Applies `rule` with `format: false` to every binary and call. */
+    function unformatted(rule: () => RewriteConfig) {
+        const r = rewrite(() => ({...rule(), format: false}));
+        return fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitBinary(binary: J.Binary, p: any): Promise<J | undefined> {
+                const visited = await super.visitBinary(binary, p) as J.Binary;
+                return await r.tryOn(this.cursor, visited) || visited;
+            }
+
+            override async visitMethodInvocation(method: J.MethodInvocation, p: any): Promise<J | undefined> {
+                const visited = await super.visitMethodInvocation(method, p) as J.MethodInvocation;
+                return await r.tryOn(this.cursor, visited) || visited;
+            }
+        });
+    }
+
+    test('format: false keeps the spacing before a capture the template spaces as the pattern did', () => {
+        const l = capture(), r = capture();
+        spec.recipe = unformatted(() => ({before: pattern`${l} == ${r}`, after: template`${l} === ${r}`}));
+        return spec.rewriteRun(
+            //language=javascript
+            javascript('const c = a ==   b;', 'const c = a ===   b;'));
+    });
+
+    test('format: false spaces a capture the template moved as the template does', () => {
+        const a = capture(), b = capture();
+        spec.recipe = unformatted(() => ({before: pattern`f(${a}, ${b})`, after: template`g(${b}, ${a})`}));
+        return spec.rewriteRun(
+            //language=javascript
+            javascript('f(x,   y);', 'g(y, x);'));
+    });
+
+    test('format: false spaces a capture of the whole match as the template does', () => {
+        const x = capture({constraint: (n: J) => n.kind === J.Kind.Identifier && (n as J.Identifier).simpleName === 'foo'});
+        const rule = rewrite(() => ({before: pattern`${x}`, after: template`wrap(${x})`, format: false}));
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitIdentifier(identifier: J.Identifier, p: any): Promise<J | undefined> {
+                return await rule.tryOn(this.cursor, identifier) || identifier;
+            }
+        });
+        return spec.rewriteRun(
+            //language=javascript
+            javascript('const c = foo;', 'const c = wrap(foo);'));
     });
 });

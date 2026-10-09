@@ -23,6 +23,11 @@ export namespace Type {
     export const FUNCTION_TYPE_NAME = '𝑓';
     export const OBJECT_TYPE_NAME = '{}';
 
+    /** Bits of a type's `flags`, the same as Java's `org.openrewrite.java.tree.Flag`. */
+    export const Flag = {
+        Static: 1 << 3,
+    }
+
     export const Kind = {
         Annotation: "org.openrewrite.java.tree.JavaType$Annotation",
         AnnotationElementValue: "org.openrewrite.java.tree.JavaType$Annotation$ElementValue",
@@ -138,7 +143,7 @@ export namespace Type {
         }
     }
 
-    export interface Array extends Type, FullyQualified {
+    export interface Array extends Type {
         readonly kind: typeof Kind.Array;
         elemType: Type;
         annotations: Type.Annotation[];
@@ -291,7 +296,6 @@ export namespace Type {
             type.kind === Type.Kind.Class ||
             type.kind === Type.Kind.Annotation ||
             type.kind === Type.Kind.Parameterized ||
-            type.kind === Type.Kind.Array ||
             type.kind === Type.Kind.ShallowClass
         );
     }
@@ -315,6 +319,23 @@ export namespace Type {
             }
             throw new Error("Cannot get fully qualified name of type: " + JSON.stringify(javaType));
         }
+    }
+
+    /**
+     * Whether `matches` accepts the fully qualified name of `type` or, with `matchOverride`, of a
+     * class or interface it extends.
+     */
+    export function isOfTypeWithName(type: Type | undefined, matchOverride: boolean,
+                                     matches: (fullyQualifiedName: string) => boolean): boolean {
+        if (!isFullyQualified(type)) {
+            return false;
+        }
+        if (matches(FullyQualified.getFullyQualifiedName(type))) {
+            return true;
+        }
+        const c = isParameterized(type) ? type.type : type;
+        return matchOverride && isClass(c) &&
+            (isOfTypeWithName(c.supertype, true, matches) || c.interfaces.some(i => isOfTypeWithName(i, true, matches)));
     }
 
     // Track type variable names and parameterized types to prevent infinite recursion

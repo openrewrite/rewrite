@@ -463,8 +463,8 @@ function matcherPattern(method: Type.Method, declaring: string): { pattern: stri
 }
 
 /**
- * The declaring type's ancestry, which bounds how general a pattern can be. A type recording
- * no supertype can only be matched by its own name or a wildcard.
+ * The declaring type's superclass chain. With `matchOverrides` a pattern may name any type in it,
+ * or an interface one of them records, which the chain does not show.
  */
 function supertypeChain(node: J): string | undefined {
     let current: Type | undefined = methodTypeOf(node)?.declaringType;

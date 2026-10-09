@@ -4,11 +4,11 @@ import {JS, JSX} from "./tree";
 import {randomId, UUID} from "../uuid";
 import {TypeVisitor} from "../java/type-visitor";
 import {mapAsync, updateIfChanged} from "../util";
-import {packageNameOf} from "./package-name";
+import {moduleName, packageNameOf, sameModule} from "./package-name";
 import {emptyMarkers, findMarker, markers, MarkersKind} from "../markers";
 import {NamedStyles} from "../style";
 import {getStyle, SpacesStyle, StyleKind} from "./style";
-import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, isValueReference, namesDeclaredIn, scopeOf, walk} from "./scope";
+import {bindingNames, compilationUnitOf, cursorOf, declarationsOf, deconflict, namesDeclaredIn, resolve, scopeOf, walk} from "./scope";
 import {create as produce, Draft} from "mutative";
 import {autoFormat} from "./format";
 import {getPrettierStyle} from "./format/prettier-format";
@@ -92,13 +92,13 @@ export function bindImport(
     // A queued import binds the module as much as one already in the file, so it answers a later
     // request the same way; a name a merged request never emits would be referenced but not bound.
     for (const v of visitor.afterVisit || []) {
-        if (v instanceof RebindImport && !sideEffectOnly && v.to.module === module &&
+        if (v instanceof RebindImport && !sideEffectOnly && sameModule(v.to.module, module) &&
             memberName(v.to.member) === memberName(options.member) &&
             (options.alias === undefined || options.alias === v.boundName)) {
             return v.boundName;
         }
-        if (!(v instanceof AddImport) || v.module !== module ||
-            v.sideEffectOnly !== sideEffectOnly || v.typeOnly !== typeOnly) {
+        if (!(v instanceof AddImport) || !sameModule(v.module, module) ||
+            v.sideEffectOnly !== sideEffectOnly || !answersTypeOnly(v.typeOnly, typeOnly)) {
             continue;
         }
         // How a specifier prints, or what name would be nice, does not say which binding is wanted.
@@ -144,8 +144,12 @@ export function bindImport(
     // would, on the next cycle, derive a suffixed name from the binding this call just added.
     const scope = scopeOf(cursor);
     for (const binding of moduleScopeBindings(cu)) {
-        if (binding.module === module && binding.member === memberName(options.member) &&
-            binding.typeOnly === typeOnly && scope.declaringScope(binding.name) === cu) {
+        if (binding.module !== undefined && sameModule(binding.module, module) && binding.member === memberName(options.member) &&
+            scope.declaringScope(binding.name) === cu) {
+            if (!answersTypeOnly(binding.typeOnly ?? false, typeOnly)) {
+                // The queued request finds this binding and drops its `type`, so the name stays
+                visitor.afterVisit.push(new AddImport(options, binding.name));
+            }
             return binding.name;
         }
     }
@@ -347,6 +351,56 @@ function requireBindings(pattern: J | undefined, module: string): ModuleScopeBin
         : {name: bound.name, module, member: bound.member, typeOnly: false});
 }
 
+/** Whether a binding answers a request, given which of the two is type-only. A value import binds the type too. */
+function answersTypeOnly(bindingTypeOnly: boolean, requestTypeOnly: boolean): boolean {
+    return requestTypeOnly || !bindingTypeOnly;
+}
+
+/**
+ * `jsImport` binding `member` as a value. A `type` on the member's specifier goes, and one on the
+ * clause moves onto the clause's other specifiers.
+ */
+function asValueImport(jsImport: JS.Import, member: string | undefined): JS.Import {
+    const clause = jsImport.importClause!;
+    const named = clause.namedBindings?.kind === JS.Kind.NamedImports ? clause.namedBindings as JS.NamedImports : undefined;
+    const imports = (specifier: J): boolean =>
+        specifier.kind === JS.Kind.ImportSpecifier && specifierBinding(specifier as JS.ImportSpecifier)?.member === member;
+
+    if (!clause.typeOnly) {
+        return !named ? jsImport : produce(jsImport, draft => {
+            for (const elem of (draft.importClause!.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+                const specifier = elem.element as Draft<JS.ImportSpecifier>;
+                if (member !== undefined && imports(elem.element as J) && specifier.importType.element) {
+                    specifier.specifier.prefix = specifier.importType.before;
+                    specifier.importType = {...specifier.importType, before: emptySpace, element: false};
+                }
+            }
+        });
+    }
+    return produce(jsImport, draft => {
+        const draftClause = draft.importClause!;
+        draftClause.typeOnly = false;
+        // The space after `type` separates nothing once it is gone
+        if (draftClause.name) {
+            draftClause.name.element.prefix = emptySpace;
+        } else if (draftClause.namedBindings) {
+            draftClause.namedBindings.prefix = emptySpace;
+            if (named) {
+                (draftClause.namedBindings as Draft<JS.NamedImports>).elements.before = emptySpace;
+            }
+        }
+        if (named) {
+            for (const elem of (draftClause.namedBindings as Draft<JS.NamedImports>).elements.elements) {
+                const specifier = elem.element as Draft<JS.ImportSpecifier>;
+                if (!imports(elem.element as J) && specifier.kind === JS.Kind.ImportSpecifier) {
+                    specifier.importType = {...specifier.importType, before: emptySpace, element: true};
+                    specifier.specifier.prefix = singleSpace;
+                }
+            }
+        }
+    });
+}
+
 /** The member a specifier imports and the name it binds it under, which are the same absent an alias. */
 function specifierBinding(specifier: JS.ImportSpecifier): { name: string; member: string } | undefined {
     if (specifier.specifier?.kind === J.Kind.Identifier) {
@@ -393,7 +447,8 @@ function importBindings(jsImport: JS.Import): ModuleScopeBinding[] {
                 ? specifierBinding(elem.element as JS.ImportSpecifier)
                 : undefined;
             if (bound) {
-                bindings.push({...bound, module, typeOnly});
+                const specifier = elem.element as JS.ImportSpecifier;
+                bindings.push({...bound, module, typeOnly: typeOnly || specifier.importType.element});
             }
         }
     }
@@ -837,7 +892,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 if (moduleSpecifier) {
                     const moduleName = this.getModuleName(moduleSpecifier);
 
-                    if (moduleName === this.module) {
+                    if (moduleName !== undefined && sameModule(moduleName, this.module)) {
                         const importClause = jsImport.importClause;
                         if (importClause?.namedBindings) {
                             if (importClause.namedBindings.kind === JS.Kind.NamedImports) {
@@ -860,7 +915,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                     const namedVar = varDecl.variables[0].element;
                     const initializer = namedVar?.initializer?.element;
 
-                    if (requiredModule(initializer) === this.module) {
+                    const required = requiredModule(initializer);
+                    if (required !== undefined && sameModule(required, this.module)) {
                         return ImportStyle.CommonJS;
                     }
                 }
@@ -875,6 +931,21 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         const hasImport = await this.checkImportExists(compilationUnit);
         if (hasImport) {
             return compilationUnit;
+        }
+
+        // A type-only binding of the member would leave a value use unbound, and a second binding
+        // of the same name would not compile, so the binding the file has loses its `type`
+        if (!this.typeOnly && !this.sideEffectOnly) {
+            const statements = compilationUnit.statements.map(stmt => {
+                const element = stmt.element;
+                return element?.kind === JS.Kind.Import &&
+                    importBindings(element as JS.Import).some(b => b.typeOnly && this.bindsSameName(b))
+                    ? {...stmt, element: asValueImport(element as JS.Import, memberName(this.member))}
+                    : stmt;
+            });
+            if (statements.some((stmt, i) => stmt !== compilationUnit.statements[i])) {
+                return {...compilationUnit, statements} as JS.CompilationUnit;
+            }
         }
 
         // If onlyIfReferenced is true, check if the identifier is actually used
@@ -1179,7 +1250,8 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
      */
     private isMatchingImport(jsImport: JS.Import): boolean {
         const moduleSpecifier = jsImport.moduleSpecifier?.element;
-        if (!moduleSpecifier || this.getModuleName(moduleSpecifier) !== this.module) {
+        const module = moduleSpecifier && this.getModuleName(moduleSpecifier);
+        if (module === undefined || !sameModule(module, this.module)) {
             return false;
         }
 
@@ -1195,9 +1267,13 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
     /** Whether a binding the file already has serves this request. */
     private answeredBy(binding: ModuleScopeBinding): boolean {
-        return binding.module === this.module &&
+        return this.bindsSameName(binding) && answersTypeOnly(binding.typeOnly ?? false, this.typeOnly);
+    }
+
+    /** Whether `binding` binds this request's member under its name, whether or not it is type-only. */
+    private bindsSameName(binding: ModuleScopeBinding): boolean {
+        return binding.module !== undefined && sameModule(binding.module, this.module) &&
             binding.member === memberName(this.member) &&
-            binding.typeOnly === this.typeOnly &&
             (this.anyNameAnswers || binding.name === this.bindingName);
     }
 
@@ -1210,7 +1286,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         }
         const namedVar = varDecl.variables[0].element;
         const module = requiredModule(namedVar?.initializer?.element);
-        if (module !== this.module) {
+        if (module === undefined || !sameModule(module, this.module)) {
             return false;
         }
         return requireBindings(namedVar!.name, module).some(binding => this.answeredBy(binding));
@@ -1269,12 +1345,12 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
     private classTypeMatchesModule(classType: Type.Class, expectedModule: string): boolean {
         const fqn = classType.fullyQualifiedName;
         // Direct match: class FQN equals the expected module (e.g., z from zod where z's type FQN is "zod")
-        if (fqn === expectedModule) {
+        if (sameModule(fqn, expectedModule)) {
             return true;
         }
         // Check via owningClass chain or FQN prefix
         const moduleFromType = this.getModuleFromClassType(classType);
-        return moduleFromType === expectedModule;
+        return moduleFromType !== undefined && sameModule(moduleFromType, expectedModule);
     }
 
     /**
@@ -1304,7 +1380,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                 }
 
                 const moduleName = this.getModuleName(moduleSpecifier);
-                if (moduleName !== this.module) {
+                if (moduleName === undefined || !sameModule(moduleName, this.module)) {
                     continue;  // Not the module we're interested in
                 }
 
@@ -1404,7 +1480,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                                 }
 
                                 const moduleName = Type.FullyQualified.getFullyQualifiedName(current);
-                                if (moduleName === targetModule) {
+                                if (sameModule(moduleName, targetModule)) {
                                     found = true;
                                 }
                             }
@@ -1413,7 +1489,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
                         else if (type && Type.isMethod(type)) {
                             const methodType = type as Type.Method;
                             const declaringTypeName = Type.FullyQualified.getFullyQualifiedName(methodType.declaringType);
-                            if (declaringTypeName === targetModule) {
+                            if (sameModule(declaringTypeName, targetModule)) {
                                 found = true;
                             }
                         }
@@ -1735,7 +1811,7 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
  */
 function importBinds(jsImport: JS.Import, module: string, member: string | undefined): string | undefined {
     const specifier = jsImport.moduleSpecifier?.element;
-    if (specifier?.kind !== J.Kind.Literal || moduleNameOf(specifier as J.Literal) !== module) {
+    if (specifier?.kind !== J.Kind.Literal || !sameModule(moduleNameOf(specifier as J.Literal), module)) {
         return undefined;
     }
     const importClause = jsImport.importClause;
@@ -1839,7 +1915,7 @@ function acceptsNamedMember(jsImport: JS.Import, module: string, typeOnly: boole
     const clause = jsImport.importClause;
     const specifier = jsImport.moduleSpecifier?.element;
     if (!clause || clause.typeOnly !== typeOnly || specifier?.kind !== J.Kind.Literal ||
-        moduleNameOf(specifier as J.Literal) !== module) {
+        !sameModule(moduleNameOf(specifier as J.Literal), module)) {
         return false;
     }
     return clause.namedBindings ? clause.namedBindings.kind === JS.Kind.NamedImports : clause.name !== undefined;
@@ -2052,7 +2128,10 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         const imports = cu.statements
             .filter(s => s.element?.kind === JS.Kind.Import)
             .map(s => s.element as JS.Import);
-        const ofModule = imports.filter(imp => importedModule(imp) === this.from.module);
+        const ofModule = imports.filter(imp => {
+            const module = importedModule(imp);
+            return module !== undefined && sameModule(module, this.from.module);
+        });
         const fromPackage = packageOf(this.from.module);
         const member = declaredMember(this.from);
         this.movedTypes = new MovedTypes(this.from, this.to, {
@@ -2201,33 +2280,51 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
 
     /**
      * Whether the identifier at the cursor stands for the moved binding: the right name, in a
-     * position that references rather than declares, reaching the module scope that binds it.
+     * position a rename may rewrite, resolving to the module scope that binds it.
      */
     private referencesBinding(identifier: J.Identifier): boolean {
-        return identifier.simpleName === this.localName &&
-            // The specifier binding the name is the one edit that is not a reference to it.
-            !this.cursor.firstEnclosing((v): v is JS.Import => (v as J | undefined)?.kind === JS.Kind.Import) &&
-            isValueReference(this.cursor, identifier) &&
-            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit;
+        return identifier.simpleName === this.localName && this.readsModuleBinding(identifier);
     }
 
-    /** A shorthand property's name slot is also the reference to the binding. */
+    private readsModuleBinding(identifier: J.Identifier): boolean {
+        return resolve(this.cursor, identifier)?.kind === JS.Kind.CompilationUnit;
+    }
+
+    /**
+     * A shorthand property's name slot is also the reference to the binding: `{x}` becomes
+     * `{x: y}`, and `{x = 1}` becomes `{x: y = 1}`.
+     */
     override async visitPropertyAssignment(propertyAssignment: JS.PropertyAssignment, p: P): Promise<J | undefined> {
         const name = propertyAssignment.name.element;
-        if (this.renaming && propertyAssignment.initializer === undefined &&
+        if (this.renaming && propertyAssignment.assigmentToken === JS.PropertyAssignment.Token.Equals &&
             name.kind === J.Kind.Identifier && (name as J.Identifier).simpleName === this.localName &&
-            scopeOf(this.cursor).declaringScope(this.localName)?.kind === JS.Kind.CompilationUnit) {
-            // The key names a property rather than the binding, so it carries no attribution,
-            // the same way `aliasing` builds a property name that stands for nothing.
+            this.readsModuleBinding(name as J.Identifier)) {
+            const reference: J.Identifier = {...await this.retyped(name as J.Identifier), simpleName: this.boundName};
+            const fallback = propertyAssignment.initializer;
+            // The key names a property rather than the binding, so it is a new node carrying no
+            // attribution, the same way `aliasing` builds a property name that stands for nothing.
             return {
                 ...propertyAssignment,
-                name: {...propertyAssignment.name, element: {...name, type: undefined, fieldType: undefined}},
+                name: {
+                    ...propertyAssignment.name,
+                    element: {...name, id: randomId(), type: undefined, fieldType: undefined},
+                    after: emptySpace
+                },
                 assigmentToken: JS.PropertyAssignment.Token.Colon,
-                initializer: {
-                    ...await this.retyped(name as J.Identifier),
+                initializer: fallback === undefined ? {...reference, prefix: singleSpace} : {
+                    id: randomId(),
+                    kind: J.Kind.Assignment,
                     prefix: singleSpace,
-                    simpleName: this.boundName
-                }
+                    markers: emptyMarkers,
+                    variable: {...reference, prefix: emptySpace},
+                    assignment: {
+                        kind: J.Kind.LeftPadded,
+                        before: propertyAssignment.name.after,
+                        element: fallback,
+                        markers: emptyMarkers
+                    },
+                    type: reference.type
+                } as J.Assignment
             } as JS.PropertyAssignment;
         }
         return super.visitPropertyAssignment(propertyAssignment, p);
@@ -2242,17 +2339,22 @@ class MovedTypes extends TypeVisitor<undefined> {
     private readonly classes: ReadonlyMap<string, string>;
     private readonly fromMember?: string;
     private readonly toMember?: string;
+    private readonly from: {module: string; member?: string};
+    private readonly to: {module: string; member?: string};
 
     /**
      * `shared` says what another binding in the file shares with the moved one. A shared module
      * object or package-qualified class name stands for that binding too, so it keeps its name.
      */
     constructor(
-        private readonly from: {module: string; member?: string},
-        private readonly to: {module: string; member?: string},
+        from: {module: string; member?: string},
+        to: {module: string; member?: string},
         shared: {module: boolean; className: boolean}
     ) {
         super();
+        // The move reads and writes module names as attribution spells them.
+        from = this.from = {...from, module: moduleName(from.module)};
+        to = this.to = {...to, module: moduleName(to.module)};
         this.fromMember = declaredMember(from);
         this.toMember = declaredMember(to);
         if (this.fromMember === undefined) {

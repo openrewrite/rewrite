@@ -14,6 +14,7 @@
 
 """Tests for Template class."""
 
+import dataclasses
 from typing import Any, Optional
 from rewrite import random_id
 
@@ -22,13 +23,14 @@ import pytest
 from rewrite import ExecutionContext, Recipe, TreeVisitor
 from rewrite.java import tree as j
 from rewrite.java.tree import Unary
-from rewrite.java.support_types import Space, JRightPadded
+from rewrite.java.support_types import Space, JLeftPadded, JRightPadded
 from rewrite.markers import Markers
 from rewrite.python.template import template, capture, pattern, Template, TemplateBuilder
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
+from rewrite.tree import Tree
 from rewrite.visitor import Cursor
 
 
@@ -370,6 +372,64 @@ class TestTemplateApply:
         RecipeSpec(recipe=recipe(False)).rewrite_run(python(
             before, "with lock:\n    wrapper(\n    new(v)\n)\n"))
 
+    def test_apply_never_puts_one_id_in_two_places(self):
+        x = capture('x')
+        pat = pattern("wrap({x})", x=x)
+        tmpl = template("{x} + {x}", x=x)
+        captured_ids: list = []
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.Double"
+
+            @property
+            def display_name(self) -> str:
+                return "Double"
+
+            @property
+            def description(self) -> str:
+                return "Splices one capture into two slots."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if not match:
+                            return method
+                        captured_ids.append(match.get(x).id)
+                        return tmpl.apply(self.cursor, values=match)
+                return Visitor()
+
+        result_ids: list = []
+
+        def collect(cu):
+            # A field walk counts a node the visitor skips
+            seen = set()
+
+            def walk(o):
+                if id(o) in seen:
+                    return
+                seen.add(id(o))
+                if isinstance(o, Tree):
+                    result_ids.append(o.id)
+                if dataclasses.is_dataclass(o) and not isinstance(o, type):
+                    for f in dataclasses.fields(o):
+                        walk(getattr(o, f.name))
+                elif isinstance(o, (list, tuple)):
+                    for e in o:
+                        walk(e)
+            walk(cu)
+
+        RecipeSpec(recipe=Rule()).rewrite_run(python(
+            "y = wrap([v for v in a])\nz = wrap(b)\n",
+            "y = [v for v in a] + [v for v in a]\nz = b + b\n",
+            after_recipe=collect))
+        assert len(result_ids) == len(set(result_ids))
+        # The first slot keeps the id of the node it replaces
+        assert all(i in result_ids for i in captured_ids)
+
     def test_apply_no_captures_returns_tree(self):
         """Test that apply with no captures returns a tree."""
         tmpl = template("x + 1")
@@ -424,7 +484,7 @@ class TestMaybeParenthesize:
     def _binary(left, op, right) -> j.Binary:
         return j.Binary(
             random_id(), Space.EMPTY, Markers.EMPTY, left,
-            JRightPadded(op, Space([], ' '), Markers.EMPTY),
+            JLeftPadded(Space([], ' '), op, Markers.EMPTY),
             right, None,
         )
 
@@ -464,7 +524,7 @@ class TestMaybeParenthesize:
         or_expr = self._binary(self._ident('a'), j.Binary.Type.Or, self._ident('b'))
         not_parent = j.Unary(
             random_id(), Space.EMPTY, Markers.EMPTY,
-            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
             or_expr, None,
         )
         cursor = self._cursor_chain(not_parent, or_expr)
@@ -506,7 +566,7 @@ class TestMaybeParenthesize:
         and_inner = self._binary(x_ident, j.Binary.Type.And, y_ident)
         not_expr = j.Unary(
             random_id(), Space.EMPTY, Markers.EMPTY,
-            JRightPadded(j.Unary.Type.Not, Space.EMPTY, Markers.EMPTY),
+            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
             j.Parentheses(
                 random_id(), Space.EMPTY, Markers.EMPTY,
                 JRightPadded(and_inner, Space.EMPTY, Markers.EMPTY),

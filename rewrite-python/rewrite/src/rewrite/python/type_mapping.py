@@ -29,7 +29,7 @@ import os
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 
 from ..java import JavaType
 
@@ -104,6 +104,12 @@ PRIMITIVE_TO_PYTHON: Dict[JavaType.Primitive, str] = {
 # ty-types descriptor kinds that map to JavaType.Method
 _FUNCTION_KINDS = frozenset(('function', 'boundMethod', 'callable', 'wrapperDescriptor'))
 
+
+def _is_module_function(descriptor: Dict[str, Any]) -> bool:
+    """Whether ty describes a function declared outside any class, at module level or nested."""
+    return descriptor.get('kind') == 'function' and 'declaringClassId' not in descriptor
+
+
 # `os.path` binds whichever of these the running platform provides, so a symbol
 # defined in one has no portable defining name. `os.path` names the same module
 # object on every platform, so it is the one to key them by.
@@ -132,6 +138,118 @@ def _module_scope_statements(body: Sequence[ast.stmt]) -> Iterator[ast.stmt]:
         yield stmt
         if isinstance(stmt, ast.If) and not stmt.orelse:
             yield from _module_scope_statements(stmt.body)
+
+
+_Position = Tuple[int, int]
+# A source range a name is bound in, less the ranges inside it that cannot see that binding
+_Region = Tuple[_Position, _Position, List[Tuple[_Position, _Position]]]
+
+_FUNCTION_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+_COMPREHENSIONS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
+_Scope = Union[ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef,
+               ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp]
+
+
+def _start(node: Union[ast.stmt, ast.expr]) -> _Position:
+    return node.lineno, node.col_offset
+
+
+def _end(node: Union[ast.stmt, ast.expr]) -> _Position:
+    # `ast.parse` sets the end position typeshed leaves optional for hand-built nodes
+    assert node.end_lineno is not None and node.end_col_offset is not None
+    return node.end_lineno, node.end_col_offset
+
+
+def _split_scope(node: _Scope) -> Tuple[List[ast.AST], List[ast.AST]]:
+    """The parts of a function, class or comprehension evaluated in the scope around it, and
+    the parts evaluated in its own."""
+    if isinstance(node, _COMPREHENSIONS):
+        first = node.generators[0]
+        nested = [c for c in ast.iter_child_nodes(node) if c is not first]
+        return [first.iter], nested + [first.target, *first.ifs]
+    if isinstance(node, ast.ClassDef):
+        return [*node.decorator_list, *node.bases, *node.keywords], list(node.body)
+    args = node.args
+    outer: List[ast.AST] = [*args.defaults, *(d for d in args.kw_defaults if d)]
+    if isinstance(node, ast.Lambda):
+        return outer, [node.body]
+    annotations = [a.annotation for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                          args.vararg, args.kwarg) if a and a.annotation]
+    return [*node.decorator_list, *outer, *annotations, *([node.returns] if node.returns else [])], \
+        list(node.body)
+
+
+def _scope_bindings(tree: ast.Module, module_level_aliases: Set[int]
+                    ) -> Tuple[Set[str], Dict[str, List[_Region]]]:
+    """The names this file binds other than by its own module-level imports. A module-scope
+    or ``global`` binding reaches the whole file, and any other the scope it is bound in.
+
+    Coarse where scoping is subtle, as with a comprehension in a class body, which counts as
+    seeing the class's bindings.
+    Declining to attribute a reference costs less than attributing it wrong.
+    """
+    file_wide: Set[str] = set()
+    regions: Dict[str, List[_Region]] = {}
+
+    def scan(scope: Union[ast.Module, _Scope], inner: List[ast.AST], walrus_names: Set[str]) -> None:
+        names: Set[str] = set()
+        declared_global: Set[str] = set()
+        hidden: List[Tuple[_Position, _Position]] = []
+        if isinstance(scope, _FUNCTION_SCOPES):
+            args = scope.args
+            names.update(a.arg for a in (*args.posonlyargs, *args.args, *args.kwonlyargs,
+                                         args.vararg, args.kwarg) if a)
+        comprehension = isinstance(scope, _COMPREHENSIONS)
+        todo = list(inner)
+        while todo:
+            node = todo.pop()
+            if isinstance(node, (*_FUNCTION_SCOPES, ast.ClassDef, *_COMPREHENSIONS)):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                    names.add(node.name)
+                outer, nested = _split_scope(node)
+                todo.extend(outer)
+                # Type parameters reach everything inside, a class's methods included
+                for param in getattr(node, 'type_params', ()):
+                    regions.setdefault(param.name, []).append((_start(node), _end(node), []))
+                body = getattr(node, 'body', None)
+                if isinstance(body, list):
+                    hidden.append((_start(body[0]), _end(node)))
+                elif isinstance(body, ast.AST):
+                    hidden.append((_start(body), _end(body)))
+                # An assignment expression in a comprehension binds in the scope around it
+                scan(node, nested, walrus_names if comprehension and isinstance(node, _COMPREHENSIONS)
+                     else names)
+                continue
+            if isinstance(node, ast.NamedExpr) and comprehension:
+                walrus_names.add(node.target.id)
+                todo.append(node.value)
+                continue
+            if isinstance(node, ast.Name):
+                if isinstance(node.ctx, (ast.Store, ast.Del)):
+                    names.add(node.id)
+            elif isinstance(node, ast.alias):
+                if id(node) not in module_level_aliases:
+                    names.add(node.asname or node.name.split('.')[0])
+            elif isinstance(node, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)):
+                if node.name:
+                    names.add(node.name)
+            elif isinstance(node, ast.MatchMapping) and node.rest:
+                names.add(node.rest)
+            elif isinstance(node, ast.Global):
+                declared_global.update(node.names)
+            todo.extend(ast.iter_child_nodes(node))
+        # A `global` declaration alone binds nothing. What the scope binds under it is module-scope.
+        file_wide.update(names & declared_global)
+        if scope is tree:
+            file_wide.update(names)
+            return
+        # A class body's bindings do not reach the bodies of the functions and classes it nests
+        region = (_start(scope), _end(scope), hidden if isinstance(scope, ast.ClassDef) else [])
+        for name in names:
+            regions.setdefault(name, []).append(region)
+
+    scan(tree, tree.body, set())
+    return file_wide, regions
 
 
 def _module_all_names(tree: ast.Module) -> Optional[Set[str]]:
@@ -234,7 +352,8 @@ class PythonTypeMapping:
         self._module_ast_tree: Optional[ast.Module] = None
         self._import_binding_index: Optional[Dict[str, str]] = None
         self._from_import_member_index: Optional[Dict[str, Tuple[str, str]]] = None
-        self._shadowed_names: Optional[Set[str]] = None
+        self._shadowed_names: Set[str] = set()
+        self._shadow_regions: Dict[str, List[_Region]] = {}
 
         # ty-types data: populated by _build_index
         self._node_index: Dict[Tuple[int, int], Tuple[int, str]] = {}  # (start, end) -> (type_id, node_kind)
@@ -1075,11 +1194,10 @@ class PythonTypeMapping:
         return (module, symbol) if '.' not in symbol else None
 
     def _writes_a_rebound_name(self, node: ast.expr) -> bool:
-        """Whether the name ``node`` is written under is one the file binds a second time."""
+        """Whether the name ``node`` is written under is bound a second time in reach of it."""
         while isinstance(node, ast.Attribute):
             node = node.value
-        self._import_bindings()
-        return isinstance(node, ast.Name) and node.id in (self._shadowed_names or ())
+        return isinstance(node, ast.Name) and self._shadowed(node)
 
     def _lookup_binding(self, node: ast.expr) -> Optional[Dict[str, str]]:
         """The BindingInfo ty attached to ``node``, by byte range."""
@@ -1099,12 +1217,15 @@ class PythonTypeMapping:
         if not isinstance(node, ast.Name):
             return None
         bound = self._import_bindings().get(node.id)
+        if bound and self._shadowed(node):
+            return None
         return '.'.join([bound, *reversed(suffix)]) if bound else None
 
     def _import_bindings(self) -> Dict[str, str]:
         """The FQN each of this file's absolute module-level imports names, keyed by the
-        name it binds, minus every name :meth:`_rebound_names` reports. The same scan
-        yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
+        name it binds, minus every name another binding reaches the whole file with. A
+        binding that reaches only some references is :meth:`_shadowed`'s to report. The same
+        scan yields the ``from M import f`` bindings that :meth:`_bound_from_import_member` reads.
 
         Python binds a name once per scope, so an import nothing else rebinds says what a
         reference to that name means whether or not ty could type it.
@@ -1117,7 +1238,10 @@ class PythonTypeMapping:
             module_level_aliases = {id(alias) for stmt in module_scope
                                     if isinstance(stmt, (ast.Import, ast.ImportFrom))
                                     for alias in stmt.names}
-            shadowed = self._rebound_names(tree, module_level_aliases)
+            if tree is not None:
+                self._shadowed_names, self._shadow_regions = \
+                    _scope_bindings(tree, module_level_aliases)
+            shadowed = set(self._shadowed_names)
 
             def bind(name: str, fqn: Optional[str]) -> None:
                 # `import a.b` after `import a` re-binds the root to the same FQN
@@ -1152,30 +1276,15 @@ class PythonTypeMapping:
                                               if name not in shadowed}
         return self._import_binding_index
 
-    def _rebound_names(self, tree: Optional[ast.Module],
-                       module_level_aliases: Set[int]) -> Set[str]:
-        """Every name this file binds somewhere other than one of its own module-level
-        imports. Coarse on purpose: a name bound twice is one whose references cannot be
-        read off an import, and declining to attribute costs less than attributing wrong.
-        """
-        if self._shadowed_names is None:
-            names: Set[str] = set()
-            for node in ast.walk(tree) if tree else ():
-                if isinstance(node, ast.Name):
-                    if isinstance(node.ctx, (ast.Store, ast.Del)):
-                        names.add(node.id)
-                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-                    names.add(node.name)
-                elif isinstance(node, ast.arg):
-                    names.add(node.arg)
-                elif isinstance(node, ast.ExceptHandler) and node.name:
-                    names.add(node.name)
-                elif isinstance(node, (ast.Global, ast.Nonlocal)):
-                    names.update(node.names)
-                elif isinstance(node, ast.alias) and id(node) not in module_level_aliases:
-                    names.add(node.asname or node.name.split('.')[0])
-            self._shadowed_names = names
-        return set(self._shadowed_names)
+    def _shadowed(self, node: ast.Name) -> bool:
+        """Whether a binding other than this file's module-level imports reaches ``node``."""
+        self._import_bindings()
+        if node.id in self._shadowed_names:
+            return True
+        position = _start(node)
+        return any(start <= position <= end
+                   and not any(h_start <= position <= h_end for h_start, h_end in hidden)
+                   for start, end, hidden in self._shadow_regions.get(node.id, ()))
 
     def _bound_from_import_member(self, node: ast.expr) -> Optional[Tuple[str, str]]:
         """The ``(module, member)`` an unshadowed module-level ``from M import f`` binds
@@ -1185,7 +1294,8 @@ class PythonTypeMapping:
         if not isinstance(node, ast.Name):
             return None
         self._import_bindings()
-        return (self._from_import_member_index or {}).get(node.id)
+        member = (self._from_import_member_index or {}).get(node.id)
+        return None if member is None or self._shadowed(node) else member
 
     def import_alias_type(self, node: ast.alias) -> Optional[JavaType]:
         """The type of the symbol an import name binds, named under the module defining
@@ -1236,7 +1346,7 @@ class PythonTypeMapping:
                 ret_id = descriptor.get('returnType')
                 if params is not None or ret_id is not None:
                     return self._method_from_function_descriptor(
-                        descriptor, node.name)
+                        descriptor, node.name, self._is_static_declaration(node, descriptor))
 
         # Fallback: build from individual parameter/return annotation types
         param_names: List[str] = []
@@ -1265,7 +1375,7 @@ class PythonTypeMapping:
             return None
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_declaration(node, None) else 0,
             _declaring_type=None,
             _name=node.name,
             _return_type=return_type,
@@ -1274,8 +1384,16 @@ class PythonTypeMapping:
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
 
+    @staticmethod
+    def _is_static_declaration(node: ast.FunctionDef, descriptor: Optional[Dict[str, Any]]) -> bool:
+        """A function declared outside a class is static, as is a static method or a classmethod."""
+        if descriptor is not None and _is_module_function(descriptor):
+            return True
+        return any(isinstance(d, ast.Name) and d.id in ('staticmethod', 'classmethod')
+                   for d in node.decorator_list)
+
     def _method_from_function_descriptor(
-            self, descriptor: Dict[str, Any], name: str
+            self, descriptor: Dict[str, Any], name: str, static: bool
     ) -> JavaType.Method:
         """Build a JavaType.Method from a function descriptor with parameters/returnType."""
         param_names, param_types = self._process_method_params(
@@ -1289,7 +1407,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if static else 0,
             _declaring_type=self._get_declaration_declaring_type(descriptor),
             _name=name,
             _return_type=return_type,
@@ -1425,7 +1543,7 @@ class PythonTypeMapping:
                 type_param_names = self._extract_type_param_names(func_desc)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if self._is_static_call(node) else 0,
             _declaring_type=declaring_type,
             _name=method_name,
             _return_type=return_type,
@@ -1433,6 +1551,27 @@ class PythonTypeMapping:
             _parameter_types=param_types if param_types else None,
             _declared_formal_type_names=type_param_names if type_param_names else None,
         )
+
+    def _is_static_call(self, node: ast.Call) -> bool:
+        """Whether the call's receiver, if spelled, is a module or a class. ty types a module
+        function, a static method and a method looked up on its class as a plain ``function``.
+        A classmethod counts too, so a pattern on a class also matches calls on its subclasses.
+        Without a callee type, an import naming the receiver names a module.
+        """
+        callee = self._descriptor_of(node.func)
+        kind = callee.get('kind')
+        if kind == 'function':
+            return True
+        if kind == 'boundMethod':
+            params = callee.get('parameters') or [{}]
+            bound_id = params[0].get('typeId')
+            bound = self._type_registry.get(bound_id) if bound_id is not None else None
+            return bound is not None and bound.get('kind') == 'subclassOf'
+        if kind in (None, 'dynamic'):
+            if isinstance(node.func, ast.Attribute):
+                return self._import_binding_fqn(node.func.value) is not None
+            return self._bound_from_import_member(node.func) is not None
+        return False
 
     def _callee_declared_name(self, node: ast.Call) -> Optional[str]:
         """The name the callee carries where it is defined. Its owner is read off the
@@ -1927,7 +2066,7 @@ class PythonTypeMapping:
         type_param_names = self._extract_type_param_names(descriptor)
 
         return JavaType.Method(
-            _flags_bit_map=0,
+            _flags_bit_map=JavaType.Flag.Static if _is_module_function(descriptor) else 0,
             _declaring_type=declaring_type,
             _name=name,
             _return_type=return_type,

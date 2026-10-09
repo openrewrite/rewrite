@@ -7,9 +7,9 @@ import {foundSearchResult} from "../../markers";
 export class UsesMethod extends JavaVisitor<ExecutionContext> {
     private readonly matcher;
 
-    constructor(pattern: string) {
+    constructor(pattern: string, matchOverrides: boolean = false) {
         super();
-        this.matcher = new MethodMatcher(pattern);
+        this.matcher = new MethodMatcher(pattern, matchOverrides);
     }
 
     protected async visitExpression(expression: Expression, p: ExecutionContext): Promise<J | undefined> {

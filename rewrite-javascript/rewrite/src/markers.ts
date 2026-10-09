@@ -128,6 +128,14 @@ export function replaceMarkerByKind(markers: Markers, newMarker: Marker): Marker
     };
 }
 
+/**
+ * Removes every marker of the given kind, returning `markers` itself when none has that kind.
+ */
+export function removeMarkerByKind(markers: Markers, kind: Marker["kind"]): Markers {
+    const kept = markers.markers.filter(m => m.kind !== kind);
+    return kept.length === markers.markers.length ? markers : {...markers, markers: kept};
+}
+
 export const emptyMarkers: Markers = asRef({
     kind: MarkersKind.Markers,
     id: randomId(),

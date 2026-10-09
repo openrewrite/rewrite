@@ -19,9 +19,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -56,7 +55,9 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
                "use is the lowest version across every source set of every subproject in a " +
                "repository. For example, the main source set of a project may use Java 8 " +
                "while its test source set uses Java 17; in that case the oldest Java version " +
-               "in use is Java 8.";
+               "in use is Java 8. When the minimum is met, the source files at that oldest Java " +
+               "version are found, along with Gradle build scripts and every non-Java source file " +
+               "(such as `pom.xml`), which have no Java version of their own.";
 
     @SuppressWarnings("ConstantConditions")
     @Override
@@ -93,17 +94,19 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<JavaVersion> acc) {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                cu.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
-                    acc.updateAndGet(current -> {
-                        if (current == null || javaVersion.getMajorVersion() < current.getMajorVersion()) {
-                            return javaVersion;
-                        }
-                        return current;
-                    }));
-                return cu;
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    tree.getMarkers().findFirst(JavaVersion.class).ifPresent(javaVersion ->
+                        acc.updateAndGet(current -> {
+                            if (current == null || majorVersion(javaVersion) < majorVersion(current)) {
+                                return javaVersion;
+                            }
+                            return current;
+                        }));
+                }
+                return tree;
             }
         };
     }
@@ -111,21 +114,37 @@ public class HasMinimumJavaVersion extends ScanningRecipe<AtomicReference<JavaVe
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<JavaVersion> acc) {
         VersionComparator versionComparator = requireNonNull(Semver.validate(canonicalizeVersion(version), null).getValue());
-        return Preconditions.check(minimumVersionInRange(acc, versionComparator), new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(minimumVersionInRange(acc, versionComparator), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                return cu.getMarkers().findFirst(JavaVersion.class)
-                        .filter(javaVersion -> acc.get() != null && javaVersion.getMajorVersion() == acc.get().getMajorVersion())
-                        .map(javaVersion -> SearchResult.found(cu, "Java version " + javaVersion.getMajorVersion()))
-                        .orElse(cu);
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+                int lowestMajorVersion = majorVersion(requireNonNull(acc.get()));
+                if (!(tree instanceof JavaSourceFile) || isBuildScript((SourceFile) tree)) {
+                    return SearchResult.found(tree, "Java version " + lowestMajorVersion);
+                }
+                return tree.getMarkers().findFirst(JavaVersion.class)
+                        .filter(javaVersion -> majorVersion(javaVersion) == lowestMajorVersion)
+                        .map(javaVersion -> SearchResult.found(tree, "Java version " + lowestMajorVersion))
+                        .orElse(tree);
             }
         });
     }
 
     private boolean minimumVersionInRange(AtomicReference<JavaVersion> acc, VersionComparator versionComparator) {
-        return acc.get() != null && versionComparator.isValid(null, Integer.toString(
-                Boolean.TRUE.equals(checkTargetCompatibility) ?
-                        acc.get().getMajorReleaseVersion() :
-                        acc.get().getMajorVersion()));
+        return acc.get() != null && versionComparator.isValid(null, Integer.toString(majorVersion(acc.get())));
+    }
+
+    // Build tool integrations never attribute a Java version to Gradle scripts
+    private static boolean isBuildScript(SourceFile sourceFile) {
+        String path = sourceFile.getSourcePath().toString();
+        return path.endsWith(".gradle") || path.endsWith(".gradle.kts");
+    }
+
+    private int majorVersion(JavaVersion javaVersion) {
+        return Boolean.TRUE.equals(checkTargetCompatibility) ?
+                javaVersion.getMajorReleaseVersion() :
+                javaVersion.getMajorVersion();
     }
 }

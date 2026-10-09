@@ -30,13 +30,13 @@ line:col  kind                   source                      type
 3:12        └ select:Identifier  arr                         <unknown>
 ```
 
-The text before `->` is a pattern that `new MethodMatcher(...)` or `usesMethod(...)` accepts for that call. It names the resolved overload's parameter types where the matcher can, and `(..)` where one has no name it compares. A type without a package, such as `Array`, matches only the type of that name in no package, and `*.Array` matches it in any package. A leading `global.`, which marks a `declare global` augmentation, is ignored on both sides. Each pattern is checked against the matcher, and a call whose pattern cannot match it, such as one declared on an anonymous class, carries a note saying so.
+The text before `->` is a pattern that `new MethodMatcher(...)` or `usesMethod(...)` accepts for that call. It names the resolved overload's parameter types where the matcher can, and `(..)` where one has no name it compares. A type without a package, such as `Array`, matches only the type of that name in no package, and `*.Array` matches it in any package. Each pattern is checked against the matcher, and a call whose pattern cannot match it, such as one declared on an anonymous class, carries a note saying so.
 
 The `arg` rows give each argument's type and its kind, which is what a capture constraint over that argument reads. Patterns spell primitives the TypeScript way, which the matcher accepts. The type column and `arg` rows use the model's names, so a `number` is the primitive `double` and a `string` is `String`. A kind only JavaScript has carries its namespace, as in `JS.Binary`, since a visitor reaches it through a method of its own.
 
 `arr.tostring()` has no declaring type, and the indented `select` row names the receiver that lost it. `<none>` is a slot the parser left empty and `<unknown>` is `Type.unknownType`.
 
-The variable accepts comma-separated flags. `missing` lists only unattributed nodes, `all` widens the listing beyond calls and declarations, and `supertypes` shows each declaring type's ancestry, which bounds how general a pattern can be.
+The variable accepts comma-separated flags. `missing` lists only unattributed nodes, `all` widens the listing beyond calls and declarations, and `supertypes` shows each declaring type's superclass chain, whose types a `matchOverrides` pattern may name.
 
 A recipe gated on a type that never resolved is the usual reason a test sees no change, so that failure names the unattributed nodes without being asked:
 

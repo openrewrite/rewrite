@@ -219,6 +219,60 @@ class TestChangeImport:
             )
         )
 
+    def test_change_qualified_ref_into_submodule_drops_parent_import(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections
+                d: collections.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+    def test_change_aliased_qualified_ref_into_submodule(self):
+        spec = RecipeSpec(recipe=ChangeImport(
+            old_module='collections',
+            old_name='Mapping',
+            new_module='collections.abc',
+        ))
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                d: c.Mapping = {}
+                """,
+                """
+                import collections.abc
+                d: collections.abc.Mapping = {}
+                """,
+            )
+        )
+
+        spec.rewrite_run(
+            python(
+                """
+                import collections as c
+                from collections import OrderedDict
+                d: c.Mapping = c.Counter(OrderedDict())
+                """,
+                """
+                import collections as c
+                from collections import OrderedDict
+                import collections.abc
+                d: collections.abc.Mapping = c.Counter(OrderedDict())
+                """,
+            )
+        )
+
     def test_change_qualified_ref_with_different_new_name(self):
         """Qualified ref rewrite when new_name differs from old_name."""
         spec = RecipeSpec(recipe=ChangeImport(
@@ -1249,6 +1303,30 @@ class TestImportsInBlocks:
                     import collections.abc
 
                 def f(x: collections.abc.Callable[[int], str]) -> None: ...
+                """,
+            )
+        )
+
+    def test_qualified_reference_into_a_submodule_drops_the_parent_import_in_the_block(self):
+        RecipeSpec(recipe=ChangeImport(
+            old_module='collections', old_name='Mapping', new_module='collections.abc',
+        )).rewrite_run(
+            python(
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections
+
+                def f(x: collections.Mapping) -> None: ...
+                """,
+                """
+                from typing import TYPE_CHECKING
+
+                if TYPE_CHECKING:
+                    import collections.abc
+
+                def f(x: collections.abc.Mapping) -> None: ...
                 """,
             )
         )
