@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.nio.file.Paths;
 import java.time.Instant;

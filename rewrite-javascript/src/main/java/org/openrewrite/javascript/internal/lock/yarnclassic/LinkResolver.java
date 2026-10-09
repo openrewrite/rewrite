@@ -17,8 +17,8 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 /**
  * Port of yarn src/resolvers/exotics/link-resolver.js (yarn 1.22.22): the linked directory's package.json, whose

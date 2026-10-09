@@ -16,7 +16,8 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
 import java.io.ByteArrayOutputStream;
@@ -420,11 +421,11 @@ final class NpmResolver {
         String directory;
         String id;
         if (hardLinkLocalPackages) {
-            directory = PosixPaths.relative(opts.lockfileDir == null ? "" : opts.lockfileDir, localPackageDir);
+            directory = RootRelativePath.relative(opts.lockfileDir == null ? "" : opts.lockfileDir, localPackageDir);
             id = "file:" + directory;
         } else {
             directory = localPackageDir;
-            id = "link:" + PosixPaths.relative(opts.projectDir == null ? "" : opts.projectDir, localPackageDir);
+            id = "link:" + RootRelativePath.relative(opts.projectDir == null ? "" : opts.projectDir, localPackageDir);
         }
         ResolveResult result = new ResolveResult();
         result.id = id;
@@ -447,7 +448,7 @@ final class NpmResolver {
         if (publishConfig.get("directory") == null || Boolean.FALSE.equals(publishConfig.get("linkDirectory"))) {
             return localPackage.getRootDir();
         }
-        return PosixPaths.join(localPackage.getRootDir(), Js.string(publishConfig.get("directory")));
+        return RootRelativePath.join(localPackage.getRootDir(), Js.string(publishConfig.get("directory")));
     }
 
     private String calcSpecifierForWorkspaceDep(ResolveDependencies.WantedDependency wantedDependency,

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.Collections;
 import java.util.List;
@@ -93,7 +94,7 @@ final class PortalResolver implements Resolver {
             throw new CannotKnow("the package.json of " + StructUtils.stringifyLocator(locator) + " (a path from " +
                                  "outside the project's workspaces)");
         }
-        String dir = PortablePath.normalize(".".equals(workspace.getRelativeCwd()) ? path :
+        String dir = PosixPath.normalize(".".equals(workspace.getRelativeCwd()) ? path :
                 workspace.getRelativeCwd() + "/" + path).replaceAll("/+$", "");
         if ("..".equals(dir) || dir.startsWith("../")) {
             throw new CannotKnow("the package.json of " + StructUtils.stringifyLocator(locator) + " (outside the " +

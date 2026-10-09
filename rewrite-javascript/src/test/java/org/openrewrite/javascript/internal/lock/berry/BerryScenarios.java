@@ -19,7 +19,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.Host;
+import org.openrewrite.javascript.internal.lock.Host;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;

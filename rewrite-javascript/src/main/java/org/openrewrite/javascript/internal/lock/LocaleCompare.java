@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import java.io.BufferedInputStream;
 import java.io.DataInputStream;
@@ -45,7 +45,7 @@ public final class LocaleCompare {
         private final String string;
 
         UnknownOrder(String string) {
-            super("The order of " + Js.quote(string) + " under Intl.Collator is not known: it is not in " +
+            super("The order of " + EcmaScript.quote(string) + " under Intl.Collator is not known: it is not in " +
                   "normalization form D where a contraction meets a character beyond the Basic Multilingual Plane");
             this.string = string;
         }

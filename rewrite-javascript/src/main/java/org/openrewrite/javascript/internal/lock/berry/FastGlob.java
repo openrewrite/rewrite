@@ -17,7 +17,8 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.Host;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.text.Normalizer;
 import java.util.ArrayDeque;
@@ -566,7 +567,7 @@ final class FastGlob {
     }
 
     private static String normalize(String path) {
-        String normalized = PortablePath.normalize(path);
+        String normalized = PosixPath.normalize(path);
         while (normalized.length() > 1 && normalized.endsWith("/")) {
             normalized = normalized.substring(0, normalized.length() - 1);
         }

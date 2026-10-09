@@ -26,10 +26,8 @@ import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.ManifestSource;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
-import org.openrewrite.javascript.internal.lock.npm.RegistryPackuments;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.registry.Environment;
@@ -96,7 +94,7 @@ public final class NativeLockEngine {
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
-        PackumentSource packuments = new RegistryPackuments(registries, view.getRegistryClient());
+        PackumentSource packuments = new NpmRegistryPackuments(registries, view.getRegistryClient());
         return new NpmLockRegenerator(NpmInputs.from(request, host(view), Instant.now()), packuments).regenerate();
     }
 

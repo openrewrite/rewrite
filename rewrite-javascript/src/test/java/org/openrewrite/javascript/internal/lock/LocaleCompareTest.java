@@ -13,17 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.fixture;
-import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 
 /**
  * Parity with {@code Intl.Collator('en').compare} in Node v24.19.0, as dumped by
@@ -31,7 +33,21 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
  */
 class LocaleCompareTest {
 
-    private static final JsonNode CASES = fixture("locale-compare-cases");
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final JsonNode CASES = cases();
+
+    private static JsonNode cases() {
+        try (InputStream is = LocaleCompareTest.class.getResourceAsStream("/npm-arborist/locale-compare-cases")) {
+            return MAPPER.readTree(is);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T json(JsonNode json) {
+        return (T) MAPPER.convertValue(json, Object.class);
+    }
 
     @Test
     void characterOrder() {

@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.regex.Pattern;

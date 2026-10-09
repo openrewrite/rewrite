@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.npm.JsonParseEvenBetterErrors;
+import org.openrewrite.javascript.internal.lock.npm.NpmRejection;
+import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
@@ -31,13 +33,13 @@ import java.util.function.Supplier;
  * registry each name is configured to, and parsed once per build so that what the build does to a
  * manifest stays its own.
  */
-public final class RegistryPackuments implements PackumentSource {
+public final class NpmRegistryPackuments implements PackumentSource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
     private final Map<String, Map<String, Object>> parsed = new HashMap<>();
 
-    public RegistryPackuments(NodeRegistries registries, NpmRegistryClient client) {
+    public NpmRegistryPackuments(NodeRegistries registries, NpmRegistryClient client) {
         this.registries = registries;
         this.client = client;
     }

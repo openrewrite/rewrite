@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.nio.file.Path;
 import java.time.Instant;

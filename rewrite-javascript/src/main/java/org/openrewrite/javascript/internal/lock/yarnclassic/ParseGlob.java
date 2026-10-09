@@ -15,7 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import org.openrewrite.javascript.internal.lock.npm.PosixPath;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.HashMap;
 import java.util.Map;

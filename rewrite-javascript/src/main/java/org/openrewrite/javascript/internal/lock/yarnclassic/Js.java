@@ -15,12 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import org.openrewrite.javascript.internal.lock.EcmaScript;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -34,12 +34,6 @@ import java.util.regex.Pattern;
  * {@code Object.assign}, {@code JSON.parse} and {@code JSON.stringify} of strings and numbers.
  */
 final class Js extends EcmaScript {
-
-    /**
-     * The characters JavaScript's {@code \s} matches.
-     */
-    static final String WHITESPACE_CLASS = "\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029" +
-                                           "\\u202F\\u205F\\u3000\\uFEFF";
 
     /**
      * The characters JavaScript's {@code .} matches; Java's also leaves out {@code \u0085}.

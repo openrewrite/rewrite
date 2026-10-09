@@ -74,6 +74,10 @@ final class NpmHttpUtils {
      * @throws ReportError YN0035 when the registry has no such package
      */
     static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, RegistrySource registry) {
+        if (project.configuration.getOptions().getBoolean("enableOfflineMode")) {
+            throw new CannotKnow("enableOfflineMode: what Yarn resolves depends on its cache, which holds the " +
+                                 "only versions it offers");
+        }
         String registryUrl = getScopeRegistry(ident.scope, project.configuration);
         return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
             String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident));

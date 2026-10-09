@@ -19,6 +19,9 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.time.Instant;
 import java.util.ArrayDeque;

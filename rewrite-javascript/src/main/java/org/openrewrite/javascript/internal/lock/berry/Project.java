@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -310,7 +311,7 @@ final class Project {
 
     @Nullable
     Workspace tryWorkspaceByCwd(String workspaceCwd) {
-        String normalized = PortablePath.normalize(workspaceCwd).replaceAll("/+$", "");
+        String normalized = PosixPath.normalize(workspaceCwd).replaceAll("/+$", "");
         return workspacesByCwd.get(normalized.isEmpty() ? "." : normalized);
     }
 

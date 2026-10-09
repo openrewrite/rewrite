@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.openrewrite.javascript.internal.lock.PosixPath;
+
 /**
  * Port of @npmcli/arborist lib/relpath.js (npm 11.17.0).
  */

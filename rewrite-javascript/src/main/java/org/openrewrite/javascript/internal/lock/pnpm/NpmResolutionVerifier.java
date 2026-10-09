@@ -20,7 +20,7 @@ import lombok.NonNull;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -34,7 +34,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static org.openrewrite.javascript.internal.lock.npm.UriComponent.encodeURIComponent;
+import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURIComponent;
 
 /**
  * Port of @pnpm/resolving.npm-resolver src/createNpmResolutionVerifier.ts and src/fetchAttestationPublishedAt.ts

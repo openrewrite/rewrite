@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.Builder;
 import lombok.Value;
@@ -31,14 +31,14 @@ public class Host {
     public static final Host UNKNOWN = Host.builder().build();
 
     @Nullable
-    String nodeVersion;
+    public String nodeVersion;
 
     @Nullable
-    String os;
+    public String os;
 
     @Nullable
-    String cpu;
+    public String cpu;
 
     @Nullable
-    String libc;
+    public String libc;
 }

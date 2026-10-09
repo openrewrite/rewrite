@@ -1,0 +1,14 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Project validation
+➤ YN0090: │ Offline work is enabled; Yarn won't fetch packages from the remote registry if it can avoid it
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Resolution step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 8ms
+exit=0
+lock unchanged

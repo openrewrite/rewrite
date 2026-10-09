@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
 
 import java.util.ArrayList;
 import java.util.Collections;

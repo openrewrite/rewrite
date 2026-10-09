@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -415,7 +416,8 @@ final class Package {
         }
         Map<String, String> out = new LinkedHashMap<>();
         for (Map.Entry<String, String> e : manifests.entrySet()) {
-            String relative = PosixPaths.relative(sourceDir, e.getKey());
+            String relative = RootRelativePath.relative(sourceDir.replace('\\', '/'),
+                    e.getKey().replace('\\', '/'));
             if (!relative.startsWith("..")) {
                 out.put(relative, e.getValue());
             }
@@ -509,7 +511,8 @@ final class Package {
 
         switch (dependencyVersion.tag) {
             case FOLDER: {
-                String relative = PosixPaths.join(sourceDir, dependencyVersion.string());
+                String relative = RootRelativePath.join(sourceDir.replace('\\', '/'),
+                        dependencyVersion.string().replace('\\', '/'));
                 dependencyVersion = new DependencyVersion(DependencyVersion.Tag.FOLDER, dependencyVersion.literal,
                         relative.isEmpty() ? "." : relative);
                 break;
@@ -557,7 +560,8 @@ final class Package {
                     dependencyVersion = dependencyVersion.asWorkspace(workspacePath);
                 } else {
                     String workspace = dependencyVersion.string();
-                    String path = "*".equals(workspace) ? "*" : PosixPaths.join(sourceDir, workspace);
+                    String path = "*".equals(workspace) ? "*" :
+                            RootRelativePath.join(sourceDir.replace('\\', '/'), workspace.replace('\\', '/'));
                     dependencyVersion = dependencyVersion.asWorkspace(path);
                     boolean foundMatchingWorkspace = lockfile.workspacePaths.containsKey(nameHash);
                     if (!foundMatchingWorkspace) {

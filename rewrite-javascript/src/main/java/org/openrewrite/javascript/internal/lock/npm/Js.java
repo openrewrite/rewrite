@@ -37,14 +37,6 @@ import java.util.regex.Pattern;
 final class Js extends EcmaScript {
 
     /**
-     * The characters {@code \s} matches in a JavaScript regular expression, for use inside a character class.
-     */
-    static final String WHITESPACE_CLASS =
-            "\\t\\n\\x0B\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
-
-;
-
-    /**
      * A member a value inherits from its prototype, such as {@code constructor}: truthy and never a string.
      */
     static final Object INHERITED = new Object() {

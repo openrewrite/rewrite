@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -69,7 +70,7 @@ final class TgzUtils {
             if (ignore(entry, stripComponents)) {
                 continue;
             }
-            String[] parts = PortablePath.normalize(entry.path).replaceAll("/\\z", "").split("/", -1);
+            String[] parts = PosixPath.normalize(entry.path).replaceAll("/\\z", "").split("/", -1);
             if (parts.length <= stripComponents) {
                 continue;
             }
@@ -77,7 +78,7 @@ final class TgzUtils {
             for (int i = stripComponents; i < parts.length; i++) {
                 slicePath.append(i > stripComponents ? "/" : "").append(parts[i]);
             }
-            String mappedPath = PortablePath.normalize(prefixPath + "/" + slicePath);
+            String mappedPath = PosixPath.normalize(prefixPath + "/" + slicePath);
             int mode = 0644;
             if ("Directory".equals(entry.type) || ((entry.mode == null ? 0 : entry.mode) & 0111) != 0) {
                 mode |= 0111;

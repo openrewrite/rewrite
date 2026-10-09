@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.Arrays;
 import java.util.List;
@@ -40,7 +41,7 @@ public final class WorkspaceRootFinder {
      * found, or null.
      */
     public static @Nullable String findWorkspaceManifest(Predicate<String> holds, String cwd) {
-        for (String dir = cwd; ; dir = PosixPaths.dirname(dir)) {
+        for (String dir = cwd; ; dir = RootRelativePath.dirname(dir)) {
             for (String name : WORKSPACE_MANIFEST_FILENAMES) {
                 String path = dir.isEmpty() ? name : dir + "/" + name;
                 if (holds.test(path)) {
@@ -66,6 +67,6 @@ public final class WorkspaceRootFinder {
             throw new PnpmError("BAD_WORKSPACE_MANIFEST_NAME", "The workspace manifest file should be named " +
                     "\"pnpm-workspace.yaml\". File found: " + workspaceManifestLocation);
         }
-        return PosixPaths.dirname(workspaceManifestLocation);
+        return RootRelativePath.dirname(workspaceManifestLocation);
     }
 }

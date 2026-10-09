@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencyTree.ResolvedDirectDependency;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.DependenciesGraphNode;
 
@@ -83,8 +84,8 @@ final class DepsResolver {
             for (ResolvedDirectDependency linked : resolvedImporter.getLinkedDependencies()) {
                 String directory = Js.string(linked.getResolution().get("directory"));
                 String target = !opts.isExcludeLinksFromLockfile() ||
-                                !PosixPaths.climbsAboveRoot(PosixPaths.normalize(directory)) ? directory :
-                        PosixPaths.join(PosixPaths.join(project.getRootDir(), "node_modules"), linked.getAlias());
+                                !RootRelativePath.climbsAboveRoot(RootRelativePath.normalize(directory)) ? directory :
+                        RootRelativePath.join(RootRelativePath.join(project.getRootDir(), "node_modules"), linked.getAlias());
                 topParents.add(new ResolvePeers.TopParent(linked.getAlias(), Js.string(linked.getVersion()), null,
                         ResolveDependencies.createNodeIdForLinkedLocalPkg(ctx.getLockfileDir(), target)));
             }

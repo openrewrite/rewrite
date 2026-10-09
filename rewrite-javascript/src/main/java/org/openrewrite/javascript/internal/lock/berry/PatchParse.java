@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -63,7 +64,7 @@ final class PatchParse {
     }
 
     static String getPath(String p) {
-        String resolved = PortablePath.normalize("/" + p);
+        String resolved = PosixPath.normalize("/" + p);
         if (resolved.length() > 1 && resolved.endsWith("/")) {
             resolved = resolved.substring(0, resolved.length() - 1);
         }

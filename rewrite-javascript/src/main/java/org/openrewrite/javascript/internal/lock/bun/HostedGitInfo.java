@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;

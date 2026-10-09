@@ -42,6 +42,12 @@ public class EcmaScript {
         }
     };
 
+    /**
+     * The characters {@code \s} matches in a JavaScript regular expression, for use inside a character class.
+     */
+    public static final String WHITESPACE_CLASS =
+            "\\t\\n\\x0B\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
+
     private static final long MAX_ARRAY_INDEX = 4294967294L;
     private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
     private static final Pattern DECIMAL_LITERAL =

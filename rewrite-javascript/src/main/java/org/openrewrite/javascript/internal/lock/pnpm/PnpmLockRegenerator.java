@@ -24,10 +24,11 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -269,7 +270,7 @@ public final class PnpmLockRegenerator {
             for (String path : inputs.getPaths()) {
                 for (String other : OTHER_MANIFEST_NAMES) {
                     if (path.equals(other) || path.endsWith("/" + other)) {
-                        dirs.add(PosixPaths.dirname(path));
+                        dirs.add(RootRelativePath.dirname(path));
                     }
                 }
             }
@@ -906,7 +907,7 @@ public final class PnpmLockRegenerator {
             if (lockfileDir.equals(lockDir)) {
                 for (Verification.Project project : allProjects) {
                     projectManifests.add(new Verification.Project(project.getRootDir(),
-                            FindPackages.getLockfileImporterId(PosixPaths.relative(lockDir, project.getRootDir())),
+                            FindPackages.getLockfileImporterId(RootRelativePath.relative(lockDir, project.getRootDir())),
                             project.getManifest()));
                 }
             }
@@ -1144,7 +1145,7 @@ public final class PnpmLockRegenerator {
         }
         String path = (String) lockfileDir;
         if (path.startsWith("/") || path.matches("^[A-Za-z]:.*") ||
-            !PosixPaths.join(lockDir, path).equals(lockDir)) {
+            !RootRelativePath.join(lockDir, path).equals(lockDir)) {
             throw new CannotKnow("the lock pnpm writes in lockfileDir " + path + " (a path from the directory " +
                                  "pnpm runs in, here " + (lockDir.isEmpty() ? "the root" : lockDir) + ")");
         }
@@ -1207,7 +1208,7 @@ public final class PnpmLockRegenerator {
         List<String> loadedFiles = new ArrayList<>();
         if (tryLoadDefaultPnpmfile) {
             loadDefaultPnpmfile(dir);
-            loadedFiles.add(PosixPaths.join(dir, ".pnpmfile.cjs"));
+            loadedFiles.add(RootRelativePath.join(dir, ".pnpmfile.cjs"));
         }
         String missing = null;
         for (Object pnpmfile : pnpmfiles) {
@@ -1216,9 +1217,9 @@ public final class PnpmLockRegenerator {
                                      "pnpm reads a path)");
             }
             String path = (String) pnpmfile;
-            String file = PosixPaths.join(dir, path);
+            String file = RootRelativePath.join(dir, path);
             if (path.startsWith("/") || path.startsWith("~") || path.matches("^[A-Za-z]:.*") ||
-                PosixPaths.climbsAboveRoot(file)) {
+                RootRelativePath.climbsAboveRoot(file)) {
                 throw new CannotKnow("whether the pnpmfile " + path + " exists (a path outside the project)");
             }
             if (loadedFiles.contains(file)) {

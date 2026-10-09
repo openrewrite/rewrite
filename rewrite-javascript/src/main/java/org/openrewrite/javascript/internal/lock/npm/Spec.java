@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -26,9 +28,9 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURIComponent;
+import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURIComponent;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.javascript.internal.lock.npm.UriComponent.decodeURIComponent;
-import static org.openrewrite.javascript.internal.lock.npm.UriComponent.encodeURIComponent;
 
 /**
  * Port of npm-package-arg 13.0.2 ({@code lib/npa.js}, its {@code Result}) on POSIX paths: what a

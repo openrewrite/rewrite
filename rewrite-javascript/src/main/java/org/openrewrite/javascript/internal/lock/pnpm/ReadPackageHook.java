@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.V8Sort;
 import org.openrewrite.semver.NodeSemver;
 
@@ -250,7 +251,7 @@ final class ReadPackageHook {
             if (protocol != null) {
                 String pkgPath = spec.substring(protocol.length());
                 specifiedViaRelativePath = !pkgPath.startsWith("/");
-                targetPath = specifiedViaRelativePath ? PosixPaths.join(rootDir, pkgPath) : pkgPath;
+                targetPath = specifiedViaRelativePath ? RootRelativePath.join(rootDir, pkgPath) : pkgPath;
             } else {
                 specifiedViaRelativePath = false;
                 targetPath = null;
@@ -352,7 +353,7 @@ final class ReadPackageHook {
 
     private static String resolveLocalOverride(VersionOverride target, @Nullable String pkgDir) {
         return target.specifiedViaRelativePath && pkgDir != null ?
-                PosixPaths.relative(pkgDir, target.targetPath) : String.valueOf(target.targetPath);
+                RootRelativePath.relative(pkgDir, target.targetPath) : String.valueOf(target.targetPath);
     }
 
     private static @Nullable VersionOverride pickMostSpecificVersionOverride(List<VersionOverride> versionOverrides) {

@@ -1,0 +1,1 @@
+.yarnrc --prefer-offline true in the edit phase only, changing ms 2.1.2 to ^2.1.0: the cache from phase one holds 2.1.2, the registry has 2.1.3.

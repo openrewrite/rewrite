@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,8 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURIComponent;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
-import static org.openrewrite.javascript.internal.lock.npm.UriComponent.decodeURIComponent;
 
 /**
  * Port of hosted-git-info 9.0.3 ({@code lib/index.js}, {@code hosts.js}, {@code from-url.js},

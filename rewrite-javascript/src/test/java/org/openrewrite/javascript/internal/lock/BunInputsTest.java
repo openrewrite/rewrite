@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;

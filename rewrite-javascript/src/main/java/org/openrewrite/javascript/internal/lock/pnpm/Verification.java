@@ -18,7 +18,8 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.UriComponent;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -391,7 +392,7 @@ final class Verification {
                 }
                 String linkedDir;
                 if (isLinked) {
-                    linkedDir = PosixPaths.join(project.getRootDir(), lockfileRef.substring(5));
+                    linkedDir = RootRelativePath.join(project.getRootDir(), lockfileRef.substring(5));
                 } else {
                     Map<String, Project> versions = workspacePackages == null ? null : workspacePackages.get(depName);
                     Project linked = versions == null ? null : versions.get(lockfileRef);
@@ -429,7 +430,7 @@ final class Verification {
         }
         Object directory = pkgSnapshot.getResolution() == null ? null : pkgSnapshot.getResolution().get("directory");
         Map<String, @Nullable Object> manifest = readPackageJson(files,
-                PosixPaths.join(lockfileDir, Js.string(directory)));
+                RootRelativePath.join(lockfileDir, Js.string(directory)));
         if (manifest == null) {
             return false;
         }
@@ -463,7 +464,7 @@ final class Verification {
     }
 
     private static @Nullable Map<String, @Nullable Object> readPackageJson(Map<String, String> files, String dir) {
-        if (PosixPaths.climbsAboveRoot(dir)) {
+        if (RootRelativePath.climbsAboveRoot(dir)) {
             throw new CannotKnow("the package.json of " + dir + " (outside the project)");
         }
         String text = files.get(dir.isEmpty() ? "package.json" : dir + "/package.json");

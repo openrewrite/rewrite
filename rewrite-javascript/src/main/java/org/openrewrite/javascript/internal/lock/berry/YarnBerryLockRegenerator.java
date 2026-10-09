@@ -25,11 +25,11 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.lock.npm.Host;
-import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.time.Instant;
 import java.util.ArrayList;

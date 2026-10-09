@@ -32,12 +32,12 @@ import java.util.regex.Pattern;
  * Port of json-parse-even-better-errors 5.0.0: {@code JSON.parse} that also notes the indentation and
  * newline of the text, so that a file can be written back the way it was.
  */
-final class JsonParseEvenBetterErrors {
+public final class JsonParseEvenBetterErrors {
 
     /**
      * Thrown as {@code JSONParseError} is, with its {@code EJSONPARSE} code.
      */
-    static final class JsonParseException extends IllegalArgumentException implements NpmError {
+    public static final class JsonParseException extends IllegalArgumentException implements NpmError {
         JsonParseException(String message, Throwable cause) {
             super(message, cause);
         }
@@ -81,7 +81,7 @@ final class JsonParseEvenBetterErrors {
     /**
      * {@code JSON.parse(text)}.
      */
-    static @Nullable Object jsonParse(String text) {
+    public static @Nullable Object jsonParse(String text) {
         try {
             return MAPPER.readValue(text, Object.class);
         } catch (IOException e) {

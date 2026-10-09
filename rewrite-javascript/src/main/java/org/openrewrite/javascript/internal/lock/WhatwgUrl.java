@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 
@@ -66,11 +66,11 @@ public final class WhatwgUrl {
     /**
      * @throws IllegalArgumentException as {@code new URL()} throws {@code TypeError: Invalid URL}.
      */
-    static WhatwgUrl parse(String input) {
+    public static WhatwgUrl parse(String input) {
         return parse(input, null);
     }
 
-    static WhatwgUrl parse(String input, @Nullable String base) {
+    public static WhatwgUrl parse(String input, @Nullable String base) {
         WhatwgUrl baseUrl = null;
         if (base != null) {
             baseUrl = basicParse(base, null);
@@ -113,11 +113,11 @@ public final class WhatwgUrl {
         return scheme + ":";
     }
 
-    String getUsername() {
+    public String getUsername() {
         return username;
     }
 
-    String getPassword() {
+    public String getPassword() {
         return password;
     }
 
@@ -128,11 +128,11 @@ public final class WhatwgUrl {
         return port == null ? host : host + ":" + port;
     }
 
-    String getHostname() {
+    public String getHostname() {
         return host == null ? "" : host;
     }
 
-    String getPort() {
+    public String getPort() {
         return port == null ? "" : Integer.toString(port);
     }
 
@@ -147,7 +147,7 @@ public final class WhatwgUrl {
         return sb.toString();
     }
 
-    String getSearch() {
+    public String getSearch() {
         return query == null || query.isEmpty() ? "" : "?" + query;
     }
 
@@ -155,7 +155,7 @@ public final class WhatwgUrl {
         return fragment == null || fragment.isEmpty() ? "" : "#" + fragment;
     }
 
-    void setHash(String value) {
+    public void setHash(String value) {
         if (value.isEmpty()) {
             fragment = null;
             return;
@@ -166,7 +166,7 @@ public final class WhatwgUrl {
         fragment = sb.toString();
     }
 
-    String getHref() {
+    public String getHref() {
         StringBuilder out = new StringBuilder(scheme).append(':');
         if (host != null) {
             out.append("//");
@@ -977,7 +977,7 @@ public final class WhatwgUrl {
         }
     }
 
-    static byte[] percentDecode(String input) {
+    public static byte[] percentDecode(String input) {
         byte[] bytes = input.getBytes(StandardCharsets.UTF_8);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         for (int i = 0; i < bytes.length; i++) {

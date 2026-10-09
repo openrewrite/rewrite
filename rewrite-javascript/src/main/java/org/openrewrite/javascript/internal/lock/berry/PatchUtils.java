@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -167,7 +168,7 @@ final class PatchUtils {
     }
 
     private static String projectPath(String cwd, String path, String patchPath) {
-        String resolved = PortablePath.normalize(".".equals(cwd) ? path : cwd + "/" + path);
+        String resolved = PosixPath.normalize(".".equals(cwd) ? path : cwd + "/" + path);
         if ("..".equals(resolved) || resolved.startsWith("../")) {
             throw new CannotKnow("the patch file " + patchPath + " (a path outside the project)");
         }

@@ -18,7 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.UriComponent;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 
 import java.math.BigInteger;
 import java.time.Instant;

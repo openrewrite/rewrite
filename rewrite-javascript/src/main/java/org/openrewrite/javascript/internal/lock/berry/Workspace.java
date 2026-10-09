@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -89,7 +90,7 @@ final class Workspace {
         int protocolIndex = range.indexOf(':');
         String protocol = protocolIndex != -1 ? range.substring(0, protocolIndex + 1) : null;
         String pathname = protocolIndex != -1 ? range.substring(protocolIndex + 1) : range;
-        if (WorkspaceResolver.PROTOCOL.equals(protocol) && PortablePath.normalize(pathname).equals(relativeCwd)) {
+        if (WorkspaceResolver.PROTOCOL.equals(protocol) && PosixPath.normalize(pathname).equals(relativeCwd)) {
             return true;
         }
         if (WorkspaceResolver.PROTOCOL.equals(protocol) &&

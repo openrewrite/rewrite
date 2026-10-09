@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.javascript.internal.lock.npm.Host;
+import org.openrewrite.javascript.internal.lock.Host;
 
 import java.time.Instant;
 import java.util.Collections;

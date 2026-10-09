@@ -108,6 +108,7 @@ public final class BerryOptions {
         DEFINITIONS.put("defaultProtocol", Definition.of(Type.STRING, "npm:"));
         DEFINITIONS.put("enableTransparentWorkspaces", Definition.of(Type.BOOLEAN, true));
         DEFINITIONS.put("enableHardenedMode", Definition.of(Type.BOOLEAN, false));
+        DEFINITIONS.put("enableOfflineMode", Definition.of(Type.BOOLEAN, false));
         DEFINITIONS.put("checksumBehavior", Definition.of(Type.STRING, "throw"));
 
         Map<String, Definition> peerMeta = new LinkedHashMap<>();

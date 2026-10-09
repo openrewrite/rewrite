@@ -19,7 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.PosixPath;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -109,6 +109,12 @@ public final class YarnClassicOptions {
     private final boolean autoAddIntegrity;
     private final boolean ignorePlatform;
 
+    /**
+     * cli/index.js: {@code --prefer-offline} turns {@code offline} on too.
+     */
+    private final boolean offline;
+    private final boolean preferOffline;
+
     @Getter(AccessLevel.NONE)
     private final PackageConstraintResolver constraintResolver = new PackageConstraintResolver(this);
 
@@ -140,7 +146,17 @@ public final class YarnClassicOptions {
         this.packBuiltPackages = Js.truthy(getOption("experimental-pack-script-packages-in-mirror"));
         this.autoAddIntegrity = !boolifyWithDefault(Js.string(getOption("unsafe-disable-integrity-migration")), true);
         this.ignorePlatform = Js.truthy(commandLine.get("ignorePlatform"));
+        this.preferOffline = Js.truthy(commandLine.get("preferOffline"));
+        this.offline = preferOffline || Js.truthy(commandLine.get("offline"));
         this.flags = normalizeFlags(commandLine);
+    }
+
+    /**
+     * What an install reads from yarn's cache instead of the registry, which the engine does not see.
+     */
+    CannotKnow offlineCache() {
+        return new CannotKnow((preferOffline ? "--prefer-offline" : "--offline") + " in .yarnrc: what yarn " +
+                              "resolves and fetches depends on its cache");
     }
 
     @Nullable

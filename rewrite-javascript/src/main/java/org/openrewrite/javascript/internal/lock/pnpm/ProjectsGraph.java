@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -248,8 +249,8 @@ final class ProjectsGraph {
                 .replaceFirst("(?i)^file:[/]*([A-Za-z]:)", "$1")
                 .replaceFirst("^file:(?:[/]*([~./]))?", "$1");
         String fetchSpec = spec.startsWith("~/") || spec.startsWith("/") || spec.matches("^[A-Za-z]:.*") ? null :
-                PosixPaths.join(where, spec);
-        if ("directory".equals(type) && (fetchSpec == null || PosixPaths.climbsAboveRoot(fetchSpec))) {
+                RootRelativePath.join(where, spec);
+        if ("directory".equals(type) && (fetchSpec == null || RootRelativePath.climbsAboveRoot(fetchSpec))) {
             unknown.add(rawSpec);
             return new Spec(type, null);
         }
@@ -277,7 +278,7 @@ final class ProjectsGraph {
             return true;
         }
         if (spec.indexOf(':') < 0 && spec.indexOf('@') > -1 && spec.contains("/") &&
-            projectMap.containsKey(PosixPaths.join(where, spec))) {
+            projectMap.containsKey(RootRelativePath.join(where, spec))) {
             unknown.add(spec);
             return true;
         }

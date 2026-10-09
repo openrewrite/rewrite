@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

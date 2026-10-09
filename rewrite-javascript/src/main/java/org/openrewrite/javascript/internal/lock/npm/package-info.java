@@ -127,3 +127,5 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.NullMarked;
 import org.openrewrite.internal.lang.NonNullFields;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.PosixPath;

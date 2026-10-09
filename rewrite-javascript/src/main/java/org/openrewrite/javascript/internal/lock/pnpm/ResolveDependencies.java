@@ -20,8 +20,9 @@ import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.EventLoop;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -1175,7 +1176,7 @@ final class ResolveDependencies {
     }
 
     static NodeId createNodeIdForLinkedLocalPkg(String lockfileDir, String pkgDir) {
-        return NodeId.of("link:" + PosixPaths.relative(lockfileDir, pkgDir));
+        return NodeId.of("link:" + RootRelativePath.relative(lockfileDir, pkgDir));
     }
 
     private static PeersResolutionResult filterMissingPeers(PeersResolutionResult result,
@@ -1607,7 +1608,7 @@ final class ResolveDependencies {
         }
 
         String rootDir = "directory".equals(pkgResponse.getResolution().get("type")) ?
-                PosixPaths.join(ctx.getLockfileDir(), Js.string(pkgResponse.getResolution().get("directory"))) :
+                RootRelativePath.join(ctx.getLockfileDir(), Js.string(pkgResponse.getResolution().get("directory"))) :
                 options.prefix;
         MissingPeersOfChildren missingPeersOfChildren = null;
         if (ctx.isHoistPeers() && !options.parentIds.contains(pkgResponse.getId())) {

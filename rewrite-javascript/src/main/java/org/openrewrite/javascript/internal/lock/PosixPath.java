@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,7 +24,7 @@ import java.util.List;
  */
 public final class PosixPath {
 
-    static final String CWD = "/";
+    public static final String CWD = "/";
 
     private PosixPath() {
     }
@@ -238,7 +238,7 @@ public final class PosixPath {
         return end == -1 ? "" : path.substring(start, end);
     }
 
-    static List<String> walkUp(String path) {
+    public static List<String> walkUp(String path) {
         List<String> paths = new ArrayList<>();
         for (path = resolve(path); !path.isEmpty(); ) {
             paths.add(path);

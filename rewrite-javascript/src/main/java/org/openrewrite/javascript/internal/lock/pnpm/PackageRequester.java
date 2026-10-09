@@ -18,8 +18,9 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.Host;
-import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -200,7 +201,7 @@ final class PackageRequester {
                                                             ResolveDependencies.@Nullable InfoFromLockfile currentPkg) {
         Map<String, @Nullable Object> resolution = resolveResult.resolution;
         if ("directory".equals(resolution.get("type"))) {
-            String dir = PosixPaths.normalize(Js.string(resolution.get("directory")));
+            String dir = RootRelativePath.normalize(Js.string(resolution.get("directory")));
             Map<String, @Nullable Object> manifest = readManifest(dir);
             if (manifest == null) {
                 throw new CannotKnow("the package.json of " + (dir.isEmpty() ? "." : dir) + " (" +
@@ -413,13 +414,13 @@ final class PackageRequester {
         }
         String projectDir = options.projectDir == null ? "" : options.projectDir;
         String lockfileDir = options.lockfileDir == null ? "" : options.lockfileDir;
-        String fetchSpec = PosixPaths.join(projectDir, spec);
-        String normalizedBareSpecifier = protocol + PosixPaths.relative(projectDir, fetchSpec);
+        String fetchSpec = RootRelativePath.join(projectDir, spec);
+        String normalizedBareSpecifier = protocol + RootRelativePath.relative(projectDir, fetchSpec);
         boolean injected = "file:".equals(protocol);
-        String dependencyPath = injected ? PosixPaths.relative(lockfileDir, fetchSpec) : fetchSpec;
+        String dependencyPath = injected ? RootRelativePath.relative(lockfileDir, fetchSpec) : fetchSpec;
         String id = !injected && ("directory".equals(type) || projectDir.equals(lockfileDir)) ?
-                protocol + PosixPaths.relative(projectDir, fetchSpec) :
-                protocol + PosixPaths.relative(lockfileDir, fetchSpec);
+                protocol + RootRelativePath.relative(projectDir, fetchSpec) :
+                protocol + RootRelativePath.relative(lockfileDir, fetchSpec);
         NpmResolver.ResolveResult result = new NpmResolver.ResolveResult();
         result.resolvedVia = "local-filesystem";
         if ("file".equals(type)) {

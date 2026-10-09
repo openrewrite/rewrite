@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -65,7 +66,7 @@ final class Workspaces {
                 workspaceGlobs.add(inputPath);
                 continue;
             }
-            String location = PosixPaths.normalize(inputPath);
+            String location = RootRelativePath.normalize(inputPath.replace('\\', '/'));
             if (location.isEmpty()) {
                 continue;
             }
@@ -83,7 +84,8 @@ final class Workspaces {
 
         for (int i = 0; i < workspaceGlobs.size(); i++) {
             String userPattern = workspaceGlobs.get(i);
-            String globPattern = userPattern.isEmpty() ? "package.json" : PosixPaths.join(userPattern, "package.json");
+            String globPattern = userPattern.isEmpty() ? "package.json" : RootRelativePath.join(
+                    userPattern.replace('\\', '/'), "package.json");
             for (String location : manifests.keySet()) {
                 if (location.isEmpty() || ignored(location)) {
                     continue;

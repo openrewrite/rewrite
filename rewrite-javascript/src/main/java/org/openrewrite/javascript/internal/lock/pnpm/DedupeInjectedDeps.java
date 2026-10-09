@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.NodeId;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencyTree.ResolvedDirectDependency;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.DependenciesGraphNode;
@@ -91,9 +92,9 @@ final class DedupeInjectedDeps {
                 ResolvedDirectDependency prev = directDependencies.get(index);
                 Map<String, @Nullable Object> resolution = new LinkedHashMap<>();
                 resolution.put("type", "directory");
-                resolution.put("directory", PosixPaths.join(lockfileDir, alias.getValue()));
+                resolution.put("directory", RootRelativePath.join(lockfileDir, alias.getValue()));
                 ResolvedDirectDependency linkedDep = new ResolvedDirectDependency(prev.getAlias(), prev.isOptional(),
-                        prev.isDev(), resolution, "link:" + PosixPaths.relative(id, alias.getValue()),
+                        prev.isDev(), resolution, "link:" + RootRelativePath.relative(id, alias.getValue()),
                         prev.getVersion(), prev.getName(), prev.getCatalogLookup(), prev.getNormalizedBareSpecifier(),
                         true);
                 directDependencies.set(index, linkedDep);

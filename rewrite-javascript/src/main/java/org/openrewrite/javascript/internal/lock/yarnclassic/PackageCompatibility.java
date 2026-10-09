@@ -17,7 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.Host;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;

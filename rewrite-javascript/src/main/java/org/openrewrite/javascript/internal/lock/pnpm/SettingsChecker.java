@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -162,8 +163,8 @@ final class SettingsChecker {
     static Map<String, @Nullable Object> calcPatchHashes(Map<String, String> patches, Map<String, String> files) {
         Map<String, @Nullable Object> hashes = new LinkedHashMap<>();
         for (Map.Entry<String, String> patch : patches.entrySet()) {
-            String path = PosixPaths.normalize(patch.getValue());
-            String content = PosixPaths.climbsAboveRoot(path) ? null : files.get(path);
+            String path = RootRelativePath.normalize(patch.getValue());
+            String content = RootRelativePath.climbsAboveRoot(path) ? null : files.get(path);
             if (content == null) {
                 throw new CannotKnow("the patch file " + patch.getValue() + " (not among the files the host gave)");
             }

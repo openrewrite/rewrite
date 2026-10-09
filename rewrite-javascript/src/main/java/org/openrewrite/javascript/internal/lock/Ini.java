@@ -13,8 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -24,7 +28,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 
 /**
  * Port of ini 6.0.0 {@code decode}, which npm reads an npmrc with.
@@ -34,15 +38,34 @@ public final class Ini {
     /**
      * A section: {@code Object.create(null)}, an object with no prototype and so no string form.
      */
-    static final class Section extends LinkedHashMap<String, @Nullable Object> {
+    public static final class Section extends LinkedHashMap<String, @Nullable Object> {
     }
 
     private static final Pattern LINES = Pattern.compile("[\\r\\n]+");
-    private static final Pattern BLANK_OR_COMMENT = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*(?:[;#]|\\z)");
+    private static final Pattern BLANK_OR_COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*(?:[;#]|\\z)");
     private static final Pattern LINE = Pattern.compile(
-            "^\\[([^\\]]*)\\][" + Js.WHITESPACE_CLASS + "]*\\z|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z");
+            "^\\[([^\\]]*)\\][" + EcmaScript.WHITESPACE_CLASS + "]*\\z|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z");
+
+    private static final ObjectMapper JSON = JsonMapper.builder()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
 
     private Ini() {
+    }
+
+    // what a JSON.parse value becomes as an object's key
+    private static String propertyKey(@Nullable Object value) {
+        if (value instanceof Number) {
+            return EcmaScript.numberToString((Number) value);
+        }
+        if (value instanceof List) {
+            List<String> items = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                items.add(item == null ? "" : propertyKey(item));
+            }
+            return String.join(",", items);
+        }
+        return value instanceof Map ? "[object Object]" : String.valueOf(value);
     }
 
     /**
@@ -67,7 +90,7 @@ public final class Ini {
                     p = new Section();
                     continue;
                 }
-                String name = Js.string(section);
+                String name = propertyKey(section);
                 Object existing = out.get(name);
                 p = truthy(existing) ? existing : new Section();
                 out.put(name, p);
@@ -77,7 +100,7 @@ public final class Ini {
             if (keyRaw == null) {
                 throw new IllegalArgumentException("Cannot read properties of null (reading 'length')");
             }
-            String keyText = Js.string(keyRaw);
+            String keyText = propertyKey(keyRaw);
             boolean isArray = keyRaw instanceof String && keyText.length() > 2 && keyText.endsWith("[]");
             String key = isArray ? keyText.substring(0, keyText.length() - 2) : keyText;
             if ("__proto__".equals(key)) {
@@ -109,7 +132,7 @@ public final class Ini {
         }
 
         List<String> remove = new ArrayList<>();
-        for (String k : Js.keys(out)) {
+        for (String k : EcmaScript.keys(out)) {
             Object section = out.get(k);
             if (!(section == null || section instanceof Map)) {
                 continue;
@@ -202,20 +225,20 @@ public final class Ini {
     static String safe(String val) {
         if (val.matches("(?s).*[=\\r\\n].*") || val.startsWith("[") || (val.length() > 1 && isQuoted(val)) ||
             !val.equals(val.trim())) {
-            return Js.quote(val);
+            return EcmaScript.quote(val);
         }
         return val.replace(";", "\\;").replace("#", "\\#");
     }
 
     static @Nullable Object unsafe(@Nullable String raw) {
-        String val = Js.trim(raw == null ? "" : raw);
+        String val = EcmaScript.trim(raw == null ? "" : raw);
         if (isQuoted(val)) {
             if (val.charAt(0) == '\'') {
                 val = val.substring(1, Math.max(1, val.length() - 1));
             }
             try {
-                return JsonParseEvenBetterErrors.jsonParse(val);
-            } catch (JsonParseEvenBetterErrors.JsonParseException ignored) {
+                return JSON.readValue(val, Object.class);
+            } catch (JsonProcessingException ignored) {
                 return val;
             }
         }
@@ -241,6 +264,6 @@ public final class Ini {
         if (esc) {
             unesc.append('\\');
         }
-        return Js.trim(unesc.toString());
+        return EcmaScript.trim(unesc.toString());
     }
 }

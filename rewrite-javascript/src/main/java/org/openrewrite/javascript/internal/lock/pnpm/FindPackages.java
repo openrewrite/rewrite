@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,7 +65,7 @@ final class FindPackages {
         }
         List<String> dirs = new ArrayList<>();
         for (String path : paths) {
-            dirs.add(PosixPaths.dirname(path));
+            dirs.add(RootRelativePath.dirname(path));
         }
         dirs.sort(KeySorting::lexCompare);
         return new ArrayList<>(new LinkedHashSet<>(dirs));

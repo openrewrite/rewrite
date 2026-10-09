@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.bun;
+package org.openrewrite.javascript.internal.lock;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The posix path arithmetic of bun's src/resolver/resolve_path.zig ({@code joinAbsString}, {@code relative})
- * on paths relative to the project root, which stands in for bun's top-level directory.
+ * Paths relative to the project's root, which stands in for the absolute directory a package manager joins paths
+ * onto: {@code ""} is the root, and a path above it keeps its leading {@code ..} segments, where the engine stops
+ * seeing the project.
  */
-final class PosixPaths {
+public final class RootRelativePath {
 
-    private PosixPaths() {
+    private RootRelativePath() {
     }
 
     /**
-     * A path relative to the root, without {@code .} segments, {@code ..} resolved, no trailing slash; {@code ""} is
-     * the root, and a path that climbs above it keeps its leading {@code ..} segments.
+     * Without {@code .} segments, {@code ..} resolved, no trailing slash.
      */
-    static String normalize(String path) {
+    public static String normalize(String path) {
         List<String> out = new ArrayList<>();
-        for (String segment : path.replace('\\', '/').split("/")) {
+        for (String segment : path.split("/")) {
             if (segment.isEmpty() || ".".equals(segment)) {
                 continue;
             }
@@ -46,17 +46,11 @@ final class PosixPaths {
         return String.join("/", out);
     }
 
-    static String join(String dir, String path) {
-        if (dir.isEmpty()) {
-            return normalize(path);
-        }
-        return normalize(dir + "/" + path);
+    public static String join(String dir, String path) {
+        return dir.isEmpty() ? normalize(path) : normalize(dir + "/" + path);
     }
 
-    /**
-     * {@code relative(from, to)} for two root-relative paths.
-     */
-    static String relative(String from, String to) {
+    public static String relative(String from, String to) {
         String[] f = normalize(from).isEmpty() ? new String[0] : normalize(from).split("/");
         String[] t = normalize(to).isEmpty() ? new String[0] : normalize(to).split("/");
         int common = 0;
@@ -71,5 +65,14 @@ final class PosixPaths {
             out.add(t[i]);
         }
         return String.join("/", out);
+    }
+
+    public static String dirname(String path) {
+        int slash = path.lastIndexOf('/');
+        return slash < 0 ? "" : path.substring(0, slash);
+    }
+
+    public static boolean climbsAboveRoot(String normalized) {
+        return "..".equals(normalized) || normalized.startsWith("../");
     }
 }

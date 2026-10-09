@@ -17,8 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
-import org.openrewrite.javascript.internal.lock.npm.Host;
-import org.openrewrite.javascript.internal.lock.npm.Ini;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 

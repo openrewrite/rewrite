@@ -18,8 +18,8 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -149,6 +149,9 @@ final class NpmResolver {
     }
 
     Promise<@Nullable Object> resolveRequest(@Nullable Object desiredVersion) {
+        if (config.isOffline()) {
+            throw config.offlineCache();
+        }
         String escapedName = NpmRegistry.escapeName(name);
         String desiredRange = Js.truthy(desiredVersion) ? Js.string(desiredVersion) : range;
         Io<Object> io = request.resolver.npmRegistry.request(escapedName, request.io);

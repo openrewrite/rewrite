@@ -26,10 +26,11 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -335,16 +336,16 @@ public final class BunLockRegenerator {
     private static void requirePatchFiles(Inputs inputs, Lockfile lockfile) {
         Map<String, String> files = new HashMap<>();
         for (Map.Entry<String, String> file : inputs.getFiles().entrySet()) {
-            files.put(PosixPaths.normalize(file.getKey()), file.getValue());
+            files.put(RootRelativePath.normalize(file.getKey().replace('\\', '/')), file.getValue());
         }
         Set<String> paths = inputs.getPaths() == null ? null : new HashSet<>();
         if (paths != null) {
             for (String path : inputs.getPaths()) {
-                paths.add(PosixPaths.normalize(path));
+                paths.add(RootRelativePath.normalize(path.replace('\\', '/')));
             }
         }
         for (String patch : lockfile.patchedDependencies.values()) {
-            String path = PosixPaths.normalize(patch);
+            String path = RootRelativePath.normalize(patch.replace('\\', '/'));
             String contents = files.get(path);
             if (contents == null) {
                 if (paths == null || paths.contains(path) || path.equals("..") || path.startsWith("../")) {

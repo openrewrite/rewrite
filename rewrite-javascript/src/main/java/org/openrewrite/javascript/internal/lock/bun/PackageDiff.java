@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -154,7 +155,7 @@ final class PackageDiff {
         if (workspacePath == null) {
             return false;
         }
-        String source = manifests.get(PosixPaths.normalize(workspacePath));
+        String source = manifests.get(RootRelativePath.normalize(workspacePath.replace('\\', '/')));
         if (source == null) {
             return false;
         }
@@ -165,7 +166,8 @@ final class PackageDiff {
             return false;
         }
         Package workspacePkg = new Package();
-        workspacePkg.parseWithJSON(toLockfile, options, log, PosixPaths.normalize(workspacePath), json,
+        workspacePkg.parseWithJSON(toLockfile, options, log,
+                RootRelativePath.normalize(workspacePath.replace('\\', '/')), json,
                 Features.WORKSPACE, manifests);
         Package fromPkg = fromLockfile.packages.get(fromResolution);
         Summary diff = generate(options, log, fromLockfile, toLockfile, fromPkg, workspacePkg, null, manifests);

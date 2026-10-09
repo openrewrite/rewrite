@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.PosixPath;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.Map;
 import java.util.Set;

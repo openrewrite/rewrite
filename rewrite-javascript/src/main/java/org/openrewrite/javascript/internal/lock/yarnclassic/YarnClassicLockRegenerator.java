@@ -24,12 +24,12 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.lock.npm.Host;
-import org.openrewrite.javascript.internal.lock.npm.LocaleCompare;
-import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -208,6 +208,9 @@ public final class YarnClassicLockRegenerator {
             flatten(resolver, topLevelPatterns, request.getManifest(), request.isFlat());
             bailout(topLevelPatterns, request.getWorkspaceLayout(), lockfile, flags);
 
+            if (config.isOffline() && !config.isPreferOffline()) {
+                throw config.offlineCache();
+            }
             resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), ref -> fetched(resolver, ref,
                     config), warnings));
             compatibility.check(resolver.getManifests(), flags.isIgnoreEngines());

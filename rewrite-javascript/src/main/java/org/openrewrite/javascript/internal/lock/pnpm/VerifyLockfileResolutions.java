@@ -18,7 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.npm.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

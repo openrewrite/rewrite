@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.provider.Arguments;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.NpmRegistryPackuments;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
@@ -154,7 +156,7 @@ final class ScenarioReplay {
 
     static PackumentSource registry(ScenarioRegistry http) {
         NodeRegistry registry = new NodeRegistry(null, REG, null, null, null, null, false, null, true, false);
-        return new RegistryPackuments(new NodeRegistries(registry, Collections.emptyMap(), null, null, null),
+        return new NpmRegistryPackuments(new NodeRegistries(registry, Collections.emptyMap(), null, null, null),
           new NpmRegistryClient(http));
     }
 

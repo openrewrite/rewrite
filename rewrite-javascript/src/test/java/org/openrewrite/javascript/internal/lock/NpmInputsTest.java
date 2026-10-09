@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
-import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 
 import java.nio.file.Paths;

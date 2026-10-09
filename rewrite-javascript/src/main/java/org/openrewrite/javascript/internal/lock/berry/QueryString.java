@@ -15,7 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
-import org.openrewrite.javascript.internal.lock.npm.UriComponent;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;

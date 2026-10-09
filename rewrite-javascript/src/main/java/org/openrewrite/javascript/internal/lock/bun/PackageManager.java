@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -496,7 +497,7 @@ final class PackageManager {
      * package was read now.
      */
     private int[] folderResolution(Resolution.Tag tag, DependencyVersion version, String path, Dependency dependency) {
-        String rel = PosixPaths.normalize(path);
+        String rel = RootRelativePath.normalize(path.replace('\\', '/'));
         Integer known = folders.get(rel);
         if (known != null) {
             return new int[]{known, 0};
