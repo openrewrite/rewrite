@@ -70,7 +70,7 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <version>3.11.0</version>
                           </plugin>
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
@@ -117,8 +117,9 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                   <build>
                       <plugins>
                           <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <version>3.11.0</version>
                           </plugin>
                       </plugins>
                   </build>
@@ -166,7 +167,7 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                               <plugin>
                                   <groupId>org.apache.maven.plugins</groupId>
                                   <artifactId>maven-compiler-plugin</artifactId>
-                                  <version>3.8.1</version>
+                                  <version>3.11.0</version>
                               </plugin>
                           </plugins>
                       </pluginManagement>
@@ -217,7 +218,7 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                           <plugin>
                               <groupId>org.apache.maven.plugins</groupId>
                               <artifactId>maven-compiler-plugin</artifactId>
-                              <version>3.8.1</version>
+                              <version>3.11.0</version>
                           </plugin>
                       </plugins>
                   </build>
@@ -325,7 +326,7 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                               <plugins>
                                   <plugin>
                                       <artifactId>maven-gpg-plugin</artifactId>
-                                      <version>3.2.4</version>
+                                      <version>3.2.7</version>
                                   </plugin>
                               </plugins>
                           </build>
@@ -380,7 +381,7 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                                   <plugins>
                                       <plugin>
                                           <artifactId>maven-gpg-plugin</artifactId>
-                                          <version>3.2.4</version>
+                                          <version>3.2.7</version>
                                       </plugin>
                                   </plugins>
                               </pluginManagement>
@@ -459,6 +460,411 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
                                       </plugin>
                                   </plugins>
                               </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeExecutionsAndDependenciesOfDuplicateBuildPlugins() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>group</groupId>
+                                      <artifactId>first</artifactId>
+                                      <version>1</version>
+                                  </dependency>
+                              </dependencies>
+                              <executions>
+                                  <execution>
+                                      <id>first</id>
+                                      <goals>
+                                          <goal>compile</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>group</groupId>
+                                      <artifactId>second</artifactId>
+                                      <version>1</version>
+                                  </dependency>
+                              </dependencies>
+                              <executions>
+                                  <execution>
+                                      <id>second</id>
+                                      <goals>
+                                          <goal>compile</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.11.0</version>
+                              <dependencies>
+                                  <dependency>
+                                      <groupId>group</groupId>
+                                      <artifactId>second</artifactId>
+                                      <version>1</version>
+                                  </dependency>
+                                  <dependency>
+                                      <groupId>group</groupId>
+                                      <artifactId>first</artifactId>
+                                      <version>1</version>
+                                  </dependency>
+                              </dependencies>
+                              <executions>
+                                  <execution>
+                                      <id>first</id>
+                                      <goals>
+                                          <goal>compile</goal>
+                                      </goals>
+                                  </execution>
+                                  <execution>
+                                      <id>second</id>
+                                      <goals>
+                                          <goal>compile</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeExecutionsWithTheSameId() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-antrun-plugin</artifactId>
+                              <version>3.1.0</version>
+                              <executions>
+                                  <execution>
+                                      <id>generate</id>
+                                      <phase>generate-sources</phase>
+                                      <goals>
+                                          <goal>run</goal>
+                                      </goals>
+                                      <configuration>
+                                          <target>
+                                              <echo message="first"/>
+                                          </target>
+                                          <skip>false</skip>
+                                      </configuration>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-antrun-plugin</artifactId>
+                              <executions>
+                                  <execution>
+                                      <id>generate</id>
+                                      <phase>process-sources</phase>
+                                      <configuration>
+                                          <target>
+                                              <echo message="second"/>
+                                          </target>
+                                      </configuration>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-antrun-plugin</artifactId>
+                              <version>3.1.0</version>
+                              <executions>
+                                  <execution>
+                                      <id>generate</id>
+                                      <phase>process-sources</phase>
+                                      <goals>
+                                          <goal>run</goal>
+                                      </goals>
+                                      <configuration>
+                                          <target>
+                                              <echo message="second"/>
+                                          </target>
+                                          <skip>false</skip>
+                                      </configuration>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void mergeConfigurationLikeMaven() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.13.0</version>
+                              <configuration>
+                                  <release>17</release>
+                                  <showWarnings>true</showWarnings>
+                                  <compilerArgs>
+                                      <arg>-Xlint:all</arg>
+                                  </compilerArgs>
+                              </configuration>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <release>21</release>
+                                  <compilerArgs combine.children="append">
+                                      <arg>-parameters</arg>
+                                  </compilerArgs>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <version>3.13.0</version>
+                              <configuration>
+                                  <release>21</release>
+                                  <compilerArgs combine.children="append">
+                                      <arg>-Xlint:all</arg>
+                                      <arg>-parameters</arg>
+                                  </compilerArgs>
+                                  <showWarnings>true</showWarnings>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void laterConfigurationOverridesWithCombineSelf() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                              <configuration>
+                                  <excludes>
+                                      <exclude>**/*IT.java</exclude>
+                                  </excludes>
+                              </configuration>
+                          </plugin>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <configuration combine.self="override">
+                                  <skipTests>true</skipTests>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-surefire-plugin</artifactId>
+                              <version>3.5.2</version>
+                              <configuration combine.self="override">
+                                  <skipTests>true</skipTests>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void lastPluginManagementDeclarationWinsWithoutMerging() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.2.5</version>
+                                  <configuration>
+                                      <trimStackTrace>false</trimStackTrace>
+                                  </configuration>
+                              </plugin>
+                              <plugin>
+                                  <artifactId>maven-jar-plugin</artifactId>
+                                  <version>3.4.2</version>
+                              </plugin>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.5.2</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-surefire-plugin</artifactId>
+                                  <version>3.5.2</version>
+                              </plugin>
+                              <plugin>
+                                  <artifactId>maven-jar-plugin</artifactId>
+                                  <version>3.4.2</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void coordinatesAreComparedTrimmed() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <artifactId>maven-jar-plugin</artifactId>
+                              <version>3.4.2</version>
+                          </plugin>
+                          <plugin>
+                              <groupId> org.apache.maven.plugins </groupId>
+                              <artifactId>
+                                  maven-jar-plugin
+                              </artifactId>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId> org.apache.maven.plugins </groupId>
+                              <artifactId>
+                                  maven-jar-plugin
+                              </artifactId>
+                              <version>3.4.2</version>
                           </plugin>
                       </plugins>
                   </build>
