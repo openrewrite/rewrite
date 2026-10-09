@@ -89,22 +89,6 @@ final class PackageResolver {
         this.warnings = warnings;
     }
 
-    boolean isNewPattern(String pattern) {
-        return patterns.get(pattern).fresh;
-    }
-
-    void updateManifest(PackageReference ref, Manifest newPkg) {
-        Manifest oldPkg = patterns.get(ref.patterns.get(0));
-        newPkg.reference = ref;
-        newPkg.remote = ref.remote;
-        newPkg.put("name", oldPkg.getName());
-        newPkg.fresh = oldPkg.fresh;
-        newPkg.put("prebuiltVariants", oldPkg.get("prebuiltVariants"));
-        for (String pattern : ref.patterns) {
-            patterns.put(pattern, newPkg);
-        }
-    }
-
     void updateManifests(List<Manifest> newPkgs) {
         for (Manifest newPkg : newPkgs) {
             if (newPkg.reference != null) {

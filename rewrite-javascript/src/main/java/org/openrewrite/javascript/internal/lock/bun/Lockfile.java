@@ -87,15 +87,6 @@ final class Lockfile {
         return resolutions.subList(pkg.dependenciesOff, pkg.dependenciesEnd());
     }
 
-    @Nullable
-    DependencyVersion resolveCatalogDependency(Dependency dep) {
-        if (dep.version.tag != DependencyVersion.Tag.CATALOG) {
-            return dep.version;
-        }
-        Dependency catalogDep = catalogs.get(dep.version.string(), dep.name);
-        return catalogDep == null ? null : catalogDep.version;
-    }
-
     boolean isWorkspaceRootDependency(int id) {
         return packages.get(0).containsDependency(id);
     }

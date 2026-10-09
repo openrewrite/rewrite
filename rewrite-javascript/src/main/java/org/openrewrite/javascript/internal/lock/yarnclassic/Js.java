@@ -292,5 +292,4 @@ final class Js extends EcmaScript {
         }
         return string(value);
     }
-
 }

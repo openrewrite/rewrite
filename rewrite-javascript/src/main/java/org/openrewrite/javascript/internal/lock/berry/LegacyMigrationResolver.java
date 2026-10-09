@@ -131,11 +131,6 @@ final class LegacyMigrationResolver implements Resolver {
         }
     }
 
-    @Nullable
-    Map<String, Locator> getResolutions() {
-        return resolutions;
-    }
-
     @Override
     public boolean supportsDescriptor(Descriptor descriptor, ResolveOptions opts) {
         return resolutions != null && resolutions.containsKey(descriptor.descriptorHash);

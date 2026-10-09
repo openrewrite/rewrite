@@ -351,14 +351,6 @@ final class Manifest {
         return out;
     }
 
-    boolean hasConsumerDependency(Ident ident) {
-        return dependencies.containsKey(ident.identHash) || peerDependencies.containsKey(ident.identHash);
-    }
-
-    boolean hasHardDependency(Ident ident) {
-        return dependencies.containsKey(ident.identHash) || devDependencies.containsKey(ident.identHash);
-    }
-
     /**
      * {@code getConditions}: the os, cpu and libc lists as a condition line, null when none is set.
      */

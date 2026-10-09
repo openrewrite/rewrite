@@ -93,19 +93,6 @@ final class Dependency {
         }
     }
 
-    boolean isAliased() {
-        switch (version.tag) {
-            case NPM:
-            case DIST_TAG:
-            case GIT:
-            case GITHUB:
-            case TARBALL:
-                return !realname().equals(name);
-            default:
-                return false;
-        }
-    }
-
     boolean eql(Dependency b) {
         return nameHash == b.nameHash && name.length() == b.name.length() && version.eql(b.version);
     }

@@ -69,14 +69,6 @@ final class VerifyLockfileResolutions {
         }
     }
 
-    static List<ResolutionPolicyViolation> collectResolutionPolicyViolations(
-            LockfileObject lockfile, List<? extends ResolutionVerifier> verifiers) {
-        if (verifiers.isEmpty() || lockfile.getPackages() == null) {
-            return new ArrayList<>();
-        }
-        return iterateLockfileViolations(collectCandidates(lockfile), verifiers);
-    }
-
     static PnpmError buildVerificationError(List<ResolutionPolicyViolation> violations) {
         List<ResolutionPolicyViolation> sorted = new ArrayList<>(violations);
         try {

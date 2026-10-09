@@ -76,21 +76,6 @@ final class PackageVersionPolicy {
                         createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude, "minimumReleaseAgeExclude") : null);
     }
 
-    static Set<String> expandPackageVersionSpecs(List<String> specs) {
-        Set<String> expandedSpecs = new LinkedHashSet<>();
-        for (String spec : specs) {
-            ParsedVersionPolicyRule parsed = parseVersionPolicyRule(spec);
-            if (parsed.exactVersions.isEmpty()) {
-                expandedSpecs.add(parsed.packageName);
-            } else {
-                for (String version : parsed.exactVersions) {
-                    expandedSpecs.add(parsed.packageName + "@" + version);
-                }
-            }
-        }
-        return expandedSpecs;
-    }
-
     /**
      * {@code isExcluded} of the npm resolver's verifier: whether the policy covers this version.
      */

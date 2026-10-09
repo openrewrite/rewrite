@@ -64,7 +64,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
     @Override public String getDescription() {
         return "Pins or upgrades a transitive npm dependency by adding an override entry to `package.json` " +
                 "and regenerating the lock file natively, without executing the package manager. For npm and Bun, adds to the `overrides` field; " +
-                "for Yarn, adds to `resolutions`; for pnpm, adds to `pnpm.overrides`. " +
+                "for Yarn, adds to `resolutions`. pnpm 11 reads overrides only from `pnpm-workspace.yaml` and Bun has no nested " +
+                "overrides, so for those the recipe changes nothing and records why. " +
                 "The override is idempotent — if the entry already exists with the same version, no change is made. " +
                 "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
                 "state shared with other dependency recipes.";
@@ -165,6 +166,15 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 List<DependencyPathSegment> parsedPath = dependencyPath == null
                         ? null
                         : PackageJsonOverrides.parsePath(dependencyPath);
+                String unread = PackageJsonOverrides.unreadOverride(pm, parsedPath);
+                if (unread != null) {
+                    if (!ps.failureRecorded) {
+                        ps.failureRecorded = true;
+                        lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(
+                                pkg.getSourcePath().toString(), packageName, "UNSUPPORTED_ENTRY_TYPE", unread));
+                    }
+                    return;
+                }
 
                 Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(

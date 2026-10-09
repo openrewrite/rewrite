@@ -34,10 +34,6 @@ final class PkgManifestUtils {
     private PkgManifestUtils() {
     }
 
-    static boolean isRuntimeAlias(String alias) {
-        return RUNTIME_NAMES.contains(alias);
-    }
-
     /**
      * Adds {@code <runtime>: runtime:<version>} to the dependencies field for each runtime the engines field asks
      * pnpm to download.

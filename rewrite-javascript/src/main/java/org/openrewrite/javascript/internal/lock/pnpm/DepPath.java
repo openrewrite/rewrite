@@ -119,17 +119,6 @@ final class DepPath {
         return new SuffixIndex(-1, -1);
     }
 
-    /**
-     * {@code parseDepPath}: the id and the peer suffix.
-     */
-    static String[] parseDepPath(String relDepPath) {
-        int peersIndex = indexOfDepPathSuffix(relDepPath).getPeersIndex();
-        if (peersIndex != -1) {
-            return new String[]{relDepPath.substring(0, peersIndex), relDepPath.substring(peersIndex)};
-        }
-        return new String[]{relDepPath, ""};
-    }
-
     static String removeSuffix(String relDepPath) {
         SuffixIndex index = indexOfDepPathSuffix(relDepPath);
         if (index.getPatchHashIndex() != -1) {

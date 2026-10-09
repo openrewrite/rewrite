@@ -161,10 +161,4 @@ final class Strings {
         }
         return c != 0xFEFF && c != 0x2028 && c != 0x2029 && (c < 0xD800 || c > 0xDFFF);
     }
-
-    static String jsonString(String text) {
-        StringBuilder out = new StringBuilder(text.length() + 2);
-        appendJsonString(out, text, true);
-        return out.toString();
-    }
 }

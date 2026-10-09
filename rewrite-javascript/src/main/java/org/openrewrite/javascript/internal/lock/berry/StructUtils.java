@@ -62,10 +62,6 @@ final class StructUtils {
                 reference);
     }
 
-    static Ident convertToIdent(Ident source) {
-        return new Ident(source.identHash, source.scope, source.name);
-    }
-
     static Locator convertDescriptorToLocator(Descriptor descriptor) {
         return new Locator(descriptor.identHash, descriptor.scope, descriptor.name, descriptor.descriptorHash,
                 descriptor.range);
@@ -74,10 +70,6 @@ final class StructUtils {
     static Descriptor convertLocatorToDescriptor(Locator locator) {
         return new Descriptor(locator.identHash, locator.scope, locator.name, locator.locatorHash,
                 locator.reference);
-    }
-
-    static Locator convertPackageToLocator(Package pkg) {
-        return new Locator(pkg.identHash, pkg.scope, pkg.name, pkg.locatorHash, pkg.reference);
     }
 
     static Package renamePackage(Package pkg, Locator locator) {
@@ -160,10 +152,6 @@ final class StructUtils {
 
     static boolean areIdentsEqual(Ident a, Ident b) {
         return a.identHash.equals(b.identHash);
-    }
-
-    static boolean areDescriptorsEqual(Descriptor a, Descriptor b) {
-        return a.descriptorHash.equals(b.descriptorHash);
     }
 
     static boolean areLocatorsEqual(Locator a, Locator b) {

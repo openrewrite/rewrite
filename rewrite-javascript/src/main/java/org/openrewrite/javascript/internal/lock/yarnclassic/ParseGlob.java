@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -74,7 +75,7 @@ final class ParseGlob {
         tok.dirname = tok.basename.isEmpty() ? glob : glob.replace(tok.basename, "");
         String[] basename = Js.splitString(tok.basename, ".");
         tok.filename = basename[0];
-        tok.extname = String.join(".", java.util.Arrays.copyOfRange(basename, 1, basename.length));
+        tok.extname = String.join(".", Arrays.copyOfRange(basename, 1, basename.length));
         tok.ext = "";
 
         if (Micromatch.isGlob(tok.dirname) && tok.basename.isEmpty()) {

@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.pnpm.RegistryMetadata;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
@@ -62,9 +61,8 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
 
     @Override
     public @Nullable String document(String url) {
-        NodeRegistry anonymous = new NodeRegistry(null, url, null, null, null, null, false, null, true, false);
         try {
-            return client.getDocumentText(anonymous, url, null, url);
+            return client.getDocumentText(registries.registryFor("", url), url, null, url);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND ||
                 e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND) {

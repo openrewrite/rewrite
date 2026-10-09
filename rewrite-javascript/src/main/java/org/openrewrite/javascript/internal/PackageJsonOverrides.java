@@ -120,6 +120,20 @@ public final class PackageJsonOverrides {
     }
 
     /**
+     * Why the package manager would not read an override written to {@code package.json}, or null when it reads it:
+     * pnpm 11 reads overrides from pnpm-workspace.yaml only, and bun warns that it does not support nested overrides.
+     */
+    public static @Nullable String unreadOverride(PackageManager pm, @Nullable List<DependencyPathSegment> path) {
+        if (pm == PackageManager.Pnpm) {
+            return "pnpm 11 reads overrides from pnpm-workspace.yaml, not from package.json";
+        }
+        if (pm == PackageManager.Bun && path != null && !path.isEmpty()) {
+            return "bun does not support nested overrides";
+        }
+        return null;
+    }
+
+    /**
      * Applies a transitive-dependency override to a {@code package.json} document,
      * dispatching on the package manager dialect.
      * <p>

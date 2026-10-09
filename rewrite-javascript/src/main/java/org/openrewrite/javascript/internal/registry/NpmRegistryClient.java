@@ -93,7 +93,7 @@ public class NpmRegistryClient {
     }
 
     /**
-     * The raw gzipped tarball bytes from {@code dist.tarball}, cached per (registry, url). Needed to reproduce
+     * The raw gzipped tarball bytes from {@code dist.tarball}, cached per url. Needed to reproduce
      * a Yarn Berry checksum, which hashes the tarball's repacked contents.
      */
     public byte[] getTarball(NodeRegistry registry, String name, @Nullable String version, String tarballUrl) {

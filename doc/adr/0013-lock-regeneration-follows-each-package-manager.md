@@ -21,8 +21,10 @@ the proof's premise wrong: an incremental install warns and writes a lock where 
 Lock regeneration follows each package manager's own resolver. The modules that package manager runs are ported into
 its own package with their names, control flow and iteration order; the lock is loaded once into that package
 manager's own model and written whole, as it writes it. `NativeLockEngine` builds the package manager's inputs from
-the request and calls its port. What ports share is Node's behavior (V8's `Date` and `RegExp`, WHATWG URL, path, ini,
-`localeCompare`) and the host's Node version and platform, never resolution.
+the request, seen once from the lock's directory (`LockDirectory`), and calls its port. What ports share lives in
+`internal.lock` and is Node's behavior, never resolution: JavaScript's value semantics (`EcmaScript`, which each port's
+`Js` extends), Node's event loop and promises (`EventLoop`), V8's `Date`, `RegExp` and short-array sort, WHATWG URL,
+path, ini, `localeCompare`, the host's Node version and platform (`Host`) and environment (`HostEnvironment`).
 
 - npm 11.17.0, `@npmcli/arborist`, in `internal.lock.npm`: the tree (`Node`, `Edge`, `Inventory`, `Link`), `Shrinkwrap`,
   `VirtualTreeLoader`, `IdealTreeBuilder` with `PlaceDep`, `CanPlaceDep` and `PeerEntrySets`, `DepFlags`, `OverrideSet`,
@@ -43,9 +45,13 @@ Three rules decide the result:
 1. Byte-exact or a failure: never a guess, never a silently unchanged lock.
 2. A failure is for what the engine cannot know (tarball contents, a git, file or remote manifest, the filesystem, the
    environment, an outcome that follows network timing) or what the package manager itself rejects. Every failure
-   says which. An unported part of a package manager is a work item, not a failure.
-3. The written lock is a fixpoint: the regenerator installs again over it, and a changed lock or a rejection there is
-   a failure, because npm sometimes warns, writes, and rejects that lock on the next install (`PEER_CONFLICT`).
+   carries its kind (`LockFileRegeneration.Kind`: cannot know, the package manager rejects or fails, discards or
+   deletes the lock, a second install), and the errors every package manager shares (a missing package, no matching
+   version, an engine or platform it excludes) are reported under one reason (`SharedError`). An unported part of a
+   package manager is a work item, not a failure.
+3. The written lock is a fixpoint: the regenerator installs again over it (`LockOnlyInstall.verify`), and a changed
+   lock or a rejection there is a failure, because npm sometimes warns, writes, and rejects that lock on the next
+   install (`PEER_CONFLICT`).
 
 The oracle is the package manager itself: what it does is settled by running it, or by its own test expectations,
 never by reading. A scenario is a directory: `pkg-before`, `before`, `pkg`, `after`, the package manager's config files,

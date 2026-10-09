@@ -271,14 +271,4 @@ final class PackageDiff {
         }
         return false;
     }
-
-    static List<Integer> unmapped(int[] mapping) {
-        List<Integer> out = new ArrayList<>();
-        for (int i = 0; i < mapping.length; i++) {
-            if (mapping[i] == Package.INVALID_PACKAGE_ID) {
-                out.add(i);
-            }
-        }
-        return out;
-    }
 }

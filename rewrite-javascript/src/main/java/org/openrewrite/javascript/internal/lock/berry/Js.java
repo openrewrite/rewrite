@@ -220,5 +220,4 @@ final class Js extends EcmaScript {
             throw new IllegalArgumentException("not a JSON value: " + value.getClass());
         }
     }
-
 }

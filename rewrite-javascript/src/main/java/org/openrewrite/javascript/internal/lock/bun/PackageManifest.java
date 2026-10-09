@@ -106,18 +106,6 @@ final class PackageManifest {
         static FindVersionResult error(Error error) {
             return new FindVersionResult(null, null, error, false);
         }
-
-        @Nullable
-        FindResult unwrap() {
-            return result;
-        }
-
-        boolean latestIsFiltered() {
-            if (withFilter) {
-                return newestFiltered != null;
-            }
-            return error == Error.ALL_VERSIONS_TOO_RECENT;
-        }
     }
 
     private static final double SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000.0;

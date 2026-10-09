@@ -82,10 +82,6 @@ final class SemverRange {
 
     static final SemverRange EMPTY = new SemverRange(Comparator.UNSET, Comparator.UNSET);
 
-    boolean anyRangeSatisfies() {
-        return left.op == Op.GTE && left.version.eql(SemverVersion.ZERO);
-    }
-
     static SemverRange initWildcard(SemverVersion version, SemverQuery.Wildcard wildcard) {
         switch (wildcard) {
             case NONE:

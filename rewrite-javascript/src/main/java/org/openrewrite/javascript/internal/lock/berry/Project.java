@@ -418,32 +418,6 @@ final class Project {
     }
 
     /**
-     * {@code getDependencyMeta}: the top-level workspace's {@code dependenciesMeta} for an ident, its exact-version
-     * entry over its plain one.
-     */
-    Map<String, Object> getDependencyMeta(Ident ident, @Nullable String version) {
-        Map<String, Object> dependencyMeta = new LinkedHashMap<>();
-        Map<@Nullable String, Map<String, Object>> dependencyMetaSet =
-                getTopLevelWorkspace().getManifest().dependenciesMeta.get(StructUtils.stringifyIdent(ident));
-        if (dependencyMetaSet == null) {
-            return dependencyMeta;
-        }
-        Map<String, Object> defaultMeta = dependencyMetaSet.get(null);
-        if (defaultMeta != null) {
-            dependencyMeta.putAll(defaultMeta);
-        }
-        if (version == null || !SemverUtils.valid(version)) {
-            return dependencyMeta;
-        }
-        for (Map.Entry<@Nullable String, Map<String, Object>> meta : dependencyMetaSet.entrySet()) {
-            if (meta.getKey() != null && meta.getKey().equals(version)) {
-                dependencyMeta.putAll(meta.getValue());
-            }
-        }
-        return dependencyMeta;
-    }
-
-    /**
      * {@code preparePackage}: the package normalized, then each dependency through the {@code reduceDependency}
      * hooks and bound by the resolver.
      */
