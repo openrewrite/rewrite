@@ -87,7 +87,6 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'bool': JavaType.Primitive.Boolean,
     'None': JavaType.Primitive.Null,
     'NoneType': JavaType.Primitive.Null,
-    'bytes': JavaType.Primitive.String,  # Close enough for matching
     'LiteralString': JavaType.Primitive.String,
 }
 
@@ -751,22 +750,15 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'bytesLiteral':
-            return JavaType.Primitive.String
+            return self._create_class_type('bytes')
 
         elif kind == 'union':
-            # Resolve all non-None members into a Union type.
-            # For Optional[X] (= X | None) with a single real member, unwrap to just X.
+            # `None` is a member like any other, so a recipe can tell `X | None` from `X`.
             resolved_bounds = []
             for member_id in descriptor.get('members', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    member_kind = member.get('kind')
-                    # Skip None/NoneType members
-                    if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
-                        continue
-                    resolved = self._resolve_type(member_id)
-                    if resolved is not None:
-                        resolved_bounds.append(resolved)
+                resolved = self._resolve_type(member_id)
+                if resolved is not None:
+                    resolved_bounds.append(resolved)
             if not resolved_bounds:
                 return _UNKNOWN
             if len(resolved_bounds) == 1:
@@ -1080,7 +1072,7 @@ class PythonTypeMapping:
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
-        if isinstance(node.value, (str, bytes)):
+        if isinstance(node.value, str):
             return JavaType.Primitive.String
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
@@ -1093,7 +1085,7 @@ class PythonTypeMapping:
             return JavaType.Primitive.Long if -2 ** 63 <= node.value < 2 ** 63 else JavaType.Primitive.None_
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
-        elif isinstance(node.value, complex):
+        elif isinstance(node.value, (bytes, complex)):
             # A literal's type slot holds a JavaType.Primitive, and J.Literal#withType
             # drops a class type put there.
             return JavaType.Primitive.None_
