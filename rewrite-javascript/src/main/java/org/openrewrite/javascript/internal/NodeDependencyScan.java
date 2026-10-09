@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
-import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -29,11 +28,9 @@ import org.openrewrite.quark.Quark;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,9 +48,6 @@ public final class NodeDependencyScan {
     private NodeDependencyScan() {
     }
 
-    private static final List<String> PACKAGE_MANAGER_FILES = Arrays.asList(
-            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs");
-
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
         public final Map<Path, Path> lockToPackage = new HashMap<>();
@@ -63,8 +57,8 @@ public final class NodeDependencyScan {
         public final Set<Path> paths = new HashSet<>();
         /** The package.json each {@link #lockFor} walk from one with its own lock, or a pnpm one, ended at. */
         final Map<Path, Path> installRoots = new HashMap<>();
-        /** A .env file visited before any bun.lock beside it, uncopied until one arrives or the scan ends. */
-        final Map<Path, SourceFile> envBeforeBunLock = new HashMap<>();
+        /** A file read only beside a lock, uncopied until the scan ends and the locks its edits write are known. */
+        final Map<Path, SourceFile> besideLock = new HashMap<>();
     }
 
     /**
@@ -82,46 +76,57 @@ public final class NodeDependencyScan {
 
     /**
      * Note a file the scan visits and keep its contents when a package manager reads it: true when {@code sf} is
-     * such a file. A .env file's contents are kept only beside a bun.lock; a {@link Quark} has none.
+     * such a file. One read only beside a lock is kept when the scan ends; a {@link Quark} has no contents.
      */
     public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
         Path path = sf.getSourcePath();
         acc.paths.add(path);
         Path name = path.getFileName();
-        if (name == null) {
-            return false;
-        }
-        if (DotEnv.FILES.contains(name.toString())) {
-            if (sf instanceof Quark) {
-                return true;
-            }
-            if (acc.locks.containsKey(bunLockBeside(path))) {
-                acc.packageManagerFiles.put(path, sf.printAll());
-            } else {
-                acc.envBeforeBunLock.put(path, sf);
-            }
-            return true;
-        }
-        if (!PACKAGE_MANAGER_FILES.contains(name.toString()) && !isPatch(path)) {
+        if (name == null || !readByAny(name.toString())) {
             return false;
         }
         if (!(sf instanceof Quark)) {
-            acc.packageManagerFiles.put(path, sf.printAll());
+            if (readAwayFromLock(name.toString())) {
+                acc.packageManagerFiles.put(path, sf.printAll());
+            } else {
+                acc.besideLock.put(path, sf);
+            }
         }
         return true;
     }
 
-    private static boolean isPatch(Path path) {
-        return path.toString().endsWith(".patch");
+    private static boolean readByAny(String fileName) {
+        for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
+            if (regeneration.reads(fileName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static boolean isDotEnv(Path path) {
-        Path name = path.getFileName();
-        return name != null && DotEnv.FILES.contains(name.toString());
+    private static boolean readAwayFromLock(String fileName) {
+        for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
+            if (regeneration.reads(fileName) && !regeneration.readsOnlyBesideLock(fileName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
-    private static Path bunLockBeside(Path file) {
-        return file.resolveSibling(LockFileRegeneration.BUN.getLockFile());
+    private static boolean readBesideOneOf(Path file, Set<Path> locks) {
+        String name = String.valueOf(file.getFileName());
+        for (LockFileRegeneration regeneration : LockFileRegeneration.ALL) {
+            if (regeneration.readsOnlyBesideLock(name) &&
+                locks.contains(file.resolveSibling(regeneration.getLockFile()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean readBy(@Nullable LockFileRegeneration regeneration, Path file) {
+        String name = String.valueOf(file.getFileName());
+        return regeneration == null ? readAwayFromLock(name) : regeneration.reads(name);
     }
 
     public static final class ProjectState {
@@ -143,24 +148,28 @@ public final class NodeDependencyScan {
         acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
         acc.locks.put(lock.getSourcePath(), lock.printAll());
         acc.lockToPackage.put(lock.getSourcePath(), packagePath);
-        Iterator<Map.Entry<Path, SourceFile>> env = acc.envBeforeBunLock.entrySet().iterator();
-        while (env.hasNext()) {
-            Map.Entry<Path, SourceFile> file = env.next();
-            if (bunLockBeside(file.getKey()).equals(lock.getSourcePath())) {
-                acc.packageManagerFiles.put(file.getKey(), file.getValue().printAll());
-                env.remove();
-            }
-        }
     }
 
-    /** Give each package.json the content of the lock {@link #lockFor} says its edits regenerate. */
+    /**
+     * Give each package.json the content of the lock {@link #lockFor} says its edits regenerate, and keep the files
+     * read only beside a lock that lie beside one of those.
+     */
     public static void linkWorkspaceMembers(Accumulator acc) {
-        acc.envBeforeBunLock.clear();
         acc.installRoots.clear();
+        Set<Path> written = new HashSet<>();
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             Path lock = lockFor(acc, project.getKey());
             project.getValue().capturedLockContent = lock == null ? null : acc.locks.get(lock);
+            if (lock != null) {
+                written.add(lock);
+            }
         }
+        for (Map.Entry<Path, SourceFile> file : acc.besideLock.entrySet()) {
+            if (readBesideOneOf(file.getKey(), written)) {
+                acc.packageManagerFiles.put(file.getKey(), file.getValue().printAll());
+            }
+        }
+        acc.besideLock.clear();
     }
 
     /**
@@ -286,7 +295,8 @@ public final class NodeDependencyScan {
     private static ProjectFiles projectFiles(Accumulator acc, @Nullable ExecutionContext ctx, Path packageJsonPath,
                                              Map<Path, String> manifests) {
         NodeResolutionResult marker = marker(acc.projects.get(packageJsonPath));
-        boolean bun = marker != null && marker.getPackageManager() == PackageManager.Bun;
+        LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(marker == null ? null :
+                marker.getPackageManager());
         Set<Path> directories = new LinkedHashSet<>();
         for (Path manifest : manifests.keySet()) {
             directories.add(directory(manifest));
@@ -295,11 +305,11 @@ public final class NodeDependencyScan {
         Map<Path, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : acc.packageManagerFiles.entrySet()) {
             Path dir = directory(file.getKey());
-            if (!bun && isDotEnv(file.getKey())) {
+            if (!readBy(regeneration, file.getKey())) {
                 continue;
             }
             if (directories.contains(dir) || above(dir, directories) ||
-                isPatch(file.getKey()) && under(dir, directories)) {
+                file.getKey().toString().endsWith(".patch") && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }

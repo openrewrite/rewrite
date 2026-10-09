@@ -37,6 +37,10 @@ final class YarnClassicInputs {
     private YarnClassicInputs() {
     }
 
+    static boolean reads(String fileName) {
+        return CONFIG_FILES.contains(fileName);
+    }
+
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> configFiles = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {

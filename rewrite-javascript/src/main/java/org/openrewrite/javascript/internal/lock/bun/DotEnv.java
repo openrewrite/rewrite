@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,8 +35,8 @@ public final class DotEnv {
      * {@code loadDefaultFiles} for {@code .production}, the suffix an install loads with: an earlier file's value
      * is kept over a later one's, and the process environment over all of them.
      */
-    public static final List<String> FILES = Arrays.asList(".env.production.local", ".env.local", ".env.production",
-        ".env");
+    public static final List<String> FILES = Collections.unmodifiableList(Arrays.asList(".env.production.local",
+            ".env.local", ".env.production", ".env"));
 
     private static final String WHITESPACE = "\t\u000B\f  \n\r";
 

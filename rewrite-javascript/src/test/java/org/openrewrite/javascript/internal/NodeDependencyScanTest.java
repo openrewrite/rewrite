@@ -30,7 +30,9 @@ import org.openrewrite.text.PlainText;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -474,34 +476,37 @@ class NodeDependencyScanTest {
         return acc;
     }
 
+    private static final List<String> CANDIDATES = Arrays.asList(".npmrc", ".yarnrc", ".yarnrc.yml",
+      "pnpm-workspace.yaml", "patches/a.patch", "bunfig.toml", ".pnpmfile.cjs", ".pnpmfile.mjs", ".env", ".env.local",
+      ".env.production", ".env.production.local", ".env.development", ".env.development.local", ".env.test",
+      ".env.test.local", ".env.staging", "README.md");
+
     /**
-     * Only bun reads .env files, and only the four bun 1.3.10's install loads from the lock's directory: whichever
-     * the scan visits first, no other project's .env contents stay in the accumulator.
+     * Each package manager's regeneration gets the files it reads: bun 1.3.10 the four .env files its install loads,
+     * pnpm a pnpmfile by its path only. Whichever the scan visits first, no file only Bun reads is kept elsewhere.
      */
     @ParameterizedTest
     @CsvSource({
       "Npm,         package-lock.json, .npmrc",
-      "YarnClassic, yarn.lock,         .npmrc .yarnrc",
-      "YarnBerry,   yarn.lock,         .yarnrc.yml",
-      "Pnpm,        pnpm-lock.yaml,    .npmrc pnpm-workspace.yaml .pnpmfile.cjs",
-      "Bun,         bun.lock,          .npmrc bunfig.toml .env.production.local .env.local .env.production .env"
+      "YarnClassic, yarn.lock,         .npmrc .yarnrc .yarnrc.yml",
+      "YarnBerry,   yarn.lock,         .yarnrc.yml patches/a.patch",
+      "Pnpm,        pnpm-lock.yaml,    .npmrc pnpm-workspace.yaml patches/a.patch",
+      "Bun,         bun.lock,          .npmrc patches/a.patch bunfig.toml .env.production.local .env.local " +
+        ".env.production .env"
     })
-    void theScanKeepsTheFilesTheProjectsPackageManagerReads(PackageManager pm, String lockName, String kept) {
+    void theScanKeepsTheFilesTheProjectsPackageManagerReads(PackageManager pm, String lockName, String read) {
         Path manifest = Paths.get("app/package.json");
+        List<String> readAnywhere = Arrays.asList(".npmrc", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml",
+          "patches/a.patch");
         for (boolean lockFirst : new boolean[]{true, false}) {
             NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
             SourceFile lock = PlainText.builder().sourcePath(Paths.get("app/" + lockName)).text("lock").build();
             if (lockFirst) {
                 NodeDependencyScan.captureLock(acc, lock);
             }
-            for (String name : kept.split(" ")) {
-                capture(acc, "app/" + name, "");
+            for (String name : CANDIDATES) {
+                capture(acc, "app/" + name, name.startsWith(".env") ? "NPM_CONFIG_TOKEN=secret" : "");
             }
-            for (String name : new String[]{".env", ".env.local", ".env.production", ".env.production.local",
-              ".env.development", ".env.development.local", ".env.test", ".env.test.local", ".env.staging"}) {
-                capture(acc, "app/" + name, "NPM_CONFIG_TOKEN=secret");
-            }
-            capture(acc, "app/README.md", "x");
             if (!lockFirst) {
                 NodeDependencyScan.captureLock(acc, lock);
             }
@@ -512,11 +517,43 @@ class NodeDependencyScanTest {
             NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc,
               new InMemoryExecutionContext(), manifest);
 
-            Path[] expected = Arrays.stream(kept.split(" ")).map(name -> Paths.get("app/" + name)).toArray(Path[]::new);
-            assertThat(acc.packageManagerFiles).as("lock first: %s", lockFirst).containsOnlyKeys(expected);
-            assertThat(acc.envBeforeBunLock).isEmpty();
-            assertThat(files.getPackageManagerFiles()).containsOnlyKeys(expected);
-            assertThat(files.getPaths()).contains(Paths.get("app/.env"), Paths.get("app/.env.development"));
+            List<String> kept = new ArrayList<>(readAnywhere);
+            for (String name : read.split(" ")) {
+                if (!kept.contains(name)) {
+                    kept.add(name);
+                }
+            }
+            assertThat(acc.packageManagerFiles).as("lock first: %s", lockFirst).containsOnlyKeys(paths("app/", kept));
+            assertThat(acc.besideLock).isEmpty();
+            assertThat(files.getPackageManagerFiles()).containsOnlyKeys(paths("app/", Arrays.asList(read.split(" "))));
+            assertThat(files.getPaths()).containsAll(paths("app/", CANDIDATES));
         }
+    }
+
+    /**
+     * bun 1.3.10 run in a workspace member installs at the root and loads the root's .env files, never those beside
+     * a lock of the member's own.
+     */
+    @Test
+    void aBunMembersOwnLockKeepsNoEnvFile() {
+        NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(PackageManager.Bun, PackageManager.Bun,
+          "bun.lock", "bun.lock");
+        capture(acc, ".env", "NPM_CONFIG_TOKEN=root");
+        capture(acc, "bunfig.toml", "[install]\n");
+        capture(acc, "packages/a/.env", "NPM_CONFIG_TOKEN=member");
+        capture(acc, "packages/a/bunfig.toml", "[install]\n");
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("bun.lock"));
+        assertThat(acc.packageManagerFiles).containsOnlyKeys(Paths.get(".env"), Paths.get("bunfig.toml"));
+    }
+
+    private static List<Path> paths(String dir, List<String> names) {
+        List<Path> paths = new ArrayList<>();
+        for (String name : names) {
+            paths.add(Paths.get(dir + name));
+        }
+        return paths;
     }
 }

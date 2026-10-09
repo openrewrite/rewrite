@@ -32,6 +32,14 @@ final class BunInputs {
     private BunInputs() {
     }
 
+    static boolean reads(String fileName) {
+        return fileName.endsWith(".patch") || readsOnlyBesideLock(fileName);
+    }
+
+    static boolean readsOnlyBesideLock(String fileName) {
+        return ".npmrc".equals(fileName) || "bunfig.toml".equals(fileName) || DotEnv.FILES.contains(fileName);
+    }
+
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {

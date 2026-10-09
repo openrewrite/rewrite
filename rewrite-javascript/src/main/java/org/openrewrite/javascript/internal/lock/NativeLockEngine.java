@@ -90,6 +90,40 @@ public final class NativeLockEngine {
         }
     }
 
+    /**
+     * Whether the package manager reads the contents of a project file of this name.
+     */
+    public static boolean reads(PackageManager pm, String fileName) {
+        switch (pm) {
+            case Npm:
+                return NpmInputs.readsOnlyBesideLock(fileName);
+            case Bun:
+                return BunInputs.reads(fileName);
+            case YarnClassic:
+                return YarnClassicInputs.reads(fileName);
+            case YarnBerry:
+                return YarnBerryInputs.reads(fileName);
+            case Pnpm:
+                return PnpmInputs.reads(fileName);
+            default:
+                return false;
+        }
+    }
+
+    /**
+     * Whether the package manager reads a file of this name only from its lock's directory.
+     */
+    public static boolean readsOnlyBesideLock(PackageManager pm, String fileName) {
+        switch (pm) {
+            case Npm:
+                return NpmInputs.readsOnlyBesideLock(fileName);
+            case Bun:
+                return BunInputs.readsOnlyBesideLock(fileName);
+            default:
+                return false;
+        }
+    }
+
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);

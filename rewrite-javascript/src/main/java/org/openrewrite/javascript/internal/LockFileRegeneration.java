@@ -26,9 +26,12 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Arrays.asList;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -44,6 +47,8 @@ public final class LockFileRegeneration {
             "ck");
     public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
     public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
+    public static final List<LockFileRegeneration> ALL = unmodifiableList(asList(NPM, YARN_CLASSIC, YARN_BERRY, PNPM,
+            BUN));
 
     public static @Nullable LockFileRegeneration forPackageManager(@Nullable PackageManager pm) {
         if (pm == null) {
@@ -183,6 +188,20 @@ public final class LockFileRegeneration {
 
     public String getLockFile() {
         return lockFile;
+    }
+
+    /**
+     * Whether the package manager reads the contents of a project file of this name.
+     */
+    public boolean reads(String fileName) {
+        return NativeLockEngine.reads(pm, fileName);
+    }
+
+    /**
+     * Whether it reads a file of this name only from its lock's directory.
+     */
+    public boolean readsOnlyBesideLock(String fileName) {
+        return NativeLockEngine.readsOnlyBesideLock(pm, fileName);
     }
 
     /**

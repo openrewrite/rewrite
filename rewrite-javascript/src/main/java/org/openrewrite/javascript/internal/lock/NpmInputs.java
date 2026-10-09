@@ -29,6 +29,10 @@ final class NpmInputs {
     private NpmInputs() {
     }
 
+    static boolean readsOnlyBesideLock(String fileName) {
+        return ".npmrc".equals(fileName);
+    }
+
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         return Inputs.builder()
                 .lock(dir.getLock())
