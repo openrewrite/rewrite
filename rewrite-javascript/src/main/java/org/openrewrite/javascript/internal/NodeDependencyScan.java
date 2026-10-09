@@ -311,7 +311,7 @@ public final class NodeDependencyScan {
                 continue;
             }
             if (directories.contains(dir) || above(dir, directories) ||
-                file.getKey().toString().endsWith(".patch") && under(dir, directories)) {
+                (file.getKey().toString().endsWith(".patch") || isManifest(file.getKey())) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }
@@ -344,6 +344,12 @@ public final class NodeDependencyScan {
             }
         }
         return new ProjectFiles(manifests, files, paths);
+    }
+
+    // a workspace member's manifest in another format than package.json, which the scan keeps as it keeps a patch
+    private static boolean isManifest(Path file) {
+        String name = String.valueOf(file.getFileName());
+        return "package.yaml".equals(name) || "package.json5".equals(name);
     }
 
     private static Path directory(Path file) {

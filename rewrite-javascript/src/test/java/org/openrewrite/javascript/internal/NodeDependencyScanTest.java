@@ -754,6 +754,35 @@ class NodeDependencyScanTest {
         assertThat(acc.packageManagerFiles).containsOnlyKeys(Paths.get(".env"), Paths.get("bunfig.toml"));
     }
 
+    /**
+     * pnpm 11.2.2 reads a workspace member's package.yaml or package.json5 where it finds one; the scan keeps them for
+     * the project of a package manager that reads them, under its directory as it keeps a patch.
+     */
+    @ParameterizedTest
+    @CsvSource({"Pnpm, pnpm-lock.yaml, true", "Npm, package-lock.json, false"})
+    void aMembersManifestInAnotherFormatIsKeptWhereItsPackageManagerReadsIt(PackageManager pm, String lockName,
+                                                                           boolean kept) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(lockName)).text("lock").build());
+        capture(acc, "packages/c/package.yaml", "name: c\n");
+        capture(acc, "packages/d/package.json5", "{name: 'd'}\n");
+        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT).text("{\"private\":true}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          ROOT);
+
+        List<Path> manifests = Arrays.asList(Paths.get("packages/c/package.yaml"),
+          Paths.get("packages/d/package.json5"));
+        if (kept) {
+            assertThat(files.getPackageManagerFiles()).containsKeys(manifests.toArray(new Path[0]));
+        } else {
+            assertThat(files.getPackageManagerFiles()).doesNotContainKeys(manifests.toArray(new Path[0]));
+        }
+        assertThat(files.getPaths()).containsAll(manifests);
+    }
+
     private static List<Path> paths(String dir, List<String> names) {
         List<Path> paths = new ArrayList<>();
         for (String name : names) {

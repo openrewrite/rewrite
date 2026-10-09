@@ -26,6 +26,8 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -119,20 +121,62 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * The edited manifest, its lock, and what else of the project the package manager reads, by path.
+     * The edited manifest, its lock, and what else of the project the package manager reads, by path, as the edit
+     * leaves it.
      */
     @Value
-    @Builder
     public static class Request {
         String packageJson;
         @Nullable String lock;
         @Nullable NodeResolutionResult marker;
         @Nullable Path packageJsonPath;
-        @Singular("manifest")
         Map<Path, String> manifests;
-        @Singular("packageManagerFile")
         Map<Path, String> packageManagerFiles;
+
+        /**
+         * The files the edit changes or creates beside the manifest (pnpm-workspace.yaml, .yarnrc.yml, a workspace
+         * root's package.json), which {@link #manifests}, {@link #packageManagerFiles} and the paths hold as edited.
+         */
+        Map<Path, String> editedFiles;
+
         @Nullable Set<Path> projectPaths;
+
+        @Builder
+        private Request(String packageJson, @Nullable String lock, @Nullable NodeResolutionResult marker,
+                        @Nullable Path packageJsonPath, @Singular("manifest") Map<Path, String> manifests,
+                        @Singular("packageManagerFile") Map<Path, String> packageManagerFiles,
+                        @Singular("editedFile") Map<Path, String> editedFiles, @Nullable Set<Path> projectPaths) {
+            this.packageJson = packageJson;
+            this.lock = lock;
+            this.marker = marker;
+            this.packageJsonPath = packageJsonPath;
+            this.editedFiles = editedFiles;
+            if (editedFiles.isEmpty()) {
+                this.manifests = manifests;
+                this.packageManagerFiles = packageManagerFiles;
+                this.projectPaths = projectPaths;
+                return;
+            }
+            Map<Path, String> editedManifests = new LinkedHashMap<>(manifests);
+            Map<Path, String> files = new LinkedHashMap<>(packageManagerFiles);
+            Set<Path> paths = projectPaths == null ? null : new LinkedHashSet<>(projectPaths);
+            for (Map.Entry<Path, String> file : editedFiles.entrySet()) {
+                if (file.getKey().equals(packageJsonPath)) {
+                    continue;
+                }
+                if (editedManifests.containsKey(file.getKey())) {
+                    editedManifests.put(file.getKey(), file.getValue());
+                } else {
+                    files.put(file.getKey(), file.getValue());
+                }
+                if (paths != null) {
+                    paths.add(file.getKey());
+                }
+            }
+            this.manifests = editedManifests;
+            this.packageManagerFiles = files;
+            this.projectPaths = paths;
+        }
     }
 
     /**

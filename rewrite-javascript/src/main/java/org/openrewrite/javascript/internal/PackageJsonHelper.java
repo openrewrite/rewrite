@@ -119,7 +119,7 @@ public class PackageJsonHelper {
         return original.withText(newContent);
     }
 
-    /** Reparse regenerated lock content, dispatching on the original's runtime type. */
+    /** Reparse regenerated lock content or an edited package-manager file, by the original's runtime type. */
     public static SourceFile reparseLock(SourceFile original, String newContent) {
         if (original instanceof Json.Document) {
             return reparseJson((Json.Document) original, newContent);
@@ -648,15 +648,28 @@ public class PackageJsonHelper {
         @Nullable SourceFile modifiedPackageJson;
         LockFileRegeneration.@Nullable Result regenResult;
 
+        /**
+         * The package-manager files the edit changes or creates, by path, which travel to the visitor as the lock does.
+         */
+        Map<Path, String> editedFiles;
+
         public boolean isChanged() { return modifiedPackageJson != null; }
 
+        /**
+         * {@code visited} as the edit leaves it, parsed as it was, when it is one of {@link #editedFiles}; else null.
+         */
+        public @Nullable SourceFile editedFile(SourceFile visited) {
+            String content = editedFiles.get(visited.getSourcePath());
+            return content == null ? null : reparseLock(visited, content);
+        }
+
         public static EditAndRegenerateResult unchanged() {
-            return new EditAndRegenerateResult(null, null);
+            return new EditAndRegenerateResult(null, null, Collections.emptyMap());
         }
 
         public static EditAndRegenerateResult changed(SourceFile modified,
                                                       LockFileRegeneration.@Nullable Result regen) {
-            return new EditAndRegenerateResult(modified, regen);
+            return new EditAndRegenerateResult(modified, regen, Collections.emptyMap());
         }
     }
 
@@ -682,18 +695,48 @@ public class PackageJsonHelper {
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
+        return editAndRegenerate(packageJson, editFn, Collections.emptyMap(), capturedLockContent, projectFiles, ctx);
+    }
+
+    /**
+     * @param editedFiles the package-manager files the edit leaves changed or created beside the manifest, by path;
+     *                    the regeneration reads them and the result carries those that differ from the scan's
+     */
+    public static EditAndRegenerateResult editAndRegenerate(
+            SourceFile packageJson,
+            java.util.function.Function<Json.Document, Json.Document> editFn,
+            Map<Path, String> editedFiles,
+            @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
+            ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
         Json.Document before = (Json.Document) packageJson;
         Json.Document after = editFn.apply(before);
-        if (after == before) {
+        Map<Path, String> changed = changedFiles(editedFiles, projectFiles);
+        if (after == before && changed.isEmpty()) {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile refreshed = refreshMarker(after);
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, capturedLockContent, projectFiles, ctx);
-        return EditAndRegenerateResult.changed(withResolvedDeps(refreshed, regen), regen);
+                : regenerateLockContent(refreshed, capturedLockContent, projectFiles, changed, ctx);
+        return new EditAndRegenerateResult(withResolvedDeps(refreshed, regen), regen, changed);
+    }
+
+    private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
+                                                  NodeDependencyScan.ProjectFiles projectFiles) {
+        Map<Path, String> changed = new LinkedHashMap<>();
+        for (Map.Entry<Path, String> file : editedFiles.entrySet()) {
+            String captured = projectFiles.getPackageManagerFiles().get(file.getKey());
+            if (captured == null) {
+                captured = projectFiles.getManifests().get(file.getKey());
+            }
+            if (!file.getValue().equals(captured)) {
+                changed.put(file.getKey(), file.getValue());
+            }
+        }
+        return changed;
     }
 
     /**
@@ -735,6 +778,15 @@ public class PackageJsonHelper {
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
+        return regenerateLockContent(packageJson, capturedLockContent, projectFiles, Collections.emptyMap(), ctx);
+    }
+
+    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
+            SourceFile packageJson,
+            @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
+            Map<Path, String> editedFiles,
+            ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()
                 .findFirst(NodeResolutionResult.class).orElse(null);
         if (marker == null || marker.getPackageManager() == null) {
@@ -755,6 +807,7 @@ public class PackageJsonHelper {
                 .packageJsonPath(packageJson.getSourcePath())
                 .manifests(projectFiles.getManifests())
                 .packageManagerFiles(projectFiles.getPackageManagerFiles())
+                .editedFiles(editedFiles)
                 .projectPaths(projectFiles.getPaths())
                 .build(), ctx);
     }
