@@ -19,9 +19,9 @@ import {JavaScriptVisitor} from "./visitor";
 import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, scopeOf} from "./scope";
 import {Cursor, isTree} from "../tree";
 import {
-    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
-    memberName, moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf, requiredModuleOfDeclaration,
-    requireJoinTarget
+    AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, ImportStyle,
+    isCommonJs, memberName, moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf,
+    requiredModuleOfDeclaration, requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {sameModule} from "./package-name";
@@ -286,7 +286,10 @@ export function maybeBind(
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
     // refusal here only has to gate the point where it would create a new one.
-    const refuseCreate = cu !== undefined && (options.typeOnly ?? false) && isCommonJs(cu);
+    const requires = options.style === undefined
+        ? cu !== undefined && isCommonJs(cu)
+        : options.style === ImportStyle.CommonJS;
+    const refuseCreate = (options.typeOnly ?? false) && requires;
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)

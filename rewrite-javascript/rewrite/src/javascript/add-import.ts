@@ -64,7 +64,10 @@ export interface AddImportOptions {
      * Cannot be combined with `sideEffectOnly`. */
     typeOnly?: boolean;
 
-    /** Optional import style to use. If not specified, auto-detects from file and existing imports */
+    /**
+     * Whether a new binding is a `require` (`CommonJS`) or an import (any other value). Unset, the
+     * file decides, binding with `require` where it is CommonJS. The binding's shape follows `member`.
+     */
     style?: ImportStyle;
 
     /** Quote character for the module specifier. If not specified, detected from the file.

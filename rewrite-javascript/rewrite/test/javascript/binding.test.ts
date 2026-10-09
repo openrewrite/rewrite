@@ -5,7 +5,7 @@ import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
-    removeNewlyUnusedAmdBindings
+    removeNewlyUnusedAmdBindings, ImportStyle
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -2411,9 +2411,15 @@ describe("maybeBind on a CommonJS file", () => {
         )).toBe("remove");
     });
 
-    test("a type-only request refuses, since a require binds values only", async () => {
+    test("a type-only request refuses, since a require binds values only, unless it asks for an import", async () => {
         expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true},
             `const {mkdirp} = require('fs-extra');\n\ntarget();`
         )).toBeUndefined();
+
+        expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true, style: ImportStyle.ES6Named},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`,
+            `import type {FileHandle} from 'fs/promises';\n\nconst {mkdirp} = require('fs-extra');\n\nFileHandle.target();`,
+            "a.ts"
+        )).toBe("FileHandle");
     });
 });

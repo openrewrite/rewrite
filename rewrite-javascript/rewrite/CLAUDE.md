@@ -325,7 +325,8 @@ rest element, or else gets `const {m} = require('mod')` at the end of the run. A
 
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
-- the file is CommonJS and the request is `typeOnly`, which a `require` cannot bind
+- a `typeOnly` request that `require` would bind, since a `require` binds values only. That is one
+  in a CommonJS file with no import `style` asked for, or one with `style: ImportStyle.CommonJS`
 - no legal identifier can be derived from the module's last path segment and no `preferredName`
   or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
 - a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller
