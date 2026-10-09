@@ -5,7 +5,7 @@ import * as path from "path";
 import {
     JavaScriptVisitor, JS, javascript, npm, packageJson, tsx, typescript, moduleBindings, isAmdBlock, ModuleBindings, maybeBind,
     maybeAddImport, MaybeBindOptions, maybeUnbind, maybeRebind, MaybeRebindOptions, maybeRemoveImport,
-    removeNewlyUnusedAmdBindings
+    removeNewlyUnusedAmdBindings, ImportStyle
 } from "../../src/javascript";
 import {emptySpace, J, rightPadded, Type} from "../../src/java";
 import {emptyMarkers} from "../../src/markers";
@@ -75,6 +75,21 @@ describe("moduleBindings", () => {
         spec.recipe = fromVisitor(captureBindings(seen));
         await spec.rewriteRun(typescript(`const Button = await import("sap/m/Button");`));
         expect(seen.moduleSystem).toBe("esm");
+    });
+
+    test("a require inside a function makes the file CommonJS, unless the function binds require itself", async () => {
+        const spec = new RecipeSpec();
+        const seen: {moduleSystem?: string} = {};
+        spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(javascript(`function f() {\n    return require('fs');\n}`));
+        expect(seen.moduleSystem).toBe("commonjs");
+
+        await spec.rewriteRun(javascript(`define(function (require, exports) { const a = require("a"); exports.x = a; });`));
+        expect(seen.moduleSystem).toBe("none");
+
+        // An `await` inside a function is not a top-level one.
+        await spec.rewriteRun(javascript(`async function f() {\n    await g();\n}`));
+        expect(seen.moduleSystem).toBe("none");
     });
 
     test("a selected require, unlike a bare one, does not read as a CommonJS binding", async () => {
@@ -726,43 +741,6 @@ describe("maybeBind", () => {
             `const Elem = require("sap/ui/core/Element");\n\nElem.target();`
         ));
         expect(bound.name).toBe("Elem");
-    });
-
-    test("a CommonJS file refuses rather than gain an import", async () => {
-        const spec = new RecipeSpec();
-        const bound: {name?: string} = {};
-        spec.recipe = fromVisitor(rebind("sap/ui/core/Element", bound));
-        await spec.rewriteRun(javascript(
-            `const other = require("a/Other");\n\ntarget();`
-        ));
-        expect(bound.name).toBeUndefined();
-    });
-
-    test("a member request refuses on a CommonJS file but still creates on an ESM file", async () => {
-        const memberBind = (bound: {value?: string}) => new class extends JavaScriptVisitor<any> {
-            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
-                bound.value = maybeBind(this, {module: "fs", member: "readFile", onlyIfReferenced: false});
-                return super.visitJsCompilationUnit(cu, p);
-            }
-        };
-
-        const onCommonJs = new RecipeSpec();
-        const commonJsName: {value?: string} = {};
-        onCommonJs.recipe = fromVisitor(memberBind(commonJsName));
-        await onCommonJs.rewriteRun(javascript(
-            `const other = require("a/Other");\n\ntarget();`
-        ));
-
-        const onEsm = new RecipeSpec();
-        const esmName: {value?: string} = {};
-        onEsm.recipe = fromVisitor(memberBind(esmName));
-        await onEsm.rewriteRun(typescript(
-            `target();`,
-            `import {readFile} from 'fs';\n\ntarget();`
-        ));
-
-        expect(commonJsName.value).toBeUndefined();
-        expect(esmName.value).toBe("readFile");
     });
 
     test("a .mjs file with a require call still creates an import", async () => {
@@ -2246,5 +2224,205 @@ describe("a node: specifier and the bare name of its built-in", () => {
             `import {isArray} from 'node:util';\n\nisArray([]);`,
             `import {isArray} from 'lodash';\n\nisArray([]);`
         ));
+    });
+
+    test("a binding moved to another built-in keeps the node: scheme its import spelled", async () => {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "_stream_duplex"}, to: {module: "stream", member: "Duplex"}});
+                maybeRebind(this, {from: {module: "_tls_wrap"}, to: {module: "tls"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import D from 'node:_stream_duplex';\nimport tlsWrap from 'node:_tls_wrap';\n\nnew D(tlsWrap);`,
+            `import tlsWrap from 'node:tls';\nimport {Duplex as D} from 'node:stream';\n\nnew D(tlsWrap);`
+        ));
+
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                maybeRebind(this, {from: {module: "_stream_duplex", member: "Duplex"}, to: {module: "stream", member: "Duplex"}});
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        await spec.rewriteRun(typescript(
+            `import {Duplex, x} from 'node:_stream_duplex';\n\nnew Duplex(x);`,
+            `import {x} from 'node:_stream_duplex';\nimport {Duplex} from 'node:stream';\n\nnew Duplex(x);`
+        ));
+    });
+});
+
+describe("maybeRebind on a require", () => {
+    function rebind(from: {module: string; member?: string}, to: {module: string; member?: string}, bound: (string | undefined)[] = []) {
+        const spec = new RecipeSpec();
+        spec.recipe = fromVisitor(new class extends JavaScriptVisitor<any> {
+            override async visitJsCompilationUnit(cu: JS.CompilationUnit, p: any): Promise<J | undefined> {
+                bound.push(maybeRebind(this, {from, to}));
+                return super.visitJsCompilationUnit(cu, p);
+            }
+        });
+        return spec;
+    }
+
+    test("a whole module moves to a member, keeping the name the file chose and its node: spelling", async () => {
+        const bound: (string | undefined)[] = [];
+        const spec = rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}, bound);
+        await spec.rewriteRun(
+            javascript(`const Duplex = require('_stream_duplex');\n\nnew Duplex();`,
+                `const {Duplex} = require('stream');\n\nnew Duplex();`),
+            javascript(`const D = require('node:_stream_duplex');\n\nnew D();`,
+                `const {Duplex: D} = require('node:stream');\n\nnew D();`)
+        );
+        expect(bound).toEqual(["Duplex", "D"]);
+    });
+
+    test("a whole module moves to a whole module, and a member to a member", async () => {
+        await rebind({module: "_tls_wrap"}, {module: "tls"}).rewriteRun(
+            javascript(`const tlsWrap = require('_tls_wrap');\n\ntlsWrap.connect();`,
+                `const tlsWrap = require('tls');\n\ntlsWrap.connect();`));
+        await rebind({module: "_tls_wrap", member: "TLSSocket"}, {module: "tls", member: "TLSSocket"}).rewriteRun(
+            javascript(`const {TLSSocket} = require('_tls_wrap');\n\nnew TLSSocket();`,
+                `const {TLSSocket} = require('tls');\n\nnew TLSSocket();`));
+    });
+
+    test("an unaliased member follows the new member's name, while an aliased one keeps its alias", async () => {
+        const bound: (string | undefined)[] = [];
+        await rebind({module: "lodash", member: "extend"}, {module: "lodash", member: "assign"}, bound).rewriteRun(
+            javascript(`const {extend} = require('lodash');\n\nextend({}, {});`,
+                `const {assign} = require('lodash');\n\nassign({}, {});`),
+            javascript(`const {extend: ext} = require('lodash');\n\next({}, {});`,
+                `const {assign: ext} = require('lodash');\n\next({}, {});`),
+            javascript(`const {extend, map} = require('lodash');\n\nextend(map);`,
+                `const {assign, map} = require('lodash');\n\nassign(map);`)
+        );
+        expect(bound).toEqual(["assign", "ext", "assign"]);
+    });
+
+    test("a move merges into an existing require of the target", async () => {
+        await rebind({module: "_stream_duplex"}, {module: "stream", member: "Duplex"}).rewriteRun(
+            javascript(`const {Readable} = require('stream');\nconst Duplex = require('_stream_duplex');\n\nnew Duplex(Readable);`,
+                `const {Readable, Duplex} = require('stream');\n\nnew Duplex(Readable);`));
+        // The target already binds the member under the name the move takes, so only the source goes.
+        await rebind({module: "m", member: "a"}, {module: "n", member: "b"}).rewriteRun(
+            javascript(`const {b} = require('n');\nconst {a} = require('m');\n\nb(a);`,
+                `const {b} = require('n');\n\nb(b);`));
+
+        await rebind({module: "m", member: "a"}, {module: "n", member: "a"}).rewriteRun(
+            javascript(`const {\n    c,\n} = require('n');\nconst {a} = require('m');\n\nc(a);`,
+                `const {\n    c,\n    a,\n} = require('n');\n\nc(a);`));
+    });
+
+    test("a moved binding joins no require of the target after the file's leading requires", async () => {
+        await rebind({module: "m", member: "a"}, {module: "n", member: "a"}).rewriteRun(
+            javascript(`const {a} = require('m');\na();\nconst {c} = require('n');`,
+                `const {a} = require('n');\na();\nconst {c} = require('n');`),
+            javascript(`const {a, b} = require('m');\na(b);\nconst {c} = require('n');`,
+                `const {b} = require('m');\nconst {a} = require('n');\na(b);\nconst {c} = require('n');`));
+    });
+
+    test("a move keeps its name where the target's binding of it cannot take the move in", async () => {
+        const spec = rebind({module: "m", member: "a"}, {module: "n", member: "b"});
+        await spec.rewriteRun(
+            typescript(`import {a} from 'm';\nconst {b} = require('n');\n\nb(a);`,
+                `import {b as a} from 'n';\nconst {b} = require('n');\n\nb(a);`),
+            typescript(`import {b} from 'n';\nconst {a} = require('m');\n\nb(a);`,
+                `import {b} from 'n';\nconst {b: a} = require('n');\n\nb(a);`),
+            javascript(`const {a} = require('m');\na();\nconst {b} = require('n');\nb();`,
+                `const {b: a} = require('n');\na();\nconst {b} = require('n');\nb();`),
+            javascript(`const {b} = require('n');\nlet {a} = require('m');\n\na = b;`,
+                `const {b} = require('n');\nlet {b: a} = require('n');\n\na = b;`)
+        );
+    });
+
+    test("a member leaving a destructuring that binds others gets a require of its own", async () => {
+        await rebind({module: "m", member: "b"}, {module: "n", member: "b"}).rewriteRun(
+            javascript(`const {a, b} = require('m');\n\na(b);`,
+                `const {a} = require('m');\nconst {b} = require('n');\n\na(b);`));
+    });
+
+    test("a rebind refuses a nested require, and one it cannot move without changing what the file declares", async () => {
+        const bound: (string | undefined)[] = [];
+        await rebind({module: "_stream_duplex", member: "Duplex"}, {module: "stream", member: "Duplex"}, bound).rewriteRun(
+            javascript(`function f() {\n    const {Duplex} = require('_stream_duplex');\n    return new Duplex();\n}`),
+            javascript(`const {Duplex, ...rest} = require('_stream_duplex');\n\nnew Duplex(rest);`),
+            javascript(`let {Duplex, x} = require('_stream_duplex');\n\nDuplex = x;`),
+            typescript(`const {Duplex}: typeof import('_stream_duplex') = require('_stream_duplex');\n\nnew Duplex();`)
+        );
+        expect(bound).toEqual([undefined, undefined, undefined, undefined]);
+    });
+});
+
+describe("maybeBind on a CommonJS file", () => {
+    const bindWith = async (options: MaybeBindOptions, before: string, after?: string, path?: string) => {
+        const spec = new RecipeSpec();
+        const bound: {name?: string} = {};
+        spec.recipe = fromVisitor(rebind(options, bound));
+        await spec.rewriteRun({...javascript(before, after), ...(path ? {path} : {})});
+        return bound.name;
+    };
+
+    test("a member gets a require of its own after the file's requires", async () => {
+        expect(await bindWith({module: "node:fs/promises", member: "rm"},
+            `const { mkdirp } = require('fs-extra');\n\ntarget();`,
+            `const { mkdirp } = require('fs-extra');\nconst { rm } = require('node:fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+    });
+
+    test("a member joins a const destructuring require of its module that has no rest element", async () => {
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {readFile} = require('node:fs/promises');\n\ntarget();`,
+            `const {readFile, rm} = require('node:fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {a, ...rest} = require('fs/promises');\nlet {b} = require('fs/promises');\n\ntarget();`,
+            `const {a, ...rest} = require('fs/promises');\nlet {b} = require('fs/promises');\nconst {rm} = require('fs/promises');\n\nrm.target();`
+        )).toBe("rm");
+    });
+
+    test("a whole module binds a name, first or after a shebang or 'use strict' in a file without top-level requires", async () => {
+        expect(await bindWith({module: "path"},
+            `#!/usr/bin/env node\nmodule.exports = target();`,
+            `#!/usr/bin/env node\nconst path = require('path');\n\nmodule.exports = path.target();`
+        )).toBe("path");
+        expect(await bindWith({module: "path"},
+            `'use strict';\n\nmodule.exports = target();`,
+            `'use strict';\n\nconst path = require('path');\n\nmodule.exports = path.target();`
+        )).toBe("path");
+        expect(await bindWith({module: "path", member: "*", preferredName: "p"},
+            `exports.f = target();`,
+            `const p = require('path');\n\nexports.f = p.target();`
+        )).toBe("p");
+    });
+
+    test("a require joins and follows only the file's leading requires, which every top-level use comes after", async () => {
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {x} = require('x');\ntarget();\nconst {readFile} = require('fs/promises');`,
+            `const {x} = require('x');\nconst {rm} = require('fs/promises');\nrm.target();\nconst {readFile} = require('fs/promises');`
+        )).toBe("rm");
+    });
+
+    test("a taken name is deconflicted and an alias is bound verbatim", async () => {
+        expect(await bindWith({module: "fs/promises", member: "rm"},
+            `const {mkdirp} = require('fs-extra');\nconst rm = 1;\n\ntarget();`,
+            `const {mkdirp} = require('fs-extra');\nconst {rm: rm_1} = require('fs/promises');\nconst rm = 1;\n\nrm_1.target();`
+        )).toBe("rm_1");
+        expect(await bindWith({module: "fs/promises", member: "rm", alias: "remove"},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`,
+            `const {mkdirp} = require('fs-extra');\nconst {rm: remove} = require('fs/promises');\n\nremove.target();`
+        )).toBe("remove");
+    });
+
+    test("a type-only request refuses, since a require binds values only, unless it asks for an import", async () => {
+        expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`
+        )).toBeUndefined();
+
+        expect(await bindWith({module: "fs/promises", member: "FileHandle", typeOnly: true, style: ImportStyle.ES6Named},
+            `const {mkdirp} = require('fs-extra');\n\ntarget();`,
+            `import type {FileHandle} from 'fs/promises';\n\nconst {mkdirp} = require('fs-extra');\n\nFileHandle.target();`,
+            "a.ts"
+        )).toBe("FileHandle");
     });
 });

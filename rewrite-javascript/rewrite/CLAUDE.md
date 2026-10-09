@@ -294,12 +294,39 @@ sees what the rebinds before it left: a statement another rebind emptied, or an 
 target to merge into. A name a queued rebind binds counts as taken for later ones. Each rebind
 renames only the types naming its own member, so a later rebind still finds its own.
 
+### A rebind of a `require`
+
+Only a top-level `const … = require('m')` declaration binds a module for a rebind, and the file stays
+CommonJS. A binding that has its statement to itself is rewritten in place, changing shape as needed:
+
+```js
+const D = require('_stream_duplex');   →   const {Duplex: D} = require('stream');
+```
+
+A binding leaving a statement that binds other names is placed the way `maybeBind` places a new
+`require`, as is a `const` one that the target's joinable `require` can take.
+
+A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
+
+### A `require` that `maybeBind` creates
+
+A `.cjs` or `.cts` file is CommonJS. So is a file without ES module syntax that calls `require` or
+reads `exports` or `module.exports` anywhere, inside a function too. There `maybeBind` binds with
+`require`, since an `import` would make the file an ES module. A function whose own parameters are
+`require`, `exports` or `module`, as an AMD factory's are, does not count.
+
+A new `require` goes among the file's leading requires, the run after a shebang and `'use strict'`
+that every other top-level statement follows, so nothing at top level reads the binding before it
+is initialised. A member joins a `const` destructuring `require` of its module there that has no
+rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
+`const name = require('mod')`. A file with no leading requires takes it first.
+
 ### When `maybeBind` returns `undefined`
 
 - the block's dependency and parameter counts already disagree, in either direction
 - a `member` is requested on the AMD lane, which binds whole modules only
-- the file binds its modules with `require` and one would have to be created (`ImportStyle.CommonJS`
-  has no add path), which covers an existing `require` shadowed where the caller asked
+- a `typeOnly` request that `require` would bind, since a `require` binds values only. That is one
+  in a CommonJS file with no import `style` asked for, or one with `style: ImportStyle.CommonJS`
 - no legal identifier can be derived from the module's last path segment and no `preferredName`
   or `alias` was given — `lodash-es`, `node:fs`, `@scope/my-lib`, `a/class`
 - a pinned `alias` cannot be bound verbatim, since deconflicting it would leave code the caller
@@ -313,10 +340,13 @@ The four above that still apply, plus these:
 - nothing binds `from`
 - `from` or `to` names a member on the AMD lane, or `to` names an alias there other than the
   parameter's own name
+- `from` is destructured beside a rest element, which would gain the property the move takes out
+- `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
+- `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
-- the file binds its modules with `require` and the move would need a new import, because `from`'s
-  statement binds something else too or the two differ in default/namespace/named shape
+- the file binds its modules with `require`, `from` is an ES import, and the move would need a new
+  import, because that import binds something else too or the two differ in default/namespace/named shape
 
 One call moves one binding. Where a second statement binds the same member under a name of its own,
 it is left as it stands: the name read from the first would bind twice if it were applied to both.
