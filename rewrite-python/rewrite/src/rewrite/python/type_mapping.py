@@ -719,20 +719,23 @@ class PythonTypeMapping:
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
             # elements from `tuple` without being generic, so only `tuple` takes them.
+            # A homogeneous (`T, ...`) element is an array of `T`, as a Java varargs
+            # parameter is, which keeps `tuple[int, ...]` apart from `tuple[int]`.
             tuple_elements = (descriptor.get('tupleElements')
                               if class_name == 'tuple' and module_name == 'builtins'
                               else None)
             if isinstance(tuple_elements, list):
-                arg_ids = [element.get('typeId') for element in tuple_elements
-                           if isinstance(element, dict)]
+                args = [(element.get('typeId'), element.get('kind') == 'homogeneous')
+                        for element in tuple_elements if isinstance(element, dict)]
             else:
-                arg_ids = descriptor.get('typeArgs') or []
+                args = [(arg_id, False) for arg_id in descriptor.get('typeArgs') or []]
 
-            resolved_args = []
-            for arg_id in arg_ids:
+            resolved_args: List[JavaType] = []
+            for arg_id, homogeneous in args:
                 arg_type = self._resolve_type(arg_id) if arg_id is not None else None
                 if arg_type is not None:
-                    resolved_args.append(arg_type)
+                    resolved_args.append(JavaType.Array(_elem_type=arg_type)
+                                         if homogeneous else arg_type)
             if resolved_args:
                 param = JavaType.Parameterized()
                 param._type = base_class
