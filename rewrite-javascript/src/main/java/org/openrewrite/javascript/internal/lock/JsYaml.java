@@ -13,23 +13,63 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.yarnclassic;
+package org.openrewrite.javascript.internal.lock;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of js-yaml 3.13.1 lib/js-yaml/loader.js {@code safeLoad} under {@code FAILSAFE_SCHEMA} (yarn 1.22.22).
+ * Port of js-yaml lib/js-yaml/loader.js {@code safeLoad} under {@code FAILSAFE_SCHEMA}: 3.13.1, which yarn 1.22.22
+ * bundles, and 3.14.1, which @yarnpkg/parsers 3.0.3 calls with {@code json: true}.
  */
-final class JsYaml {
+public final class JsYaml {
 
-    static final String YAML_EXCEPTION = "YAMLException";
+    public enum Release {
+        V3_13_1,
+        V3_14_1
+    }
+
+    /**
+     * The release, the {@code json} option (a duplicated key overrides the earlier one in place), and the objects a
+     * mapping becomes.
+     */
+    @Value
+    public static class Options {
+        Release release;
+        boolean json;
+        Supplier<Map<String, @Nullable Object>> objects;
+    }
+
+    /**
+     * The TypeError js-yaml's own code raises.
+     */
+    public static final class TypeError extends RuntimeException {
+        TypeError(String message) {
+            super(message);
+        }
+    }
+
+
+    public static final class YamlException extends RuntimeException {
+        YamlException(String message) {
+            super(message);
+        }
+
+        @Override
+        public String toString() {
+            return "YAMLException: " + getMessage();
+        }
+    }
+
+    private static final String PROTO = "__proto__";
 
     private static final int CONTEXT_FLOW_IN = 1;
     private static final int CONTEXT_FLOW_OUT = 2;
@@ -77,18 +117,18 @@ final class JsYaml {
     /**
      * The stream's one document, null for a stream without documents.
      */
-    static @Nullable Object safeLoadFailsafe(String input) {
-        List<@Nullable Object> documents = loadDocuments(input);
+    public static @Nullable Object safeLoadFailsafe(String input, Options options) {
+        List<@Nullable Object> documents = loadDocuments(input, options);
         if (documents.isEmpty()) {
             return null;
         }
         if (documents.size() == 1) {
             return documents.get(0);
         }
-        throw new JsError(YAML_EXCEPTION, "expected a single document in the stream, but found more");
+        throw new YamlException("expected a single document in the stream, but found more");
     }
 
-    private static List<@Nullable Object> loadDocuments(String input) {
+    private static List<@Nullable Object> loadDocuments(String input, Options options) {
         if (!input.isEmpty()) {
             char last = input.charAt(input.length() - 1);
             if (last != '\n' && last != '\r') {
@@ -98,7 +138,12 @@ final class JsYaml {
                 input = input.substring(1);
             }
         }
-        State state = new State(input);
+        State state = new State(input, options);
+        int nullpos = input.indexOf('\0');
+        if (options.release != Release.V3_13_1 && nullpos != -1) {
+            state.position = nullpos;
+            throw state.error("null byte is not allowed in input");
+        }
         while (state.ch(state.position) == ' ') {
             state.lineIndent += 1;
             state.position += 1;
@@ -111,6 +156,7 @@ final class JsYaml {
 
     private static final class State {
         final String input;
+        final Options options;
         final int length;
         int position;
         int line;
@@ -131,7 +177,8 @@ final class JsYaml {
         @Nullable
         Object result;
 
-        State(String input) {
+        State(String input, Options options) {
+            this.options = options;
             this.length = input.length();
             this.input = input + '\0';
         }
@@ -141,8 +188,8 @@ final class JsYaml {
             return i >= 0 && i < input.length() ? input.charAt(i) : -1;
         }
 
-        JsError error(String message) {
-            return new JsError(YAML_EXCEPTION, message);
+        YamlException error(String message) {
+            return new YamlException(message);
         }
 
         void append(String s) {
@@ -201,32 +248,36 @@ final class JsYaml {
             }
         }
 
-        PlainObject storeMappingPair(@Nullable PlainObject mapping, @Nullable Object keyNode,
-                                     @Nullable Object valueNode) {
+        Map<String, @Nullable Object> storeMappingPair(@Nullable Map<String, @Nullable Object> mapping,
+                                                       @Nullable Object keyNode, @Nullable Object valueNode) {
+            String key;
             if (keyNode instanceof List) {
-                List<@Nullable Object> key = new ArrayList<>((List<?>) keyNode);
-                for (int index = 0; index < key.size(); index++) {
-                    if (key.get(index) instanceof List) {
+                StringBuilder joined = new StringBuilder();
+                List<?> items = (List<?>) keyNode;
+                for (int index = 0; index < items.size(); index++) {
+                    Object item = items.get(index);
+                    if (item instanceof List) {
                         throw error("nested arrays are not supported inside keys");
                     }
-                    if (key.get(index) instanceof Map) {
-                        key.set(index, "[object Object]");
+                    if (index > 0) {
+                        joined.append(',');
                     }
+                    joined.append(item == null ? "" : item instanceof Map ? "[object Object]" : item);
                 }
-                keyNode = key;
+                key = joined.toString();
+            } else if (keyNode instanceof Map) {
+                key = "[object Object]";
+            } else {
+                key = String.valueOf(keyNode);
             }
-            if (keyNode instanceof Map) {
-                keyNode = "[object Object]";
-            }
-            String key = keyNode == null ? "null" : Js.string(keyNode);
             if (mapping == null) {
-                mapping = new PlainObject();
+                mapping = options.objects.get();
             }
-            if (mapping.containsKey(key)) {
+            if (!options.json && mapping.containsKey(key)) {
                 throw error("duplicated mapping key");
             }
-            // `{}.__proto__ = value` sets the object's prototype and makes no key
-            if (!PlainObject.PROTO.equals(key)) {
+            // `{}.__proto__ = value` makes no key
+            if (!PROTO.equals(key)) {
                 mapping.put(key, valueNode);
             }
             return mapping;
@@ -234,7 +285,7 @@ final class JsYaml {
 
         // anchorMap[name] = value, which for `__proto__` likewise makes no key
         void putAnchor(String name, @Nullable Object value) {
-            if (!PlainObject.PROTO.equals(name)) {
+            if (!PROTO.equals(name)) {
                 anchorMap.put(name, value);
             }
         }
@@ -364,7 +415,7 @@ final class JsYaml {
                 c = ch(++position);
             }
             captureSegment(captureStart, captureEnd, false);
-            if (Js.truthy(result)) {
+            if (result instanceof String && !((String) result).isEmpty()) {
                 return true;
             }
             kind = savedKind;
@@ -478,7 +529,7 @@ final class JsYaml {
             } else if (c == '{') {
                 terminator = '}';
                 isMapping = true;
-                collection = new PlainObject();
+                collection = options.objects.get();
             } else {
                 return false;
             }
@@ -523,7 +574,7 @@ final class JsYaml {
                     valueNode = result;
                 }
                 if (isMapping) {
-                    storeMappingPair((PlainObject) collection, keyNode, valueNode);
+                    storeMappingPair((Map<String, @Nullable Object>) collection, keyNode, valueNode);
                 } else if (isPair) {
                     ((List<@Nullable Object>) collection).add(storeMappingPair(null, keyNode, valueNode));
                 } else {
@@ -687,7 +738,7 @@ final class JsYaml {
         boolean readBlockMapping(int nodeIndent, int flowIndent) {
             String savedTag = tag;
             String savedAnchor = anchor;
-            PlainObject mapping = new PlainObject();
+            Map<String, @Nullable Object> mapping = options.objects.get();
             Object keyNode = null;
             Object valueNode = null;
             boolean atExplicitKey = false;
@@ -897,9 +948,9 @@ final class JsYaml {
                 throw error("name of an alias node must contain at least one character");
             }
             String alias = input.substring(start, position);
-            // the alias test calls anchorMap.hasOwnProperty, which an anchor of that name shadows
-            if (anchorMap.containsKey("hasOwnProperty")) {
-                throw new JsError(JsError.TYPE_ERROR, "state.anchorMap.hasOwnProperty is not a function");
+            // 3.13.1's alias test calls anchorMap.hasOwnProperty, which an anchor of that name shadows
+            if (options.release == Release.V3_13_1 && anchorMap.containsKey("hasOwnProperty")) {
+                throw new TypeError("state.anchorMap.hasOwnProperty is not a function");
             }
             if (!anchorMap.containsKey(alias)) {
                 throw error("unidentified alias \"" + alias + "\"");
@@ -971,6 +1022,9 @@ final class JsYaml {
                 }
             }
             // FAILSAFE_SCHEMA has no implicit types, so `?` resolves nothing
+            if (options.release != Release.V3_13_1 && "?".equals(tag) && result != null && !"scalar".equals(kind)) {
+                throw error("unacceptable node kind for !<?> tag; it should be \"scalar\", not \"" + kind + "\"");
+            }
             if (tag != null && !"!".equals(tag) && !"?".equals(tag)) {
                 String typeKind = TYPE_KINDS.get(tag);
                 if (typeKind == null || (kind != null && !typeKind.equals(kind))) {
@@ -982,7 +1036,7 @@ final class JsYaml {
                 }
                 if (result == null) {
                     result = "scalar".equals(typeKind) ? "" : "sequence".equals(typeKind) ?
-                            new ArrayList<>() : new PlainObject();
+                            new ArrayList<>() : options.objects.get();
                 }
                 if (anchor != null) {
                     putAnchor(anchor, result);

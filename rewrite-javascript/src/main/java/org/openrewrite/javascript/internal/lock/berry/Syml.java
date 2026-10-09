@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,6 +30,8 @@ import java.util.regex.Pattern;
  * Port of @yarnpkg/parsers sources/syml.ts and sources/grammars/syml.pegjs (Yarn 4.10.3).
  */
 final class Syml {
+
+    private static final JsYaml.Options OPTIONS = new JsYaml.Options(JsYaml.Release.V3_14_1, true, LinkedHashMap::new);
 
     // JavaScript's `.`, which unlike Java's also matches U+0085
     private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
@@ -172,7 +175,7 @@ final class Syml {
         if (LEGACY.matcher(source).find()) {
             return parseViaPeg(source);
         }
-        Object value = JsYaml.safeLoadFailsafe(source);
+        Object value = JsYaml.safeLoadFailsafe(source, OPTIONS);
         if (value == null) {
             return new LinkedHashMap<>();
         }

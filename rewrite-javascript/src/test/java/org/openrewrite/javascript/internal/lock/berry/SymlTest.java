@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

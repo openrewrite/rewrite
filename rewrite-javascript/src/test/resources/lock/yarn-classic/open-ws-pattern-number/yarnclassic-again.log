@@ -1,15 +1,15 @@
 yarn install v1.22.22
 error TypeError: pattern.replace is not a function
-    at /Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:41581:49
+    at <yarn>/lib/cli.js:41581:49
     at Array.map (<anonymous>)
-    at Config.<anonymous> (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:41580:76)
+    at Config.<anonymous> (<yarn>/lib/cli.js:41580:76)
     at Generator.next (<anonymous>)
-    at step (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:310:30)
-    at /Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:328:14
+    at step (<yarn>/lib/cli.js:310:30)
+    at <yarn>/lib/cli.js:328:14
     at new Promise (<anonymous>)
-    at new F (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:5539:28)
-    at Config.<anonymous> (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:307:12)
-    at Config.resolveWorkspaces (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:41632:21)
+    at new F (<yarn>/lib/cli.js:5539:28)
+    at Config.<anonymous> (<yarn>/lib/cli.js:307:12)
+    at Config.resolveWorkspaces (<yarn>/lib/cli.js:41632:21)
 info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
 over=before
 exit=1

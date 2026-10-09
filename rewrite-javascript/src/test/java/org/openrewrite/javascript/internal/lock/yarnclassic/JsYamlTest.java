@@ -65,7 +65,7 @@ class JsYamlTest {
     void loadsAsYarnsJsYamlDoes(String text, String json) {
         String answer;
         try {
-            answer = Js.jsonStringify(JsYaml.safeLoadFailsafe(text));
+            answer = Js.jsonStringify(LockfileParser.safeLoadFailsafe(text));
         } catch (JsError e) {
             answer = "throws";
         }
@@ -74,7 +74,7 @@ class JsYamlTest {
 
     @Test
     void anAliasIsTheObjectItsAnchorNames() {
-        Map<?, ?> document = (Map<?, ?>) JsYaml.safeLoadFailsafe("'a': &x {version: '1'}\n'b': *x\n");
+        Map<?, ?> document = (Map<?, ?>) LockfileParser.safeLoadFailsafe("'a': &x {version: '1'}\n'b': *x\n");
         assertThat(document.get("b")).isSameAs(document.get("a"));
     }
 }

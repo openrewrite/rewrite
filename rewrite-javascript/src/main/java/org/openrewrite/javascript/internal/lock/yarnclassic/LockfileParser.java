@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -33,6 +34,8 @@ import java.util.regex.Pattern;
  * .yarnrc shares), the merge of a lock holding git conflict markers, and the js-yaml fallback.
  */
 final class LockfileParser {
+
+    private static final JsYaml.Options YAML = new JsYaml.Options(JsYaml.Release.V3_13_1, false, PlainObject::new);
 
     static final int LOCKFILE_VERSION = 1;
 
@@ -382,14 +385,25 @@ final class LockfileParser {
                 return parser.parse(0);
             } catch (RuntimeException error1) {
                 try {
-                    return JsYaml.safeLoadFailsafe(str);
+                    return safeLoadFailsafe(str);
                 } catch (RuntimeException error2) {
                     throw error1;
                 }
             }
         }
-        Object result = JsYaml.safeLoadFailsafe(str);
+        Object result = safeLoadFailsafe(str);
         return result == null || result instanceof Map || result instanceof List ? result : new PlainObject();
+    }
+
+    // js-yaml's errors as yarn's JavaScript sees them
+    static @Nullable Object safeLoadFailsafe(String str) {
+        try {
+            return JsYaml.safeLoadFailsafe(str, YAML);
+        } catch (JsYaml.YamlException e) {
+            throw new JsError("YAMLException", String.valueOf(e.getMessage()));
+        } catch (JsYaml.TypeError e) {
+            throw new JsError(JsError.TYPE_ERROR, String.valueOf(e.getMessage()));
+        }
     }
 
     static ParseResult parseWithConflict(String str, String fileLoc) {

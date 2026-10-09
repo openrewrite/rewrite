@@ -48,8 +48,8 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code JsYaml} ports the loader of js-yaml 3.14.1 (Copyright (C) 2011-2015 by Vitaly Puzrin); {@code QueryString},
- * {@code PortablePath} and {@code GlobParent} Node.js {@code lib/querystring.js} and {@code lib/path.js} (Copyright
+ * {@code internal.lock.JsYaml} ports the loader of js-yaml 3.14.1 (Copyright (C) 2011-2015 by Vitaly Puzrin);
+ * {@code QueryString} and {@code GlobParent} Node.js {@code lib/querystring.js} and {@code lib/path.js} (Copyright
  * Joyent, Inc. and other Node contributors); {@code FastGlob} fast-glob 3.3.2 (Copyright (c) Denis Malinochkin);
  * {@code Picomatch}, {@code PicomatchParse} and {@code PicomatchScan} picomatch 2.3.1 (Copyright (c) 2017-present,
  * Jon Schlinkert), as micromatch 4.0.5 calls it (Copyright (c) 2014-present, Jon Schlinkert); {@code Braces} braces

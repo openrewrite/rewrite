@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.semver.NodeSemver;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,7 +61,8 @@ class SemverUtilsTest {
     @MethodSource("specs")
     void satisfiesWithPrereleases(String spec) {
         String[] row = spec.split("\\|");
-        assertThat(SemverUtils.satisfiesWithPrereleases(row[1], row[0])).isEqualTo(Boolean.parseBoolean(row[2]));
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases(row[1], row[0], false))
+                .isEqualTo(Boolean.parseBoolean(row[2]));
     }
 
     static String[] specs() {
@@ -72,7 +74,7 @@ class SemverUtilsTest {
         int differentResults = 0;
         for (String spec : SPECS) {
             String[] row = spec.split("\\|");
-            if (SemverUtils.satisfiesWithPrereleases(row[1], row[0]) !=
+            if (YarnpkgSemverUtils.satisfiesWithPrereleases(row[1], row[0], false) !=
                 NodeSemver.satisfies(row[1], row[0], NodeSemver.Options.INCLUDE_PRERELEASE)) {
                 differentResults++;
             }

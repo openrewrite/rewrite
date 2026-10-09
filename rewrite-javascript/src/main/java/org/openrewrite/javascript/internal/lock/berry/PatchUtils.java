@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -191,7 +192,7 @@ final class PatchUtils {
             for (Map<String, Object> effect : PatchParse.parsePatchFile((String) source)) {
                 Object semverExclusivity = effect.get("semverExclusivity");
                 if (semverExclusivity != null && sourceVersion != null &&
-                    !SemverUtils.satisfiesWithPrereleases(sourceVersion, (String) semverExclusivity)) {
+                    !YarnpkgSemverUtils.satisfiesWithPrereleases(sourceVersion, (String) semverExclusivity, false)) {
                     continue;
                 }
                 Map<String, Object> effectWithoutRange = new LinkedHashMap<>(effect);

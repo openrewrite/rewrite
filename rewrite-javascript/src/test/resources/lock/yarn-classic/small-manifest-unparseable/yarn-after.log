@@ -1,8 +1,8 @@
 yarn install v1.22.22
 error SyntaxError: /private/var/folders/g0/fw0qzk3j4qxf1dqyrcndmtv80000gn/T/tmp.MP8u9I7CHa/project/package.json: Expected double-quoted property name in JSON at position 63 (line 1 column 64)
     at JSON.parse (<anonymous>)
-    at /Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:1629:59
+    at <yarn>/lib/cli.js:1629:59
     at Generator.next (<anonymous>)
-    at step (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:310:30)
-    at /Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:321:13
+    at step (<yarn>/lib/cli.js:310:30)
+    at <yarn>/lib/cli.js:321:13
 info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

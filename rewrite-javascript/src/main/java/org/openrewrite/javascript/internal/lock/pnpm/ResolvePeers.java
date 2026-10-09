@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.DependenciesTreeNode;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.MissingPeerInfo;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.NodeId;
@@ -1020,7 +1021,7 @@ final class ResolvePeers {
                                 optionalPeer, peerVersionRange));
                 continue;
             }
-            if (!SemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true)) {
+            if (!YarnpkgSemverUtils.satisfiesWithPrereleases(resolved.version, peerVersionRange, true)) {
                 List<ParentPackage> peerLocation = resolved.nodeId == null ? new ArrayList<>() :
                         getLocationFromParentNodeIds(ctx.dependenciesTree, resolved.parentNodeIds);
                 ctx.peerDependencyIssues.getBad().computeIfAbsent(peerName, k -> new ArrayList<>())

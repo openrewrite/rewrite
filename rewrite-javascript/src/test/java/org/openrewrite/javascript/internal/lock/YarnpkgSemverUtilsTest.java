@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.pnpm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -22,10 +22,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Yarn's packages/yarnpkg-core/tests/semverUtils.test.ts {@code satisfiesWithPrereleases} cases, and what the function
- * pnpm 11.2.2 bundles answers, run under node over semver 7.8.0, for a version whose prerelease the fallback drops.
+ * Yarn's packages/yarnpkg-core/tests/semverUtils.test.ts {@code satisfiesWithPrereleases} cases, and what the
+ * function pnpm 11.2.2 bundles answers under node over semver 7.8.0 for a version whose prerelease the fallback drops.
  */
-class SemverUtilsTest {
+class YarnpkgSemverUtilsTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
@@ -58,24 +58,24 @@ class SemverUtilsTest {
     void satisfiesWithPrereleases(String spec) {
         String[] row = spec.split("\\|");
         boolean expected = Boolean.parseBoolean(row[2]);
-        assertThat(SemverUtils.satisfiesWithPrereleases(row[1], row[0], false)).as(spec).isEqualTo(expected);
-        assertThat(SemverUtils.satisfiesWithPrereleases(row[1], row[0], true)).as(spec).isEqualTo(expected);
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases(row[1], row[0], false)).as(spec).isEqualTo(expected);
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases(row[1], row[0], true)).as(spec).isEqualTo(expected);
     }
 
     @Test
     void theDroppedPrereleaseIsTestedAgainstTheComparatorsAsWritten() {
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0-beta", ">1.0.0-rc", true)).isTrue();
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0-rc.1", "<=1.0.0-rc", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0", "<=1.0.0-rc", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0-rc", "<1.0.0-beta", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0-rc", "<1.0.0-beta", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases("2.0.0-rc1", "^1.0.0", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0-beta", ">1.0.0-rc", true)).isTrue();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0-rc.1", "<=1.0.0-rc", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0", "<=1.0.0-rc", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0-rc", "<1.0.0-beta", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0-rc", "<1.0.0-beta", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("2.0.0-rc1", "^1.0.0", true)).isFalse();
     }
 
     @Test
     void nothingSatisfiesAnInvalidRangeOrNoVersion() {
-        assertThat(SemverUtils.satisfiesWithPrereleases("1.0.0", "not a range", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases("", "*", true)).isFalse();
-        assertThat(SemverUtils.satisfiesWithPrereleases(null, "*", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("1.0.0", "not a range", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases("", "*", true)).isFalse();
+        assertThat(YarnpkgSemverUtils.satisfiesWithPrereleases(null, "*", true)).isFalse();
     }
 }

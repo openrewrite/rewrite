@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -105,7 +106,7 @@ final class PackageExtensions {
         List<RangeExtensions> extensionsPerIdent = packageExtensions.get(original.identHash);
         if (extensionsPerIdent != null && original.version != null) {
             for (RangeExtensions rangeExtensions : extensionsPerIdent) {
-                if (!SemverUtils.satisfiesWithPrereleases(original.version, rangeExtensions.range)) {
+                if (!YarnpkgSemverUtils.satisfiesWithPrereleases(original.version, rangeExtensions.range, false)) {
                     continue;
                 }
                 for (Extension extension : rangeExtensions.extensions) {

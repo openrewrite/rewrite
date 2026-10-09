@@ -3,13 +3,13 @@ warning package.json: No license field
 warning p@1.0.0: No license field
 error TypeError: Cannot convert object to primitive value
     at RegExp.test (<anonymous>)
-    at GitResolver.isVersion (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:37229:19)
-    at getExoticResolver (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:29720:18)
-    at ResolutionMap.parsePatternInfo (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:49856:124)
-    at ResolutionMap.init (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:49834:23)
-    at _loop (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:6838:29)
+    at GitResolver.isVersion (<yarn>/lib/cli.js:37229:19)
+    at getExoticResolver (<yarn>/lib/cli.js:29720:18)
+    at ResolutionMap.parsePatternInfo (<yarn>/lib/cli.js:49856:124)
+    at ResolutionMap.init (<yarn>/lib/cli.js:49834:23)
+    at _loop (<yarn>/lib/cli.js:6838:29)
     at _loop.next (<anonymous>)
-    at Install.<anonymous> (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:7034:27)
+    at Install.<anonymous> (<yarn>/lib/cli.js:7034:27)
     at Generator.next (<anonymous>)
-    at step (/Users/jon/.npm-global/lib/node_modules/yarn/lib/cli.js:310:30)
+    at step (<yarn>/lib/cli.js:310:30)
 info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.
