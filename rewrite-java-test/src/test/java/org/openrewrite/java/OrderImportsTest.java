@@ -21,11 +21,16 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.UncheckedConsumer;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.emptySet;
@@ -604,35 +609,52 @@ class OrderImportsTest implements RewriteTest {
     @Test
     void doNotFoldNestedTypeConflictingWithJavaLang() {
         rewriteRun(
-          spec -> spec.beforeRecipe(addTypesToSourceSet("main")),
-          srcMainJava(
-            java(
+          spec -> spec.beforeRecipe(withNestedTypeOnClasspath()),
+          java(
+            """
+              package a;
+              public class Rel {
+                  public static class A {}
+                  public static class B {}
+                  public static class C {}
+                  public static class String {}
+              }
               """
-                package a;
-                public class Rel {
-                    public static class A {}
-                    public static class B {}
-                    public static class String {}
-                }
-                """
-            ),
-            java(
+          ),
+          java(
+            """
+              package b;
+
+              import static a.Rel.A;
+              import static a.Rel.B;
+              import static a.Rel.C;
+
+              class User {
+                  A a;
+                  B b;
+                  C c;
+                  String s;
+              }
               """
-                package b;
-
-                import static a.Rel.A;
-                import static a.Rel.B;
-                import static a.Rel.String;
-
-                class User {
-                    A a;
-                    B b;
-                    String s;
-                }
-                """
-            )
           )
         );
+    }
+
+    private static UncheckedConsumer<List<SourceFile>> withNestedTypeOnClasspath() {
+        return sourceFiles -> {
+            withSourceTypesOnClasspath().accept(sourceFiles);
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sourceFile = sourceFiles.get(i);
+                final int index = i;
+                sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                    List<JavaType.FullyQualified> classpath = new ArrayList<>(sourceSet.getClasspath());
+                    classpath.add(JavaType.ShallowClass.build("a.Rel$String"));
+                    classpath.add(JavaType.ShallowClass.build("java.lang.String"));
+                    sourceFiles.set(index, sourceFile.withMarkers(sourceFile.getMarkers().computeByType(
+                            sourceSet.withClasspath(classpath), (original, updated) -> updated)));
+                });
+            }
+        };
     }
 
     @Test

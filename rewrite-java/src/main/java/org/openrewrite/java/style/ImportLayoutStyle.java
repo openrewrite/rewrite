@@ -628,6 +628,18 @@ public class ImportLayoutStyle implements JavaStyle {
             }
 
             for (JavaType.FullyQualified classGraphFqn : classpath) {
+                // Binary names put nested types in the outer package, so associate them with their owning class.
+                JavaType.FullyQualified owningClass = classGraphFqn.getOwningClass();
+                if (owningClass != null && checkPackageForClasses.contains(owningClass.getFullyQualifiedName())) {
+                    String className = classGraphFqn.getClassName();
+                    int lastDot = className.lastIndexOf('.');
+                    if (lastDot >= 0) {
+                        className = className.substring(lastDot + 1);
+                    }
+                    nameToPackages.computeIfAbsent(className, p -> new HashSet<>(3))
+                            .add(owningClass.getFullyQualifiedName());
+                    continue;
+                }
                 String packageName = classGraphFqn.getPackageName();
                 if (checkPackageForClasses.contains(packageName)) {
                     String className = classGraphFqn.getClassName();
