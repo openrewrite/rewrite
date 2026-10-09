@@ -36,6 +36,8 @@ export {RewriteRpc} from "./rewrite-rpc";
 export {RpcRecipe, RpcVisitor} from "./recipe";
 export {DelegatingRecipe, prepareJavaRecipe} from "./java-recipe";
 export {registerVisitor} from "./request/visitor-registry";
+// Registers the codecs for the Java Python marker, which a Java host sends on Python project files
+export * from "./python-resolution-result";
 
 RpcCodecs.registerCodec(TreeKind.Checksum, {
     async rpcReceive(before: Checksum, q: RpcReceiveQueue): Promise<Checksum> {
