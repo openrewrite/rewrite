@@ -254,7 +254,7 @@ class NodeDependencyScanTest {
         if (reported != null) {
             ExecutionContext ctx = new InMemoryExecutionContext();
             LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(ps.capturedPackageJson,
-              null, ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, project), ctx);
+              ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, project), ctx);
             assertThat(result).isNotNull();
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getErrorMessage()).contains(reported);
@@ -324,7 +324,7 @@ class NodeDependencyScanTest {
 
                 NodeDependencyScan.linkWorkspaceMembers(acc);
                 ExecutionContext ctx = new InMemoryExecutionContext();
-                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member, null,
+                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
                   acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
                   ctx);
 
@@ -368,7 +368,7 @@ class NodeDependencyScanTest {
               .isEqualTo(ownLock ? Paths.get("packages/a/pnpm-lock.yaml") : null);
             if (ownLock) {
                 ExecutionContext ctx = new InMemoryExecutionContext();
-                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member, null,
+                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
                   acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
                   ctx);
                 assertThat(result).isNotNull();

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
@@ -36,38 +35,19 @@ import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
-import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
-import java.nio.file.Path;
 import java.time.Instant;
 
 /**
- * Native lock regeneration, by package manager, each through the port of its own install: npm through
- * {@link NpmLockRegenerator} (arborist), Bun through {@link BunLockRegenerator}, Yarn classic through
- * {@link YarnClassicLockRegenerator}, Yarn Berry through {@link YarnBerryLockRegenerator} and pnpm through
- * {@link PnpmLockRegenerator}. What a route cannot reproduce byte for byte fails with a structured {@link Failure} and
- * no lock; there is no shell-out (it would leak registry credentials).
+ * Builds the project's package manager's inputs from the {@link Request} and runs the port of that package manager's
+ * own install: {@link NpmLockRegenerator}, {@link BunLockRegenerator}, {@link YarnClassicLockRegenerator},
+ * {@link YarnBerryLockRegenerator} or {@link PnpmLockRegenerator}. There is no shell-out (it would leak registry
+ * credentials).
  */
 public final class NativeLockEngine {
 
     private NativeLockEngine() {
-    }
-
-    public static Result regenerate(PackageManager pm,
-                                    String editedPackageJson,
-                                    @Nullable String originalPackageJson,
-                                    @Nullable String existingLock,
-                                    @Nullable NodeResolutionResult marker,
-                                    @Nullable Path packageJsonPath,
-                                    ExecutionContext ctx) {
-        return regenerate(pm, Request.builder()
-                .packageJson(editedPackageJson)
-                .originalPackageJson(originalPackageJson)
-                .lock(existingLock)
-                .marker(marker)
-                .packageJsonPath(packageJsonPath)
-                .build(), ctx);
     }
 
     public static Result regenerate(PackageManager pm, Request request, ExecutionContext ctx) {

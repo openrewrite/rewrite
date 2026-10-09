@@ -708,9 +708,8 @@ public class PackageJsonHelper {
             return EditAndRegenerateResult.unchanged();
         }
         SourceFile refreshed = refreshMarker(after);
-        String originalPackageJsonContent = before.printAll();
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
-                : regenerateLockContent(refreshed, originalPackageJsonContent, capturedLockContent, projectFiles, ctx);
+                : regenerateLockContent(refreshed, capturedLockContent, projectFiles, ctx);
         return EditAndRegenerateResult.changed(withResolvedDeps(refreshed, regen), regen);
     }
 
@@ -746,21 +745,11 @@ public class PackageJsonHelper {
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile packageJson, @Nullable String capturedLockContent, ExecutionContext ctx) {
-        return regenerateLockContent(packageJson, null, capturedLockContent, ctx);
+        return regenerateLockContent(packageJson, capturedLockContent, NodeDependencyScan.ProjectFiles.NONE, ctx);
     }
 
     public static LockFileRegeneration.@Nullable Result regenerateLockContent(
             SourceFile packageJson,
-            @Nullable String originalPackageJsonContent,
-            @Nullable String capturedLockContent,
-            ExecutionContext ctx) {
-        return regenerateLockContent(packageJson, originalPackageJsonContent, capturedLockContent,
-                NodeDependencyScan.ProjectFiles.NONE, ctx);
-    }
-
-    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
-            SourceFile packageJson,
-            @Nullable String originalPackageJsonContent,
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
@@ -779,7 +768,6 @@ public class PackageJsonHelper {
                 new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
         return regen.regenerate(LockFileRegeneration.Request.builder()
                 .packageJson(content)
-                .originalPackageJson(originalPackageJsonContent)
                 .lock(capturedLockContent)
                 .marker(marker)
                 .packageJsonPath(packageJson.getSourcePath())

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
@@ -81,8 +82,27 @@ class NativeLockEngineTest {
                 new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
     }
 
-    private Result regen(PackageManager pm, String original, String edited, String lock) {
-        return NativeLockEngine.regenerate(pm, edited, original, lock, null, Paths.get("package.json"), ctx);
+    private Result regen(PackageManager pm, String edited, @Nullable String lock) {
+        return regen(pm, edited, lock, null);
+    }
+
+    private Result regen(PackageManager pm, String edited, @Nullable String lock,
+                         @Nullable NodeResolutionResult marker) {
+        return NativeLockEngine.regenerate(pm, Request.builder()
+                .packageJson(edited)
+                .lock(lock)
+                .marker(marker)
+                .packageJsonPath(Paths.get("package.json"))
+                .build(), ctx);
+    }
+
+    private static NodeResolutionResult projectNpmrc(String... keysAndValues) {
+        Map<String, String> npmrc = new LinkedHashMap<>();
+        for (int i = 0; i < keysAndValues.length; i += 2) {
+            npmrc.put(keysAndValues[i], keysAndValues[i + 1]);
+        }
+        return nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(singletonList(
+                new Npmrc(NpmrcScope.Project, npmrc)));
     }
 
     @Test
@@ -92,7 +112,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.Bun, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .packageManagerFile(Paths.get("app/.npmrc"), resource(scenario + "npmrc"))
@@ -128,7 +147,6 @@ class NativeLockEngineTest {
         String patch = "patches/ms@2.1.3.patch";
         Request.RequestBuilder request = Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"));
         Set<Path> withoutPatch = new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/bun.lock")));
@@ -156,7 +174,6 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
         Request.RequestBuilder request = Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.npmrc"))));
@@ -177,7 +194,6 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
         Request.RequestBuilder request = Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/.env"))));
@@ -194,7 +210,7 @@ class NativeLockEngineTest {
 
     @Test
     void bunWithoutALockFailsLoud() {
-        Result result = regen(PackageManager.Bun, "{\"dependencies\":{}}", "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+        Result result = regen(PackageManager.Bun, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
@@ -207,7 +223,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .packageManagerFile(Paths.get("app/.yarnrc"), resource(scenario + "yarnrc"))
@@ -238,8 +253,7 @@ class NativeLockEngineTest {
 
     @Test
     void yarnClassicWithoutALockFailsLoud() {
-        Result result = regen(PackageManager.YarnClassic, "{\"dependencies\":{}}",
-                "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
+        Result result = regen(PackageManager.YarnClassic, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
@@ -254,7 +268,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.YarnBerry, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .packageManagerFile(Paths.get("app/.yarnrc.yml"), resource(scenario + "yarnrc-after"))
@@ -281,7 +294,7 @@ class NativeLockEngineTest {
 
     @Test
     void yarnBerryWithoutALockFailsLoud() {
-        Result result = regen(PackageManager.YarnBerry, "{\"dependencies\":{}}",
+        Result result = regen(PackageManager.YarnBerry,
                 "{\"packageManager\":\"yarn@4.10.3\",\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
@@ -303,11 +316,14 @@ class NativeLockEngineTest {
     void npmrcTokenWithExplicitDefaultPortRegeneratesLock() {
         String registry = "https://registry.example:443/npm/";
         NodeExecutionContextView.view(ctx).setRegistries(emptyList());
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.User, Map.of(
-                        "registry", "https://registry.example/npm/",
-                        "//registry.example/npm/:_authToken", "s3cret")),
-                new Npmrc(NpmrcScope.Project, Map.of("registry", registry, "always-auth", "false"))));
+        Map<String, String> user = new LinkedHashMap<>();
+        user.put("registry", "https://registry.example/npm/");
+        user.put("//registry.example/npm/:_authToken", "s3cret");
+        Map<String, String> project = new LinkedHashMap<>();
+        project.put("registry", registry);
+        project.put("always-auth", "false");
+        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(Arrays.asList(
+                new Npmrc(NpmrcScope.User, user), new Npmrc(NpmrcScope.Project, project)));
         routes.put(registry + "lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
         routes.put(registry + "lodash/4.17.20",
                 "{\"name\":\"lodash\",\"version\":\"4.17.20\",\"dependencies\":{}}");
@@ -346,10 +362,8 @@ class NativeLockEngineTest {
                 "  }\n" +
                 "}\n";
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                lock, marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"name\":\"x\",\"dependencies\":{\"lodash\":\"^4.17.21\"}}", lock,
+                marker);
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(
@@ -362,9 +376,7 @@ class NativeLockEngineTest {
 
     @Test
     void pnpmDiscardsALockOfAnotherMajor() {
-        Result result = regen(PackageManager.Pnpm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
+        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
                 "lockfileVersion: 5.4\n");
 
         assertThat(result.isSuccess()).isFalse();
@@ -378,7 +390,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.Pnpm, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
-                .originalPackageJson(resource(scenario + "pkg-before"))
                 .lock(resource(scenario + "before"))
                 .packageJsonPath(Paths.get("app/package.json"))
                 .packageManagerFile(Paths.get("app/pnpm-workspace.yaml"), resource(scenario + "workspace"))
@@ -409,8 +420,7 @@ class NativeLockEngineTest {
 
     @Test
     void pnpmWithoutALockFailsLoud() {
-        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{}}", "{\"dependencies\":{\"ms\":\"2.0.0\"}}",
-                null);
+        Result result = regen(PackageManager.Pnpm, "{\"dependencies\":{\"ms\":\"2.0.0\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
@@ -421,11 +431,8 @@ class NativeLockEngineTest {
         routes.put("https://registry.npmjs.org/left-pad", resource("lock/npm/add-leaf/http/left-pad"));
         routes.put("https://registry.npmjs.org/left-pad/1.3.0", resource("lock/npm/add-leaf/http/left-pad-1.3.0"));
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                resource("lock/npm/add-leaf/pkg-after"),
-                resource("lock/npm/add-leaf/pkg-before"),
-                resource("lock/npm/add-leaf/before"),
-                null, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, resource("lock/npm/add-leaf/pkg-after"),
+                resource("lock/npm/add-leaf/before"));
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource("lock/npm/add-leaf/after"));
@@ -435,10 +442,7 @@ class NativeLockEngineTest {
     void versionNotFoundFailsLoud() {
         routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
 
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^5.0.0\"}}",
-                npmLock("4.17.20"));
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^5.0.0\"}}", npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.VERSION_NOT_FOUND);
@@ -446,16 +450,11 @@ class NativeLockEngineTest {
 
     @Test
     void nullLockFailsLoud() {
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                null, null, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
     }
-
-    // --- C7: workspace importer targeting --------------------------------
 
     @Test
     void workspaceMemberBumpTargetsMemberImporterByteExact() {
@@ -465,7 +464,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
                 .packageJson(resource("lock/npm/workspace/pkg-after"))
-                .originalPackageJson(resource("lock/npm/workspace/pkg-before"))
                 .lock(resource("lock/npm/workspace/before"))
                 .packageJsonPath(Paths.get("packages/foo/package.json"))
                 .manifest(Paths.get("package.json"), "{\n  \"name\": \"npm-lock-ws\",\n  \"version\": \"1.0.0\",\n" +
@@ -483,7 +481,6 @@ class NativeLockEngineTest {
 
         Result result = NativeLockEngine.regenerate(PackageManager.Npm, Request.builder()
                 .packageJson(after)
-                .originalPackageJson(before)
                 .lock(npmLock("4.17.20"))
                 .packageJsonPath(Paths.get("package.json"))
                 .manifest(Paths.get("package.json"), before)
@@ -495,13 +492,8 @@ class NativeLockEngineTest {
 
     @Test
     void npmrcValueNpmRejectsFailsLoud() {
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.Project, Map.of("lockfile-version", "abc"))));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("lockfile-version", "abc"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).startsWith("npm fails on this edit: Invalid lockfileVersion config: NaN");
@@ -509,13 +501,8 @@ class NativeLockEngineTest {
 
     @Test
     void npmrcReadingTheEnvironmentFailsLoud() {
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.Project, Map.of("legacy-peer-deps", "${LPD}"))));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("legacy-peer-deps", "${LPD}"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
@@ -524,18 +511,14 @@ class NativeLockEngineTest {
 
     @Test
     void npmrcDryRunLeavesTheLockUnchanged() {
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.Project, Map.of("dry-run", "true"))));
         routes.put("https://registry.npmjs.org/lodash", "{\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
         routes.put("https://registry.npmjs.org/lodash/4.17.21",
                 "{\"name\":\"lodash\",\"version\":\"4.17.21\",\"dependencies\":{}," +
                         "\"dist\":{\"tarball\":\"https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz\"," +
                         "\"integrity\":\"sha512-NEW\"}}");
 
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("dry-run", "true"));
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(npmLock("4.17.20"));
@@ -543,13 +526,8 @@ class NativeLockEngineTest {
 
     @Test
     void npmrcGlobalFailsLoud() {
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.Project, Map.of("global", "true"))));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("global", "true"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail())
@@ -559,33 +537,20 @@ class NativeLockEngineTest {
     // npm 11.17.0: location=global is global mode, even beside global=false written before it
     @Test
     void npmrcLocationGlobalFailsLoud() {
-        Map<String, String> npmrc = new LinkedHashMap<>();
-        npmrc.put("global", "false");
-        npmrc.put("location", "global");
-        NodeResolutionResult marker = nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(List.of(
-                new Npmrc(NpmrcScope.Project, npmrc)));
-
-        Result result = NativeLockEngine.regenerate(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                npmLock("4.17.20"), marker, Paths.get("package.json"), ctx);
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"),
+                projectNpmrc("global", "false", "location", "global"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail())
                 .startsWith("npm rejects this edit (ESHRINKWRAPGLOBAL): cannot generate lockfile for global packages");
     }
 
-    // --- C4: credentials never leak into a failure detail ----------------
-
     @Test
     void registryTokenInUrlNeverAppearsInFailureDetail() {
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(new NodeRegistry(
                 null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true, false)));
 
-        Result result = regen(PackageManager.Npm,
-                "{\"dependencies\":{\"lodash\":\"^4.17.20\"}}",
-                "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}",
-                npmLock("4.17.20"));
+        Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"));
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getDetail()).doesNotContain("s3cr3ttoken");

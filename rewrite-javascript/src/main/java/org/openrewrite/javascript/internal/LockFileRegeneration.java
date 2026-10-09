@@ -30,9 +30,9 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Regenerate a JavaScript project's lock file natively — without executing the package manager — via
- * the shared {@link NativeLockEngine}. A pre-configured instance exists per {@link PackageManager};
- * {@link #forPackageManager(PackageManager)} selects one.
+ * Regenerate a JavaScript project's lock file natively — without executing the package manager — through the port of
+ * that package manager's own install that {@link NativeLockEngine} dispatches to. A pre-configured instance exists per
+ * {@link PackageManager}; {@link #forPackageManager(PackageManager)} selects one.
  */
 public final class LockFileRegeneration {
 
@@ -90,7 +90,6 @@ public final class LockFileRegeneration {
     @Builder
     public static class Request {
         String packageJson;
-        @Nullable String originalPackageJson;
         @Nullable String lock;
         @Nullable NodeResolutionResult marker;
         @Nullable Path packageJsonPath;
@@ -116,19 +115,8 @@ public final class LockFileRegeneration {
         @Nullable String errorMessage;
         @Nullable Failure failure;
 
-        /** Notes accompanying a successful regeneration, e.g. orphaned entries retained after a removal. */
-        @Nullable String detail;
-
         public static Result success(String lockFileContent) {
-            return new Result(true, lockFileContent, null, null, null);
-        }
-
-        public static Result success(String lockFileContent, @Nullable String detail) {
-            return new Result(true, lockFileContent, null, null, detail);
-        }
-
-        public static Result failure(String errorMessage) {
-            return new Result(false, null, errorMessage, null, null);
+            return new Result(true, lockFileContent, null, null);
         }
 
         public static Result failure(Failure failure) {
@@ -137,7 +125,7 @@ public final class LockFileRegeneration {
                 message.append(" [").append(failure.getPackageName()).append(']');
             }
             message.append(": ").append(failure.getDetail());
-            return new Result(false, null, message.toString(), failure, null);
+            return new Result(false, null, message.toString(), failure);
         }
     }
 
@@ -168,32 +156,9 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * Regenerate the lock file natively via {@link NativeLockEngine}.
-     *
-     * @param packageJsonContent         the post-edit package.json content to lock
-     * @param originalPackageJsonContent the pre-edit package.json, used to scope the edit to the
-     *                                   dependencies the recipe actually changed; {@code null} whole-manifest reconcile
-     * @param existingLockContent        the current lock content for the minimal update, or {@code null}
-     * @param marker                     carries npmrc/registry config, engines, and package manager
-     * @param packageJsonPath            the manifest path, for failure attribution and lock-path derivation
-     * @param ctx                        supplies the {@code HttpSender} and host-configured registries/credentials
+     * @param ctx supplies the {@code HttpSender} and host-configured registries/credentials
      * @return the new lock content, or a structured failure
      */
-    public Result regenerate(String packageJsonContent,
-                             @Nullable String originalPackageJsonContent,
-                             @Nullable String existingLockContent,
-                             @Nullable NodeResolutionResult marker,
-                             @Nullable Path packageJsonPath,
-                             ExecutionContext ctx) {
-        return regenerate(Request.builder()
-                .packageJson(packageJsonContent)
-                .originalPackageJson(originalPackageJsonContent)
-                .lock(existingLockContent)
-                .marker(marker)
-                .packageJsonPath(packageJsonPath)
-                .build(), ctx);
-    }
-
     public Result regenerate(Request request, ExecutionContext ctx) {
         return NativeLockEngine.regenerate(pm, request, ctx);
     }
