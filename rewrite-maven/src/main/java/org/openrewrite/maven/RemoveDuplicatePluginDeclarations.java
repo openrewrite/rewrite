@@ -21,23 +21,18 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
 import java.util.function.BinaryOperator;
 
-import static java.util.Arrays.asList;
-
 public class RemoveDuplicatePluginDeclarations extends Recipe {
 
     private static final XPathMatcher PLUGINS_MATCHER = new XPathMatcher("//build/plugins");
     private static final XPathMatcher PLUGIN_MANAGEMENT_PLUGINS_MATCHER = new XPathMatcher("//build/pluginManagement/plugins");
     private static final XPathMatcher REPORTING_PLUGINS_MATCHER = new XPathMatcher("//reporting/plugins");
-
-    private static final List<String> CHILD_ORDER = asList(
-            "groupId", "artifactId", "version", "extensions", "id", "phase",
-            "executions", "dependencies", "goals", "inherited", "configuration");
 
     @Getter
     final String displayName = "Remove duplicate plugin declarations";
@@ -88,35 +83,47 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         if (plugins.getContent() == null) {
             return plugins;
         }
-        Map<String, Xml.Tag> combined = new HashMap<>();
-        Map<String, Xml.Tag> first = new HashMap<>();
-        boolean hasDuplicates = false;
+        Map<String, List<Xml.Tag>> occurrences = new HashMap<>();
         for (Content content : plugins.getContent()) {
             String key = pluginKey(content);
             if (key != null) {
-                Xml.Tag plugin = (Xml.Tag) content;
-                Xml.Tag earlier = combined.get(key);
-                if (earlier == null) {
-                    first.put(key, plugin);
-                    combined.put(key, plugin);
-                } else {
-                    hasDuplicates = true;
-                    combined.put(key, combine.apply(earlier, plugin));
-                }
+                occurrences.computeIfAbsent(key, k -> new ArrayList<>()).add((Xml.Tag) content);
             }
         }
-        if (!hasDuplicates) {
+        if (occurrences.values().stream().allMatch(o -> o.size() == 1)) {
             return plugins;
+        }
+
+        Map<Content, List<Content>> comments = leadingComments(plugins.getContent());
+        Set<Content> removed = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (List<Xml.Tag> duplicates : occurrences.values()) {
+            for (Xml.Tag duplicate : duplicates.subList(1, duplicates.size())) {
+                removed.add(duplicate);
+                removed.addAll(comments.get(duplicate));
+            }
         }
 
         List<Content> collapsed = new ArrayList<>(plugins.getContent().size());
         for (Content content : plugins.getContent()) {
-            String key = pluginKey(content);
-            if (key == null) {
-                collapsed.add(content);
-            } else if (first.get(key) == content) {
-                collapsed.add(combined.get(key).withPrefix(content.getPrefix()));
+            if (removed.contains(content)) {
+                continue;
             }
+            String key = pluginKey(content);
+            List<Xml.Tag> duplicates = key == null ? null : occurrences.get(key);
+            if (duplicates == null || duplicates.size() == 1) {
+                collapsed.add(content);
+                continue;
+            }
+            Xml.Tag result = duplicates.get(0);
+            for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
+                result = combine.apply(result, later);
+            }
+            for (Xml.Tag later : duplicates.subList(1, duplicates.size())) {
+                for (Content comment : comments.get(later)) {
+                    collapsed.add(reindent(comment, later, result));
+                }
+            }
+            collapsed.add(result.withPrefix(withIndent(content.getPrefix(), indentOf(result))));
         }
         return plugins.withContent(collapsed);
     }
@@ -137,7 +144,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
      * Mirrors {@code DuplicateMerger} in Maven 3's {@code DefaultModelNormalizer}, which merges each duplicate
      * build plugin into the one before it with the later declaration dominant.
      */
-    private static Xml.Tag mergePlugin(Xml.Tag dominant, Xml.Tag recessive) {
+    private static Xml.Tag mergePlugin(Xml.Tag dominant, Xml.Tag earlier) {
+        Xml.Tag recessive = reindent(earlier, earlier, dominant);
         Xml.Tag merged = inheritChild(dominant, recessive, "version");
         merged = inheritChild(merged, recessive, "extensions");
         merged = inheritChild(merged, recessive, "inherited");
@@ -173,7 +181,8 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         for (Xml.Tag execution : dominant.getChildren("execution")) {
             dominantById.put(executionId(execution), execution);
         }
-        Set<Xml.Tag> mergedIntoRecessive = Collections.newSetFromMap(new IdentityHashMap<>());
+        Map<Content, List<Content>> dominantComments = leadingComments(contentOf(dominant));
+        Set<Content> moved = Collections.newSetFromMap(new IdentityHashMap<>());
         List<Content> content = new ArrayList<>();
         for (Content c : contentOf(recessive)) {
             Xml.Tag sameId = c instanceof Xml.Tag && "execution".equals(((Xml.Tag) c).getName()) ?
@@ -181,12 +190,14 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
             if (sameId == null) {
                 content.add(c);
             } else {
-                mergedIntoRecessive.add(sameId);
+                moved.add(sameId);
+                moved.addAll(dominantComments.get(sameId));
+                content.addAll(dominantComments.get(sameId));
                 content.add(mergeExecution(sameId, (Xml.Tag) c).withPrefix(c.getPrefix()));
             }
         }
         for (Content c : contentOf(dominant)) {
-            if (!mergedIntoRecessive.contains(c)) {
+            if (!moved.contains(c)) {
                 content.add(c);
             }
         }
@@ -290,20 +301,117 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         if (dominantChild != null) {
             content.set(indexOf(content, dominantChild), merge.apply(dominantChild, recessiveChild));
         } else {
-            content.add(insertionIndex(content, name), recessiveChild);
+            content.add(insertionIndex(content, recessive, recessiveChild), recessiveChild);
         }
         return dominant.withContent(content);
     }
 
-    private static int insertionIndex(List<Content> content, String name) {
-        int rank = CHILD_ORDER.indexOf(name);
-        for (int i = 0; i < content.size(); i++) {
-            Content c = content.get(i);
-            if (c instanceof Xml.Tag && CHILD_ORDER.indexOf(((Xml.Tag) c).getName()) > rank) {
-                return i;
+    /**
+     * Places a child copied over from the earlier declaration next to the same neighbours it had there, keeping
+     * the author's element order.
+     */
+    private static int insertionIndex(List<Content> content, Xml.Tag recessive, Xml.Tag recessiveChild) {
+        List<Xml.Tag> siblings = recessive.getChildren();
+        int at = siblings.indexOf(recessiveChild);
+        for (int i = at - 1; i >= 0; i--) {
+            int index = lastIndexOfTag(content, siblings.get(i).getName());
+            if (index >= 0) {
+                while (index + 1 < content.size() && content.get(index + 1) instanceof Xml.Comment &&
+                       !content.get(index + 1).getPrefix().contains("\n")) {
+                    index++;
+                }
+                return index + 1;
+            }
+        }
+        Map<Content, List<Content>> comments = leadingComments(content);
+        for (int i = at + 1; i < siblings.size(); i++) {
+            int index = lastIndexOfTag(content, siblings.get(i).getName());
+            if (index >= 0) {
+                return index - comments.get(content.get(index)).size();
             }
         }
         return content.size();
+    }
+
+    private static int lastIndexOfTag(List<Content> content, String name) {
+        for (int i = content.size() - 1; i >= 0; i--) {
+            if (content.get(i) instanceof Xml.Tag && name.equals(((Xml.Tag) content.get(i)).getName())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Comments on their own lines directly above a tag describe it, so they travel with it when it is merged.
+     */
+    private static Map<Content, List<Content>> leadingComments(List<? extends Content> content) {
+        Map<Content, List<Content>> comments = new IdentityHashMap<>();
+        List<Content> pending = new ArrayList<>();
+        for (Content c : content) {
+            if (c instanceof Xml.Comment) {
+                if (!pending.isEmpty() || c.getPrefix().contains("\n")) {
+                    pending.add(c);
+                }
+            } else {
+                comments.put(c, pending);
+                pending = new ArrayList<>();
+            }
+        }
+        return comments;
+    }
+
+    private static String indentOf(Content content) {
+        String prefix = content.getPrefix();
+        return prefix.substring(prefix.lastIndexOf('\n') + 1);
+    }
+
+    private static String withIndent(String prefix, String indent) {
+        int newline = prefix.lastIndexOf('\n');
+        return newline < 0 ? prefix : prefix.substring(0, newline + 1) + indent;
+    }
+
+    /**
+     * Converts the indentation of {@code xml} from the style {@code from} is written in to the style of {@code to},
+     * level by level, so content moved between two declarations doesn't mix tabs and spaces.
+     */
+    private static <X extends Xml> X reindent(X xml, Xml.Tag from, Xml.Tag to) {
+        String fromBase = indentOf(from);
+        String toBase = indentOf(to);
+        String fromUnit = indentUnit(from);
+        String toUnit = fromUnit.isEmpty() || indentUnit(to).isEmpty() ? fromUnit : indentUnit(to);
+        if (fromBase.equals(toBase) && fromUnit.equals(toUnit)) {
+            return xml;
+        }
+        //noinspection unchecked
+        return (X) new XmlVisitor<Integer>() {
+            @Override
+            public Xml preVisit(Xml tree, Integer p) {
+                String prefix = tree.getPrefix();
+                int lineStart = prefix.lastIndexOf('\n') + 1;
+                if (lineStart == 0 || !prefix.startsWith(fromBase, lineStart)) {
+                    return tree;
+                }
+                String rest = prefix.substring(lineStart + fromBase.length());
+                StringBuilder indent = new StringBuilder(toBase);
+                while (!fromUnit.isEmpty() && rest.startsWith(fromUnit)) {
+                    indent.append(toUnit);
+                    rest = rest.substring(fromUnit.length());
+                }
+                return tree.withPrefix(prefix.substring(0, lineStart) + indent + rest);
+            }
+        }.visitNonNull(xml, 0);
+    }
+
+    private static String indentUnit(Xml.Tag tag) {
+        String indent = indentOf(tag);
+        for (Content child : contentOf(tag)) {
+            if (child.getPrefix().contains("\n")) {
+                String childIndent = indentOf(child);
+                return childIndent.startsWith(indent) ? childIndent.substring(indent.length()) : "";
+            }
+        }
+        return "";
     }
 
     private static int indexOf(List<Content> content, Content child) {

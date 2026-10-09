@@ -873,4 +873,140 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void keepElementOrderAndCommentsOfMergedDeclarations() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <!-- integration tests -->
+                          <plugin>
+                              <artifactId>maven-failsafe-plugin</artifactId>
+                              <version>3.5.2</version>
+                              <configuration>
+                                  <skipITs>false</skipITs>
+                              </configuration>
+                              <executions>
+                                  <!-- run the tests -->
+                                  <execution>
+                                      <goals>
+                                          <goal>integration-test</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                          <!-- verify after integration tests -->
+                          <plugin>
+                              <artifactId>maven-failsafe-plugin</artifactId>
+                              <executions>
+                                  <!-- check the results -->
+                                  <execution>
+                                      <goals>
+                                          <goal>verify</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1.0.0</version>
+                  <build>
+                      <plugins>
+                          <!-- integration tests -->
+                          <!-- verify after integration tests -->
+                          <plugin>
+                              <artifactId>maven-failsafe-plugin</artifactId>
+                              <version>3.5.2</version>
+                              <configuration>
+                                  <skipITs>false</skipITs>
+                              </configuration>
+                              <executions>
+                                  <!-- run the tests -->
+                                  <!-- check the results -->
+                                  <execution>
+                                      <goals>
+                                          <goal>verify</goal>
+                                          <goal>integration-test</goal>
+                                      </goals>
+                                  </execution>
+                              </executions>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void reindentEarlierDeclarationToMatchTheLaterOne() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+                          <plugin>
+                              <artifactId>maven-deploy-plugin</artifactId>
+                              <version>2.8.1</version>
+                              <configuration>
+                                  <skip>true</skip>
+                              </configuration>
+                          </plugin>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-deploy-plugin</artifactId>
+              \t\t\t\t<executions>
+              \t\t\t\t\t<execution>
+              \t\t\t\t\t\t<id>default-deploy</id>
+              \t\t\t\t\t\t<phase>none</phase>
+              \t\t\t\t\t</execution>
+              \t\t\t\t</executions>
+              \t\t\t</plugin>
+              \t\t</plugins>
+              \t</build>
+              </project>
+              """,
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-deploy-plugin</artifactId>
+              \t\t\t\t<version>2.8.1</version>
+              \t\t\t\t<configuration>
+              \t\t\t\t\t<skip>true</skip>
+              \t\t\t\t</configuration>
+              \t\t\t\t<executions>
+              \t\t\t\t\t<execution>
+              \t\t\t\t\t\t<id>default-deploy</id>
+              \t\t\t\t\t\t<phase>none</phase>
+              \t\t\t\t\t</execution>
+              \t\t\t\t</executions>
+              \t\t\t</plugin>
+              \t\t</plugins>
+              \t</build>
+              </project>
+              """
+          )
+        );
+    }
 }
