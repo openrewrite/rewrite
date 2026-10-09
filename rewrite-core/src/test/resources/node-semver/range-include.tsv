@@ -19,6 +19,7 @@
 # Rows where satisfies(version, range[, includePrerelease]) is TRUE.
 # Column 3 is an options tag: empty = strict, `incPre` = includePrerelease overload,
 # `loose` = skipped (loose parsing is unsupported).
+# ^1.2.3 1.2.3-pre incPre is in range-exclude.tsv, as node-semver 7.8.4 answers it.
 # Each row: range<TAB>version<TAB>options. Fields are tab-separated; \t \n \r \\ escaped.
 1.0.0 - 2.0.0	1.2.3
 ^1.2.3+build	1.2.3

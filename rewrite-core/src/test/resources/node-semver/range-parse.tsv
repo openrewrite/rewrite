@@ -20,6 +20,7 @@
 # npm's `-0` upper-bound convention (`^1.2.3` -> `>=1.2.3 <2.0.0-0`, which excludes 2.0.0-alpha).
 # Wildcard/collapse rows (`*`, `''`, `>=0.0.0`) whose canonical form node collapses to the ANY
 # comparator are covered by satisfies behavior in range-include/exclude instead, not here.
+# The rows of ^0.0 and ^ 1.2 ^ 1 give node-semver 7.8.4's answers (fixtures-7.8.4, dump-fixtures.js).
 # Each row: range<TAB>desugaredComparators. Fields are tab-separated; \t \n \r \\ escaped.
 1.0.0	1.0.0
 =1.0.0	1.0.0

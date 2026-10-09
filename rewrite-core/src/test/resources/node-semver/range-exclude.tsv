@@ -20,6 +20,7 @@
 # prerelease-inclusion guard: a prerelease is rejected unless a comparator names its exact
 # major.minor.patch tuple AND itself carries a prerelease.
 # Column 3 options tag: empty = strict, `loose` = skipped (loose parsing is unsupported).
+# The row ^1.2.3 1.2.3-pre incPre gives node-semver 7.8.4's answer (fixtures-7.8.4, dump-fixtures.js).
 # Each row: range<TAB>version<TAB>options. Fields are tab-separated; \t \n \r \\ escaped.
 1.0.0 - 2.0.0	2.2.3
 ^1.2.3	2.0.0
