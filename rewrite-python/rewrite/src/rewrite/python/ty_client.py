@@ -62,7 +62,7 @@ def _ty_user_config_dir(python_version: str) -> str:
 class TyTypesClient:
     """Client for the ty-types CLI.
 
-    This client starts `ty-types --serve` as a subprocess and communicates via
+    ``initialize`` starts `ty-types --serve` as a subprocess, which communicates via
     line-delimited JSON-RPC over stdin/stdout. Create an instance per parse
     batch and close it when done.
 
@@ -76,14 +76,13 @@ class TyTypesClient:
 
     def __init__(self, virtual_env: Optional[str] = None,
                  python_version: Optional[str] = None):
-        """Create a client and start the ``ty-types --serve`` subprocess.
+        """Create a client. ``initialize`` starts the ``ty-types --serve`` subprocess.
 
         Args:
             virtual_env: Optional path to a virtual environment whose
                 ``site-packages`` ty-types should use to resolve the project's
                 third-party dependencies. When provided it is exported as
-                ``VIRTUAL_ENV`` to the subprocess and takes precedence over the
-                running interpreter's ``sys.prefix`` fallback. The normal parse
+                ``VIRTUAL_ENV`` to the subprocess. The normal parse
                 path uses this to point ty-types at a dependency workspace built
                 from the project's ``pyproject.toml`` so that supertypes reaching
                 into installed dependencies (e.g. ``class User(BaseModel)``)
@@ -126,7 +125,12 @@ class TyTypesClient:
         # The JavaTypes those descriptors resolve to, sharing their lifetime.
         self.java_types = SessionTypeCache()
 
-        self._start_process()
+        self._binary = self._find_binary()
+        if self._binary is None:
+            raise RuntimeError(
+                "ty-types is not installed. Ensure the ty-types binary is on PATH."
+            )
+        self._process_root: Optional[str] = None
 
     def __enter__(self) -> TyTypesClient:
         return self
@@ -134,34 +138,29 @@ class TyTypesClient:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.shutdown()
 
-    def _start_process(self) -> None:
-        """Start the ty-types subprocess."""
-        binary = self._find_binary()
-        if binary is None:
-            self._process = None
-            raise RuntimeError(
-                "ty-types is not installed. Ensure the ty-types binary is on PATH."
-            )
-
+    def _start_process(self, project_root: str) -> None:
+        """Start the ty-types subprocess for a session rooted at ``project_root``."""
         if self._python_version is not None and self._ty_config_dir is None:
             self._ty_config_dir = _ty_user_config_dir(self._python_version)
 
         try:
             self._process = subprocess.Popen(
-                [str(binary), '--serve'],
+                [str(self._binary), '--serve'],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=self._subprocess_env(virtual_env=self._virtual_env,
-                                         ty_config_dir=self._ty_config_dir),
+                                         ty_config_dir=self._ty_config_dir,
+                                         project_root=project_root),
             )
         except FileNotFoundError:
             self._process = None
-            # No instance escapes the constructor to be shut down later.
+            # Callers drop a client whose initialize raised without shutting it down.
             self._discard_ty_config()
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+        self._process_root = project_root
 
         # Draining both pipes keeps ty from deadlocking on a full buffer; threads
         # because a pipe read cannot be bounded on Windows.
@@ -200,7 +199,8 @@ class TyTypesClient:
                         prefix: Optional[str] = None,
                         base_prefix: Optional[str] = None,
                         virtual_env: Optional[str] = None,
-                        ty_config_dir: Optional[str] = None) -> Dict[str, str]:
+                        ty_config_dir: Optional[str] = None,
+                        project_root: Optional[str] = None) -> Dict[str, str]:
         """Build the environment for the ty-types subprocess.
 
         ty-types resolves a project's third-party packages by discovering the
@@ -215,8 +215,10 @@ class TyTypesClient:
            project's dependencies installed, so ty must be pointed at a venv that
            does, otherwise imports like ``pydantic`` — and the supertypes
            reachable through them — resolve to ``Unknown``.
-        2. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
-        3. Otherwise, when the interpreter running the parse is itself a virtual
+        2. Otherwise, a ``.venv`` in ``project_root`` holding a ``pyvenv.cfg``
+           is the project's own environment and is exported likewise.
+        3. Otherwise, an inherited ``VIRTUAL_ENV`` is respected.
+        4. Otherwise, when the interpreter running the parse is itself a virtual
            environment (``prefix`` differs from ``base_prefix``) — e.g. tests
            launched through an absolute interpreter path rather than an activated
            venv — fall back to that interpreter's environment.
@@ -241,10 +243,16 @@ class TyTypesClient:
             _point_at(virtual_env)
             return env
 
+        # 2. ty fails to initialize on an exported VIRTUAL_ENV without a pyvenv.cfg.
+        project_venv = os.path.join(project_root, '.venv') if project_root else None
+        if project_venv and os.path.isfile(os.path.join(project_venv, 'pyvenv.cfg')):
+            _point_at(project_venv)
+            return env
+
         prefix = sys.prefix if prefix is None else prefix
         base_prefix = sys.base_prefix if base_prefix is None else base_prefix
 
-        # 2./3. Only when the caller hasn't already pinned an environment and we
+        # 3./4. Only when the caller hasn't already pinned an environment and we
         #       are inside a virtual environment.
         if 'VIRTUAL_ENV' not in env and prefix != base_prefix:
             _point_at(prefix)
@@ -329,18 +337,21 @@ class TyTypesClient:
         """Initialize the ty-types session with a project root.
 
         If already initialized with the same project root, this is a no-op.
-        If initialized with a different root, shuts down and reinitializes.
+        Otherwise it starts a ty-types process for the root, replacing one that
+        serves another root or has been shut down.
         """
         if self._initialized and self._project_root == project_root:
             return True
 
-        if self._initialized:
+        # The process environment depends on the root's .venv.
+        if self._process is not None and (self._initialized or self._process_root != project_root):
             self.shutdown()
-            # A different project root means a brand-new ty session whose type
-            # ids start over; drop the accumulated table so ids don't collide.
+        if self._process is None:
+            # A new ty session numbers its type ids from scratch, so ids from an
+            # earlier session would collide.
             self.session_types.clear()
             self.java_types.clear()
-            self._start_process()
+            self._start_process(project_root)
 
         if self._try_initialize(project_root):
             return True
@@ -354,7 +365,7 @@ class TyTypesClient:
                          self._python_version)
             self._python_version = None
             self.shutdown()
-            self._start_process()
+            self._start_process(project_root)
             return self._try_initialize(project_root)
         return False
 

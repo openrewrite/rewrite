@@ -309,16 +309,14 @@ class TemplateEngine:
                 import tempfile as _tmpmod
                 from rewrite.python.ty_client import TyTypesClient
 
-                venv = None
                 if options and options.dependencies:
                     from .dependency_workspace import DependencyWorkspace
                     workspace = DependencyWorkspace.get_or_create(options.dependencies)
-                    venv = os.path.join(workspace, ".venv")
                 else:
                     workspace = _tmpmod.mkdtemp()
                     owns_workspace = True
 
-                ty_client = TyTypesClient(virtual_env=venv)
+                ty_client = TyTypesClient()
                 ty_client.initialize(workspace)
 
                 # ty needs a real file path for type resolution

@@ -75,7 +75,8 @@ class TestTyTypesClient:
 
     def test_client_context_manager(self):
         """Test that TyTypesClient shuts down on context exit."""
-        with TyTypesClient() as client:
+        with TyTypesClient() as client, tempfile.TemporaryDirectory() as tmpdir:
+            assert client.initialize(tmpdir)
             assert client._process is not None
         assert client._process is None
 
@@ -3442,6 +3443,21 @@ class TestSubprocessEnvVirtualEnv:
             virtual_env='/tmp/ws/.venv',
         )
         assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
+    def test_project_venv_outranks_inherited_environments_but_not_an_explicit_one(self, tmp_path):
+        venv = tmp_path / '.venv'
+        venv.mkdir()
+        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv'}
+
+        def subprocess_env(**kwargs):
+            return TyTypesClient._subprocess_env(base_env=inherited, project_root=str(tmp_path), **kwargs)
+
+        assert subprocess_env()['VIRTUAL_ENV'] == '/inherited/.venv'
+
+        (venv / 'pyvenv.cfg').write_text('home = /usr/bin\n')
+        assert subprocess_env(prefix='/dev/.venv', base_prefix='/usr')['VIRTUAL_ENV'] == str(venv)
+
+        assert subprocess_env(virtual_env='/tmp/ws/.venv')['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
     def test_no_virtual_env_keeps_existing_sys_prefix_behavior(self):
         env = TyTypesClient._subprocess_env(
