@@ -187,6 +187,11 @@ class TestArgumentMatching:
 
         assert not str_arg.matches(JavaType.Union(_bounds=[JavaType.Primitive.Int, string]))
 
+    def test_unknown_member_of_an_optional_argument_is_excused_like_an_unknown_argument(self):
+        str_arg = MethodMatcher.create("foo.Bar baz(str)")._argument_matchers[0]
+        optional_unknown = JavaType.Union(_bounds=[JavaType.Unknown(), JavaType.Primitive.Null])
+        assert str_arg.matches_unknown(optional_unknown)
+
 
 class TestMethodMatcherRepr:
     """Test string representation."""

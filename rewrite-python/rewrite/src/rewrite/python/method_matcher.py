@@ -35,7 +35,7 @@ Wildcards:
 """
 
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import Callable, Optional, List
 
 from rewrite import Cursor
 from rewrite.java.support_types import JavaType
@@ -584,9 +584,7 @@ class TypedArgumentMatcher(ArgumentMatcher):
 
     def matches(self, arg_type) -> bool:
         if isinstance(arg_type, JavaType.Union):
-            # Patterns have no union syntax, so `str` names an argument that may also be None.
-            members = [b for b in arg_type.bounds if b is not JavaType.Primitive.Null]
-            return bool(members) and all(self.matches(b) for b in members)
+            return _every_member_but_none(arg_type, self.matches)
 
         fqn = _get_fqn(arg_type)
         if fqn is None:
@@ -600,7 +598,15 @@ class TypedArgumentMatcher(ArgumentMatcher):
     def matches_unknown(self, arg_type) -> bool:
         if arg_type is None or isinstance(arg_type, JavaType.Unknown):
             return True
+        if isinstance(arg_type, JavaType.Union):
+            return _every_member_but_none(arg_type, self.matches_unknown)
         return self.matches(arg_type)
+
+
+def _every_member_but_none(union: JavaType.Union, matches: Callable[[JavaType], bool]) -> bool:
+    """Patterns have no union syntax, so `str` names an argument that may also be None."""
+    members = [b for b in union.bounds if b is not JavaType.Primitive.Null]
+    return bool(members) and all(matches(b) for b in members)
 
 
 def _get_fqn(type_obj) -> Optional[str]:

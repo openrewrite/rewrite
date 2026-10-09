@@ -1006,6 +1006,12 @@ class TestUnionTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
+    def test_optional_of_an_unresolved_type_is_unknown_rather_than_none(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'None'}
+        mapping._type_registry[2] = {'kind': 'union', 'members': [999, 1]}
+        assert isinstance(mapping._resolve_type(2), JavaType.Unknown)
+
     def test_bytes_is_a_class_distinct_from_str(self):
         source = '''
             def f(b: bytes):
@@ -1020,6 +1026,7 @@ class TestUnionTypes:
                 result = mapping.type(reference)
                 assert isinstance(result, JavaType.Class)
                 assert result.fully_qualified_name == 'bytes'
+                assert result.supertype is not None
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 

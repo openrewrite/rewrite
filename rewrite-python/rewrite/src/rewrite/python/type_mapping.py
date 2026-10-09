@@ -750,7 +750,7 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'bytesLiteral':
-            return self._create_class_type('bytes')
+            return self._class_reference({'className': 'bytes', 'moduleName': 'builtins'})
 
         elif kind == 'union':
             # `None` is a member like any other, so a recipe can tell `X | None` from `X`.
@@ -759,7 +759,7 @@ class PythonTypeMapping:
                 resolved = self._resolve_type(member_id)
                 if resolved is not None:
                     resolved_bounds.append(resolved)
-            if not resolved_bounds:
+            if all(b is JavaType.Primitive.Null for b in resolved_bounds):
                 return _UNKNOWN
             if len(resolved_bounds) == 1:
                 return resolved_bounds[0]
