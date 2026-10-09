@@ -15,90 +15,42 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * A recipe's request as the Yarn Berry regenerator takes it: the manifests, paths and package-manager files (the
- * patch files) under the lock's directory, and the {@code .yarnrc.yml} of that directory and of each directory above
- * it.
+ * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
+ * {@code .yarnrc.yml} of that directory and of each directory above it.
  */
 final class YarnBerryInputs {
-
-    private static final String RC_FILENAME = ".yarnrc.yml";
 
     private YarnBerryInputs() {
     }
 
-    static Inputs from(Request request, Host host, Instant now) {
-        String rootDir = NpmInputs.rootDirectory(request);
-        Map<String, String> manifests = new LinkedHashMap<>();
-        for (Map.Entry<String, String> manifest : NpmInputs.manifests(request, rootDir).entrySet()) {
-            if (!manifest.getKey().equals("..") && !manifest.getKey().startsWith("../")) {
-                manifests.put(manifest.getKey(), manifest.getValue());
+    static Inputs from(LockDirectory dir, Host host, Instant now) {
+        Map<String, String> configFiles = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            if (file.getKey().matches("(\\.\\./)*" + "\\.yarnrc\\.yml")) {
+                configFiles.put(file.getKey(), file.getValue());
+            }
+        }
+        Map<String, String> patches = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
+            if (file.getKey().endsWith(".patch")) {
+                patches.put(file.getKey(), file.getValue());
             }
         }
         return Inputs.builder()
-                .lock(request.getLock())
-                .manifests(manifests)
-                .configFiles(configFiles(request, rootDir))
-                .files(files(request, rootDir))
-                .paths(paths(request, rootDir))
+                .lock(dir.getLock())
+                .manifests(dir.manifestsUnder(""))
+                .configFiles(configFiles)
+                .files(patches)
+                .paths(dir.pathsUnder(""))
                 .host(host)
                 .now(now)
                 .build();
-    }
-
-    private static Map<String, String> configFiles(Request request, String rootDir) {
-        Map<String, String> files = new LinkedHashMap<>();
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            Path fileName = file.getKey().getFileName();
-            String up = NpmInputs.up(rootDir, NpmInputs.directory(file.getKey()));
-            if (fileName != null && RC_FILENAME.equals(fileName.toString()) && up != null) {
-                files.put(up + RC_FILENAME, file.getValue());
-            }
-        }
-        return files;
-    }
-
-    private static Map<String, String> files(Request request, String rootDir) {
-        Map<String, String> files = new LinkedHashMap<>();
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            String path = underRoot(file.getKey(), rootDir);
-            if (path != null) {
-                files.put(path, file.getValue());
-            }
-        }
-        return files;
-    }
-
-    private static @Nullable Set<String> paths(Request request, String rootDir) {
-        if (request.getProjectPaths() == null) {
-            return null;
-        }
-        Set<String> paths = new LinkedHashSet<>();
-        for (Path file : request.getProjectPaths()) {
-            String path = underRoot(file, rootDir);
-            if (path != null) {
-                paths.add(path);
-            }
-        }
-        return paths;
-    }
-
-    private static @Nullable String underRoot(Path file, String rootDir) {
-        String path = file.normalize().toString().replace('\\', '/');
-        if (rootDir.isEmpty()) {
-            return path;
-        }
-        return path.startsWith(rootDir + "/") ? path.substring(rootDir.length() + 1) : null;
     }
 }

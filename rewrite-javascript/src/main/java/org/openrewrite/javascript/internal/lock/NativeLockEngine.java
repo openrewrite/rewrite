@@ -73,19 +73,18 @@ public final class NativeLockEngine {
      * when run in the manifest's directory, by that package manager's own walk; else 0.
      */
     public static int installRoot(PackageManager pm, Request request) {
+        LockDirectory dir = LockDirectory.of(request);
         switch (pm) {
             case Npm:
-                return NpmLockRegenerator.installRoot(NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+                return NpmLockRegenerator.installRoot(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             case Bun:
-                return BunLockRegenerator.installRoot(BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+                return BunLockRegenerator.installRoot(BunInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             case YarnClassic:
-                return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
-                        Instant.EPOCH));
+                return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             case YarnBerry:
                 return YarnBerryLockRegenerator.installRoot();
             case Pnpm:
-                return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
-                        PnpmInputs.NO_REGISTRY));
+                return PnpmLockRegenerator.installRoot(PnpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             default:
                 return 0;
         }
@@ -95,14 +94,16 @@ public final class NativeLockEngine {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         PackumentSource packuments = new NpmRegistryPackuments(registries, view.getRegistryClient());
-        return new NpmLockRegenerator(NpmInputs.from(request, host(view), Instant.now()), packuments).regenerate();
+        return new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), host(view), Instant.now()), packuments)
+                .regenerate();
     }
 
     private static Result regenerateBun(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         ManifestSource manifests = new BunRegistryManifests(registries, view.getRegistryClient());
-        return new BunLockRegenerator(BunInputs.from(request, host(view), Instant.now()), manifests).regenerate();
+        return new BunLockRegenerator(BunInputs.from(LockDirectory.of(request), host(view), Instant.now()), manifests)
+                .regenerate();
     }
 
     private static Result regenerateYarnClassic(Request request, ExecutionContext ctx) {
@@ -110,7 +111,8 @@ public final class NativeLockEngine {
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         YarnClassicRegistryPackuments packuments = new YarnClassicRegistryPackuments(registries,
                 view.getRegistryClient());
-        return new YarnClassicLockRegenerator(YarnClassicInputs.from(request, host(view), Instant.now()), packuments)
+        return new YarnClassicLockRegenerator(YarnClassicInputs.from(LockDirectory.of(request), host(view),
+                Instant.now()), packuments)
                 .regenerate();
     }
 
@@ -118,7 +120,8 @@ public final class NativeLockEngine {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         RegistrySource registry = new YarnBerryRegistrySource(registries, view.getRegistryClient());
-        return new YarnBerryLockRegenerator(YarnBerryInputs.from(request, host(view), Instant.now()), registry)
+        return new YarnBerryLockRegenerator(YarnBerryInputs.from(LockDirectory.of(request), host(view),
+                Instant.now()), registry)
                 .regenerate();
     }
 
@@ -126,7 +129,8 @@ public final class NativeLockEngine {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         PnpmRegistryMetadata registry = new PnpmRegistryMetadata(registries, view.getRegistryClient());
-        return new PnpmLockRegenerator(PnpmInputs.from(request, host(view), Instant.now(), registry)).regenerate();
+        return new PnpmLockRegenerator(PnpmInputs.from(LockDirectory.of(request), host(view), Instant.now()),
+                registry).regenerate();
     }
 
     private static Host host(NodeExecutionContextView view) {

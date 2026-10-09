@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
@@ -55,7 +56,7 @@ class ConfigurationTest {
                 "  unsetEnvWithEmptyFallback:\n    npmAuthToken: \"${NOT_EXISTING_ENV-}\"\n" +
                 "  emptyEnvWithStrictFallback:\n    npmAuthToken: \"${EMPTY_VARIABLE-fallback-value}\"\n" +
                 "  emptyEnvWithFallback:\n    npmAuthToken: \"${EMPTY_VARIABLE:-fallback-for-empty-value}\"\n" +
-                "  emptyEnvWithEmptyFallback:\n    npmAuthToken: \"${EMPTY_VARIABLE:-}\"\n"), env);
+                "  emptyEnvWithEmptyFallback:\n    npmAuthToken: \"${EMPTY_VARIABLE:-}\"\n"), HostEnvironment.of(env));
         assertThat(scope(options, "onlyEnv").get("npmAuthToken")).isEqualTo("AAA-BBB-CCC");
         assertThat(scope(options, "multipleEnvs").get("npmAuthToken"))
                 .isEqualTo("AAA-BBB-CCC-separator-AAA-BBB-CCC");
@@ -72,7 +73,7 @@ class ConfigurationTest {
     void forbidsUnsetVariables() {
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "npmScopes:\n  onlyEnv:\n    npmAuthToken: \"${A_VARIABLE_THAT_DEFINITELY_DOESNT_EXIST}\"\n"),
-                Collections.emptyMap()))
+                HostEnvironment.of(Collections.emptyMap())))
                 .isInstanceOf(BerryOptions.UsageError.class);
     }
 
@@ -89,7 +90,7 @@ class ConfigurationTest {
                 "  one:\n    npmAlwaysAuth: \"${ONE_VARIABLE}\"\n" +
                 "  zero:\n    npmAlwaysAuth: \"${ZERO_VARIABLE}\"\n" +
                 "  defaultTrue:\n    npmAlwaysAuth: \"${NOT_EXISTING_ENV-true}\"\n" +
-                "  defaultFalse:\n    npmAlwaysAuth: \"${NOT_EXISTING_ENV-false}\"\n"), env);
+                "  defaultFalse:\n    npmAlwaysAuth: \"${NOT_EXISTING_ENV-false}\"\n"), HostEnvironment.of(env));
         assertThat(scope(options, "true").get("npmAlwaysAuth")).isEqualTo(true);
         assertThat(scope(options, "false").get("npmAlwaysAuth")).isEqualTo(false);
         assertThat(scope(options, "one").get("npmAlwaysAuth")).isEqualTo(true);
@@ -102,7 +103,7 @@ class ConfigurationTest {
     void mergesMapProperties() {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "npmRegistryServer: \"https://foo.server\"\nnpmScopes:\n  foo:\n    npmAuthToken: token for foo\n"),
-                Collections.emptyMap());
+                HostEnvironment.of(Collections.emptyMap()));
         Map<String, Object> second = new LinkedHashMap<>();
         second.put("npmRegistryServer", "http://bar.server");
         Map<String, Object> scopes = new LinkedHashMap<>();
@@ -119,7 +120,7 @@ class ConfigurationTest {
     @Test
     void ignoresYarnRegistryIfSet() {
         BerryOptions options = BerryOptions.load(Collections.emptyMap(),
-                Collections.singletonMap("YARN_REGISTRY", "https://example.org"));
+                HostEnvironment.of(Collections.singletonMap("YARN_REGISTRY", "https://example.org")));
         options.restrictTo(YarnRelease.of("4.10.3").getSettings());
         assertThat(options.get("npmRegistryServer")).isEqualTo("https://registry.yarnpkg.com");
     }
@@ -137,12 +138,12 @@ class ConfigurationTest {
                 "YARN_PROFILE", "YARN_GPG", "YARN_IGNORE_NODE", "YARN_WRAP_OUTPUT", "YARN_HOME", "YARN_CONF_DIR",
                 "YARN_REGISTRY", "YARN_IGNORE_CWD"}) {
             BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"),
-                    Collections.singletonMap(variable, "1"));
+                    HostEnvironment.of(Collections.singletonMap(variable, "1")));
             options.restrictTo(YarnRelease.of("4.10.3").getSettings());
             assertThat(options.get("compressionLevel")).as(variable).isEqualTo(3);
         }
-        assertThatThrownBy(() -> BerryOptions.load(Collections.emptyMap(), Collections.singletonMap("YARN_COMMAND",
-                "x")).restrictTo(YarnRelease.of("4.10.3").getSettings()))
+        assertThatThrownBy(() -> BerryOptions.load(Collections.emptyMap(), HostEnvironment.of(Collections.singletonMap("YARN_COMMAND",
+                "x"))).restrictTo(YarnRelease.of("4.10.3").getSettings()))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: command");
     }
@@ -169,13 +170,13 @@ class ConfigurationTest {
     @Test
     void doesNotMergeAnArrayThatDoesNotConcatenate() {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
-                "npmPreapprovedPackages:\n  - example.com\n"), Collections.emptyMap());
+                "npmPreapprovedPackages:\n  - example.com\n"), HostEnvironment.of(Collections.emptyMap()));
         options.use("second file", Collections.singletonMap("npmPreapprovedPackages",
                 Collections.singletonList("evil.com")));
         assertThat(options.get("npmPreapprovedPackages")).isEqualTo(Collections.singletonList("example.com"));
 
         assertThat(BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "npmPreapprovedPackages: [rc]\n"),
-                Collections.singletonMap("YARN_NPM_PREAPPROVED_PACKAGES", "env")).get("npmPreapprovedPackages"))
+                HostEnvironment.of(Collections.singletonMap("YARN_NPM_PREAPPROVED_PACKAGES", "env"))).get("npmPreapprovedPackages"))
                 .isEqualTo(Collections.singletonList("env"));
     }
 
@@ -253,7 +254,7 @@ class ConfigurationTest {
         if (!near.isEmpty()) {
             files.put(".yarnrc.yml", near);
         }
-        return BerryOptions.load(files, Collections.emptyMap());
+        return BerryOptions.load(files, HostEnvironment.of(Collections.emptyMap()));
     }
 
     private static String scopes(BerryOptions options) {

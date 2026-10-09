@@ -43,7 +43,7 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("repo/app/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLock()).isEqualTo("__metadata:\n  version: 8\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
@@ -51,7 +51,7 @@ class YarnBerryInputsTest {
         assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc.yml", "../.yarnrc.yml");
         assertThat(inputs.getConfigFiles().get(".yarnrc.yml")).isEqualTo("compressionLevel: 0\n");
         assertThat(inputs.getPaths()).isNull();
-        assertThat(inputs.getEnv()).isEmpty();
+        assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
     }
 
@@ -65,7 +65,7 @@ class YarnBerryInputsTest {
             Paths.get("repo/packages/a/package.json"), Paths.get("other/.yarnrc.yml"))))
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc.yml",
           "packages/a/package.json");

@@ -126,7 +126,6 @@ public final class LockFileRegeneration {
         @Singular("packageManagerFile")
         Map<Path, String> packageManagerFiles;
         @Nullable Set<Path> projectPaths;
-        @Nullable Path workingDirectory;
     }
 
     @Value

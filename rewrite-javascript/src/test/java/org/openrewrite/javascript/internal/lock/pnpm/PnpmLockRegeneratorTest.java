@@ -117,8 +117,7 @@ class PnpmLockRegeneratorTest {
           .files(files)
           .env(environment)
           .now(Instant.parse("2026-10-08T00:00:00Z"))
-          .registry(NO_REGISTRY)
-          .build()).install();
+          .build(), NO_REGISTRY).install();
     }
 
     private static PnpmLockRegenerator.Install withManifest(String manifest, String... env) {
@@ -139,8 +138,7 @@ class PnpmLockRegeneratorTest {
           .manifests(scenario.manifests(false, before))
           .files(files)
           .now(scenario.phaseTime("after"))
-          .registry(new ScenarioRegistry(scenario, "after"))
-          .build()).install();
+          .build(), new ScenarioRegistry(scenario, "after")).install();
     }
 
     private static PnpmScenarios.Scenario scenario(String name) {
@@ -322,8 +320,7 @@ class PnpmLockRegeneratorTest {
           .paths(held)
           .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
           .now(Instant.parse("2026-10-08T00:00:00Z"))
-          .registry(NO_REGISTRY)
-          .build()).install();
+          .build(), NO_REGISTRY).install();
     }
 
     /**
@@ -391,8 +388,7 @@ class PnpmLockRegeneratorTest {
           .manifest("", WITH + "\"packageManager\":\"pnpm@9.15.0\"}")
           .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
           .now(Instant.parse("2026-10-08T00:00:00Z"))
-          .registry(PNPM_9_15_0)
-          .build()).install())
+          .build(), PNPM_9_15_0).install())
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("9.15.0"));
         assertThat(withManifest(WITH + "\"packageManager\":\"pnpm@11.2.2+sha512.0000\"}").getWritten())
           .isEqualTo(LOCK);
@@ -546,8 +542,7 @@ class PnpmLockRegeneratorTest {
           .lock(LOCK)
           .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"wrappy\":\"1.0.2\"}")
           .now(Instant.parse("2026-10-08T00:00:00Z"))
-          .registry(NO_REGISTRY)
-          .build()).install())
+          .build(), NO_REGISTRY).install())
           .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.getCode()).isEqualTo("ERR_INVALID_PACKAGE_CONFIG"));
     }
 }

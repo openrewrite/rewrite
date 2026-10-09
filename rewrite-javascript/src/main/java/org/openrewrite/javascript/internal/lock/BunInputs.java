@@ -15,86 +15,44 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 
-import java.nio.file.Path;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * A recipe's request as the Bun regenerator takes it: the manifests placed as {@link NpmInputs} places them, the
- * .npmrc and bunfig.toml of the lock's directory, the package-manager files under it (the patch files, the .env
- * files) by path, the paths under it the project holds, and the package.json of each directory above it. Without the
- * .npmrc file itself, the project's npmrc the marker read stands in for it.
+ * The Bun regenerator's inputs: the lock's directory's own .npmrc and bunfig.toml, the patch and .env files under it,
+ * and the package.json of each directory above it when bun runs in that directory.
  */
 final class BunInputs {
+
+    private static final List<String> DOT_ENV = Arrays.asList(".env.production.local", ".env.local",
+            ".env.production", ".env");
 
     private BunInputs() {
     }
 
-    static Inputs from(Request request, Host host, Instant now) {
-        String rootDir = NpmInputs.rootDirectory(request);
-        String npmrc = file(request, rootDir, ".npmrc");
+    static Inputs from(LockDirectory dir, Host host, Instant now) {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
+            if (file.getKey().endsWith(".patch") || DOT_ENV.contains(file.getKey())) {
+                files.put(file.getKey(), file.getValue());
+            }
+        }
         return Inputs.builder()
-                .lock(request.getLock())
-                .manifests(NpmInputs.manifests(request, rootDir))
-                .npmrc(npmrc != null ? npmrc : NpmInputs.projectNpmrc(request.getMarker()))
-                .bunfig(file(request, rootDir, "bunfig.toml"))
-                .files(files(request, rootDir))
-                .paths(paths(request, rootDir))
-                .parentManifests(NpmInputs.parentManifests(request, rootDir))
+                .lock(dir.getLock())
+                .manifests(dir.getManifests())
+                .npmrc(dir.file(".npmrc"))
+                .bunfig(dir.file("bunfig.toml"))
+                .files(files)
+                .paths(dir.pathsUnder(""))
+                .parentManifests(dir.getRunsIn().isEmpty() ? dir.parentManifests() : Collections.emptyMap())
                 .host(host)
                 .now(now)
                 .build();
-    }
-
-    // every package-manager file under the root, by path relative to it
-    private static Map<String, String> files(Request request, String rootDir) {
-        Map<String, String> files = new LinkedHashMap<>();
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            String path = underRoot(file.getKey(), rootDir);
-            if (path != null) {
-                files.put(path, file.getValue());
-            }
-        }
-        return files;
-    }
-
-    private static @Nullable Set<String> paths(Request request, String rootDir) {
-        if (request.getProjectPaths() == null) {
-            return null;
-        }
-        Set<String> paths = new LinkedHashSet<>();
-        for (Path file : request.getProjectPaths()) {
-            String path = underRoot(file, rootDir);
-            if (path != null) {
-                paths.add(path);
-            }
-        }
-        return paths;
-    }
-
-    private static @Nullable String underRoot(Path file, String rootDir) {
-        String path = file.normalize().toString().replace('\\', '/');
-        if (rootDir.isEmpty()) {
-            return path;
-        }
-        return path.startsWith(rootDir + "/") ? path.substring(rootDir.length() + 1) : null;
-    }
-
-    private static @Nullable String file(Request request, String rootDir, String name) {
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            Path fileName = file.getKey().getFileName();
-            if (fileName != null && name.equals(fileName.toString()) &&
-                rootDir.equals(NpmInputs.directory(file.getKey()))) {
-                return file.getValue();
-            }
-        }
-        return null;
     }
 }

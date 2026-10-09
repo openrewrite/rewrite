@@ -40,7 +40,7 @@ class NpmInputsTest {
           .packageManagerFile(Paths.get("repo/other/package.json"), "{\"name\":\"other\"}")
           .build();
 
-        Inputs inputs = NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getParentManifests()).containsExactly(
           entry("packages/a", "{\"name\":\"repo\"}"), entry("repo/packages/a", "{\"name\":\"top\"}"));
@@ -61,7 +61,7 @@ class NpmInputsTest {
           .packageManagerFile(Paths.get("package.json"), "{\"workspaces\":[\"repo\"]}")
           .build();
 
-        Inputs inputs = NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getParentManifests()).isEmpty();

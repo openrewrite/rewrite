@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
@@ -97,9 +98,10 @@ public final class BunLockRegenerator {
         Set<String> paths;
 
         /**
-         * The process environment, which the project's .env files never override.
+         * The process environment, which the project's .env files never override; null when the host does not know
+         * it.
          */
-        @Singular("env")
+        @Nullable
         Map<String, String> env;
 
         @Builder.Default
@@ -404,8 +406,9 @@ public final class BunLockRegenerator {
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
     static PendingInstall installWithManager(Inputs inputs, @Nullable ManifestSource registry, Log log) {
+        HostEnvironment env = HostEnvironment.of(inputs.getEnv());
         BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
-                DotEnv.load(inputs.getEnv(), inputs.getFiles()));
+                env.with(DotEnv.load(env.known(), inputs.getFiles())));
         LoadResult loadResult = loadFromCwd(inputs.getLock(), options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();

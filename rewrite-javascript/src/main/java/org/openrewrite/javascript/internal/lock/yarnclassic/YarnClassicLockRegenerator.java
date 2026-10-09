@@ -375,9 +375,6 @@ public final class YarnClassicLockRegenerator {
         if (e instanceof CannotKnow) {
             return INSTALL.failure((CannotKnow) e);
         }
-        if (e instanceof YarnClassicOptions.NeedsEnvironment) {
-            return INSTALL.failure(new CannotKnow("the environment: " + e.getMessage()));
-        }
         if (e instanceof LocaleCompare.UnknownOrder) {
             return INSTALL.failure(new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage()));
         }

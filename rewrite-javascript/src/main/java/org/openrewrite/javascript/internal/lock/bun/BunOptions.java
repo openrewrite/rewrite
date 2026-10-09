@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
@@ -69,7 +70,7 @@ public final class BunOptions {
     /**
      * The options from the project's bunfig.toml, .npmrc and environment, any of which may be absent.
      */
-    public static BunOptions load(@Nullable String bunfigToml, @Nullable String npmrc, Map<String, String> env) {
+    public static BunOptions load(@Nullable String bunfigToml, @Nullable String npmrc, HostEnvironment env) {
         Install install = new Install();
         if (bunfigToml != null) {
             Json.Expr bunfig = Toml.parse(bunfigToml);
@@ -99,7 +100,7 @@ public final class BunOptions {
         return url != null ? url : registry;
     }
 
-    private void apply(Install install, Map<String, String> env) {
+    private void apply(Install install, HostEnvironment env) {
         String base = install.defaultRegistry != null && !install.defaultRegistry.isEmpty() ?
                 install.defaultRegistry : DEFAULT_REGISTRY;
         registry = expandEnv(base, env);
@@ -140,7 +141,7 @@ public final class BunOptions {
         minimumReleaseAgeMs = install.minimumReleaseAgeMs;
         minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
         for (String key : new String[]{"BUN_CONFIG_REGISTRY", "NPM_CONFIG_REGISTRY", "npm_config_registry"}) {
-            String value = env.get(key);
+            String value = env.setting(key);
             if (value != null && !value.isEmpty() && (value.startsWith("https://") || value.startsWith("http://"))) {
                 registry = value;
                 break;
@@ -149,9 +150,9 @@ public final class BunOptions {
     }
 
     // Npm.Registry.Scope.fromAPI: a url of $NAME is the environment variable's value
-    private static String expandEnv(String url, Map<String, String> env) {
+    private static String expandEnv(String url, HostEnvironment env) {
         if (url.startsWith("$")) {
-            String replaced = env.get(Strings.trim(url.substring(1), "/"));
+            String replaced = env.reference(Strings.trim(url.substring(1), "/"));
             if (replaced != null && replaced.length() > 1) {
                 return replaced;
             }
@@ -234,89 +235,47 @@ public final class BunOptions {
             return b != null ? b : current;
         }
 
-        void readNpmrc(String npmrc, Map<String, String> env) {
-            Map<String, String> out = new LinkedHashMap<>();
-            for (String rawLine : npmrc.split("\r?\n")) {
-                String line = rawLine.trim();
-                if (line.isEmpty() || line.charAt(0) == ';' || line.charAt(0) == '#' || line.charAt(0) == '[') {
-                    continue;
-                }
-                int eq = line.indexOf('=');
-                String key = (eq < 0 ? line : line.substring(0, eq)).trim();
-                String value = eq < 0 ? "true" : line.substring(eq + 1).trim();
-                if (value.length() >= 2 && (value.charAt(0) == '"' && value.charAt(value.length() - 1) == '"' ||
-                                            value.charAt(0) == '\'' && value.charAt(value.length() - 1) == '\'')) {
-                    value = value.substring(1, value.length() - 1);
-                }
-                out.put(expandVariables(key, env), expandVariables(value, env));
+        // ini.zig loadNpmrc: the top-level keys it reads, each of the type it takes
+        void readNpmrc(String npmrc, HostEnvironment env) {
+            Map<String, @Nullable Object> out = Ini.parse(npmrc, env);
+            Object registry = out.get("registry");
+            if (registry instanceof String) {
+                defaultRegistry = (String) registry;
             }
-            String registry = out.get("registry");
-            if (registry != null) {
-                defaultRegistry = registry;
-            }
-            String dry = out.get("dry-run");
-            if (dry != null) {
+            Object dry = out.get("dry-run");
+            if (dry instanceof String) {
                 dryRun = "true".equals(dry);
+            } else if (dry instanceof Boolean) {
+                dryRun = (Boolean) dry;
             }
             for (String key : new String[]{"omit", "include"}) {
-                String value = out.get(key);
-                if (value == null) {
-                    continue;
-                }
                 boolean include = "include".equals(key);
-                if ("dev".equals(value)) {
-                    saveDev = include;
-                } else if ("peer".equals(value)) {
-                    savePeer = include;
-                } else if ("optional".equals(value)) {
-                    saveOptional = include;
-                }
-            }
-            Boolean link = npmrcBool(out.get("link-workspace-packages"));
-            if (link != null) {
-                linkWorkspacePackages = link;
-            }
-            Boolean saveExact = npmrcBool(out.get("save-exact"));
-            if (saveExact != null) {
-                exact = saveExact;
-            }
-            for (Map.Entry<String, String> entry : out.entrySet()) {
-                String key = entry.getKey();
-                if (key.startsWith("@") && key.endsWith(":registry")) {
-                    scoped.put(key.substring(1, key.length() - ":registry".length()), entry.getValue());
-                }
-            }
-        }
-
-        private static @Nullable Boolean npmrcBool(@Nullable String value) {
-            if ("true".equals(value)) {
-                return true;
-            }
-            if ("false".equals(value)) {
-                return false;
-            }
-            return null;
-        }
-
-        // ${NAME} is the environment variable's value
-        private static String expandVariables(String s, Map<String, String> env) {
-            StringBuilder out = new StringBuilder();
-            int i = 0;
-            while (i < s.length()) {
-                if (s.startsWith("${", i)) {
-                    int end = s.indexOf('}', i + 2);
-                    if (end > 0) {
-                        String value = env.get(s.substring(i + 2, end));
-                        if (value != null) {
-                            out.append(value);
-                        }
-                        i = end + 1;
-                        continue;
+                Object value = out.get(key);
+                List<?> values = value instanceof List ? (List<?>) value : Collections.singletonList(value);
+                for (Object item : values) {
+                    if ("dev".equals(item)) {
+                        saveDev = include;
+                    } else if ("peer".equals(item)) {
+                        savePeer = include;
+                    } else if ("optional".equals(item)) {
+                        saveOptional = include;
                     }
                 }
-                out.append(s.charAt(i++));
             }
-            return out.toString();
+            Object link = out.get("link-workspace-packages");
+            if (link instanceof Boolean) {
+                linkWorkspacePackages = (Boolean) link;
+            }
+            Object saveExact = out.get("save-exact");
+            if (saveExact instanceof Boolean) {
+                exact = (Boolean) saveExact;
+            }
+            for (Map.Entry<String, @Nullable Object> entry : out.entrySet()) {
+                String key = entry.getKey();
+                if (key.startsWith("@") && key.endsWith(":registry") && entry.getValue() instanceof String) {
+                    scoped.put(key.substring(1, key.length() - ":registry".length()), (String) entry.getValue());
+                }
+            }
         }
     }
 }

@@ -66,18 +66,16 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path, which
-     * paths the project holds at all (null when the host has not said), and the directory the package manager
-     * runs in when it is not the lock's.
+     * What a lock regeneration reads of the project besides the edited manifest and the lock, by path, and which
+     * paths the project holds at all (null when the host has not said).
      */
     @Value
     public static class ProjectFiles {
-        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap(), null, null);
+        public static final ProjectFiles NONE = new ProjectFiles(emptyMap(), emptyMap(), null);
 
         Map<Path, String> manifests;
         Map<Path, String> packageManagerFiles;
         @Nullable Set<Path> paths;
-        @Nullable Path workingDirectory;
     }
 
     /**
@@ -98,6 +96,12 @@ public final class NodeDependencyScan {
 
     private static boolean isPatch(Path path) {
         return path.toString().endsWith(".patch");
+    }
+
+    // only bun install loads them
+    private static boolean isDotEnv(Path path) {
+        Path name = path.getFileName();
+        return name != null && name.toString().startsWith(".env");
     }
 
     public static final class ProjectState {
@@ -164,7 +168,7 @@ public final class NodeDependencyScan {
     private static Path installRoot(Accumulator acc, Path packageJsonPath, ProjectState ps, @Nullable Path lock,
                                     NodeResolutionResult marker, LockFileRegeneration regeneration) {
         String manifest = print(null, packageJsonPath, ps);
-        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest), null);
+        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest));
         int depth = regeneration.installRoot(LockFileRegeneration.Request.builder()
                 .packageJson(manifest)
                 .lock(lock == null ? null : acc.locks.get(lock))
@@ -250,21 +254,16 @@ public final class NodeDependencyScan {
 
     /**
      * {@link #projectManifests}, the package-manager files beside or above them, the package.json of each directory
-     * above and of the members those list, the paths under or directly above them; the edited package's directory
-     * when the package manager run there installs at a workspace root's lock (pnpm's runs alike from anywhere in it).
+     * above and of the members those list, and the paths under or directly above them.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        Map<Path, String> manifests = projectManifests(acc, ctx, packageJsonPath);
-        Path lock = lockFor(acc, packageJsonPath);
-        NodeResolutionResult marker = marker(acc.projects.get(packageJsonPath));
-        boolean walkedToRoot = acc.installRoots.containsKey(packageJsonPath) && lock != null &&
-                               !packageJsonPath.equals(acc.lockToPackage.get(lock)) &&
-                               (marker == null || marker.getPackageManager() != PackageManager.Pnpm);
-        return projectFiles(acc, ctx, packageJsonPath, manifests, walkedToRoot ? directory(packageJsonPath) : null);
+        return projectFiles(acc, ctx, packageJsonPath, projectManifests(acc, ctx, packageJsonPath));
     }
 
     private static ProjectFiles projectFiles(Accumulator acc, @Nullable ExecutionContext ctx, Path packageJsonPath,
-                                             Map<Path, String> manifests, @Nullable Path workingDirectory) {
+                                             Map<Path, String> manifests) {
+        NodeResolutionResult marker = marker(acc.projects.get(packageJsonPath));
+        boolean bun = marker != null && marker.getPackageManager() == PackageManager.Bun;
         Set<Path> directories = new LinkedHashSet<>();
         for (Path manifest : manifests.keySet()) {
             directories.add(directory(manifest));
@@ -273,6 +272,9 @@ public final class NodeDependencyScan {
         Map<Path, String> files = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : acc.packageManagerFiles.entrySet()) {
             Path dir = directory(file.getKey());
+            if (!bun && isDotEnv(file.getKey())) {
+                continue;
+            }
             if (directories.contains(dir) || above(dir, directories) ||
                 isPatch(file.getKey()) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
@@ -299,7 +301,7 @@ public final class NodeDependencyScan {
                 paths.add(path);
             }
         }
-        return new ProjectFiles(manifests, files, paths, workingDirectory);
+        return new ProjectFiles(manifests, files, paths);
     }
 
     private static Path directory(Path file) {

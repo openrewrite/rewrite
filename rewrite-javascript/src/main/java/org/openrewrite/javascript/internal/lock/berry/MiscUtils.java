@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -105,13 +106,13 @@ final class MiscUtils {
     /**
      * @throws BerryOptions.UsageError when a variable without a fallback is not set.
      */
-    static String replaceEnvVariables(String value, Map<String, String> env) {
+    static String replaceEnvVariables(String value, HostEnvironment env) {
         Matcher m = ENV_VARIABLE.matcher(value);
         StringBuffer out = new StringBuffer();
         while (m.find()) {
             String variableName = m.group("variableName");
-            boolean variableExist = env.containsKey(variableName);
-            String variableValue = env.get(variableName);
+            String variableValue = env.reference(variableName);
+            boolean variableExist = env.known().containsKey(variableName);
             String replacement;
             if (variableValue != null && !variableValue.isEmpty()) {
                 replacement = variableValue;

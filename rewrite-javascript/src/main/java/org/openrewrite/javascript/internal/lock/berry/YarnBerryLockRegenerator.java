@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
@@ -89,7 +90,7 @@ public final class YarnBerryLockRegenerator {
         /**
          * The environment Yarn runs under; the {@code YARN_*} keys are settings.
          */
-        @Singular("env")
+        @Nullable
         Map<String, String> env;
 
         @Builder.Default
@@ -399,7 +400,7 @@ public final class YarnBerryLockRegenerator {
     private BerryOptions options() {
         if (options == null) {
             try {
-                options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
+                options = BerryOptions.load(inputs.getConfigFiles(), HostEnvironment.of(inputs.getEnv()));
             } catch (JsError e) {
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Internal Error: " + e.getMessage());
             }

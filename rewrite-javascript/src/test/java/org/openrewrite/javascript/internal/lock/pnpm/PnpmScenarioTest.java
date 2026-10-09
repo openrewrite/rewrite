@@ -102,7 +102,6 @@ class PnpmScenarioTest {
           .files(files)
           .paths(PnpmScenarios.paths(files, manifests, scenario.lockDir()))
           .now(recording.phaseTime("after"))
-          .registry(new ScenarioRegistry(recording, "after"))
           .host(host(recording.recordedWith()));
         if (recording.recordedWith() == null) {
             // a downloaded fixture records no clock and no publish times
@@ -153,7 +152,8 @@ class PnpmScenarioTest {
         }
         Result result;
         try {
-            result = new PnpmLockRegenerator(inputs(scenario, scenario.file("before"))).regenerate();
+            result = new PnpmLockRegenerator(inputs(scenario, scenario.file("before")),
+                    new ScenarioRegistry(recording(scenario), "after")).regenerate();
         } catch (ScenarioRegistry.RouteNotRecorded e) {
             record(name, "failed", e.getMessage());
             fail(name + ": " + e.getMessage());

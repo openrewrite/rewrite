@@ -15,13 +15,11 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
-import org.openrewrite.javascript.internal.lock.pnpm.RegistryMetadata;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -37,22 +35,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class PnpmInputsTest {
 
-    private static final RegistryMetadata NO_REGISTRY = new RegistryMetadata() {
-        @Override
-        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
-            return null;
-        }
-
-        @Override
-        public @Nullable String attestations(String registry, String name, String version) {
-            return null;
-        }
-
-        @Override
-        public @Nullable String document(String url) {
-            return null;
-        }
-    };
+;
 
     @Test
     void memberEditPlacesManifestsAndTheFilesUnderTheLocksDirectory() {
@@ -69,7 +52,7 @@ class PnpmInputsTest {
           .packageManagerFile(Paths.get("package.json"), "{\"name\":\"above\"}")
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLock()).isEqualTo("lockfileVersion: '9.0'\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
@@ -80,7 +63,6 @@ class PnpmInputsTest {
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
-        assertThat(inputs.getRegistry()).isSameAs(NO_REGISTRY);
     }
 
     /**
@@ -103,7 +85,7 @@ class PnpmInputsTest {
             new Npmrc(NpmrcScope.Project, Collections.singletonMap("registry", "https://member.example/")))))
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLockDir()).isEqualTo("packages/b");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "packages/b");
@@ -123,7 +105,7 @@ class PnpmInputsTest {
           .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLockDir()).isEmpty();
         assertThat(inputs.getManifests()).containsOnlyKeys("");
@@ -140,7 +122,7 @@ class PnpmInputsTest {
             Paths.get("repo/pnpm-lock.yaml"), Paths.get("repo/local/package.json"), Paths.get("other/package.json"))))
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "pnpm-lock.yaml",
           "local/package.json");
@@ -157,7 +139,7 @@ class PnpmInputsTest {
             new Npmrc(NpmrcScope.Project, Collections.singletonMap("registry", "https://project.example/")))))
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getFiles().get(".npmrc")).contains("registry=https://project.example/");
     }
@@ -185,7 +167,7 @@ class PnpmInputsTest {
             request.packageManagerFile(Paths.get(workspaceManifest), "packages:\n  - packages/*\n");
         }
 
-        Inputs inputs = PnpmInputs.from(request.build(), Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getFiles().containsKey(".npmrc")).isEqualTo(standsIn);
     }
@@ -204,7 +186,7 @@ class PnpmInputsTest {
           .packageManagerFile(Paths.get("repo/pnpm-workspace.yaml"), "packages:\n  - packages/*\n")
           .build();
 
-        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLockDir()).isEmpty();
         assertThat(inputs.getDir()).isEqualTo("packages/a");
@@ -231,7 +213,7 @@ class PnpmInputsTest {
             request.packageManagerFile(Paths.get(workspaceManifest), "packages:\n  - packages/*\n");
         }
 
-        Inputs inputs = PnpmInputs.from(request.build(), Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+        Inputs inputs = PnpmInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getLockDir()).isEqualTo(lockDir);
         assertThat(inputs.getPaths()).contains(misspelt.startsWith("packages/a/") && lockDir.isEmpty() ?

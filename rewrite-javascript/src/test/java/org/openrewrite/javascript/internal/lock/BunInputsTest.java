@@ -46,7 +46,7 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("repo/packages/a/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
@@ -67,9 +67,9 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("other/patches/x.patch"), "")
           .build();
 
-        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", "bunfig.toml", ".env");
+        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", ".env");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
         assertThat(inputs.getPaths()).isNull();
     }
@@ -84,7 +84,7 @@ class BunInputsTest {
             Paths.get("repo/patches/./ms@2.1.3.patch"), Paths.get("other/patches/x.patch"))))
           .build();
 
-        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "bun.lock", "patches/ms@2.1.3.patch");
     }
@@ -99,7 +99,7 @@ class BunInputsTest {
             new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://project.example/")))))
           .build();
 
-        Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getNpmrc()).contains("registry=https://project.example/");
         assertThat(inputs.getBunfig()).isNull();

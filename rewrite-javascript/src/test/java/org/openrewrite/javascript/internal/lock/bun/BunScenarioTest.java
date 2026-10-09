@@ -171,6 +171,7 @@ class BunScenarioTest {
           .bunfig(scenario.config(false, "bunfig", "bunfig.toml"))
           .files(scenario.tree(false))
           .paths(scenario.paths(false, before))
+          .env(Collections.emptyMap())
           .now(scenario.now())
           .build();
     }

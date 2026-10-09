@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -160,7 +161,7 @@ class CacheTest {
 
     private static BerryOptions options(String yarnrc) {
         return BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
-                Collections.emptyMap());
+                HostEnvironment.of(Collections.emptyMap()));
     }
 
     private static BerryScenarios.Scenario scenario(String name) {

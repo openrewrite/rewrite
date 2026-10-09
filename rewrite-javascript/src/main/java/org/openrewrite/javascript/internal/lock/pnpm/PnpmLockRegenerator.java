@@ -99,9 +99,6 @@ public final class PnpmLockRegenerator {
         @NonNull
         Instant now;
 
-        @NonNull
-        RegistryMetadata registry;
-
         @Builder.Default
         Host host = Host.UNKNOWN;
 
@@ -172,12 +169,14 @@ public final class PnpmLockRegenerator {
     private static final String WORKSPACE_DIR = "";
 
     private final Inputs inputs;
+    private final RegistryMetadata registry;
 
     // a project pnpm lists without a package.json, which it reports once the lock is verified
     private @Nullable String missingManifest;
 
-    public PnpmLockRegenerator(Inputs inputs) {
+    public PnpmLockRegenerator(Inputs inputs, RegistryMetadata registry) {
         this.inputs = inputs;
+        this.registry = registry;
     }
 
     /**
@@ -204,7 +203,7 @@ public final class PnpmLockRegenerator {
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
-        return INSTALL.verify(written, again -> new PnpmLockRegenerator(inputs.toBuilder().lock(again).build())
+        return INSTALL.verify(written, again -> new PnpmLockRegenerator(inputs.toBuilder().lock(again).build(), registry)
                 .writeLock(), PnpmLockRegenerator::failure);
     }
 
@@ -412,7 +411,7 @@ public final class PnpmLockRegenerator {
         NpmResolver npmResolver = storeResolver(options, registries, fetchFullMetadata(options));
         PackageRequester requester = new PackageRequester(npmResolver, files, inputs.getHost(),
                 options.isTrue("engineStrict"), options.isTrue("force"), nodeVersion(options), supportedArchitectures,
-                inputs.getRegistry(), nodeDownloadMirrors(options));
+                registry, nodeDownloadMirrors(options));
 
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(wantedLockfile,
                 install.getLockfileDir(), requester);
@@ -493,7 +492,7 @@ public final class PnpmLockRegenerator {
     @SuppressWarnings("unchecked")
     private void resolveConfigDeps(Map<String, String> depsToResolve, EnvLockfile envLockfile,
                                    Map<String, String> registries, Map<String, String> namedRegistries) {
-        NpmResolver resolveFromNpm = new NpmResolver(inputs.getRegistry(), registries, namedRegistries, null, true,
+        NpmResolver resolveFromNpm = new NpmResolver(registry, registries, namedRegistries, null, true,
                 false, inputs.getNow());
         for (Map.Entry<String, String> dep : depsToResolve.entrySet()) {
             String name = dep.getKey();
@@ -669,7 +668,7 @@ public final class PnpmLockRegenerator {
         PackageRequester requester = new PackageRequester(storeResolver(options, registries,
                 options.get("fetchFullMetadata")), new LinkedHashMap<>(), inputs.getHost(),
                 options.isTrue("engineStrict"), options.isTrue("force"), nodeVersion(options), null,
-                inputs.getRegistry(), nodeDownloadMirrors(options));
+                registry, nodeDownloadMirrors(options));
         ResolveDependencies.ResolutionContext ctx = new ResolveDependencies.ResolutionContext(emptyLockfile, "",
                 requester);
         ctx.setForceFullResolution(true);
@@ -716,7 +715,7 @@ public final class PnpmLockRegenerator {
                 Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
                                                 "no-downgrade".equals(options.get("trustPolicy"))) &&
                                                !options.isTrue("registrySupportsTimeField");
-        return new NpmResolver(inputs.getRegistry(), registries,
+        return new NpmResolver(registry, registries,
                 NpmResolver.mergeNamedRegistries(namedRegistries(options)), options.get("saveWorkspaceProtocol"),
                 !Boolean.FALSE.equals(options.get("minimumReleaseAgeIgnoreMissingTime")), fullMetadata,
                 inputs.getNow());
@@ -1536,7 +1535,7 @@ public final class PnpmLockRegenerator {
                         .trustPolicyIgnoreAfter(number(options, "trustPolicyIgnoreAfter"))
                         .registries(options.getRegistries())
                         .namedRegistries(namedRegistries(options))
-                        .fetch(inputs.getRegistry())
+                        .fetch(registry)
                         .now(inputs.getNow())
                         .build());
         return npmVerifier == null ? Collections.emptyList() : Collections.singletonList(npmVerifier);

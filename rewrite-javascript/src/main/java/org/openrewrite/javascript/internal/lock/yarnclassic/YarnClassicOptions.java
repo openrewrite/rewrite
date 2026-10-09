@@ -19,6 +19,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -117,15 +118,6 @@ public final class YarnClassicOptions {
 
     @Getter(AccessLevel.NONE)
     private final PackageConstraintResolver constraintResolver = new PackageConstraintResolver(this);
-
-    /**
-     * An option that reads an environment variable the host did not supply ({@code ${NAME}} in the .npmrc).
-     */
-    public static final class NeedsEnvironment extends RuntimeException {
-        NeedsEnvironment(String message) {
-            super(message);
-        }
-    }
 
     private YarnClassicOptions(Map<String, @Nullable Object> yarnConfig, Map<String, @Nullable Object> npmConfig,
                                Map<String, @Nullable Object> commandLine, @Nullable Map<String, String> env) {
@@ -538,12 +530,11 @@ public final class YarnClassicOptions {
             String replacement;
             if (!esc.isEmpty() && esc.length() % 2 != 0) {
                 replacement = m.group();
-            } else if (env == null) {
-                throw new NeedsEnvironment("the .npmrc reads " + m.group());
-            } else if (!env.containsKey(m.group(2))) {
-                throw new JsError(JsError.ERROR, "Failed to replace env in config: " + m.group());
             } else {
-                replacement = env.get(m.group(2));
+                replacement = HostEnvironment.of(env).reference(m.group(2));
+                if (replacement == null) {
+                    throw new JsError(JsError.ERROR, "Failed to replace env in config: " + m.group());
+                }
             }
             m.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }

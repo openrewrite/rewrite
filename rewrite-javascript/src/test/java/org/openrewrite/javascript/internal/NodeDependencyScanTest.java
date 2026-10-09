@@ -137,7 +137,6 @@ class NodeDependencyScanTest {
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(rootLock);
         assertThat(files.getManifests()).containsOnlyKeys(ROOT, MEMBER);
-        assertThat(files.getWorkingDirectory()).isEqualTo(pm == PackageManager.Pnpm ? null : Paths.get("packages/a"));
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
         assertThat(NodeDependencyScan.lockImporters(acc, rootLock)).containsExactly(ROOT, MEMBER);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
@@ -435,7 +434,6 @@ class NodeDependencyScanTest {
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
         assertThat(files.getManifests()).containsOnlyKeys(MEMBER);
         assertThat(files.getPackageManagerFiles()).containsOnlyKeys(ROOT);
-        assertThat(files.getWorkingDirectory()).isNull();
         assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("member lock");
         assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
         assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).containsExactly(MEMBER);

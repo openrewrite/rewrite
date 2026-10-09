@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.junit.jupiter.api.Test;
 
 import java.util.Collections;
@@ -76,7 +77,7 @@ class NpmHttpUtilsTest {
     void aScopeEntryDefaultsToThePublicRegistry() {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "npmRegistryServer: \"https://mirror.example\"\nnpmScopes:\n  corp:\n    npmAuthToken: x\n"),
-                Collections.emptyMap());
+                HostEnvironment.of(Collections.emptyMap()));
         Configuration configuration = new Configuration(options, YarnRelease.of("4.10.3"));
         assertThat(NpmHttpUtils.getScopeRegistry(null, configuration)).isEqualTo("https://mirror.example");
         assertThat(NpmHttpUtils.getScopeRegistry("corp", configuration)).isEqualTo("https://registry.yarnpkg.com");
@@ -87,7 +88,7 @@ class NpmHttpUtilsTest {
     @Test
     void theJsrScopeIsTheProjectsRegistryBeforeYarn49() {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
-                "npmRegistryServer: \"https://mirror.example\"\n"), Collections.emptyMap());
+                "npmRegistryServer: \"https://mirror.example\"\n"), HostEnvironment.of(Collections.emptyMap()));
         assertThat(NpmHttpUtils.getScopeRegistry("jsr", new Configuration(options, YarnRelease.of("4.8.1"))))
                 .isEqualTo("https://mirror.example");
         assertThat(NpmHttpUtils.getScopeRegistry("jsr", new Configuration(options, YarnRelease.of("4.9.0"))))

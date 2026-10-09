@@ -20,6 +20,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -50,6 +51,7 @@ class BunLockRoundTripTest {
           .manifests(lock.manifests())
           .npmrc(lock.npmrc())
           .bunfig(lock.bunfig())
+          .env(Collections.emptyMap())
           .now(lock.getScenario().now())
           .build(), null);
     }

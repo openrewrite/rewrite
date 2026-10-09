@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
@@ -156,7 +157,7 @@ public final class BerryOptions {
      */
     private final Map<String, String> keySources = new LinkedHashMap<>();
 
-    private final Map<String, String> env;
+    private final HostEnvironment env;
 
     /**
      * The first plugin the sources name that is not one the CLI bundles, with its source; Yarn runs its code.
@@ -164,7 +165,7 @@ public final class BerryOptions {
     @Getter
     private @Nullable String thirdPartyPlugin;
 
-    private BerryOptions(Map<String, String> env) {
+    private BerryOptions(HostEnvironment env) {
         this.env = env;
         for (Map.Entry<String, Definition> definition : DEFINITIONS.entrySet()) {
             values.put(definition.getKey(), getDefaultValue(definition.getValue(), false));
@@ -187,7 +188,7 @@ public final class BerryOptions {
      * The defaults, as a project with no rc file and no environment has them.
      */
     public static BerryOptions defaults() {
-        return new BerryOptions(Collections.emptyMap());
+        return new BerryOptions(HostEnvironment.of(Collections.emptyMap()));
     }
 
     /**
@@ -197,9 +198,9 @@ public final class BerryOptions {
      * @param env         the environment Yarn runs under
      * @throws UsageError where Yarn's configuration rejects a file or a value
      */
-    public static BerryOptions load(Map<String, String> configFiles, Map<String, String> env) {
+    public static BerryOptions load(Map<String, String> configFiles, HostEnvironment env) {
         BerryOptions options = new BerryOptions(env);
-        String rcFilename = getRcFilename(env);
+        String rcFilename = getRcFilename(env.known());
         TreeMap<Integer, Object[]> byDepth = new TreeMap<>(Collections.reverseOrder());
         for (Map.Entry<String, String> file : configFiles.entrySet()) {
             String path = file.getKey();
@@ -225,7 +226,7 @@ public final class BerryOptions {
         List<Object[]> rcFiles = new ArrayList<>(byDepth.values());
         ConfigUtils.Resolved resolvedRcFile = ConfigUtils.resolveRcFiles(rcFiles);
 
-        Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env);
+        Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env.known());
         environmentSettings.remove("rcFilename");
         options.use("<environment>", environmentSettings);
         if (resolvedRcFile != null) {

@@ -16,10 +16,8 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -29,9 +27,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the Yarn classic regenerator takes it, with the config files of the lock's directory, of
- * each directory above it and of those from the working directory up to it, and the package.json of the directories
- * above it; the marker's npmrc stands in for a missing .npmrc.
+ * The Yarn classic regenerator's inputs: the config files of the lock's directory, of each directory above it and of
+ * those from where yarn runs up to it, and the package.json of the directories above it.
  */
 final class YarnClassicInputs {
 
@@ -40,69 +37,47 @@ final class YarnClassicInputs {
     private YarnClassicInputs() {
     }
 
-    static Inputs from(Request request, Host host, Instant now) {
-        String rootDir = NpmInputs.rootDirectory(request);
-        Path workingDirectory = request.getWorkingDirectory();
-        String cwd = workingDirectory == null ? "" : NpmInputs.location(rootDir,
-                workingDirectory.normalize().toString().replace('\\', '/'));
-        Map<String, String> configFiles = configFiles(request, rootDir, cwd);
-        if (!configFiles.containsKey(".npmrc")) {
-            String npmrc = NpmInputs.projectNpmrc(request.getMarker());
-            if (npmrc != null) {
-                configFiles.put(".npmrc", npmrc);
+    static Inputs from(LockDirectory dir, Host host, Instant now) {
+        Map<String, String> configFiles = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            String path = file.getKey();
+            int slash = path.lastIndexOf('/');
+            String name = path.substring(slash + 1);
+            String parent = slash < 0 ? "" : path.substring(0, slash);
+            boolean above = parent.matches("\\.\\.(/\\.\\.)*");
+            if (CONFIG_FILES.contains(name) && (parent.isEmpty() || above || isOnTheWayTo(parent, dir.getRunsIn())) ||
+                above && "package.json".equals(name)) {
+                configFiles.put(path, file.getValue());
             }
         }
         return Inputs.builder()
-                .lock(request.getLock())
-                .manifests(NpmInputs.manifests(request, rootDir))
+                .lock(dir.getLock())
+                .manifests(dir.getManifests())
                 .configFiles(configFiles)
-                .paths(paths(request, rootDir))
-                .directory(rootDir)
-                .cwd(cwd)
+                .paths(paths(dir))
+                .directory(dir.getPath())
+                .cwd(dir.getRunsIn())
                 .host(host)
                 .now(now)
                 .build();
     }
 
-    private static Map<String, String> configFiles(Request request, String rootDir, String cwd) {
-        Map<String, String> files = new LinkedHashMap<>();
-        for (Map.Entry<Path, String> file : request.getPackageManagerFiles().entrySet()) {
-            Path fileName = file.getKey().getFileName();
-            if (fileName == null) {
-                continue;
-            }
-            String dir = NpmInputs.directory(file.getKey());
-            String up = NpmInputs.up(rootDir, dir);
-            if (up != null && (CONFIG_FILES.contains(fileName.toString()) ||
-                               !up.isEmpty() && "package.json".equals(fileName.toString()))) {
-                files.put(up + fileName, file.getValue());
-            } else if (up == null && CONFIG_FILES.contains(fileName.toString()) &&
-                       (rootDir.isEmpty() || dir.startsWith(rootDir + "/"))) {
-                String location = NpmInputs.location(rootDir, dir);
-                if (cwd.equals(location) || cwd.startsWith(location + "/")) {
-                    files.put(location + "/" + fileName, file.getValue());
-                }
-            }
-        }
-        return files;
-    }
-
-    private static @Nullable Set<String> paths(Request request, String rootDir) {
-        if (request.getProjectPaths() == null) {
+    // the paths under the lock's directory and those directly in a directory above it
+    private static @Nullable Set<String> paths(LockDirectory dir) {
+        if (dir.getPaths() == null) {
             return null;
         }
         Set<String> paths = new LinkedHashSet<>();
-        for (Path file : request.getProjectPaths()) {
-            String path = file.normalize().toString().replace('\\', '/');
-            String up = file.getFileName() == null ? null : NpmInputs.up(rootDir, NpmInputs.directory(file));
-            if (rootDir.isEmpty()) {
+        for (String path : dir.getPaths()) {
+            int slash = path.lastIndexOf('/');
+            if (!path.startsWith("../") || path.substring(0, slash).matches("\\.\\.(/\\.\\.)*")) {
                 paths.add(path);
-            } else if (path.startsWith(rootDir + "/")) {
-                paths.add(path.substring(rootDir.length() + 1));
-            } else if (up != null) {
-                paths.add(up + file.getFileName());
             }
         }
         return paths;
+    }
+
+    private static boolean isOnTheWayTo(String dir, String runsIn) {
+        return !dir.startsWith("..") && (runsIn.equals(dir) || runsIn.startsWith(dir + "/"));
     }
 }

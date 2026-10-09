@@ -64,7 +64,6 @@ class PnpmLockRoundTripTest {
           .files(files)
           .paths(PnpmScenarios.paths(files, lock.manifests(), lock.getScenario().lockDir()))
           .now(lock.now())
-          .registry(new ScenarioRegistry(lock.getScenario(), lock.phase()))
           .host(PnpmScenarioTest.host(lock.getScenario().recordedWith()));
         if (lock.getScenario().recordedWith() == null) {
             // a downloaded fixture records no clock and no publish times, so its lock cannot be checked for maturity
@@ -88,7 +87,7 @@ class PnpmLockRoundTripTest {
         }
         PnpmLockRegenerator.Install install;
         try {
-            install = new PnpmLockRegenerator(inputs(lock)).install();
+            install = new PnpmLockRegenerator(inputs(lock), new ScenarioRegistry(lock.getScenario(), lock.phase())).install();
         } catch (LockfileReader.IgnoredLockfile e) {
             String readingLog = lock.isBefore() ? lock.getScenario().file("pnpm-after.log") : log;
             if (readingLog == null) {
