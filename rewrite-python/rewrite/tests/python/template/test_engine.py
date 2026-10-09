@@ -14,9 +14,12 @@
 
 """Tests for template engine."""
 
+import shutil
+import sys
+
 import pytest
 
-from rewrite.java import tree as j
+from rewrite.java import JavaType, tree as j
 from rewrite.python.template import capture, TemplateEngine
 from rewrite.python.template.engine import TemplateOptions
 
@@ -281,6 +284,22 @@ class TestEngineContextAndDependencies:
         assert "MY_CONST = 42" in wrapper
         # imports come before context
         assert wrapper.index("import os") < wrapper.index("MY_CONST = 42")
+
+
+    @pytest.mark.skipif(shutil.which("uv") is None, reason="uv not installed")
+    def test_dependencies_resolve_from_their_workspace_venv(self, monkeypatch):
+        # The runner's environment, which lacks the declared dependency.
+        monkeypatch.setenv("VIRTUAL_ENV", sys.prefix)
+        TemplateEngine.clear_cache()
+
+        tree = TemplateEngine.get_template_tree(
+            "semver.Version(1, 2, 3)",
+            {},
+            TemplateOptions(imports=("import semver",), dependencies=(("semver", "3.0.4"),)),
+        )
+
+        assert isinstance(tree.type, JavaType.FullyQualified)
+        assert tree.type.fully_qualified_name == "semver.version.Version"
 
 
 class TestAutoFormatIntegration:
