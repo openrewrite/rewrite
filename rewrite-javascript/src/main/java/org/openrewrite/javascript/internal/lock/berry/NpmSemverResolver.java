@@ -76,9 +76,13 @@ final class NpmSemverResolver implements Resolver {
         Object versions = registryData.get("versions");
         List<String> candidates = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> version : Js.entries(versions)) {
-            if (SemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
-                NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
-                candidates.add(version.getKey());
+            try {
+                if (SemverUtils.valid(version.getKey()) && range.test(version.getKey()) &&
+                    NpmHttpUtils.isPackageApproved(project, descriptor, version.getKey(), registryData.get("time"))) {
+                    candidates.add(version.getKey());
+                }
+            } catch (JsError ignored) {
+                // Yarn's candidate filter skips a version whose test throws
             }
         }
         List<String> noDeprecatedCandidates = new ArrayList<>();

@@ -143,12 +143,7 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Which lock yarn 1.22.22, bun 1.3.10 and npm 11.17.0 write when run in packages/a, both it and the root holding
-     * one: the root's (workspaces as given), with or without packages/package.json in between (workspaces
-     * {@code ["x/*"]}) and a config file in packages/a. Yarn classic's walk stops at the first workspaces list and
-     * matches it with micromatch 2.3.11, which keeps a leading {@code ./}; Bun's stops at the first parent with
-     * workspaces; npm's at the nearest that lists the project. Yarn reads the config files from where it runs, which
-     * the root's regeneration is given as its working directory.
+     * Which lock yarn 1.22.22, bun 1.3.10 and npm 11.17.0 write when run in packages/a, both it and the root holding one.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
