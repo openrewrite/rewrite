@@ -26,7 +26,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * js-yaml 3.13.1's {@code safeLoad} under {@code FAILSAFE_SCHEMA}, as yarn 1.22.22's bundled copy answered each text.
+ * js-yaml 3.13.1's {@code safeLoad} under {@code FAILSAFE_SCHEMA}, as yarn 1.22.22's bundled copy answered each text
+ * (the test resources' {@code generate/bundle-rows.js} prints the rows).
  */
 class JsYamlTest {
 

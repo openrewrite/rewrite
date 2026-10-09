@@ -34,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The config the registries read from the environment and the .npmrc, as yarn 1.22.22's own registries answered
- * from its bundle, and the cases of its own tests of the registries and util/env-replace.js.
+ * The registries' config from the environment and the .npmrc as yarn 1.22.22's bundle answered (the test resources'
+ * {@code generate/bundle-rows.js} prints the rows), and the cases of yarn's tests of the registries and env-replace.
  */
 class YarnClassicOptionsTest {
 

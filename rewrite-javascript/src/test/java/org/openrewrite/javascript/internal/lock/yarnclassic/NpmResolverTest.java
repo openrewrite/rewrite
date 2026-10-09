@@ -33,7 +33,8 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The version a range picks from a packument, and the remote a picked version becomes.
+ * The version a range picks from a packument, and the remote a picked version becomes; the test resources'
+ * {@code generate/bundle-rows.js} prints the rows that hold yarn 1.22.22's own answers.
  */
 class NpmResolverTest {
 

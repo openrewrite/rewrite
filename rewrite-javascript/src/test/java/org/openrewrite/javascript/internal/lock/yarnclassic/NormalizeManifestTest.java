@@ -29,7 +29,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * yarn 1.22.22's __tests__/normalize-manifest.js over the fixtures whose fields the port normalizes.
+ * yarn 1.22.22's __tests__/normalize-manifest.js over the fixtures whose fields the port normalizes; the test
+ * resources' {@code generate/bundle-rows.js} prints the rows that hold yarn's own answers.
  */
 class NormalizeManifestTest {
 
