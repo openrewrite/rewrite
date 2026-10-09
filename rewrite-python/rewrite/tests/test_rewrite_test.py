@@ -476,28 +476,43 @@ class TestUvHelper:
         assert os.path.isdir(os.path.join(specs[0].project_root, ".venv"))
 
     @pytest.mark.skipif(not _uv_available(), reason="uv not installed")
-    def test_uv_spec_parses_with_type_attribution(self):
-        """Source specs from uv() are parsed with workspace type attribution."""
-        spec = RecipeSpec()
-        spec.rewrite_run(
-            *uv(
-                pyproject(
-                    """
-                    [project]
-                    name = "test"
-                    version = "0.0.0"
-                    requires-python = ">=3.10"
-                    dependencies = ["six==1.17.0"]
-                    """
-                ),
-                python(
-                    """
-                    import six
-                    x = 1
-                    """
-                ),
-            )
+    @pytest.mark.skipif(not _ty_types_available(), reason="ty-types not installed")
+    def test_uv_spec_resolves_types_from_its_dependencies(self, monkeypatch):
+        import sys
+        # The runner's environment, which lacks the declared dependency.
+        monkeypatch.setenv("VIRTUAL_ENV", sys.prefix)
+        types = {}
+
+        class Collect(PythonVisitor):
+            def visit_method_invocation(self, mi, p):
+                types[mi.name.simple_name] = mi.type
+                return super().visit_method_invocation(mi, p)
+
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                dependencies = ["semver==3.0.4"]
+                """
+            ),
+            python(
+                """
+                import semver
+                v = semver.Version(1, 2, 3)
+                """,
+                before_recipe=lambda cu: Collect().visit(cu, None),
+            ),
         )
+        if specs[0].project_root is None:
+            pytest.skip("uv could not build the workspace")
+
+        RecipeSpec().rewrite_run(*specs)
+
+        assert isinstance(types["Version"], JavaType.FullyQualified)
+        assert types["Version"].fully_qualified_name == "semver.version.Version"
 
 
 def _await(node: J) -> Await:
