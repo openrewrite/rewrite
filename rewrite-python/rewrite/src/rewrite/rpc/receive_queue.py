@@ -58,12 +58,9 @@ _EMPTY_LIST: List[Any] = _FrozenList()
 class RpcObjectData:
     """Data structure for RPC object messages.
 
-    Slotted rather than tuple-backed: neither has a __dict__, but a slot store is a direct
-    assignment where NamedTuple.__new__ is generated Python that packs a tuple — about 20% cheaper
-    to construct on 3.12, and ~70M of these are created per medium-set sequential run.
-
-    Nothing indexes, unpacks or compares one: the send side builds plain dicts, not these, so the
-    tuple behaviour was unused.
+    Slotted rather than tuple-backed: about 20% cheaper to construct on 3.12, and ~70M of these
+    are created per medium-set sequential run. Read by attribute only — the send side builds
+    plain dicts, so one of these never reaches json.dumps.
     """
 
     __slots__ = ('state', 'value_type', 'value', 'ref', 'trace')
@@ -75,6 +72,12 @@ class RpcObjectData:
         self.value = value
         self.ref = ref
         self.trace = trace
+
+    # receive_list reports a desynchronized queue by formatting the message it got, which a
+    # default object repr would reduce to an address.
+    def __repr__(self) -> str:
+        return (f"RpcObjectData(state={self.state}, value_type={self.value_type!r}, "
+                f"value={self.value!r}, ref={self.ref!r}, trace={self.trace!r})")
 
 
 class RpcReceiveQueue:

@@ -2887,11 +2887,9 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    # How much to ask for when the size wanted is not known — the header scan, which is looking
-    # for a newline and cannot say how far away it is. A body read sizes itself to the frame
-    # instead: a read returns exactly what it asks for rather than being capped by the pipe's
-    # capacity, so a megabyte asked for in 64 KiB pieces is sixteen reads and sixteen appends
-    # where one read is neither.
+    # For the reads that cannot say how much is wanted: the header scan, and a body read that
+    # fell through to the loop below. A sized body read instead asks for the whole frame, since
+    # a read returns what it asks for, not what the pipe holds.
     _CHUNK_SIZE = 65536
 
     def __init__(self):
@@ -2923,15 +2921,13 @@ class _StdinBuffer:
     def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
         """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout.
 
-        A read sized to the frame returns the whole body in one call, and the bytes object
-        ``os.read`` allocates for it is already what this method returns — so the common case
-        costs one allocation and no copy, where accumulating into the buffer and slicing out of
-        it costs three. Taken only with nothing buffered and no deadline, because the deadline
-        paths in :meth:`_fill` read through ``select`` or a thread instead.
+        The bytes object ``os.read`` allocates for a frame-sized read is already what this
+        returns, so with nothing buffered there is no append, slice or second copy — the general
+        path below costs three. Skipped when a deadline applies, because :meth:`_fill` then reads
+        through ``select`` or a thread.
         """
-        # Positive n only: os.read(fd, 0) returns b'' and cannot be told apart from end of
-        # stream, and a negative n raises where the general path below slices silently. Both
-        # belong to that path, which handles them as it always has.
+        # Positive n only: os.read(fd, 0) returns b'' and cannot be told from end of stream, and
+        # a negative n raises where the general path below slices silently.
         if n > 0 and not self._buf and deadline is None:
             chunk = os.read(self._get_fd(), n)
             if not chunk:
@@ -3072,10 +3068,9 @@ def write_message(response: dict):
     that would corrupt the JSON-RPC protocol headers. Mirrors the pattern
     used by read_message() which uses os.read() on the read side.
 
-    Header and body go out as separate writes. Concatenating them copies the whole body to
-    prepend about twenty-six bytes, which costs in proportion to the message, where the extra
-    write costs a fixed syscall that does not. ``os.writev`` would avoid both but is absent on
-    Windows, and the saving over two writes measured below this machine's noise anyway.
+    Header and body go out as separate writes: concatenating copies the whole body to prepend a
+    short header, a cost that scales with the message where the extra syscall does not.
+    ``os.writev`` avoids both but is absent on Windows, and measured no better where it exists.
     """
     content_bytes = json.dumps(response).encode('utf-8')
     header = f"Content-Length: {len(content_bytes)}\r\n\r\n".encode('utf-8')
