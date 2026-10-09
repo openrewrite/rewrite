@@ -1,0 +1,1 @@
+hand-made packages on a local registry: a package reached at depth 2 and, through the sibling listed first, at depth 4 resolves first where it is shallower, so its child's optional peer on it is not hoisted to the root (jest 29's jest-resolve): add lwp-leaf

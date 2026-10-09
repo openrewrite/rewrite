@@ -1,0 +1,100 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      lwp-leaf:
+        specifier: 1.0.0
+        version: 1.0.0
+      lwp-top:
+        specifier: 1.0.0
+        version: 1.0.0
+
+packages:
+
+  lwp-cli@1.0.0:
+    resolution: {integrity: sha512-xAvxrWZH3czpzEfwQ6vEiRwtfc+Gg3Re9Z8AABfSeeNGDZmmt0Sjc6D0a7BTd3vOaiLxTMWBcVCjMmx4koW3iw==}
+
+  lwp-config@1.0.0:
+    resolution: {integrity: sha512-LCNjneqweSsv9zrub/2THXV9Tqn+lMF1b+vkUN5IaTPZdoBl6movfj02ONWCzcEkFGC41t50BwzE+OAoHUN1Tg==}
+
+  lwp-core@1.0.0:
+    resolution: {integrity: sha512-P0Lcht2xav2mr23K9Z0Dv/vbrRrRPlx/WPM9Yy7AZ5jTg1ARLZ4936q4svvHUm6FY6ZhW5n+o0cjah1aZUjq4A==}
+
+  lwp-haste@1.0.0:
+    resolution: {integrity: sha512-oGptyWfLWtliVyby67XLO9HHII5LZmerlHvxjXAWidIZjwDbA3Wp72XfzSXcwMfPe27MGVFoOOvgLaHKnub5pQ==}
+
+  lwp-leaf@1.0.0:
+    resolution: {integrity: sha512-L9iDJfoZRaO/GXlWigwCowE3dg3YpVg8WLoFY+grC0eBx7UAJwyZLyTG6YojE4UTnvFmYtAKm7TeOw0i2ylcIQ==}
+
+  lwp-pnp@1.0.0:
+    resolution: {integrity: sha512-8pRp4xAXl8g/XPqkTT+ZB9eGSOMWt5hCQLXeWcJ/tPpgfTJddZfeepFlwPMTQiNYyPYHaileP9FatTX0w6+iiA==}
+    peerDependencies:
+      lwp-resolve: '*'
+    peerDependenciesMeta:
+      lwp-resolve:
+        optional: true
+
+  lwp-resolve@1.0.0:
+    resolution: {integrity: sha512-0+qM2m09v1LWAvqQ97XO6eFn49qShXGa2b1tkucifiRCiRnnJIWTzS2F4qJiF7sXE2IWrTNqKh0gkInFjuvfFw==}
+
+  lwp-runner@1.0.0:
+    resolution: {integrity: sha512-VBiCKtBpgIdGwt4vr7hon+OftBDVwm0FzjUaK9uFzO9TgRgdrzuQcyJYP4kmfyXklDnE4r8OJgEHKkA7xWpqrA==}
+
+  lwp-top@1.0.0:
+    resolution: {integrity: sha512-gZe1OYioacPkJ7l5NJEHnejsvPfW0m7C/5GvpNpqKkGkWhCzdwKomDiPCjKZDduaQOutlGhnoT0ot8jOdPgGag==}
+
+  lwp-util@1.0.0:
+    resolution: {integrity: sha512-3O/6qcyQiXGD1a2f3sgWLMib1mSl6AYb3S++0KaCZCXXfszTrNpI9x0lXvcxs8933JZAhJSTRlp2WVdzORtfdQ==}
+
+  lwp-worker@1.0.0:
+    resolution: {integrity: sha512-1hlM5iEdg6QJP+NymK4b/8blwSiesg3uSpEGJxX2SnlMshnIEbxUyveDuD/yU7cRjN1dGOFeGT4sQ5RJGGUPDA==}
+
+snapshots:
+
+  lwp-cli@1.0.0:
+    dependencies:
+      lwp-config: 1.0.0
+
+  lwp-config@1.0.0:
+    dependencies:
+      lwp-runner: 1.0.0
+
+  lwp-core@1.0.0:
+    dependencies:
+      lwp-resolve: 1.0.0
+
+  lwp-haste@1.0.0:
+    dependencies:
+      lwp-worker: 1.0.0
+
+  lwp-leaf@1.0.0: {}
+
+  lwp-pnp@1.0.0(lwp-resolve@1.0.0):
+    optionalDependencies:
+      lwp-resolve: 1.0.0
+
+  lwp-resolve@1.0.0:
+    dependencies:
+      lwp-haste: 1.0.0
+      lwp-pnp: 1.0.0(lwp-resolve@1.0.0)
+
+  lwp-runner@1.0.0:
+    dependencies:
+      lwp-resolve: 1.0.0
+
+  lwp-top@1.0.0:
+    dependencies:
+      lwp-cli: 1.0.0
+      lwp-core: 1.0.0
+
+  lwp-util@1.0.0: {}
+
+  lwp-worker@1.0.0:
+    dependencies:
+      lwp-util: 1.0.0
