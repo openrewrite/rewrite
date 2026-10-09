@@ -31,6 +31,6 @@ def test_dispatches_peer_requests_while_response_pending():
         # The fake peer answers our request with the result of the
         # GetLanguages callback it made against us mid-request.
         result = client.send_request("RoundTrip", {})
-        assert result == ["org.openrewrite.python.tree.Py$CompilationUnit"]
+        assert result == ["org.openrewrite.python.tree.Py$CompilationUnit", "org.openrewrite.toml.tree.Toml$Document"]
     finally:
         client.shutdown()

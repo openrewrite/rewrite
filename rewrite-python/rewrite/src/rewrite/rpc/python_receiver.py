@@ -36,6 +36,7 @@ from rewrite.python.tree import (
     Star, NamedArgument, TypeHintedExpression, ErrorFrom, MatchCase, Slice
 )
 from rewrite.rpc.receive_queue import RpcReceiveQueue
+from rewrite.toml.rpc import register_toml_codecs
 from rewrite.utils import random_id, id_to_int, id_to_str
 
 T = TypeVar('T')
@@ -2298,3 +2299,4 @@ _register_python_marker_codecs()  # Python-specific markers including PrintSynta
 _register_python_resolution_result_codecs()  # PythonResolutionResult and nested types
 _register_file_attributes_codec()  # Consumes the source-file fileAttributes sub-fields
 _register_execution_context_codec()
+register_toml_codecs()  # TOML documents (pyproject.toml, Pipfile, ...)

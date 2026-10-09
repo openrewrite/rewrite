@@ -13,6 +13,8 @@ from rewrite.java import Space, JRightPadded, JLeftPadded, JContainer, J
 from rewrite.parser import ParseError
 from rewrite.python import CompilationUnit
 from rewrite.python.support_types import PyComment
+from rewrite.toml import Toml
+from rewrite.toml.rpc import send_toml
 from rewrite.python.tree import (
     Async, Await, Binary, ChainedAssignment, ExceptionType,
     LiteralType, TypeHint, ExpressionStatement, ExpressionTypeTree,
@@ -67,6 +69,10 @@ class PythonRpcSender:
     def _visit(self, tree: Any, q: 'RpcSendQueue') -> None:
         """Visit a tree node, dispatching to appropriate visitor method."""
         if tree is None:
+            return
+
+        if isinstance(tree, Toml):
+            send_toml(tree, q)
             return
 
         # First handle common J fields via pre_visit

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 the original author or authors.
+ * Copyright 2026 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,29 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.toml.marker;
+package org.openrewrite.toml.internal.rpc;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.rpc.RpcCodec;
+import org.openrewrite.rpc.DynamicDispatchRpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 import org.openrewrite.rpc.RpcSendQueue;
+import org.openrewrite.toml.tree.Toml;
 
-import java.util.UUID;
-
-@Value
-@With
-public class InlineTable implements Marker, RpcCodec<InlineTable> {
-    UUID id;
+public class TomlRpcCodec extends DynamicDispatchRpcCodec<Toml> {
 
     @Override
-    public void rpcSend(InlineTable after, RpcSendQueue q) {
-        q.getAndSend(after, m -> m.getId().toString());
+    public String getSourceFileType() {
+        return Toml.Document.class.getName();
     }
 
     @Override
-    public InlineTable rpcReceive(InlineTable before, RpcReceiveQueue q) {
-        return before.withId(q.receiveAndGet(before.getId(), UUID::fromString));
+    public Class<? extends Toml> getType() {
+        return Toml.class;
+    }
+
+    @Override
+    public void rpcSend(Toml after, RpcSendQueue q) {
+        new TomlSender().visit(after, q);
+    }
+
+    @Override
+    public Toml rpcReceive(Toml before, RpcReceiveQueue q) {
+        return new TomlReceiver().visitNonNull(before, q);
     }
 }

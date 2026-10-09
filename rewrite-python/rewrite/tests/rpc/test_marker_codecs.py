@@ -48,6 +48,7 @@ from rewrite.rpc.python_receiver import PythonRpcReceiver
 from rewrite.rpc.receive_queue import RpcReceiveQueue
 from rewrite.rpc.send_queue import RpcSendQueue
 from rewrite.style import GeneralFormatStyle, NamedStyles
+from rewrite.toml import ArrayTable, InlineTable
 
 _CU_TYPE = 'org.openrewrite.python.tree.Py$CompilationUnit'
 
@@ -85,6 +86,8 @@ _SAMPLES = [
     RaiseTuple(random_id()),
     SuppressNewline(random_id()),
     TupleExceptClause(random_id()),
+    ArrayTable(random_id()),
+    InlineTable(random_id()),
     NamedStyles.build(
         IntelliJ.spaces().with_other(IntelliJ.spaces().other.with_before_comma(True)),
         IntelliJ.tabs_and_indents(), IntelliJ.blank_lines(), IntelliJ.wrapping_and_braces(), IntelliJ.other(),
