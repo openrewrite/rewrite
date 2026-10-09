@@ -20,7 +20,8 @@ import {compilationUnitOf, cursorOf, declarationsOf, isReference, namesUsedIn, s
 import {Cursor, isTree} from "../tree";
 import {
     AddImportOptions, bindImport, bindingShape, existingImportBinding, ExistingImportBinding, hasEsmSyntax, isCommonJs,
-    memberName, moduleNameOf, nameTaken, RebindImport, requireDeclarationOf, requiredModuleOfDeclaration
+    memberName, moduleNameOf, nameTaken, RebindImport, requireBinds, requireDeclarationOf, requiredModuleOfDeclaration,
+    requireJoinTarget
 } from "./add-import";
 import {RemoveImport} from "./remove-import";
 import {sameModule} from "./package-name";
@@ -360,8 +361,12 @@ export function maybeRebind(visitor: JavaScriptVisitor<any>, options: MaybeRebin
     if (existing === undefined) {
         return undefined;
     }
+    // A binding leaving a `let` or `var` destructuring would land in a `const` require.
+    if (existing.viaRequire && existing.reassignable && !existing.onlyMemberOfStatement) {
+        return undefined;
+    }
     // `RebindImport` replaces an import it cannot rewrite in place, and a CommonJS file can gain no import.
-    if (isCommonJs(cu) && !existing.viaRequire &&
+    if (!existing.viaRequire && isCommonJs(cu) &&
         (!existing.onlyMemberOfStatement || bindingShape(options.from.member) !== bindingShape(options.to.member))) {
         return undefined;
     }
@@ -412,7 +417,11 @@ function reusesTargetImport(
 ): boolean {
     const target = existingImportBinding(cu, to.module, to.member);
     // An import and a require of one module are separate declarations of the name.
-    return target?.localName === name && target.viaRequire === moved.viaRequire &&
+    // A require takes the move in only where `AddImport` joins it.
+    const joinTarget = moved.viaRequire ? requireJoinTarget(cu, to.module) : undefined;
+    const joined = !moved.viaRequire || (!moved.reassignable && joinTarget !== undefined &&
+        requireBinds(joinTarget, to.module, to.member) === name);
+    return target?.localName === name && target.viaRequire === moved.viaRequire && joined &&
         bindingShape(to.member) === "named" && !target.typeOnly && !moved.typeOnly && onlyReferences(cu, name);
 }
 
@@ -457,8 +466,8 @@ export function maybeRemoveImport(visitor: JavaScriptVisitor<any>, module: strin
 
 /**
  * @deprecated Use {@link maybeBind} instead. Beyond binding through an AMD factory parameter,
- * `maybeBind` returns `undefined` rather than creating an import where the file binds its modules
- * with `require`, or where no legal identifier can be derived from the module and none was named.
+ * `maybeBind` binds with `require` where the file binds its modules that way, and returns
+ * `undefined` where no legal identifier can be derived from the module and none was named.
  */
 export function maybeAddImport(
     visitor: JavaScriptVisitor<any>,

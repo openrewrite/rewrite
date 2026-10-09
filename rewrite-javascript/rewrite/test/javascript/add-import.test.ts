@@ -1575,7 +1575,7 @@ describe('AddImport visitor', () => {
             }).toThrow("Cannot combine sideEffectOnly with onlyIfReferenced");
         });
 
-        test('a file that binds its modules with require gains a side-effect require', async () => {
+        test('a file that binds its modules with require gains a side-effect require, once', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new AddImport({module: 'core-js/stable', sideEffectOnly: true}));
 
@@ -1585,6 +1585,12 @@ describe('AddImport visitor', () => {
                     `
                         const other = require('other');
                     `,
+                    `
+                        const other = require('other');
+                        require('core-js/stable');
+                    `
+                ),
+                javascript(
                     `
                         const other = require('other');
                         require('core-js/stable');

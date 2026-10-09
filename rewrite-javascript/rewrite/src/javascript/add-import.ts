@@ -306,9 +306,22 @@ export function isCommonJs(cu: JS.CompilationUnit): boolean {
     walk(cu.statements, node => {
         found ||= node.kind === J.Kind.MethodInvocation && isRequireCall(node as J.MethodInvocation) ||
             node.kind === J.Kind.FieldAccess && isExportsAccess(node as J.FieldAccess);
-        return !found;
+        return !found && !bindsCommonJsName(node);
     });
     return found;
+}
+
+const commonJsNames = new Set(['require', 'exports', 'module']);
+
+/** Whether `node` is a function whose parameters bind `require`, `exports` or `module`, as an AMD factory's do. */
+function bindsCommonJsName(node: {kind: string}): boolean {
+    const parameters: J.RightPadded<J>[] = node.kind === J.Kind.MethodDeclaration
+        ? (node as J.MethodDeclaration).parameters.elements
+        : node.kind === J.Kind.Lambda ? (node as J.Lambda).parameters.parameters : [];
+    return parameters.some(({element}) => (isIdentifier(element)
+        ? [element.simpleName]
+        : declarationsOf(element).flatMap(d => d.variables.flatMap(v => bindingNames(v.element.name).map(b => b.name))))
+        .some(name => commonJsNames.has(name)));
 }
 
 /** `exports.x` or `module.exports`, where a CommonJS module publishes what it exports. */
@@ -1070,6 +1083,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         for (const stmt of compilationUnit.statements) {
             const statement = stmt.element;
 
+            // Any top-level require of the module loads it, which is all a side-effect request asks.
+            if (this.sideEffectOnly && requiredModulesOf(statement).some(m => sameModule(m, this.module))) {
+                return true;
+            }
+
             // Check ES6 imports
             if (statement?.kind === JS.Kind.Import) {
                 const jsImport = statement as JS.Import;
@@ -1559,27 +1577,11 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
         let pattern: J.VariableDeclarations.NamedVariable["name"] = newIdentifier(this.bindingName!);
         if (key !== undefined && key !== '*') {
             const element = movedBinding(pattern, -1, key, this.bindingName!) as JS.BindingElement;
-            const target = compilationUnit.statements
-                .map(s => requireDeclarationOf(s.element))
-                .find(declaration => declaration !== undefined && joins(declaration, this.module, 'const'));
+            const target = requireJoinTarget(compilationUnit, this.module);
             if (target !== undefined) {
                 return joinedRequire(compilationUnit, target, element);
             }
-            const braceSpace = detectBraceSpacing(compilationUnit) ? singleSpace : emptySpace;
-            pattern = {
-                kind: JS.Kind.ObjectBindingPattern,
-                id: randomId(),
-                prefix: emptySpace,
-                markers: emptyMarkers,
-                leadingAnnotations: [],
-                modifiers: [],
-                bindings: {
-                    kind: J.Kind.Container,
-                    before: emptySpace,
-                    elements: [rightPadded({...element, prefix: braceSpace}, braceSpace)],
-                    markers: emptyMarkers
-                }
-            } as JS.ObjectBindingPattern;
+            pattern = holding(pattern, element, detectBraceSpacing(compilationUnit)) as JS.ObjectBindingPattern;
         }
         return withRequireStatement(compilationUnit, {
             kind: J.Kind.VariableDeclarations,
@@ -1729,12 +1731,24 @@ export class AddImport<P> extends JavaScriptVisitor<P> {
 
 }
 
-/** A top-level `const … = require('m')` statement, which binds its module the way an import does. */
+/**
+ * A top-level `const … = require('m')` statement, which binds its module the way an import does.
+ * A typed one is none, since its annotation describes the pattern an edit would change.
+ */
 export function requireDeclarationOf(statement: J | undefined): J.VariableDeclarations | undefined {
     return statement?.kind === J.Kind.VariableDeclarations &&
+        (statement as J.VariableDeclarations).typeExpression === undefined &&
         requiredModuleOfDeclaration(statement as J.VariableDeclarations) !== undefined
         ? statement as J.VariableDeclarations
         : undefined;
+}
+
+/** The modules a top-level statement loads with `require`, binding them or not. */
+function requiredModulesOf(statement: J | undefined): string[] {
+    return statement?.kind === J.Kind.MethodInvocation
+        ? [requiredModuleOf(statement as J.MethodInvocation) ?? []].flat()
+        : declarationsOf(statement).flatMap(d =>
+            d.variables.flatMap(v => requiredModule(v.element.initializer?.element) ?? []));
 }
 
 /** A top-level statement that loads a module with `require`, binding it or not. */
@@ -1770,23 +1784,17 @@ function withRequireStatement(cu: JS.CompilationUnit, statement: Statement): JS.
     const statements = cu.statements;
     const padded = rightPadded(statement, emptySpace,
         detectSemi(cu) ? markers({kind: J.Markers.Semicolon, id: randomId()}) : emptyMarkers);
-    let last = -1;
-    statements.forEach((s, i) => {
-        if (isRequireStatement(s.element)) {
-            last = i;
-        }
-    });
-    if (last >= 0) {
+    const {start: at, end} = leadingRequires(cu);
+    if (end > at) {
         return {
             ...cu,
             statements: [
-                ...statements.slice(0, last + 1),
+                ...statements.slice(0, end),
                 {...padded, element: {...statement, prefix: space("\n")}},
-                ...statements.slice(last + 1)
+                ...statements.slice(end)
             ]
         };
     }
-    const at = isUseStrict(statements[0]?.element) ? 1 : 0;
     const next = statements[at]?.element;
     if (next === undefined) {
         return {...cu, statements: [...statements, {...padded, element: {...statement, prefix: space(at === 0 ? "" : "\n\n")}}]};
@@ -1816,7 +1824,7 @@ function requirePattern(declaration: J.VariableDeclarations): J {
  * import. A whole-module require answers both a default and a namespace member, since CommonJS
  * has no such split.
  */
-function requireBinds(
+export function requireBinds(
     declaration: J.VariableDeclarations,
     module: string,
     member: string | undefined
@@ -1837,17 +1845,43 @@ function requireBinds(
     return requireBindings(pattern, required).find(b => b.member === key)?.name;
 }
 
+/**
+ * Where the file's leading requires start, after a shebang and `'use strict'`, and end. Every
+ * top-level statement after them runs once they are initialised, so a binding placed there is read after it.
+ */
+function leadingRequires(cu: JS.CompilationUnit): {start: number; end: number} {
+    const statements = cu.statements;
+    let start = 0;
+    while (start < statements.length &&
+        (statements[start].element?.kind === JS.Kind.Shebang || isUseStrict(statements[start].element))) {
+        start++;
+    }
+    let end = start;
+    while (end < statements.length && isRequireStatement(statements[end].element)) {
+        end++;
+    }
+    return {start, end};
+}
+
+/** The require a new member of `module` joins. It is a destructuring one among the file's leading requires. */
+export function requireJoinTarget(cu: JS.CompilationUnit, module: string): J.VariableDeclarations | undefined {
+    const {start, end} = leadingRequires(cu);
+    return cu.statements.slice(start, end)
+        .map(s => requireDeclarationOf(s.element))
+        .find(declaration => declaration !== undefined && joins(declaration, module));
+}
+
 function keywordsOf(declaration: J.VariableDeclarations): string {
     return declaration.modifiers.map(m => m.keyword).join(' ');
 }
 
 /**
- * Whether a new element can join `declaration`, a destructuring require of `module`. It declares with
- * `keywords`, so the element binds as it would alone, and has no rest element, which must stay last.
+ * Whether a new element can join `declaration`, a destructuring require of `module`. It is a `const`,
+ * so the element binds as a new require would, and has no rest element, which must stay last.
  */
-function joins(declaration: J.VariableDeclarations, module: string, keywords: string): boolean {
+function joins(declaration: J.VariableDeclarations, module: string): boolean {
     const pattern = requirePattern(declaration);
-    return isObjectBindingPattern(pattern) && !hasRest(pattern) && keywordsOf(declaration) === keywords &&
+    return isObjectBindingPattern(pattern) && !hasRest(pattern) && keywordsOf(declaration) === 'const' &&
         sameModule(requiredModuleOfDeclaration(declaration)!, module);
 }
 
@@ -1996,6 +2030,9 @@ export interface ExistingImportBinding {
 
     /** Whether a top-level `require` declaration binds it rather than an import. */
     viaRequire: boolean;
+
+    /** Whether a `let` or `var` declares it, which the file may reassign. */
+    reassignable: boolean;
 }
 
 /**
@@ -2011,14 +2048,14 @@ export function existingImportBinding(
         const element = stmt.element;
         const declaration = requireDeclarationOf(element);
         const required = declaration && requireBinds(declaration, module, member);
-        // A binding leaving a `let` or `var` destructuring would land in a `const` require.
-        if (required !== undefined && (isOnlyRequired(declaration!) || keywordsOf(declaration!) === 'const')) {
+        if (required !== undefined) {
             return {
                 localName: required,
                 onlyMemberOfStatement: isOnlyRequired(declaration!),
                 aliased: required !== memberName(member),
                 typeOnly: false,
-                viaRequire: true
+                viaRequire: true,
+                reassignable: keywordsOf(declaration!) !== 'const'
             };
         }
         if (element?.kind !== JS.Kind.Import) {
@@ -2031,7 +2068,8 @@ export function existingImportBinding(
                 onlyMemberOfStatement: isOnlyMember(element as JS.Import),
                 aliased: localName !== memberName(member),
                 typeOnly: bindsTypeOnly(element as JS.Import, member),
-                viaRequire: false
+                viaRequire: false,
+                reassignable: false
             };
         }
     }
@@ -2312,29 +2350,15 @@ export class RebindImport<P> extends JavaScriptVisitor<P> {
         if (!isOnlyRequired(declaration)) {
             return withPattern(rebound, withoutElement(pattern as JS.ObjectBindingPattern, index));
         }
-        if (!isIdentifier(binding) && this.joinsEarlierRequire(declaration)) {
+        // `AddImport` merges the binding into the target's require where `requireJoinTarget` finds one.
+        if (!isIdentifier(binding) && keywordsOf(declaration) === 'const' &&
+            requireJoinTarget(this.cu!, this.to.module) !== undefined) {
             this.dropped = rebound.id;
             return rebound;
         }
         this.transformedInPlace = true;
-        return withRequire(rebound, spelledLike(this.to.module, sourceModule), holding(pattern, binding));
-    }
-
-    /**
-     * Whether a destructuring `require` of the target before `source` can take its binding, which
-     * `AddImport` then merges there. One after it would leave the binding unreadable where it was declared.
-     */
-    private joinsEarlierRequire(source: J.VariableDeclarations): boolean {
-        for (const stmt of this.cu!.statements) {
-            const other = requireDeclarationOf(stmt.element);
-            if (other === source) {
-                return false;
-            }
-            if (other !== undefined && keywordsOf(source) === 'const' && joins(other, this.to.module, 'const')) {
-                return true;
-            }
-        }
-        return false;
+        return withRequire(rebound, spelledLike(this.to.module, sourceModule),
+            holding(pattern, binding, detectBraceSpacing(this.cu!)));
     }
 
     override async visitIdentifier(identifier: J.Identifier, p: P): Promise<J | undefined> {
@@ -2523,8 +2547,11 @@ function movedBinding(
     };
 }
 
-/** `pattern`, the binding a require declares, reduced to `binding` alone in its place. */
-function holding(pattern: J, binding: J.Identifier | JS.BindingElement): J {
+/**
+ * `pattern`, the binding a require declares, reduced to `binding` alone in its place.
+ * A new destructuring pads its braces where `braceSpacing` says the file does.
+ */
+function holding(pattern: J, binding: J.Identifier | JS.BindingElement, braceSpacing: boolean): J {
     if (isIdentifier(binding)) {
         return {...binding, prefix: pattern.prefix};
     }
@@ -2549,7 +2576,8 @@ function holding(pattern: J, binding: J.Identifier | JS.BindingElement): J {
         bindings: {
             kind: J.Kind.Container,
             before: emptySpace,
-            elements: [rightPadded(binding, emptySpace)],
+            elements: [rightPadded({...binding, prefix: braceSpacing ? singleSpace : emptySpace},
+                braceSpacing ? singleSpace : emptySpace)],
             markers: emptyMarkers
         }
     } as JS.ObjectBindingPattern;

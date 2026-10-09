@@ -304,7 +304,7 @@ const D = require('_stream_duplex');   →   const {Duplex: D} = require('stream
 ```
 
 A binding leaving a statement that binds other names is placed the way `maybeBind` places a new
-`require`, as is one that a `require` of the target before it can take.
+`require`, as is a `const` one that the target's joinable `require` can take.
 
 A target that is a built-in keeps the `node:` scheme the source spelled, on either lane.
 
@@ -312,11 +312,14 @@ A target that is a built-in keeps the `node:` scheme the source spelled, on eith
 
 A `.cjs` or `.cts` file is CommonJS. So is a file without ES module syntax that calls `require` or
 reads `exports` or `module.exports` anywhere, inside a function too. There `maybeBind` binds with
-`require`, since an `import` would make the file an ES module. A member joins a top-level `const`
-destructuring `require` of its module without a rest element, or else gets
-`const {m} = require('mod')` of its own. A whole module gets `const name = require('mod')`. A new
-statement goes after the file's last top-level `require`. A file with none takes it first, after a
-`'use strict'` directive.
+`require`, since an `import` would make the file an ES module. A function whose own parameters are
+`require`, `exports` or `module`, as an AMD factory's are, does not count.
+
+A new `require` goes among the file's leading requires, the run after a shebang and `'use strict'`
+that every other top-level statement follows, so nothing at top level reads the binding before it
+is initialised. A member joins a `const` destructuring `require` of its module there that has no
+rest element, or else gets `const {m} = require('mod')` at the end of the run. A whole module gets
+`const name = require('mod')`. A file with no leading requires takes it first.
 
 ### When `maybeBind` returns `undefined`
 
@@ -338,6 +341,7 @@ The four above that still apply, plus these:
   parameter's own name
 - `from` is destructured beside a rest element, which would gain the property the move takes out
 - `from` is destructured in a `let` or `var` `require` beside other names, since its new `require` is a `const`
+- `from`'s `require` has a type annotation, which describes the pattern the move would change
 - `to.alias` is not a legal identifier, or is a name that is taken in the sense of "Which name a
   rebind binds"
 - the file binds its modules with `require`, `from` is an ES import, and the move would need a new
