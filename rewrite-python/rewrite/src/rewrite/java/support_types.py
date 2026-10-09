@@ -736,13 +736,7 @@ class JContainer(Generic[J2]):
             return self._t._elements
 
         def replace(self, **kwargs) -> JContainer[J3]:
-            """Replace fields of the container using keyword arguments."""
-            if 'elements' in kwargs:
-                elements = kwargs['elements']
-                if self._t._elements is elements:
-                    return self._t
-                return JContainer(self._t._before, elements, self._t._markers)
-            return self._t
+            return replace_if_changed(self._t, **kwargs)
 
     _padding: Optional[weakref.ReferenceType[JContainer.PaddingHelper[J2]]] = None
 

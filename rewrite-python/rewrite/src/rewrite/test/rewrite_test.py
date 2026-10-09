@@ -318,8 +318,14 @@ class RecipeSpec:
 
             try:
                 from rewrite.python.ty_client import TyTypesClient
-                # handle_parse resolves this same version for a real parse.
-                ty_client = TyTypesClient(python_version=ty_python_version(detect_from_project(root)))
+                # Without an explicit venv, ty-types resolves against the runner's
+                # environment, not the uv() workspace's venv holding the dependencies.
+                venv = Path(root) / ".venv"
+                ty_client = TyTypesClient(
+                    virtual_env=str(venv) if venv.is_dir() else None,
+                    # handle_parse resolves this same version for a real parse.
+                    python_version=ty_python_version(detect_from_project(root)),
+                )
                 if not ty_client.initialize(root):
                     ty_status = f"off, ty could not initialize against {root}"
             except (ImportError, RuntimeError) as exc:
