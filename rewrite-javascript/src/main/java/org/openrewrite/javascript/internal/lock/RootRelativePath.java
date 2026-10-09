@@ -19,9 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Paths relative to the project's root, which stands in for the absolute directory a package manager joins paths
- * onto: {@code ""} is the root, and a path above it keeps its leading {@code ..} segments, where the engine stops
- * seeing the project.
+ * Paths relative to the project's root, standing in for the absolute directory a package manager joins paths onto:
+ * {@code ""} is the root, and a path above it keeps its leading {@code ..} segments.
  */
 public final class RootRelativePath {
 

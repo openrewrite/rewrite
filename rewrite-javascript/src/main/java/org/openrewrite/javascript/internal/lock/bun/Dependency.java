@@ -18,9 +18,8 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Port of bun's src/install/dependency.zig (bun 1.3.10): an edge of a package, by the name it is installed under
- * (an alias included), with its spec and behavior. Its resolution lives in the lockfile's resolution buffer at
- * the same index.
+ * Port of bun's src/install/dependency.zig (bun 1.3.10): an edge by the name it is installed under, with its spec
+ * and behavior; its resolution is at the same index of the lockfile's resolution buffer.
  */
 final class Dependency {
 

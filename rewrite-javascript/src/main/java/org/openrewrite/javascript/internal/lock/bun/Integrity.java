@@ -19,9 +19,8 @@ import java.util.Arrays;
 import java.util.Base64;
 
 /**
- * Port of bun's src/install/integrity.zig (bun 1.3.10) with Zig's standard base64 codec without padding: the
- * digest is decoded on read and encoded again on write, a pad of {@code =} appended for sha1 and {@code ==}
- * for every other algorithm.
+ * Port of bun's src/install/integrity.zig (bun 1.3.10): the digest decoded and encoded again with Zig's unpadded
+ * base64, then {@code =} appended for sha1 and {@code ==} for every other algorithm.
  */
 final class Integrity {
 

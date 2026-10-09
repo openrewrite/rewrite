@@ -19,9 +19,8 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A failure talking to an npm registry, carrying enough structure for the lock engine to
- * map it onto a per-package recipe failure. The reason set is kept distinct from the
- * engine's lock-failure taxonomy so the client does not depend on it.
+ * A failure talking to an npm registry, with the reason and package the lock engine maps onto a recipe failure;
+ * its reasons are the client's own, so the client does not depend on the engine's.
  */
 @Getter
 public class NodeRegistryException extends RuntimeException {

@@ -19,10 +19,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Port of Zig's lib/std/hash_map.zig {@code HashMapUnmanaged} over {@code AutoContext(u64)} with the default
- * maximum load of 80% (oven-sh/zig c031cbebf5b063210473ff5204a24ebfb2492c72, the Zig bun 1.3.10 builds with),
- * without removal: bun.lock.zig collects the trusted and the patched dependencies it writes into such a map and
- * writes them in the map's slot order.
+ * Port of Zig's lib/std/hash_map.zig {@code HashMapUnmanaged} over {@code AutoContext(u64)}, 80% load (oven-sh/zig
+ * c031cbebf5, the Zig of bun 1.3.10): bun.lock.zig writes trusted and patched dependencies in its slot order.
  */
 final class TrustedDependencies<V> {
 

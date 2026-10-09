@@ -16,10 +16,8 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 /**
- * A root package.json arborist cannot build a node from (an override key it cannot parse, a dependency
- * whose spec is not a string, ...): npm discards the manifest, resolves nothing and writes an empty lock.
- * Also a {@code $name} override reference that names nothing on an edge the build reaches, where npm exits
- * without a lock. The message names what was refused.
+ * A root package.json arborist cannot build a node from (npm writes an empty lock), or a {@code $name} override
+ * naming nothing on an edge the build reaches (npm writes none); the message names what was refused.
  */
 public final class MalformedManifest extends IllegalStateException {
     public MalformedManifest(String message) {

@@ -19,10 +19,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * Port of bun's src/install/npm.zig {@code Negatable}, {@code OperatingSystem}, {@code Architecture} and
- * {@code Libc} (bun 1.3.10): an {@code os}/{@code cpu}/{@code libc} list as a bit set of the values it allows.
- * The names are in bun's {@code ComptimeStringMap} order (by length, then bytes), which is the order
- * {@link #toJson} writes them in.
+ * Port of bun's src/install/npm.zig {@code Negatable} and its os, cpu and libc tables (bun 1.3.10): a bit set of the
+ * values a list allows, named in {@code ComptimeStringMap} order (length, then bytes), as {@link #toJson} writes.
  */
 final class Negatable {
 
