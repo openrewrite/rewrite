@@ -139,7 +139,8 @@ class ConfigurationTest {
             options.restrictTo(YarnRelease.of("4.10.3").getSettings());
             assertThat(options.get("compressionLevel")).as(variable).isEqualTo(3);
         }
-        assertThatThrownBy(() -> BerryOptions.load(Collections.emptyMap(), HostEnvironment.of(Collections.singletonMap("YARN_COMMAND",
+        assertThatThrownBy(() ->
+                BerryOptions.load(Collections.emptyMap(), HostEnvironment.of(Collections.singletonMap("YARN_COMMAND",
                 "x"))).restrictTo(YarnRelease.of("4.10.3").getSettings()))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: command");
@@ -171,7 +172,8 @@ class ConfigurationTest {
         assertThat(options.get("npmPreapprovedPackages")).isEqualTo(Collections.singletonList("example.com"));
 
         assertThat(BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "npmPreapprovedPackages: [rc]\n"),
-                HostEnvironment.of(Collections.singletonMap("YARN_NPM_PREAPPROVED_PACKAGES", "env"))).get("npmPreapprovedPackages"))
+                HostEnvironment.of(Collections.singletonMap("YARN_NPM_PREAPPROVED_PACKAGES", "env")))
+                        .get("npmPreapprovedPackages"))
                 .isEqualTo(Collections.singletonList("env"));
     }
 

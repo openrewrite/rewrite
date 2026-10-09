@@ -49,7 +49,8 @@ class BerryOptionsTest {
         BerryOptions options = BerryOptions.load(files, HostEnvironment.of(Collections.emptyMap()));
         assertThat(options.get("compressionLevel")).isEqualTo(3);
         assertThat(options.get("enableTransparentWorkspaces")).isEqualTo(false);
-        assertThat(BerryOptions.load(files, HostEnvironment.of(Collections.singletonMap("YARN_COMPRESSION_LEVEL", "mixed")))
+        assertThat(BerryOptions.load(files,
+                HostEnvironment.of(Collections.singletonMap("YARN_COMPRESSION_LEVEL", "mixed")))
                 .get("compressionLevel")).isEqualTo("mixed");
     }
 
@@ -74,7 +75,8 @@ class BerryOptionsTest {
     @Test
     void replacesEnvironmentVariables() {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
-                "npmRegistryServer: \"${REGISTRY:-https://fallback.example}\"\n"), HostEnvironment.of(Collections.emptyMap()));
+                "npmRegistryServer: \"${REGISTRY:-https://fallback.example}\"\n"),
+                        HostEnvironment.of(Collections.emptyMap()));
         assertThat(options.get("npmRegistryServer")).isEqualTo("https://fallback.example");
     }
 
@@ -129,7 +131,8 @@ class BerryOptionsTest {
     void onlyTheEnvironmentTurnsStrictSettingsOff() {
         Set<String> settings = YarnRelease.of("4.10.3").getSettings();
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
-                "enableStrictSettings: false\nfooUnknownSetting: 1\ncompressionLevel: 3\n"), HostEnvironment.of(Collections.emptyMap()))
+                "enableStrictSettings: false\nfooUnknownSetting: 1\ncompressionLevel: 3\n"),
+                        HostEnvironment.of(Collections.emptyMap()))
                 .restrictTo(settings))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: fooUnknownSetting");
@@ -143,11 +146,13 @@ class BerryOptionsTest {
         Map<String, String> env = new LinkedHashMap<>();
         env.put("YARN_ENABLE_STRICT_SETTINGS", "false");
         env.put("YARN_FOO_UNKNOWN", "1");
-        BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"), HostEnvironment.of(env)).restrictTo(settings);
+        BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"), HostEnvironment.of(env))
+                .restrictTo(settings);
 
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "enableStrictSettings: false\nfooUnknownSetting: 1\n"),
-                HostEnvironment.of(Collections.singletonMap("YARN_ENABLE_STRICT_SETTINGS", "true"))).restrictTo(settings))
+                HostEnvironment.of(Collections.singletonMap("YARN_ENABLE_STRICT_SETTINGS", "true")))
+                        .restrictTo(settings))
                 .isInstanceOf(BerryOptions.UsageError.class);
     }
 
@@ -168,13 +173,15 @@ class BerryOptionsTest {
                     .isInstanceOf(JsError.class)
                     .hasMessageContaining("Invalid value, expected one of mixed, 0, 1");
         }
-        assertThat(BerryOptions.load(Collections.emptyMap(), HostEnvironment.of(Collections.singletonMap("YARN_COMPRESSION_LEVEL", "0x5")))
+        assertThat(BerryOptions.load(Collections.emptyMap(),
+                HostEnvironment.of(Collections.singletonMap("YARN_COMPRESSION_LEVEL", "0x5")))
                 .get("compressionLevel")).isEqualTo(5);
         assertThat(BerryOptions.parseInt("\u3000\u2028-12")).isEqualTo(-12);
         assertThat(BerryOptions.parseInt("99999999999")).isEqualTo(99999999999d);
     }
 
     private static BerryOptions options(String yarnrc) {
-        return BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc), HostEnvironment.of(Collections.emptyMap()));
+        return BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
+                HostEnvironment.of(Collections.emptyMap()));
     }
 }

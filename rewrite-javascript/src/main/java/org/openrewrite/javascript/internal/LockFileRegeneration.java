@@ -38,8 +38,10 @@ import static java.util.Objects.requireNonNull;
 public final class LockFileRegeneration {
 
     public static final LockFileRegeneration NPM = new LockFileRegeneration(PackageManager.Npm, "package-lock.json");
-    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(PackageManager.YarnClassic, "yarn.lock");
-    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lock");
+    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(PackageManager.YarnClassic, "yar" +
+            "n.lock");
+    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lo" +
+            "ck");
     public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
     public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
 

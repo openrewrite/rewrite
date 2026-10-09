@@ -93,7 +93,8 @@ class NpmInstallChecksTest {
 
     @Test
     void npmPrerelease() {
-        assertThatCode(() -> NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "69.420.0-yolo", "69.420.0-yolo", false))
+        assertThatCode(() ->
+          NpmInstallChecks.checkEngine(e(">=1.2.3", ">=0.8"), "69.420.0-yolo", "69.420.0-yolo", false))
           .doesNotThrowAnyException();
     }
 
@@ -129,12 +130,14 @@ class NpmInstallChecksTest {
 
     @Test
     void targetCpuWrong() {
-        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}")).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}"))
+          .matches(NpmInstallChecksTest::badPlatform);
     }
 
     @Test
     void osWrong() {
-        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}")).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}"))
+          .matches(NpmInstallChecksTest::badPlatform);
     }
 
     @Test
@@ -165,12 +168,14 @@ class NpmInstallChecksTest {
 
     @Test
     void everythingWrongWithArrays() {
-        assertThatThrownBy(() -> platform("{\"cpu\":[\"enten-cpu\"],\"os\":[\"enten-os\"]}")).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> platform("{\"cpu\":[\"enten-cpu\"],\"os\":[\"enten-os\"]}"))
+          .matches(NpmInstallChecksTest::badPlatform);
     }
 
     @Test
     void osWrongNegation() {
-        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"!darwin\"}")).matches(NpmInstallChecksTest::badPlatform);
+        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"!darwin\"}"))
+          .matches(NpmInstallChecksTest::badPlatform);
     }
 
     @Test
@@ -180,13 +185,15 @@ class NpmInstallChecksTest {
 
     @Test
     void nothingWrongWithOverriddenOs() {
-        assertThatCode(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("enten-os").build()))
+        assertThatCode(() ->
+          platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("enten-os").build()))
           .doesNotThrowAnyException();
     }
 
     @Test
     void nothingWrongWithOverriddenCpu() {
-        assertThatCode(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("enten-cpu").build()))
+        assertThatCode(() ->
+          platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("enten-cpu").build()))
           .doesNotThrowAnyException();
     }
 
@@ -198,13 +205,15 @@ class NpmInstallChecksTest {
 
     @Test
     void wrongOsWithOverriddenOs() {
-        assertThatThrownBy(() -> platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("another-os").build()))
+        assertThatThrownBy(() ->
+          platform("{\"cpu\":\"any\",\"os\":\"enten-os\"}", false, Host.builder().os("another-os").build()))
           .matches(NpmInstallChecksTest::badPlatform);
     }
 
     @Test
     void wrongCpuWithOverriddenCpu() {
-        assertThatThrownBy(() -> platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("another-cpu").build()))
+        assertThatThrownBy(() ->
+          platform("{\"cpu\":\"enten-cpu\",\"os\":\"any\"}", false, Host.builder().cpu("another-cpu").build()))
           .matches(NpmInstallChecksTest::badPlatform);
     }
 
@@ -224,7 +233,8 @@ class NpmInstallChecksTest {
     @Test
     void configuredLibcIsCheckedOnAnUnknownMachine() {
         Host glibc = Host.builder().libc("glibc").build();
-        assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false, glibc, Host.UNKNOWN))
+        assertThatThrownBy(() ->
+          NpmInstallChecks.checkPlatform(json("{\"libc\":\"musl\"}"), false, glibc, Host.UNKNOWN))
           .matches(NpmInstallChecksTest::badPlatform);
         assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, glibc, Host.UNKNOWN))
           .doesNotThrowAnyException();
@@ -236,7 +246,8 @@ class NpmInstallChecksTest {
     @Test
     void configuredOsDropsTheMachinesLibc() {
         Host linuxGlibc = Host.builder().os("linux").cpu("x64").libc("glibc").build();
-        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN, linuxGlibc))
+        assertThatCode(() ->
+          NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false, Host.UNKNOWN, linuxGlibc))
           .doesNotThrowAnyException();
         assertThatThrownBy(() -> NpmInstallChecks.checkPlatform(json("{\"libc\":[\"glibc\"]}"), false,
           Host.builder().os("darwin").build(), linuxGlibc)).matches(NpmInstallChecksTest::badPlatform);
@@ -254,7 +265,8 @@ class NpmInstallChecksTest {
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
         assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"npm\":true}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
-        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":[\">=1\"]}}"),
+        assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\"," +
+                "\"engines\":{\"node\":[\">=1\"]}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
         assertThatThrownBy(() -> NpmInstallChecks.checkEngine(json("{\"_id\":\"p@1\",\"engines\":{\"node\":{}}}"),
           "11.17.0", "v20.0.0", false)).isInstanceOf(NpmInstallChecks.UnsupportedEngine.class);
@@ -272,7 +284,8 @@ class NpmInstallChecksTest {
 
     @Test
     void unknownHostSatisfiesEveryCheck() {
-        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\",\"libc\":\"musl\"}"),
+        assertThatCode(() -> NpmInstallChecks.checkPlatform(json("{\"cpu\":\"enten-cpu\",\"os\":\"enten-os\"," +
+                "\"libc\":\"musl\"}"),
           false, Host.UNKNOWN, Host.UNKNOWN)).doesNotThrowAnyException();
         assertThatCode(() -> NpmInstallChecks.checkEngine(e(null, ">=99"), "11.17.0", null, false))
           .doesNotThrowAnyException();

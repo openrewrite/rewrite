@@ -28,7 +28,8 @@ import static org.openrewrite.semver.Semver.isVersion;
  * <a href="https://github.com/npm/node-semver#hyphen-ranges-xyz---abc">Hyphen ranges</a>.
  */
 public class HyphenRange extends LatestRelease {
-    private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
+    private static final Pattern HYPHEN_RANGE_PATTERN = Pattern.compile("(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)\\s*-\\s" +
+            "*(\\d+(\\.\\d+)?(\\.\\d+)?(\\.\\d+)?)");
 
     // The npm hyphen grammar; groups 1-5 = "from" bound and its major/minor/patch/prerelease, 6-10 = "to".
     private static final Pattern NODE_HYPHEN_PATTERN = Pattern.compile(
@@ -101,7 +102,8 @@ public class HyphenRange extends LatestRelease {
         return (from + " " + to).trim();
     }
 
-    private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr, boolean incPre) {
+    private static String hyphenFrom(String from, String fM, String fm, String fp, @Nullable String fpr,
+            boolean incPre) {
         if (XRange.isX(fM)) {
             return "";
         }

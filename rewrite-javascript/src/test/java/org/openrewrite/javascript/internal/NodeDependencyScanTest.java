@@ -162,7 +162,8 @@ class NodeDependencyScanTest {
                                                                      String configFile, String written) {
         String lockName = Paths.get(written).getFileName().toString();
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
-        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(lockName)).text("root lock").build());
+        NodeDependencyScan.captureLock(acc,
+          PlainText.builder().sourcePath(Paths.get(lockName)).text("root lock").build());
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + lockName))
           .text("member lock").build());
         acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
@@ -456,10 +457,12 @@ class NodeDependencyScanTest {
     private static final Path ROOT = Paths.get("package.json");
     private static final Path MEMBER = Paths.get("packages/a/package.json");
 
-    private static NodeDependencyScan.Accumulator workspaceWithMemberLock(PackageManager rootPm, PackageManager memberPm,
+    private static NodeDependencyScan.Accumulator workspaceWithMemberLock(PackageManager rootPm,
+      PackageManager memberPm,
                                                                         String rootLock, String memberLock) {
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
-        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get(rootLock)).text("root lock").build());
+        NodeDependencyScan.captureLock(acc,
+          PlainText.builder().sourcePath(Paths.get(rootLock)).text("root lock").build());
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("packages/a/" + memberLock))
           .text("member lock").build());
         acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)

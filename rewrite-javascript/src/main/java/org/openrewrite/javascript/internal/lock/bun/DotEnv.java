@@ -34,7 +34,8 @@ public final class DotEnv {
      * {@code loadDefaultFiles} for {@code .production}, the suffix an install loads with: an earlier file's value
      * is kept over a later one's, and the process environment over all of them.
      */
-    public static final List<String> FILES = Arrays.asList(".env.production.local", ".env.local", ".env.production", ".env");
+    public static final List<String> FILES = Arrays.asList(".env.production.local", ".env.local", ".env.production",
+        ".env");
 
     private static final String WHITESPACE = "\t\u000B\f  \n\r";
 

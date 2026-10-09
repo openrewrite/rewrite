@@ -42,7 +42,8 @@ public final class Ini {
     }
 
     private static final Pattern LINES = Pattern.compile("[\\r\\n]+");
-    private static final Pattern BLANK_OR_COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*(?:[;#]|\\z)");
+    private static final Pattern BLANK_OR_COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS +
+            "]*(?:[;#]|\\z)");
     private static final Pattern LINE = Pattern.compile(
             "^\\[([^\\]]*)\\][" + EcmaScript.WHITESPACE_CLASS + "]*\\z|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z");
 

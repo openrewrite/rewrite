@@ -29,7 +29,8 @@ import static org.openrewrite.semver.Semver.isVersion;
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
  */
 public class XRange extends LatestRelease {
-    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
+    private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]" +
+            "|\\d+))?(?:\\.([*xX+]|\\d+))?)?");
 
     static final String XRANGE_ID = ParsedVersion.NUMERIC_ID + "|x|X|\\*";
 
@@ -48,7 +49,8 @@ public class XRange extends LatestRelease {
     // The npm x-range grammar (no + wildcard, no 4th component); groups: operator, major, minor, patch, prerelease.
     private static final Pattern NODE_X_RANGE_PATTERN = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN + "$");
 
-    private static final Pattern NODE_X_RANGE_PATTERN_LOOSE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN_LOOSE + "$");
+    private static final Pattern NODE_X_RANGE_PATTERN_LOOSE = Pattern.compile("^((?:<|>)?=?)\\s*" + XRANGE_PLAIN_LOOSE +
+            "$");
 
     private static final Pattern NODE_STAR_PATTERN = Pattern.compile("^(?:<|>)?=?\\s*\\*$");
 
@@ -114,7 +116,8 @@ public class XRange extends LatestRelease {
 
     public static Validated<XRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
-        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*") || pattern.contains("+"))) {
+        if (!matcher.matches() ||
+                !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*") || pattern.contains("+"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");
         }
 

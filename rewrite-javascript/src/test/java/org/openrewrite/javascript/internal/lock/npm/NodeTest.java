@@ -117,7 +117,8 @@ class NodeTest {
             "optionalDependencies", obj("optional", "", "overlap", "", "optMissing", "")))
           .realpath("/srv/user/projects/root").path("/srv/user/projects/root").meta(rootMetadata)
           .child(opts()
-            .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies", obj("peer", "")))
+            .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies",
+            obj("peer", "")))
             .fsChild(opts().realpath("/srv/user/projects/root/node_modules/prod/foo")
               .path("/srv/user/projects/root/node_modules/prod/foo").name("foo")
               .pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("meta", ""))).build())
@@ -202,7 +203,8 @@ class NodeTest {
         treeCheck(root);
 
         Node newProd = node(opts().name("prod")
-          .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies", obj("peer", "")))
+          .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies",
+          obj("peer", "")))
           .path("/some/path").resolved("prod").integrity("prod"));
         assertThat(newProd.canReplace(prod)).as("new prod can replace prod").isTrue();
         int kidCount = prod.getChildren().size();
@@ -320,7 +322,8 @@ class NodeTest {
     // load with a virtual filesystem parent; upstream also asserts the throws of arborist's debug mode
     @Test
     void loadWithAVirtualFilesystemParent() {
-        Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "", "link3", "")))
+        Node root = node(opts()
+          .pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "", "link3", "")))
           .path("/srv/user/projects/root").realpath("/srv/user/projects/root"));
         Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a"));
         Link link = link(opts().pkg(obj("name", "link", "version", "1.2.3", "dependencies", obj("a", "", "kid", "")))
@@ -374,7 +377,8 @@ class NodeTest {
         assertThat(target3.getFsParent()).isSameAs(packages);
         assertThat(link3.getRealpath()).as("link realpath updated").isEqualTo(target3.getPath());
 
-        Node linkChild = node(opts().path(target3.getPath() + "/linkchild").pkg(obj("name", "linkchild", "version", "1.2.3")));
+        Node linkChild = node(opts().path(target3.getPath() + "/linkchild")
+          .pkg(obj("name", "linkchild", "version", "1.2.3")));
         linkChild.setFsParent(link3);
         assertThat(linkChild.getFsParent()).isSameAs(link3.getTarget());
         assertThat(linkChild.getRoot()).isSameAs(root);
@@ -428,7 +432,8 @@ class NodeTest {
         assertThat(aChild.getParent()).isSameAs(a);
         assertThat(a.getChildren().get("achild")).isSameAs(aChild);
         List<Node> underA = root.getInventory().values().stream()
-          .filter(n -> n.getPath() != null && n.getPath().startsWith(a.getPath()) && n != a).collect(Collectors.toList());
+          .filter(n -> n.getPath() != null && n.getPath().startsWith(a.getPath()) && n != a)
+          .collect(Collectors.toList());
         String aLoc = a.getLocation();
         Link aLink = link(opts().path(a.getPath()).target(node(opts().path("/some/other/a").pkg(a.getPackage()))));
         aLink.setRoot(root);
@@ -451,7 +456,8 @@ class NodeTest {
         assertThat(remoteTarget.getFsParent()).as("remote target has no fsParent").isNull();
         assertThat(remoteTarget.getParent()).as("remote target has no parent").isNull();
         assertThat(root.getTops()).as("remote target in root.tops").contains(remoteTarget);
-        Node remoteParent = node(opts().path("/remote/node_modules/a").pkg(obj("name", "a", "version", "1.2.3")).root(root));
+        Node remoteParent = node(opts().path("/remote/node_modules/a").pkg(obj("name", "a", "version", "1.2.3"))
+          .root(root));
         assertThat(remoteParent.getChildren().get("x")).isSameAs(remoteTarget);
         treeCheck(root);
     }
@@ -471,12 +477,14 @@ class NodeTest {
     @Test
     void changingRoot() {
         Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/srv/user/projects/root").realpath("/srv/user/projects/root").meta(emptyLock("/srv/user/projects/root")));
+          .path("/srv/user/projects/root").realpath("/srv/user/projects/root")
+          .meta(emptyLock("/srv/user/projects/root")));
         Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3")).parent(root).name("a")
           .resolved("https://example.com/a-1.2.3.tgz").integrity("sha512-asdfasdfasdf"));
         Node b = node(opts().pkg(obj("name", "b", "version", "1.2.3")).parent(a).name("b"));
         Node root2 = node(opts().pkg(obj("name", "root2", "dependencies", obj("a", "", "link", "", "link2", "")))
-          .path("/srv/user/projects/root2").realpath("/srv/user/projects/root2").meta(emptyLock("/srv/user/projects/root2")));
+          .path("/srv/user/projects/root2").realpath("/srv/user/projects/root2")
+          .meta(emptyLock("/srv/user/projects/root2")));
         assertThat(a.getRoot()).isSameAs(root);
         assertThat(b.getRoot()).isSameAs(root);
         assertTree("changing root: before, root", root);
@@ -502,9 +510,11 @@ class NodeTest {
 
     @Test
     void bundledDependenciesLogic() {
-        Node root = node(opts().pkg(obj("name", "root", "dependencies", obj("a", "", "b", "", "d", "", "e", "", "f", ""),
+        Node root = node(opts()
+          .pkg(obj("name", "root", "dependencies", obj("a", "", "b", "", "d", "", "e", "", "f", ""),
           "bundleDependencies", arr("a"))).path("/path/to/root").realpath("/path/to/root"));
-        Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3", "dependencies", obj("b", "", "aa", ""))).parent(root));
+        Node a = node(opts().pkg(obj("name", "a", "version", "1.2.3", "dependencies", obj("b", "", "aa", "")))
+          .parent(root));
         Node aa = node(opts().pkg(obj("name", "aa", "version", "1.2.3")).parent(a));
         Node b = node(opts().pkg(obj("name", "b", "version", "1.2.3", "dependencies", obj("c", ""))).parent(root));
         Node c = node(opts().pkg(obj("name", "c", "version", "1.2.3", "dependencies", obj("cc", ""))).parent(root));
@@ -514,7 +524,8 @@ class NodeTest {
         Node f = node(opts().pkg(obj("name", "f", "version", "1.2.3", "dependencies", obj("fa", "", "fb", ""),
           "bundleDependencies", arr("fb"))).parent(root));
         node(opts().pkg(obj("name", "fa", "version", "1.2.3")).parent(f));
-        Node fb = node(opts().pkg(obj("name", "fb", "version", "1.2.3", "dependencies", obj("e", "", "fc", ""))).parent(f));
+        Node fb = node(opts().pkg(obj("name", "fb", "version", "1.2.3", "dependencies", obj("e", "", "fc", "")))
+          .parent(f));
         node(opts().pkg(obj("name", "fc", "version", "1.2.3", "dependencies", obj("fb", ""))).parent(f));
 
         assertThat(a.isInBundle()).as("bundled dep is bundled").isTrue();
@@ -551,17 +562,21 @@ class NodeTest {
         assertThat(node(opts().path("/path/to/foo/node_modules/a/b/c").realpath("/path/to/foo/node_modules/a/b/c")
           .pkg(obj("name", "c"))).inNodeModules()).as("not directly in node_modules").isNull();
         assertThat(node(opts().path("/path/to/foo/node_modules/@c/d").realpath("/path/to/foo/node_modules/@c/d")
-          .pkg(obj("name", "@a/b/c/d/e"))).inNodeModules()).as("scoped package in node_modules").isEqualTo("/path/to/foo");
+          .pkg(obj("name", "@a/b/c/d/e"))).inNodeModules()).as("scoped package in node_modules")
+          .isEqualTo("/path/to/foo");
     }
 
     @Test
     void updateMetadataWhenMovingBetweenLinkedTopOfTreeParents() {
-        Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/root").realpath("/srv/user/projects/root")
+        Node root = node(opts().pkg(obj("name", "root")).path("/srv/user/projects/root")
+          .realpath("/srv/user/projects/root")
           .meta(emptyLock("/srv/user/projects/root")));
-        Node top1 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top1").realpath("/path/to/top1")
+        Node top1 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top1")
+          .realpath("/path/to/top1")
           .meta(emptyLock("/path/to/top1")));
         link(opts().name("link1").parent(root).realpath(top1.getPath()).target(top1));
-        Node top2 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top2").realpath("/path/to/top2")
+        Node top2 = node(opts().pkg(obj("name", "top", "version", "1.1.1")).path("/path/to/top2")
+          .realpath("/path/to/top2")
           .meta(emptyLock("/path/to/top2")));
         Link link2 = link(opts().name("link2").parent(root).realpath(top2.getPath()).target(top2));
         Node child = node(opts().parent(top1)
@@ -613,7 +628,8 @@ class NodeTest {
     @Test
     void nodesInShrinkwraps() {
         Node root = node(opts().pkg(obj("dependencies", obj("a", ""))).path("/path/to/root")
-          .child(opts().name("a").pkg(obj("name", "a", "version", "1.2.3", "dependencies", obj("b", ""), "_hasShrinkwrap", true))
+          .child(opts().name("a")
+          .pkg(obj("name", "a", "version", "1.2.3", "dependencies", obj("b", ""), "_hasShrinkwrap", true))
             .child(opts().name("b").pkg(obj("version", "1.2.3", "name", "b", "dependencies", obj("c", "")))
               .child(opts().name("c").pkg(obj("name", "c", "version", "1.2.3")).build()).build()).build()));
         Node a = child(root, "a");
@@ -698,10 +714,12 @@ class NodeTest {
 
     @Test
     void doNotRelyOnLegacyResolvedForFileNodes() {
-        Node old = node(opts().pkg(obj("_resolved", "file:/x/y/z/blorg.tgz", "_where", "/why/did/i/think/this/was/a/good/idea"))
+        Node old = node(opts()
+          .pkg(obj("_resolved", "file:/x/y/z/blorg.tgz", "_where", "/why/did/i/think/this/was/a/good/idea"))
           .path("/some/completely/different/path"));
         assertThat(old.getResolved()).isNull();
-        Node notOld = node(opts().pkg(obj("_resolved", "file:/x/y/z/blorg.tgz")).path("/some/completely/different/path"));
+        Node notOld = node(opts().pkg(obj("_resolved", "file:/x/y/z/blorg.tgz"))
+          .path("/some/completely/different/path"));
         assertThat(notOld.getResolved()).isEqualTo("file:/x/y/z/blorg.tgz");
     }
 
@@ -747,7 +765,8 @@ class NodeTest {
         assertEdge(y1x2, "y", "2", null, y1y2);
         assertEdge(y1y2, "x", "1", Edge.INVALID, y1x2);
 
-        Node y1y2x1 = node(opts().pkg(obj("name", "x", "version", "1.0.0", "dependencies", obj("y", "1"))).parent(y1y2));
+        Node y1y2x1 = node(opts().pkg(obj("name", "x", "version", "1.0.0", "dependencies", obj("y", "1")))
+          .parent(y1y2));
         assertEdge(root, "x", "1", null, x1);
         assertEdge(x1, "y", "1", null, y1);
         assertEdge(y1, "x", "2", null, y1x2);
@@ -755,7 +774,8 @@ class NodeTest {
         assertEdge(y1y2, "x", "1", null, y1y2x1);
         assertEdge(y1y2x1, "y", "1", Edge.INVALID, y1y2);
 
-        Node y1y2y1 = node(opts().pkg(obj("name", "y", "version", "1.0.0", "dependencies", obj("x", "2"))).parent(y1y2));
+        Node y1y2y1 = node(opts().pkg(obj("name", "y", "version", "1.0.0", "dependencies", obj("x", "2")))
+          .parent(y1y2));
         assertEdge(root, "x", "1", null, x1);
         assertEdge(x1, "y", "1", null, y1);
         assertEdge(y1, "x", "2", null, y1x2);
@@ -783,11 +803,13 @@ class NodeTest {
         check(x, x, true);
 
         Node p = node(opts().path("/foo"));
-        check(node(opts().name("a").parent(p).integrity("sha512-xyz")), node(opts().name("b").parent(p).integrity("sha512-xyz")), false);
+        check(node(opts().name("a").parent(p).integrity("sha512-xyz")),
+          node(opts().name("b").parent(p).integrity("sha512-xyz")), false);
 
         Node root = node(opts().path("/root"));
         Node target = node(opts().root(root).path("/foo").pkg(obj("name", "x", "version", "1.2.3")));
-        check(link(opts().root(root).path("/a/x").target(target)), link(opts().root(root).path("/b/x").target(target)), true);
+        check(link(opts().root(root).path("/a/x").target(target)), link(opts().root(root).path("/b/x").target(target)),
+          true);
 
         check(node(opts().path("/foo").pkg(obj("name", "x", "version", "1.2.3"))),
           node(opts().path("/foo").pkg(obj("name", "x", "version", "1.2.3"))), true);
@@ -904,7 +926,8 @@ class NodeTest {
             .child(opts().pkg(obj("name", "a", "version", "4.5.6", "dependencies", obj())).build()).build()));
         Node z = child(y, "z");
         Node a = child(z, "a");
-        assertThat(y.explain()).isEqualTo(why("y", "2.3.4", "node_modules/y", false, dependent("prod", "y", "2", n.explain())));
+        assertThat(y.explain())
+          .isEqualTo(why("y", "2.3.4", "node_modules/y", false, dependent("prod", "y", "2", n.explain())));
         assertThat(z.explain()).isEqualTo(why("z", "3.4.5", "node_modules/y/node_modules/z", false,
           dependent("prod", "z", "3", y.explain())));
         assertThat(a.explain()).isEqualTo(why("a", "4.5.6", "node_modules/y/node_modules/z/node_modules/a", false,
@@ -937,8 +960,10 @@ class NodeTest {
 
         Node actual = child(node(opts().path("/project").pkg(obj("dependencies", obj("a", "1")))
           .child(opts().pkg(obj("name", "a", "version", "1.2.3", "dependencies", obj("b", "1"))).build())
-          .child(opts().pkg(obj("name", "b", "version", "1.2.3", "dependencies", obj("c", "1", "d", "1"))).build())), "b");
-        Node virtualB = node(opts().path("/virtual-root").pkg(new LinkedHashMap<>(actual.getPackage())).sourceReference(actual)
+          .child(opts().pkg(obj("name", "b", "version", "1.2.3", "dependencies", obj("c", "1", "d", "1"))).build())),
+          "b");
+        Node virtualB = node(opts().path("/virtual-root").pkg(new LinkedHashMap<>(actual.getPackage()))
+          .sourceReference(actual)
           .child(opts().pkg(obj("name", "c", "version", "1.2.3", "dependencies", obj("d", "1"))).build())
           .child(opts().pkg(obj("name", "d", "version", "1.2.3")).build()));
         Edge edge = child(virtualB, "c").getEdgesOut().get("d");
@@ -948,7 +973,8 @@ class NodeTest {
             obj("name", "c", "version", "1.2.3", "whileInstalling", whileInstalling, "location", "node_modules/c",
               "isWorkspace", false, "dependents", arr(dependent("prod", "c", "1",
                 why("b", "1.2.3", "node_modules/b", false, dependent("prod", "b", "1",
-                  why("a", "1.2.3", "node_modules/a", false, dependent("prod", "a", "1", obj("location", "/project")))))))))));
+                  why("a", "1.2.3", "node_modules/a", false,
+                    dependent("prod", "a", "1", obj("location", "/project")))))))))));
         assertThat(child(virtualB, "d").explain(edge)).isEqualTo(d);
 
         Node badParent = node(opts().path("/bad/nodes"));
@@ -963,7 +989,8 @@ class NodeTest {
           .path("/bad/nodes/node_modules/noname"));
         Map<String, Object> noPkgWhy = noPkgDep.explain();
         assertThat((List<?>) noPkgWhy.get("errors")).singleElement()
-          .satisfies(e -> assertThat(((Throwable) e).getMessage()).isEqualTo("invalid package: lacks name and/or version"));
+          .satisfies(e -> assertThat(((Throwable) e).getMessage()).isEqualTo("invalid package: lacks name and/or " +
+                  "version"));
         assertThat(noPkgWhy.get("package")).isEqualTo(obj("noname", "bad", "noversion", "node"));
 
         Node workspacesRoot = node(opts().path("/some/path")
@@ -977,7 +1004,8 @@ class NodeTest {
         assertThat(ws.explain()).as("should have workspaces properly set up").isEqualTo(wsWhy);
     }
 
-    private static Map<String, Object> why(String name, String version, String location, boolean isWorkspace, Object... dependents) {
+    private static Map<String, Object> why(String name, String version, String location, boolean isWorkspace,
+      Object... dependents) {
         return obj("name", name, "version", version, "location", location, "isWorkspace", isWorkspace,
           "dependents", new ArrayList<>(Arrays.asList(dependents)));
     }
@@ -1011,7 +1039,8 @@ class NodeTest {
         Node r1 = node(opts().path("/root1"));
         Node r2 = node(opts().path("/root1/root2").child(opts().pkg(obj("name", "foo", "version", "1.2.3")).build()));
         Node r3 = node(opts().path("/root1/root3"));
-        Node child3 = node(opts().path("/root1/root2/node_modules/foo").pkg(obj("name", "foo", "version", "1.2.3")).root(r3));
+        Node child3 = node(opts().path("/root1/root2/node_modules/foo").pkg(obj("name", "foo", "version", "1.2.3"))
+          .root(r3));
         Node child = child(r2, "foo");
         assertThat(r1.getInventory().size()).isEqualTo(1);
         assertThat(r2.getInventory().size()).isEqualTo(2);
@@ -1077,21 +1106,24 @@ class NodeTest {
 
         @Test
         void preferProdOverPeer() {
-            Node n = node(opts().path("/path/to/project").pkg(obj("dependencies", obj("foo", "1.x"), "peerDependencies", obj("foo", ">=1"))));
+            Node n = node(opts().path("/path/to/project")
+              .pkg(obj("dependencies", obj("foo", "1.x"), "peerDependencies", obj("foo", ">=1"))));
             assertThat(n.getEdgesOut().get("foo").getType()).isEqualTo(Edge.Type.PROD);
             assertThat(n.getEdgesOut().get("foo").getSpec()).isEqualTo("1.x");
         }
 
         @Test
         void preferDevOverPeer() {
-            Node n = node(opts().path("/path/to/project").pkg(obj("devDependencies", obj("foo", "1.x"), "peerDependencies", obj("foo", ">=1"))));
+            Node n = node(opts().path("/path/to/project")
+              .pkg(obj("devDependencies", obj("foo", "1.x"), "peerDependencies", obj("foo", ">=1"))));
             assertThat(n.getEdgesOut().get("foo").getType()).isEqualTo(Edge.Type.DEV);
             assertThat(n.getEdgesOut().get("foo").getSpec()).isEqualTo("1.x");
         }
 
         @Test
         void preferProdOverDev() {
-            Node n = node(opts().path("/path/to/project").pkg(obj("devDependencies", obj("foo", "1.x"), "dependencies", obj("foo", ">=1"))));
+            Node n = node(opts().path("/path/to/project")
+              .pkg(obj("devDependencies", obj("foo", "1.x"), "dependencies", obj("foo", ">=1"))));
             assertThat(n.getEdgesOut().get("foo").getType()).isEqualTo(Edge.Type.DEV);
             assertThat(n.getEdgesOut().get("foo").getSpec()).isEqualTo("1.x");
         }
@@ -1110,17 +1142,22 @@ class NodeTest {
               .realpath("/srv/user/projects/workspaces_root"));
             root.setWorkspaces(workspaces("foo", "/srv/user/projects/workspaces_root/foo"));
             root.setPackage(obj("name", "bar", "version", "1.2.3", "dependencies", obj("foo", "2.3.4")));
-            assertThat(root.getEdgesOut().get("foo").getType()).as("keeps workspace edge").isEqualTo(Edge.Type.WORKSPACE);
+            assertThat(root.getEdgesOut().get("foo").getType()).as("keeps workspace edge")
+              .isEqualTo(Edge.Type.WORKSPACE);
         }
     }
 
     @Test
     void canDedupe() {
         Node root = node(opts().path("/path/to/root")
-          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("bundler", "", "wrapper", "", "a", "1", "b", "2", "c", "3")))
-          .child(opts().pkg(obj("name", "bundler", "version", "1.2.3", "bundleDependencies", arr("a"), "dependencies", obj("a", "1")))
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies",
+          obj("bundler", "", "wrapper", "", "a", "1", "b", "2", "c", "3")))
+          .child(opts()
+          .pkg(obj("name", "bundler", "version", "1.2.3", "bundleDependencies", arr("a"), "dependencies",
+          obj("a", "1")))
             .child(opts().pkg(obj("name", "a", "version", "1.2.3")).integrity("a123").build()).build())
-          .child(opts().pkg(obj("name", "wrapper", "version", "1.2.3", "dependencies", obj("a", "1"), "_hasShrinkwrap", true))
+          .child(opts()
+          .pkg(obj("name", "wrapper", "version", "1.2.3", "dependencies", obj("a", "1"), "_hasShrinkwrap", true))
             .hasShrinkwrap(true)
             .child(opts().pkg(obj("name", "a", "version", "1.2.3")).integrity("a123").build()).build())
           .child(opts().pkg(obj("name", "a", "version", "1.2.3")).integrity("a123").build())
@@ -1139,8 +1176,10 @@ class NodeTest {
         assertThat(root.getInventory().filter(Node::canDedupe).stream().map(Node::getLocation)).as("preferDedupe=false")
           .containsExactly("node_modules/c/node_modules/a", "node_modules/b/node_modules/e",
             "node_modules/b/node_modules/c/node_modules/a/node_modules/e");
-        assertThat(root.getInventory().filter(n -> n.canDedupe(true)).stream().map(Node::getLocation)).as("preferDedupe=true")
-          .containsExactly("node_modules/c/node_modules/a", "node_modules/b/node_modules/a", "node_modules/b/node_modules/e",
+        assertThat(root.getInventory().filter(n -> n.canDedupe(true)).stream().map(Node::getLocation)).as("preferDedu" +
+                "pe=true")
+          .containsExactly("node_modules/c/node_modules/a", "node_modules/b/node_modules/a",
+          "node_modules/b/node_modules/e",
             "node_modules/b/node_modules/c/node_modules/a/node_modules/e");
 
         Node top = node(opts().fsParent(root).path(root.getPath() + "/packages/top")
@@ -1197,13 +1236,17 @@ class NodeTest {
 
     @Test
     void canReplaceWithIsAlwaysFalseWhenPackageNameDoesNotMatch() {
-        Node root = node(opts().path("/some/path").pkg(obj("dependencies", obj("foo", "1.2.3", "alias", "npm:bar@1.2.3")))
+        Node root = node(opts().path("/some/path")
+          .pkg(obj("dependencies", obj("foo", "1.2.3", "alias", "npm:bar@1.2.3")))
           .child(opts().pkg(obj("name", "foo", "version", "1.2.3")).build())
           .child(opts().name("alias").pkg(obj("name", "bar", "version", "1.2.3")).build()));
-        Node rep = node(opts().path("/some/path/node_modules/foo").name("foo").pkg(obj("name", "bar", "version", "1.2.3")));
+        Node rep = node(opts().path("/some/path/node_modules/foo").name("foo")
+          .pkg(obj("name", "bar", "version", "1.2.3")));
         assertThat(rep.canReplace(child(root, "foo"))).as("cannot replace actual node with an alias").isFalse();
-        Node alias = node(opts().path("/some/path/node_modules/alias").name("alias").pkg(obj("name", "bar", "version", "1.2.3")));
-        assertThat(alias.canReplace(child(root, "alias"))).as("can replace alias with a different alias to same thing").isTrue();
+        Node alias = node(opts().path("/some/path/node_modules/alias").name("alias")
+          .pkg(obj("name", "bar", "version", "1.2.3")));
+        assertThat(alias.canReplace(child(root, "alias"))).as("can replace alias with a different alias to same thing")
+          .isTrue();
     }
 
     @Test
@@ -1214,7 +1257,8 @@ class NodeTest {
         Node current = child(tree, "a");
         Node rep = node(opts().path(current.getPath()).pkg(obj("name", "a", "version", "2.0.0")));
         assertThat(rep.canReplace(current)).as("cannot replace because peer dep").isFalse();
-        assertThat(rep.canReplace(current, Collections.singletonList("b"))).as("can replace if ignoring the `b` peer").isTrue();
+        assertThat(rep.canReplace(current, Collections.singletonList("b"))).as("can replace if ignoring the `b` peer")
+          .isTrue();
     }
 
     @Test
@@ -1244,12 +1288,14 @@ class NodeTest {
 
         @Test
         void skipsLoadingWhenNoOverridesAreProvided() {
-            assertThat(node(opts().loadOverrides(true).path("/some/path").pkg(obj("name", "foo"))).getOverrides()).isNull();
+            assertThat(node(opts().loadOverrides(true).path("/some/path").pkg(obj("name", "foo"))).getOverrides())
+              .isNull();
         }
 
         @Test
         void skipsLoadingWhenOverridesAreEmpty() {
-            assertThat(node(opts().loadOverrides(true).path("/some/path").pkg(obj("name", "foo", "overrides", obj()))).getOverrides()).isNull();
+            assertThat(node(opts().loadOverrides(true).path("/some/path").pkg(obj("name", "foo", "overrides", obj())))
+              .getOverrides()).isNull();
         }
 
         @Test
@@ -1295,13 +1341,15 @@ class NodeTest {
             baseOverride.setName("test-package");
             baseOverride.setValue("1.0.0");
             Node from = node(opts().path("/some/path").overrides(baseOverride));
-            Node node = node(opts().pkg(obj("name", "test-package", "version", "1.0.0")).parent(from).overrides(baseOverride));
+            Node node = node(opts().pkg(obj("name", "test-package", "version", "1.0.0")).parent(from)
+              .overrides(baseOverride));
             OverrideSet equalOverride = new OverrideSet(obj("foo", "bar"));
             equalOverride.setName("test-package");
             equalOverride.setValue("1.0.0");
             new Edge(from, Edge.Type.PROD, "test-package", "*").setOverrides(equalOverride);
             assertThat(node.getEdgesIn()).hasSize(1);
-            assertThat(node.isOverridden()).as("node.overridden returns false when edge.override equals edge.from.override").isFalse();
+            assertThat(node.isOverridden())
+              .as("node.overridden returns false when edge.override equals edge.from.override").isFalse();
         }
 
         @Test
@@ -1311,12 +1359,14 @@ class NodeTest {
               .child(opts().pkg(obj("name", "bar", "version", "1.x")).build()));
             assertThatThrownBy(conflictingTree::assertRootOverrides).isInstanceOf(Node.OverrideConflict.class)
               .satisfies(e -> assertThat(((Node.OverrideConflict) e).getCode()).isEqualTo("EOVERRIDE"));
-            assertThatCode(() -> child(conflictingTree, "bar").assertRootOverrides()).as("child does not throw").doesNotThrowAnyException();
+            assertThatCode(() -> child(conflictingTree, "bar").assertRootOverrides()).as("child does not throw")
+              .doesNotThrowAnyException();
 
             Node safeTree = node(opts().loadOverrides(true).path("/some/path")
               .pkg(obj("name", "foo", "dependencies", obj("bar", "1.x"), "overrides", obj("baz", "2.x")))
               .child(opts().pkg(obj("name", "bar", "version", "1.x")).build()));
-            assertThatCode(safeTree::assertRootOverrides).as("non conflicting tree does not throw").doesNotThrowAnyException();
+            assertThatCode(safeTree::assertRootOverrides).as("non conflicting tree does not throw")
+              .doesNotThrowAnyException();
         }
 
         @Test
@@ -1332,7 +1382,8 @@ class NodeTest {
         @Test
         void settingRootReplacesOverrides() {
             Node root = node(opts().path("/some/path").loadOverrides(true)
-              .pkg(obj("name", "root", "version", "1.0.0", "dependencies", obj("foo", "^1.0.0"), "overrides", obj("bar", "^2.0.0"))));
+              .pkg(obj("name", "root", "version", "1.0.0", "dependencies", obj("foo", "^1.0.0"), "overrides",
+              obj("bar", "^2.0.0"))));
             Node foo = node(opts().path("/some/path/node_modules/foo")
               .pkg(obj("name", "foo", "version", "1.0.0", "dependencies", obj("bar", "^1.0.0"))));
             Node bar = node(opts().path("/some/path/node_modules/bar").pkg(obj("name", "bar", "version", "2.0.0")));
@@ -1344,7 +1395,8 @@ class NodeTest {
             assertThat(foo.getEdgesOut().get("bar").isValid()).isFalse();
 
             bar.setRoot(root);
-            assertThat(bar.getOverrides()).as("bar still does not have overrides until connected by a dependency edge").isNull();
+            assertThat(bar.getOverrides()).as("bar still does not have overrides until connected by a dependency edge")
+              .isNull();
             assertThat(foo.getEdgesOut().get("bar").isValid()).isFalse();
 
             foo.setRoot(root);
@@ -1416,7 +1468,8 @@ class NodeTest {
         Node specific = node(opts().pkg(obj("name", "specific")).parent(root).overrides(specificOverrides));
         new Edge(common, Edge.Type.PROD, "nodeA", "*");
         new Edge(specific, Edge.Type.PROD, "nodeA", "*");
-        assertThat(node.getEdgesIn()).extracting(Edge::getOverrides).containsExactly(commonOverrides, specificOverrides);
+        assertThat(node.getEdgesIn()).extracting(Edge::getOverrides)
+          .containsExactly(commonOverrides, specificOverrides);
         assertThat(node.getOverrides()).isSameAs(commonOverrides);
 
         boolean result = node.updateOverridesEdgeInRemoved(commonOverrides);
@@ -1452,12 +1505,14 @@ class NodeTest {
         boolean result = node.updateOverridesEdgeInRemoved(originalOverrides);
         assertThat(result).as("returns true when override set changes").isTrue();
         assertThat(recalcCalled[0]).as("recalculateOutEdgesOverrides was called").isTrue();
-        assertThat(specificOverrides.isEqual(node.getOverrides())).as("node.overrides updated to the specific override set").isTrue();
+        assertThat(specificOverrides.isEqual(node.getOverrides()))
+          .as("node.overrides updated to the specific override set").isTrue();
     }
 
     private Node mockDepTree(String mockDepVersion, Map<String, Object> mockDepDependencies, Node.Options grandchild) {
         return node(opts().loadOverrides(true).path("/root")
-          .pkg(obj("name", "root", "version", "1.0.0", "dependencies", obj("mockDep", "1.x"), "overrides", obj("mockDep", "2.x")))
+          .pkg(obj("name", "root", "version", "1.0.0", "dependencies", obj("mockDep", "1.x"), "overrides",
+          obj("mockDep", "2.x")))
           .child(opts().name("mockDep").pkg(obj("version", mockDepVersion, "dependencies", mockDepDependencies))
             .child(grandchild).build()));
     }
@@ -1468,7 +1523,8 @@ class NodeTest {
         Edge edge = tree.getEdgesOut().get("mockDep");
         edge.setOverrides(new OverrideSet(obj("mockDep", "1.x")));
         edge.reload();
-        assertThat(edge.getOverrides().getValue()).as("Edge override propagates the correct override value from the parent")
+        assertThat(edge.getOverrides().getValue()).as("Edge override propagates the correct override value from the " +
+                                                      "parent")
           .isEqualTo("2.x");
     }
 
@@ -1499,7 +1555,8 @@ class NodeTest {
             edge.reload(true);
             edge.setOverrides(overridesV1);
             mockDep.setOverrides(overridesV4);
-            assertThat(edge.getError()).as("Edge should be invalid with conflicting override versions").isEqualTo("INVALID");
+            assertThat(edge.getError()).as("Edge should be invalid with conflicting override versions")
+              .isEqualTo("INVALID");
             assertThat(edge.isValid()).isFalse();
         }
 

@@ -55,7 +55,8 @@ public class NpmOptions {
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}?]+)(\\?)?\\}");
     private static final Pattern LEADING_INTEGER = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*([+-]?\\d+)");
     private static final Pattern DIGIT = Pattern.compile("[0-9]");
-    private static final Pattern NUMBER = Pattern.compile("^[+-]?(\\d+\\.?\\d*(e[+-]?\\d+)?|\\.\\d+(e[+-]?\\d+)?|Infinity)$",
+    private static final Pattern NUMBER = Pattern.compile("^[+-]?(\\d+\\.?\\d*(e[+-]?\\d+)?|\\.\\d+(e[+-]" +
+                                                          "?\\d+)?|Infinity)$",
             Pattern.CASE_INSENSITIVE);
     private static final List<String> KEYS = Arrays.asList(
             "lockfile-version", "legacy-peer-deps", "install-links", "omit-lockfile-registry-resolved",

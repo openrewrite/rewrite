@@ -68,13 +68,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
     @Override public String getDisplayName() { return "Upgrade npm dependency version"; }
 
     @Override public String getDescription() {
-        return "Upgrades the version constraint of matching npm dependencies in `package.json` and " +
-                "regenerates the lock file natively, without executing the package manager. Matching is by exact package " +
-                "name or glob pattern. " +
-                "v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
-                "version will use semver to skip already-up-to-date constraints. " +
-                "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
-                "state shared with other dependency recipes.";
+        return "Upgrades the version constraint of matching npm dependencies in `package.json` and regenerates the " +
+                "lock file natively, without executing the package manager. Matching is by exact package name or " +
+                "glob pattern. v1 uses simple string inequality for the upgrade check (always overwrites). A future " +
+                "version will use semver to skip already-up-to-date constraints. Not safe to use as a precondition: " +
+                "consults the package registry over the network and publishes per-project state shared with other " +
+                "dependency recipes.";
     }
 
     @Override
@@ -86,7 +85,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 r -> r.packageName != null || r.packagePattern != null));
     }
 
-    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
+    @Override
+    public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyScan.Accumulator();
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
@@ -108,7 +110,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k ->
+                            new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                     ps.matchedDeps = findMatches(sf);
                 }
@@ -225,7 +228,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.matchedDeps == null || ps.matchedDeps.isEmpty()) return;
                 List<MatchedDependency> matches = ps.matchedDeps;
-                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeVersion(doc, matches, newVersion);
+                Function<Json.Document, Json.Document> edit = doc ->
+                        PackageJsonHelper.upgradeVersion(doc, matches, newVersion);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
                         NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
@@ -244,6 +248,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
             return;
         }
         ps.failureRecorded = true;
-        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult,
+                packageName);
     }
 }

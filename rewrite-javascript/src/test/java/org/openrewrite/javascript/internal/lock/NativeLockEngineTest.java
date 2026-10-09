@@ -79,7 +79,8 @@ class NativeLockEngineTest {
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         // Pin the registry so discovery is deterministic (never reads a real ~/.npmrc or env).
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
+                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true,
+                        false)));
     }
 
     private Result regen(PackageManager pm, String edited, @Nullable String lock) {
@@ -132,11 +133,13 @@ class NativeLockEngineTest {
 
         Result withoutDirectory = NativeLockEngine.regenerate(PackageManager.Bun, request.build(), ctx);
         Result result = NativeLockEngine.regenerate(PackageManager.Bun,
-                request.manifest(Paths.get("local/package.json"), resource(scenario + "tree/local/package.json")).build(),
+                request.manifest(Paths.get("local/package.json"), resource(scenario + "tree/local/package.json"))
+                        .build(),
                 ctx);
 
         assertThat(withoutDirectory.getFailure()).isNotNull();
-        assertThat(withoutDirectory.getFailure().getDetail()).startsWith("the engine cannot know directory manifest of local");
+        assertThat(withoutDirectory.getFailure().getDetail()).startsWith("the engine cannot know directory manifest " +
+                "of local");
         assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         assertThat(result.getLockFileContent()).isEqualTo(resource(scenario + "after"));
     }
@@ -496,7 +499,8 @@ class NativeLockEngineTest {
                 projectNpmrc("lockfile-version", "abc"));
 
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getFailure().getDetail()).startsWith("npm fails on this edit: Invalid lockfileVersion config: NaN");
+        assertThat(result.getFailure().getDetail()).startsWith("npm fails on this edit: Invalid lockfileVersion " +
+                "config: NaN");
     }
 
     @Test
@@ -548,7 +552,8 @@ class NativeLockEngineTest {
     @Test
     void registryTokenInUrlNeverAppearsInFailureDetail() {
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(new NodeRegistry(
-                null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true, false)));
+                null, "https://user:s3cr3ttoken@registry.example.com/", null, null, null, null, false, null, true,
+                        false)));
 
         Result result = regen(PackageManager.Npm, "{\"dependencies\":{\"lodash\":\"^4.17.21\"}}", npmLock("4.17.20"));
 

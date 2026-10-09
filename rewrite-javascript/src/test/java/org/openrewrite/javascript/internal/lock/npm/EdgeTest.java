@@ -100,9 +100,11 @@ class EdgeTest {
     @Test
     void satisfiedBy() {
         assertThat(new Edge(a, PROD, "b", "1.x").satisfiedBy(b)).as("b satisfies b@1.x").isTrue();
-        assertThat(new Edge(a, PROD, "c", "1.x", "2.x", null).satisfiedBy(c)).as("c@2 satisfies spec:1.x, accept:2.x").isTrue();
+        assertThat(new Edge(a, PROD, "c", "1.x", "2.x", null).satisfiedBy(c)).as("c@2 satisfies spec:1.x, accept:2.x")
+          .isTrue();
         assertThat(new Edge(a, PROD, "c", "1.x", "2.x", null).getAccept()).isEqualTo("2.x");
-        assertThat(new Edge(a, PROD, "c", "1.x", "", null).satisfiedBy(c)).as("c@2 satisfies spec:1.x, accept:*").isTrue();
+        assertThat(new Edge(a, PROD, "c", "1.x", "", null).satisfiedBy(c)).as("c@2 satisfies spec:1.x, accept:*")
+          .isTrue();
         assertThat(new Edge(a, PROD, "c", "1.x").satisfiedBy(b)).as("b does not satisfy edge for c").isFalse();
     }
 
@@ -115,7 +117,8 @@ class EdgeTest {
           entry("name", "c"), entry("spec", "2.x"), entry("type", "prod"), entry("from", "node_modules/a"),
           entry("error", "MISSING"), entry("overridden", "2.x"));
 
-        Map<String, Object> overriddenExplanation = new Edge(a, PROD, "c", "1.x", null, overrideSet.getEdgeRule("c", "1.x")).explain();
+        Map<String, Object> overriddenExplanation = new Edge(a, PROD, "c", "1.x", null,
+          overrideSet.getEdgeRule("c", "1.x")).explain();
         assertThat(overriddenExplanation.get("rawSpec")).isEqualTo("1.x");
         assertThat(overriddenExplanation.get("spec")).isEqualTo("2.x");
         assertThat(overriddenExplanation.get("overridden")).isEqualTo(true);
@@ -274,7 +277,8 @@ class EdgeTest {
               entry("from", a.explain()));
             explainEdge.detach();
             assertThat(explainEdge.explain()).isNotSameAs(expl)
-              .containsOnly(entry("type", "peerOptional"), entry("name", "foo"), entry("spec", "*"), entry("error", "DETACHED"));
+              .containsOnly(entry("type", "peerOptional"), entry("name", "foo"), entry("spec", "*"),
+              entry("error", "DETACHED"));
         }
     }
 
@@ -311,9 +315,11 @@ class EdgeTest {
     void overrideReferencesFindTheCorrectRoot() {
         OverrideSet overrides = new OverrideSet(obj("foo", "$foo"));
         Node root = node(opts().path("/root").overrides(overrides)
-          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides", obj("foo", "$foo")))
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides",
+          obj("foo", "$foo")))
           .child(opts().pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj()))
-            .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj("foo", "^2.0.0"))).build()).build()));
+            .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj("foo", "^2.0.0"))).build())
+            .build()));
         Node bar = child(child(root, "foo"), "bar");
 
         // a virtual root standing in for bar, holding its own copy of foo, as the ideal tree builder makes one
@@ -328,8 +334,10 @@ class EdgeTest {
     @Test
     void shrinkwrappedAndBundledDepsAreNotOverriddenAndRemainValid() {
         Node root = node(opts().path("/root").loadOverrides(true)
-          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides", obj("bar", "^2.0.0")))
-          .child(opts().hasShrinkwrap(true).pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("bar", "^1.0.0")))
+          .pkg(obj("name", "root", "version", "1.2.3", "dependencies", obj("foo", "^1.0.0"), "overrides",
+          obj("bar", "^2.0.0")))
+          .child(opts().hasShrinkwrap(true)
+          .pkg(obj("name", "foo", "version", "1.2.3", "dependencies", obj("bar", "^1.0.0")))
             .child(opts().pkg(obj("name", "bar", "version", "1.2.3", "dependencies", obj())).build()).build()));
         Node foo = child(root, "foo");
         Edge edge = foo.getEdgesOut().get("bar");
@@ -345,7 +353,8 @@ class EdgeTest {
         Node localFrom = node(opts().pkg(obj("name", "local", "devDependencies", obj("foo", "^1.2.3"))).parent(root)
           .overrides(new OverrideSet(obj("foo", "$foo"))));
         Edge edge = new Edge(localFrom, PROD, "foo", "1.x");
-        assertThat(edge.getSpec()).as("should fall back to local package version from devDependencies").isEqualTo("^1.2.3");
+        assertThat(edge.getSpec()).as("should fall back to local package version from devDependencies")
+          .isEqualTo("^1.2.3");
     }
 
     @Test

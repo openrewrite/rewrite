@@ -48,7 +48,8 @@ class DependencyEditAfterEarlierPackageJsonChangeTest implements RewriteTest {
         });
         HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
         NodeExecutionContextView.view(ctx).setRegistries(singletonList(
-                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true, false)));
+                new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, false, null, true,
+                        false)));
         spec.executionContext(ctx);
     }
 

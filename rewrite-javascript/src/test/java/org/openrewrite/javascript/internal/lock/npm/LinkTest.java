@@ -72,13 +72,15 @@ class LinkTest {
 
     @Test
     void linkTargetSetter() {
-        Link link = link(opts().path("/path/to/link").realpath("/node-a").pkg(obj("name", "node-a", "version", "1.2.3")));
+        Link link = link(opts().path("/path/to/link").realpath("/node-a")
+          .pkg(obj("name", "node-a", "version", "1.2.3")));
         Node oldTarget = link.getTarget();
         assertThat(oldTarget).isNotNull();
         assertThat(oldTarget.getLinksIn()).as("target takes note of link").contains(link);
         assertThat(link.getPackage()).as("link has same package as target").isSameAs(oldTarget.getPackage());
 
-        Node newTarget = node(opts().path("/node-b").realpath("/node-b").pkg(obj("name", "node-b", "version", "1.2.3")));
+        Node newTarget = node(opts().path("/node-b").realpath("/node-b")
+          .pkg(obj("name", "node-b", "version", "1.2.3")));
         link.setTarget(newTarget);
         assertThat(oldTarget.getLinksIn()).as("old target has no links in now").isEmpty();
         assertThat(link.getTarget()).isSameAs(newTarget);
@@ -216,7 +218,8 @@ class LinkTest {
           .realpath("/path/to/store/foo").target(target).parent(root));
 
         assertThat(root.getOverrides()).isNotNull();
-        assertThat(target.getOverrides()).as("target.overrides stays undefined when no rule matches a target dep").isNull();
+        assertThat(target.getOverrides()).as("target.overrides stays undefined when no rule matches a target dep")
+          .isNull();
         Edge bazEdge = target.getEdgesOut().get("baz");
         assertThat(bazEdge).isNotNull();
         assertThat(bazEdge.getOverrides()).as("unrelated edge keeps edge.overrides undefined").isNull();

@@ -25,8 +25,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class SsriTest {
 
-    private static final String A = "sha512-AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==";
-    private static final String B = "sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==";
+    private static final String A = "sha512-AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA" +
+                                    "QEBAQEBAQEBAQ==";
+    private static final String B = "sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA" +
+                                    "gICAgICAgICAg==";
     private static final String S = "sha1-AwMDAwMDAwMDAwMDAwMDAwMDAwM=";
     private static final String T = "sha1-BAQEBAQEBAQEBAQEBAQEBAQEBAQ=";
     private static final String M = "md5-BQUFBQUFBQUFBQUFBQUFBQ==";

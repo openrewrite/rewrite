@@ -118,7 +118,8 @@ final class MapWorkspaces {
      * {@code mapWorkspaces({cwd, pkg})} over the locations holding a package.json ({@code ""} the root): package name
      * to absolute path, in the order the patterns list them.
      */
-    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg, VirtualTreeLoader.ProjectFiles files) {
+    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg,
+            VirtualTreeLoader.ProjectFiles files) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
         Patterns p = getPatterns(workspaces);
         Map<String, String> results = new LinkedHashMap<>();

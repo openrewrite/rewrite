@@ -90,8 +90,8 @@ class JsonStringifyNiceTest {
     @Test
     void spacesCanBeSetTheNumberThree() {
         assertThat(JsonStringifyNice.stringify(spacesObj(), Collections.emptyList(), 3)).isEqualTo(
-          "{\n   \"y\": \"z\",\n   \"yy\": \"a\",\n   \"z\": 1,\n   \"a\": {\n      \"a\": 2,\n      \"b\": 1\n   },\n" +
-          "   \"obj\": {\n      \"b\": \"x\",\n      \"a\": {}\n   }\n}\n");
+          "{\n   \"y\": \"z\",\n   \"yy\": \"a\",\n   \"z\": 1,\n   \"a\": {\n      \"a\": 2,\n      \"b\": 1\n   " +
+          "},\n   \"obj\": {\n      \"b\": \"x\",\n      \"a\": {}\n   }\n}\n");
     }
 
     @Test
@@ -124,8 +124,8 @@ class JsonStringifyNiceTest {
     void arraysSortBeforeObjectsAndKeepTheirOrder() {
         assertThat(JsonStringifyNice.stringify(obj("b", obj("x", 1), "a", arr(3, obj("z", 1, "a", 2), arr()), "c",
                                                    arr())))
-          .isEqualTo("{\n  \"a\": [\n    3,\n    {\n      \"a\": 2,\n      \"z\": 1\n    },\n    []\n  ],\n  \"c\": [],\n" +
-                     "  \"b\": {\n    \"x\": 1\n  }\n}\n");
+          .isEqualTo("{\n  \"a\": [\n    3,\n    {\n      \"a\": 2,\n      \"z\": 1\n    },\n    []\n  ],\n  \"c\": " +
+                     "[],\n  \"b\": {\n    \"x\": 1\n  }\n}\n");
     }
 
     @Test

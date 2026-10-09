@@ -384,7 +384,8 @@ public final class PackageJsonOverrides {
         return replaceMemberValue(obj, key, newLit);
     }
 
-    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key, org.openrewrite.json.tree.JsonValue newValue) {
+    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key,
+            org.openrewrite.json.tree.JsonValue newValue) {
         java.util.List<org.openrewrite.json.tree.JsonRightPadded<org.openrewrite.json.tree.Json>> members =
                 new java.util.ArrayList<>(obj.getPadding().getMembers());
         for (int i = 0; i < members.size(); i++) {

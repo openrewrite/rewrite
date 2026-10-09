@@ -47,8 +47,9 @@ class PatchParseTest {
                                          "\"lines\":[\"this\",\"is\",\"\"],\"noNewlineAtEndOfFile\":false}," +
                                          "{\"type\":\"deletion\",\"lines\":[\"a\"],\"noNewlineAtEndOfFile\":false}," +
                                          "{\"type\":\"insertion\",\"lines\":[\"\"],\"noNewlineAtEndOfFile\":false}," +
-                                         "{\"type\":\"context\",\"lines\":[\"file\"],\"noNewlineAtEndOfFile\":false}]}]," +
-                                         "\"beforeHash\":\"2de83dd\",\"afterHash\":\"842652c\"}]";
+                                         "{\"type\":\"context\",\"lines\":[\"file\"]," +
+                                         "\"noNewlineAtEndOfFile\":false}]}],\"beforeHash\":\"2de83dd\"," +
+                                         "\"afterHash\":\"842652c\"}]";
 
     private static String withHeader(String header) {
         return PATCH.replace("@@ -1,5 +1,5 @@", header);
@@ -88,10 +89,12 @@ class PatchParseTest {
                                  "@@ -0,0 +1 @@\n" +
                                  "+this is a new file\n").replace("\n", "\r\n");
         assertThat(Js.jsonStringify(PatchParse.parsePatchFile(crlfLineBreaks))).isEqualTo(
-                "[{\"type\":\"file creation\",\"semverExclusivity\":null,\"hunk\":{\"header\":{\"original\":" +
-                "{\"start\":1,\"length\":0},\"patched\":{\"start\":1,\"length\":1}},\"parts\":[{\"type\":\"insertion\"," +
-                "\"lines\":[\"this is a new file\\r\"],\"noNewlineAtEndOfFile\":false}]},\"path\":\"banana.ts\"," +
-                "\"mode\":420,\"hash\":\"3e1267f\"}]");
+                "[{\"type\":\"file " +
+                "creation\",\"semverExclusivity\":null,\"hunk\":{\"header\":{\"original\":{\"start\":1,\"length\":0}," +
+                "\"patched\":{\"start\":1,\"length\":1}},\"parts\":[{\"type\":\"insertion\",\"lines\":[\"this is a " +
+                "new " +
+                "file\\r\"],\"noNewlineAtEndOfFile\":false}]},\"path\":\"banana.ts\",\"mode\":420," +
+                "\"hash\":\"3e1267f\"}]");
     }
 
     @Test
@@ -112,13 +115,14 @@ class PatchParseTest {
                                               " two\n" +
                                               "\n";
         assertThat(Js.jsonStringify(PatchParse.parsePatchFile(modeChangeAndModifyAndRename))).isEqualTo(
-                "[{\"type\":\"rename\",\"semverExclusivity\":null,\"fromPath\":\"numbers.txt\",\"toPath\":\"banana.txt\"}," +
-                "{\"type\":\"mode change\",\"semverExclusivity\":null,\"path\":\"banana.txt\",\"oldMode\":420," +
-                "\"newMode\":493},{\"type\":\"patch\",\"semverExclusivity\":null,\"path\":\"banana.txt\",\"hunks\":" +
-                "[{\"header\":{\"original\":{\"start\":1,\"length\":4},\"patched\":{\"start\":1,\"length\":4}}," +
-                "\"parts\":[{\"type\":\"deletion\",\"lines\":[\"one\"],\"noNewlineAtEndOfFile\":false}," +
-                "{\"type\":\"insertion\",\"lines\":[\"ne\"],\"noNewlineAtEndOfFile\":false},{\"type\":\"context\"," +
-                "\"lines\":[\"\",\"two\",\"\"],\"noNewlineAtEndOfFile\":false}]}],\"beforeHash\":\"fbf1785\"," +
-                "\"afterHash\":\"92d2c5f\"}]");
+                "[{\"type\":\"rename\",\"semverExclusivity\":null,\"fromPath\":\"numbers.txt\"," +
+                "\"toPath\":\"banana.txt\"},{\"type\":\"mode " +
+                "change\",\"semverExclusivity\":null,\"path\":\"banana.txt\",\"oldMode\":420,\"newMode\":493}," +
+                "{\"type\":\"patch\",\"semverExclusivity\":null,\"path\":\"banana.txt\"," +
+                "\"hunks\":[{\"header\":{\"original\":{\"start\":1,\"length\":4},\"patched\":{\"start\":1," +
+                "\"length\":4}},\"parts\":[{\"type\":\"deletion\",\"lines\":[\"one\"]," +
+                "\"noNewlineAtEndOfFile\":false},{\"type\":\"insertion\",\"lines\":[\"ne\"]," +
+                "\"noNewlineAtEndOfFile\":false},{\"type\":\"context\",\"lines\":[\"\",\"two\",\"\"]," +
+                "\"noNewlineAtEndOfFile\":false}]}],\"beforeHash\":\"fbf1785\",\"afterHash\":\"92d2c5f\"}]");
     }
 }

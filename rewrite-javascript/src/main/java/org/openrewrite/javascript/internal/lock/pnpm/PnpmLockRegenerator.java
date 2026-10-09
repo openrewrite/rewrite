@@ -202,7 +202,8 @@ public final class PnpmLockRegenerator {
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
-        return INSTALL.verify(written, again -> new PnpmLockRegenerator(inputs.toBuilder().lock(again).build(), registry)
+        return INSTALL.verify(written, again ->
+                new PnpmLockRegenerator(inputs.toBuilder().lock(again).build(), registry)
                 .writeLock(), PnpmLockRegenerator::failure);
     }
 
@@ -905,7 +906,8 @@ public final class PnpmLockRegenerator {
             if (lockfileDir.equals(lockDir)) {
                 for (Verification.Project project : allProjects) {
                     projectManifests.add(new Verification.Project(project.getRootDir(),
-                            FindPackages.getLockfileImporterId(RootRelativePath.relative(lockDir, project.getRootDir())),
+                            FindPackages.getLockfileImporterId(RootRelativePath.relative(lockDir,
+                                    project.getRootDir())),
                             project.getManifest()));
                 }
             }

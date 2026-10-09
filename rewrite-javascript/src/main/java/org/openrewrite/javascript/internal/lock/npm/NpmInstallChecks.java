@@ -64,7 +64,8 @@ final class NpmInstallChecks {
         private final Map<String, @Nullable String> current;
         private final Map<String, @Nullable Object> required;
 
-        UnsupportedPlatform(String pkgid, Map<String, @Nullable String> current, Map<String, @Nullable Object> required) {
+        UnsupportedPlatform(String pkgid, Map<String, @Nullable String> current,
+                Map<String, @Nullable Object> required) {
             super("Unsupported platform");
             this.pkgid = pkgid;
             this.current = current;

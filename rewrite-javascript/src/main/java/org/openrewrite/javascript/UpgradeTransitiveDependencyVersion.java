@@ -62,16 +62,19 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
 
     @Override public String getDescription() {
-        return "Pins or upgrades a transitive npm dependency by adding an override entry to `package.json` " +
-                "and regenerating the lock file natively, without executing the package manager. For npm and Bun, adds to the `overrides` field; " +
-                "for Yarn, adds to `resolutions`. pnpm 11 reads overrides only from `pnpm-workspace.yaml` and Bun has no nested " +
-                "overrides, so for those the recipe changes nothing and records why. " +
-                "The override is idempotent — if the entry already exists with the same version, no change is made. " +
-                "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
-                "state shared with other dependency recipes.";
+        return "Pins or upgrades a transitive npm dependency by adding an override entry to `package.json` and " +
+                "regenerating the lock file natively, without executing the package manager. For npm and Bun, adds " +
+                "to the `overrides` field; for Yarn, adds to `resolutions`. pnpm 11 reads overrides only from " +
+                "`pnpm-workspace.yaml` and Bun has no nested overrides, so for those the recipe changes nothing and " +
+                "records why. The override is idempotent — if the entry already exists with the same version, no " +
+                "change is made. Not safe to use as a precondition: consults the package registry over the network " +
+                "and publishes per-project state shared with other dependency recipes.";
     }
 
-    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
+    @Override
+    public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyScan.Accumulator();
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
@@ -93,7 +96,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k ->
+                            new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
                 return tree;
@@ -176,7 +180,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
                     return;
                 }
 
-                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
+                Function<Json.Document, Json.Document> edit = doc ->
+                        PackageJsonHelper.upgradeTransitive(doc, pm, packageName, newVersion, parsedPath);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
                         NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
@@ -195,6 +200,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             return;
         }
         ps.failureRecorded = true;
-        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult,
+                packageName);
     }
 }

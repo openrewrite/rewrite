@@ -30,8 +30,10 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
  */
 class PacoteTest {
 
-    private static final String A = "sha512-AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==";
-    private static final String B = "sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==";
+    private static final String A = "sha512-AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA" +
+                                    "QEBAQEBAQEBAQ==";
+    private static final String B = "sha512-AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA" +
+                                    "gICAgICAgICAg==";
     private static final String S = "sha1-AwMDAwMDAwMDAwMDAwMDAwMDAwM=";
 
     private static PackumentSource registry(String packument) {
@@ -51,7 +53,8 @@ class PacoteTest {
     }
 
     private static Map<String, Object> manifest(String packument, String spec, Pacote.Options options) {
-        return pacote(packument, VirtualTreeLoader.ProjectFiles.builder().build()).manifest(Spec.npa(spec, "/"), options);
+        return pacote(packument, VirtualTreeLoader.ProjectFiles.builder().build())
+          .manifest(Spec.npa(spec, "/"), options);
     }
 
     private static Pacote pacote(String packument, VirtualTreeLoader.ProjectFiles files) {
@@ -59,9 +62,10 @@ class PacoteTest {
     }
 
     private static String versioned(String dist) {
-        return "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{" +
-               "\"1.0.0\":{\"name\":\"x\",\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://r/x-1.0.0.tgz\"" + dist + "}}," +
-               "\"2.0.0\":{\"name\":\"x\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://r/x-2.0.0.tgz\"" + dist + "}}}}";
+        return "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"x\"," +
+               "\"version\":\"1.0.0\",\"dist\":{\"tarball\":\"https://r/x-1.0.0.tgz\"" + dist + "}}," +
+               "\"2.0.0\":{\"name\":\"x\",\"version\":\"2.0.0\",\"dist\":{\"tarball\":\"https://r/x-2.0.0.tgz\"" +
+                 dist + "}}}}";
     }
 
     private static final String LATEST_BELOW_HIGHEST = versioned("");
@@ -69,12 +73,16 @@ class PacoteTest {
     // the fetcher's constructor: this.defaultTag = opts.defaultTag || 'latest'
     @Test
     void defaultTagFallsBackToLatest() {
-        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().build()).get("version")).isEqualTo("1.0.0");
-        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("").build()).get("version"))
+        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().build()).get("version"))
           .isEqualTo("1.0.0");
-        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("null").build()).get("version"))
+        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("").build())
+          .get("version"))
+          .isEqualTo("1.0.0");
+        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("null").build())
+          .get("version"))
           .isEqualTo("2.0.0");
-        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("beta").build()).get("version"))
+        assertThat(manifest(LATEST_BELOW_HIGHEST, "x@*", Pacote.Options.builder().defaultTag("beta").build())
+          .get("version"))
           .isEqualTo("2.0.0");
     }
 
@@ -109,7 +117,8 @@ class PacoteTest {
     // dist.signatures is read under `if (this.integrity)` whether or not the manifest has a dist
     @Test
     void heldIntegrityWithoutDistReadsSignaturesOfUndefined() {
-        String noDist = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"name\":\"x\",\"version\":\"1.0.0\"}}}";
+        String noDist = "{\"name\":\"x\",\"dist-tags\":{\"latest\":\"1.0.0\"}," +
+                        "\"versions\":{\"1.0.0\":{\"name\":\"x\",\"version\":\"1.0.0\"}}}";
         assertThat(manifest(noDist, "x@1.0.0", Pacote.Options.builder().build())).doesNotContainKey("_integrity");
         assertThatThrownBy(() -> manifest(noDist, "x@1.0.0", Pacote.Options.builder().integrity(S).build()))
           .hasMessage("Cannot read properties of undefined (reading 'signatures')");

@@ -152,7 +152,8 @@ class SpecTest {
     @Test
     void basicAssertions() {
         assertThat(Spec.resolve("foo", "1.2.3", "/whatnot").toString()).as("parsed object").isEqualTo("foo@1.2.3");
-        assertThat(Spec.npa("git+http://foo.com/bar").toString()).as("parsed git toString").isEqualTo("git+http://foo.com/bar");
+        assertThat(Spec.npa("git+http://foo.com/bar").toString()).as("parsed git toString")
+            .isEqualTo("git+http://foo.com/bar");
         assertThat(Spec.npa("./foo/bar", "/here").getFetchSpec()).as("`where` is reused").isEqualTo("/here/foo/bar");
         assertThat(Spec.npa(Spec.npa("./foo/bar", "/here"), "/whatnot").getFetchSpec())
           .as("`where` arg overrides the one in the spec object").isEqualTo("/whatnot/foo/bar");
@@ -163,7 +164,8 @@ class SpecTest {
         assertThat(Spec.npa(parsedSpec, "./here")).as("reused if where matches").isSameAs(parsedSpec);
         assertThat(Spec.npa(parsedSpec, "./there")).as("new instance if where does not match").isNotSameAs(parsedSpec);
 
-        assertThatThrownBy(() -> Spec.npa("this is not a \0 valid package name or url")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Spec.npa("this is not a \0 valid package name or url"))
+            .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> Spec.npa("gopher://yea right")).hasMessage("Invalid URL");
         assertThatThrownBy(() -> Spec.resolve("invalid/name", "1.0.0", null)).as("Invalid names throw errrors")
           .isInstanceOf(Spec.InvalidSpecException.class);
@@ -211,7 +213,8 @@ class SpecTest {
     // upstream sets process.cwd(), which only supplies the default `where`
     @Test
     void directoryCwdHasNonUriCompatibleComponents() {
-        String where = "/tmp/ !\"$%&'()*+,-.0123456789:;<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+        String where = "/tmp/ " +
+                       "!\"$%&'()*+,-.0123456789:;<=>@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
         Spec spec = Spec.npa("./", where);
         assertThat(spec.getType()).isEqualTo(Spec.Type.DIRECTORY);
         assertThat(spec.getWhere()).isEqualTo(where);
@@ -224,13 +227,20 @@ class SpecTest {
     void errorMessage() {
         assertThatThrownBy(() -> Spec.npa("lodash.has@>=^4")).hasMessage("Invalid tag name \">=^4\" of package " +
           "\"lodash.has@>=^4\": Tags may not have any characters that encodeURIComponent encodes.");
-        assertThatThrownBy(() -> Spec.npa("lodash.has @^4")).hasMessage("Invalid package name \"lodash.has \" of package " +
-          "\"lodash.has @^4\": name cannot contain leading or trailing spaces; name can only contain URL-friendly characters.");
-        assertThatThrownBy(() -> Spec.npa("user/foo#1234::semver:^1.2.3")).hasMessage("cannot override existing committish with a semver range");
-        assertThatThrownBy(() -> Spec.npa("user/foo#semver:^1.2.3::1234")).hasMessage("cannot override existing semver range with a committish");
-        assertThatThrownBy(() -> Spec.npa("user/foo#path:skipped::path:dist")).hasMessage("cannot override existing path with a second path");
-        assertThatThrownBy(() -> Spec.npa("user/foo#1234::5678")).hasMessage("cannot override existing committish with a second committish");
-        assertThatThrownBy(() -> Spec.npa("user/foo#semver:^1.0.0::semver:^2.0.0")).hasMessage("cannot override existing semver range with a second semver range");
+        assertThatThrownBy(() -> Spec.npa("lodash.has @^4"))
+            .hasMessage("Invalid package name \"lodash.has \" of package " +
+          "\"lodash.has @^4\": name cannot contain leading or trailing spaces; name can only contain URL-friendly " +
+          "characters.");
+        assertThatThrownBy(() -> Spec.npa("user/foo#1234::semver:^1.2.3"))
+            .hasMessage("cannot override existing committish with a semver range");
+        assertThatThrownBy(() -> Spec.npa("user/foo#semver:^1.2.3::1234"))
+            .hasMessage("cannot override existing semver range with a committish");
+        assertThatThrownBy(() -> Spec.npa("user/foo#path:skipped::path:dist"))
+            .hasMessage("cannot override existing path with a second path");
+        assertThatThrownBy(() -> Spec.npa("user/foo#1234::5678"))
+            .hasMessage("cannot override existing committish with a second committish");
+        assertThatThrownBy(() -> Spec.npa("user/foo#semver:^1.0.0::semver:^2.0.0"))
+            .hasMessage("cannot override existing semver range with a second semver range");
     }
 
     @Test
@@ -257,7 +267,8 @@ class SpecTest {
         assertThat(Spec.npa("a.tar.gz", "/test/a/b").getType()).as("local tarball").isEqualTo(Spec.Type.FILE);
         assertThat(Spec.npa("d", "/test/a/b").getType()).as("remote package").isEqualTo(Spec.Type.RANGE);
         assertThat(Spec.npa("file:./a.tar.gz", "/test/a/b").getType()).as("local tarball").isEqualTo(Spec.Type.FILE);
-        assertThat(Spec.npa("file:./b", "/test/a/b").getType()).as("local package directory").isEqualTo(Spec.Type.DIRECTORY);
+        assertThat(Spec.npa("file:./b", "/test/a/b").getType()).as("local package directory")
+            .isEqualTo(Spec.Type.DIRECTORY);
         assertThat(Spec.npa("file:./c", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
         assertThat(Spec.npa("file:./d", "/test/a/b").getType()).isEqualTo(Spec.Type.DIRECTORY);
     }
@@ -274,8 +285,10 @@ class SpecTest {
         assertThat(hosted.getType()).as("hosted package dependency is git").isEqualTo(Spec.Type.GIT);
         assertThat(hosted.getHosted()).isNotNull();
         assertThat(hosted.getHosted().getType()).as("github package dependency").isEqualTo("github");
-        assertThat(Spec.npa("e@1", "/test/a/b").getType()).as("range like specifier is never a local file").isEqualTo(Spec.Type.RANGE);
-        assertThat(Spec.npa("e@1.0.0", "/test/a/b").getType()).as("version like specifier is never a local file").isEqualTo(Spec.Type.VERSION);
+        assertThat(Spec.npa("e@1", "/test/a/b").getType()).as("range like specifier is never a local file")
+            .isEqualTo(Spec.Type.RANGE);
+        assertThat(Spec.npa("e@1.0.0", "/test/a/b").getType()).as("version like specifier is never a local file")
+            .isEqualTo(Spec.Type.VERSION);
     }
 
     @Test

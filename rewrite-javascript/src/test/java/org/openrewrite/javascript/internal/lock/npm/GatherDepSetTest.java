@@ -91,7 +91,8 @@ class GatherDepSetTest {
     @Test
     void setWithCOnly() {
         Set<Node> setC = gather("c");
-        assertThat(printSet(setC)).containsExactly("node_modules/c", "node_modules/r", "node_modules/s", "node_modules/t");
+        assertThat(printSet(setC))
+          .containsExactly("node_modules/c", "node_modules/r", "node_modules/s", "node_modules/t");
         assertThat(setC).contains(tree.getChildren().get("c"))
           .doesNotContainAnyElementsOf(Collections.singletonList(tree.getChildren().get("a")))
           .doesNotContain(tree.getChildren().get("b"), tree.getChildren().get("x"));

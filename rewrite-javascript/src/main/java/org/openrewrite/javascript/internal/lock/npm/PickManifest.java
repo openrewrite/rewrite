@@ -93,7 +93,8 @@ public final class PickManifest {
     private PickManifest() {
     }
 
-    private static boolean engineOk(@Nullable Object manifest, @Nullable String npmVersion, @Nullable String nodeVersion) {
+    private static boolean engineOk(@Nullable Object manifest, @Nullable String npmVersion,
+            @Nullable String nodeVersion) {
         if (!(manifest instanceof Map)) {
             return true;
         }
@@ -319,7 +320,8 @@ public final class PickManifest {
     }
 
     @SafeVarargs
-    private static List<Map.Entry<String, @Nullable Object>> concat(List<Map.Entry<String, @Nullable Object>>... lists) {
+    private static List<Map.Entry<String, @Nullable Object>> concat(
+            List<Map.Entry<String, @Nullable Object>>... lists) {
         List<Map.Entry<String, @Nullable Object>> all = new ArrayList<>();
         for (List<Map.Entry<String, @Nullable Object>> list : lists) {
             all.addAll(list);

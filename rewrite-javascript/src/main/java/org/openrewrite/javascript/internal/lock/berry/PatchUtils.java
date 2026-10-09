@@ -136,7 +136,8 @@ final class PatchUtils {
             parent = project.tryWorkspaceByLocator(parentLocator);
             if (parent == null) {
                 throw new CannotKnow("the patch files " + String.join(", ", patchPaths) + " inside " +
-                                     StructUtils.stringifyLocator(parentLocator) + " (Yarn reads them from its archive)");
+                                     StructUtils.stringifyLocator(parentLocator) + " (Yarn reads them from its " +
+                                             "archive)");
             }
         }
         List<@Nullable Object> sources = new ArrayList<>();
@@ -209,7 +210,8 @@ final class PatchUtils {
         if (parentLocator != null) {
             params.put("locator", StructUtils.stringifyLocator(parentLocator));
         }
-        return StructUtils.makeLocator(ident, StructUtils.makeRange(PROTOCOL, StructUtils.stringifyLocator(sourcePackage),
+        return StructUtils.makeLocator(ident,
+                StructUtils.makeRange(PROTOCOL, StructUtils.stringifyLocator(sourcePackage),
                 String.join("&", patchPaths), params));
     }
 }

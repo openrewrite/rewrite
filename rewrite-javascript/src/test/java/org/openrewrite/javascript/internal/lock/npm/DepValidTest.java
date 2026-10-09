@@ -58,18 +58,24 @@ class DepValidTest {
         assertThat(DepValid.depValid(linkToSomePath, Spec.npa("file:/some/path"), null, emptyRequestor))
           .as("links must point at intended target").isTrue();
         Link linkElsewhere = link(opts().name("kid").realpath("/some/other/path"));
-        assertThat(depValid(linkElsewhere, "file:/some/path", null)).as("links must point at intended target").isFalse();
-        assertThat(depValid(node(opts().path("/some/path")), "file:/some/path", null)).as("file:// must be a link").isFalse();
+        assertThat(depValid(linkElsewhere, "file:/some/path", null)).as("links must point at intended target")
+          .isFalse();
+        assertThat(depValid(node(opts().path("/some/path")), "file:/some/path", null)).as("file:// must be a link")
+          .isFalse();
 
         assertThat(depValid(child("foo", "1.2.3", "git://host/repo#somebranch"), "git://host/repo#semver:1.x", null))
           .as("git url with semver range").isTrue();
-        assertThat(depValid(node(opts().name("foo").pkg(obj("name", "bar", "version", "1.2.3"))), "npm:bar@1.2.3", null))
+        assertThat(depValid(node(opts().name("foo").pkg(obj("name", "bar", "version", "1.2.3"))), "npm:bar@1.2.3",
+          null))
           .as("alias is ok").isTrue();
-        assertThat(depValid(child("abbrev", null, "https://registry/abbrev-1.1.1.tgz"), "https://registry/abbrev-1.1.1.tgz", null))
+        assertThat(depValid(child("abbrev", null, "https://registry/abbrev-1.1.1.tgz"),
+          "https://registry/abbrev-1.1.1.tgz", null))
           .as("remote url match").isTrue();
-        assertThat(depValid(child("bar", null, "git+ssh://git@github.com/foo/bar"), "git+ssh://git@github.com/foo/bar.git", null))
+        assertThat(depValid(child("bar", null, "git+ssh://git@github.com/foo/bar"),
+          "git+ssh://git@github.com/foo/bar.git", null))
           .as("matching _from saveSpec").isTrue();
-        assertThat(depValid(child("bar", null, "git+ssh://git@github.com/foo/bar"), "git+ssh://git@github.com/bar/foo.git", null))
+        assertThat(depValid(child("bar", null, "git+ssh://git@github.com/foo/bar"),
+          "git+ssh://git@github.com/bar/foo.git", null))
           .as("different repo").isFalse();
         assertThat(depValid(child("bar", null, null), "git+ssh://git@github.com/bar/foo.git", null))
           .as("missing repo").isFalse();
@@ -138,7 +144,8 @@ class DepValidTest {
         String sha256 = "8e3a9b3579ab330238c06b761e7f1b5dc5b4ac6e5a96da4dd2fb3b7411009df8";
         assertThat(depValid(child("foo", "1.2.3", "npm/repo#" + sha1), "npm/repo#" + sha1, null))
           .as("git url with full sha-1 hash match").isTrue();
-        assertThat(depValid(child("foo", "1.2.3", "npm/repo#" + sha1), "npm/repo#1d7bd85a85fa2571fa532d2fc842ed099b236ad2", null))
+        assertThat(depValid(child("foo", "1.2.3", "npm/repo#" + sha1),
+          "npm/repo#1d7bd85a85fa2571fa532d2fc842ed099b236ad2", null))
           .as("git url with full sha-1 hash mismatch").isFalse();
         assertThat(depValid(child("foo", "1.2.3", "npm/repo#" + sha256), "npm/repo#" + sha256, null))
           .as("git url with full sha-256 hash match").isTrue();
@@ -158,7 +165,8 @@ class DepValidTest {
 
     @Test
     void gitTagOrBranchChangeDetectedViaLockfileCommittish() {
-        Node child = child("repo", "1.0.0", "git+ssh://git@github.com/npm/repo.git#0d7bd85a85fa2571fa532d2fc842ed099b236ad2");
+        Node child = child("repo", "1.0.0",
+          "git+ssh://git@github.com/npm/repo.git#0d7bd85a85fa2571fa532d2fc842ed099b236ad2");
 
         assertThat(DepValid.depValid(child, "npm/repo#v1.0.0", null, requestor("dependencies", "npm/repo#v1.0.0")))
           .as("unchanged tag is valid").isTrue();
@@ -166,7 +174,8 @@ class DepValidTest {
           .as("changed tag must be re-resolved").isFalse();
         assertThat(DepValid.depValid(child, "npm/repo#other", null, requestor("devDependencies", "npm/repo#main")))
           .as("changed branch in devDependencies must be re-resolved").isFalse();
-        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("optionalDependencies", "npm/repo#v1.0.0")))
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null,
+          requestor("optionalDependencies", "npm/repo#v1.0.0")))
           .as("changed tag in optionalDependencies must be re-resolved").isFalse();
         assertThat(DepValid.depValid(child, "npm/repo#other", null, requestor("peerDependencies", "npm/repo#main")))
           .as("changed branch in peerDependencies must be re-resolved").isFalse();
@@ -176,7 +185,8 @@ class DepValidTest {
           .as("non-git lockfile spec is ignored, falling back to the repo-only check").isTrue();
         assertThat(depValid(child, "npm/repo#v2.0.0", null))
           .as("without lockfile data, fall back to the repo-only check").isTrue();
-        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null, requestor("dependencies", "invalid spec with spaces")))
+        assertThat(DepValid.depValid(child, "npm/repo#v2.0.0", null,
+          requestor("dependencies", "invalid spec with spaces")))
           .as("unparseable lockfile spec is ignored, falling back to the repo-only check").isTrue();
     }
 }

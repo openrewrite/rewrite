@@ -31,7 +31,8 @@ final class NodeComparand {
     // Only groups 1 (operator) and 2 (version) are read; the prerelease group inside is unused.
     private static final Pattern COMPARATOR = Pattern.compile(
             "^((?:<|>)?=?)\\s*(v?" +
-                    "(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")" +
+                    "(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" + ParsedVersion.NUMERIC_ID + ")\\.(?:" +
+                        ParsedVersion.NUMERIC_ID + ")" +
                     ParsedVersion.PRERELEASE_GROUP + "?" + ParsedVersion.BUILD + "?)$");
 
     // node-semver re.js COMPARATORLOOSE.

@@ -87,7 +87,8 @@ class PnpmLockRoundTripTest {
         }
         PnpmLockRegenerator.Install install;
         try {
-            install = new PnpmLockRegenerator(inputs(lock), new ScenarioRegistry(lock.getScenario(), lock.phase())).install();
+            install = new PnpmLockRegenerator(inputs(lock), new ScenarioRegistry(lock.getScenario(), lock.phase()))
+              .install();
         } catch (LockfileReader.IgnoredLockfile e) {
             String readingLog = lock.isBefore() ? lock.getScenario().file("pnpm-after.log") : log;
             if (readingLog == null) {

@@ -72,7 +72,8 @@ final class Js extends EcmaScript {
             "trimRight trimStart");
     private static final Set<String> NUMBER_MEMBERS = members("toExponential toFixed toPrecision");
 
-    private static final Pattern DECIMAL_LITERAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
+    private static final Pattern DECIMAL_LITERAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE]" +
+            "[+-]?\\d+)?)");
 
     private Js() {
     }

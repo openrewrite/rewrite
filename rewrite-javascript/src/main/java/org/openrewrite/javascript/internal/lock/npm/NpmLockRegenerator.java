@@ -124,7 +124,8 @@ public final class NpmLockRegenerator {
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }
-            VirtualTreeLoader.ProjectFiles files = projectFiles(truthy(inputs.getLock()) ? new LockFile(inputs.getLock()) : null);
+            VirtualTreeLoader.ProjectFiles files = projectFiles(truthy(inputs.getLock()) ?
+                new LockFile(inputs.getLock()) : null);
             path = projectPath(files);
             IdealTreeBuilder arb = arborist(path, files, options);
             arb.buildIdealTree();

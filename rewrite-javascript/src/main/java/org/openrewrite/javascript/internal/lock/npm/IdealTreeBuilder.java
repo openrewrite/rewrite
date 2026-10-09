@@ -622,7 +622,8 @@ public final class IdealTreeBuilder {
         if (cached != null) {
             return cached;
         }
-        Map<String, Object> mani = pacote.manifest(spec, pacoteOptions.integrity(fetchOptions.get("integrity")).build());
+        Map<String, Object> mani = pacote.manifest(spec,
+                pacoteOptions.integrity(fetchOptions.get("integrity")).build());
         manifests.put(spec.getRaw(), mani);
         return mani;
     }

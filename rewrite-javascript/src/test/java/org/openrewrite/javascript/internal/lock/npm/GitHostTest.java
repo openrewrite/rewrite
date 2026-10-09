@@ -92,7 +92,8 @@ class GitHostTest {
 
     @Test
     void invalidResultsParseToUndefined() {
-        for (String url : new String[]{"https://google.com", "git+ssh://git@nothosted.com/abc/def", "git://nothosted.com",
+        for (String url : new String[]{"https://google.com", "git+ssh://git@nothosted.com/abc/def",
+            "git://nothosted.com",
           "git+file:///foo/bar", "git+ssh://git@git.unlucky.com:RND/electron-tools/some-tool#2.0.1", "::", "", null}) {
             assertThat(GitHost.fromUrl(url)).as(url + " returns undefined").isNull();
         }
@@ -100,7 +101,8 @@ class GitHostTest {
 
     @Test
     void parseUrl() {
-        assertThat(GitHost.parseUrl("git+ssh://git@abc:frontend/utils.git#6d45447e0c5eb6cd2e3edf05a8c5a9bb81950c79", false))
+        assertThat(GitHost.parseUrl("git+ssh://git@abc:frontend/utils.git#6d45447e0c5eb6cd2e3edf05a8c5a9bb81950c79",
+            false))
           .as("git+ssh url").isNotNull();
         assertThat(GitHost.parseUrl("file:../../../global-prefix/lib/node_modules/@myscope/bar", false))
           .as("file url").isNotNull();

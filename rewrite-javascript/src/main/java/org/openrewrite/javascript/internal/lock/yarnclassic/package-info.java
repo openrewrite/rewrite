@@ -66,12 +66,12 @@
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
  * {@code DeepEqual} ports deep-equal 1.0.1, {@code internal.lock.JsYaml} the loader of js-yaml 3.13.1,
- * {@code ObjectPath} object-path 0.11.4, {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0, {@code Micromatch}
- * micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff 2.0.0, {@code Braces} braces 1.8.5 with
- * expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and randomatic
- * 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob 0.3.2 and
- * {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles them, and
- * {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the MIT License:
+ * {@code ObjectPath} object-path 0.11.4, {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0,
+ * {@code Micromatch} micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff 2.0.0, {@code Braces} braces
+ * 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
+ * randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob
+ * 0.3.2 and {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles
+ * them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the MIT License:
  * <ul>
  *     <li>deep-equal: James Halliday</li>
  *     <li>brace-expansion, balanced-match: Copyright (c) 2013 Julian Gruber</li>

@@ -200,7 +200,8 @@ class VirtualTreeLoaderTest {
           .manifest("",
                     "{\"name\":\"project\",\"version\":\"1.0.0\",\"dependencies\":{\"sibling\":\"file:../sibling\"}}")
           .manifest("../sibling", "{\"name\":\"sibling\",\"version\":\"1.0.0\"}")
-          .lock(new LockFile(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion", 3,
+          .lock(new LockFile(JsonStringifyNice.stringify(obj("name", "project", "version", "1.0.0", "lockfileVersion",
+          3,
             "requires", true,
             "packages", obj(
               "", obj("name", "project", "version", "1.0.0", "dependencies", obj("sibling", "file:../sibling")),

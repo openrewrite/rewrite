@@ -301,7 +301,8 @@ public final class BunLockRegenerator {
         List<String> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
-            throw new Rejected(Kind.PM_REJECTS, reasonFor(manager.log.errors), failed.get(0).replaceFirst("@[^@]*$", ""),
+            throw new Rejected(Kind.PM_REJECTS, reasonFor(manager.log.errors),
+                    failed.get(0).replaceFirst("@[^@]*$", ""),
                     first + failed.get(0) + " failed to resolve");
         }
         if (manager.options.isFrozenLockfile() && !cleaned.eql(beforeClean, cleaned.packages.size())) {

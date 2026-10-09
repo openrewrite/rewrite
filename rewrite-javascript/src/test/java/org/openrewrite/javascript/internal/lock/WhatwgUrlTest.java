@@ -42,7 +42,8 @@ class WhatwgUrlTest {
         try (InputStream is = WhatwgUrlTest.class.getResourceAsStream("/npm-arborist/url-cases")) {
             List<Arguments> rows = new ArrayList<>();
             for (JsonNode row : new ObjectMapper().readTree(is)) {
-                rows.add(Arguments.of(row.get("input").asText(), row.get("base").isNull() ? null : row.get("base").asText(), row));
+                rows.add(Arguments.of(row.get("input").asText(), row.get("base").isNull() ? null :
+                        row.get("base").asText(), row));
             }
             return rows.stream();
         } catch (IOException e) {

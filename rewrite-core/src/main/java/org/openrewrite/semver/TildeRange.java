@@ -30,12 +30,14 @@ import static org.openrewrite.semver.Semver.isVersion;
  * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
  */
 public class TildeRange extends LatestRelease {
-    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:\\.(\\d+))?");
+    private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:" +
+            "\\.(\\d+))?");
 
     // The npm tilde grammar; unlike TILDE_RANGE_PATTERN, no 4th component, wildcards allowed.
     private static final Pattern NODE_TILDE_PATTERN = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN + "$");
 
-    private static final Pattern NODE_TILDE_PATTERN_LOOSE = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN_LOOSE + "$");
+    private static final Pattern NODE_TILDE_PATTERN_LOOSE = Pattern.compile("^(?:~>?)" + XRange.XRANGE_PLAIN_LOOSE +
+            "$");
 
     private final String upperExclusive;
     private final String lower;
@@ -73,7 +75,8 @@ public class TildeRange extends LatestRelease {
     public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern) {
         return build(pattern, metadataPattern, false);
     }
-    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern, boolean requireRelease) {
+    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern,
+            boolean requireRelease) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");

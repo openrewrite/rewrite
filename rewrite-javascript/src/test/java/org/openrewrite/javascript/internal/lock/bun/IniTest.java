@@ -49,7 +49,8 @@ class IniTest {
         try (InputStream is = IniTest.class.getResourceAsStream("ini-cases")) {
             for (JsonNode c : MAPPER.readTree(is)) {
                 cases.add(Arguments.of(c.get("name").asText(), c.get("ini").asText(),
-                        MAPPER.convertValue(c.get("env"), Map.class), MAPPER.convertValue(c.get("expected"), Map.class)));
+                        MAPPER.convertValue(c.get("env"), Map.class),
+                          MAPPER.convertValue(c.get("expected"), Map.class)));
             }
         }
         return cases;
@@ -98,7 +99,8 @@ class IniTest {
 
     @Test
     void matchesNpmIni() {
-        assertThat(parse("\n'{ \"what\": \"is this\" }' = seriously?\n")).isEqualTo(map("[Object object]", "seriously?"));
+        assertThat(parse("\n'{ \"what\": \"is this\" }' = seriously?\n"))
+          .isEqualTo(map("[Object object]", "seriously?"));
         assertThat(parse("\n'[1, 2, 3]' = cmon man\n")).isEqualTo(map("1,2,3", "cmon man"));
     }
 

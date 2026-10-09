@@ -27,9 +27,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class NpmLockRegeneratorTest {
 
     private static final String MANIFEST = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\"\n}\n";
-    private static final String LOCK = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": 3,\n" +
-                                       "  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": \"a\",\n" +
-                                       "      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
+    private static final String LOCK = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"lockfileVersion\": " +
+                                       "3,\n  \"requires\": true,\n  \"packages\": {\n    \"\": {\n      \"name\": " +
+                                       "\"a\",\n      \"version\": \"1.0.0\"\n    }\n  }\n}\n";
 
     private static final PackumentSource NO_REGISTRY = new PackumentSource() {
         @Override
@@ -59,7 +59,8 @@ class NpmLockRegeneratorTest {
       "{\"private\":true,\"workspaces\":[\"packages/*\",\"!packages/a\"]}||",
       "{\"workspaces\":[\"packages/*\"]||"
     })
-    void npmInstallsAtTheNearestDirectoryAboveWhoseWorkspacesListTheProject(String root, String mid, String installsAt) {
+    void npmInstallsAtTheNearestDirectoryAboveWhoseWorkspacesListTheProject(String root, String mid,
+            String installsAt) {
         NpmLockRegenerator.Inputs.InputsBuilder inputs = NpmLockRegenerator.Inputs.builder()
           .lock(LOCK)
           .manifest("", MANIFEST)

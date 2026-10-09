@@ -84,7 +84,8 @@ final class Pacote {
         Spec fetched = spec.getType() == Spec.Type.ALIAS && spec.getSubSpec() != null ? spec.getSubSpec() : spec;
         switch (Objects.requireNonNull(fetched.getType())) {
             case GIT:
-                throw new CannotKnow("git manifest " + (truthy(fetched.getSaveSpec()) ? fetched.getSaveSpec() : fetched.getRaw()));
+                throw new CannotKnow("git manifest " +
+                    (truthy(fetched.getSaveSpec()) ? fetched.getSaveSpec() : fetched.getRaw()));
             case FILE:
                 throw new CannotKnow("local tarball " + fetched.getRawSpec());
             case DIRECTORY:
@@ -139,7 +140,8 @@ final class Pacote {
                     for (String algorithm : Ssri.algorithms(integrity)) {
                         if (Ssri.algorithms(parsed).contains(algorithm)) {
                             throw new NpmRejection("EINTEGRITY", "Integrity checksum failed when using " + algorithm +
-                                                                 ": wanted " + integrity + " but got " + parsed + ".", null);
+                                                                 ": wanted " + integrity + " but got " + parsed + ".",
+                                                                     null);
                         }
                     }
                 }

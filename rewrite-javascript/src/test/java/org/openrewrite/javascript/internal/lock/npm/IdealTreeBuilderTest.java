@@ -93,7 +93,8 @@ class IdealTreeBuilderTest {
             sb.append(" integrity=").append(Js.string(node.getIntegrity()));
             sb.append(" flags=").append(flags(node));
             sb.append(" target=").append(node.isLink() ? node.getTarget().getLocation() : "");
-            sb.append(" entry=").append(JsonStringifyNice.stringify(Shrinkwrap.metaFromNode(node, path, NpmOptions.DEFAULT)));
+            sb.append(" entry=")
+              .append(JsonStringifyNice.stringify(Shrinkwrap.metaFromNode(node, path, NpmOptions.DEFAULT)));
             out.put(node.getLocation(), sb.toString());
         }
         return out;
@@ -203,10 +204,12 @@ class IdealTreeBuilderTest {
             built = ScenarioReplay.builder(edit, http, path).buildIdealTree();
         } catch (RuntimeException e) {
             String code = codeOf(e);
-            String thrown = e.getClass().getSimpleName() + (code != null ? "[" + code + "]" : "") + ": " + e.getMessage();
+            String thrown = e.getClass().getSimpleName() + (code != null ? "[" + code + "]" : "") + ": " +
+              e.getMessage();
             if (expectTree) {
                 failed(label, http, "failed", thrown);
-                throw new AssertionError(label + " expected npm's tree but the build failed: " + thrown + missing(http), e);
+                throw new AssertionError(label + " expected npm's tree but the build failed: " + thrown + missing(http),
+                  e);
             }
             assertExpectedFailure(label, expect, kind, e, code, thrown, http);
             return;

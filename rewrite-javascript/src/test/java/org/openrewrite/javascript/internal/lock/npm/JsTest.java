@@ -78,9 +78,10 @@ class JsTest {
 
     @Test
     void keysOfObjectPutIntegersFirst() {
-        assertThat(Js.keys(json("{\"b\":1,\"4294967295\":1,\"4294967294\":1,\"1\":1,\"01\":1,\"-1\":1,\"1.5\":1,\"0\":1," +
-                                "\"1e3\":1,\"10\":1,\"9007199254740993\":1}")))
-          .containsExactly("0", "1", "10", "4294967294", "b", "4294967295", "01", "-1", "1.5", "1e3", "9007199254740993");
+        assertThat(Js.keys(json("{\"b\":1,\"4294967295\":1,\"4294967294\":1,\"1\":1,\"01\":1,\"-1\":1,\"1.5\":1," +
+                                "\"0\":1,\"1e3\":1,\"10\":1,\"9007199254740993\":1}")))
+          .containsExactly("0", "1", "10", "4294967294", "b", "4294967295", "01", "-1", "1.5", "1e3",
+          "9007199254740993");
     }
 
     @Test
@@ -88,7 +89,8 @@ class JsTest {
         assertThat(Js.entries(arr("x", null))).extracting(Map.Entry::getKey).containsExactly("0", "1");
         assertThat(Js.entries(arr("x", null))).extracting(Map.Entry::getValue).containsExactly("x", null);
         assertThat(Js.keys("ab")).containsExactly("0", "1");
-        assertThat(Js.entries("a\ud83d\ude00")).extracting(Map.Entry::getValue).containsExactly("a", "\ud83d", "\ude00");
+        assertThat(Js.entries("a\ud83d\ude00")).extracting(Map.Entry::getValue)
+                .containsExactly("a", "\ud83d", "\ude00");
         assertThat(Js.keys(5)).isEmpty();
         assertThat(Js.keys(true)).isEmpty();
         assertThat(Js.keys(obj())).isEmpty();

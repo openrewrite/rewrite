@@ -246,7 +246,8 @@ class OverrideSetTest {
             @Test
             void handlesNonSemverSpecTypesGracefully() {
                 assertThat(OverrideSet.haveConflictingRules(
-                  new OverrideSet(obj("foo", "github:user/repo")), new OverrideSet(obj("foo", "file:./local")))).isFalse();
+                  new OverrideSet(obj("foo", "github:user/repo")), new OverrideSet(obj("foo", "file:./local"))))
+                    .isFalse();
             }
 
             @Test

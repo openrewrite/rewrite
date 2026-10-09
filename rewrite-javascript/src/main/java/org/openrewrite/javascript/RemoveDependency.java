@@ -50,9 +50,11 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     String packageName;
 
     @Option(displayName = "Scope",
-            description = "The dependency scope to remove from: `dependencies`, `devDependencies`, `peerDependencies`, " +
-                    "`optionalDependencies`, or `bundledDependencies`. If not specified, removes from all scopes.",
-            valid = {"dependencies", "devDependencies", "peerDependencies", "optionalDependencies", "bundledDependencies"},
+            description = "The dependency scope to remove from: `dependencies`, `devDependencies`, " +
+                    "`peerDependencies`, `optionalDependencies`, or `bundledDependencies`. If not specified, removes " +
+                    "from all scopes.",
+            valid = {"dependencies", "devDependencies", "peerDependencies", "optionalDependencies",
+                    "bundledDependencies"},
             example = "dependencies",
             required = false)
     @Nullable String scope;
@@ -61,12 +63,14 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
 
     @Override public String getDescription() {
-        return "Remove an npm dependency from `package.json` and regenerate the lock file natively, without executing " +
-                "the package manager. " +
-                "If the dependency does not exist in any scope, the recipe is a no-op.";
+        return "Remove an npm dependency from `package.json` and regenerate the lock file natively, without " +
+                "executing the package manager. If the dependency does not exist in any scope, the recipe is a no-op.";
     }
 
-    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
+    @Override
+    public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyScan.Accumulator();
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
@@ -88,7 +92,8 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k ->
+                            new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
                 return tree;
@@ -169,7 +174,8 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 if (ps.modifiedPackageJson != null) return;
                 if (ps.scopesContainingPackage == null) return;
                 Set<String> scopes = ps.scopesContainingPackage;
-                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes);
+                Function<Json.Document, Json.Document> edit = doc ->
+                        PackageJsonHelper.removeDependency(doc, packageName, scopes);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
                         NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
@@ -188,6 +194,7 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
             return;
         }
         ps.failureRecorded = true;
-        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult,
+                packageName);
     }
 }

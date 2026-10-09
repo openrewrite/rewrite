@@ -83,7 +83,8 @@ class ShrinkwrapTest {
 
             assertThat(meta.get("node_modules/registry").get("resolved")).isEqualTo(omit ? null : url);
             assertThat(meta.get("node_modules/tar").get("resolved")).as("not a registry dep").isEqualTo(url);
-            assertThat(Shrinkwrap.metaFromNode(registry, "", NpmOptions.DEFAULT).get("resolved")).as("metaFromNode default").isEqualTo(url);
+            assertThat(Shrinkwrap.metaFromNode(registry, "", NpmOptions.DEFAULT).get("resolved"))
+              .as("metaFromNode default").isEqualTo(url);
         }
     }
 
@@ -514,7 +515,8 @@ class ShrinkwrapTest {
             "symlink", "file:./abbrev-link-target", "tarball", "file:abbrev-1.1.1.tgz", "bundler", "1.2.3"))));
         assertThat(m.isLoadedFromDisk()).isTrue();
         Map<String, Object> abbrev = obj(
-          "integrity", "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
+          "integrity",
+            "sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==",
           "resolved", "https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz", "version", "1.1.1");
         Map<String, Object> scoped = obj("integrity", "the integrity is not valid, clearly", "resolved",
                                          "fake resolved value");
@@ -559,7 +561,8 @@ class ShrinkwrapTest {
                       "regalias@xyz:\n  version \"1.0.2\"\n" +
                       "  resolved \"https://registry.yarnpkg.com/mkdirp/-/mkdirp-1.0.2.tgz#" + hash + "\"\n" +
                       "  integrity " + sha + "\n";
-        Shrinkwrap s = new Shrinkwrap("/path", NpmOptions.DEFAULT).load(projectFiles(null, yarn, "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"}}"));
+        Shrinkwrap s = new Shrinkwrap("/path", NpmOptions.DEFAULT)
+          .load(projectFiles(null, yarn, "{\"dependencies\":{\"mkdirp\":\"^1.0.2\"}}"));
         Map<String, Object> opt = new LinkedHashMap<>();
         assertThat(s.checkYarnLock("mkdirp@^1.0.2", opt).getRaw()).isEqualTo("mkdirp@1.0.2");
         assertThat(opt).isEqualTo(obj("resolved", "https://registry.npmjs.org/mkdirp/-/mkdirp-1.0.2.tgz", "integrity",
@@ -599,7 +602,8 @@ class ShrinkwrapTest {
 
     @Test
     void ignoreYarnLockFileParseErrors() {
-        Shrinkwrap s = new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(null, "this is not a yarn lock file!", null));
+        Shrinkwrap s = new Shrinkwrap("/dir", NpmOptions.DEFAULT)
+          .load(projectFiles(null, "this is not a yarn lock file!", null));
         assertThat(s.getYarnLock()).isNotNull();
         assertThat(s.getYarnLock().getEntries()).isEmpty();
     }
@@ -607,8 +611,10 @@ class ShrinkwrapTest {
     @Test
     void emptyYarnLockIsNoYarnLock() {
         String lock = "{\"name\":\"p\",\"lockfileVersion\":3,\"packages\":{\"\":{\"name\":\"p\"}}}\n";
-        assertThat(new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(lock, "", null)).getYarnLock()).isNull();
-        assertThat(new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(null, "", null)).getYarnLock()).isNull();
+        assertThat(new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(lock, "", null)).getYarnLock())
+          .isNull();
+        assertThat(new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(null, "", null)).getYarnLock())
+          .isNull();
         Shrinkwrap blank = new Shrinkwrap("/dir", NpmOptions.DEFAULT).load(projectFiles(lock, "\n", null));
         assertThat(blank.getYarnLock()).isNotNull();
         assertThat(blank.getYarnLock().getEntries()).isEmpty();

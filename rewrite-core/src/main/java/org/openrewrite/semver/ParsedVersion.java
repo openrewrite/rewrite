@@ -40,8 +40,10 @@ final class ParsedVersion {
     static final String BUILD = "(?:\\+[0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*)";
 
     static final String PRERELEASE_ID_LOOSE = "(?:\\d*[a-zA-Z-][0-9a-zA-Z-]*|\\d+)";
-    static final String PRERELEASE_GROUP_LOOSE = "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE + ")*))";
-    static final String LOOSE_PLAIN = "[v=\\s]*(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)" + PRERELEASE_GROUP_LOOSE + "?" + BUILD + "?";
+    static final String PRERELEASE_GROUP_LOOSE = "(?:-?(" + PRERELEASE_ID_LOOSE + "(?:\\." + PRERELEASE_ID_LOOSE +
+            ")*))";
+    static final String LOOSE_PLAIN = "[v=\\s]*(?:\\d+)\\.(?:\\d+)\\.(?:\\d+)" + PRERELEASE_GROUP_LOOSE + "?" + BUILD +
+            "?";
 
     // Port of node-semver re.js FULL (major.minor.patch, no leading zeros, prerelease and build split).
     private static final Pattern STRICT_PATTERN = Pattern.compile(
@@ -146,7 +148,8 @@ final class ParsedVersion {
             }
         }
 
-        ParsedVersion strict = nodeView(STRICT_PATTERN, version, matches, groups, qualifier, preReleaseEnding, patchedVersion);
+        ParsedVersion strict = nodeView(STRICT_PATTERN, version, matches, groups, qualifier, preReleaseEnding,
+                patchedVersion);
         if (strict != null) {
             return strict;
         }

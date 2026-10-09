@@ -54,7 +54,8 @@ class YarnClassicInputsTest {
         assertThat(inputs.getEnv()).isNull();
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
         assertThat(inputs.getCwd()).isEqualTo("packages/a");
-        Inputs fromRoot = YarnClassicInputs.from(LockDirectory.of(builder.packageJsonPath(Paths.get("repo/package.json"))
+        Inputs fromRoot = YarnClassicInputs.from(
+          LockDirectory.of(builder.packageJsonPath(Paths.get("repo/package.json"))
           .packageJson("{\"private\":true,\"workspaces\":[\"packages/*\"]}").build()), Host.UNKNOWN, Instant.EPOCH);
         assertThat(fromRoot.getCwd()).isEmpty();
         assertThat(fromRoot.getConfigFiles()).containsOnlyKeys(".yarnrc", ".npmrc");
@@ -125,7 +126,8 @@ class YarnClassicInputsTest {
                      "at the workspace root ../../, whose workspaces list web/app, and writes ../../yarn.lock, not " +
                      "this project's");
 
-        Inputs unlisted = YarnClassicInputs.from(LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()),
+        Inputs unlisted = YarnClassicInputs.from(
+          LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()),
           Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(unlisted.getDirectory()).isEqualTo("tools/app");

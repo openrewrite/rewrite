@@ -83,7 +83,8 @@ public final class VirtualTreeLoader {
                 String text = manifests.get(location);
                 Map<String, Object> parsed = parsedManifests.get(location);
                 try {
-                    value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) : NONE;
+                    value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) :
+                        NONE;
                 } catch (RuntimeException e) {
                     value = e;
                 }

@@ -46,7 +46,8 @@ final class ExplainEresolve {
         Map<String, Object> whileInstalling = dep != null && map(dep.get("whileInstalling")) != null ?
                 map(dep.get("whileInstalling")) :
                 current != null && map(current.get("whileInstalling")) != null ? map(current.get("whileInstalling")) :
-                edge != null && map(edge.get("from")) != null ? map(map(edge.get("from")).get("whileInstalling")) : null;
+                edge != null && map(edge.get("from")) != null ? map(map(edge.get("from")).get("whileInstalling")) :
+                        null;
         if (whileInstalling != null) {
             out.add("While resolving: " + printNode(whileInstalling));
         }
@@ -133,7 +134,8 @@ final class ExplainEresolve {
             dep = "overridden " + dep + " (was \"" + string(edge.get("rawSpec")) + "\")";
         }
         String fromMsg = " from " + explainFrom(from, depth, seen);
-        return ("prod".equals(type) ? "" : type + " ") + (truthy(edge.get("bundled")) ? "bundled " : "") + dep + fromMsg;
+        return ("prod".equals(type) ? "" : type + " ") + (truthy(edge.get("bundled")) ? "bundled " : "") + dep +
+                fromMsg;
     }
 
     private static String explainFrom(@Nullable Map<String, Object> from, int depth, Set<String> seen) {
@@ -146,7 +148,8 @@ final class ExplainEresolve {
             return printNode(from);
         }
         seen.add(nodeId);
-        String result = printNode(from) + explainDependents(from, depth - 1, seen) + explainLinksIn(from, depth - 1, seen);
+        String result = printNode(from) + explainDependents(from, depth - 1, seen) +
+                explainLinksIn(from, depth - 1, seen);
         seen.remove(nodeId);
         return result;
     }

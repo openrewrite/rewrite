@@ -53,7 +53,8 @@ class NpmInvalidEdgesReport {
                 }
                 for (Edge edge : ScenarioReplay.problemEdges(tree)) {
                     Node to = edge.getTo();
-                    lines.add(row + edge.getFrom().getLocation() + "\t" + edge.getType() + "\t" + edge.getName() + "\t" +
+                    lines.add(row + edge.getFrom().getLocation() + "\t" + edge.getType() + "\t" + edge.getName() +
+                            "\t" +
                               edge.getSpec() + "\t" + (to == null ? "" : to.getLocation()) + "\t" +
                               (edge.getError() == null ? "" : edge.getError()));
                 }

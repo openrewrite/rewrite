@@ -62,15 +62,18 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
     @Override public String getInstanceNameSuffix() { return String.format("`%s`", packageName); }
 
     @Override public String getDescription() {
-        return "Add an npm dependency to `package.json` and regenerate the lock file natively, without executing " +
-                "the package manager. If the dependency already exists in any scope, the recipe is a no-op. " +
-                "Not safe to use as a precondition: consults the package registry over the network and publishes per-project " +
+        return "Add an npm dependency to `package.json` and regenerate the lock file natively, without executing the " +
+                "package manager. If the dependency already exists in any scope, the recipe is a no-op. Not safe to " +
+                "use as a precondition: consults the package registry over the network and publishes per-project " +
                 "state shared with other dependency recipes.";
     }
 
     private String targetScope() { return scope == null ? "dependencies" : scope; }
 
-    @Override public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) { return new NodeDependencyScan.Accumulator(); }
+    @Override
+    public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyScan.Accumulator();
+    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
@@ -92,7 +95,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState());
+                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k ->
+                            new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
                 return tree;
@@ -168,7 +172,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
                 if (ps.modifiedPackageJson != null) return;
-                Function<Json.Document, Json.Document> edit = doc -> PackageJsonHelper.addDependency(doc, packageName, version, targetScope());
+                Function<Json.Document, Json.Document> edit = doc ->
+                        PackageJsonHelper.addDependency(doc, packageName, version, targetScope());
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
                         pkg, edit, ps.capturedLockContent,
                         NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
@@ -187,6 +192,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyScan.Accumulator
             return;
         }
         ps.failureRecorded = true;
-        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult, packageName);
+        LockFileRegeneration.insertFailureRow(ctx, lockRegenerationFailures, packageJsonPath, ps.regenResult,
+                packageName);
     }
 }

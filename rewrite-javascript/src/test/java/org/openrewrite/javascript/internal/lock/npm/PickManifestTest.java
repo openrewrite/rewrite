@@ -33,8 +33,9 @@ class PickManifestTest {
         return NpmTreeSupport.json(json);
     }
 
-    private static final String FOUR_VERSIONS = "{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"1.0.1\":{\"version\":\"1.0.1\"}," +
-                                                "\"1.0.2\":{\"version\":\"1.0.2\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}";
+    private static final String FOUR_VERSIONS = "{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                "\"1.0.1\":{\"version\":\"1.0.1\"},\"1.0.2\":{\"version\":\"1.0.2\"}," +
+                                                "\"2.0.0\":{\"version\":\"2.0.0\"}}}";
 
     private static String version(Map<String, Object> packument, String wanted) {
         return (String) PickManifest.pickManifest(packument, wanted).get("version");
@@ -71,14 +72,18 @@ class PickManifestTest {
 
     @Test
     void basicTagSelection() {
-        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\"},\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
-                                                 "\"1.0.1\":{\"version\":\"1.0.1\"},\"1.0.2\":{\"version\":\"1.0.2\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}");
+        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\"}," +
+                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"1.0.1\":{\"version\":\"1.0.1\"}," +
+                                                 "\"1.0.2\":{\"version\":\"1.0.2\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}}}");
         assertThat(version(metadata, "foo")).isEqualTo("1.0.1");
     }
 
     @Test
     void errorsIfANonRegistrySpecIsProvided() {
-        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\"},\"versions\":{\"1.0.1\":{\"version\":\"1.0.1\"}}}");
+        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\"}," +
+                                                 "\"versions\":{\"1.0.1\":{\"version\":\"1.0.1\"}}}");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "!?!?!?!"))
           .hasMessageContaining("Invalid tag name");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "file://foo.tar.gz"))
@@ -87,7 +92,8 @@ class PickManifestTest {
 
     @Test
     void skipsAnyInvalidVersionKeys() {
-        Map<String, Object> metadata = packument("{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"lol ok\":{\"version\":\"1.0.1\"}}}");
+        Map<String, Object> metadata = packument("{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"lol " +
+                                                 "ok\":{\"version\":\"1.0.1\"}}}");
         assertThat(version(metadata, "^1.0.0")).isEqualTo("1.0.0");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "^1.0.1"))
           .isInstanceOf(PickManifest.PickFailure.class)
@@ -96,7 +102,9 @@ class PickManifestTest {
 
     @Test
     void etargetIfRangeDoesNotMatchAnything() {
-        Map<String, Object> metadata = packument("{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{\"version\":\"2.0.0\"},\"2.0.5\":{\"version\":\"2.0.5\"}}}");
+        Map<String, Object> metadata = packument("{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}," +
+                                                 "\"2.0.5\":{\"version\":\"2.0.5\"}}}");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "^2.1.0"))
           .matches(t -> "ETARGET".equals(code(t)));
     }
@@ -104,8 +112,10 @@ class PickManifestTest {
     @Test
     void e403IfVersionIsForbidden() {
         Map<String, Object> metadata = packument("{\"dist-tags\":{\"latest\":\"2.1.0\"}," +
-                                                 "\"policyRestrictions\":{\"versions\":{\"2.1.0\":{\"version\":\"2.1.0\"}}}," +
-                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{\"version\":\"2.0.0\"},\"2.0.5\":{\"version\":\"2.0.5\"}}}");
+                                                 "\"policyRestrictions\":{\"versions\":{\"2.1.0\":{\"version\":" +
+                                                 "\"2.1.0\"}}},\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}," +
+                                                 "\"2.0.5\":{\"version\":\"2.0.5\"}}}");
         assertThat(version(metadata, "2")).isEqualTo("2.0.5");
         assertThat(version(metadata, "")).isEqualTo("2.0.5");
         assertThat(version(metadata, "1 || 2")).isEqualTo("2.0.5");
@@ -115,8 +125,11 @@ class PickManifestTest {
 
     @Test
     void e403IfVersionIsForbiddenProvidedAMinorVersion() {
-        Map<String, Object> metadata = packument("{\"policyRestrictions\":{\"versions\":{\"2.1.0\":{\"version\":\"2.1.0\"},\"2.1.5\":{\"version\":\"2.1.5\"}}}," +
-                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{\"version\":\"2.0.0\"},\"2.0.5\":{\"version\":\"2.0.5\"}}}");
+        Map<String, Object> metadata = packument("{\"policyRestrictions\":{\"versions\":{\"2.1.0\":{\"version\":" +
+                                                 "\"2.1.0\"},\"2.1.5\":{\"version\":\"2.1.5\"}}}," +
+                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}," +
+                                                 "\"2.0.5\":{\"version\":\"2.0.5\"}}}");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "2.1"))
           .matches(t -> "E403".equals(code(t)));
     }
@@ -124,8 +137,11 @@ class PickManifestTest {
     @Test
     void e403IfVersionIsForbiddenProvidedAMajorVersion() {
         Map<String, Object> metadata = packument("{\"dist-tags\":{\"latest\":\"2.0.5\",\"borked\":\"2.1.5\"}," +
-                                                 "\"policyRestrictions\":{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"2.1.0\":{\"version\":\"2.1.0\"},\"2.1.5\":{\"version\":\"2.1.5\"}}}," +
-                                                 "\"versions\":{\"2.0.0\":{\"version\":\"2.0.0\"},\"2.0.5\":{\"version\":\"2.0.5\"}}}");
+                                                 "\"policyRestrictions\":{\"versions\":{\"1.0.0\":{\"version\":" +
+                                                 "\"1.0.0\"},\"2.1.0\":{\"version\":\"2.1.0\"}," +
+                                                 "\"2.1.5\":{\"version\":\"2.1.5\"}}}," +
+                                                 "\"versions\":{\"2.0.0\":{\"version\":\"2.0.0\"}," +
+                                                 "\"2.0.5\":{\"version\":\"2.0.5\"}}}");
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "1"))
           .matches(t -> "E403".equals(code(t)));
         assertThatThrownBy(() -> PickManifest.pickManifest(metadata, "borked"))
@@ -134,8 +150,11 @@ class PickManifestTest {
 
     @Test
     void ifDefaultTagMatchesAGivenRangeUseIt() {
-        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\",\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
-                                                 "\"1.0.1\":{\"version\":\"1.0.1\"},\"1.0.2\":{\"version\":\"1.0.2\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}");
+        Map<String, Object> metadata = packument("{\"dist-tags\":{\"foo\":\"1.0.1\",\"latest\":\"1.0.0\"}," +
+                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"1.0.1\":{\"version\":\"1.0.1\"}," +
+                                                 "\"1.0.2\":{\"version\":\"1.0.2\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}}}");
         PickManifest.Options foo = PickManifest.Options.builder().defaultTag("foo").build();
         assertThat(version(metadata, "^1.0.0", foo)).isEqualTo("1.0.1");
         assertThat(version(metadata, "^2.0.0", foo)).isEqualTo("2.0.0");
@@ -144,9 +163,12 @@ class PickManifestTest {
 
     @Test
     void starRangesUseDefaultTagIfNoVersionsMatch() {
-        Map<String, Object> metadata = packument("{\"dist-tags\":{\"latest\":\"1.0.0-pre.0\",\"beta\":\"2.0.0-beta.0\"}," +
-                                                 "\"versions\":{\"1.0.0-pre.0\":{\"version\":\"1.0.0-pre.0\"},\"1.0.0-pre.1\":{\"version\":\"1.0.0-pre.1\"}," +
-                                                 "\"2.0.0-beta.0\":{\"version\":\"2.0.0-beta.0\"},\"2.0.0-beta.1\":{\"version\":\"2.0.0-beta.1\"}}}");
+        Map<String, Object> metadata = packument("{\"dist-tags\":{\"latest\":\"1.0.0-pre.0\"," +
+                                                 "\"beta\":\"2.0.0-beta.0\"}," +
+                                                 "\"versions\":{\"1.0.0-pre.0\":{\"version\":\"1.0.0-pre.0\"}," +
+                                                 "\"1.0.0-pre.1\":{\"version\":\"1.0.0-pre.1\"}," +
+                                                 "\"2.0.0-beta.0\":{\"version\":\"2.0.0-beta.0\"}," +
+                                                 "\"2.0.0-beta.1\":{\"version\":\"2.0.0-beta.1\"}}}");
         PickManifest.Options beta = PickManifest.Options.builder().defaultTag("beta").build();
         assertThat(version(metadata, "*", beta)).isEqualTo("2.0.0-beta.0");
         assertThat(version(metadata, "*")).isEqualTo("1.0.0-pre.0");
@@ -181,8 +203,9 @@ class PickManifestTest {
         assertThat(version(packument(FOUR_VERSIONS), "== 1.0.0 || foo")).isEqualTo("1.0.0");
     }
 
-    private static final String DEPRECATED = "{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"1.0.1\":{\"version\":\"1.0.1\"}," +
-                                             "\"1.1.0\":{\"version\":\"1.1.0\",\"deprecated\":\"yes\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}";
+    private static final String DEPRECATED = "{\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                             "\"1.0.1\":{\"version\":\"1.0.1\"},\"1.1.0\":{\"version\":\"1.1.0\"," +
+                                             "\"deprecated\":\"yes\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}";
 
     @Test
     void matchesSkipDeprecatedVersions() {
@@ -202,10 +225,17 @@ class PickManifestTest {
     @Test
     void acceptsOptsBeforeOptionToDoDateBasedCutoffs() {
         Map<String, Object> metadata = packument("{\"dist-tags\":{\"latest\":\"3.0.0\"}," +
-                                                 "\"time\":{\"modified\":\"2018-01-03T00:00:00.000Z\",\"created\":\"2018-01-01T00:00:00.000Z\"," +
-                                                 "\"1.0.0\":\"2018-01-01T00:00:00.000Z\",\"2.0.0\":\"2018-01-02T00:00:00.000Z\",\"2.0.1\":\"2018-01-03T00:00:00.000Z\"," +
-                                                 "\"2.0.2\":\"2018-01-03T00:00:00.123Z\",\"3.0.0\":\"2018-01-04T00:00:00.000Z\"}," +
-                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"},\"2.0.0\":{\"version\":\"2.0.0\"},\"2.0.1\":{\"version\":\"2.0.1\"},\"3.0.0\":{\"version\":\"3.0.0\"}}}");
+                                                 "\"time\":{\"modified\":\"2018-01-03T00:00:00.000Z\"," +
+                                                 "\"created\":\"2018-01-01T00:00:00.000Z\"," +
+                                                 "\"1.0.0\":\"2018-01-01T00:00:00.000Z\"," +
+                                                 "\"2.0.0\":\"2018-01-02T00:00:00.000Z\"," +
+                                                 "\"2.0.1\":\"2018-01-03T00:00:00.000Z\"," +
+                                                 "\"2.0.2\":\"2018-01-03T00:00:00.123Z\"," +
+                                                 "\"3.0.0\":\"2018-01-04T00:00:00.000Z\"}," +
+                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                                 "\"2.0.0\":{\"version\":\"2.0.0\"}," +
+                                                 "\"2.0.1\":{\"version\":\"2.0.1\"}," +
+                                                 "\"3.0.0\":{\"version\":\"3.0.0\"}}}");
         PickManifest.Options before0102 = PickManifest.Options.builder().before("2018-01-02").build();
         assertThat(version(metadata, "*", before0102)).isEqualTo("2.0.0");
         assertThat(version(metadata, "latest", before0102)).isEqualTo("2.0.0");
@@ -261,8 +291,9 @@ class PickManifestTest {
         assertThatThrownBy(() -> PickManifest.pickManifest(pack, "borked")).matches(t -> "ETARGET".equals(code(t)));
     }
 
-    private static final String VULNY = "{\"name\":\"vulny\",\"dist-tags\":{\"latest\":\"1.0.3\"},\"versions\":{" +
-                                        "\"1.0.0\":{\"version\":\"1.0.0\"},\"1.0.1\":{\"version\":\"1.0.1\"},\"1.0.2\":{\"version\":\"1.0.2\"}," +
+    private static final String VULNY = "{\"name\":\"vulny\",\"dist-tags\":{\"latest\":\"1.0.3\"}," +
+                                        "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                        "\"1.0.1\":{\"version\":\"1.0.1\"},\"1.0.2\":{\"version\":\"1.0.2\"}," +
                                         "\"1.0.3\":{\"version\":\"1.0.3\"},\"2.0.0\":{\"version\":\"2.0.0\"}}}";
 
     @Test
@@ -301,21 +332,31 @@ class PickManifestTest {
     void normalizePackageBins() {
         String bin = "./bin/foobar.js";
         Map<String, Object> metadata = packument("{\"name\":\"foobar\",\"versions\":{" +
-                                                 "\"1.0.0\":{\"bin\":\"" + bin + "\",\"name\":\"foobar\",\"version\":\"1.0.0\"}," +
-                                                 "\"1.0.1\":{\"bin\":\"" + bin + "\",\"name\":\"foobar\",\"version\":\"1.0.1\"}," +
-                                                 "\"1.0.2\":{\"bin\":\"" + bin + "\",\"name\":\"foobar\",\"version\":\"1.0.2\"}," +
-                                                 "\"2.0.0\":{\"bin\":\"" + bin + "\",\"name\":\"foobar\",\"version\":\"2.0.0\"}}}");
+                                                 "\"1.0.0\":{\"bin\":\"" + bin +
+                                                   "\",\"name\":\"foobar\",\"version\":\"1.0.0\"}," +
+                                                 "\"1.0.1\":{\"bin\":\"" + bin +
+                                                   "\",\"name\":\"foobar\",\"version\":\"1.0.1\"}," +
+                                                 "\"1.0.2\":{\"bin\":\"" + bin +
+                                                   "\",\"name\":\"foobar\",\"version\":\"1.0.2\"}," +
+                                                 "\"2.0.0\":{\"bin\":\"" + bin +
+                                                   "\",\"name\":\"foobar\",\"version\":\"2.0.0\"}}}");
         Map<String, Object> metadataScoped = packument("{\"nameScoped\":\"@scope/foobar\",\"versions\":{" +
-                                                       "\"1.0.0\":{\"bin\":\"" + bin + "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.0\"}," +
-                                                       "\"1.0.1\":{\"bin\":\"" + bin + "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.1\"}," +
-                                                       "\"1.0.2\":{\"bin\":\"" + bin + "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.2\"}," +
-                                                       "\"2.0.0\":{\"bin\":\"" + bin + "\",\"name\":\"@scope/foobar\",\"version\":\"2.0.0\"}}}");
+                                                       "\"1.0.0\":{\"bin\":\"" + bin +
+                                                         "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.0\"}," +
+                                                       "\"1.0.1\":{\"bin\":\"" + bin +
+                                                         "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.1\"}," +
+                                                       "\"1.0.2\":{\"bin\":\"" + bin +
+                                                         "\",\"name\":\"@scope/foobar\",\"version\":\"1.0.2\"}," +
+                                                       "\"2.0.0\":{\"bin\":\"" + bin +
+                                                         "\",\"name\":\"@scope/foobar\",\"version\":\"2.0.0\"}}}");
 
         Map<String, Object> manifest = PickManifest.pickManifest(metadata, "^1.0.0");
-        assertThat(manifest).isEqualTo(json("{\"name\":\"foobar\",\"version\":\"1.0.2\",\"bin\":{\"foobar\":\"bin/foobar.js\"}}"));
+        assertThat(manifest).isEqualTo(json("{\"name\":\"foobar\",\"version\":\"1.0.2\"," +
+                                            "\"bin\":{\"foobar\":\"bin/foobar.js\"}}"));
 
         Map<String, Object> manifestScoped = PickManifest.pickManifest(metadataScoped, "^1.0.0");
-        assertThat(manifestScoped).isEqualTo(json("{\"name\":\"@scope/foobar\",\"version\":\"1.0.2\",\"bin\":{\"foobar\":\"bin/foobar.js\"}}"));
+        assertThat(manifestScoped).isEqualTo(json("{\"name\":\"@scope/foobar\",\"version\":\"1.0.2\"," +
+                                                  "\"bin\":{\"foobar\":\"bin/foobar.js\"}}"));
     }
 
     @Test
@@ -328,15 +369,18 @@ class PickManifestTest {
     // packument
     @Test
     void avoidStrictWithNothingToPick() {
-        Map<String, Object> oddly = packument("{\"name\":\"oddly\",\"dist-tags\":{\"latest\":\"1.0.2\"},\"versions\":{" +
-                                              "\"1.0.0\":{\"version\":\"1.0.0\"},\"1.0.2\":{\"version\":\"2.5.0\"}}}");
-        assertThat(PickManifest.pickManifest(oddly, "1.0.2", PickManifest.Options.builder().avoid(">=2").avoidStrict(true).build()))
+        Map<String, Object> oddly = packument("{\"name\":\"oddly\",\"dist-tags\":{\"latest\":\"1.0.2\"}," +
+                                              "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}," +
+                                              "\"1.0.2\":{\"version\":\"2.5.0\"}}}");
+        assertThat(PickManifest.pickManifest(oddly, "1.0.2",
+          PickManifest.Options.builder().avoid(">=2").avoidStrict(true).build()))
           .isEqualTo(json("{\"_outsideDependencyRange\":true,\"_isSemVerMajor\":false}"));
     }
 
     @Test
     void namelessPackumentRendersUndefined() {
-        Map<String, Object> nameless = packument("{\"dist-tags\":{\"latest\":\"1.0.0\"},\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}}}");
+        Map<String, Object> nameless = packument("{\"dist-tags\":{\"latest\":\"1.0.0\"}," +
+                                                 "\"versions\":{\"1.0.0\":{\"version\":\"1.0.0\"}}}");
         assertThatThrownBy(() -> PickManifest.pickManifest(nameless, "2.0.0"))
           .hasMessage("No matching version found for undefined@2.0.0.");
         assertThatThrownBy(() -> PickManifest.pickManifest(packument("{\"versions\":{}}"), null))
