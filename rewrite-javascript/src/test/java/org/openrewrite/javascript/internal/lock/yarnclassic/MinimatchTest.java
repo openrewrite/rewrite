@@ -21,8 +21,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The globs a resolution or a workspaces list takes, as yarn 1.22.22's bundled minimatch 3.0.4 answers them: path
- * globs, extglobs, classes, braces, negation, comments and escapes.
+ * The globs a resolution or a workspaces list takes, as yarn 1.22.22's bundled minimatch 3.0.4 answers them; the
+ * test resources' {@code generate/minimatch-rows.js} prints the rows.
  */
 class MinimatchTest {
 

@@ -860,7 +860,7 @@ a/**/b	a/bb	false
 **/	foo/bar	false
 **/*/	foo/bar	false
 */*/	foo/bar	false
-**/..	/home/foo/..	true
+**/..	/srv/foo/..	true
 **/a	a	true
 **	a/a	true
 a/**	a/a	true
@@ -1393,7 +1393,7 @@ a/*/?/**/e.md	a/bbb/c/d/efgh.ijk/e.md	true
 a/*/ab??.md	a/bbb/abcd.md	true
 a/bbb/ab??.md	a/bbb/abcd.md	true
 a/bbb/ab???md	a/bbb/abcd.md	true
-C:/Users/window/AppData/Local/Temp/testworkspace_V7osKW**	C:/Users/window/AppData/Local/Temp/testworkspace_V7osKW/packages/malfored1	false
+C:/Profiles/window/AppData/Local/Temp/testworkspace_V7osKW**	C:/Profiles/window/AppData/Local/Temp/testworkspace_V7osKW/packages/malfored1	false
 foo**	foobar	true
 foo**	foo	true
 foo/**	foo	false
