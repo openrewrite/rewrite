@@ -75,7 +75,8 @@ class TestTyTypesClient:
 
     def test_client_context_manager(self):
         """Test that TyTypesClient shuts down on context exit."""
-        with TyTypesClient() as client:
+        with TyTypesClient() as client, tempfile.TemporaryDirectory() as tmpdir:
+            assert client.initialize(tmpdir)
             assert client._process is not None
         assert client._process is None
 
@@ -3407,6 +3408,26 @@ class TestSubprocessEnvVirtualEnv:
             prefix='/some/dev/.venv',
             base_prefix='/usr',
             virtual_env='/tmp/ws/.venv',
+        )
+        assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
+
+    def test_project_venv_outranks_inherited_environments_but_not_an_explicit_one(self, tmp_path):
+        (tmp_path / '.venv').mkdir()
+        inherited = {'PATH': '/usr/bin', 'VIRTUAL_ENV': '/inherited/.venv', 'CONDA_PREFIX': '/conda/env'}
+
+        env = TyTypesClient._subprocess_env(
+            base_env=inherited,
+            prefix='/dev/.venv',
+            base_prefix='/usr',
+            project_root=str(tmp_path),
+        )
+        assert 'VIRTUAL_ENV' not in env
+        assert 'CONDA_PREFIX' not in env
+
+        env = TyTypesClient._subprocess_env(
+            base_env=inherited,
+            virtual_env='/tmp/ws/.venv',
+            project_root=str(tmp_path),
         )
         assert env['VIRTUAL_ENV'] == '/tmp/ws/.venv'
 
