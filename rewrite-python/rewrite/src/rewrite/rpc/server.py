@@ -2887,11 +2887,11 @@ class _StdinBuffer:
     instance is shared by read_message() and read_message_with_timeout().
     """
 
-    # A response body is read whole, and a page of tree data runs to hundreds of
-    # kilobytes, so each read should take as much as the pipe will give. A pipe
-    # returns at most its own capacity per read, and os.read allocates what it is
-    # asked for before shrinking to what arrived, so an over-large request costs
-    # only the unused difference.
+    # How much to ask for when the size wanted is not known — the header scan, which is looking
+    # for a newline and cannot say how far away it is. A body read sizes itself to the frame
+    # instead: a read returns exactly what it asks for rather than being capped by the pipe's
+    # capacity, so a megabyte asked for in 64 KiB pieces is sixteen reads and sixteen appends
+    # where one read is neither.
     _CHUNK_SIZE = 65536
 
     def __init__(self):
@@ -2921,7 +2921,26 @@ class _StdinBuffer:
                 return None
 
     def read_bytes(self, n: int, deadline: Optional[float] = None) -> Optional[bytes]:
-        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout."""
+        """Read exactly *n* bytes.  Returns ``None`` on EOF/timeout.
+
+        A read sized to the frame returns the whole body in one call, and the bytes object
+        ``os.read`` allocates for it is already what this method returns — so the common case
+        costs one allocation and no copy, where accumulating into the buffer and slicing out of
+        it costs three. Taken only with nothing buffered and no deadline, because the deadline
+        paths in :meth:`_fill` read through ``select`` or a thread instead.
+        """
+        # Positive n only: os.read(fd, 0) returns b'' and cannot be told apart from end of
+        # stream, and a negative n raises where the general path below slices silently. Both
+        # belong to that path, which handles them as it always has.
+        if n > 0 and not self._buf and deadline is None:
+            chunk = os.read(self._get_fd(), n)
+            if not chunk:
+                self.at_eof = True
+                return None
+            if len(chunk) == n:
+                return chunk
+            self._buf += chunk
+
         while len(self._buf) < n:
             if not self._fill(deadline):
                 return None
