@@ -1,0 +1,4 @@
+packages:
+  - '.'
+virtualStoreOnly: true
+enableModulesDir: false

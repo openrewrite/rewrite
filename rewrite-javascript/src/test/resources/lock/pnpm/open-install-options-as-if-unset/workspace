@@ -1,0 +1,17 @@
+packages:
+  - '.'
+dedupe: false
+fixLockfile: false
+forceFullResolution: false
+frozenLockfile: false
+frozenLockfileIfExists: false
+ignorePackageManifest: false
+latest: false
+pruneDirectDependencies: false
+pruneLockfileImporters: true
+resolutionOnly: false
+saveLockfile: true
+update: false
+updatePackageManifest: false
+updateToLatest: false
+workspace: false

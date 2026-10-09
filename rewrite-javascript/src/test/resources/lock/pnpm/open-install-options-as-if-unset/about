@@ -1,0 +1,1 @@
+Install options pnpm-workspace.yaml sets to the values a lock-only install takes unset; the root adds abbrev.

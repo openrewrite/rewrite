@@ -1,0 +1,1 @@
+pnpm-workspace.yaml beside a pnpm-workspace.yml, which find-up reaches after it; the root adds abbrev.

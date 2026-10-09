@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace whose root holds a .pnpmfile.cjs; b adds abbrev.

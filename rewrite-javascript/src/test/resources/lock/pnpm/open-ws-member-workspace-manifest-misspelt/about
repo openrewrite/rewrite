@@ -1,0 +1,1 @@
+pnpm run in packages/b, which holds a .pnpm-workspace.yaml, of a shared workspace; b adds abbrev.
