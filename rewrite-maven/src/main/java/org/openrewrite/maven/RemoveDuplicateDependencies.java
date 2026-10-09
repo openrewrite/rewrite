@@ -19,15 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.SearchResult;
-import org.openrewrite.maven.tree.Dependency;
-import org.openrewrite.maven.tree.ResolvedDependency;
-import org.openrewrite.maven.tree.ResolvedManagedDependency;
-import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.time.Duration;
@@ -37,131 +32,107 @@ import java.util.*;
 @EqualsAndHashCode(callSuper = false)
 public class RemoveDuplicateDependencies extends Recipe {
 
+    private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
+    private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
+    private static final XPathMatcher PROFILE_DEPENDENCIES_MATCHER = new XPathMatcher("/project/profiles/profile/dependencies");
+    private static final XPathMatcher PROFILE_MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/profiles/profile/dependencyManagement/dependencies");
+
     String displayName = "Remove duplicate Maven dependencies";
 
-    String description = "Removes duplicated dependencies in the `<dependencies>` and `<dependencyManagement>` sections of the `pom.xml`.";
+    String description = "Maven 3.10 and Maven 4 fail the build when a `<dependencies>` or `<dependencyManagement>` section, " +
+                         "including those of a profile, declares the same `groupId:artifactId:type:classifier` more than once, " +
+                         "regardless of `<scope>`. Earlier Maven versions only warned and kept a single declaration: " +
+                         "the first one in a project's `<dependencyManagement>`, and otherwise the last one, " +
+                         "in the position of the first. This recipe removes the duplicates, keeping the declaration " +
+                         "earlier Maven versions used so that the resolved dependencies stay the same.";
 
     Duration estimatedEffortPerOccurrence = Duration.ofMinutes(2);
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new MavenIsoVisitor<ExecutionContext>() {
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
-                Xml.Tag root = document.getRoot();
-                if (root.getChild("dependencies").isPresent() || root.getChild("dependencyManagement").isPresent()) {
-                    return SearchResult.found(document);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
+                    return removeDuplicates(t, false);
                 }
-                return document;
+                if (DEPENDENCIES_MATCHER.matches(getCursor()) ||
+                    PROFILE_DEPENDENCIES_MATCHER.matches(getCursor()) ||
+                    PROFILE_MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
+                    return removeDuplicates(t, true);
+                }
+                return t;
             }
-        }, new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
-            private final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
-            @SuppressWarnings("DataFlowIssue")
-            @Override
-            public Xml.@Nullable Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependenciesTag()) {
-                    getCursor().putMessage("dependencies", new HashMap<DependencyKey, Xml.Tag>());
-                } else if (isManagedDependenciesTag()) {
-                    getCursor().putMessage("managedDependencies", new HashMap<DependencyKey, Xml.Tag>());
-                } else if (isDependencyTag()) {
-                    Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("dependencies");
-                    DependencyKey dependencyKey = getDependencyKey(tag);
-                    if (dependencyKey != null) {
-                        Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
-                        if (existing != null && existing != tag) {
-                            maybeUpdateModel();
-                            return null;
-                        }
-                    }
-                } else if (isManagedDependencyTag()) {
-                    Map<DependencyKey, Xml.Tag> dependencies = getCursor().getNearestMessage("managedDependencies");
-                    DependencyKey dependencyKey = getManagedDependencyKey(tag);
-                    if (dependencyKey != null) {
-                        // Additionally compare classifier and type, which are only partially compared in `findManagedDependency`
-                        String classifier = getResolutionResult().getPom().getValue(tag.getChildValue("classifier").orElse(null));
-                        String type = getResolutionResult().getPom().getValue(tag.getChildValue("type").orElse("jar"));
-                        if (Objects.equals(classifier, dependencyKey.getClassifier()) &&
-                                Objects.equals(type, dependencyKey.getType())) {
-                            Xml.Tag existing = dependencies.putIfAbsent(dependencyKey, tag);
-                            if (existing != null && existing != tag) {
-                                maybeUpdateModel();
-                                return null;
-                            }
-                        }
-
+            private Xml.Tag removeDuplicates(Xml.Tag dependencies, boolean lastDeclarationWins) {
+                Map<String, List<Xml.Tag>> declarations = new HashMap<>();
+                for (Xml.Tag dependency : dependencies.getChildren("dependency")) {
+                    String key = managementKey(dependency);
+                    if (key != null) {
+                        declarations.computeIfAbsent(key, k -> new ArrayList<>()).add(dependency);
                     }
                 }
-                return super.visitTag(tag, ctx);
-            }
+                if (declarations.values().stream().allMatch(duplicates -> duplicates.size() == 1)) {
+                    return dependencies;
+                }
 
-            private boolean isDependenciesTag() {
-                return DEPENDENCIES_MATCHER.matches(getCursor());
-            }
-
-            private boolean isManagedDependenciesTag() {
-                return MANAGED_DEPENDENCIES_MATCHER.matches(getCursor());
-            }
-
-            private @Nullable DependencyKey getDependencyKey(Xml.Tag tag) {
-                Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
-                Scope scope = tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile);
-                if (dependencies.containsKey(scope)) {
-                    for (ResolvedDependency resolvedDependency : dependencies.get(scope)) {
-                        Dependency req = resolvedDependency.getRequested();
-                        String reqGroup = req.getGroupId();
-                        if ((reqGroup == null || reqGroup.equals(tag.getChildValue("groupId").orElse(null))) &&
-                                Objects.equals(req.getArtifactId(), tag.getChildValue("artifactId").orElse(null)) &&
-                                Objects.equals(Optional.ofNullable(req.getType()).orElse("jar"), tag.getChildValue("type").orElse("jar")) &&
-                                Objects.equals(req.getClassifier(), tag.getChildValue("classifier").orElse(null))) {
-                            return DependencyKey.from(resolvedDependency, scope);
-                        }
+                Set<String> seen = new HashSet<>();
+                List<Content> content = new ArrayList<>();
+                for (Content c : dependencies.getContent()) {
+                    String key = c instanceof Xml.Tag && "dependency".equals(((Xml.Tag) c).getName()) ?
+                            managementKey((Xml.Tag) c) : null;
+                    if (key == null) {
+                        content.add(c);
+                    } else if (seen.add(key)) {
+                        Xml.Tag first = (Xml.Tag) c;
+                        List<Xml.Tag> duplicates = declarations.get(key);
+                        Xml.Tag winner = duplicates.get(lastDeclarationWins ? duplicates.size() - 1 : 0);
+                        content.add(sameDeclaration(first, winner) ? first : winner.withPrefix(first.getPrefix()));
                     }
                 }
-                return null;
+                maybeUpdateModel();
+                return dependencies.withContent(content);
             }
 
-            private @Nullable DependencyKey getManagedDependencyKey(Xml.Tag tag) {
-                if (tag.getChildValue("scope").filter("import"::equalsIgnoreCase).isPresent()) {
-                    return DependencyKey.from(tag);
+            private @Nullable String managementKey(Xml.Tag dependency) {
+                String artifactId = value(dependency, "artifactId");
+                if (artifactId == null) {
+                    return null;
                 }
-                ResolvedManagedDependency resolvedDependency = findManagedDependency(tag);
-                return resolvedDependency != null ? DependencyKey.from(resolvedDependency) : null;
+                String type = value(dependency, "type");
+                String classifier = value(dependency, "classifier");
+                return value(dependency, "groupId") + ":" + artifactId + ":" +
+                       (type == null ? "jar" : type) +
+                       (classifier == null ? "" : ":" + classifier);
             }
-        });
-    }
 
-    @Value
-    private static class DependencyKey {
-        @Nullable
-        String groupId;
+            // Raw text, as Maven compares it: a property can resolve differently per profile
+            private @Nullable String value(Xml.Tag dependency, String child) {
+                return dependency.getChildValue(child)
+                        .map(String::trim)
+                        .filter(v -> !v.isEmpty())
+                        .orElse(null);
+            }
 
-        String artifactId;
-        String type;
+            private boolean sameDeclaration(Xml.Tag a, Xml.Tag b) {
+                for (String child : Arrays.asList("version", "scope", "optional", "systemPath")) {
+                    if (!Objects.equals(value(a, child), value(b, child))) {
+                        return false;
+                    }
+                }
+                return exclusions(a).equals(exclusions(b));
+            }
 
-        @Nullable
-        String classifier;
-
-        Scope scope;
-
-        public static DependencyKey from(ResolvedDependency dependency, Scope scope) {
-            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), scope);
-        }
-
-        public static DependencyKey from(ResolvedManagedDependency dependency) {
-            return new DependencyKey(dependency.getGroupId(), dependency.getArtifactId(), dependency.getType(), dependency.getClassifier(), Scope.Compile);
-        }
-
-        public static @Nullable DependencyKey from(Xml.Tag tag) {
-            return tag.getChildValue("artifactId").map(artifactId ->
-                    new DependencyKey(
-                            tag.getChildValue("groupId").orElse(null),
-                            artifactId,
-                            tag.getChildValue("type").orElse("jar"),
-                            tag.getChildValue("classifier").orElse(null),
-                            tag.getChildValue("scope").map(Scope::fromName).orElse(Scope.Compile)
-                    )).orElse(null);
-        }
+            private Set<String> exclusions(Xml.Tag dependency) {
+                Set<String> exclusions = new HashSet<>();
+                dependency.getChild("exclusions").ifPresent(e -> {
+                    for (Xml.Tag exclusion : e.getChildren("exclusion")) {
+                        exclusions.add(value(exclusion, "groupId") + ":" + value(exclusion, "artifactId"));
+                    }
+                });
+                return exclusions;
+            }
+        };
     }
 }

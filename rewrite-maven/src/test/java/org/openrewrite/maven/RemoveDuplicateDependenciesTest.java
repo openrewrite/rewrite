@@ -236,7 +236,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void removeDependencyWithDifferentVersion() {
+    void keepLastDeclarationWhenVersionsDiffer() {
         rewriteRun(
           pomXml(
             """
@@ -273,7 +273,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                   <dependency>
                     <groupId>com.google.inject</groupId>
                     <artifactId>guice</artifactId>
-                    <version>4.2.1</version>
+                    <version>4.2.2</version>
                   </dependency>
                 </dependencies>
               </project>
@@ -378,7 +378,7 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void keepDependencyWithDifferentScope() {
+    void removeDuplicateWithDifferentScope() {
         rewriteRun(
           pomXml(
             """
@@ -397,12 +397,452 @@ class RemoveDuplicateDependenciesTest implements RewriteTest {
                     <scope>compile</scope>
                   </dependency>
                   <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
                     <groupId>com.google.guava</groupId>
                     <artifactId>guava</artifactId>
                     <version>29.0-jre</version>
                     <scope>test</scope>
                   </dependency>
                 </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <scope>test</scope>
+                  </dependency>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>4.13.2</version>
+                    <scope>test</scope>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepExclusionsOfLastDeclaration() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                    <exclusions>
+                      <exclusion>
+                        <groupId>com.google.code.findbugs</groupId>
+                        <artifactId>jsr305</artifactId>
+                      </exclusion>
+                    </exclusions>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepFirstManagedDeclarationWhenVersionsDiffer() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>30.1-jre</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeManagedDuplicateWithDifferentVersionProperties() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                  <google.version>29.0-jre</google.version>
+                </properties>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${guava.version}</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${google.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <guava.version>29.0-jre</guava.version>
+                  <google.version>29.0-jre</google.version>
+                </properties>
+
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${guava.version}</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDeclarationWhosePropertyResolvesToADuplicate() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <extra.artifact>guava</extra.artifact>
+                </properties>
+
+                <profiles>
+                  <profile>
+                    <id>collections</id>
+                    <properties>
+                      <extra.artifact>guava-testlib</extra.artifact>
+                    </properties>
+                  </profile>
+                </profiles>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>${extra.artifact}</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeDuplicatesInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeManagedDuplicatesInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>29.0-jre</version>
+                        </dependency>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencyManagement>
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>30.1-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </dependencyManagement>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDependencyRedeclaredInProfile() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>29.0-jre</version>
+                  </dependency>
+                </dependencies>
+
+                <profiles>
+                  <profile>
+                    <id>extra</id>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>30.1-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </profile>
+                </profiles>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepDuplicateDependenciesOfPlugin() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-dependency-plugin</artifactId>
+                      <version>3.8.1</version>
+                      <dependencies>
+                          <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                          </dependency>
+                          <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>30.1-jre</version>
+                          </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
               </project>
               """
           )
