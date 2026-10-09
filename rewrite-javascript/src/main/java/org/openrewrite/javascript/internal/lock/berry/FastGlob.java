@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.Picomatch;
+import org.openrewrite.javascript.internal.lock.PicomatchScan;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.text.Normalizer;
@@ -42,6 +44,9 @@ import java.util.regex.Pattern;
  * Port of fast-glob 3.3.2 as Workspace.ts calls it, over the project's directories with POSIX paths.
  */
 final class FastGlob {
+
+    private static final Picomatch.Options PICOMATCH = new Picomatch.Options(Picomatch.Release.V2_3_1, false, true);
+    private static final Picomatch.Options PICOMATCH_DOT = new Picomatch.Options(Picomatch.Release.V2_3_1, true, true);
 
     private static final List<String> IGNORE = Arrays.asList("**/node_modules", "**/.git", "**/.yarn");
 
@@ -235,7 +240,7 @@ final class FastGlob {
         Map<String, List<String>> group = new LinkedHashMap<>();
         for (String pattern : patterns) {
             String base = GlobParent.globParent(pattern);
-            if (Picomatch.objectPrototypeMember(base) != null) {
+            if (Js.objectPrototypeMember(base) != null) {
                 throw new JsError(JsError.TYPE_ERROR, "collection[base].push is not a function");
             }
             group.computeIfAbsent(base, b -> new ArrayList<>()).add(pattern);
@@ -284,7 +289,7 @@ final class FastGlob {
     }
 
     private static List<String> getPatternParts(String pattern) {
-        List<String> parts = PicomatchScan.parts(pattern);
+        List<String> parts = new ArrayList<>(PicomatchScan.scan(pattern, true).getParts());
         if (parts.isEmpty()) {
             parts = new ArrayList<>(Collections.singletonList(pattern));
         }
@@ -302,9 +307,18 @@ final class FastGlob {
     private static List<Pattern> makeRe(List<String> patterns, boolean dot) {
         List<Pattern> out = new ArrayList<>();
         for (String pattern : patterns) {
-            out.add(Picomatch.makeRe(pattern, dot));
+            out.add(makeRe(pattern, dot));
         }
         return out;
+    }
+
+    // picomatch 2.3.1 under fast-glob's options; its errors are Yarn's
+    private static Pattern makeRe(String pattern, boolean dot) {
+        try {
+            return Picomatch.makeRe(pattern, dot ? PICOMATCH_DOT : PICOMATCH);
+        } catch (Picomatch.PatternError e) {
+            throw new JsError(e.getName(), e.getMessage());
+        }
     }
 
     private static boolean matchAny(String entry, List<Pattern> patternsRe) {
@@ -428,7 +442,7 @@ final class FastGlob {
                 List<Segment> segments = new ArrayList<>();
                 for (String part : getPatternParts(pattern)) {
                     boolean dynamic = isDynamicPattern(part);
-                    segments.add(new Segment(dynamic, part, dynamic ? Picomatch.makeRe(part, false) : null));
+                    segments.add(new Segment(dynamic, part, dynamic ? makeRe(part, false) : null));
                 }
                 int firstSection = segments.size();
                 for (int i = segments.size() - 1; i >= 0; i--) {

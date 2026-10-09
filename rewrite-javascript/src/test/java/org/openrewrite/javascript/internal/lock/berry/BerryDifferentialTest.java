@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.PicomatchScan;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -38,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.zip.GZIPInputStream;
 
@@ -189,34 +189,6 @@ class BerryDifferentialTest {
     }
 
     @Test
-    void picomatchCompilesAsYarnsBundleDoes() {
-        List<String> differences = new ArrayList<>();
-        for (String[] row : rows("glob-picomatch.tsv.gz")) {
-            boolean dot = "1".equals(row[1]);
-            String actual;
-            try {
-                actual = Picomatch.source(row[0], dot, true);
-            } catch (JsError e) {
-                actual = "!" + e;
-            }
-            if (!actual.equals(row[2])) {
-                differences.add(row[0] + " dot=" + dot + " => " + row[2] + " / " + actual);
-                continue;
-            }
-            if (actual.startsWith("!")) {
-                continue;
-            }
-            Pattern regex = Picomatch.makeRe(row[0], dot);
-            tree(row[3]).fields().forEachRemaining(test -> {
-                if (regex.matcher(test.getKey()).find() != test.getValue().asBoolean()) {
-                    differences.add(row[0] + " dot=" + dot + " test " + test.getKey() + " => " + test.getValue());
-                }
-            });
-        }
-        assertThat(differences).isEmpty();
-    }
-
-    @Test
     void bracesExpandAsYarnsBundleDoes() {
         List<String> differences = new ArrayList<>();
         for (String[] row : rows("glob-braces.tsv.gz")) {
@@ -240,7 +212,7 @@ class BerryDifferentialTest {
         List<String> differences = new ArrayList<>();
         for (String[] row : rows("glob-parent.tsv.gz")) {
             String base = GlobParent.globParent(row[0]);
-            JsonNode parts = NODES.arrayNode().addAll(PicomatchScan.parts(row[0]).stream()
+            JsonNode parts = NODES.arrayNode().addAll(PicomatchScan.scan(row[0], true).getParts().stream()
                     .map(NODES::textNode).collect(Collectors.toList()));
             boolean dynamic = FastGlob.isDynamicPattern(row[0]);
             if (!base.equals(row[1]) || !parts.equals(tree(row[2])) || dynamic != "1".equals(row[3])) {

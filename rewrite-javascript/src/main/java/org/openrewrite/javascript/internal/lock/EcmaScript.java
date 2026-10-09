@@ -22,6 +22,7 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -57,6 +58,10 @@ public class EcmaScript {
      */
     public static final String WHITESPACE_CLASS =
             "\\t\\n\\x0B\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
+
+    private static final List<String> OBJECT_PROTOTYPE = Arrays.asList("__defineGetter__", "__defineSetter__",
+            "hasOwnProperty", "__lookupGetter__", "__lookupSetter__", "isPrototypeOf", "propertyIsEnumerable",
+            "toString", "valueOf", "toLocaleString");
 
     private static final long MAX_ARRAY_INDEX = 4294967294L;
     private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
@@ -136,6 +141,20 @@ public class EcmaScript {
             }
         }
         return indices;
+    }
+
+    /**
+     * {@code {}[key]} for a key a plain object does not own: what it inherits from {@code Object.prototype}, as
+     * {@code String()} gives it, or null.
+     */
+    public static @Nullable String objectPrototypeMember(String key) {
+        if ("__proto__".equals(key)) {
+            return "[object Object]";
+        }
+        if ("constructor".equals(key)) {
+            return "function Object() { [native code] }";
+        }
+        return OBJECT_PROTOTYPE.contains(key) ? "function " + key + "() { [native code] }" : null;
     }
 
     /**

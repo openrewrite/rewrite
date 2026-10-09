@@ -17,12 +17,18 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Picomatch;
+import org.openrewrite.javascript.internal.lock.PicomatchScan;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Port of tinyglobby 0.2.16 (src/index.ts, crawler.ts, patterns.ts, utils.ts) under the options pnpm 11.2.2's
@@ -30,9 +36,11 @@ import java.util.regex.Pattern;
  */
 final class Tinyglobby {
 
-    private static final Pattern ONLY_PARENT_DIRECTORIES = Picomatch.regExp("^(\\/?\\.\\.)+$");
-    private static final Pattern PARENT_DIRECTORY = Picomatch.regExp("^(\\/?\\.\\.)+");
-    private static final Pattern ESCAPING_BACKSLASHES = Picomatch.regExp("\\\\(?=[()[\\]{}!*+?@|])");
+    private static final Picomatch.Options PICOMATCH = new Picomatch.Options(Picomatch.Release.V4_0_4, false, true);
+
+    private static final Pattern ONLY_PARENT_DIRECTORIES = regExp("^(\\/?\\.\\.)+$");
+    private static final Pattern PARENT_DIRECTORY = regExp("^(\\/?\\.\\.)+");
+    private static final Pattern ESCAPING_BACKSLASHES = regExp("\\\\(?=[()[\\]{}!*+?@|])");
 
     private @Nullable List<String> commonPath;
     private String root = "";
@@ -70,8 +78,8 @@ final class Tinyglobby {
                 ignorePatterns.add(props.normalizePattern(pattern.substring(1), true));
             }
         }
-        Predicate<String> matcher = Picomatch.matcher(matchPatterns, false);
-        Predicate<String> ignored = Picomatch.matcher(ignorePatterns, false);
+        Predicate<String> matcher = matcher(matchPatterns);
+        Predicate<String> ignored = matcher(ignorePatterns);
         Predicate<String> partialMatcher = getPartialMatcher(matchPatterns);
 
         List<String> found = new ArrayList<>();
@@ -155,7 +163,7 @@ final class Tinyglobby {
             List<String> parts = splitPattern(pattern);
             List<Predicate<String>> partMatchers = new ArrayList<>();
             for (String part : parts) {
-                partMatchers.add(Picomatch.matcher(part, false));
+                partMatchers.add(matcher(Collections.singletonList(part)));
             }
             patternsParts.add(parts);
             matchers.add(partMatchers);
@@ -189,6 +197,19 @@ final class Tinyglobby {
             }
             return false;
         };
+    }
+
+    // picomatch 4.0.4 under tinyglobby's options; its errors are pnpm's
+    private static Predicate<String> matcher(List<String> globs) {
+        try {
+            return Picomatch.matcher(globs, PICOMATCH);
+        } catch (Picomatch.PatternError e) {
+            throw new JsError(e.getMessage());
+        }
+    }
+
+    private static Pattern regExp(String source) {
+        return Pattern.compile(requireNonNull(V8RegExp.toJava(source)));
     }
 
     static List<String> splitPattern(String path) {

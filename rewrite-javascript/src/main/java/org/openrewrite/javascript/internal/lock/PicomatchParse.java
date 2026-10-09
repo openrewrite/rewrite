@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.berry;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -24,23 +23,28 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.javascript.internal.lock.berry.Picomatch.*;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.trim;
+import static org.openrewrite.javascript.internal.lock.Picomatch.*;
 
 /**
- * Port of picomatch 2.3.1 lib/parse.js under the options fast-glob 3.3.2 gives micromatch 4.0.5.
+ * Port of picomatch lib/parse.js, 2.3.1 and 4.0.4: 4.0.4 merges adjacent text from the value and guards repeated
+ * extglobs; 2.3.1 reads its tables through {@code Object.prototype}.
  */
 final class PicomatchParse {
 
-    private static final Pattern REGEX_NON_SPECIAL_CHARS = JsRegExp.of("^[^@![\\].,$*+?^{}()|\\\\/]+");
-    private static final Pattern NO_FAST_PATH = JsRegExp.of("(^[*!]|[/()[\\]{}\"])");
-    private static final Pattern BACKSLASHES = JsRegExp.of("^\\\\+");
-    private static final Pattern ALL_BACKSLASHES = JsRegExp.of("\\\\+");
-    private static final Pattern CLOSING_PARENS = JsRegExp.of("^\\)+$");
-    private static final Pattern EXTENSION = JsRegExp.of("^\\.[^\\\\/.]+$");
-    private static final Pattern GROUP_START = JsRegExp.of("^\\([^?]");
-    private static final Pattern LOOKAROUND = JsRegExp.of("[!=<:]");
-    private static final Pattern LOOKBEHIND = JsRegExp.of("<([!=]|\\w+>)");
-    private static final Pattern EXTENSION_SUFFIX = JsRegExp.of("^(.*?)\\.(\\w+)$");
+    private static final Pattern REGEX_NON_SPECIAL_CHARS = regExp("^[^@![\\].,$*+?^{}()|\\\\/]+");
+    private static final Pattern NO_FAST_PATH = regExp("(^[*!]|[/()[\\]{}\"])");
+    private static final Pattern BACKSLASHES = regExp("^\\\\+");
+    private static final Pattern ALL_BACKSLASHES = regExp("\\\\+");
+    private static final Pattern CLOSING_PARENS = regExp("^\\)+$");
+    private static final Pattern EXTENSION = regExp("^\\.[^\\\\/.]+$");
+    private static final Pattern GROUP_START = regExp("^\\([^?]");
+    private static final Pattern LOOKAROUND = regExp("[!=<:]");
+    private static final Pattern LOOKBEHIND = regExp("<([!=]|\\w+>)");
+    private static final Pattern EXTENSION_SUFFIX = regExp("^(.*?)\\.(\\w+)$");
+    private static final Pattern SIMPLE_AT_EXTGLOB = regExp("^@\\([^\\\\()[\\]{}|]+\\)$");
+    private static final Pattern ESCAPED_CHAR = regExp("\\\\(.)");
+    private static final Pattern STARS_AND_QMARKS = regExp("^[*?]+$");
 
     private PicomatchParse() {
     }
@@ -76,6 +80,9 @@ final class PicomatchParse {
         String inner = "";
         @Nullable Token prev;
         int parens;
+        String output = "";
+        int startIndex;
+        int tokensIndex;
 
         Extglob(String type, String open, String close) {
             this.type = type;
@@ -113,26 +120,20 @@ final class PicomatchParse {
     }
 
     /**
-     * @throws JsError the SyntaxError for an input over 65536 characters, and the TypeError an input naming a
-     *                 member of {@code Object.prototype} raises
+     * @throws PatternError the SyntaxError for an input over 65536 characters, and 2.3.1's TypeError for an input
+     *                     naming a member of {@code Object.prototype}
      */
-    static State parse(String input, boolean dot, boolean fastpaths) {
-        return parse(input, dot, fastpaths, true);
+    static State parse(String input, Options options, boolean fastpaths) {
+        return new Parser(input, options, fastpaths).parse();
     }
 
-    /**
-     * @param posix whether {@code [!} opens a negated class, as under fast-glob's {@code posix: true}
-     */
-    static State parse(String input, boolean dot, boolean fastpaths, boolean posix) {
-        return new Parser(input, dot, fastpaths, posix).parse();
-    }
-
-    static @Nullable String fastpaths(String input, boolean dot) {
+    static @Nullable String fastpaths(String input, Options options) {
         if (input.length() > MAX_LENGTH) {
-            throw new JsError(JsError.SYNTAX_ERROR, "Input length: " + input.length() +
-                                                    ", exceeds maximum allowed length: " + MAX_LENGTH);
+            throw new PatternError(PatternError.SYNTAX_ERROR, "Input length: " + input.length() +
+                                                              ", exceeds maximum allowed length: " + MAX_LENGTH);
         }
-        String replaced = replacement(input);
+        boolean dot = options.isDot();
+        String replaced = replacement(input, options.getRelease());
         if (replaced != null) {
             input = replaced;
         }
@@ -197,10 +198,261 @@ final class PicomatchParse {
         return (a == null ? "undefined" : a) + b;
     }
 
+    private static List<String> splitTopLevel(String input) {
+        List<String> parts = new ArrayList<>();
+        int bracket = 0;
+        int paren = 0;
+        int quote = 0;
+        StringBuilder value = new StringBuilder();
+        boolean escaped = false;
+        for (int i = 0; i < input.length(); i++) {
+            char ch = input.charAt(i);
+            if (escaped) {
+                value.append(ch);
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                value.append(ch);
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                quote = quote == 1 ? 0 : 1;
+                value.append(ch);
+                continue;
+            }
+            if (quote == 0) {
+                if (ch == '[') {
+                    bracket++;
+                } else if (ch == ']' && bracket > 0) {
+                    bracket--;
+                } else if (bracket == 0) {
+                    if (ch == '(') {
+                        paren++;
+                    } else if (ch == ')' && paren > 0) {
+                        paren--;
+                    } else if (ch == '|' && paren == 0) {
+                        parts.add(value.toString());
+                        value.setLength(0);
+                        continue;
+                    }
+                }
+            }
+            value.append(ch);
+        }
+        parts.add(value.toString());
+        return parts;
+    }
+
+    private static boolean isPlainBranch(String branch) {
+        boolean escaped = false;
+        for (int i = 0; i < branch.length(); i++) {
+            char ch = branch.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                continue;
+            }
+            if ("?*+@!()[]{}".indexOf(ch) >= 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static @Nullable String normalizeSimpleBranch(String branch) {
+        String value = trim(branch);
+        while (SIMPLE_AT_EXTGLOB.matcher(value).find()) {
+            value = value.substring(2, value.length() - 1);
+        }
+        if (!isPlainBranch(value)) {
+            return null;
+        }
+        return ESCAPED_CHAR.matcher(value).replaceAll("$1");
+    }
+
+    private static boolean hasRepeatedCharPrefixOverlap(List<String> branches) {
+        List<String> values = new ArrayList<>();
+        for (String branch : branches) {
+            String normalized = normalizeSimpleBranch(branch);
+            if (normalized != null && !normalized.isEmpty()) {
+                values.add(normalized);
+            }
+        }
+        for (int i = 0; i < values.size(); i++) {
+            for (int j = i + 1; j < values.size(); j++) {
+                String a = values.get(i);
+                String b = values.get(j);
+                char c = a.charAt(0);
+                if (!onlyChar(a, c) || !onlyChar(b, c)) {
+                    continue;
+                }
+                if (a.equals(b) || a.startsWith(b) || b.startsWith(a)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // s === c.repeat(s.length)
+    private static boolean onlyChar(String s, char c) {
+        for (int i = 0; i < s.length(); i++) {
+            if (s.charAt(i) != c) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // {type, body, end} of a `+(` or `*(` extglob at the start of the pattern
+    private static @Nullable String[] parseRepeatedExtglob(String pattern, boolean requireEnd) {
+        if (pattern.length() < 2 || (pattern.charAt(0) != '+' && pattern.charAt(0) != '*') ||
+            pattern.charAt(1) != '(') {
+            return null;
+        }
+        int bracket = 0;
+        int paren = 0;
+        int quote = 0;
+        boolean escaped = false;
+        for (int i = 1; i < pattern.length(); i++) {
+            char ch = pattern.charAt(i);
+            if (escaped) {
+                escaped = false;
+                continue;
+            }
+            if (ch == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (ch == '"') {
+                quote = quote == 1 ? 0 : 1;
+                continue;
+            }
+            if (quote == 1) {
+                continue;
+            }
+            if (ch == '[') {
+                bracket++;
+                continue;
+            }
+            if (ch == ']' && bracket > 0) {
+                bracket--;
+                continue;
+            }
+            if (bracket > 0) {
+                continue;
+            }
+            if (ch == '(') {
+                paren++;
+                continue;
+            }
+            if (ch == ')') {
+                paren--;
+                if (paren == 0) {
+                    if (requireEnd && i != pattern.length() - 1) {
+                        return null;
+                    }
+                    return new String[]{String.valueOf(pattern.charAt(0)), pattern.substring(2, i),
+                            String.valueOf(i)};
+                }
+            }
+        }
+        return null;
+    }
+
+    private static @Nullable String getStarExtglobSequenceOutput(String pattern) {
+        int index = 0;
+        List<String> chars = new ArrayList<>();
+        while (index < pattern.length()) {
+            String[] match = parseRepeatedExtglob(pattern.substring(index), false);
+            if (match == null || !"*".equals(match[0])) {
+                return null;
+            }
+            List<String> branches = splitTopLevel(match[1]);
+            if (branches.size() != 1) {
+                return null;
+            }
+            String branch = normalizeSimpleBranch(trim(branches.get(0)));
+            if (branch == null || branch.length() != 1) {
+                return null;
+            }
+            chars.add(branch);
+            index += Integer.parseInt(match[2]) + 1;
+        }
+        if (chars.isEmpty()) {
+            return null;
+        }
+        StringBuilder source = new StringBuilder();
+        if (chars.size() == 1) {
+            source.append(escapeRegex(chars.get(0)));
+        } else {
+            source.append('[');
+            for (String c : chars) {
+                source.append(escapeRegex(c));
+            }
+            source.append(']');
+        }
+        return source + "*";
+    }
+
+    private static int repeatedExtglobRecursion(String pattern) {
+        int depth = 0;
+        String value = trim(pattern);
+        String[] match = parseRepeatedExtglob(value, true);
+        while (match != null) {
+            depth++;
+            value = trim(match[1]);
+            match = parseRepeatedExtglob(value, true);
+        }
+        return depth;
+    }
+
+    private static final class RepeatedExtglob {
+        final boolean risky;
+        final @Nullable String safeOutput;
+
+        RepeatedExtglob(boolean risky, @Nullable String safeOutput) {
+            this.risky = risky;
+            this.safeOutput = safeOutput;
+        }
+    }
+
+    private static RepeatedExtglob analyzeRepeatedExtglob(String body) {
+        List<String> branches = new ArrayList<>();
+        for (String branch : splitTopLevel(body)) {
+            branches.add(trim(branch));
+        }
+        if (branches.size() > 1) {
+            for (String branch : branches) {
+                if (branch.isEmpty() || STARS_AND_QMARKS.matcher(branch).find()) {
+                    return new RepeatedExtglob(true, null);
+                }
+            }
+            if (hasRepeatedCharPrefixOverlap(branches)) {
+                return new RepeatedExtglob(true, null);
+            }
+        }
+        for (String branch : branches) {
+            String safeOutput = getStarExtglobSequenceOutput(branch);
+            if (safeOutput != null && !safeOutput.isEmpty()) {
+                return new RepeatedExtglob(true, safeOutput);
+            }
+            if (repeatedExtglobRecursion(branch) > DEFAULT_MAX_EXTGLOB_RECURSION) {
+                return new RepeatedExtglob(true, null);
+            }
+        }
+        return new RepeatedExtglob(false, null);
+    }
+
     private static final class Parser {
+        private final Options options;
         private final boolean dot;
         private final boolean fastpaths;
-        private final boolean posix;
         private final State state = new State();
         private final List<Token> tokens = state.tokens;
         private final Token bos = new Token("bos", "", "");
@@ -214,15 +466,16 @@ final class PicomatchParse {
         private Token prev = bos;
         private String value = "";
 
-        Parser(String input, boolean dot, boolean fastpaths, boolean posix) {
-            this.dot = dot;
+        Parser(String input, Options options, boolean fastpaths) {
+            this.options = options;
+            this.dot = options.isDot();
             this.fastpaths = fastpaths;
-            this.posix = posix;
             this.nodot = dot ? "" : NO_DOT;
             this.qmarkNoDot = dot ? QMARK : QMARK_NO_DOT;
-            String replaced = replacement(input);
-            if (replaced != null && objectPrototypeMember(input) != null) {
-                throw new JsError(JsError.TYPE_ERROR, "output.startsWith is not a function");
+            String replaced = replacement(input, options.getRelease());
+            if (replaced != null && options.getRelease() == Release.V2_3_1 &&
+                EcmaScript.objectPrototypeMember(input) != null) {
+                throw new PatternError(PatternError.TYPE_ERROR, "output.startsWith is not a function");
             }
             this.input = replaced != null ? replaced : input;
             this.len = this.input.length();
@@ -230,8 +483,8 @@ final class PicomatchParse {
 
         State parse() {
             if (len > MAX_LENGTH) {
-                throw new JsError(JsError.SYNTAX_ERROR, "Input length: " + len +
-                                                        ", exceeds maximum allowed length: " + MAX_LENGTH);
+                throw new PatternError(PatternError.SYNTAX_ERROR, "Input length: " + len +
+                                                                  ", exceeds maximum allowed length: " + MAX_LENGTH);
             }
             tokens.add(bos);
             if (input.startsWith("./")) {
@@ -288,7 +541,7 @@ final class PicomatchParse {
                                 int idx = prev.value.lastIndexOf('[');
                                 String pre = prev.value.substring(0, idx);
                                 String rest = prev.value.substring(Math.min(idx + 2, prev.value.length()));
-                                String posix = posixRegexSource(rest);
+                                String posix = posixRegexSource(rest, options.getRelease());
                                 if (posix != null) {
                                     prev.value = pre + posix;
                                     state.backtrack = true;
@@ -307,7 +560,7 @@ final class PicomatchParse {
                     if ("]".equals(value) && ("[".equals(prev.value) || "[^".equals(prev.value))) {
                         value = "\\" + value;
                     }
-                    if (posix && "!".equals(value) && "[".equals(prev.value)) {
+                    if (options.isPosix() && "!".equals(value) && "[".equals(prev.value)) {
                         value = "^";
                     }
                     prev.value += value;
@@ -837,8 +1090,14 @@ final class PicomatchParse {
                 append(tok.value, tok.output);
             }
             if ("text".equals(prev.type) && "text".equals(tok.type)) {
-                prev.value += tok.value;
-                prev.output = (prev.output == null ? "" : prev.output) + tok.value;
+                if (options.getRelease() == Release.V2_3_1) {
+                    prev.value += tok.value;
+                    prev.output = (prev.output == null ? "" : prev.output) + tok.value;
+                } else {
+                    prev.output = (prev.output == null || prev.output.isEmpty() ? prev.value : prev.output) +
+                                  tok.value;
+                    prev.value += tok.value;
+                }
                 return;
             }
 
@@ -851,6 +1110,9 @@ final class PicomatchParse {
             Extglob token = Extglob.of(value);
             token.prev = prev;
             token.parens = state.parens;
+            token.output = state.output;
+            token.startIndex = state.index;
+            token.tokensIndex = tokens.size();
             String output = token.open;
 
             increment("parens");
@@ -862,6 +1124,29 @@ final class PicomatchParse {
         }
 
         private void extglobClose(Extglob token) {
+            String literal = input.substring(token.startIndex, Math.min(state.index + 1, len));
+            String body = token.startIndex + 2 < state.index ? input.substring(token.startIndex + 2, state.index) : "";
+            RepeatedExtglob analysis = options.getRelease() == Release.V2_3_1 ? new RepeatedExtglob(false, null) :
+                    analyzeRepeatedExtglob(body);
+            if (("plus".equals(token.type) || "star".equals(token.type)) && analysis.risky) {
+                String safeOutput = analysis.safeOutput != null ?
+                        (token.output.isEmpty() ? ONE_CHAR : "") + analysis.safeOutput : null;
+                Token open = tokens.get(token.tokensIndex);
+                open.type = "text";
+                open.value = literal;
+                open.output = safeOutput != null && !safeOutput.isEmpty() ? safeOutput : escapeRegex(literal);
+                for (int i = token.tokensIndex + 1; i < tokens.size(); i++) {
+                    tokens.get(i).value = "";
+                    tokens.get(i).output = "";
+                }
+                state.output = token.output + open.output;
+                state.backtrack = true;
+                Token paren = new Token("paren", value, "");
+                paren.extglob = true;
+                push(paren);
+                decrement("parens");
+                return;
+            }
             String output = token.close;
             if ("negate".equals(token.type)) {
                 String extglobStar = STAR;
@@ -873,7 +1158,7 @@ final class PicomatchParse {
                 }
                 String rest = remaining();
                 if (token.inner.contains("*") && !rest.isEmpty() && test(EXTENSION, rest)) {
-                    String expression = new Parser(rest, dot, false, posix).parse().output;
+                    String expression = new Parser(rest, options, false).parse().output;
                     output = token.close = ")" + expression + ")" + extglobStar + ")";
                 }
             }

@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.berry;
+package org.openrewrite.javascript.internal.lock;
+
+import lombok.Value;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Port of picomatch 2.3.1 lib/scan.js for the {@code parts} fast-glob 3.3.2 reads ({@code parts: true}).
+ * Port of picomatch lib/scan.js (the same in 2.3.1 and 4.0.4), as far as fast-glob and tinyglobby read its result:
+ * {@code isGlob}, {@code negated}, {@code parts}.
  */
-final class PicomatchScan {
+public final class PicomatchScan {
 
     private static final int NAN = -1;
 
@@ -34,16 +37,29 @@ final class PicomatchScan {
         this.str = input;
     }
 
-    static List<String> parts(String input) {
-        return new PicomatchScan(input).scan();
+    @Value
+    public static class State {
+        boolean isGlob;
+        boolean negated;
+
+        /**
+         * The segments between slashes, under {@code parts: true}; empty otherwise.
+         */
+        List<String> parts;
     }
 
-    private List<String> scan() {
+    public static State scan(String input, boolean parts) {
+        return new PicomatchScan(input).scan(parts);
+    }
+
+    private State scan(boolean partsOption) {
         int length = str.length() - 1;
+        boolean scanToEnd = partsOption;
         List<Integer> slashes = new ArrayList<>();
         int start = 0;
         boolean isGlob = false;
         boolean braceEscaped = false;
+        boolean negated = false;
         boolean finished = false;
         int braces = 0;
 
@@ -72,12 +88,18 @@ final class PicomatchScan {
                     if (!braceEscaped && code == '.' && (code = advance()) == '.') {
                         isGlob = true;
                         finished = true;
-                        continue;
+                        if (scanToEnd) {
+                            continue;
+                        }
+                        break;
                     }
                     if (!braceEscaped && code == ',') {
                         isGlob = true;
                         finished = true;
-                        continue;
+                        if (scanToEnd) {
+                            continue;
+                        }
+                        break;
                     }
                     if (code == '}') {
                         braces--;
@@ -88,7 +110,10 @@ final class PicomatchScan {
                         }
                     }
                 }
-                continue;
+                if (scanToEnd) {
+                    continue;
+                }
+                break;
             }
 
             if (code == '/') {
@@ -106,22 +131,30 @@ final class PicomatchScan {
             if (isExtglobChar && peek() == '(') {
                 isGlob = true;
                 finished = true;
-                while (index < length && (code = advance()) > 0) {
-                    if (code == '\\') {
-                        code = advance();
-                        continue;
+                if (scanToEnd) {
+                    while (index < length && (code = advance()) > 0) {
+                        if (code == '\\') {
+                            code = advance();
+                            continue;
+                        }
+                        if (code == ')') {
+                            isGlob = true;
+                            finished = true;
+                            break;
+                        }
                     }
-                    if (code == ')') {
-                        break;
-                    }
+                    continue;
                 }
-                continue;
+                break;
             }
 
             if (code == '*' || code == '?') {
                 isGlob = true;
                 finished = true;
-                continue;
+                if (scanToEnd) {
+                    continue;
+                }
+                break;
             }
 
             if (code == '[') {
@@ -137,49 +170,62 @@ final class PicomatchScan {
                         break;
                     }
                 }
-                continue;
+                if (scanToEnd) {
+                    continue;
+                }
+                break;
             }
 
             if (code == '!' && index == start) {
+                negated = true;
                 start++;
                 continue;
             }
 
             if (code == '(') {
                 isGlob = true;
-                while (index < length && (code = advance()) > 0) {
-                    if (code == '(') {
-                        code = advance();
-                        continue;
+                if (scanToEnd) {
+                    while (index < length && (code = advance()) > 0) {
+                        if (code == '(') {
+                            code = advance();
+                            continue;
+                        }
+                        if (code == ')') {
+                            finished = true;
+                            break;
+                        }
                     }
-                    if (code == ')') {
-                        finished = true;
-                        break;
-                    }
+                    continue;
                 }
-                continue;
+                break;
             }
 
             if (isGlob) {
                 finished = true;
+                if (scanToEnd) {
+                    continue;
+                }
+                break;
             }
         }
 
         List<String> parts = new ArrayList<>();
-        int prevIndex = 0;
-        for (int idx = 0; idx < slashes.size(); idx++) {
-            int n = prevIndex != 0 ? prevIndex + 1 : start;
-            int i = slashes.get(idx);
-            String value = n < i ? str.substring(n, i) : "";
-            if (idx != 0 || !value.isEmpty()) {
-                parts.add(value);
+        if (partsOption) {
+            int prevIndex = 0;
+            for (int idx = 0; idx < slashes.size(); idx++) {
+                int n = prevIndex != 0 ? prevIndex + 1 : start;
+                int i = slashes.get(idx);
+                String value = n < i ? str.substring(n, i) : "";
+                if (idx != 0 || !value.isEmpty()) {
+                    parts.add(value);
+                }
+                prevIndex = i;
             }
-            prevIndex = i;
+            if (prevIndex != 0 && prevIndex + 1 < str.length()) {
+                parts.add(str.substring(prevIndex + 1));
+            }
         }
-        if (prevIndex != 0 && prevIndex + 1 < str.length()) {
-            parts.add(str.substring(prevIndex + 1));
-        }
-        return parts;
+        return new State(isGlob, negated, parts);
     }
 
     private int peek() {

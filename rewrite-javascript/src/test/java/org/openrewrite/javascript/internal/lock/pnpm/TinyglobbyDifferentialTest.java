@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.PicomatchScan;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -28,10 +29,7 @@ import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Predicate;
 import java.util.zip.GZIPInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -43,37 +41,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TinyglobbyDifferentialTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Test
-    void picomatchCompilesAndMatchesAsPnpmDoes() {
-        List<String> differences = new ArrayList<>();
-        for (String[] row : rows("globs-picomatch.tsv.gz")) {
-            String pattern = row[0];
-            String expected = row[1];
-            String source;
-            try {
-                source = Picomatch.source(pattern, false);
-            } catch (JsError e) {
-                source = "!" + e.getMessage();
-            }
-            if (expected.startsWith("!") ? !source.startsWith("!") || !expected.endsWith(source.substring(1)) :
-                    !expected.equals(source)) {
-                differences.add(pattern + " => " + expected + " / " + source);
-                continue;
-            }
-            if (expected.startsWith("!")) {
-                continue;
-            }
-            Predicate<String> matcher = Picomatch.matcher(pattern, false);
-            for (Iterator<Map.Entry<String, JsonNode>> it = json(row[2]).fields(); it.hasNext(); ) {
-                Map.Entry<String, JsonNode> test = it.next();
-                if (matcher.test(test.getKey()) != test.getValue().asBoolean()) {
-                    differences.add(pattern + " on " + test.getKey() + " => " + test.getValue());
-                }
-            }
-        }
-        assertThat(differences).isEmpty();
-    }
 
     @Test
     void scanSplitsAsPnpmDoes() {

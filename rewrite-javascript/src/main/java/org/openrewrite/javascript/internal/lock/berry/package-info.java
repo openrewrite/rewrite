@@ -51,13 +51,13 @@
  * {@code internal.lock.JsYaml} ports the loader of js-yaml 3.14.1 (Copyright (C) 2011-2015 by Vitaly Puzrin);
  * {@code QueryString} and {@code GlobParent} Node.js {@code lib/querystring.js} and {@code lib/path.js} (Copyright
  * Joyent, Inc. and other Node contributors); {@code FastGlob} fast-glob 3.3.2 (Copyright (c) Denis Malinochkin);
- * {@code Picomatch}, {@code PicomatchParse} and {@code PicomatchScan} picomatch 2.3.1 (Copyright (c) 2017-present,
- * Jon Schlinkert), as micromatch 4.0.5 calls it (Copyright (c) 2014-present, Jon Schlinkert); {@code Braces} braces
- * 3.0.2 (Copyright (c) 2014-2018, Jon Schlinkert); {@code FillRange} fill-range 7.0.1 (Copyright (c) 2014-present,
- * Jon Schlinkert); {@code GlobParent} is-glob 4.0.3 (Copyright (c) 2014-2017, Jon Schlinkert) and is-extglob 2.1.1
- * (Copyright (c) 2014-2016, Jon Schlinkert); {@code BerryOptions} camelcase 5.3.1 (Copyright (c) Sindre Sorhus
- * &lt;sindresorhus@gmail.com&gt; (sindresorhus.com)); and {@code YarnBerryLockRegenerator} corepack 0.35.0's
- * {@code parseSpec} (Copyright (c) Corepack contributors), all distributed under the MIT License:
+ * {@code internal.lock.Picomatch}, {@code PicomatchParse} and {@code PicomatchScan} picomatch 2.3.1 (Copyright (c)
+ * 2017-present, Jon Schlinkert), as micromatch 4.0.5 calls it (Copyright (c) 2014-present, Jon Schlinkert);
+ * {@code Braces} braces 3.0.2 (Copyright (c) 2014-2018, Jon Schlinkert); {@code FillRange} fill-range 7.0.1
+ * (Copyright (c) 2014-present, Jon Schlinkert); {@code GlobParent} is-glob 4.0.3 (Copyright (c) 2014-2017, Jon
+ * Schlinkert) and is-extglob 2.1.1 (Copyright (c) 2014-2016, Jon Schlinkert); {@code BerryOptions} camelcase 5.3.1
+ * (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt; (sindresorhus.com)); and {@code YarnBerryLockRegenerator}
+ * corepack 0.35.0's {@code parseSpec} (Copyright (c) Corepack contributors), all distributed under the MIT License:
  * <pre>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
  * this software and associated documentation files (the "Software"), to deal in

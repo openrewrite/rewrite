@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.util.Arrays;
@@ -34,6 +35,9 @@ final class NpmHttpUtils {
     private static final List<String> CACHED_FIELDS = Arrays.asList("name", "dist.tarball", "bin", "scripts", "os",
             "cpu", "libc", "dependencies", "dependenciesMeta", "optionalDependencies", "peerDependencies",
             "peerDependenciesMeta", "deprecated");
+
+    // micromatch 4.0.5 isMatch under its default options
+    private static final Picomatch.Options MICROMATCH = new Picomatch.Options(Picomatch.Release.V2_3_1, false, false);
 
     private NpmHttpUtils() {
     }
@@ -223,7 +227,7 @@ final class NpmHttpUtils {
             return false;
         }
         if (!validator.identHash.equals(ident.identHash) &&
-            !Picomatch.isMatch(StructUtils.stringifyIdent(ident), StructUtils.stringifyIdent(validator))) {
+            !isMatch(StructUtils.stringifyIdent(ident), StructUtils.stringifyIdent(validator))) {
             return false;
         }
         if ("unknown".equals(validator.range)) {
@@ -234,5 +238,13 @@ final class NpmHttpUtils {
             return false;
         }
         return version instanceof String && validatorRange.test((String) version);
+    }
+
+    private static boolean isMatch(String str, String pattern) {
+        try {
+            return Picomatch.matcher(pattern, MICROMATCH).test(str);
+        } catch (Picomatch.PatternError e) {
+            throw new JsError(e.getName(), e.getMessage());
+        }
     }
 }

@@ -13,22 +13,64 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.berry;
+package org.openrewrite.javascript.internal.lock;
 
+import lombok.Getter;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
- * Port of picomatch 2.3.1 lib/picomatch.js, lib/utils.js and lib/constants.js, as fast-glob 3.3.2 calls it.
+ * Port of picomatch lib/picomatch.js, lib/utils.js and lib/constants.js over paths with forward slashes: 2.3.1, which
+ * fast-glob 3.3.2 and micromatch 4.0.5 call in Yarn 4.10.3, and 4.0.4, which tinyglobby 0.2.16 calls in pnpm 11.2.2.
  */
-final class Picomatch {
+public final class Picomatch {
+
+    public enum Release {
+        V2_3_1,
+        V4_0_4
+    }
+
+    /**
+     * The release, and the {@code dot} and {@code posix} options; {@code posix} makes {@code [!} a negated class.
+     */
+    @Value
+    public static class Options {
+        Release release;
+        boolean dot;
+        boolean posix;
+    }
+
+    /**
+     * A TypeError or SyntaxError picomatch raises, by its JavaScript name.
+     */
+    @Getter
+    public static final class PatternError extends RuntimeException {
+        static final String TYPE_ERROR = "TypeError";
+        static final String SYNTAX_ERROR = "SyntaxError";
+
+        private final String name;
+
+        PatternError(String name, String message) {
+            super(message);
+            this.name = name;
+        }
+
+        @Override
+        public String toString() {
+            return name + ": " + getMessage();
+        }
+    }
 
     static final int MAX_LENGTH = 1024 * 64;
+    static final int DEFAULT_MAX_EXTGLOB_RECURSION = 0;
 
     static final String DOT_LITERAL = "\\.";
     static final String PLUS_LITERAL = "\\+";
@@ -48,13 +90,8 @@ final class Picomatch {
     private static final Map<String, String> POSIX_REGEX_SOURCE = new HashMap<>();
     private static final Map<String, String> REPLACEMENTS = new HashMap<>();
 
-    // what a lookup in an object literal finds on Object.prototype, as a string
-    private static final List<String> OBJECT_PROTOTYPE = Arrays.asList("__defineGetter__", "__defineSetter__",
-            "hasOwnProperty", "__lookupGetter__", "__lookupSetter__", "isPrototypeOf", "propertyIsEnumerable",
-            "toString", "valueOf", "toLocaleString");
-
     private static final String REGEX_SPECIAL_CHARS = "-*+?.^${}(|)[]";
-    private static final Pattern NEVER = JsRegExp.of("$^");
+    private static final Pattern NEVER = regExp("$^");
 
     static {
         POSIX_REGEX_SOURCE.put("alnum", "a-zA-Z0-9");
@@ -81,42 +118,62 @@ final class Picomatch {
     }
 
     /**
-     * {@code picomatch.makeRe(input, options)}; throws JsError, picomatch's TypeError for an empty input or one naming
-     * a member of {@code Object.prototype}.
+     * {@code picomatch(globs, options)}: a matcher that is true when any of the globs matches.
+     * @throws PatternError picomatch's TypeError for an empty glob, and {@link #makeRe}'s
      */
-    static Pattern makeRe(String input, boolean dot) {
-        return toRegex(source(input, dot, true));
+    public static Predicate<String> matcher(List<String> globs, Options options) {
+        List<Predicate<String>> fns = new ArrayList<>();
+        for (String glob : globs) {
+            fns.add(matcher(glob, options));
+        }
+        return str -> {
+            for (Predicate<String> isMatch : fns) {
+                if (isMatch.test(str)) {
+                    return true;
+                }
+            }
+            return false;
+        };
     }
 
-    /**
-     * micromatch 4.0.5 {@code isMatch(str, pattern)} under its default options.
-     * @throws JsError picomatch's TypeError for an empty pattern, and {@link #makeRe}'s
-     */
-    static boolean isMatch(String str, String pattern) {
-        if (pattern.isEmpty()) {
-            throw new JsError(JsError.TYPE_ERROR, "Expected pattern to be a non-empty string");
+    public static Predicate<String> matcher(String glob, Options options) {
+        if (glob.isEmpty()) {
+            throw new PatternError(PatternError.TYPE_ERROR, "Expected pattern to be a non-empty string");
         }
-        Pattern regex = toRegex(source(pattern, false, false));
-        if (str.isEmpty()) {
+        Pattern regex = makeRe(glob, options);
+        return input -> test(input, regex, glob);
+    }
+
+    // picomatch.test without a format: the input as it is, or the regex
+    private static boolean test(String input, Pattern regex, String glob) {
+        if (input.isEmpty()) {
             return false;
         }
-        return str.equals(pattern) || regex.matcher(str).find();
+        return input.equals(glob) || regex.matcher(input).find();
     }
 
     /**
-     * The JavaScript source {@code makeRe} gives {@code new RegExp}.
+     * {@code picomatch.makeRe(input, options)}.
+     * @throws PatternError for an empty input, one over 65536 characters, and 2.3.1's for an Object.prototype member
      */
-    static String source(String input, boolean dot, boolean posix) {
+    public static Pattern makeRe(String input, Options options) {
+        return toRegex(source(input, options));
+    }
+
+    /**
+     * The source {@code compileRe} gives {@code new RegExp}.
+     */
+    public static String source(String input, Options options) {
         if (input.isEmpty()) {
-            throw new JsError(JsError.TYPE_ERROR, "Expected a non-empty string");
+            throw new PatternError(PatternError.TYPE_ERROR, "Expected a non-empty string");
         }
         String output = null;
         boolean negated = false;
         if (input.charAt(0) == '.' || input.charAt(0) == '*') {
-            output = PicomatchParse.fastpaths(input, dot);
+            output = PicomatchParse.fastpaths(input, options);
         }
         if (output == null || output.isEmpty()) {
-            PicomatchParse.State state = PicomatchParse.parse(input, dot, true, posix);
+            PicomatchParse.State state = PicomatchParse.parse(input, options, true);
             output = state.output;
             negated = state.negated;
         }
@@ -124,41 +181,45 @@ final class Picomatch {
         return negated ? "^(?!" + source + ").*$" : source;
     }
 
-    // V8's SyntaxError gives the regex that matches nothing but the empty string
+    // new RegExp(source); V8's SyntaxError gives /$^/, which matches nothing but the empty string
     private static Pattern toRegex(String source) {
-        Pattern pattern = JsRegExp.compile(source);
-        return pattern != null ? pattern : NEVER;
+        String java = V8RegExp.toJava(source);
+        if (java == null) {
+            return NEVER;
+        }
+        try {
+            return Pattern.compile(java);
+        } catch (PatternSyntaxException e) {
+            throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
+        }
     }
 
     /**
-     * {@code REPLACEMENTS[input]}: a replacement, a member of {@code Object.prototype} as a string, or null.
+     * A regular expression literal of the ported module's source.
      */
-    static @Nullable String replacement(String input) {
+    static Pattern regExp(String source) {
+        String java = V8RegExp.toJava(source);
+        if (java == null) {
+            throw new IllegalArgumentException("V8 rejects /" + source + "/");
+        }
+        return Pattern.compile(java);
+    }
+
+    /**
+     * {@code REPLACEMENTS[input]}: 2.3.1's object inherits from {@code Object.prototype}, 4.0.4's does not.
+     */
+    static @Nullable String replacement(String input, Release release) {
         String replaced = REPLACEMENTS.get(input);
-        return replaced != null ? replaced : objectPrototypeMember(input);
+        return replaced != null || release != Release.V2_3_1 ? replaced : EcmaScript.objectPrototypeMember(input);
     }
 
     /**
-     * {@code POSIX_REGEX_SOURCE[name]}: a character class body, a member of {@code Object.prototype} as a string, or
-     * null.
+     * {@code POSIX_REGEX_SOURCE[name]}, an object that inherits from {@code Object.prototype} as in
+     * {@link #replacement}.
      */
-    static @Nullable String posixRegexSource(String name) {
+    static @Nullable String posixRegexSource(String name, Release release) {
         String source = POSIX_REGEX_SOURCE.get(name);
-        return source != null ? source : objectPrototypeMember(name);
-    }
-
-    /**
-     * {@code key in {}}, the property a plain object inherits from {@code Object.prototype}, as {@code String()}
-     * gives it; null when it inherits none.
-     */
-    static @Nullable String objectPrototypeMember(String key) {
-        if ("__proto__".equals(key)) {
-            return "[object Object]";
-        }
-        if ("constructor".equals(key)) {
-            return "function Object() { [native code] }";
-        }
-        return OBJECT_PROTOTYPE.contains(key) ? "function " + key + "() { [native code] }" : null;
+        return source != null || release != Release.V2_3_1 ? source : EcmaScript.objectPrototypeMember(name);
     }
 
     static boolean hasRegexChars(String str) {
