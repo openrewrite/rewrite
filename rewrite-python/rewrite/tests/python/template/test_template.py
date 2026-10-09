@@ -26,12 +26,22 @@ from rewrite.java.tree import Unary
 from rewrite.java.support_types import Space, JLeftPadded, JRightPadded
 from rewrite.markers import Markers
 from rewrite.python.template import template, capture, pattern, Template, TemplateBuilder
+from rewrite.python.template.coordinates import PythonCoordinates
 from rewrite.python.template.engine import TemplateEngine
 from rewrite.python.template.precedence import enclosing_tree, maybe_parenthesize
+from rewrite.python.template.replacement import SubstitutedValue
 from rewrite.python.visitor import PythonVisitor
 from rewrite.test import RecipeSpec, python
 from rewrite.tree import Tree
 from rewrite.visitor import Cursor
+
+
+def _assert_unmarked(tree) -> None:
+    class Check(PythonVisitor[None]):
+        def pre_visit(self, t, p):
+            assert t.markers.find_first(SubstitutedValue) is None, t
+            return t
+    Check().visit(tree, None)
 
 
 class TestTemplate:
@@ -370,7 +380,7 @@ class TestTemplateApply:
         RecipeSpec(recipe=recipe(True)).rewrite_run(python(
             before, "with lock:\n    wrapper(\n        new(v)\n    )\n"))
         RecipeSpec(recipe=recipe(False)).rewrite_run(python(
-            before, "with lock:\n    wrapper(\n    new(v)\n)\n"))
+            before, "with lock:\n    wrapper(\n    new(v)\n)\n", after_recipe=_assert_unmarked))
 
     def test_apply_never_puts_one_id_in_two_places(self):
         x = capture('x')
@@ -430,7 +440,7 @@ class TestTemplateApply:
         # The first slot keeps the id of the node it replaces
         assert all(i in result_ids for i in captured_ids)
 
-    def test_substituted_trailing_comma_keeps_its_layout(self):
+    def test_substituted_value_keeps_its_layout(self):
         x = capture('x')
         y = capture('y')
         tmpl = template("{x} += {y}", x=x, y=y)
@@ -452,13 +462,60 @@ class TestTemplateApply:
                 class Visitor(PythonVisitor[ExecutionContext]):
                     def visit_assignment(self, a, p):
                         a = super().visit_assignment(a, p)
+                        if not isinstance(a.assignment, j.Binary):
+                            return a
                         return tmpl.apply(self.cursor, values={'x': a.variable, 'y': a.assignment.right})
                 return Visitor()
 
         RecipeSpec(recipe=Rule()).rewrite_run(
             python("w = w + (0,)\n", "w += (0,)\n"),
+            python("w = w + [ 0 ]\n", "w += [ 0 ]\n", after_recipe=_assert_unmarked),
             python("w = w + (\n    0,\n    1,\n)\n", "w += (\n    0,\n    1,\n)\n"),
         )
+
+    def test_hand_built_value_gets_the_spacing_it_cannot_print_without(self):
+        v = capture('v')
+        pat = pattern("f({v})", v=v)
+        tmpl = template("print({x})", x=capture('x'))
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.PrintNegated"
+
+            @property
+            def display_name(self) -> str:
+                return "Print negated"
+
+            @property
+            def description(self) -> str:
+                return "Rewrites `f(v)` as `print(not v)`."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_method_invocation(self, method, p):
+                        method = super().visit_method_invocation(method, p)
+                        match = pat.match(method, self.cursor)
+                        if not match:
+                            return method
+                        negated = j.Unary(
+                            random_id(), Space.EMPTY, Markers.EMPTY,
+                            JLeftPadded(Space.EMPTY, j.Unary.Type.Not, Markers.EMPTY),
+                            match.get(v).replace(prefix=Space.EMPTY), None,
+                        )
+                        return tmpl.apply(self.cursor, values={'x': negated})
+                return Visitor()
+
+        RecipeSpec(recipe=Rule()).rewrite_run(python("f(y)\n", "print(not y)\n"))
+
+    def test_apply_without_cursor_leaves_the_result_unformatted(self):
+        tmpl = template("print({expr})", expr=capture('expr'))
+        ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
+
+        result = tmpl.apply(None, values={'expr': ident}, coordinates=PythonCoordinates.replace(ident))
+
+        _assert_unmarked(result)
+        assert isinstance(result, j.MethodInvocation)
 
     def test_apply_no_captures_returns_tree(self):
         """Test that apply with no captures returns a tree."""
@@ -474,6 +531,7 @@ class TestTemplateApply:
         ident = j.Identifier(random_id(), Space.EMPTY, Markers.EMPTY, [], "hello", None, None)
         result = tmpl.apply(cursor=None, values={'expr': ident})
 
+        _assert_unmarked(result)
         assert isinstance(result, j.MethodInvocation)
         assert len(result.arguments) == 1
         assert isinstance(result.arguments[0], j.Identifier)
