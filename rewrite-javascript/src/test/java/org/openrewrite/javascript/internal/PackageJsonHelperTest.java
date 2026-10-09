@@ -16,6 +16,9 @@
 package org.openrewrite.javascript.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
@@ -101,6 +104,55 @@ class PackageJsonHelperTest {
                 "    \"lodash\": \"^4.17.21\"\n" +
                 "  }\n" +
                 "}\n");
+    }
+
+    @Test
+    void addDependencyDeclinesANonObjectScope() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"overrides\": []\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.addDependency(doc, "lodash", "^4.17.21", "overrides");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "overrides")).isEqualTo(1);
+    }
+
+    @Test
+    void setNestedEntryDeclinesANonObjectOuterKey() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"pnpm\": \"hoist\"\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", "lodash", "^4.17.21");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "pnpm")).isEqualTo(1);
+    }
+
+    @Test
+    void setNestedEntryDeclinesANonObjectInnerKey() {
+        String before = "{\n" +
+                "  \"name\": \"x\",\n" +
+                "  \"pnpm\": {\n" +
+                "    \"overrides\": \"none\"\n" +
+                "  }\n" +
+                "}\n";
+        Json.Document doc = parsePackageJson(before);
+        Json.Document modified = PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", "lodash", "^4.17.21");
+        assertThat(modified.printAll()).isEqualTo(before);
+        assertThat(countMembersNamed(modified.printAll(), "overrides")).isEqualTo(1);
+    }
+
+    private static int countMembersNamed(String printed, String name) {
+        int count = 0;
+        int from = 0;
+        String key = "\"" + name + "\":";
+        while ((from = printed.indexOf(key, from)) >= 0) {
+            count++;
+            from += key.length();
+        }
+        return count;
     }
 
     @Test
@@ -508,5 +560,91 @@ class PackageJsonHelperTest {
                 null,
                 new InMemoryExecutionContext(Throwable::printStackTrace))
                 .findFirst().orElseThrow();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "catalog:,                       catalog:",
+            "catalog:react17,                catalog:",
+            "workspace:^,                    workspace:",
+            "workspace:1.4.1,                workspace:",
+            "npm:@acme/logger@^1.4.1,        npm:",
+            "patch:acme-logger@1.4.1#fix.patch, patch:",
+            "portal:../acme-logger,          portal:",
+            "file:../acme-logger,            file:",
+            "link:../acme-logger,            link:",
+            "github:acme/logger,             github:",
+            "https://example.com/acme.tgz,   https:",
+            "git+ssh://example.com/acme.git, git+ssh:",
+            // npm's schemeless shorthands, answered with the protocol they expand to
+            "user/repo,                      github:",
+            "mochajs/mocha#4727d357ea,       github:",
+            "user/repo#semver:^1.0.0,        github:",
+            "git@github.com:user/repo.git,   git+ssh:",
+            "../pkg,                         file:",
+            "./pkg,                          file:",
+            "/abs/pkg,                       file:",
+            "~/pkg,                          file:",
+            // npm-package-arg's file rules: any leading `.`, a drive letter, a tarball name, or a slash
+            // in anything that is not a GitHub shorthand
+            ".local,                         file:",
+            "C:\\pkgs\\foo,                  file:",
+            "c:/pkgs/foo,                    file:",
+            "foo-1.0.0.tgz,                  file:",
+            "team/sub/repo,                  file:",
+            "@scope/pkg,                     file:",
+            // hosted-git-info allows whitespace after the `#`
+            "user/repo#semver:>=1 <2,        github:"
+    })
+    void protocolSpecifiersAreRecognised(String value, String expectedProtocol) {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isEqualTo(expectedProtocol);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"^1.4.1", "~1.4.1", "1.4.1", "1.x", "*", "", "latest", "next",
+            ">=1.0.0 <2.0.0", "1.2.3 - 2.3.4", "1.2.3-beta.1", "1.2.3+build.4", "Catalog:", "-bad:"})
+    void versionConstraintsAreNotMistakenForProtocols(String value) {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(value)).isNull();
+    }
+
+    @Test
+    void nullIsNotAProtocol() {
+        assertThat(PackageJsonHelper.dependencySpecifierProtocol(null)).isNull();
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "file:,      true",
+            "link:,      true",
+            "portal:,    true",
+            "github:,    true",
+            "http:,      true",
+            "https:,     true",
+            "git:,       true",
+            "git+ssh:,   true",
+            "git+https:, true",
+            "git+file:,  true",
+            "catalog:,   false",
+            "workspace:, false",
+            "patch:,     false",
+            "npm:,       false",
+            "future:,    false",
+            // the hosted shortcuts npm documents as dependency values are one category
+            "gitlab:,    true",
+            "bitbucket:, true",
+            "gist:,      true",
+            // hosted-git-info knows this one, npm does not document it, so it refuses like any other
+            "sourcehut:, false",
+            // merely beginning with `git` is not enough to be taken for a checkout; only `git+` is
+            "git-lfs:,   false",
+            "gitmoji:,   false"
+    })
+    void locationSpecifiersAreDistinguishedFromIndirectionSpecifiers(String protocol, boolean location) {
+        assertThat(PackageJsonHelper.isLocationSpecifier(protocol)).isEqualTo(location);
+    }
+
+    @Test
+    void nullIsNotALocationSpecifier() {
+        assertThat(PackageJsonHelper.isLocationSpecifier(null)).isFalse();
     }
 }

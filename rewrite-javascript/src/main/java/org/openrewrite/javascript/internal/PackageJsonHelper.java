@@ -19,6 +19,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.Tree;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
@@ -216,6 +217,27 @@ public class PackageJsonHelper {
         return null;
     }
 
+    /** Whether {@code key} is a top-level member of {@code doc} that does not hold an object. */
+    public static boolean holdsNonObject(Json.Document doc, String key) {
+        return doc.getValue() instanceof Json.JsonObject &&
+                hasMemberNamed((Json.JsonObject) doc.getValue(), key) &&
+                findObjectMember((Json.JsonObject) doc.getValue(), key) == null;
+    }
+
+    /**
+     * Whether {@code obj} has a member keyed {@code name}, whatever its value type. The complement of
+     * {@link #findObjectMember} returning null for a key that exists but does not hold an object, which
+     * a caller must not read as "absent" and append a second member of that name.
+     */
+    static boolean hasMemberNamed(Json.JsonObject obj, String name) {
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {
             Object value = ((Json.Literal) node).getValue();
@@ -311,6 +333,11 @@ public class PackageJsonHelper {
 
         Json.JsonObject existingScope = findObjectMember(root, scope);
         if (existingScope == null) {
+            // The key is there but does not hold an object, so there is nothing to add to and appending
+            // would write a second member of the same name. Decline; the recipe reports it.
+            if (hasMemberNamed(root, scope)) {
+                return doc;
+            }
             // Detect indent unit from the first root member's prefix (e.g. "\n  " → "  ").
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
@@ -357,6 +384,80 @@ public class PackageJsonHelper {
             updatedScope = appendMember(existingScope, newDep);
         }
         return doc.withValue(replaceMember(root, scope, updatedScope));
+    }
+
+    /**
+     * Sets {@code doc[outerKey][innerKey][entryKey] = entryValue}, creating the outer and inner objects
+     * when absent, and returning {@code doc} <em>unchanged</em> when the entry already holds that value.
+     * <p>
+     * Both properties matter to callers. Formatting is preserved throughout, so setting one nested entry
+     * does not reprint the whole manifest; and the unchanged return is what keeps a recipe built on this
+     * single-cycle, since {@link #editAndRegenerate} decides whether anything changed by reference identity.
+     */
+    public static Json.Document setNestedEntry(Json.Document doc, String outerKey, String innerKey,
+                                               String entryKey, String entryValue) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = detectIndentUnit(root);
+
+        Json.JsonObject outer = findObjectMember(root, outerKey);
+        if (outer == null) {
+            // The key is there but does not hold an object, so there is nothing to nest into and
+            // appending would write a second member of the same name. Decline; the recipe reports it.
+            if (hasMemberNamed(root, outerKey)) {
+                return doc;
+            }
+            Json.JsonObject inner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            Json.JsonObject outerObj = newObjectHolding(makeMember(innerKey, inner,
+                    Space.build("\n" + indent + indent, emptyList())), indent);
+            return doc.withValue(appendMember(root, makeMember(outerKey, outerObj, Space.EMPTY)));
+        }
+
+        Json.JsonObject inner = findObjectMember(outer, innerKey);
+        if (inner == null) {
+            if (hasMemberNamed(outer, innerKey)) {
+                return doc;
+            }
+            Json.JsonObject innerObj = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent);
+            // The JSON parser represents {} as a single Json.Empty member, which an append would print as {,}.
+            Json.JsonObject updatedOuter = outer.getMembers().stream().allMatch(m -> m instanceof Json.Empty) ?
+                    newObjectHolding(makeMember(innerKey, innerObj, Space.build("\n" + indent + indent, emptyList())),
+                            indent).withPrefix(outer.getPrefix()) :
+                    appendMember(outer, makeMember(innerKey, innerObj, Space.EMPTY));
+            return doc.withValue(replaceMember(root, outerKey, updatedOuter));
+        }
+
+        for (Json m : inner.getMembers()) {
+            if (!(m instanceof Json.Member)) continue;
+            Json.Member member = (Json.Member) m;
+            if (!entryKey.equals(literalString(member.getKey()))) continue;
+            if (entryValue.equals(literalString(member.getValue()))) {
+                return doc;
+            }
+            Json.Literal newLit = makeStringLiteral(entryValue).withPrefix(member.getValue().getPrefix());
+            return doc.withValue(replaceMember(root, outerKey,
+                    replaceMember(outer, innerKey, replaceMember(inner, entryKey, newLit))));
+        }
+
+        Json.JsonObject updatedInner;
+        if (inner.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            updatedInner = newObjectHolding(makeMember(entryKey, makeStringLiteral(entryValue),
+                    Space.build("\n" + indent + indent + indent, emptyList())), indent + indent)
+                    .withPrefix(inner.getPrefix());
+        } else {
+            updatedInner = appendMember(inner, makeMember(entryKey, makeStringLiteral(entryValue), Space.EMPTY));
+        }
+        return doc.withValue(replaceMember(root, outerKey,
+                replaceMember(outer, innerKey, updatedInner)));
+    }
+
+    /** A new object holding exactly {@code member}, with {@code closingIndent} before its closing brace. */
+    private static Json.JsonObject newObjectHolding(Json.Member member, String closingIndent) {
+        return new Json.JsonObject(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY,
+                singletonList(JsonRightPadded.build((Json) member)
+                        .withAfter(Space.build("\n" + closingIndent, emptyList()))));
     }
 
     /**
@@ -480,6 +581,149 @@ public class PackageJsonHelper {
         return root.getPadding().withMembers(members);
     }
 
+    /**
+     * The specifier protocol of a dependency value that is not a version constraint, or {@code null}
+     * when the value is an ordinary range.
+     * <p>
+     * A {@code package.json} version position can hold an indirection instead of a range: pnpm's
+     * {@code catalog:}, a {@code workspace:} link, Yarn's {@code patch:}, {@code portal:} and
+     * {@code npm:} aliases, or a plain {@code file:}, {@code link:}, {@code git:} or {@code https:}
+     * specifier. The constraint such a value refers to lives somewhere else, so overwriting it with a
+     * range silently discards what it pointed at. Recognised structurally, by a URI-style scheme
+     * prefix, because the set of protocols grows with each package manager release and skipping an
+     * unfamiliar one is always safer than overwriting it. No version range can be mistaken for a scheme
+     * prefix: ranges start with a digit, {@code ^}, {@code ~}, {@code >}, {@code <}, {@code =} or
+     * {@code *}, and dist-tags like {@code latest} carry no colon.
+     * <p>
+     * npm also accepts values without a scheme: {@code "express": "expressjs/express"} is shorthand for
+     * GitHub, {@code git@host:user/repo.git} is a git dependency, and a local path or tarball name is a
+     * {@code file:} dependency (npm-package-arg's {@code resolve}). Such a value is answered with the
+     * protocol it <em>means</em>, so the returned protocol is not always a prefix of the value.
+     */
+    public static @Nullable String dependencySpecifierProtocol(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        // npm-package-arg checks a file spec before anything else, which is what keeps a drive letter
+        // like `c:/pkgs/foo` from reading as a one-letter scheme.
+        if (FILE_SPEC.matcher(value).find()) {
+            return "file:";
+        }
+        int colon = value.indexOf(':');
+        if (colon >= 1 && isSchemePrefix(value, colon)) {
+            return value.substring(0, colon + 1);
+        }
+        return schemelessShorthandProtocol(value);
+    }
+
+    private static boolean isSchemePrefix(String value, int colon) {
+        for (int i = 0; i < colon; i++) {
+            char c = value.charAt(i);
+            boolean schemeChar = c >= 'a' && c <= 'z' ||
+                    i > 0 && (c >= '0' && c <= '9' || c == '+' || c == '.' || c == '-');
+            if (!schemeChar) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** npm-package-arg's {@code isPosixFile} and {@code isWindowsFile}, which a manifest can meet on either. */
+    private static final Pattern FILE_SPEC = Pattern.compile("^(?:[.]|~[/]|[/\\\\]|[a-zA-Z]:)");
+
+    /** npm-package-arg's {@code isFileType}: a tarball named without any path. */
+    private static final Pattern FILE_TYPE = Pattern.compile("[.](?:tgz|tar\\.gz|tar)$", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * The protocol a value without a scheme prefix expands to, or {@code null} when it is an ordinary
+     * version constraint. Follows npm-package-arg's {@code resolve}: a GitHub shorthand first, and any
+     * other value holding a slash, or naming a tarball, is a local path.
+     */
+    private static @Nullable String schemelessShorthandProtocol(String value) {
+        // A bare scp-style location. The label is cosmetic: a value starting with `git@` is
+        // unambiguously not a version range whatever it is called.
+        if (value.startsWith("git@")) {
+            return "git+ssh:";
+        }
+        if (isGitHubShorthand(value)) {
+            return "github:";
+        }
+        if (value.indexOf('/') >= 0 || value.indexOf('\\') >= 0 || FILE_TYPE.matcher(value).find()) {
+            return "file:";
+        }
+        return null;
+    }
+
+    /** hosted-git-info's {@code isGitHubShorthand}: {@code user/repo}, where anything may follow a {@code #}. */
+    private static boolean isGitHubShorthand(String value) {
+        int hash = value.indexOf('#');
+        int end = hash < 0 ? value.length() : hash;
+        int firstSlash = value.indexOf('/');
+        int secondSlash = firstSlash < 0 ? -1 : value.indexOf('/', firstSlash + 1);
+        if (firstSlash <= 0 || firstSlash >= end || secondSlash >= 0 && secondSlash < end ||
+                value.charAt(end - 1) == '/') {
+            return false;
+        }
+        for (int i = 0; i < end; i++) {
+            char c = value.charAt(i);
+            if (Character.isWhitespace(c) || c == '@' || c == ':') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether {@code protocol} is a <em>location specifier</em>: one whose value is a place to fetch
+     * the same package from, rather than an indirection to a constraint declared elsewhere.
+     * <p>
+     * {@code file:}, {@code link:} and {@code portal:} are all a relative path to a local folder,
+     * {@code github:}, {@code http:}, {@code https:} and the git family are a remote location.
+     * Replacing any of them with a version range is a migration to the registry: the package stays the
+     * same, only where it comes from changes. An <em>indirection specifier</em> such as
+     * {@code catalog:}, {@code workspace:}, {@code patch:} or {@code npm:} instead defers to a
+     * declaration held elsewhere or names a different target, so replacing it discards what it pointed
+     * at.
+     * <p>
+     * The git family is matched by composition rather than by listing it: {@code git+<transport>:}
+     * means git over that transport, so it is a checkout whatever the transport turns out to be. That
+     * is the only open-ended rule here, and it is closed under the meaning of {@code +}. A bare
+     * {@code git} prefix is not used, because it also matches {@code gitlab:}, {@code gitmoji:} and
+     * anything else that merely begins with those letters.
+     * <p>
+     * The hosted shortcuts are the four npm documents as dependency values ({@code github:},
+     * {@code gist:}, {@code bitbucket:}, {@code gitlab:}), which are one category: each names a git
+     * host to fetch the same package from, and a gist is a repository like the rest. A host with no
+     * shortcut, such as Azure DevOps or a self-hosted instance, is written as a full
+     * {@code git+https:} or {@code git+ssh:} URL and is already covered by the rule above.
+     * <p>
+     * Any other protocol is not a location specifier. npm resolves these shortcuts through
+     * hosted-git-info, which knows further hosts that npm does not document here, so this list is
+     * deliberately the documented four; an undocumented or newly added host refuses and is reported,
+     * which is the safe direction. The caller that asks this question is about to overwrite the
+     * value, so an unfamiliar protocol has to refuse.
+     */
+    public static boolean isLocationSpecifier(@Nullable String protocol) {
+        if (protocol == null) {
+            return false;
+        }
+        switch (protocol) {
+            case "file:":
+            case "link:":
+            case "portal:":
+            case "github:":
+            case "http:":
+            case "https:":
+            case "git:":
+            case "gist:":
+            case "bitbucket:":
+            case "gitlab:":
+                return true;
+            default:
+                return protocol.startsWith("git+");
+        }
+    }
+
     public static Json.Document upgradeVersion(Json.Document doc, List<MatchedDependency> matched, String newVersion) {
         if (!(doc.getValue() instanceof Json.JsonObject) || matched.isEmpty()) {
             return doc;
@@ -512,9 +756,16 @@ public class PackageJsonHelper {
                 String name = literalString(depMember.getKey());
                 if (name == null || !targetNames.contains(name)) continue;
                 if (!(depMember.getValue() instanceof Json.Literal)) continue;
-                Json.Literal newLit = makeStringLiteral(newVersion);
                 Json.Literal oldLit = (Json.Literal) depMember.getValue();
-                newLit = newLit.withPrefix(oldLit.getPrefix());
+                // Callers already filter these out by marker, but this is the layer that does the
+                // overwriting and the only one that sees what the manifest actually says. A marker is
+                // free to report a resolved version where the manifest holds a reference, and the cost
+                // of being wrong here is a discarded constraint, so the check is repeated.
+                // Every protocol is refused here, location specifier or not, unlike changeDependency:
+                // UpgradeDependencyVersion accepts a glob, so one run could repoint every matching fork,
+                // tarball and local link to the registry without ever naming them.
+                if (dependencySpecifierProtocol(literalString(oldLit)) != null) continue;
+                Json.Literal newLit = makeStringLiteral(newVersion).withPrefix(oldLit.getPrefix());
                 children.set(j, children.get(j).withElement(depMember.withValue(newLit)));
                 scopeChanged = true;
             }
@@ -560,6 +811,22 @@ public class PackageJsonHelper {
                 Json.Literal oldKeyLit = (Json.Literal) depMember.getKey();
                 Json.Literal newKeyLit = makeStringLiteral(newName).withPrefix(oldKeyLit.getPrefix());
 
+                // An indirection specifier is a reference into a pnpm catalog, a workspace member or a
+                // patch, and that reference is keyed on the name being changed. Renaming here without
+                // renaming it there yields a manifest that no longer installs, and overwriting the value
+                // discards the constraint outright. Neither is recoverable from the manifest alone, so
+                // the whole declaration is left as it is; the caller reports why.
+                // A location specifier only says where to fetch the same package from, so an explicit
+                // newVersion migrates it to the registry rather than discarding anything. Without a
+                // newVersion it is refused too: the value points at the old package, and carrying it
+                // over to the new name would install the wrong thing under the right key.
+                if (depMember.getValue() instanceof Json.Literal) {
+                    String protocol = dependencySpecifierProtocol(literalString(depMember.getValue()));
+                    if (protocol != null && (newVersion == null || !isLocationSpecifier(protocol))) {
+                        continue;
+                    }
+                }
+
                 JsonValue newValue = depMember.getValue();
                 if (newVersion != null && depMember.getValue() instanceof Json.Literal) {
                     Json.Literal oldValLit = (Json.Literal) depMember.getValue();
@@ -586,7 +853,54 @@ public class PackageJsonHelper {
                                                    NodeResolutionResult.PackageManager pm,
                                                    String name, String newVersion,
                                                    @Nullable List<DependencyPathSegment> path) {
+        // Only a global override is declined. A scoped override such as `foo>acme-logger` pins the copy
+        // under `foo` and never reaches the reference-held constraint of the direct declaration; the
+        // path names the parents, never the overridden package itself.
+        if ((path == null || path.isEmpty()) && declaredProtocolReference(doc, name) != null) {
+            // The declaration holds a reference, not a version, so its real constraint lives elsewhere.
+            // An override beside it would silently win over whatever that is, and the next edit to the
+            // declaration would not move what is installed.
+            return doc;
+        }
         return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
+    }
+
+    /** The specifier protocol any scope of this manifest declares {@code name} with, or null if none does. */
+    static @Nullable String declaredProtocolReference(Json.Document doc, String name) {
+        List<MatchedDependency> declarations = findProtocolDeclarations(doc, name);
+        return declarations.isEmpty() ?
+                null :
+                dependencySpecifierProtocol(declarations.get(0).getCurrentVersion());
+    }
+
+    /**
+     * Every declaration of {@code name} in a declared scope of {@code doc} whose value carries a
+     * specifier protocol, so a caller reporting the decline can name the scope and the current value.
+     */
+    public static List<MatchedDependency> findProtocolDeclarations(Json.Document doc, String name) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return emptyList();
+        }
+        List<MatchedDependency> declarations = new ArrayList<>();
+        for (Json rootMember : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (!(rootMember instanceof Json.Member)) continue;
+            Json.Member scope = (Json.Member) rootMember;
+            String scopeKey = literalString(scope.getKey());
+            if (scopeKey == null || !isDeclaredScope(scopeKey) ||
+                    !(scope.getValue() instanceof Json.JsonObject)) {
+                continue;
+            }
+            for (Json child : ((Json.JsonObject) scope.getValue()).getMembers()) {
+                if (!(child instanceof Json.Member)) continue;
+                Json.Member dependency = (Json.Member) child;
+                if (!name.equals(literalString(dependency.getKey()))) continue;
+                String value = literalString(dependency.getValue());
+                if (value != null && dependencySpecifierProtocol(value) != null) {
+                    declarations.add(new MatchedDependency(name, scopeKey, value));
+                }
+            }
+        }
+        return declarations;
     }
 
     /**
