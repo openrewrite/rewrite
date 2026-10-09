@@ -63,10 +63,22 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.MigrateToMaven3_10
 displayName: Migrate to Maven 3.10
-description: Migrates a project to Maven 3.10. Maven 3.10 rejects some POMs that earlier Maven 3 versions built with a warning, such as POMs with duplicate dependency or plugin declarations. This recipe fixes those POMs and updates an existing Maven wrapper to Maven 3.10.
+description: Migrates a project to Maven 3.10. Maven 3.10 rejects some POMs that earlier Maven 3 versions built with a warning, such as POMs with duplicate dependency or plugin declarations. This recipe fixes those POMs, removes encoding and output timestamp properties that now equal the Maven 3.10 super POM defaults, and updates an existing Maven wrapper to Maven 3.10.
 recipeList:
   - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
   - org.openrewrite.maven.RemoveDuplicateDependencies
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.build.sourceEncoding
+      onlyIfValuesMatch: true
+      includeSuperPomDefaults: true
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.reporting.outputEncoding
+      onlyIfValuesMatch: true
+      includeSuperPomDefaults: true
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.build.outputTimestamp
+      onlyIfValuesMatch: true
+      includeSuperPomDefaults: true
   - org.openrewrite.maven.UpdateMavenWrapper:
       distributionVersion: 3.10.x
       addIfMissing: false
@@ -74,7 +86,7 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.MigrateToMaven4
 displayName: Migrate to Maven 4
-description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, runs the Maven 3.10 migration (which removes duplicate plugin and dependency declarations and updates an existing Maven wrapper to Maven 3.10), updates lifecycle phases, upgrades plugins known to fail under Maven 4, switches repository URLs to HTTPS, and replaces removed properties to ensure compatibility with Maven 4.
+description: Migrates Maven POMs from Maven 3 to Maven 4, addressing breaking changes and deprecations. This recipe updates property expressions, runs the Maven 3.10 migration (which removes duplicate plugin and dependency declarations, removes properties that equal the new super POM defaults, and updates an existing Maven wrapper to Maven 3.10), updates lifecycle phases, upgrades plugins known to fail under Maven 4, switches repository URLs to HTTPS, and replaces removed properties to ensure compatibility with Maven 4.
 recipeList:
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
   - org.openrewrite.maven.MigrateToMaven3_10

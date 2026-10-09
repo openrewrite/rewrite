@@ -29,6 +29,7 @@ import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -39,6 +40,14 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantProperties extends Recipe {
+    private static final Map<String, String> SUPER_POM_DEFAULTS = new HashMap<>();
+
+    static {
+        SUPER_POM_DEFAULTS.put("project.build.sourceEncoding", "UTF-8");
+        SUPER_POM_DEFAULTS.put("project.reporting.outputEncoding", "UTF-8");
+        SUPER_POM_DEFAULTS.put("project.build.outputTimestamp", "1980-02-01T00:00:00Z");
+    }
+
     @Option(displayName = "Property name",
             description = "Property name glob expression pattern used to match properties that should be checked.",
             example = "*.version",
@@ -52,6 +61,16 @@ public class RemoveRedundantProperties extends Recipe {
             required = false)
     @Nullable
     Boolean onlyIfValuesMatch;
+
+    @Option(displayName = "Include super POM defaults",
+            description = "Also treat the properties that the Maven 3.10 and later super POM defines as inherited: " +
+                    "`project.build.sourceEncoding` and `project.reporting.outputEncoding` as `UTF-8`, and " +
+                    "`project.build.outputTimestamp` as `1980-02-01T00:00:00Z`. A property that no parent POM defines " +
+                    "is only removed when its value equals that default. Earlier Maven versions do not have these " +
+                    "defaults, so only enable this for builds that run on Maven 3.10 or later. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean includeSuperPomDefaults;
 
     String displayName = "Remove redundant properties";
 
@@ -105,13 +124,23 @@ public class RemoveRedundantProperties extends Recipe {
                 }
                 String parentPropertyValue = parentProperties.get(tag.getName());
                 if (parentPropertyValue == null) {
-                    return false;
+                    return equalsSuperPomDefault(tag, mrr);
                 }
                 if (!Boolean.TRUE.equals(onlyIfValuesMatch)) {
                     return true;
                 }
                 return tag.getValue()
                         .map(parentPropertyValue::equals)
+                        .orElse(false);
+            }
+
+            private boolean equalsSuperPomDefault(Xml.Tag tag, MavenResolutionResult mrr) {
+                String superPomDefault = SUPER_POM_DEFAULTS.get(tag.getName());
+                if (!Boolean.TRUE.equals(includeSuperPomDefaults) || superPomDefault == null) {
+                    return false;
+                }
+                return tag.getValue()
+                        .map(value -> superPomDefault.equalsIgnoreCase(mrr.getPom().getValue(value)))
                         .orElse(false);
             }
         };

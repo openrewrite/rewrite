@@ -27,7 +27,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantProperties(null, null));
+        spec.recipe(new RemoveRedundantProperties(null, null, null));
     }
 
     @DocumentExample
@@ -186,7 +186,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void onlyRemoveIfValuesMatchEnabled() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
           mavenProject("parent",
             pomXml(
               """
@@ -243,7 +243,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeWithNamePattern() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null)),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null, null)),
           mavenProject("parent",
             pomXml(
               """
@@ -428,7 +428,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removePropertyWithExpressionValue() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
           mavenProject("parent",
             pomXml(
               """
@@ -722,6 +722,121 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
                 </properties>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void removeSuperPomDefaults() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>standalone</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
+                  <project.reporting.outputEncoding>${project.build.sourceEncoding}</project.reporting.outputEncoding>
+                  <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
+                  <junit.version>5.9.1</junit.version>
+                </properties>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>standalone</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <junit.version>5.9.1</junit.version>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepValuesThatDifferFromSuperPomDefaults() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>standalone</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
+                  <project.reporting.outputEncoding>${project.build.sourceEncoding}</project.reporting.outputEncoding>
+                  <project.build.outputTimestamp>2026-10-09T12:00:00Z</project.build.outputTimestamp>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepSuperPomDefaultsWhenNotIncluded() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>standalone</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                  <project.build.outputTimestamp>1980-02-01T00:00:00Z</project.build.outputTimestamp>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void keepSuperPomDefaultThatOverridesParent() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          mavenProject("parent",
+            pomXml(
+              """
+                <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <properties>
+                    <project.build.sourceEncoding>ISO-8859-1</project.build.sourceEncoding>
+                  </properties>
+                  <modules>
+                    <module>child</module>
+                  </modules>
+                </project>
+                """
+            ),
+            mavenProject("child",
+              pomXml(
+                """
+                  <project>
+                    <parent>
+                      <groupId>com.example</groupId>
+                      <artifactId>parent</artifactId>
+                      <version>1.0.0</version>
+                    </parent>
+                    <artifactId>child</artifactId>
+                    <properties>
+                      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                    </properties>
+                  </project>
+                  """
+              )
+            )
           )
         );
     }

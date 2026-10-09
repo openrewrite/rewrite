@@ -85,4 +85,36 @@ class MigrateToMaven3_10Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removesPropertiesEqualToSuperPomDefaults() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1.0.0</version>
+                  <properties>
+                      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                      <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                      <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
+                      <maven.compiler.release>17</maven.compiler.release>
+                  </properties>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.example</groupId>
+                  <artifactId>demo</artifactId>
+                  <version>1.0.0</version>
+                  <properties>
+                      <project.build.outputTimestamp>1980-01-01T00:00:02Z</project.build.outputTimestamp>
+                      <maven.compiler.release>17</maven.compiler.release>
+                  </properties>
+              </project>
+              """
+          )
+        );
+    }
 }
