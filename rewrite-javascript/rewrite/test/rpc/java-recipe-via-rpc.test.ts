@@ -16,6 +16,7 @@
 import {describeJavaRpc, testJavaRpc} from "../../src/test/java-rpc";
 import {RecipeSpec} from "../../src/test";
 import {text} from "../../src/text";
+import {javascript} from "../../src/javascript";
 import {prepareJavaRecipe} from "../../src/rpc";
 
 describeJavaRpc("Java recipe via RPC", () => {
@@ -43,6 +44,20 @@ describeJavaRpc("Java recipe via RPC", () => {
             {
                 ...text("Hello, world!", "Goodbye, world!"),
                 path: "greeting.txt",
+            },
+        );
+    });
+
+    testJavaRpc("FindAndReplace converts and edits a parsed JavaScript source", async ({javaRpc: _javaRpc}) => {
+        const spec = new RecipeSpec();
+        spec.recipe = await prepareJavaRecipe(
+            "org.openrewrite.text.FindAndReplace",
+            {find: "Hello", replace: "Goodbye"},
+        );
+        await spec.rewriteRun(
+            {
+                ...javascript("const greeting = 'Hello';", "const greeting = 'Goodbye';"),
+                path: "example.js",
             },
         );
     });

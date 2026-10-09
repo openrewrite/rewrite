@@ -1,5 +1,5 @@
 import {Json} from "../../src/json";
-import {asRef, ReferenceMap, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
+import {asRef, ReferenceMap, RpcCodecs, RpcReceiveQueue, RpcSendQueue, RpcObjectState, StringInternTable} from "../../src/rpc";
 import type {RpcObjectData} from "../../src/rpc";
 import {IntelliJ, JavaScriptParser, JS, sourceFileCache, SpacesStyleDetailKind, StyleKind} from "../../src/javascript";
 import {MarkersKind} from "../../src/markers";
@@ -136,6 +136,38 @@ describe("RPC queues", () => {
         expect(batch.map(d => d.state)).toEqual([
             RpcObjectState.NO_CHANGE, RpcObjectState.END_OF_OBJECT,
         ]);
+    });
+
+    test("a source file of another type than requested is received with its own codecs", async () => {
+        // given
+        const document = "test.ReplacementDocument";
+        const leaf = "test.ReplacementLeaf";
+        RpcCodecs.registerCodec(document, {
+            async rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, leaf: await q.receive(before.leaf)};
+            },
+            async rpcSend() {
+            }
+        }, document);
+        RpcCodecs.registerCodec(leaf, {
+            async rpcReceive(before: any, q: RpcReceiveQueue) {
+                return {...before, text: await q.receive(before.text)};
+            },
+            async rpcSend() {
+            }
+        }, document);
+        const batch: RpcObjectData[] = [
+            {state: RpcObjectState.ADD, valueType: document},
+            {state: RpcObjectState.ADD, valueType: leaf},
+            {state: RpcObjectState.ADD, value: "Goodbye"},
+        ];
+        const q = new RpcReceiveQueue(new Map(), JS.Kind.CompilationUnit, async () => batch.splice(0), undefined, false);
+
+        // when
+        const received = await q.receive<any>({kind: JS.Kind.CompilationUnit});
+
+        // then
+        expect(received).toEqual({kind: document, leaf: {kind: leaf, text: "Goodbye"}});
     });
 
     test("reading past END_OF_OBJECT fails rather than re-serving the batch", async () => {
