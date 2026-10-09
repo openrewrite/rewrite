@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
@@ -32,6 +33,7 @@ import java.nio.file.Paths;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
@@ -199,24 +201,23 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Which lock pnpm 11.2.2 writes run in a project below the root: the root's when pnpm-workspace.yaml lists it and
-     * the workspace shares one lock, else its own (as it is when unlisted), and its own when lockfileDir is the
-     * directory pnpm runs in; pnpm ignores package.json workspaces.
+     * Which lock pnpm 11.2.2 writes run in a project below the root: the root's when listed and shared, else its own;
+     * under lockfileDir its own, which without one is cannot-know (run at the root, the root's).
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-      "packages/a | shared   | true  | pnpm-lock.yaml",
-      "packages/a | shared   | false | pnpm-lock.yaml",
-      "packages/a | unshared | true  | packages/a/pnpm-lock.yaml",
-      "packages/a | unshared | false |",
-      "packages/a | none     | true  | packages/a/pnpm-lock.yaml",
-      "tools/x    | shared   | true  | tools/x/pnpm-lock.yaml",
-      "tools/x    | unshared | true  | tools/x/pnpm-lock.yaml",
-      "packages/a | here     | true  | packages/a/pnpm-lock.yaml",
-      "packages/a | here     | false |"
+      "packages/a | shared   | true  | pnpm-lock.yaml |",
+      "packages/a | shared   | false | pnpm-lock.yaml |",
+      "packages/a | unshared | true  | packages/a/pnpm-lock.yaml |",
+      "packages/a | unshared | false | |",
+      "packages/a | none     | true  | packages/a/pnpm-lock.yaml |",
+      "tools/x    | shared   | true  | tools/x/pnpm-lock.yaml |",
+      "tools/x    | unshared | true  | tools/x/pnpm-lock.yaml |",
+      "packages/a | here     | true  | packages/a/pnpm-lock.yaml |",
+      "packages/a | here     | false | pnpm-lock.yaml | run in packages/a it installs into packages/a/pnpm-lock.yaml"
     })
     void aPnpmProjectGoesToTheLockItsWorkspaceInstallsItInto(String dir, String workspace, boolean ownLock,
-                                                            String written) {
+                                                            String written, String reported) {
         NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
         Path project = Paths.get(dir + "/package.json");
         NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml"))
@@ -248,67 +249,126 @@ class NodeDependencyScanTest {
         assertThat(NodeDependencyScan.lockFor(acc, project)).isEqualTo(lock);
         assertThat(acc.projects.get(project).capturedLockContent).isEqualTo(lock == null ? null :
           lock.getNameCount() == 1 ? "root lock" : "own lock");
+        if (reported != null) {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(ps.capturedPackageJson,
+              null, ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, project), ctx);
+            assertThat(result).isNotNull();
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getErrorMessage()).contains(reported);
+        }
     }
 
     /**
-     * Where pnpm's walk from a member stops before it picks a lock, the edit goes to the workspace root's lock, whose
-     * regeneration reads the same configuration and reports what stops pnpm, whether or not the member has its own.
-     * The file is written as given, the workspace manifest otherwise lists packages/*; {@code unread} is a file the
-     * host holds without its contents.
+     * Each way pnpm's walk from a member stops before it picks a lock: the edit goes to the workspace root's lock,
+     * whose regeneration walks from the member again and reports it, shared or not, with or without a member lock.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
       ".npmrc              | registry=${REG}                          | the environment (${REG}",
       ".npmrc              | //r.example/:tokenHelper=x               | TOKEN_HELPER_IN_PROJECT_CONFIG",
+      ".npmrc              | //r.example/:_auth=x                     | ERR_PNPM_AUTH_INVALID_BASE64",
       ".npmrc              | unread                                   | .npmrc (its contents were not read)",
       "pnpm-workspace.yaml | packages: [                              | pnpm rejects this edit",
+      "pnpm-workspace.yaml | packages: 5                              | packages field is not an array",
+      "pnpm-workspace.yaml | packages: [packages/*]\\ncatalog: [1]    | Expected catalog field to be an object",
       "pnpm-workspace.yaml | packages: [packages/*, ../shared/*]      | ../shared",
       "pnpm-workspace.yaml | packages: [packages/*]\\noverrides: [1]  | ERR_PNPM_INVALID_OVERRIDES",
+      "pnpm-workspace.yaml | packages: [packages/*]\\noverrides: {x: $x} | ERR_PNPM_CANNOT_RESOLVE_OVERRIDE_VERSION",
       "pnpm-workspace.yaml | packages: [packages/*]\\nx: ${REG}       | the environment (${REG}",
       "pnpm-workspace.yaml | packages: [packages/*]\\nregistries: 5   | registries",
       "pnpm-workspace.yaml | packages: [packages/*]\\nlockfileDir: x  | lockfileDir x",
+      "pnpm-workspace.yaml | packages: [packages/*]\\nlockfileDir: 5  | lockfileDir (number",
+      "pnpm-workspace.yaml | packages: [packages/*]\\nlockfileDir: /x | lockfileDir /x",
       "pnpm-workspace.yaml | unread | pnpm-workspace.yaml (its contents were not read)",
+      "pnpm-workspace.yml  | packages: [packages/*]                   | ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME",
+      "packages/a/.pnpm-workspace.yaml | packages: [.]                | ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME",
       "package.json        | {not json                                | ERR_INVALID_PACKAGE_CONFIG",
       "package.json | {\"devEngines\":{\"runtime\":{\"name\":\"node\",\"version\":\">=x.y\"}}} | Invalid comparator"
     })
     void aPnpmWalkThatStopsGoesToTheWorkspaceLockWhoseRegenerationReportsWhy(String file, String content,
                                                                              String reported) {
-        for (boolean ownLock : new boolean[]{false, true}) {
-            NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
-            NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml"))
-              .text("root lock").build());
-            if (ownLock) {
-                NodeDependencyScan.captureLock(acc, PlainText.builder()
-                  .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
-            }
-            String text = content.replace("\\n", "\n");
-            acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
-              .text("package.json".equals(file) ? text : "{\"name\":\"root\",\"private\":true}")
-              .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
-                singletonList("packages/a/package.json")))))
-              .build();
-            SourceFile member = PlainText.builder().sourcePath(MEMBER)
-              .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
-              .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
-            acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
-              member;
-            capture(acc, "pnpm-workspace.yaml", "pnpm-workspace.yaml".equals(file) ? text :
-              "packages:\n  - 'packages/*'\n");
-            if (".npmrc".equals(file)) {
-                capture(acc, ".npmrc", text);
-            }
+        String text = content.replace("\\n", "\n");
+        for (boolean shared : new boolean[]{true, false}) {
+            for (boolean ownLock : new boolean[]{false, true}) {
+                NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+                NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml"))
+                  .text("root lock").build());
+                if (ownLock) {
+                    NodeDependencyScan.captureLock(acc, PlainText.builder()
+                      .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
+                }
+                acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+                  .text("package.json".equals(file) ? text : "{\"name\":\"root\",\"private\":true}")
+                  .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
+                    singletonList("packages/a/package.json")))))
+                  .build();
+                SourceFile member = PlainText.builder().sourcePath(MEMBER)
+                  .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
+                  .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+                acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState())
+                  .capturedPackageJson = member;
+                String unshared = shared ? "" : "\nsharedWorkspaceLockfile: false\n";
+                if ("pnpm-workspace.yaml".equals(file)) {
+                    capture(acc, file, "unread".equals(text) ? text : text + unshared);
+                } else if ("pnpm-workspace.yml".equals(file)) {
+                    capture(acc, file, text + unshared);
+                } else {
+                    capture(acc, "pnpm-workspace.yaml", "packages:\n  - 'packages/*'\n" + unshared);
+                    if (!"package.json".equals(file)) {
+                        capture(acc, file, text);
+                    }
+                }
 
-            NodeDependencyScan.linkWorkspaceMembers(acc);
-            ExecutionContext ctx = new InMemoryExecutionContext();
-            LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member, null,
-              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+                NodeDependencyScan.linkWorkspaceMembers(acc);
+                ExecutionContext ctx = new InMemoryExecutionContext();
+                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member, null,
+                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
+                  ctx);
 
-            assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("pnpm-lock.yaml"));
-            assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
-            assertThat(result).isNotNull();
-            assertThat(result.isSuccess()).isFalse();
-            assertThat(result.getErrorMessage()).contains(reported);
+                assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("pnpm-lock.yaml"));
+                assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
+                assertThat(result).isNotNull();
+                assertThat(result.isSuccess()).isFalse();
+                assertThat(result.getErrorMessage()).contains(reported);
+            }
         }
+    }
+
+    /**
+     * The marker's .npmrc is the repository root's, so it stands in for an unread root .npmrc in the walk from a
+     * member as in the regeneration: unshared, the member's own lock.
+     */
+    @ParameterizedTest
+    @CsvSource({"true, true, pnpm-lock.yaml", "true, false, pnpm-lock.yaml",
+      "false, true, packages/a/pnpm-lock.yaml"})
+    void theMarkersNpmrcStandsInForTheRepositoryRootsInTheWalk(boolean shared, boolean ownLock, String written) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        NodeDependencyScan.captureLock(acc, PlainText.builder().sourcePath(Paths.get("pnpm-lock.yaml"))
+          .text("root lock").build());
+        if (ownLock) {
+            NodeDependencyScan.captureLock(acc, PlainText.builder()
+              .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
+        }
+        acc.projects.get(ROOT).capturedPackageJson = PlainText.builder().sourcePath(ROOT)
+          .text("{\"name\":\"root\",\"private\":true}")
+          .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
+            singletonList("packages/a/package.json")))))
+          .build();
+        acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+          PlainText.builder().sourcePath(MEMBER)
+            .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
+            .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(
+              singletonList(new NodeResolutionResult.Npmrc(NodeResolutionResult.NpmrcScope.Project,
+                singletonMap("registry", "https://registry.npmjs.org/")))))))
+            .build();
+        capture(acc, "pnpm-workspace.yaml", "packages:\n  - 'packages/*'\n" +
+                                            (shared ? "" : "sharedWorkspaceLockfile: false\n"));
+        capture(acc, ".npmrc", "unread");
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get(written));
     }
 
     private static void capture(NodeDependencyScan.Accumulator acc, String path, String text) {

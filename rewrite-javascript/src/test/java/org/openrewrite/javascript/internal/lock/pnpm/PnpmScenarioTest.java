@@ -92,11 +92,14 @@ class PnpmScenarioTest {
             files.put(".npmrc", npmrc);
         }
         PnpmScenarios.Scenario recording = recording(scenario);
+        Map<String, String> manifests = scenario.manifests(false, lock);
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock)
           .lockDir(scenario.lockDir())
-          .manifests(scenario.manifests(false, lock))
+          .dir(scenario.runDir() != null ? scenario.runDir() : scenario.lockDir())
+          .manifests(manifests)
           .files(files)
+          .paths(PnpmScenarios.paths(files, manifests, scenario.lockDir()))
           .now(recording.phaseTime("after"))
           .registry(new ScenarioRegistry(recording, "after"))
           .host(host(recording.recordedWith()));

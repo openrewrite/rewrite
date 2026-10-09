@@ -32,6 +32,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -211,6 +212,15 @@ final class PnpmScenarios {
         String lockDir() {
             String lockDir = file("lock-dir");
             return lockDir == null ? "" : lockDir.trim();
+        }
+
+        /**
+         * The directory pnpm ran the edit in ({@code run-dir}); null for the root.
+         */
+        @Nullable
+        String runDir() {
+            String runDir = file("run-dir");
+            return runDir == null ? null : runDir.trim();
         }
 
         /**
@@ -500,6 +510,18 @@ final class PnpmScenarios {
         public String toString() {
             return name;
         }
+    }
+
+    /**
+     * What a recorded project holds, which is all a scenario gives: its files, its manifests and the lock.
+     */
+    static Set<String> paths(Map<String, String> files, Map<String, String> manifests, String lockDir) {
+        Set<String> paths = new LinkedHashSet<>(files.keySet());
+        for (String dir : manifests.keySet()) {
+            paths.add(dir.isEmpty() ? "package.json" : dir + "/package.json");
+        }
+        paths.add(lockDir.isEmpty() ? "pnpm-lock.yaml" : lockDir + "/pnpm-lock.yaml");
+        return paths;
     }
 
     static List<Scenario> discover() {

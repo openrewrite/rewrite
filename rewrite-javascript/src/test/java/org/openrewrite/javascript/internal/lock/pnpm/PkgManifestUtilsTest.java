@@ -74,7 +74,7 @@ class PkgManifestUtilsTest {
     }
 
     /**
-     * fpm2-probes-2.sh's runtime-null-entry and runtime-on-fail-string-entry, as pnpm 11.2.2 failed on 2026-10-08.
+     * A null runtime entry, and a string one under runtimeOnFail, as pnpm 11.2.2 failed on both on 2026-10-08.
      */
     @Test
     void runtimeEntriesPnpmCannotReadAreJavaScriptsTypeErrors() {

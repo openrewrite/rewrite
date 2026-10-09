@@ -404,6 +404,7 @@ final class PnpmOptions {
         config.put("dedupe-direct-deps", false);
         config.put("dedupe-injected-deps", true);
         config.put("disallow-workspace-cycles", false);
+        config.put("enable-modules-dir", true);
         config.put("exclude-links-from-lockfile", false);
         config.put("git-branch-lockfile", false);
         config.put("optional", true);
@@ -423,6 +424,7 @@ final class PnpmOptions {
         config.put("strict-peer-dependencies", false);
         config.put("registry-supports-time-field", false);
         config.put("peers-suffix-max-length", 1000.0);
+        config.put("virtual-store-only", false);
         // extendInstallOptions' defaults where config/reader sets none
         config.put("auto-install-peers-from-highest-match", false);
         config.put("engine-strict", false);

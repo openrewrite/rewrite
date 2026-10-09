@@ -61,6 +61,7 @@ class PnpmLockRoundTripTest {
           .lockDir(lock.getScenario().lockDir())
           .manifests(lock.manifests())
           .files(files)
+          .paths(PnpmScenarios.paths(files, lock.manifests(), lock.getScenario().lockDir()))
           .now(lock.now())
           .registry(new ScenarioRegistry(lock.getScenario(), lock.phase()))
           .host(PnpmScenarioTest.host(lock.getScenario().recordedWith()));

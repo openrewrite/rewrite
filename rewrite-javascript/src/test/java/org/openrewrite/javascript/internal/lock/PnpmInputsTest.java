@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
@@ -159,5 +161,81 @@ class PnpmInputsTest {
         Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
 
         assertThat(inputs.getFiles().get(".npmrc")).contains("registry=https://project.example/");
+    }
+
+    /**
+     * The marker's .npmrc is read from the repository root, so it stands in only where pnpm reads the .npmrc of
+     * that directory: a workspace or project there, for the walk from a member as for the root's lock.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "packages/a/package.json      | pnpm-workspace.yaml      | true",
+      "package.json                 | pnpm-workspace.yaml      | true",
+      "repo/packages/a/package.json | repo/pnpm-workspace.yaml | false",
+      "repo/package.json            | none                     | false"
+    })
+    void theMarkersNpmrcStandsInForTheRepositoryRootsOnly(String packageJsonPath, String workspaceManifest,
+                                                         boolean standsIn) {
+        Request.RequestBuilder request = Request.builder()
+          .packageJson("{\"name\":\"a\"}")
+          .lock("lockfileVersion: '9.0'\n")
+          .packageJsonPath(Paths.get(packageJsonPath))
+          .marker(nodeResolutionResult(PackageManager.Pnpm).withNpmrcConfigs(Collections.singletonList(
+            new Npmrc(NpmrcScope.Project, Collections.singletonMap("registry", "https://project.example/")))));
+        if (!"none".equals(workspaceManifest)) {
+            request.packageManagerFile(Paths.get(workspaceManifest), "packages:\n  - packages/*\n");
+        }
+
+        Inputs inputs = PnpmInputs.from(request.build(), Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+
+        assertThat(inputs.getFiles().containsKey(".npmrc")).isEqualTo(standsIn);
+    }
+
+    /**
+     * A member's edit regenerates the workspace root's lock with pnpm run in the member's directory.
+     */
+    @Test
+    void pnpmRunsInTheEditedManifestsDirectory() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"a\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .lock("lockfileVersion: '9.0'\n")
+          .packageJsonPath(Paths.get("repo/packages/a/package.json"))
+          .manifest(Paths.get("repo/package.json"), "{\"name\":\"root\",\"private\":true}")
+          .manifest(Paths.get("repo/packages/a/package.json"), "{\"name\":\"a\"}")
+          .packageManagerFile(Paths.get("repo/pnpm-workspace.yaml"), "packages:\n  - packages/*\n")
+          .build();
+
+        Inputs inputs = PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+
+        assertThat(inputs.getLockDir()).isEmpty();
+        assertThat(inputs.getDir()).isEqualTo("packages/a");
+    }
+
+    /**
+     * pnpm stops at the nearest workspace manifest by any of the names it looks for; a misspelt one below a
+     * pnpm-workspace.yaml stays under the root, where the regeneration finds it.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "pnpm-workspace.yml                 | | packages/a",
+      "packages/a/.pnpm-workspace.yaml    | pnpm-workspace.yaml | packages/a",
+      "packages/a/pnpm-workspaces.yml     | | ''"
+    })
+    void aMisspeltWorkspaceManifestIsWherePnpmStops(String misspelt, String workspaceManifest, String lockDir) {
+        Request.RequestBuilder request = Request.builder()
+          .packageJson("{\"name\":\"a\"}")
+          .lock("lockfileVersion: '9.0'\n")
+          .packageJsonPath(Paths.get("packages/a/package.json"))
+          .projectPaths(new LinkedHashSet<>(Arrays.asList(Paths.get("packages/a/package.json"),
+            Paths.get(misspelt))));
+        if (workspaceManifest != null) {
+            request.packageManagerFile(Paths.get(workspaceManifest), "packages:\n  - packages/*\n");
+        }
+
+        Inputs inputs = PnpmInputs.from(request.build(), Host.UNKNOWN, Instant.EPOCH, NO_REGISTRY);
+
+        assertThat(inputs.getLockDir()).isEqualTo(lockDir);
+        assertThat(inputs.getPaths()).contains(misspelt.startsWith("packages/a/") && lockDir.isEmpty() ?
+          misspelt.substring("packages/a/".length()) : misspelt);
     }
 }

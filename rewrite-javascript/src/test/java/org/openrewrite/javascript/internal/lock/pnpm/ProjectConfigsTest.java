@@ -224,6 +224,24 @@ class ProjectConfigsTest {
           "Field hoistPattern is not supported but was specified");
     }
 
+    /**
+     * A YAML timestamp is a Date, which {@code typeof} calls an object and which has no enumerable properties.
+     */
+    @Test
+    void aDateIsAnObjectWithoutProperties() {
+        Object date = JsYaml.load("2026-01-01");
+        assertThat(date).isInstanceOf(JsYaml.Timestamp.class);
+        assertThat(record(date)).isEqualTo("{}");
+        assertThat(record(project1(date))).isEqualTo(json(obj("{'project-1':{}}")));
+        throwsCode(singletonList(date), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_DEFINED", "is not defined");
+        throwsCode(singletonList(matching("match", date)), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY",
+          "received \"2026-01-01T00:00:00.000Z\"");
+        Map<String, Map<String, @Nullable Object>> record =
+          ProjectConfigs.createProjectConfigRecord(singletonList(matching("overrides", date)));
+        assertThat(record).isNotNull();
+        assertThat(record.get("project-1")).containsOnlyKeys("overrides").containsEntry("overrides", date);
+    }
+
     @Test
     void arrayDoesNotErrorOnUnsupportedButUndefinedFields() {
         Map<String, @Nullable Object> item = matching("ignoreScripts", JsYaml.UNDEFINED);

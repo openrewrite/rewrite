@@ -117,8 +117,7 @@ class EnvInstallerTest {
     }
 
     /**
-     * fpm2-probes.sh's config-dep-corrupted, as pnpm 11.2.2 rejected it on 2026-10-08: the env document names a
-     * version its packages do not hold.
+     * As pnpm 11.2.2 rejected it on 2026-10-08: the env document names a version its packages do not hold.
      */
     @Test
     void aLockedConfigDependencyWithoutItsPackagesEntry() {

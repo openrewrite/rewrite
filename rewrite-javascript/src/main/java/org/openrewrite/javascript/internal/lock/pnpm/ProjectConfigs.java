@@ -36,31 +36,30 @@ final class ProjectConfigs {
     /**
      * {@code createProjectConfigRecord}: each project's settings by project name; null without packageConfigs.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable Map<String, Map<String, @Nullable Object>> createProjectConfigRecord(
             @Nullable Object configSet) {
         if (configSet == null || configSet == JsYaml.UNDEFINED) {
             return null;
         }
-        if (!(configSet instanceof Map) && !(configSet instanceof List)) {
+        if (!isObject(configSet) && !(configSet instanceof List)) {
             throw new PnpmError("PROJECT_CONFIGS_IS_NEITHER_OBJECT_NOR_ARRAY",
                     "Expecting packageConfigs to be either an object or an array but received " +
                     Js.jsonStringify(configSet));
         }
         Map<String, Map<String, @Nullable Object>> result = new LinkedHashMap<>();
-        if (configSet instanceof Map) {
-            Map<String, @Nullable Object> record = (Map<String, @Nullable Object>) configSet;
+        if (!(configSet instanceof List)) {
+            Map<String, @Nullable Object> record = properties(configSet);
             for (String projectName : Js.keys(record)) {
                 result.put(projectName, createProjectConfigFromRaw(record.get(projectName)));
             }
             return result;
         }
         for (Object item : (List<?>) configSet) {
-            if (!(item instanceof Map)) {
+            if (!isObject(item)) {
                 throw new PnpmError("PROJECT_CONFIGS_ARRAY_ITEM_IS_NOT_AN_OBJECT",
                         "Expecting a packageConfigs item to be an object but received " + Js.jsonStringify(item));
             }
-            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) item;
+            Map<String, @Nullable Object> map = properties(item);
             if (!map.containsKey("match")) {
                 throw new PnpmError("PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_DEFINED",
                         "A packageConfigs match is not defined");
@@ -84,18 +83,17 @@ final class ProjectConfigs {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, @Nullable Object> createProjectConfigFromRaw(@Nullable Object config) {
-        if (!(config instanceof Map)) {
+        if (!isObject(config)) {
             throw new PnpmError("PROJECT_CONFIG_NOT_AN_OBJECT",
                     "Expecting project-specific config to be an object, but received " + Js.jsonStringify(config));
         }
-        Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) config;
+        Map<String, @Nullable Object> map = properties(config);
         checkType(map, "hoist", "boolean");
         checkType(map, "modulesDir", "string");
         checkType(map, "saveExact", "boolean");
         checkType(map, "savePrefix", "string");
-        if (isDefined(map, "overrides") && !(map.get("overrides") instanceof Map)) {
+        if (isDefined(map, "overrides") && !isObject(map.get("overrides"))) {
             throw invalidValueType("object", map.get("overrides"));
         }
         for (String key : Js.keys(map)) {
@@ -110,6 +108,17 @@ final class ProjectConfigs {
             return result;
         }
         return map;
+    }
+
+    // typeof 'object', not null and not an array: a mapping, or the Date js-yaml makes of a timestamp
+    static boolean isObject(@Nullable Object value) {
+        return value instanceof Map || value instanceof JsYaml.Timestamp;
+    }
+
+    // a Date's own enumerable properties: none
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> properties(@Nullable Object object) {
+        return object instanceof Map ? (Map<String, @Nullable Object>) object : new LinkedHashMap<>();
     }
 
     private static void checkType(Map<String, @Nullable Object> config, String field, String expectedType) {

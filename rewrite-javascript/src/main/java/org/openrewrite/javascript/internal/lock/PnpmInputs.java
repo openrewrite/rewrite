@@ -20,8 +20,10 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.RegistryMetadata;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -29,9 +31,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A recipe's request as the pnpm regenerator takes it, by path from the workspace directory pnpm finds from the lock's
- * (the nearest holding a pnpm-workspace.yaml, read or not, else the lock's own); the marker's {@code .npmrc} when the
- * host has none.
+ * A recipe's request as the pnpm regenerator takes it, by path from the workspace directory pnpm finds from the lock's;
+ * the marker's {@code .npmrc}, the repository root's, where pnpm reads that directory's and the host has none.
  */
 final class PnpmInputs {
 
@@ -83,15 +84,18 @@ final class PnpmInputs {
                 manifests.put(manifest.getKey(), manifest.getValue());
             }
         }
-        if (!files.containsKey(".npmrc") && rootDir.equals(lockDir)) {
+        if (!files.containsKey(".npmrc") && rootDir.isEmpty()) {
             String npmrc = NpmInputs.projectNpmrc(request.getMarker());
             if (npmrc != null) {
                 files.put(".npmrc", npmrc);
             }
         }
+        String editedDir = NpmInputs.directory(request.getPackageJsonPath() == null ? Paths.get("package.json") :
+                request.getPackageJsonPath());
         return Inputs.builder()
                 .lock(request.getLock())
                 .lockDir(NpmInputs.location(rootDir, lockDir))
+                .dir(underRoot(editedDir, rootDir))
                 .manifests(manifests)
                 .files(files)
                 .paths(paths(request, rootDir))
@@ -101,22 +105,24 @@ final class PnpmInputs {
                 .build();
     }
 
-    // findWorkspaceDir from the lock's directory up, over the files the host holds, read or not
+    // the nearest directory from the lock's up holding a pnpm-workspace.yaml, read or not, else a misspelt one pnpm
+    // stops at; one misspelt below the root is under it, where the regenerator's findWorkspaceDir sees it
     private static String workspaceDir(Request request, String lockDir) {
-        Set<Path> held = new LinkedHashSet<>(request.getPackageManagerFiles().keySet());
-        if (request.getProjectPaths() != null) {
-            held.addAll(request.getProjectPaths());
+        Set<String> held = new LinkedHashSet<>();
+        for (Path file : request.getPackageManagerFiles().keySet()) {
+            held.add(file.normalize().toString().replace('\\', '/'));
         }
-        String found = null;
-        for (Path file : held) {
-            Path name = file.getFileName();
-            String dir = NpmInputs.directory(file);
-            if (name != null && WORKSPACE_MANIFEST.equals(name.toString()) && NpmInputs.up(lockDir, dir) != null &&
-                (found == null || dir.length() > found.length())) {
-                found = dir;
+        if (request.getProjectPaths() != null) {
+            for (Path file : request.getProjectPaths()) {
+                held.add(file.normalize().toString().replace('\\', '/'));
             }
         }
-        return found == null ? lockDir : found;
+        String found = WorkspaceRootFinder.findWorkspaceManifest(path -> held.contains(path) &&
+                ("/" + path).endsWith("/" + WORKSPACE_MANIFEST), lockDir);
+        if (found == null) {
+            found = WorkspaceRootFinder.findWorkspaceManifest(held::contains, lockDir);
+        }
+        return found == null ? lockDir : NpmInputs.directory(Paths.get(found));
     }
 
     private static @Nullable Set<String> paths(Request request, String rootDir) {
@@ -134,9 +140,12 @@ final class PnpmInputs {
     }
 
     private static @Nullable String underRoot(Path file, String rootDir) {
-        String path = file.normalize().toString().replace('\\', '/');
-        if (rootDir.isEmpty()) {
-            return path;
+        return underRoot(file.normalize().toString().replace('\\', '/'), rootDir);
+    }
+
+    private static @Nullable String underRoot(String path, String rootDir) {
+        if (rootDir.isEmpty() || path.equals(rootDir)) {
+            return rootDir.isEmpty() ? path : "";
         }
         return path.startsWith(rootDir + "/") ? path.substring(rootDir.length() + 1) : null;
     }

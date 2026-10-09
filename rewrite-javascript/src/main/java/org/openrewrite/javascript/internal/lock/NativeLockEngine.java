@@ -98,6 +98,10 @@ public final class NativeLockEngine {
      * lock reproduces it; else 0. Yarn Berry's project is the nearest directory with a yarn.lock, the manifest's own.
      */
     public static int installRoot(PackageManager pm, Request request) {
+        if (pm == PackageManager.Pnpm) {
+            return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
+                    PnpmInputs.NO_REGISTRY));
+        }
         try {
             switch (pm) {
                 case Npm:
@@ -107,14 +111,11 @@ public final class NativeLockEngine {
                 case YarnClassic:
                     return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
                             Instant.EPOCH));
-                case Pnpm:
-                    return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
-                            PnpmInputs.NO_REGISTRY));
                 default:
                     return 0;
             }
         } catch (RuntimeException e) {
-            // npm, Bun and Yarn classic walk only from a manifest with its own lock, whose regeneration reports this
+            // these walk only from a manifest with its own lock, whose regeneration reports this
             return 0;
         }
     }

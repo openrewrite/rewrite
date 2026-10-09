@@ -21,9 +21,12 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -187,7 +190,7 @@ class PnpmLockRegeneratorTest {
     }
 
     /**
-     * fpm2-probes.sh's config-dep-* over small-config-dependency-add's after.
+     * pnpm 11.2.2 over small-config-dependency-add's after: unchanged, or resolving a changed or ranged specifier.
      */
     @Test
     void configDependenciesOverALockThatRecordsThem() {
@@ -230,25 +233,126 @@ class PnpmLockRegeneratorTest {
     }
 
     /**
-     * getConfig copies every camelCase key of pnpm-workspace.yaml into the options the install reads
-     * (studies/pnpm-settings.md): one that changes the lock or the outcome and that the port does not read is
-     * cannot-know.
+     * Installing each project into its own lock, recursive.ts loads the pnpmfiles setting from the project's directory;
+     * a shared install never reads it. The recorded scenarios pin both; these are the files the host may not show.
+     */
+    @Test
+    void thePnpmfilesSettingOfAProjectInstalledOnItsOwn() {
+        String unshared = "packages:\n  - '.'\nsharedWorkspaceLockfile: false\n";
+        assertThatThrownBy(() -> install(unshared + "pnpmfiles: [hooks/x.cjs]", null))
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("whether the pnpmfile"));
+        assertThatThrownBy(() -> installHolding(unshared + "pnpmfiles: [hooks/x.cjs]", "hooks/x.cjs"))
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("what hooks/x.cjs does"));
+        assertThatThrownBy(() -> installHolding(unshared + "pnpmfiles: [hooks/x.cjs, hooks/y.cjs]", "hooks/y.cjs"))
+          .isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> installHolding(unshared + "pnpmfiles: [hooks/x.cjs]"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_PNPMFILE_NOT_FOUND"))
+          .hasMessage("pnpmfile at \"hooks/x.cjs\" is not found");
+        assertThat(installHolding(unshared + "pnpmfiles: [.pnpmfile.cjs]").getWritten()).isEqualTo(LOCK);
+        assertThat(installHolding(unshared + "pnpmfiles: [hooks/x.cjs]\nignorePnpmfile: true").getWritten())
+          .isEqualTo(LOCK);
+        assertThat(installHolding("packages:\n  - '.'\npnpmfiles: [hooks/x.cjs]").getWritten()).isEqualTo(LOCK);
+        assertThatThrownBy(() -> installHolding(unshared + "pnpmfiles: hooks/x.cjs"))
+          .isInstanceOf(CannotKnow.class);
+        assertThatThrownBy(() -> installHolding(unshared + "pnpmfiles: [../x.cjs]")).isInstanceOf(CannotKnow.class);
+    }
+
+    /**
+     * recursive.ts spreads a project's packageConfigs over its install: overrides that are a Date (a YAML timestamp)
+     * replace the workspace's with none.
+     */
+    @Test
+    void projectOverridesThatAreADate() {
+        String unshared = "packages:\n  - '.'\nsharedWorkspaceLockfile: false\noverrides: {wrappy: 1.0.1}\n";
+        assertThat(install(unshared + "packageConfigs: {p: {overrides: 2026-01-01}}", null).getWritten())
+          .isEqualTo(LOCK);
+        assertThat(install(unshared, null).getResolution()).isEqualTo("overrides");
+    }
+
+    @Test
+    void virtualStoreOnlyNeedsAModulesDirectory() {
+        assertThatThrownBy(() -> install("virtualStoreOnly: true\nenableModulesDir: false", null))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_CONFIG_CONFLICT_VIRTUAL_STORE_ONLY_WITH_NO_MODULES_DIR"));
+        assertThat(install("virtualStoreOnly: true", null).getWritten()).isEqualTo(LOCK);
+        assertThat(install("enableModulesDir: false", null).getWritten()).isEqualTo(LOCK);
+    }
+
+    /**
+     * pnpm stops at a workspace manifest by another of the names it looks for, nearest first.
+     */
+    @Test
+    void aMisspeltWorkspaceManifest() {
+        assertThatThrownBy(() -> installHolding(null, "pnpm-workspace.yml"))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME"))
+          .hasMessage("The workspace manifest file should be named \"pnpm-workspace.yaml\". File found: " +
+                      "pnpm-workspace.yml");
+        assertThat(installHolding("packages:\n  - '.'\n", "pnpm-workspace.yml").getWritten()).isEqualTo(LOCK);
+    }
+
+    /**
+     * A project whose manifest is package.yaml or package.json5, which the host does not read.
+     */
+    @Test
+    void aProjectWithAnotherManifestName() {
+        assertThatThrownBy(() -> installHolding("packages:\n  - '.'\n  - 'packages/*'\n", "packages/b/package.yaml"))
+          .isInstanceOfSatisfying(CannotKnow.class,
+            e -> assertThat(e.getSubject()).contains("packages/b/package.yaml"));
+        assertThat(installHolding("packages:\n  - '.'\n", "packages/b/package.json5").getWritten()).isEqualTo(LOCK);
+    }
+
+    private static PnpmLockRegenerator.Install installHolding(@Nullable String workspace, String... paths) {
+        Map<String, String> files = new LinkedHashMap<>();
+        Set<String> held = new LinkedHashSet<>(Arrays.asList("package.json", "pnpm-lock.yaml"));
+        held.addAll(Arrays.asList(paths));
+        if (workspace != null) {
+            files.put("pnpm-workspace.yaml", workspace);
+            held.add("pnpm-workspace.yaml");
+        }
+        return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", MANIFEST)
+          .files(files)
+          .paths(held)
+          .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
+          .now(Instant.parse("2026-10-08T00:00:00Z"))
+          .registry(NO_REGISTRY)
+          .build()).install();
+    }
+
+    /**
+     * getConfig copies every camelCase key of pnpm-workspace.yaml into the options the install reads: one that changes
+     * the lock or the outcome and that the port does not read is cannot-know.
      */
     @ParameterizedTest
     @ValueSource(strings = {"update: true", "updatePackageManifest: true", "latest: true", "dedupe: true",
       "fixLockfile: true", "forceFullResolution: true", "resolutionOnly: true", "frozenLockfile: true",
       "frozenLockfileIfExists: true", "ignorePackageManifest: true", "saveLockfile: false",
-      "pruneLockfileImporters: false", "workspace: true", "ignoredPackages: [x]", "rootProjectManifestDir: x", "packageManager: {name: pnpm}",
-      "wantedPackageManager: {name: pnpm}", "dir: x", "workspacePackagePatterns: [x]", "production: true",
-      "only: dev", "dev: true", "optional: false", "recursiveInstall: false", "workspaceRoot: true", "filter: [x]",
-      "filterProd: [x]", "offline: true", "preferOffline: true", "lockfileDir: x", "lockfileDir: /abs",
-      "lockfileDir: 5"})
+      "pruneLockfileImporters: false", "workspace: true", "ignoredPackages: [x]", "rootProjectManifestDir: x",
+      "packageManager: {name: pnpm}", "wantedPackageManager: {name: pnpm}", "dir: x",
+      "workspacePackagePatterns: [x]", "production: true", "only: dev", "dev: true", "optional: false",
+      "recursiveInstall: false", "workspaceRoot: true", "filter: [x]", "filterProd: [x]", "offline: true",
+      "preferOffline: true", "lockfileDir: x", "lockfileDir: /abs", "lockfileDir: 5"})
     void anInstallOptionTheWorkspaceManifestSetsIsCannotKnow(String setting) {
         assertThatThrownBy(() -> install("packages:\n  - '.'\n" + setting, null)).isInstanceOf(CannotKnow.class);
     }
 
     /**
-     * Rows of studies/pnpm-settings.md that do not reach the lock, and a name no typed code on the install path reads.
+     * Those options set to the value a lock-only install takes when they are not set.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"update: false", "latest: false", "dedupe: false", "fixLockfile: false",
+      "forceFullResolution: false", "resolutionOnly: false", "frozenLockfile: false", "frozenLockfileIfExists: false",
+      "ignorePackageManifest: false", "saveLockfile: true", "pruneLockfileImporters: true", "workspace: false",
+      "pruneDirectDependencies: false", "updateToLatest: false", "updatePackageManifest: false"})
+    void anInstallOptionSetAsIfUnsetChangesNothing(String setting) {
+        assertThat(install("packages:\n  - '.'\n" + setting, null).getWritten()).isEqualTo(LOCK);
+    }
+
+    /**
+     * Settings that do not reach the lock, and a name no typed code on the install path reads.
      */
     @ParameterizedTest
     @ValueSource(strings = {"nodeLinker: hoisted", "dedupeDirectDeps: true", "depth: 5", "sort: false",
@@ -260,7 +364,7 @@ class PnpmLockRegeneratorTest {
     }
 
     /**
-     * agent-probe.sh (the review's) and fpm2-probes.sh's agent-trust-policy.
+     * An agent server resolves the install; under trustPolicy no-downgrade pnpm 11.2.2 refuses it.
      */
     @Test
     void anAgentResolvesTheInstall() {
@@ -274,7 +378,7 @@ class PnpmLockRegeneratorTest {
     }
 
     /**
-     * fpm2-probes.sh's pm-*: the release a packageManager field or devEngines.packageManager names.
+     * The pnpm release a packageManager field or devEngines.packageManager names, as pnpm 11.2.2 handles each.
      */
     @Test
     void anotherPnpmReleaseTakesTheInstallOver() {

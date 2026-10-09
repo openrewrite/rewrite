@@ -66,6 +66,12 @@ public final class PnpmLockRegenerator {
         String lockDir = "";
 
         /**
+         * The directory pnpm runs in relative to the root, the edited manifest's; null for the lock's.
+         */
+        @Nullable
+        String dir;
+
+        /**
          * The project's manifests by location: {@code ""} the root, {@code packages/a} a workspace member.
          */
         @Singular
@@ -182,6 +188,15 @@ public final class PnpmLockRegenerator {
         }
         String written;
         try {
+            String dir = inputs.getDir();
+            if (dir != null && !dir.equals(inputs.getLockDir())) {
+                String into = installsInto(inputs, dir);
+                if (!into.equals(inputs.getLockDir())) {
+                    throw new CannotKnow("which lock pnpm writes for this edit (run in " + dir + " it installs " +
+                                         "into " + lockfilePath(into) + ", not " + lockfilePath(inputs.getLockDir()) +
+                                         ")");
+                }
+            }
             written = writeLock();
         } catch (RuntimeException e) {
             return Result.failure(failure(e, ""));
@@ -209,20 +224,67 @@ public final class PnpmLockRegenerator {
         }
         int workspaceRoot = lockDir.split("/").length;
         try {
-            requireConfigFiles(inputs);
-            String rootManifestText = inputs.getManifests().get("");
-            PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"),
-                    inputs.getFiles().get(".npmrc"), rootManifestText == null ? null : rootManifest(rootManifestText),
-                    inputs.getEnv());
-            String lockfileDir = lockfileDir(options, lockDir);
-            if (lockfileDir == null || lockfileDir.equals(lockDir)) {
-                return 0;
+            String into = installsInto(inputs, lockDir);
+            if (into.isEmpty()) {
+                return workspaceRoot;
             }
-            return FindPackages.findWorkspaceProjects(inputs.getManifests().keySet(),
-                    options.getWorkspacePackagePatterns()).contains(lockDir) ? workspaceRoot : 0;
+            // under lockfileDir pnpm run here would start a lock of every project; run at the root, it writes that one
+            return into.equals(lockDir) && inputs.getLock() == null &&
+                   Js.truthy(loadOptions(inputs).get("lockfileDir")) ? workspaceRoot : 0;
         } catch (RuntimeException e) {
             return workspaceRoot;
         }
+    }
+
+    // main.ts' findWorkspaceDir and getConfig's lockfileDir, run in dir: the directory of the lock pnpm installs dir's
+    // project into
+    private static String installsInto(Inputs inputs, String dir) {
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(path -> holds(inputs, path), dir);
+        if (workspaceDir == null || dir.isEmpty()) {
+            return dir;
+        }
+        if (!workspaceDir.isEmpty()) {
+            return workspaceDir;
+        }
+        PnpmOptions options = loadOptions(inputs);
+        String lockfileDir = lockfileDir(options, dir);
+        boolean listed = FindPackages.findWorkspaceProjects(manifestDirs(inputs),
+                options.getWorkspacePackagePatterns()).contains(dir);
+        return lockfileDir == null || lockfileDir.equals(dir) || !listed ? dir : WORKSPACE_DIR;
+    }
+
+    private static PnpmOptions loadOptions(Inputs inputs) {
+        String rootManifestText = inputs.getManifests().get("");
+        Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
+        requireConfigFiles(inputs);
+        return PnpmOptions.load(inputs.getFiles().get(WorkspaceRootFinder.WORKSPACE_MANIFEST_FILENAME),
+                inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
+    }
+
+    // workspace.project-manifest-reader's other manifest names, which it reads where there is no package.json
+    private static final List<String> OTHER_MANIFEST_NAMES = Arrays.asList("package.json5", "package.yaml");
+
+    // the directories holding a manifest findPackages' patterns can match
+    private static Set<String> manifestDirs(Inputs inputs) {
+        Set<String> dirs = new LinkedHashSet<>(inputs.getManifests().keySet());
+        if (inputs.getPaths() != null) {
+            for (String path : inputs.getPaths()) {
+                for (String other : OTHER_MANIFEST_NAMES) {
+                    if (path.equals(other) || path.endsWith("/" + other)) {
+                        dirs.add(PosixPaths.dirname(path));
+                    }
+                }
+            }
+        }
+        return dirs;
+    }
+
+    private static boolean holds(Inputs inputs, String path) {
+        return inputs.getFiles().containsKey(path) || inputs.getPaths() != null && inputs.getPaths().contains(path);
+    }
+
+    private static String lockfilePath(String dir) {
+        return dir.isEmpty() ? LockfileReader.WANTED_LOCKFILE : dir + "/" + LockfileReader.WANTED_LOCKFILE;
     }
 
     /**
@@ -809,10 +871,11 @@ public final class PnpmLockRegenerator {
     }
 
     Install install() {
+        WorkspaceRootFinder.findWorkspaceDir(path -> holds(inputs, path), inputs.getLockDir());
         String rootManifestText = inputs.getManifests().get("");
         Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
         requireConfigFiles(inputs);
-        PnpmOptions options = PnpmOptions.load(inputs.getFiles().get("pnpm-workspace.yaml"),
+        PnpmOptions options = PnpmOptions.load(inputs.getFiles().get(WorkspaceRootFinder.WORKSPACE_MANIFEST_FILENAME),
                 inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
         requireSettings(options);
         boolean workspace = options.getWorkspacePackagePatterns() != null;
@@ -831,7 +894,7 @@ public final class PnpmLockRegenerator {
                 lockText = installConfigDeps(configDependencies, options, namedRegistries, lockText);
             }
         }
-        loadHooks(options, configDependencies, lockfileDir == null ? WORKSPACE_DIR : lockfileDir);
+        loadHooks(options, configDependencies, lockfileDir == null ? lockDir : lockfileDir);
         List<Verification.Project> allProjects = workspace ? projects(options, true) : null;
         if (options.isTrue("global")) {
             throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. Use \"pnpm " +
@@ -862,9 +925,6 @@ public final class PnpmLockRegenerator {
             for (Verification.Project project : allProjects) {
                 if (project.getRootDir().equals(lockDir)) {
                     projectManifests.add(new Verification.Project(project.getRootDir(), ".", project.getManifest()));
-                    if (!lockDir.isEmpty() && !options.isTrue("ignorePnpmfile") && tryLoadDefaultPnpmfile(options)) {
-                        loadDefaultPnpmfile(lockDir);
-                    }
                 }
             }
         }
@@ -879,12 +939,21 @@ public final class PnpmLockRegenerator {
             checkWorkspaceCycles(options, projectsGraph);
             Map<String, Map<String, @Nullable Object>> projectConfigs =
                     ProjectConfigs.createProjectConfigRecord(options.get("packageConfigs"));
+            // recursive.ts installs each project on its own: its hooks, its packageConfigs, then install()
             if (lockfileDir == null && !projectManifests.isEmpty()) {
+                requireHooks(options, lockDir);
                 overrides = projectOverrides(ProjectConfigs.getProjectConfig(projectConfigs,
                         projectManifests.get(0).getManifest().get("name")), overrides);
+                agent(options);
             }
         } else {
             agent(options);
+        }
+        if (Js.truthy(options.get("virtualStoreOnly")) && !Js.truthy(options.get("enableModulesDir")) &&
+            !Js.truthy(options.get("enableGlobalVirtualStore"))) {
+            throw new PnpmError("CONFIG_CONFLICT_VIRTUAL_STORE_ONLY_WITH_NO_MODULES_DIR", "Cannot use " +
+                    "virtualStoreOnly when enableModulesDir is false (the standard virtual store requires " +
+                    "node_modules/.pnpm)");
         }
         if (!options.isTrue("useLockfile")) {
             throw new PnpmError("CONFIG_CONFLICT_LOCKFILE_ONLY_WITH_NO_LOCKFILE", "Cannot generate a " +
@@ -909,7 +978,7 @@ public final class PnpmLockRegenerator {
         ReadPackageHook readPackageHook = ReadPackageHook.createReadPackageHook(
                 options.isTrue("ignoreCompatibilityDb"), lockDir, parsedOverrides,
                 options.get("ignoredOptionalDependencies"), options.get("packageExtensions"));
-        if (workspace) {
+        if (workspace && lockfileDir != null) {
             agent(options);
         }
         List<Verification.Project> projects = readPackage(readPackageHook, projectManifests);
@@ -1018,8 +1087,14 @@ public final class PnpmLockRegenerator {
     // getConfig copies every camelCase key of pnpm-workspace.yaml into the config the install reads as its options;
     // these change the lock or the install's outcome and are not settings the port reads
     private static void requireSettings(PnpmOptions options) {
+        Map<String, Boolean> asIfUnset = new LinkedHashMap<>(AS_IF_UNSET);
+        if (options.getWorkspacePackagePatterns() != null) {
+            // recursive.ts: true when every project of the workspace is installed
+            asIfUnset.put("pruneLockfileImporters", true);
+        }
         for (String option : UNPORTED_OPTIONS) {
-            if (options.isExplicitlySet(option)) {
+            if (options.isExplicitlySet(option) && !(asIfUnset.containsKey(option) &&
+                                                     asIfUnset.get(option).equals(options.get(option)))) {
                 throw new CannotKnow("what pnpm does with " + option + " (" +
                                      Js.jsonStringify(options.get(option)) + "), an option of the install");
             }
@@ -1053,6 +1128,19 @@ public final class PnpmLockRegenerator {
             "updatePackageManifest", "updateToLatest", "wantedPackageManager", "workspace", "workspaceDir",
             "workspacePackagePatterns");
 
+    // the value of an option above that a lock-only install treats as the option unset (extendInstallOptions'
+    // defaults, install.ts' frozenLockfileIfExists under lockfileOnly, the commands' truthiness checks)
+    private static final Map<String, Boolean> AS_IF_UNSET = new LinkedHashMap<>();
+
+    static {
+        for (String option : Arrays.asList("dedupe", "fixLockfile", "forceFullResolution", "frozenLockfile",
+                "frozenLockfileIfExists", "ignorePackageManifest", "latest", "pruneDirectDependencies",
+                "resolutionOnly", "update", "updatePackageManifest", "updateToLatest", "workspace")) {
+            AS_IF_UNSET.put(option, false);
+        }
+        AS_IF_UNSET.put("saveLockfile", true);
+    }
+
     // config.lockfileDir: pnpm-workspace.yaml's, a path from the directory pnpm runs in (here the lock's), else the
     // workspace's when it shares one lock; null when each project installs into its own
     private static @Nullable String lockfileDir(PnpmOptions options, String lockDir) {
@@ -1074,13 +1162,12 @@ public final class PnpmLockRegenerator {
     }
 
     // recursive.ts: a project's packageConfigs overrides replace the workspace's for its own lock
-    @SuppressWarnings("unchecked")
     private static Map<String, String> projectOverrides(@Nullable Map<String, @Nullable Object> localConfig,
                                                         Map<String, String> overrides) {
         if (localConfig == null || !localConfig.containsKey("overrides")) {
             return overrides;
         }
-        Map<String, @Nullable Object> local = (Map<String, @Nullable Object>) localConfig.get("overrides");
+        Map<String, @Nullable Object> local = ProjectConfigs.properties(localConfig.get("overrides"));
         Map<String, String> out = new LinkedHashMap<>();
         for (String selector : Js.keys(local)) {
             Object spec = local.get(selector);
@@ -1109,6 +1196,61 @@ public final class PnpmLockRegenerator {
         return pnpmfile == null || pnpmfile == JsYaml.UNDEFINED;
     }
 
+    // recursive.ts' requireHooks for a project installed into its own lock, from its directory: its default
+    // pnpmfile and the pnpmfiles setting (which getConfig's requireHooks does not read)
+    private void requireHooks(PnpmOptions options, String dir) {
+        if (options.isTrue("ignorePnpmfile")) {
+            return;
+        }
+        Object pnpmfiles = options.get("pnpmfiles");
+        if (Js.truthy(pnpmfiles) && !(pnpmfiles instanceof List)) {
+            throw new CannotKnow("what pnpm makes of pnpmfiles (" + Js.typeOf(pnpmfiles) + ", where pnpm reads a " +
+                                 "list)");
+        }
+        requirePnpmfiles(dir, tryLoadDefaultPnpmfile(options), Js.truthy(pnpmfiles) ? (List<?>) pnpmfiles :
+                Collections.emptyList());
+    }
+
+    // hooks.pnpmfile requireHooks from dir: the default .pnpmfile.mjs or .pnpmfile.cjs, then each pnpmfile listed,
+    // which pnpm runs, or fails on when one is missing
+    private void requirePnpmfiles(String dir, boolean tryLoadDefaultPnpmfile, List<?> pnpmfiles) {
+        List<String> loadedFiles = new ArrayList<>();
+        if (tryLoadDefaultPnpmfile) {
+            loadDefaultPnpmfile(dir);
+            loadedFiles.add(PosixPaths.join(dir, ".pnpmfile.cjs"));
+        }
+        String missing = null;
+        for (Object pnpmfile : pnpmfiles) {
+            if (!(pnpmfile instanceof String)) {
+                throw new CannotKnow("what pnpm makes of a pnpmfile that is a " + Js.typeOf(pnpmfile) + " (where " +
+                                     "pnpm reads a path)");
+            }
+            String path = (String) pnpmfile;
+            String file = PosixPaths.join(dir, path);
+            if (path.startsWith("/") || path.startsWith("~") || path.matches("^[A-Za-z]:.*") ||
+                PosixPaths.climbsAboveRoot(file)) {
+                throw new CannotKnow("whether the pnpmfile " + path + " exists (a path outside the project)");
+            }
+            if (loadedFiles.contains(file)) {
+                continue;
+            }
+            loadedFiles.add(file);
+            if (holds(inputs, file)) {
+                throw new CannotKnow("what " + file + " does (pnpm runs its hooks)");
+            }
+            if (inputs.getPaths() == null) {
+                throw new CannotKnow("whether the pnpmfile " + file + " exists (the host does not say which files " +
+                                     "the project holds)");
+            }
+            if (missing == null) {
+                missing = file;
+            }
+        }
+        if (missing != null) {
+            throw new PnpmError("PNPMFILE_NOT_FOUND", "pnpmfile at \"" + missing + "\" is not found");
+        }
+    }
+
     // the .pnpmfile.mjs or .pnpmfile.cjs of a directory
     private void loadDefaultPnpmfile(String dir) {
         for (String defaultPnpmfile : new String[]{".pnpmfile.mjs", ".pnpmfile.cjs"}) {
@@ -1124,7 +1266,7 @@ public final class PnpmLockRegenerator {
     private List<Verification.Project> projects(PnpmOptions options, boolean workspace) {
         List<String> dirs = new ArrayList<>();
         if (workspace) {
-            dirs.addAll(FindPackages.findWorkspaceProjects(inputs.getManifests().keySet(),
+            dirs.addAll(FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                     options.getWorkspacePackagePatterns()));
         } else {
             dirs.add(inputs.getLockDir());
@@ -1133,6 +1275,13 @@ public final class PnpmLockRegenerator {
         for (String dir : dirs) {
             String text = inputs.getManifests().get(dir);
             if (text == null) {
+                for (String other : OTHER_MANIFEST_NAMES) {
+                    String path = dir.isEmpty() ? other : dir + "/" + other;
+                    if (holds(inputs, path)) {
+                        throw new CannotKnow("the manifest pnpm reads from " + path + " (only package.json files " +
+                                             "are read)");
+                    }
+                }
                 if (missingManifest == null) {
                     missingManifest = dir;
                 }
@@ -1315,8 +1464,8 @@ public final class PnpmLockRegenerator {
         return valid != null && Long.parseLong(valid.substring(0, valid.indexOf('.'))) >= 12;
     }
 
-    // installConfigDepsAndLoadHooks: every pnpmfile pnpm loads is JavaScript, its plugins' among them; the default
-    // one from lockfileDir, else from where pnpm runs, which for a lock without lockfileDir is taken to be the root
+    // installConfigDepsAndLoadHooks: every pnpmfile pnpm loads is JavaScript, its plugins' among them, from
+    // lockfileDir, else from where pnpm runs
     private void loadHooks(PnpmOptions options, @Nullable Object configDependencies, String dir) {
         if (options.isTrue("ignorePnpmfile")) {
             return;
@@ -1337,16 +1486,9 @@ public final class PnpmLockRegenerator {
             throw new CannotKnow("what " + Js.string(globalPnpmfile) + " does (pnpm runs its hooks)");
         }
         Object pnpmfile = options.get("pnpmfile");
-        if (tryLoadDefaultPnpmfile(options)) {
-            loadDefaultPnpmfile(dir);
-            return;
-        }
-        Object first = pnpmfile instanceof List ? ((List<?>) pnpmfile).isEmpty() ? null : ((List<?>) pnpmfile).get(0) :
-                pnpmfile;
-        if (first != null) {
-            throw new CannotKnow("what " + Js.string(first) + " does (pnpm runs its hooks, or fails when there is " +
-                                 "no such file)");
-        }
+        requirePnpmfiles(dir, tryLoadDefaultPnpmfile(options), pnpmfile == null || pnpmfile == JsYaml.UNDEFINED ?
+                Collections.emptyList() : pnpmfile instanceof List ? (List<?>) pnpmfile :
+                Collections.singletonList(pnpmfile));
     }
 
     private static boolean isPluginName(String configDepName) {
