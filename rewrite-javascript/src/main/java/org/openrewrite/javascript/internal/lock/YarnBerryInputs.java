@@ -20,24 +20,27 @@ import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.I
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
- * {@code .yarnrc.yml} of that directory and of each directory above it.
+ * {@code .yarnrc.yml} of each directory from where Yarn runs up.
  */
 final class YarnBerryInputs {
+
+    private static final String RC_FILENAME = ".yarnrc.yml";
 
     private YarnBerryInputs() {
     }
 
     static boolean reads(String fileName) {
-        return ".yarnrc.yml".equals(fileName) || fileName.endsWith(".patch");
+        return RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> configFiles = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
-            if (file.getKey().matches("(\\.\\./)*" + "\\.yarnrc\\.yml")) {
+            if (file.getKey().matches("(\\.\\./)*" + "\\.yarnrc\\.yml") || onTheWayTo(file.getKey(), dir.getRunsIn())) {
                 configFiles.put(file.getKey(), file.getValue());
             }
         }
@@ -51,10 +54,30 @@ final class YarnBerryInputs {
                 .lock(dir.getLock())
                 .manifests(dir.manifestsUnder(""))
                 .configFiles(configFiles)
+                .runsIn(dir.getRunsIn())
                 .files(patches)
                 .paths(dir.pathsUnder(""))
                 .host(host)
                 .now(now)
                 .build();
+    }
+
+    /**
+     * Whether a file is there, by its path from the lock's directory ({@code ../yarn.lock}): read, held, the lock or a
+     * manifest.
+     */
+    static Predicate<String> holds(LockDirectory dir) {
+        return path -> dir.getFiles().containsKey(path) || dir.getPaths() != null && dir.getPaths().contains(path) ||
+                       "yarn.lock".equals(path) && dir.getLock() != null ||
+                       "package.json".equals(path) && dir.getManifests().containsKey("");
+    }
+
+    // an rc file in a directory between the lock's and the one Yarn runs in, or in that one
+    private static boolean onTheWayTo(String path, String runsIn) {
+        if (!path.endsWith("/" + RC_FILENAME) || path.startsWith("../")) {
+            return false;
+        }
+        String parent = path.substring(0, path.length() - RC_FILENAME.length() - 1);
+        return runsIn.equals(parent) || runsIn.startsWith(parent + "/");
     }
 }

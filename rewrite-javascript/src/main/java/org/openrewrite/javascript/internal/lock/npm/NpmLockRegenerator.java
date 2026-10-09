@@ -21,6 +21,7 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -103,8 +104,14 @@ public final class NpmLockRegenerator {
         String directoryName;
 
         /**
-         * The package.json of each directory above the project that npm walks through from where it runs, nearest
-         * first, keyed by the project's location from that directory ({@code packages/a}).
+         * The directory npm runs in, the edited manifest's, relative to the lock's.
+         */
+        @Builder.Default
+        String runsIn = "";
+
+        /**
+         * The package.json of each directory above the one npm runs in, which it walks through, nearest first,
+         * keyed by that directory's location from there ({@code packages/a}).
          */
         @Singular
         Map<String, String> parentManifests;
@@ -126,13 +133,18 @@ public final class NpmLockRegenerator {
         String written;
         try {
             int localPrefix = loadLocalPrefix(inputs);
-            if (localPrefix > 0) {
+            int lockDir = inputs.getRunsIn().isEmpty() ? 0 : inputs.getRunsIn().split("/").length;
+            if (localPrefix > lockDir) {
                 StringBuilder up = new StringBuilder("..");
-                for (int i = localPrefix; i > 1; i--) {
+                for (int i = localPrefix - lockDir; i > 1; i--) {
                     up.append("/..");
                 }
                 throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
                                      ", whose workspaces list this project, and writes that root's lock");
+            }
+            if (localPrefix < lockDir) {
+                throw new CannotKnow("the lock npm writes: run in " + inputs.getRunsIn() + " it installs " +
+                                     localPrefix + " directories above it, not at this lock");
             }
             if (inputs.getNpmrc() == null && inputs.getPaths() != null && inputs.getPaths().contains(".npmrc")) {
                 throw new CannotKnow(".npmrc (its contents were not read)");
@@ -163,23 +175,23 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * How many directories above the project npm installs, writing that directory's lock; 0 when it installs here or
-     * the walk fails, which {@link #regenerate()} reports, as it walks first.
+     * Where npm run in the project's directory installs and writes its lock; a walk that fails, which
+     * {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static int installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(Inputs inputs) {
         try {
-            return loadLocalPrefix(inputs);
+            return new InstallRoot(loadLocalPrefix(inputs), false);
         } catch (RuntimeException e) {
-            return 0;
+            return InstallRoot.STOPS_HERE;
         }
     }
 
     /**
-     * @npmcli/config {@code loadLocalPrefix}: how many directories above the project npm installs, at the nearest
-     * whose workspaces map the project, writing that directory's lock; 0 when it installs here.
+     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm installs, at the
+     * nearest whose workspaces map it, writing that directory's lock; 0 when it installs there.
      */
     private static int loadLocalPrefix(Inputs inputs) {
-        String manifest = inputs.getManifests().get("");
+        String manifest = inputs.getManifests().get(inputs.getRunsIn());
         if (manifest == null) {
             return 0;
         }

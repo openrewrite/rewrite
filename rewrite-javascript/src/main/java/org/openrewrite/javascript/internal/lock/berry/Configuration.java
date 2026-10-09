@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static java.util.Arrays.asList;
@@ -44,6 +45,24 @@ final class Configuration {
     Configuration(BerryOptions options, YarnRelease release) {
         this.options = options;
         this.release = release;
+    }
+
+    /**
+     * {@code findProjectCwd}, in directories above where Yarn runs: the nearest holding a yarn.lock, else the farthest
+     * holding a package.json; -1 for none. {@code holds} answers by path from there ({@code ../yarn.lock}).
+     */
+    static int findProjectCwd(Predicate<String> holds, int levels) {
+        int projectCwd = -1;
+        StringBuilder up = new StringBuilder();
+        for (int depth = 0; depth <= levels; depth++, up.append("../")) {
+            if (holds.test(up + "yarn.lock")) {
+                return depth;
+            }
+            if (holds.test(up + "package.json")) {
+                projectCwd = depth;
+            }
+        }
+        return projectCwd;
     }
 
     @Nullable

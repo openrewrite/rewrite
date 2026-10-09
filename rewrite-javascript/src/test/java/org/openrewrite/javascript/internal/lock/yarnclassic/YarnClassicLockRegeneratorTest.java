@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -345,7 +346,8 @@ class YarnClassicLockRegeneratorTest {
         if (configFile != null) {
             inputs.configFile(configFile, "registry \"https://registry.npmjs.org\"\n");
         }
-        assertThat(YarnClassicLockRegenerator.installRoot(inputs.build())).isEqualTo(installRoot);
+        assertThat(YarnClassicLockRegenerator.installRoot(inputs.build()))
+                .isEqualTo(new InstallRoot(installRoot, false));
     }
 
     /**
@@ -360,11 +362,12 @@ class YarnClassicLockRegeneratorTest {
                 .directory("a")
                 .now(Instant.EPOCH);
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("", "{\"name\":\"a\"}").build()))
-                .isEqualTo(1);
+                .isEqualTo(new InstallRoot(1, false));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("",
-                "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build())).isEqualTo(1);
+                "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build()))
+                .isEqualTo(new InstallRoot(1, false));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.configFile("../.yarnrc", "--focus true\n").build()))
-                .isEqualTo(0);
+                .isEqualTo(InstallRoot.HERE);
     }
 
     /**

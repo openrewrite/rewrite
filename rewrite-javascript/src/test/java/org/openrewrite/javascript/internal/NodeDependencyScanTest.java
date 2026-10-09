@@ -439,21 +439,140 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * A root holding no lock of the member's package manager is not where that lock is written: the member's own
-     * goes to the engine, which finds the root above it.
+     * npm 11.17.0 run in a member whose root lists it writes the root's lock, creating it beside a yarn.lock, and
+     * leaves the member's own: no lock the host holds takes the edit.
      */
     @Test
-    void aMemberKeepsItsOwnLockWhenTheRootHoldsNoneOfItsPackageManager() {
+    void aMemberWhoseRootHoldsNoneOfItsPackageManagersLockWritesNoneTheHostHolds() {
         NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(PackageManager.YarnClassic, PackageManager.Npm,
           "yarn.lock", "package-lock.json");
         Path memberLock = Paths.get("packages/a/package-lock.json");
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
 
-        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
-        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("member lock");
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isNull();
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isNull();
         assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
-        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).containsExactly(MEMBER);
+        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+    }
+
+    /**
+     * Which lock npm 11.17.0, yarn 1.22.22, Yarn 4.10.3, pnpm 11.2.2 and bun 1.3.10 write run in a member, recorded;
+     * none where it writes none the host holds. Yarn rejects an unlisted member, as the root lock's regeneration does.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "Npm         | packages/* | true  | true  | package-lock.json",
+      "Npm         | packages/* | true  | false | package-lock.json",
+      "Npm         | libs/*     | true  | false |",
+      "Npm         | packages/* | false | true  |",
+      "YarnClassic | packages/* | true  | true  | yarn.lock",
+      "YarnClassic | packages/* | true  | false | yarn.lock",
+      "YarnClassic | libs/*     | true  | false |",
+      "YarnClassic | packages/* | false | true  |",
+      "YarnBerry   | packages/* | true  | true  | packages/a/yarn.lock",
+      "YarnBerry   | packages/* | true  | false | yarn.lock",
+      "YarnBerry   | libs/*     | true  | false | yarn.lock",
+      "YarnBerry   | packages/* | false | true  | packages/a/yarn.lock",
+      "Pnpm        | packages/* | true  | true  | pnpm-lock.yaml",
+      "Pnpm        | packages/* | true  | false | pnpm-lock.yaml",
+      "Pnpm        | libs/*     | true  | false |",
+      "Pnpm        | packages/* | false | true  |",
+      "Bun         | packages/* | true  | true  | bun.lock",
+      "Bun         | packages/* | true  | false | bun.lock",
+      "Bun         | libs/*     | true  | false |",
+      "Bun         | packages/* | false | true  |"
+    })
+    void eachPackageManagerRunInAMemberWritesTheLockItsOwnWalkFinds(PackageManager pm, String pattern,
+                                                                    boolean rootLock, boolean memberLock,
+                                                                    String written) {
+        String lockName = LockFileRegeneration.forPackageManager(pm).getLockFile();
+        String lockText = pm == PackageManager.YarnBerry ? "__metadata:\n  version: 8\n  cacheKey: 10c0\n" : "lock";
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        if (rootLock) {
+            captureFile(acc, lockName, lockText);
+        }
+        if (memberLock) {
+            captureFile(acc, "packages/a/" + lockName, lockText);
+        }
+        boolean listed = "packages/*".equals(pattern);
+        String root = "{\"name\":\"root\",\"private\":true,\"dependencies\":{\"ms\":\"2.1.3\"}" +
+                      (pm == PackageManager.Pnpm ? "" : ",\"workspaces\":[\"" + pattern + "\"]") +
+                      (pm == PackageManager.YarnBerry ? ",\"packageManager\":\"yarn@4.10.3\"" : "") + "}";
+        project(acc, ROOT, root, nodeResolutionResult(pm, listed ? singletonList("packages/a/package.json") :
+          emptyList()));
+        SourceFile member = project(acc, MEMBER,
+          "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}",
+          nodeResolutionResult(pm));
+        if (pm == PackageManager.Pnpm) {
+            capture(acc, "pnpm-workspace.yaml", "packages:\n  - " + pattern + "\n");
+        }
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        Path lock = written == null ? null : Paths.get(written);
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(lock);
+        assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo(lock == null ? null : lockText);
+        if (pm == PackageManager.YarnBerry && !listed) {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
+              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+            assertThat(result).isNotNull();
+            assertThat(result.getFailure()).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.PM_REJECTS);
+            assertThat(result.getFailure().getDetail()).isEqualTo("yarn rejects this edit: Usage Error: The nearest " +
+                                                                  "package directory (packages/a) doesn't seem to be " +
+                                                                  "part of the project declared in .");
+        }
+    }
+
+    /**
+     * A walk from a member without a lock that stops before it picks one goes to the nearest lock, whose regeneration
+     * walks from the member again and reports it.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "Npm         | package.json          | the engine cannot know the package's files",
+      "YarnClassic | packages/package.json | yarn fails on this edit: SyntaxError: packages/package.json"
+    })
+    void aWalkThatStopsGoesToTheNearestLockWhoseRegenerationReportsWhy(PackageManager pm, String stops,
+                                                                      String reported) {
+        String lockName = LockFileRegeneration.forPackageManager(pm).getLockFile();
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        captureFile(acc, lockName, "root lock");
+        String workspaces = "\"private\":true,\"workspaces\":[\"packages/*\"]";
+        project(acc, ROOT, "{\"name\":\"root\"," + workspaces + (stops.equals("package.json") ?
+          ",\"directories\":{\"bin\":\"bin\"}}" : "}"), nodeResolutionResult(pm,
+          singletonList("packages/a/package.json")));
+        if (!stops.equals("package.json")) {
+            project(acc, Paths.get(stops), "{not json", nodeResolutionResult(pm));
+        }
+        SourceFile member = project(acc, MEMBER, "{\"name\":\"a\",\"version\":\"1.0.0\"}", nodeResolutionResult(pm));
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get(lockName));
+        assertThat(result).isNotNull();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getDetail()).startsWith(reported);
+    }
+
+    private static void captureFile(NodeDependencyScan.Accumulator acc, String path, String text) {
+        SourceFile file = PlainText.builder().sourcePath(Paths.get(path)).text(text).build();
+        NodeDependencyScan.capturePackageManagerFile(acc, file);
+        NodeDependencyScan.captureLock(acc, file);
+    }
+
+    private static SourceFile project(NodeDependencyScan.Accumulator acc, Path path, String text,
+                                      NodeResolutionResult marker) {
+        SourceFile manifest = PlainText.builder().sourcePath(path).text(text)
+          .markers(Markers.build(singletonList(marker))).build();
+        NodeDependencyScan.capturePackageManagerFile(acc, manifest);
+        acc.projects.computeIfAbsent(path, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = manifest;
+        return manifest;
     }
 
     private static final Path ROOT = Paths.get("package.json");

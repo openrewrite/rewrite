@@ -28,8 +28,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class YarnBerryInputsTest {
 
+    /**
+     * Yarn 4.10.3 run in a member reads every .yarnrc.yml from there up (open-member-yarnrc-run-in-member), not a
+     * sibling's.
+     */
     @Test
-    void memberEditPlacesManifestsAndReadsTheRcFilesUpToTheRepository() {
+    void memberEditPlacesManifestsAndReadsTheRcFilesFromTheMemberUpToTheRepository() {
         Request request = Request.builder()
           .packageJson("{\"name\":\"a\",\"version\":\"2.0.0\"}")
           .lock("__metadata:\n  version: 8\n")
@@ -40,6 +44,7 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("repo/app/.yarnrc.yml"), "compressionLevel: 0\n")
           .packageManagerFile(Paths.get("repo/.yarnrc.yml"), "enableTelemetry: false\n")
           .packageManagerFile(Paths.get("repo/app/packages/a/.yarnrc.yml"), "npmRegistryServer: x\n")
+          .packageManagerFile(Paths.get("repo/app/packages/b/.yarnrc.yml"), "npmRegistryServer: y\n")
           .packageManagerFile(Paths.get("repo/app/.npmrc"), "registry=https://example.com/\n")
           .build();
 
@@ -48,7 +53,8 @@ class YarnBerryInputsTest {
         assertThat(inputs.getLock()).isEqualTo("__metadata:\n  version: 8\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
-        assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc.yml", "../.yarnrc.yml");
+        assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
+        assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc.yml", "../.yarnrc.yml", "packages/a/.yarnrc.yml");
         assertThat(inputs.getConfigFiles().get(".yarnrc.yml")).isEqualTo("compressionLevel: 0\n");
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();

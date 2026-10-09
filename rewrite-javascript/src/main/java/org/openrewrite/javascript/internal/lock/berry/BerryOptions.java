@@ -192,8 +192,8 @@ public final class BerryOptions {
     }
 
     /**
-     * Reads {@code configFiles}, the rc files by path from the project's directory (another name only as
-     * {@code YARN_RC_FILENAME} names it), under {@code env}; throws UsageError where Yarn's configuration rejects one.
+     * Reads {@code configFiles}, the rc files by path from the project's directory, from where Yarn runs up (another
+     * name only as {@code YARN_RC_FILENAME} names it), under {@code env}; throws UsageError where Yarn rejects one.
      */
     public static BerryOptions load(Map<String, String> configFiles, HostEnvironment env) {
         BerryOptions options = new BerryOptions(env);
@@ -206,6 +206,11 @@ public final class BerryOptions {
             while (rest.startsWith("../")) {
                 rest = rest.substring(3);
                 up++;
+            }
+            int slash = rest.lastIndexOf('/');
+            if (slash >= 0 && up == 0) {
+                up = -rest.substring(0, slash).split("/").length;
+                rest = rest.substring(slash + 1);
             }
             if (!rest.equals(rcFilename)) {
                 continue;

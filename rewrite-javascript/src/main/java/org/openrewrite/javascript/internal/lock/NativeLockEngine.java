@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeExecutionContextView;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
@@ -65,10 +66,10 @@ public final class NativeLockEngine {
     }
 
     /**
-     * How many directories above the edited manifest's the workspace root is whose lock the package manager writes
-     * when run in the manifest's directory, by that package manager's own walk; else 0.
+     * Where the package manager installs when run in the edited manifest's directory, by its own walk: npm's
+     * localPrefix, Bun's workspace root, Yarn classic's findWorkspaceRoot, Berry's project, pnpm's workspace dir.
      */
-    public static int installRoot(PackageManager pm, Request request) {
+    public static InstallRoot installRoot(PackageManager pm, Request request) {
         LockDirectory dir = LockDirectory.of(request);
         switch (pm) {
             case Npm:
@@ -78,11 +79,11 @@ public final class NativeLockEngine {
             case YarnClassic:
                 return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             case YarnBerry:
-                return YarnBerryLockRegenerator.installRoot();
+                return YarnBerryLockRegenerator.installRoot(YarnBerryInputs.holds(dir), dir.depth());
             case Pnpm:
                 return PnpmLockRegenerator.installRoot(PnpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             default:
-                return 0;
+                return InstallRoot.STOPS_HERE;
         }
     }
 

@@ -21,6 +21,7 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -208,29 +209,30 @@ public final class PnpmLockRegenerator {
     }
 
     /**
-     * Run in the lock's directory, how many directories above it the workspace root is whose lock pnpm installs the
-     * lock's project into, or whose lock's regeneration reports what stops pnpm before it picks a lock; else 0.
+     * Run in the lock's directory, the workspace root whose lock pnpm installs the lock's project into; when pnpm stops
+     * before it picks a lock, the workspace root, whose lock's regeneration reports why.
      */
-    public static int installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(Inputs inputs) {
         String lockDir = inputs.getLockDir();
         if (lockDir.isEmpty()) {
-            return 0;
+            return InstallRoot.HERE;
         }
         int workspaceRoot = lockDir.split("/").length;
         try {
             String into = installsInto(inputs, lockDir);
             if (into.isEmpty()) {
-                return workspaceRoot;
+                return new InstallRoot(workspaceRoot, false);
             }
             if (!into.equals(lockDir) || inputs.getLock() != null) {
-                return 0;
+                return InstallRoot.HERE;
             }
             // under lockfileDir pnpm run here would start a lock of every project; run at the root, it writes that one
             PnpmOptions options = loadOptions(inputs);
             return Js.truthy(options.get("lockfileDir")) && FindPackages.findWorkspaceProjects(manifestDirs(inputs),
-                    options.getWorkspacePackagePatterns()).contains(lockDir) ? workspaceRoot : 0;
+                    options.getWorkspacePackagePatterns()).contains(lockDir) ? new InstallRoot(workspaceRoot, true) :
+                    InstallRoot.HERE;
         } catch (RuntimeException e) {
-            return workspaceRoot;
+            return new InstallRoot(workspaceRoot, true);
         }
     }
 

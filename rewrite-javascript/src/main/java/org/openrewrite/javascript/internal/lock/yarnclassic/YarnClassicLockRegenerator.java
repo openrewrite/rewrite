@@ -21,6 +21,7 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -421,6 +422,7 @@ public final class YarnClassicLockRegenerator {
         requireRelease(rc);
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
         requirePackageManager();
+        requireWorkspaceRootAbove(looseSemver);
         int workspaceRoot = findWorkspaceRoot(looseSemver, warnings);
         if (YarnClassicOptions.focus(rc) && workspaceRoot <= 0) {
             throw new MessageError("This command can only be run inside an individual workspace.");
@@ -443,14 +445,37 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * How many directories above the project the workspace root is whose lock yarn writes when run in the project;
-     * 0 when it installs here, as under {@code --focus}, or the walk fails, which {@link #regenerate()} reports.
+     * Where yarn run in the project's directory installs and writes its lock: here under {@code --focus}; a walk that
+     * fails, which {@link #regenerate()} reports, stops here.
      */
-    public static int installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(Inputs inputs) {
         try {
-            return new YarnClassicLockRegenerator(inputs).installRoot();
+            return new InstallRoot(new YarnClassicLockRegenerator(inputs).installRoot(), false);
         } catch (RuntimeException e) {
-            return 0;
+            return InstallRoot.STOPS_HERE;
+        }
+    }
+
+    // config.js findWorkspaceRoot starts where yarn runs: a manifest with workspaces below this lock's stops it there
+    private void requireWorkspaceRootAbove(boolean looseSemver) {
+        Set<String> paths = inputs.getPaths();
+        for (String dir = inputs.getCwd(); !dir.isEmpty(); dir = dir.contains("/") ?
+                dir.substring(0, dir.lastIndexOf('/')) : "") {
+            String file = dir + "/package.json";
+            String text = inputs.getManifests().containsKey(dir) ? inputs.getManifests().get(dir) :
+                    inputs.getConfigFiles().get(file);
+            if (text == null) {
+                if (paths != null && paths.contains(file)) {
+                    throw new CannotKnow(file + " (its contents were not read)");
+                }
+                continue;
+            }
+            Map<String, @Nullable Object> ws = extractWorkspaces(tryManifest(dir, text, looseSemver, true, null,
+                    new ArrayList<>()));
+            if (ws != null && Js.truthy(ws.get("packages"))) {
+                throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + " it stops at the " +
+                                     "workspaces of " + file + ", not at this lock");
+            }
         }
     }
 
@@ -600,7 +625,8 @@ public final class YarnClassicLockRegenerator {
     private @Nullable String findPackageManager() {
         Set<String> paths = inputs.getPaths();
         for (String dir = inputs.getCwd(); !dir.isEmpty(); dir = dir.substring(0, Math.max(dir.lastIndexOf('/'), 0))) {
-            String text = inputs.getManifests().get(dir);
+            String text = inputs.getManifests().containsKey(dir) ? inputs.getManifests().get(dir) :
+                    inputs.getConfigFiles().get(dir + "/package.json");
             if (text == null && paths != null && paths.contains(dir + "/package.json")) {
                 throw new CannotKnow(dir + "/package.json (its contents were not read)");
             }

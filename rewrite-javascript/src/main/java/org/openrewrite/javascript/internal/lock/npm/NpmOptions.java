@@ -513,7 +513,7 @@ public class NpmOptions {
         return out;
     }
 
-    // @npmcli/config env-replace.js: an unset ${NAME} stays as written, ${NAME?} becomes empty; an escaped one is literal
+    // @npmcli/config env-replace.js: an unset ${NAME} stays as written, ${NAME?} is empty, an escaped one literal
     private static String envReplace(String f, HostEnvironment env) {
         Matcher m = ENV_EXPR.matcher(f);
         StringBuffer out = new StringBuffer();

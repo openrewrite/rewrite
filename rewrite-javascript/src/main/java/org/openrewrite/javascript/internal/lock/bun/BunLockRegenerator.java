@@ -22,6 +22,7 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -111,8 +112,14 @@ public final class BunLockRegenerator {
         Instant now;
 
         /**
-         * The package.json of each directory above the project that bun walks through from where it runs, nearest
-         * first, keyed by the project's location from that directory ({@code packages/a}).
+         * The directory bun runs in, the edited manifest's, relative to the lock's.
+         */
+        @Builder.Default
+        String runsIn = "";
+
+        /**
+         * The package.json of each directory above the one bun runs in, which it walks through, nearest first,
+         * keyed by that directory's location from there ({@code packages/a}).
          */
         @Singular
         Map<String, String> parentManifests;
@@ -214,13 +221,18 @@ public final class BunLockRegenerator {
         String written;
         try {
             int workspaceRoot = findWorkspaceRoot(inputs);
-            if (workspaceRoot > 0) {
+            int lockDir = inputs.getRunsIn().isEmpty() ? 0 : inputs.getRunsIn().split("/").length;
+            if (workspaceRoot > lockDir) {
                 StringBuilder up = new StringBuilder("..");
-                for (int i = workspaceRoot; i > 1; i--) {
+                for (int i = workspaceRoot - lockDir; i > 1; i--) {
                     up.append("/..");
                 }
                 throw new CannotKnow("the lock bun writes: it installs at the workspace root " + up +
                                      ", whose workspaces list this project, and writes that root's bun.lock");
+            }
+            if (workspaceRoot < lockDir) {
+                throw new CannotKnow("the lock bun writes: run in " + inputs.getRunsIn() + " it installs " +
+                                     workspaceRoot + " directories above it, not at this bun.lock");
             }
             written = install(inputs.getLock());
         } catch (RuntimeException e) {
@@ -230,23 +242,23 @@ public final class BunLockRegenerator {
     }
 
     /**
-     * How many directories above the project bun installs, writing that root's bun.lock; 0 when it installs here or
-     * the walk fails, which {@link #regenerate()} reports, as it walks first.
+     * Where bun run in the project's directory installs and writes its bun.lock; a walk that fails, which
+     * {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static int installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(Inputs inputs) {
         try {
-            return findWorkspaceRoot(inputs);
+            return new InstallRoot(findWorkspaceRoot(inputs), false);
         } catch (RuntimeException e) {
-            return 0;
+            return InstallRoot.STOPS_HERE;
         }
     }
 
     /**
-     * PackageManager.init: how many directories above the project bun installs, at the first package.json above
-     * with workspaces when they list the project, writing that root's bun.lock; 0 when it installs here.
+     * PackageManager.init: how many directories above the one it runs in bun installs, at the first package.json
+     * above with workspaces when they list it, writing that root's bun.lock; 0 when it installs there.
      */
     private static int findWorkspaceRoot(Inputs inputs) {
-        String manifest = inputs.getManifests().get("");
+        String manifest = inputs.getManifests().get(inputs.getRunsIn());
         if (manifest == null) {
             return 0;
         }

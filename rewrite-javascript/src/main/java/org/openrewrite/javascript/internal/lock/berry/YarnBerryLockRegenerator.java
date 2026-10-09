@@ -22,6 +22,7 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -29,6 +30,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
@@ -40,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Port of @yarnpkg/plugin-essentials sources/commands/install.ts, {@code --mode=update-lockfile} (Yarn 4.10.3).
@@ -83,10 +86,17 @@ public final class YarnBerryLockRegenerator {
         Map<String, String> files;
 
         /**
-         * The rc files by path from the root: {@code .yarnrc.yml}, and {@code ../.yarnrc.yml} for a directory above.
+         * The rc files by path from the root, from where Yarn runs up: {@code packages/a/.yarnrc.yml},
+         * {@code .yarnrc.yml}, and {@code ../.yarnrc.yml} for a directory above.
          */
         @Singular
         Map<String, String> configFiles;
+
+        /**
+         * The directory Yarn runs in, the edited manifest's, relative to the root.
+         */
+        @Builder.Default
+        String runsIn = "";
 
         /**
          * The environment Yarn runs under; the {@code YARN_*} keys are settings.
@@ -153,11 +163,12 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * Configuration.findProjectCwd: Yarn's project is the nearest directory holding a yarn.lock, so a project with a
-     * lock of its own, the only one the scan asks about, installs here: 0.
+     * Configuration.findProjectCwd from where Yarn runs, whose lock it writes; whether it runs in one of the project's
+     * workspaces is Project.find's, which the install checks. {@code holds} answers by path from where Yarn runs.
      */
-    public static int installRoot() {
-        return 0;
+    public static InstallRoot installRoot(Predicate<String> holds, int levels) {
+        int projectCwd = Configuration.findProjectCwd(holds, levels);
+        return projectCwd < 0 ? InstallRoot.STOPS_HERE : new InstallRoot(projectCwd, false);
     }
 
     /**
@@ -204,6 +215,7 @@ public final class YarnBerryLockRegenerator {
         }
         Loaded loaded = load(release, settings);
         Project project = loaded.getProject();
+        find(project);
         if (project.lockfileLastVersion == null) {
             throw Rejected.discardsLock(lock.trim().isEmpty() ? "the lock is empty" : "the lock has no __metadata");
         }
@@ -216,6 +228,32 @@ public final class YarnBerryLockRegenerator {
         project.fetchEverything(registry);
         String written = write(project);
         return written == null ? lock : written;
+    }
+
+    /**
+     * Project.find from where Yarn runs: the project it finds must be this lock's, and the nearest package directory
+     * one of its workspaces.
+     */
+    private void find(Project project) {
+        String runsIn = inputs.getRunsIn();
+        if (runsIn.isEmpty()) {
+            return;
+        }
+        int levels = runsIn.split("/").length;
+        int projectCwd = Configuration.findProjectCwd(path -> {
+            String file = PosixPath.normalize(runsIn + "/" + path);
+            return "yarn.lock".equals(file) || inputs.getPaths() != null && inputs.getPaths().contains(file) ||
+                   file.endsWith("package.json") && inputs.getManifests().containsKey(file.contains("/") ?
+                           PosixPath.dirname(file) : "");
+        }, levels);
+        if (projectCwd != levels) {
+            throw new CannotKnow("the lock Yarn writes: run in " + runsIn + " its project is " +
+                                 (levels - projectCwd) + " directories below this lock's");
+        }
+        if (project.tryWorkspaceByCwd(runsIn) == null) {
+            throw new BerryOptions.UsageError("The nearest package directory (" + runsIn + ") doesn't seem to be " +
+                                              "part of the project declared in .");
+        }
     }
 
     /**

@@ -28,7 +28,7 @@ import java.util.Set;
 
 /**
  * The Yarn classic regenerator's inputs: the config files of the lock's directory, of each directory above it and of
- * those from where yarn runs up to it, and the package.json of the directories above it.
+ * those from where yarn runs up to it, and the package.json of those directories.
  */
 final class YarnClassicInputs {
 
@@ -50,7 +50,7 @@ final class YarnClassicInputs {
             String parent = slash < 0 ? "" : path.substring(0, slash);
             boolean above = parent.matches("\\.\\.(/\\.\\.)*");
             if (CONFIG_FILES.contains(name) && (parent.isEmpty() || above || isOnTheWayTo(parent, dir.getRunsIn())) ||
-                above && "package.json".equals(name)) {
+                "package.json".equals(name) && (above || isOnTheWayTo(parent, dir.getRunsIn()))) {
                 configFiles.put(path, file.getValue());
             }
         }

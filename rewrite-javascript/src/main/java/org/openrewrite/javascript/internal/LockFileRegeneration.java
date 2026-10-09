@@ -135,6 +135,19 @@ public final class LockFileRegeneration {
         @Nullable Set<Path> projectPaths;
     }
 
+    /**
+     * Where the package manager run in the edited manifest's directory installs: {@code depth} directories above it.
+     * When its walk stops before it picks a lock, the lock there, or the nearest, reports why.
+     */
+    @Value
+    public static class InstallRoot {
+        public static final InstallRoot HERE = new InstallRoot(0, false);
+        public static final InstallRoot STOPS_HERE = new InstallRoot(0, true);
+
+        int depth;
+        boolean stopped;
+    }
+
     @Value
     public static class Failure {
         Kind kind;
@@ -213,10 +226,9 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * How many directories above the edited manifest's the workspace root is whose lock an install run in the
-     * manifest's directory writes, when regenerating that lock reproduces it; else 0.
+     * The package manager's own answer to where it installs when run in the edited manifest's directory.
      */
-    public int installRoot(Request request) {
+    public InstallRoot installRoot(Request request) {
         return NativeLockEngine.installRoot(pm, request);
     }
 }

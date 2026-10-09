@@ -54,6 +54,20 @@ class BerryOptionsTest {
                 .get("compressionLevel")).isEqualTo("mixed");
     }
 
+    // Configuration.findRcFiles walks from where Yarn runs: a member's own rc file is the nearest
+    @Test
+    void theRcFileWhereYarnRunsIsNearerThanTheProjects() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("../.yarnrc.yml", "compressionLevel: 5\nenableTransparentWorkspaces: false\n");
+        files.put(".yarnrc.yml", "compressionLevel: 3\ndefaultProtocol: \"jsr:\"\n");
+        files.put("packages/.yarnrc.yml", "compressionLevel: 2\n");
+        files.put("packages/a/.yarnrc.yml", "compressionLevel: 1\n");
+        BerryOptions options = BerryOptions.load(files, HostEnvironment.of(Collections.emptyMap()));
+        assertThat(options.get("compressionLevel")).isEqualTo(1);
+        assertThat(options.get("defaultProtocol")).isEqualTo("jsr:");
+        assertThat(options.get("enableTransparentWorkspaces")).isEqualTo(false);
+    }
+
     @Test
     void mapSettingsMergeAcrossFiles() {
         Map<String, String> files = new LinkedHashMap<>();

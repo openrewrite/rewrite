@@ -66,11 +66,11 @@ class NpmInputsTest {
     }
 
     /**
-     * npm run in a member stops at the first directory above whose workspaces list it, the root the host sent the
-     * edit to.
+     * npm run in a member walks from there, nearest first: the root the host sent the edit to, then the directories
+     * above it.
      */
     @Test
-    void aMemberEditWalksNothingAboveTheRootItWasSentTo() {
+    void aMemberEditWalksFromTheMember() {
         Request request = Request.builder()
           .packageJson("{\"name\":\"a\"}")
           .lock("{}")
@@ -83,7 +83,10 @@ class NpmInputsTest {
         Inputs inputs = NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
-        assertThat(inputs.getParentManifests()).isEmpty();
+        assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
+        assertThat(inputs.getParentManifests()).containsExactly(
+          entry("packages/a", "{\"private\":true,\"workspaces\":[\"packages/*\"]}"),
+          entry("repo/packages/a", "{\"workspaces\":[\"repo\"]}"));
     }
 
     /**

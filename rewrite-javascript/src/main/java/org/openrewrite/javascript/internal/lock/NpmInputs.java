@@ -18,11 +18,10 @@ package org.openrewrite.javascript.internal.lock;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 
 import java.time.Instant;
-import java.util.Collections;
 
 /**
  * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json of
- * each directory above it when npm runs in that directory.
+ * each directory above the one npm runs in.
  */
 final class NpmInputs {
 
@@ -42,7 +41,8 @@ final class NpmInputs {
                 .now(now)
                 .directoryName(dir.name())
                 .manifests(dir.getManifests())
-                .parentManifests(dir.getRunsIn().isEmpty() ? dir.parentManifests() : Collections.emptyMap())
+                .runsIn(dir.getRunsIn())
+                .parentManifests(dir.manifestsAbove(dir.getRunsIn()))
                 .build();
     }
 }

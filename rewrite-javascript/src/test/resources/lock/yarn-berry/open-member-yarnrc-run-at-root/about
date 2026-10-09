@@ -1,0 +1,1 @@
+The member packages/a bumps is-number and holds its own .yarnrc.yml whose packageExtensions give is-number a dependency on ms; Yarn run at the root does not read the member's rc file and the root's lock has no ms (control of open-member-yarnrc-run-in-member).

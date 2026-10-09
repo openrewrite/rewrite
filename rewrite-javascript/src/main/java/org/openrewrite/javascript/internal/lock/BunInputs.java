@@ -19,13 +19,12 @@ import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 
 import java.time.Instant;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
  * The Bun regenerator's inputs: the lock's directory's own .npmrc and bunfig.toml, the patch and .env files under it,
- * and the package.json of each directory above it when bun runs in that directory.
+ * and the package.json of each directory above the one bun runs in.
  */
 final class BunInputs {
 
@@ -54,7 +53,8 @@ final class BunInputs {
                 .bunfig(dir.file("bunfig.toml"))
                 .files(files)
                 .paths(dir.pathsUnder(""))
-                .parentManifests(dir.getRunsIn().isEmpty() ? dir.parentManifests() : Collections.emptyMap())
+                .runsIn(dir.getRunsIn())
+                .parentManifests(dir.manifestsAbove(dir.getRunsIn()))
                 .host(host)
                 .now(now)
                 .build();

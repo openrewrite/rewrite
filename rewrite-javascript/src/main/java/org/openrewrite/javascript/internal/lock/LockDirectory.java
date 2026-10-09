@@ -24,6 +24,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -169,7 +170,25 @@ public final class LockDirectory {
      * directory as seen from there ({@code packages/a}).
      */
     public Map<String, String> parentManifests() {
+        return manifestsAbove("");
+    }
+
+    /**
+     * The package.json of each directory above {@code dir}, a directory relative to the lock's, that the host holds,
+     * nearest first, keyed by {@code dir} as seen from there.
+     */
+    public Map<String, String> manifestsAbove(String dir) {
         Map<String, String> parents = new LinkedHashMap<>();
+        String[] within = dir.isEmpty() ? new String[0] : dir.split("/");
+        for (int up = 1; up <= within.length; up++) {
+            String ancestor = String.join("/", Arrays.asList(within).subList(0, within.length - up));
+            String manifest = manifests.containsKey(ancestor) ? manifests.get(ancestor) :
+                    files.get(ancestor.isEmpty() ? "package.json" : ancestor + "/package.json");
+            if (manifest != null) {
+                parents.put(String.join("/", Arrays.asList(within).subList(within.length - up, within.length)),
+                        manifest);
+            }
+        }
         String[] segments = path.isEmpty() ? new String[0] : path.split("/");
         StringBuilder up = new StringBuilder();
         for (int depth = 1; depth <= segments.length; depth++) {
@@ -180,10 +199,17 @@ public final class LockDirectory {
                 for (int i = segments.length - depth; i < segments.length; i++) {
                     below.append(below.length() == 0 ? "" : "/").append(segments[i]);
                 }
-                parents.put(below.toString(), manifest);
+                parents.put(below + (dir.isEmpty() ? "" : "/" + dir), manifest);
             }
         }
         return parents;
+    }
+
+    /**
+     * How many directories the lock's is below the repository's root.
+     */
+    public int depth() {
+        return path.isEmpty() ? 0 : path.split("/").length;
     }
 
     /**
