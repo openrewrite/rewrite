@@ -217,7 +217,8 @@ final class ResolveDependencyTree {
             arg.setUpdatePackageManifest(false);
             resolveArgs.add(arg);
         }
-        ResolveDependencies.RootResult root = ResolveDependencies.resolveRootDependencies(ctx, resolveArgs);
+        ResolveDependencies.RootResult root = ctx.getLoop().await(
+                ResolveDependencies.resolveRootDependencies(ctx, resolveArgs));
 
         for (ResolveDependencies.PendingNode pendingNode : ctx.getPendingNodes()) {
             DependenciesTreeNode node = new DependenciesTreeNode(pendingNode.getResolvedPackage(),

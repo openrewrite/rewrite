@@ -19,6 +19,7 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.pnpm.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -209,25 +210,24 @@ final class ResolveDependencies {
      * The missing peers of a package's children, known once its children are resolved (a deferred promise).
      */
     static final class MissingPeersOfChildren {
-        private @Nullable Map<String, MissingPeerInfo> value;
+        private final Promise<Map<String, MissingPeerInfo>> promise;
         private boolean resolved;
 
+        MissingPeersOfChildren(EventLoop loop) {
+            this.promise = new Promise<>(loop);
+        }
+
         void resolve(Map<String, MissingPeerInfo> missingPeers) {
-            if (value == null) {
-                value = missingPeers;
-            }
             resolved = true;
+            promise.resolve(missingPeers);
         }
 
         boolean isResolved() {
             return resolved;
         }
 
-        Map<String, MissingPeerInfo> get() {
-            if (value == null) {
-                throw new IllegalStateException("missing peers of children awaited before they were resolved");
-            }
-            return value;
+        Promise<Map<String, MissingPeerInfo>> get() {
+            return promise;
         }
     }
 
@@ -445,16 +445,26 @@ final class ResolveDependencies {
         PkgAddress resolveDependencyResult;
 
         @Nullable
-        Function<PostponedResolutionOpts, PeersResolutionResult> postponedResolution;
+        Function<PostponedResolutionOpts, Promise<PeersResolutionResult>> postponedResolution;
 
         @Nullable
-        Function<ParentPkgAliases, PeersResolutionResult> postponedPeersResolution;
+        Function<ParentPkgAliases, Promise<PeersResolutionResult>> postponedPeersResolution;
     }
 
     @Value
     static class ResolvedDependenciesResult {
         List<PkgAddress> pkgAddresses;
-        PeersResolutionResult resolvingPeers;
+        Promise<PeersResolutionResult> resolvingPeers;
+    }
+
+    /**
+     * What resolving one importer's direct dependencies leaves for resolveDependenciesOfImporters' second step.
+     */
+    @Value
+    static class ImporterDependencies {
+        List<PkgAddress> pkgAddresses;
+        List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponedResolutionsQueue;
+        List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue;
     }
 
     @Getter
@@ -532,6 +542,7 @@ final class ResolveDependencies {
         private final Set<String> allPeerDepNames = new LinkedHashSet<>();
         private @Nullable Map<String, PatchingConfig.PatchGroup> patchedDependencies;
         private final Set<String> appliedPatches = new LinkedHashSet<>();
+        private final EventLoop loop = new EventLoop();
         private long nodeIdCounter;
 
         ResolutionContext(LockfileObject wantedLockfile, String lockfileDir, PackageRequester storeController) {
@@ -545,120 +556,148 @@ final class ResolveDependencies {
         }
     }
 
-    static RootResult resolveRootDependencies(ResolutionContext ctx, List<ImporterToResolve> importers) {
+    static Promise<RootResult> resolveRootDependencies(ResolutionContext ctx, List<ImporterToResolve> importers) {
         if (ctx.isAutoInstallPeers()) {
             ctx.setAllPreferredVersions(PreferredVersions.getPreferredVersionsFromLockfileAndManifests(
                     ctx.getWantedLockfile().getPackages(), Collections.emptyList()));
         } else if (ctx.isHoistPeers()) {
             ctx.setAllPreferredVersions(new LinkedHashMap<>());
         }
-        ImportersResolution ofImporters = resolveDependenciesOfImporters(ctx, importers);
-        List<PkgAddressesByImporter> byImporters = ofImporters.getPkgAddressesByImportersWithoutPeers();
-        Instant publishedBy = ofImporters.getPublishedBy();
-        Map<String, String> time = ofImporters.getTime();
-        if (!ctx.isHoistPeers()) {
-            return new RootResult(addressesOf(byImporters), time);
-        }
-        List<PkgAddress> workspaceRootDeps = new ArrayList<>();
-        if (ctx.isResolvePeersFromWorkspaceRoot()) {
-            for (int i = 0; i < importers.size(); i++) {
-                if (".".equals(importers.get(i).getOptions().getParentIds().get(0))) {
-                    workspaceRootDeps = byImporters.get(i).getPkgAddresses();
-                    break;
-                }
+        return resolveDependenciesOfImporters(ctx, importers).then(ofImporters -> {
+            List<PkgAddressesByImporter> byImporters = ofImporters.getPkgAddressesByImportersWithoutPeers();
+            Map<String, String> time = ofImporters.getTime();
+            if (!ctx.isHoistPeers()) {
+                return Promise.resolved(ctx.getLoop(), new RootResult(addressesOf(byImporters), time));
             }
-        }
-        while (true) {
-            List<Map<String, List<String>>> allMissingOptionalPeersByImporters = new ArrayList<>();
-            for (int index = 0; index < byImporters.size(); index++) {
-                PkgAddressesByImporter result = byImporters.get(index);
-                ImporterToResolve importer = importers.get(index);
-                ParentPkgAliases parentPkgAliases = importer.getParentPkgAliases();
-                Map<String, List<String>> allMissingOptionalPeers = new LinkedHashMap<>();
-                while (true) {
-                    for (PkgAddress pkgAddress : result.getPkgAddresses()) {
-                        parentPkgAliases.put(pkgAddress.getAlias(), Boolean.TRUE);
-                    }
-                    List<Map.Entry<String, MissingPeerInfo>> missingOptionalPeers = new ArrayList<>();
-                    List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers = new ArrayList<>();
-                    for (Map.Entry<String, MissingPeerInfo> peer : result.getMissingPeers().entrySet()) {
-                        if (peer.getValue().isOptional()) {
-                            missingOptionalPeers.add(peer);
-                        } else {
-                            missingRequiredPeers.add(peer);
-                            parentPkgAliases.put(peer.getKey(), Boolean.TRUE);
-                        }
-                    }
-                    if (ctx.isAutoInstallPeers()) {
-                        for (Map.Entry<String, PkgAddress> resolved : result.getResolvedPeers().entrySet()) {
-                            if (!Js.truthy(parentPkgAliases.get(resolved.getKey()))) {
-                                result.getPkgAddresses().add(resolved.getValue());
-                            }
-                        }
-                    }
-                    for (Map.Entry<String, MissingPeerInfo> optional : missingOptionalPeers) {
-                        List<String> ranges = allMissingOptionalPeers.get(optional.getKey());
-                        if (ranges == null) {
-                            allMissingOptionalPeers.put(optional.getKey(),
-                                    new ArrayList<>(Collections.singletonList(optional.getValue().getRange())));
-                        } else if (!ranges.contains(optional.getValue().getRange())) {
-                            ranges.add(optional.getValue().getRange());
-                        }
-                    }
-                    if (missingRequiredPeers.isEmpty()) {
+            List<PkgAddress> workspaceRootDeps = new ArrayList<>();
+            if (ctx.isResolvePeersFromWorkspaceRoot()) {
+                for (int i = 0; i < importers.size(); i++) {
+                    if (".".equals(importers.get(i).getOptions().getParentIds().get(0))) {
+                        workspaceRootDeps = byImporters.get(i).getPkgAddresses();
                         break;
                     }
-                    Map<String, String> dependencies = hoistPeers(ctx.isAutoInstallPeers(),
-                            ctx.getAllPreferredVersions(), workspaceRootDeps, missingRequiredPeers);
-                    if (dependencies.isEmpty()) {
-                        break;
-                    }
-                    List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
-                            Collections.<String, @Nullable Object>singletonMap("dependencies", dependencies));
-                    ResolvedDependenciesOptions options = importer.getOptions().copy();
-                    options.setParentPkgAliases(parentPkgAliases);
-                    options.setPublishedBy(publishedBy);
-                    options.setUpdateToLatest(false);
-                    ResolvedDependenciesResult resolved = resolveDependencies(ctx, importer.getPreferredVersions(),
-                            wantedDependencies, options);
-                    result.getPkgAddresses().addAll(resolved.getPkgAddresses());
-                    PeersResolutionResult filtered = filterMissingPeers(resolved.getResolvingPeers(), parentPkgAliases);
-                    result.setMissingPeers(filtered.getMissingPeers());
-                    result.setResolvedPeers(filtered.getResolvedPeers());
                 }
-                allMissingOptionalPeersByImporters.add(allMissingOptionalPeers);
             }
-            boolean hasNewMissingPeers = false;
+            return hoistMissingPeers(ctx, importers, byImporters, workspaceRootDeps, ofImporters.getPublishedBy())
+                    .then(done -> Promise.resolved(ctx.getLoop(), new RootResult(addressesOf(byImporters), time)));
+        });
+    }
+
+    // resolveRootDependencies' while (true): every importer's required peers, then the optional peers it can hoist
+    private static Promise<Void> hoistMissingPeers(ResolutionContext ctx, List<ImporterToResolve> importers,
+                                                   List<PkgAddressesByImporter> byImporters,
+                                                   List<PkgAddress> workspaceRootDeps,
+                                                   @Nullable Instant publishedBy) {
+        List<Promise<Map<String, List<String>>>> byImporter = new ArrayList<>();
+        for (int index = 0; index < byImporters.size(); index++) {
+            byImporter.add(hoistRequiredPeers(ctx, importers.get(index), byImporters.get(index), workspaceRootDeps,
+                    publishedBy, new LinkedHashMap<>()));
+        }
+        return Promise.all(ctx.getLoop(), byImporter).then(allMissingOptionalPeersByImporters -> {
+            boolean[] hasNewMissingPeers = {false};
+            List<Promise<Void>> hoisting = new ArrayList<>();
             for (int index = 0; index < allMissingOptionalPeersByImporters.size(); index++) {
                 Map<String, List<String>> allMissingOptionalPeers = allMissingOptionalPeersByImporters.get(index);
                 ImporterToResolve importer = importers.get(index);
-                if (!allMissingOptionalPeers.isEmpty() && ctx.getAllPreferredVersions() != null) {
+                PkgAddressesByImporter result = byImporters.get(index);
+                hoisting.add(Promise.async(ctx.getLoop(), () -> {
+                    if (allMissingOptionalPeers.isEmpty() || ctx.getAllPreferredVersions() == null) {
+                        return Promise.resolved(ctx.getLoop(), null);
+                    }
                     Map<String, String> optionalDependencies = getHoistableOptionalPeers(allMissingOptionalPeers,
                             ctx.getAllPreferredVersions());
-                    if (!optionalDependencies.isEmpty()) {
-                        hasNewMissingPeers = true;
-                        List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
-                                Collections.<String, @Nullable Object>singletonMap("optionalDependencies",
-                                        optionalDependencies));
-                        ResolvedDependenciesOptions options = importer.getOptions().copy();
-                        options.setParentPkgAliases(importer.getParentPkgAliases());
-                        options.setPublishedBy(publishedBy);
-                        options.setUpdateToLatest(false);
-                        ResolvedDependenciesResult resolved = resolveDependencies(ctx,
-                                importer.getPreferredVersions(), wantedDependencies, options);
-                        byImporters.get(index).getPkgAddresses().addAll(resolved.getPkgAddresses());
-                        PeersResolutionResult filtered = filterMissingPeers(resolved.getResolvingPeers(),
-                                importer.getParentPkgAliases());
-                        byImporters.get(index).setMissingPeers(filtered.getMissingPeers());
-                        byImporters.get(index).setResolvedPeers(filtered.getResolvedPeers());
+                    if (optionalDependencies.isEmpty()) {
+                        return Promise.resolved(ctx.getLoop(), null);
+                    }
+                    hasNewMissingPeers[0] = true;
+                    List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
+                            Collections.<String, @Nullable Object>singletonMap("optionalDependencies",
+                                    optionalDependencies));
+                    ResolvedDependenciesOptions options = importer.getOptions().copy();
+                    options.setParentPkgAliases(importer.getParentPkgAliases());
+                    options.setPublishedBy(publishedBy);
+                    options.setUpdateToLatest(false);
+                    return resolveDependencies(ctx, importer.getPreferredVersions(), wantedDependencies, options)
+                            .then(resolved -> {
+                                result.getPkgAddresses().addAll(resolved.getPkgAddresses());
+                                return resolved.getResolvingPeers().then(peers -> {
+                                    PeersResolutionResult filtered = filterMissingPeers(peers,
+                                            importer.getParentPkgAliases());
+                                    result.setMissingPeers(filtered.getMissingPeers());
+                                    result.setResolvedPeers(filtered.getResolvedPeers());
+                                    return Promise.resolved(ctx.getLoop(), null);
+                                });
+                            });
+                }));
+            }
+            return Promise.all(ctx.getLoop(), hoisting).then(done -> hasNewMissingPeers[0] ?
+                    hoistMissingPeers(ctx, importers, byImporters, workspaceRootDeps, publishedBy) :
+                    Promise.resolved(ctx.getLoop(), null));
+        });
+    }
+
+    // the inner while (true) of one importer: hoist its missing required peers until none is left to hoist
+    private static Promise<Map<String, List<String>>> hoistRequiredPeers(
+            ResolutionContext ctx, ImporterToResolve importer, PkgAddressesByImporter result,
+            List<PkgAddress> workspaceRootDeps, @Nullable Instant publishedBy,
+            Map<String, List<String>> allMissingOptionalPeers) {
+        return Promise.async(ctx.getLoop(), () -> {
+            ParentPkgAliases parentPkgAliases = importer.getParentPkgAliases();
+            for (PkgAddress pkgAddress : result.getPkgAddresses()) {
+                parentPkgAliases.put(pkgAddress.getAlias(), Boolean.TRUE);
+            }
+            List<Map.Entry<String, MissingPeerInfo>> missingOptionalPeers = new ArrayList<>();
+            List<Map.Entry<String, MissingPeerInfo>> missingRequiredPeers = new ArrayList<>();
+            for (Map.Entry<String, MissingPeerInfo> peer : result.getMissingPeers().entrySet()) {
+                if (peer.getValue().isOptional()) {
+                    missingOptionalPeers.add(peer);
+                } else {
+                    missingRequiredPeers.add(peer);
+                    parentPkgAliases.put(peer.getKey(), Boolean.TRUE);
+                }
+            }
+            if (ctx.isAutoInstallPeers()) {
+                for (Map.Entry<String, PkgAddress> resolved : result.getResolvedPeers().entrySet()) {
+                    if (!Js.truthy(parentPkgAliases.get(resolved.getKey()))) {
+                        result.getPkgAddresses().add(resolved.getValue());
                     }
                 }
             }
-            if (!hasNewMissingPeers) {
-                break;
+            for (Map.Entry<String, MissingPeerInfo> optional : missingOptionalPeers) {
+                List<String> ranges = allMissingOptionalPeers.get(optional.getKey());
+                if (ranges == null) {
+                    allMissingOptionalPeers.put(optional.getKey(),
+                            new ArrayList<>(Collections.singletonList(optional.getValue().getRange())));
+                } else if (!ranges.contains(optional.getValue().getRange())) {
+                    ranges.add(optional.getValue().getRange());
+                }
             }
-        }
-        return new RootResult(addressesOf(byImporters), time);
+            if (missingRequiredPeers.isEmpty()) {
+                return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
+            }
+            Map<String, String> dependencies = hoistPeers(ctx.isAutoInstallPeers(), ctx.getAllPreferredVersions(),
+                    workspaceRootDeps, missingRequiredPeers);
+            if (dependencies.isEmpty()) {
+                return Promise.resolved(ctx.getLoop(), allMissingOptionalPeers);
+            }
+            List<WantedDependency> wantedDependencies = getNonDevWantedDependencies(
+                    Collections.<String, @Nullable Object>singletonMap("dependencies", dependencies));
+            ResolvedDependenciesOptions options = importer.getOptions().copy();
+            options.setParentPkgAliases(parentPkgAliases);
+            options.setPublishedBy(publishedBy);
+            options.setUpdateToLatest(false);
+            return resolveDependencies(ctx, importer.getPreferredVersions(), wantedDependencies, options)
+                    .then(resolved -> {
+                        result.getPkgAddresses().addAll(resolved.getPkgAddresses());
+                        return resolved.getResolvingPeers().then(peers -> {
+                            PeersResolutionResult filtered = filterMissingPeers(peers, parentPkgAliases);
+                            result.setMissingPeers(filtered.getMissingPeers());
+                            result.setResolvedPeers(filtered.getResolvedPeers());
+                            return hoistRequiredPeers(ctx, importer, result, workspaceRootDeps, publishedBy,
+                                    allMissingOptionalPeers);
+                        });
+                    });
+        });
     }
 
     private static List<List<PkgAddress>> addressesOf(List<PkgAddressesByImporter> byImporters) {
@@ -669,29 +708,54 @@ final class ResolveDependencies {
         return out;
     }
 
-    private static ImportersResolution resolveDependenciesOfImporters(ResolutionContext ctx,
-                                                                      List<ImporterToResolve> importers) {
+    private static Promise<ImportersResolution> resolveDependenciesOfImporters(ResolutionContext ctx,
+                                                                               List<ImporterToResolve> importers) {
         boolean pickLowestVersion = "time-based".equals(ctx.getResolutionMode()) ||
                                     "lowest-direct".equals(ctx.getResolutionMode());
-        List<List<DependencyResolution>> resolveResults = new ArrayList<>();
-        List<List<PkgAddress>> addressesByImporter = new ArrayList<>();
+        List<Promise<ImporterDependencies>> resolving = new ArrayList<>();
         for (ImporterToResolve importer : importers) {
-            List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(importer.getWantedDependencies(),
-                    ctx.getWantedLockfile(), ctx.getRegistries(), importer.getOptions().getPreferredDependencies(),
-                    importer.getOptions().isProceed() || ctx.isForceFullResolution(),
-                    importer.getOptions().getResolvedDependencies());
-            List<DependencyResolution> resolved = new ArrayList<>();
-            List<PkgAddress> pkgAddresses = new ArrayList<>();
-            for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
-                DependencyResolution result = resolveDependenciesOfImporterDependency(ctx, importer,
-                        pickLowestVersion, extendedWantedDep);
-                resolved.add(result);
-                if (result.getResolveDependencyResult() != null) {
-                    pkgAddresses.add(result.getResolveDependencyResult());
+            resolving.add(Promise.async(ctx.getLoop(), () -> {
+                List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(
+                        importer.getWantedDependencies(), ctx.getWantedLockfile(), ctx.getRegistries(),
+                        importer.getOptions().getPreferredDependencies(),
+                        importer.getOptions().isProceed() || ctx.isForceFullResolution(),
+                        importer.getOptions().getResolvedDependencies());
+                List<Promise<DependencyResolution>> dependencies = new ArrayList<>();
+                for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
+                    dependencies.add(Promise.async(ctx.getLoop(), () -> resolveDependenciesOfImporterDependency(ctx,
+                            importer, pickLowestVersion, extendedWantedDep)));
                 }
-            }
-            resolveResults.add(resolved);
-            addressesByImporter.add(pkgAddresses);
+                return Promise.all(ctx.getLoop(), dependencies).then(resolved -> {
+                    List<PkgAddress> pkgAddresses = new ArrayList<>();
+                    List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponed =
+                            new ArrayList<>();
+                    List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeers =
+                            new ArrayList<>();
+                    for (DependencyResolution result : resolved) {
+                        if (result.getResolveDependencyResult() != null) {
+                            pkgAddresses.add(result.getResolveDependencyResult());
+                        }
+                        if (result.getPostponedResolution() != null) {
+                            postponed.add(result.getPostponedResolution());
+                        }
+                        if (result.getPostponedPeersResolution() != null) {
+                            postponedPeers.add(result.getPostponedPeersResolution());
+                        }
+                    }
+                    return Promise.resolved(ctx.getLoop(),
+                            new ImporterDependencies(pkgAddresses, postponed, postponedPeers));
+                });
+            }));
+        }
+        return Promise.all(ctx.getLoop(), resolving).then(resolveResults ->
+                resolvePostponedOfImporters(ctx, importers, resolveResults));
+    }
+
+    private static Promise<ImportersResolution> resolvePostponedOfImporters(
+            ResolutionContext ctx, List<ImporterToResolve> importers, List<ImporterDependencies> resolveResults) {
+        List<List<PkgAddress>> addressesByImporter = new ArrayList<>();
+        for (ImporterDependencies result : resolveResults) {
+            addressesByImporter.add(result.getPkgAddresses());
         }
         Instant publishedBy = null;
         Map<String, String> time = null;
@@ -731,80 +795,91 @@ final class ResolveDependencies {
             (publishedBy == null || publishedBy.isAfter(ctx.getMaximumPublishedBy()))) {
             publishedBy = ctx.getMaximumPublishedBy();
         }
-        List<PkgAddressesByImporter> out = new ArrayList<>();
+        Instant cutoff = publishedBy;
+        Map<String, String> newTime = time;
+        List<Promise<PkgAddressesByImporter>> byImporters = new ArrayList<>();
         for (int i = 0; i < importers.size(); i++) {
             ImporterToResolve importer = importers.get(i);
-            List<PkgAddress> pkgAddresses = addressesByImporter.get(i);
-            PreferredVersions.ByName newPreferredVersions = new PreferredVersions.ByName(new LinkedHashMap<>(),
-                    importer.getPreferredVersions());
-            ParentPkgAliases currentParentPkgAliases = new ParentPkgAliases();
-            for (PkgAddress pkgAddress : pkgAddresses) {
-                if (currentParentPkgAliases.get(pkgAddress.getAlias()) != Boolean.TRUE) {
-                    currentParentPkgAliases.put(pkgAddress.getAlias(), pkgAddress);
-                }
-                if (pkgAddress.isUpdated()) {
-                    ctx.getUpdatedSet().add(pkgAddress.getAlias());
-                }
-                ResolvedPackage resolvedPackage = ctx.getResolvedPkgsById().get(pkgAddress.getPkgId());
-                if (resolvedPackage == null) {
-                    continue;
-                }
-                if (!newPreferredVersions.hasOwn(resolvedPackage.getName())) {
-                    Map<String, PreferredVersions.Selector> inherited =
-                            importer.getPreferredVersions().get(resolvedPackage.getName());
-                    newPreferredVersions.put(resolvedPackage.getName(),
-                            inherited == null ? new LinkedHashMap<>() : new LinkedHashMap<>(inherited));
-                }
-                Map<String, PreferredVersions.Selector> selectors =
-                        newPreferredVersions.get(resolvedPackage.getName());
-                if (selectors.get(resolvedPackage.getVersion()) == null) {
-                    selectors.put(resolvedPackage.getVersion(), PreferredVersions.Selector.of("version",
-                            PreferredVersions.DIRECT_DEP_SELECTOR_WEIGHT));
-                }
-            }
-            ParentPkgAliases newParentPkgAliases = new ParentPkgAliases(importer.getParentPkgAliases());
-            newParentPkgAliases.putAll(currentParentPkgAliases);
-            PostponedResolutionOpts postponedResolutionOpts = new PostponedResolutionOpts(newPreferredVersions,
-                    newParentPkgAliases, publishedBy);
-            List<PeersResolutionResult> childrenResults = new ArrayList<>();
-            for (DependencyResolution result : resolveResults.get(i)) {
-                if (result.getPostponedResolution() != null) {
-                    childrenResults.add(result.getPostponedResolution().apply(postponedResolutionOpts));
-                }
-            }
-            if (!ctx.isHoistPeers()) {
-                out.add(new PkgAddressesByImporter(pkgAddresses, new LinkedHashMap<>(), new LinkedHashMap<>()));
-                continue;
-            }
-            List<PeersResolutionResult> postponedPeersResolution = new ArrayList<>();
-            for (DependencyResolution result : resolveResults.get(i)) {
-                if (result.getPostponedPeersResolution() != null) {
-                    postponedPeersResolution.add(result.getPostponedPeersResolution()
-                            .apply(postponedResolutionOpts.getParentPkgAliases()));
-                }
-            }
-            Map<String, PkgAddress> resolvedPeers = new LinkedHashMap<>();
-            for (PeersResolutionResult r : childrenResults) {
-                resolvedPeers.putAll(r.getResolvedPeers());
-            }
-            for (PeersResolutionResult r : postponedPeersResolution) {
-                resolvedPeers.putAll(r.getResolvedPeers());
-            }
-            List<Map<String, MissingPeerInfo>> missing = new ArrayList<>(
-                    filterMissingPeersFromPkgAddresses(pkgAddresses, currentParentPkgAliases, resolvedPeers));
-            for (PeersResolutionResult r : childrenResults) {
-                missing.add(r.getMissingPeers());
-            }
-            for (PeersResolutionResult r : postponedPeersResolution) {
-                missing.add(r.getMissingPeers());
-            }
-            out.add(new PkgAddressesByImporter(pkgAddresses,
-                    mergePkgsDeps(missing, ctx.isAutoInstallPeersFromHighestMatch()), resolvedPeers));
+            ImporterDependencies resolveResult = resolveResults.get(i);
+            byImporters.add(Promise.async(ctx.getLoop(), () ->
+                    resolvePostponedOfImporter(ctx, importer, resolveResult, cutoff)));
         }
-        return new ImportersResolution(out, publishedBy, time);
+        return Promise.all(ctx.getLoop(), byImporters).then(out ->
+                Promise.resolved(ctx.getLoop(), new ImportersResolution(out, cutoff, newTime)));
     }
 
-    private static DependencyResolution resolveDependenciesOfImporterDependency(
+    private static Promise<PkgAddressesByImporter> resolvePostponedOfImporter(
+            ResolutionContext ctx, ImporterToResolve importer, ImporterDependencies resolveResult,
+            @Nullable Instant publishedBy) {
+        List<PkgAddress> pkgAddresses = resolveResult.getPkgAddresses();
+        PreferredVersions.ByName newPreferredVersions = new PreferredVersions.ByName(new LinkedHashMap<>(),
+                importer.getPreferredVersions());
+        ParentPkgAliases currentParentPkgAliases = new ParentPkgAliases();
+        for (PkgAddress pkgAddress : pkgAddresses) {
+            if (currentParentPkgAliases.get(pkgAddress.getAlias()) != Boolean.TRUE) {
+                currentParentPkgAliases.put(pkgAddress.getAlias(), pkgAddress);
+            }
+            if (pkgAddress.isUpdated()) {
+                ctx.getUpdatedSet().add(pkgAddress.getAlias());
+            }
+            ResolvedPackage resolvedPackage = ctx.getResolvedPkgsById().get(pkgAddress.getPkgId());
+            if (resolvedPackage == null) {
+                continue;
+            }
+            if (!newPreferredVersions.hasOwn(resolvedPackage.getName())) {
+                Map<String, PreferredVersions.Selector> inherited =
+                        importer.getPreferredVersions().get(resolvedPackage.getName());
+                newPreferredVersions.put(resolvedPackage.getName(),
+                        inherited == null ? new LinkedHashMap<>() : new LinkedHashMap<>(inherited));
+            }
+            Map<String, PreferredVersions.Selector> selectors = newPreferredVersions.get(resolvedPackage.getName());
+            if (selectors.get(resolvedPackage.getVersion()) == null) {
+                selectors.put(resolvedPackage.getVersion(), PreferredVersions.Selector.of("version",
+                        PreferredVersions.DIRECT_DEP_SELECTOR_WEIGHT));
+            }
+        }
+        ParentPkgAliases newParentPkgAliases = new ParentPkgAliases(importer.getParentPkgAliases());
+        newParentPkgAliases.putAll(currentParentPkgAliases);
+        PostponedResolutionOpts postponedResolutionOpts = new PostponedResolutionOpts(newPreferredVersions,
+                newParentPkgAliases, publishedBy);
+        List<Promise<PeersResolutionResult>> children = new ArrayList<>();
+        for (Function<PostponedResolutionOpts, Promise<PeersResolutionResult>> postponed :
+                resolveResult.getPostponedResolutionsQueue()) {
+            children.add(postponed.apply(postponedResolutionOpts));
+        }
+        return Promise.all(ctx.getLoop(), children).then(childrenResults -> {
+            if (!ctx.isHoistPeers()) {
+                return Promise.resolved(ctx.getLoop(),
+                        new PkgAddressesByImporter(pkgAddresses, new LinkedHashMap<>(), new LinkedHashMap<>()));
+            }
+            List<Promise<PeersResolutionResult>> peers = new ArrayList<>();
+            for (Function<ParentPkgAliases, Promise<PeersResolutionResult>> postponed :
+                    resolveResult.getPostponedPeersResolutionQueue()) {
+                peers.add(postponed.apply(postponedResolutionOpts.getParentPkgAliases()));
+            }
+            return Promise.all(ctx.getLoop(), peers).then(postponedPeersResolution -> {
+                Map<String, PkgAddress> resolvedPeers = new LinkedHashMap<>();
+                for (PeersResolutionResult r : childrenResults) {
+                    resolvedPeers.putAll(r.getResolvedPeers());
+                }
+                for (PeersResolutionResult r : postponedPeersResolution) {
+                    resolvedPeers.putAll(r.getResolvedPeers());
+                }
+                List<Map<String, MissingPeerInfo>> missing = new ArrayList<>(
+                        filterMissingPeersFromPkgAddresses(pkgAddresses, currentParentPkgAliases, resolvedPeers));
+                for (PeersResolutionResult r : childrenResults) {
+                    missing.add(r.getMissingPeers());
+                }
+                for (PeersResolutionResult r : postponedPeersResolution) {
+                    missing.add(r.getMissingPeers());
+                }
+                return Promise.resolved(ctx.getLoop(), new PkgAddressesByImporter(pkgAddresses,
+                        mergePkgsDeps(missing, ctx.isAutoInstallPeersFromHighestMatch()), resolvedPeers));
+            });
+        });
+    }
+
+    private static Promise<DependencyResolution> resolveDependenciesOfImporterDependency(
             ResolutionContext ctx, ImporterToResolve importer, boolean pickLowestVersion,
             ExtendedWantedDependency extendedWantedDep) {
         WantedDependency wanted = extendedWantedDep.getWantedDependency();
@@ -825,13 +900,14 @@ final class ResolveDependencies {
         options.setPickLowestVersion(pickLowestVersion && !importer.isUpdatePackageManifest());
         options.setPinnedVersion(importer.getPinnedVersion());
         options.setPublishedBy(ctx.getMaximumPublishedBy());
-        DependencyResolution result = resolveDependenciesOfDependency(ctx, importer.getPreferredVersions(), options,
-                extendedWantedDep);
-        if (result.getResolveDependencyResult() != null && catalogLookup != null) {
-            result.getResolveDependencyResult().setCatalogLookup(new CatalogLookup(catalogLookup.getCatalogName(),
-                    catalogLookup.getSpecifier(), originalBareSpecifier));
-        }
-        return result;
+        return resolveDependenciesOfDependency(ctx, importer.getPreferredVersions(), options, extendedWantedDep)
+                .then(result -> {
+                    if (result.getResolveDependencyResult() != null && catalogLookup != null) {
+                        result.getResolveDependencyResult().setCatalogLookup(new CatalogLookup(
+                                catalogLookup.getCatalogName(), catalogLookup.getSpecifier(), originalBareSpecifier));
+                    }
+                    return Promise.resolved(ctx.getLoop(), result);
+                });
     }
 
     private static List<Map<String, MissingPeerInfo>> filterMissingPeersFromPkgAddresses(
@@ -855,29 +931,46 @@ final class ResolveDependencies {
         return out;
     }
 
-    static ResolvedDependenciesResult resolveDependencies(ResolutionContext ctx,
-                                                          PreferredVersions.ByName preferredVersions,
-                                                          List<WantedDependency> wantedDependencies,
-                                                          ResolvedDependenciesOptions options) {
-        List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(wantedDependencies,
-                ctx.getWantedLockfile(), ctx.getRegistries(), options.getPreferredDependencies(),
-                options.isProceed() || ctx.isForceFullResolution(), options.getResolvedDependencies());
-        List<Function<PostponedResolutionOpts, PeersResolutionResult>> postponedResolutionsQueue = new ArrayList<>();
-        List<Function<ParentPkgAliases, PeersResolutionResult>> postponedPeersResolutionQueue = new ArrayList<>();
-        List<PkgAddress> pkgAddresses = new ArrayList<>();
-        for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
-            DependencyResolution result = resolveDependenciesOfDependency(ctx, preferredVersions, options,
-                    extendedWantedDep);
-            if (result.getResolveDependencyResult() != null) {
-                pkgAddresses.add(result.getResolveDependencyResult());
+    static Promise<ResolvedDependenciesResult> resolveDependencies(ResolutionContext ctx,
+                                                                   PreferredVersions.ByName preferredVersions,
+                                                                   List<WantedDependency> wantedDependencies,
+                                                                   ResolvedDependenciesOptions options) {
+        return Promise.async(ctx.getLoop(), () -> {
+            List<ExtendedWantedDependency> extendedWantedDeps = getDepsToResolve(wantedDependencies,
+                    ctx.getWantedLockfile(), ctx.getRegistries(), options.getPreferredDependencies(),
+                    options.isProceed() || ctx.isForceFullResolution(), options.getResolvedDependencies());
+            List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponedResolutionsQueue =
+                    new ArrayList<>();
+            List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue =
+                    new ArrayList<>();
+            List<PkgAddress> pkgAddresses = new ArrayList<>();
+            List<Promise<Void>> resolving = new ArrayList<>();
+            for (ExtendedWantedDependency extendedWantedDep : extendedWantedDeps) {
+                resolving.add(Promise.async(ctx.getLoop(), () -> resolveDependenciesOfDependency(ctx,
+                        preferredVersions, options, extendedWantedDep).then(result -> {
+                    if (result.getResolveDependencyResult() != null) {
+                        pkgAddresses.add(result.getResolveDependencyResult());
+                    }
+                    if (result.getPostponedResolution() != null) {
+                        postponedResolutionsQueue.add(result.getPostponedResolution());
+                    }
+                    if (result.getPostponedPeersResolution() != null) {
+                        postponedPeersResolutionQueue.add(result.getPostponedPeersResolution());
+                    }
+                    return Promise.resolved(ctx.getLoop(), null);
+                })));
             }
-            if (result.getPostponedResolution() != null) {
-                postponedResolutionsQueue.add(result.getPostponedResolution());
-            }
-            if (result.getPostponedPeersResolution() != null) {
-                postponedPeersResolutionQueue.add(result.getPostponedPeersResolution());
-            }
-        }
+            return Promise.all(ctx.getLoop(), resolving).then(done -> resolvePostponed(ctx, preferredVersions,
+                    options, pkgAddresses, postponedResolutionsQueue, postponedPeersResolutionQueue));
+        });
+    }
+
+    // the rest of resolveDependencies, once every dependency of this level is resolved
+    private static Promise<ResolvedDependenciesResult> resolvePostponed(
+            ResolutionContext ctx, PreferredVersions.ByName preferredVersions, ResolvedDependenciesOptions options,
+            List<PkgAddress> pkgAddresses,
+            List<Function<PostponedResolutionOpts, Promise<PeersResolutionResult>>> postponedResolutionsQueue,
+            List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue) {
         PreferredVersions.ByName newPreferredVersions = new PreferredVersions.ByName(new LinkedHashMap<>(),
                 preferredVersions);
         ParentPkgAliases currentParentPkgAliases = new ParentPkgAliases();
@@ -906,44 +999,52 @@ final class ResolveDependencies {
         newParentPkgAliases.putAll(currentParentPkgAliases);
         PostponedResolutionOpts postponedResolutionOpts = new PostponedResolutionOpts(newPreferredVersions,
                 newParentPkgAliases, options.getPublishedBy());
-        List<PeersResolutionResult> childrenResults = new ArrayList<>();
-        for (Function<PostponedResolutionOpts, PeersResolutionResult> postponed : postponedResolutionsQueue) {
-            childrenResults.add(postponed.apply(postponedResolutionOpts));
+        List<Promise<PeersResolutionResult>> children = new ArrayList<>();
+        for (Function<PostponedResolutionOpts, Promise<PeersResolutionResult>> postponed : postponedResolutionsQueue) {
+            children.add(postponed.apply(postponedResolutionOpts));
         }
-        if (!ctx.isHoistPeers()) {
-            return new ResolvedDependenciesResult(pkgAddresses,
-                    new PeersResolutionResult(new LinkedHashMap<>(), new LinkedHashMap<>()));
-        }
-        return new ResolvedDependenciesResult(pkgAddresses, startResolvingPeers(childrenResults, pkgAddresses,
-                options.getParentPkgAliases(), currentParentPkgAliases, postponedPeersResolutionQueue,
-                ctx.isAutoInstallPeersFromHighestMatch()));
+        return Promise.all(ctx.getLoop(), children).then(childrenResults -> {
+            if (!ctx.isHoistPeers()) {
+                return Promise.resolved(ctx.getLoop(), new ResolvedDependenciesResult(pkgAddresses,
+                        Promise.resolved(ctx.getLoop(),
+                                new PeersResolutionResult(new LinkedHashMap<>(), new LinkedHashMap<>()))));
+            }
+            return Promise.resolved(ctx.getLoop(), new ResolvedDependenciesResult(pkgAddresses,
+                    startResolvingPeers(ctx, childrenResults, pkgAddresses, options.getParentPkgAliases(),
+                            currentParentPkgAliases, postponedPeersResolutionQueue)));
+        });
     }
 
-    private static PeersResolutionResult startResolvingPeers(
-            List<PeersResolutionResult> childrenResults, List<PkgAddress> pkgAddresses,
+    private static Promise<PeersResolutionResult> startResolvingPeers(
+            ResolutionContext ctx, List<PeersResolutionResult> childrenResults, List<PkgAddress> pkgAddresses,
             ParentPkgAliases parentPkgAliases, ParentPkgAliases currentParentPkgAliases,
-            List<Function<ParentPkgAliases, PeersResolutionResult>> postponedPeersResolutionQueue,
-            boolean autoInstallPeersFromHighestMatch) {
-        List<PeersResolutionResult> results = new ArrayList<>();
-        for (Function<ParentPkgAliases, PeersResolutionResult> postponed : postponedPeersResolutionQueue) {
-            results.add(postponed.apply(parentPkgAliases));
-        }
-        Map<String, PkgAddress> resolvedPeers = new LinkedHashMap<>();
-        for (PeersResolutionResult r : childrenResults) {
-            resolvedPeers.putAll(r.getResolvedPeers());
-        }
-        for (PeersResolutionResult r : results) {
-            resolvedPeers.putAll(r.getResolvedPeers());
-        }
-        List<Map<String, MissingPeerInfo>> missing = new ArrayList<>(
-                filterMissingPeersFromPkgAddresses(pkgAddresses, currentParentPkgAliases, resolvedPeers));
-        for (PeersResolutionResult r : childrenResults) {
-            missing.add(r.getMissingPeers());
-        }
-        for (PeersResolutionResult r : results) {
-            missing.add(r.getMissingPeers());
-        }
-        return new PeersResolutionResult(mergePkgsDeps(missing, autoInstallPeersFromHighestMatch), resolvedPeers);
+            List<Function<ParentPkgAliases, Promise<PeersResolutionResult>>> postponedPeersResolutionQueue) {
+        return Promise.async(ctx.getLoop(), () -> {
+            List<Promise<PeersResolutionResult>> resolving = new ArrayList<>();
+            for (Function<ParentPkgAliases, Promise<PeersResolutionResult>> postponed :
+                    postponedPeersResolutionQueue) {
+                resolving.add(postponed.apply(parentPkgAliases));
+            }
+            return Promise.all(ctx.getLoop(), resolving).then(results -> {
+                Map<String, PkgAddress> resolvedPeers = new LinkedHashMap<>();
+                for (PeersResolutionResult r : childrenResults) {
+                    resolvedPeers.putAll(r.getResolvedPeers());
+                }
+                for (PeersResolutionResult r : results) {
+                    resolvedPeers.putAll(r.getResolvedPeers());
+                }
+                List<Map<String, MissingPeerInfo>> missing = new ArrayList<>(
+                        filterMissingPeersFromPkgAddresses(pkgAddresses, currentParentPkgAliases, resolvedPeers));
+                for (PeersResolutionResult r : childrenResults) {
+                    missing.add(r.getMissingPeers());
+                }
+                for (PeersResolutionResult r : results) {
+                    missing.add(r.getMissingPeers());
+                }
+                return Promise.resolved(ctx.getLoop(), new PeersResolutionResult(
+                        mergePkgsDeps(missing, ctx.isAutoInstallPeersFromHighestMatch()), resolvedPeers));
+            });
+        });
     }
 
     private static Map<String, MissingPeerInfo> mergePkgsDeps(List<Map<String, MissingPeerInfo>> pkgsDeps,
@@ -983,10 +1084,9 @@ final class ResolveDependencies {
         }
     }
 
-    private static DependencyResolution resolveDependenciesOfDependency(ResolutionContext ctx,
-                                                                        PreferredVersions.ByName preferredVersions,
-                                                                        ResolvedDependenciesOptions options,
-                                                                        ExtendedWantedDependency extendedWantedDep) {
+    private static Promise<DependencyResolution> resolveDependenciesOfDependency(
+            ResolutionContext ctx, PreferredVersions.ByName preferredVersions, ResolvedDependenciesOptions options,
+            ExtendedWantedDependency extendedWantedDep) {
         WantedDependency wanted = extendedWantedDep.getWantedDependency();
         int updateDepth = wanted.getUpdateDepth() != null ? wanted.getUpdateDepth() : options.getUpdateDepth();
         boolean updateShouldContinue = options.getCurrentDepth() <= updateDepth;
@@ -1032,39 +1132,44 @@ final class ResolveDependencies {
             }
         }
 
-        PkgAddress resolveDependencyResult = resolveDependency(wanted, ctx, resolveDependencyOpts);
-        if (resolveDependencyResult == null) {
-            return new DependencyResolution(null, null, null);
-        }
-        if (resolveDependencyResult.isLinkedDependency()) {
-            @SuppressWarnings("ConstantConditions")
-            String directory = Js.string(resolveDependencyResult.getResolution().get("directory"));
-            ResolvedPackage linked = new ResolvedPackage("", Js.string(resolveDependencyResult.getName()),
-                    Js.string(resolveDependencyResult.getVersion()));
-            DependenciesTreeNode node = new DependenciesTreeNode(linked, -1);
-            node.setChildren(new LinkedHashMap<>());
-            node.setInstallable(true);
-            ctx.getDependenciesTree().put(createNodeIdForLinkedLocalPkg(ctx.getLockfileDir(), directory), node);
-            return new DependencyResolution(resolveDependencyResult, null, null);
-        }
-        if (!resolveDependencyResult.isNew()) {
-            MissingPeersOfChildren missingPeersOfChildren = resolveDependencyResult.getMissingPeersOfChildren();
-            return new DependencyResolution(resolveDependencyResult, null, missingPeersOfChildren == null ? null :
-                    parentPkgAliases -> filterMissingPeers(new PeersResolutionResult(missingPeersOfChildren.get(),
-                            new LinkedHashMap<>()), parentPkgAliases));
-        }
-        List<String> parentIds = new ArrayList<>(options.getParentIds());
-        parentIds.add(resolveDependencyResult.getPkgId());
-        PackageSnapshot dependencyLockfile = info == null ? null : info.getDependencyLockfile();
-        int parentDepth = options.getCurrentDepth();
-        return new DependencyResolution(resolveDependencyResult, postponedResolutionOpts -> {
-            PeersResolutionResult result = resolveChildren(ctx, resolveDependencyResult, parentIds,
-                    dependencyLockfile, parentDepth, updateDepth, options.getPrefix(), postponedResolutionOpts);
-            if (resolveDependencyResult.getMissingPeersOfChildren() != null) {
-                resolveDependencyResult.getMissingPeersOfChildren().resolve(result.getMissingPeers());
+        return resolveDependency(wanted, ctx, resolveDependencyOpts).then(resolveDependencyResult -> {
+            if (resolveDependencyResult == null) {
+                return Promise.resolved(ctx.getLoop(), new DependencyResolution(null, null, null));
             }
-            return filterMissingPeers(result, postponedResolutionOpts.getParentPkgAliases());
-        }, null);
+            if (resolveDependencyResult.isLinkedDependency()) {
+                @SuppressWarnings("ConstantConditions")
+                String directory = Js.string(resolveDependencyResult.getResolution().get("directory"));
+                ResolvedPackage linked = new ResolvedPackage("", Js.string(resolveDependencyResult.getName()),
+                        Js.string(resolveDependencyResult.getVersion()));
+                DependenciesTreeNode node = new DependenciesTreeNode(linked, -1);
+                node.setChildren(new LinkedHashMap<>());
+                node.setInstallable(true);
+                ctx.getDependenciesTree().put(createNodeIdForLinkedLocalPkg(ctx.getLockfileDir(), directory), node);
+                return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult, null, null));
+            }
+            if (!resolveDependencyResult.isNew()) {
+                MissingPeersOfChildren missingPeersOfChildren = resolveDependencyResult.getMissingPeersOfChildren();
+                return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult, null,
+                        missingPeersOfChildren == null ? null : parentPkgAliases ->
+                                missingPeersOfChildren.get().then(missingPeers -> Promise.resolved(ctx.getLoop(),
+                                        filterMissingPeers(new PeersResolutionResult(missingPeers,
+                                                new LinkedHashMap<>()), parentPkgAliases)))));
+            }
+            List<String> parentIds = new ArrayList<>(options.getParentIds());
+            parentIds.add(resolveDependencyResult.getPkgId());
+            PackageSnapshot dependencyLockfile = info == null ? null : info.getDependencyLockfile();
+            int parentDepth = options.getCurrentDepth();
+            return Promise.resolved(ctx.getLoop(), new DependencyResolution(resolveDependencyResult,
+                    postponedResolutionOpts -> resolveChildren(ctx, resolveDependencyResult, parentIds,
+                            dependencyLockfile, parentDepth, updateDepth, options.getPrefix(),
+                            postponedResolutionOpts).then(result -> {
+                        if (resolveDependencyResult.getMissingPeersOfChildren() != null) {
+                            resolveDependencyResult.getMissingPeersOfChildren().resolve(result.getMissingPeers());
+                        }
+                        return Promise.resolved(ctx.getLoop(),
+                                filterMissingPeers(result, postponedResolutionOpts.getParentPkgAliases()));
+                    }), null));
+        });
     }
 
     static NodeId createNodeIdForLinkedLocalPkg(String lockfileDir, String pkgDir) {
@@ -1088,11 +1193,11 @@ final class ResolveDependencies {
         return new PeersResolutionResult(newMissing, resolvedPeers);
     }
 
-    private static PeersResolutionResult resolveChildren(ResolutionContext ctx, PkgAddress parentPkg,
-                                                         List<String> parentIds,
-                                                         @Nullable PackageSnapshot dependencyLockfile,
-                                                         int parentDepth, int updateDepth, String prefix,
-                                                         PostponedResolutionOpts opts) {
+    private static Promise<PeersResolutionResult> resolveChildren(ResolutionContext ctx, PkgAddress parentPkg,
+                                                                  List<String> parentIds,
+                                                                  @Nullable PackageSnapshot dependencyLockfile,
+                                                                  int parentDepth, int updateDepth, String prefix,
+                                                                  PostponedResolutionOpts opts) {
         Map<String, @Nullable String> currentResolvedDependencies = null;
         if (dependencyLockfile != null) {
             currentResolvedDependencies = new LinkedHashMap<>();
@@ -1121,22 +1226,22 @@ final class ResolveDependencies {
         options.setResolvedDependencies(resolvedDependencies);
         options.setUpdateDepth(updateDepth);
         options.setParentIds(parentIds);
-        ResolvedDependenciesResult result = resolveDependencies(ctx, opts.getPreferredVersions(),
-                wantedDependencies, options);
-        List<ChildId> children = new ArrayList<>();
-        Map<String, NodeId> childNodeIds = new LinkedHashMap<>();
-        for (PkgAddress child : result.getPkgAddresses()) {
-            children.add(new ChildId(child.getAlias(), child.getPkgId()));
-            childNodeIds.put(child.getAlias(), child.getNodeId() != null ? child.getNodeId() :
-                    NodeId.of(child.getPkgId()));
-        }
-        ctx.getChildrenByParentId().put(parentPkg.getPkgId(), children);
-        DependenciesTreeNode node = new DependenciesTreeNode(ctx.getResolvedPkgsById().get(parentPkg.getPkgId()),
-                parentDepth);
-        node.setChildren(childNodeIds);
-        node.setInstallable(parentPkg.isInstallable());
-        ctx.getDependenciesTree().put(parentPkg.getNodeId(), node);
-        return result.getResolvingPeers();
+        return resolveDependencies(ctx, opts.getPreferredVersions(), wantedDependencies, options).then(result -> {
+            List<ChildId> children = new ArrayList<>();
+            Map<String, NodeId> childNodeIds = new LinkedHashMap<>();
+            for (PkgAddress child : result.getPkgAddresses()) {
+                children.add(new ChildId(child.getAlias(), child.getPkgId()));
+                childNodeIds.put(child.getAlias(), child.getNodeId() != null ? child.getNodeId() :
+                        NodeId.of(child.getPkgId()));
+            }
+            ctx.getChildrenByParentId().put(parentPkg.getPkgId(), children);
+            DependenciesTreeNode node = new DependenciesTreeNode(
+                    ctx.getResolvedPkgsById().get(parentPkg.getPkgId()), parentDepth);
+            node.setChildren(childNodeIds);
+            node.setInstallable(parentPkg.isInstallable());
+            ctx.getDependenciesTree().put(parentPkg.getNodeId(), node);
+            return result.getResolvingPeers();
+        });
     }
 
     static List<ExtendedWantedDependency> getDepsToResolve(List<WantedDependency> wantedDependencies,
@@ -1283,56 +1388,72 @@ final class ResolveDependencies {
         @Nullable String pinnedVersion;
     }
 
-    private static @Nullable PkgAddress resolveDependency(WantedDependency wantedDependency, ResolutionContext ctx,
-                                                          ResolveDependencyOptions options) {
+    private static Promise<@Nullable PkgAddress> resolveDependency(WantedDependency wantedDependency,
+                                                                   ResolutionContext ctx,
+                                                                   ResolveDependencyOptions options) {
         InfoFromLockfile currentPkg = options.currentPkg;
-        if (!options.parentPkg.isInstallable()) {
-            wantedDependency = wantedDependency.copy();
-            wantedDependency.setOptional(true);
+        WantedDependency wanted;
+        if (options.parentPkg.isInstallable()) {
+            wanted = wantedDependency;
+        } else {
+            wanted = wantedDependency.copy();
+            wanted.setOptional(true);
         }
         PreferredVersions.ByName preferredVersions = !options.updateRequested && options.preferredVersion != null ?
-                getExactSinglePreferredVersions(wantedDependency, options.preferredVersion) :
+                getExactSinglePreferredVersions(wanted, options.preferredVersion) :
                 options.preferredVersions;
+        return Promise.async(ctx.getLoop(), () -> requestPackage(wanted, ctx, options, currentPkg, preferredVersions))
+                .recover(e -> {
+                    boolean trustDowngrade = e instanceof PnpmError &&
+                                             "ERR_PNPM_TRUST_DOWNGRADE".equals(((PnpmError) e).getCode());
+                    if ((e instanceof PnpmError || e instanceof JsError) && wanted.isOptional() && !trustDowngrade) {
+                        return Promise.resolved(ctx.getLoop(), null);
+                    }
+                    throw e;
+                })
+                .then(pkgResponse -> pkgResponse == null ? Promise.resolved(ctx.getLoop(), null) :
+                        resolvedDependency(wanted, ctx, options, currentPkg, pkgResponse));
+    }
 
-        PackageRequester.PackageResponse pkgResponse;
-        try {
-            boolean calcSpecifier = options.currentDepth == 0;
-            if (options.update == null && currentPkg != null && currentPkg.getVersion() != null &&
-                currentPkg.getPkgId().endsWith("@" + currentPkg.getVersion()) && !calcSpecifier) {
-                wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
-                        currentPkg.getVersion(), ctx.getNamedRegistryPrefixes()));
-            }
-            PackageRequester.RequestPackageOptions request = new PackageRequester.RequestPackageOptions();
-            request.alwaysTryWorkspacePackages = ctx.getLinkWorkspacePackagesDepth() >= options.currentDepth;
-            request.currentPkg = currentPkg;
-            request.currentPkgPublishedAt = currentPkg == null ? null : timeOf(ctx, currentPkg.getPkgId());
-            request.defaultTag = ctx.getDefaultTag();
-            request.publishedBy = options.publishedBy;
-            request.publishedByExclude = ctx.getPublishedByExclude();
-            request.trustPolicy = ctx.getTrustPolicy();
-            request.trustPolicyExclude = ctx.getTrustPolicyExclude();
-            request.trustPolicyIgnoreAfter = ctx.getTrustPolicyIgnoreAfter();
-            request.pickLowestVersion = options.pickLowestVersion;
-            request.lockfileDir = ctx.getLockfileDir();
-            request.preferredVersions = preferredVersions;
-            request.preferWorkspacePackages = ctx.isPreferWorkspacePackages();
-            request.projectDir = options.currentDepth > 0 && !wantedDependency.getBareSpecifier().startsWith("file:") ?
-                    ctx.getLockfileDir() : options.parentPkg.getRootDir();
-            request.update = options.update;
-            request.workspacePackages = ctx.getWorkspacePackages();
-            request.injectWorkspacePackages = ctx.isInjectWorkspacePackages();
-            request.calcSpecifier = calcSpecifier;
-            request.pinnedVersion = options.pinnedVersion;
-            pkgResponse = ctx.getStoreController().requestPackage(wantedDependency, request);
-        } catch (PnpmError | JsError e) {
-            boolean trustDowngrade = e instanceof PnpmError &&
-                                     "ERR_PNPM_TRUST_DOWNGRADE".equals(((PnpmError) e).getCode());
-            if (wantedDependency.isOptional() && !trustDowngrade) {
-                return null;
-            }
-            throw e;
+    private static Promise<PackageRequester.PackageResponse> requestPackage(
+            WantedDependency wantedDependency, ResolutionContext ctx, ResolveDependencyOptions options,
+            @Nullable InfoFromLockfile currentPkg, PreferredVersions.ByName preferredVersions) {
+        boolean calcSpecifier = options.currentDepth == 0;
+        if (options.update == null && currentPkg != null && currentPkg.getVersion() != null &&
+            currentPkg.getPkgId().endsWith("@" + currentPkg.getVersion()) && !calcSpecifier) {
+            wantedDependency.setBareSpecifier(replaceVersionInBareSpecifier(wantedDependency.getBareSpecifier(),
+                    currentPkg.getVersion(), ctx.getNamedRegistryPrefixes()));
         }
+        PackageRequester.RequestPackageOptions request = new PackageRequester.RequestPackageOptions();
+        request.alwaysTryWorkspacePackages = ctx.getLinkWorkspacePackagesDepth() >= options.currentDepth;
+        request.currentPkg = currentPkg;
+        request.currentPkgPublishedAt = currentPkg == null ? null : timeOf(ctx, currentPkg.getPkgId());
+        request.defaultTag = ctx.getDefaultTag();
+        request.publishedBy = options.publishedBy;
+        request.publishedByExclude = ctx.getPublishedByExclude();
+        request.trustPolicy = ctx.getTrustPolicy();
+        request.trustPolicyExclude = ctx.getTrustPolicyExclude();
+        request.trustPolicyIgnoreAfter = ctx.getTrustPolicyIgnoreAfter();
+        request.pickLowestVersion = options.pickLowestVersion;
+        request.lockfileDir = ctx.getLockfileDir();
+        request.preferredVersions = preferredVersions;
+        request.preferWorkspacePackages = ctx.isPreferWorkspacePackages();
+        request.projectDir = options.currentDepth > 0 && !wantedDependency.getBareSpecifier().startsWith("file:") ?
+                ctx.getLockfileDir() : options.parentPkg.getRootDir();
+        request.update = options.update;
+        request.workspacePackages = ctx.getWorkspacePackages();
+        request.injectWorkspacePackages = ctx.isInjectWorkspacePackages();
+        request.calcSpecifier = calcSpecifier;
+        request.pinnedVersion = options.pinnedVersion;
+        return ctx.getLoop().request(() -> ctx.getStoreController().requestPackage(wantedDependency, request));
+    }
 
+    // resolveDependency after the package is requested
+    private static Promise<@Nullable PkgAddress> resolvedDependency(WantedDependency wantedDependency,
+                                                                    ResolutionContext ctx,
+                                                                    ResolveDependencyOptions options,
+                                                                    @Nullable InfoFromLockfile currentPkg,
+                                                                    PackageRequester.PackageResponse pkgResponse) {
         if (pkgResponse.getPolicyViolation() != null) {
             ctx.getResolutionPolicyViolations().add(pkgResponse.getPolicyViolation());
         }
@@ -1370,18 +1491,32 @@ final class ResolveDependencies {
                     Js.string(responseManifest.get("version")));
             linked.setNormalizedBareSpecifier(pkgResponse.getNormalizedBareSpecifier());
             linked.setPkg(responseManifest);
-            return linked;
+            return Promise.resolved(ctx.getLoop(), linked);
         }
 
+        Map<String, @Nullable Object> manifest = getManifestFromResponse(pkgResponse, wantedDependency, currentPkg);
+        if (manifest.get("dependencies") == null) {
+            manifest.put("dependencies", new LinkedHashMap<String, @Nullable Object>());
+        }
+        ReadPackageHook readPackageHook = ctx.getReadPackageHook();
+        if (readPackageHook == null) {
+            return Promise.resolved(ctx.getLoop(),
+                    pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse, manifest));
+        }
+        return Promise.resolved(ctx.getLoop(), readPackageHook.apply(manifest, null)).then(hooked ->
+                Promise.resolved(ctx.getLoop(), pkgAddress(wantedDependency, ctx, options, currentPkg, pkgResponse,
+                        hooked)));
+    }
+
+    // resolveDependency after the readPackage hook
+    private static @Nullable PkgAddress pkgAddress(WantedDependency wantedDependency, ResolutionContext ctx,
+                                                   ResolveDependencyOptions options,
+                                                   @Nullable InfoFromLockfile currentPkg,
+                                                   PackageRequester.PackageResponse pkgResponse,
+                                                   Map<String, @Nullable Object> manifest) {
         boolean prepare;
         boolean hasBin;
-        Map<String, @Nullable Object> pkg = getManifestFromResponse(pkgResponse, wantedDependency, currentPkg);
-        if (pkg.get("dependencies") == null) {
-            pkg.put("dependencies", new LinkedHashMap<String, @Nullable Object>());
-        }
-        if (ctx.getReadPackageHook() != null) {
-            pkg = ctx.getReadPackageHook().apply(pkg, null);
-        }
+        Map<String, @Nullable Object> pkg = manifest;
         Object peerDependencies = pkg.get("peerDependencies");
         if (Js.truthy(peerDependencies) && Js.truthy(pkg.get("dependencies"))) {
             Map<String, @Nullable Object> copy = new LinkedHashMap<>(pkg);
@@ -1481,7 +1616,7 @@ final class ResolveDependencies {
                     missingPeersOfChildren = existing.getMissingPeersOfChildren();
                 }
             } else {
-                missingPeersOfChildren = new MissingPeersOfChildren();
+                missingPeersOfChildren = new MissingPeersOfChildren(ctx.getLoop());
                 ctx.getMissingPeersOfChildrenByPkgId().put(pkgResponse.getId(),
                         new MissingPeersOfChildrenAtDepth(options.currentDepth, missingPeersOfChildren));
             }
