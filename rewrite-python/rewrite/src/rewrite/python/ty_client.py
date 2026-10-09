@@ -76,7 +76,7 @@ class TyTypesClient:
 
     def __init__(self, virtual_env: Optional[str] = None,
                  python_version: Optional[str] = None):
-        """Create a client; ``initialize`` starts the ``ty-types --serve`` subprocess.
+        """Create a client. ``initialize`` starts the ``ty-types --serve`` subprocess.
 
         Args:
             virtual_env: Optional path to a virtual environment whose
@@ -131,7 +131,7 @@ class TyTypesClient:
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
-        self._started = False
+        self._process_root: Optional[str] = None
 
     def __enter__(self) -> TyTypesClient:
         return self
@@ -141,7 +141,6 @@ class TyTypesClient:
 
     def _start_process(self, project_root: str) -> None:
         """Start the ty-types subprocess for a session rooted at ``project_root``."""
-        self._started = True
         if self._python_version is not None and self._ty_config_dir is None:
             self._ty_config_dir = _ty_user_config_dir(self._python_version)
 
@@ -162,6 +161,7 @@ class TyTypesClient:
             raise RuntimeError(
                 "ty-types is not installed. Ensure the ty-types binary is on PATH."
             )
+        self._process_root = project_root
 
         # Draining both pipes keeps ty from deadlocking on a full buffer; threads
         # because a pipe read cannot be bounded on Windows.
@@ -245,7 +245,8 @@ class TyTypesClient:
             _point_at(virtual_env)
             return env
 
-        # 2. Left to ty's discovery, which tolerates a .venv that is no venv.
+        # 2. ty's own discovery accepts an empty or partial .venv, which an
+        #    exported VIRTUAL_ENV does not.
         if project_root and os.path.isdir(os.path.join(project_root, '.venv')):
             env.pop('VIRTUAL_ENV', None)
             env.pop('CONDA_PREFIX', None)
@@ -350,8 +351,10 @@ class TyTypesClient:
             # ids start over; drop the accumulated table so ids don't collide.
             self.session_types.clear()
             self.java_types.clear()
-            self._start_process(project_root)
-        elif not self._started:
+        elif self._process is not None and self._process_root != project_root:
+            # Its environment was built for the other root's .venv.
+            self.shutdown()
+        if self._process is None:
             self._start_process(project_root)
 
         if self._try_initialize(project_root):
