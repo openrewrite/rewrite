@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

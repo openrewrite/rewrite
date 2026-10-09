@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;

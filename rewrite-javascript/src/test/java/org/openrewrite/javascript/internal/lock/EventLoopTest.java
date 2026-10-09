@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.pnpm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.javascript.internal.lock.pnpm.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -104,6 +104,6 @@ class EventLoopTest {
     void aPromiseNothingSettlesIsReported() {
         assertThatThrownBy(() -> loop.await(new Promise<String>(loop)))
           .isInstanceOf(IllegalStateException.class)
-          .hasMessage("the resolution never settles");
+          .hasMessage("the promise never settles");
     }
 }

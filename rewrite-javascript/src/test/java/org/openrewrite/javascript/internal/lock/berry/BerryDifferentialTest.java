@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.io.BufferedReader;
 import java.io.IOException;

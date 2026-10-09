@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.npm.UriComponent;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;

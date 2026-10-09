@@ -56,12 +56,7 @@ final class Syml {
     /**
      * The value {@code undefined}: a field with it is dropped, as is a mapping holding only such fields.
      */
-    static final Object UNDEFINED = new Object() {
-        @Override
-        public String toString() {
-            return "undefined";
-        }
-    };
+    static final Object UNDEFINED = Js.UNDEFINED;
 
     private Syml() {
     }

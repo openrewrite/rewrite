@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.time.Instant;
 import java.util.ArrayDeque;

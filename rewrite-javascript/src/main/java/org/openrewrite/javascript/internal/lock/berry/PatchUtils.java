@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
 import java.util.Arrays;

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

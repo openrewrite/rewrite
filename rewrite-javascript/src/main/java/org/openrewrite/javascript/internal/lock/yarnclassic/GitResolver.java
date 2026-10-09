@@ -16,7 +16,8 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 import java.util.regex.Pattern;
 

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 /**
  * Port of yarn src/resolvers/exotics/registry-resolver.js (yarn 1.22.22): an {@code npm:} or {@code yarn:} alias,

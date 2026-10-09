@@ -22,8 +22,13 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 
 import java.time.Instant;
@@ -113,11 +118,7 @@ public final class BunLockRegenerator {
         Map<String, String> parentManifests;
     }
 
-    static final String BUN_REJECTS = "bun rejects this edit";
-    static final String CANNOT_KNOW = "the engine cannot know";
-    static final String DISCARDS_LOCK = "bun would discard the lock and resolve everything from scratch";
-    static final String DELETES_LOCK = "bun deletes bun.lock: the root has no package left";
-    static final String SECOND_INSTALL = "a second bun install over the lock written for this edit";
+    private static final LockOnlyInstall INSTALL = LockOnlyInstall.BUN;
 
     /**
      * {@code Lockfile.LoadResult}: a lock that was not found, one that failed to load (bun prints the error and
@@ -201,21 +202,6 @@ public final class BunLockRegenerator {
         }
     }
 
-    /**
-     * What bun does with an edit the engine does not reproduce, by kind.
-     */
-    @Getter
-    static final class Rejected extends RuntimeException {
-        private final Reason reason;
-        private final @Nullable String packageName;
-
-        Rejected(Reason reason, @Nullable String packageName, String message) {
-            super(message);
-            this.reason = reason;
-            this.packageName = packageName;
-        }
-    }
-
     private final Inputs inputs;
     private final ManifestSource registry;
 
@@ -233,23 +219,14 @@ public final class BunLockRegenerator {
                 for (int i = workspaceRoot; i > 1; i--) {
                     up.append("/..");
                 }
-                throw new PackageManager.CannotKnow("the lock bun writes: it installs at the workspace root " + up +
-                                                    ", whose workspaces list this project, and writes that root's bun.lock");
+                throw new CannotKnow("the lock bun writes: it installs at the workspace root " + up +
+                                     ", whose workspaces list this project, and writes that root's bun.lock");
             }
             written = install(inputs.getLock());
         } catch (RuntimeException e) {
-            return Result.failure(failure(e, ""));
+            return Result.failure(failure(e));
         }
-        try {
-            String rewritten = install(written);
-            if (!rewritten.equals(written)) {
-                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
-                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
-            }
-        } catch (RuntimeException e) {
-            return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
-        }
-        return Result.success(written);
+        return INSTALL.verify(written, this::install, BunLockRegenerator::failure);
     }
 
     /**
@@ -295,7 +272,7 @@ public final class BunLockRegenerator {
 
     private String install(@Nullable String lock) {
         if (lock == null) {
-            throw new Rejected(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no bun.lock");
+            throw Rejected.discardsLock("the project has no bun.lock");
         }
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
@@ -305,8 +282,8 @@ public final class BunLockRegenerator {
             install = installWithManager(these, registry, log);
             if (!install.getLoadResult().isOk()) {
                 TextLockfileReader.ParseError error = install.getLoadResult().getError();
-                throw new Rejected(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": " + (error == null ?
-                        "the lock is empty" : error.error + ": " + error.getMessage().split("\n", 2)[0]));
+                throw Rejected.discardsLock(error == null ?
+                        "the lock is empty" : error.error + ": " + error.getMessage().split("\n", 2)[0]);
             }
             requirePatchFiles(these, install.getLockfile());
             install.getManager().resolve(install.getPackagesBefore());
@@ -314,7 +291,7 @@ public final class BunLockRegenerator {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
                 throw e;
             }
-            throw new Rejected(Reason.MALFORMED_MANIFEST, null, BUN_REJECTS + ": " + log.errors.get(0));
+            throw new Rejected(Kind.PM_REJECTS, Reason.MALFORMED_MANIFEST, null, log.errors.get(0));
         }
         PackageManager manager = install.getManager();
 
@@ -323,16 +300,15 @@ public final class BunLockRegenerator {
         List<String> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
-            throw new Rejected(reasonFor(manager.log.errors), failed.get(0).replaceFirst("@[^@]*$", ""),
-                    BUN_REJECTS + ": " + first + failed.get(0) + " failed to resolve");
+            throw new Rejected(Kind.PM_REJECTS, reasonFor(manager.log.errors), failed.get(0).replaceFirst("@[^@]*$", ""),
+                    first + failed.get(0) + " failed to resolve");
         }
         if (manager.options.isFrozenLockfile() && !cleaned.eql(beforeClean, cleaned.packages.size())) {
-            throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
-                    BUN_REJECTS + ": lockfile had changes, but lockfile is frozen");
+            throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen");
         }
         String written = install.write(cleaned);
         if (written == null) {
-            throw new Rejected(Reason.RESOLUTION_REQUIRED, null, DELETES_LOCK);
+            throw new Rejected(Kind.DELETES_LOCK, Reason.RESOLUTION_REQUIRED, null, "the root has no package left");
         }
         return written;
     }
@@ -344,14 +320,14 @@ public final class BunLockRegenerator {
         }
         for (String file : DotEnv.FILES) {
             if (inputs.getPaths().contains(file) && !inputs.getFiles().containsKey(file)) {
-                throw new PackageManager.CannotKnow(file + " (its contents were not read)");
+                throw new CannotKnow(file + " (its contents were not read)");
             }
         }
         if (inputs.getBunfig() == null && inputs.getPaths().contains("bunfig.toml")) {
-            throw new PackageManager.CannotKnow("bunfig.toml (its contents were not read)");
+            throw new CannotKnow("bunfig.toml (its contents were not read)");
         }
         if (inputs.getNpmrc() == null && inputs.getPaths().contains(".npmrc")) {
-            throw new PackageManager.CannotKnow(".npmrc (its contents were not read)");
+            throw new CannotKnow(".npmrc (its contents were not read)");
         }
     }
 
@@ -372,14 +348,13 @@ public final class BunLockRegenerator {
             String contents = files.get(path);
             if (contents == null) {
                 if (paths == null || paths.contains(path) || path.equals("..") || path.startsWith("../")) {
-                    throw new PackageManager.CannotKnow("patch file " + patch + " (its contents were not read)");
+                    throw new CannotKnow("patch file " + patch + " (its contents were not read)");
                 }
-                throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
-                        BUN_REJECTS + ": Couldn't find patch file: '" + patch + "'");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Couldn't find patch file: '" + patch + "'");
             }
             if (contents.isEmpty()) {
-                throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
-                        BUN_REJECTS + ": patchfile " + path + " is empty, please restore or delete it.");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,
+                        "patchfile " + path + " is empty, please restore or delete it.");
             }
         }
     }
@@ -387,41 +362,26 @@ public final class BunLockRegenerator {
     private static Reason reasonFor(List<String> errors) {
         String first = errors.isEmpty() ? "" : errors.get(0);
         if (first.startsWith("No version matching") || first.contains("\" with tag \"")) {
-            return Reason.VERSION_NOT_FOUND;
+            return SharedError.NO_MATCHING_VERSION.getReason();
         }
         if (first.startsWith("GET ")) {
-            return Reason.PACKAGE_NOT_FOUND;
+            return SharedError.PACKAGE_NOT_FOUND.getReason();
         }
         return Reason.RESOLUTION_REQUIRED;
     }
 
-    private static Failure failure(RuntimeException e, String prefix) {
+    private static Failure failure(RuntimeException e) {
         if (e instanceof Rejected) {
-            Rejected rejected = (Rejected) e;
-            return new Failure(rejected.getReason(), rejected.getPackageName(), prefix + rejected.getMessage());
+            return INSTALL.failure((Rejected) e);
         }
-        if (e instanceof PackageManager.CannotKnow) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null,
-                    prefix + CANNOT_KNOW + " " + ((PackageManager.CannotKnow) e).getSubject());
+        if (e instanceof CannotKnow) {
+            return INSTALL.failure((CannotKnow) e);
         }
         if (e instanceof Json.SyntaxError) {
-            return new Failure(Reason.MALFORMED_MANIFEST, null,
-                    prefix + BUN_REJECTS + ": ParserError: failed to parse package.json: " + e.getMessage());
+            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null,
+                    "ParserError: failed to parse package.json: " + e.getMessage());
         }
         throw e;
-    }
-
-    private static String firstDifference(String a, String b) {
-        String[] as = a.split("\n", -1);
-        String[] bs = b.split("\n", -1);
-        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
-            String x = i < as.length ? as[i] : "";
-            String y = i < bs.length ? bs[i] : "";
-            if (!x.equals(y)) {
-                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
-            }
-        }
-        return "the files differ";
     }
 
     static LoadResult loadFromCwd(@Nullable String lock, BunOptions options) {
@@ -486,8 +446,7 @@ public final class BunLockRegenerator {
 
         if (needsNewLockfile) {
             if (options.isFrozenLockfile() && inputs.getLock() != null) {
-                throw new Rejected(Reason.RESOLUTION_REQUIRED, null,
-                        BUN_REJECTS + ": lockfile had changes, but lockfile is frozen");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "lockfile had changes, but lockfile is frozen");
             }
             Json.Expr rootJson = Json.parse(rootManifest);
             manager.lockfile = new Lockfile();

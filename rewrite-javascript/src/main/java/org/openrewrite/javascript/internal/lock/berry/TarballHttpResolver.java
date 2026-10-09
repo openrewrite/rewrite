@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 
 import java.util.Collections;

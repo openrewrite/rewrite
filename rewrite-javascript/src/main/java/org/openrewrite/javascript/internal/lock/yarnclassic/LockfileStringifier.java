@@ -16,11 +16,10 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8Sort;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -114,37 +113,7 @@ final class LockfileStringifier {
             a.sort(LockfileStringifier::priorityThenAlphaSort);
             return a;
         }
-        Comparator<String> c = LockfileStringifier::priorityThenAlphaSort;
-        int runHi = 1;
-        if (c.compare(a.get(1), a.get(0)) < 0) {
-            runHi = 2;
-            while (runHi < n && c.compare(a.get(runHi), a.get(runHi - 1)) < 0) {
-                runHi++;
-            }
-            Collections.reverse(a.subList(0, runHi));
-        } else {
-            runHi = 2;
-            while (runHi < n && c.compare(a.get(runHi), a.get(runHi - 1)) >= 0) {
-                runHi++;
-            }
-        }
-        for (int start = runHi; start < n; start++) {
-            String pivot = a.get(start);
-            int left = 0;
-            int right = start;
-            while (left < right) {
-                int mid = (left + right) >>> 1;
-                if (c.compare(pivot, a.get(mid)) < 0) {
-                    right = mid;
-                } else {
-                    left = mid + 1;
-                }
-            }
-            for (int p = start; p > left; p--) {
-                a.set(p, a.get(p - 1));
-            }
-            a.set(left, pivot);
-        }
+        V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort, "keys");
         return a;
     }
 

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8Sort;
 import org.openrewrite.semver.NodeSemver;
 
 import java.io.ByteArrayOutputStream;

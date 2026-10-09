@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 /**
  * Port of @yarnpkg/plugin-git sources/GitFetcher.ts (Yarn 4.10.3): the archive is the repository's packed tree.

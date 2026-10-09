@@ -20,6 +20,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -186,16 +187,16 @@ class PnpmScenarioTest {
         boolean ok;
         switch (kind) {
             case "cannot-know":
-                ok = detail.startsWith("the engine cannot know") && namesEvery(detail, rest);
+                ok = failure.getKind() == Kind.CANNOT_KNOW && namesEvery(detail, rest);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK;
                 break;
             case "pm-rejects":
-                ok = detail.startsWith(PnpmLockRegenerator.PNPM_REJECTS) && detail.contains(rest);
+                ok = failure.getKind() == Kind.PM_REJECTS && detail.contains(rest);
                 break;
             case "second-install-rejects":
-                ok = detail.startsWith(PnpmLockRegenerator.SECOND_INSTALL) && detail.contains(code) &&
+                ok = failure.getKind() == Kind.SECOND_INSTALL && detail.contains(code) &&
                      namesEvery(detail, rest);
                 break;
             default:

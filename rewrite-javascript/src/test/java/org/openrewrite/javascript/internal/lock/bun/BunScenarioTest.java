@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -219,22 +220,22 @@ class BunScenarioTest {
         boolean ok;
         switch (kind) {
             case "exact":
-                ok = failure.getDetail().equals(BunLockRegenerator.DELETES_LOCK);
+                ok = failure.getKind() == Kind.DELETES_LOCK;
                 break;
             case "cannot-know":
-                ok = failure.getDetail().startsWith(BunLockRegenerator.CANNOT_KNOW) &&
+                ok = failure.getKind() == Kind.CANNOT_KNOW &&
                      failure.getDetail().contains(rest);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK;
                 break;
             case "pm-rejects":
-                ok = failure.getDetail().startsWith(BunLockRegenerator.BUN_REJECTS) &&
+                ok = failure.getKind() == Kind.PM_REJECTS &&
                      failure.getDetail().contains(rest.replaceFirst("^error: ", "")) && http.missing.isEmpty();
                 break;
             case "second-install-rejects":
             case "unstable":
-                ok = failure.getDetail().startsWith(BunLockRegenerator.SECOND_INSTALL);
+                ok = failure.getKind() == Kind.SECOND_INSTALL;
                 break;
             default:
                 ok = false;

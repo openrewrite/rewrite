@@ -23,6 +23,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -210,7 +211,7 @@ class YarnClassicScenarioTest {
         boolean ok;
         switch (kind) {
             case "cannot-know":
-                ok = detail.startsWith(YarnClassicLockRegenerator.CANNOT_KNOW) && namesEvery(detail, rest);
+                ok = failure.getKind() == Kind.CANNOT_KNOW && namesEvery(detail, rest);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
@@ -218,15 +219,15 @@ class YarnClassicScenarioTest {
             case "pm-rejects":
                 // yarn prints its own messages bare and JavaScript's errors by name, which the registry's 404 is
                 // too; a package the registry does not have is the one route that is not recorded
-                ok = (detail.startsWith(YarnClassicLockRegenerator.YARN_REJECTS) ||
-                      JS_ERROR.matcher(rest).lookingAt() && detail.startsWith(YarnClassicLockRegenerator.YARN_FAILS)) &&
+                ok = (failure.getKind() == Kind.PM_REJECTS ||
+                      JS_ERROR.matcher(rest).lookingAt() && failure.getKind() == Kind.PM_FAILS) &&
                      saysWhatYarnSaid(detail, rest) &&
                      (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND &&
                       (rest.startsWith("Couldn't find package") || rest.endsWith(": Not found")));
                 break;
             case "second-install-rejects":
             case "unstable":
-                ok = detail.startsWith(YarnClassicLockRegenerator.SECOND_INSTALL);
+                ok = failure.getKind() == Kind.SECOND_INSTALL;
                 break;
             default:
                 ok = false;

@@ -13,17 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.pnpm;
+package org.openrewrite.javascript.internal.lock;
 
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
 /**
- * V8's {@code Array.prototype.sort} (array-sort.tq) for fewer than 64 elements, whose order pnpm's inconsistent
- * comparators depend on.
+ * V8's {@code Array.prototype.sort} (array-sort.tq) for fewer than 64 elements, whose order an inconsistent
+ * comparator decides.
  */
-final class V8Sort {
+public final class V8Sort {
 
     private V8Sort() {
     }
@@ -31,7 +31,7 @@ final class V8Sort {
     /**
      * Sorts in place; cannot-know for 64 elements or more, where V8 merges runs.
      */
-    static <T> void sort(List<T> a, Comparator<T> c, String what) {
+    public static <T> void sort(List<T> a, Comparator<T> c, String what) {
         int n = a.size();
         if (n < 2) {
             return;

@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -61,7 +62,7 @@ public final class NativeLockEngine {
                 case Pnpm:
                     return regeneratePnpm(request, ctx);
                 default:
-                    return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
+                    return Result.failure(new Failure(Kind.CANNOT_KNOW, Reason.RESOLUTION_REQUIRED, null,
                             "no native lock regeneration for " + pm));
             }
         } catch (NodeRegistryException nre) {
@@ -139,23 +140,19 @@ public final class NativeLockEngine {
                 .build();
     }
 
+    // a document the registry does not have, the package manager is refused too; one it could not read, the engine
     private static Failure toFailure(NodeRegistryException e) {
-        Reason reason;
         switch (e.getReason()) {
             case AUTH_FAILED:
-                reason = Reason.AUTH_FAILED;
-                break;
+                return new Failure(Kind.CANNOT_KNOW, Reason.AUTH_FAILED, e.getPackageName(), e.getMessage());
             case PACKAGE_NOT_FOUND:
-                reason = Reason.PACKAGE_NOT_FOUND;
-                break;
+                return new Failure(Kind.PM_REJECTS, SharedError.PACKAGE_NOT_FOUND.getReason(), e.getPackageName(),
+                        e.getMessage());
             case VERSION_NOT_FOUND:
-                reason = Reason.VERSION_NOT_FOUND;
-                break;
+                return new Failure(Kind.PM_REJECTS, Reason.VERSION_NOT_FOUND, e.getPackageName(), e.getMessage());
             case UNREACHABLE:
             default:
-                reason = Reason.REGISTRY_UNREACHABLE;
-                break;
+                return new Failure(Kind.CANNOT_KNOW, Reason.REGISTRY_UNREACHABLE, e.getPackageName(), e.getMessage());
         }
-        return new Failure(reason, e.getPackageName(), e.getMessage());
     }
 }

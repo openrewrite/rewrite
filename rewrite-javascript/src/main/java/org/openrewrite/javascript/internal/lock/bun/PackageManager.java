@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -40,14 +41,6 @@ final class PackageManager {
      * What resolving a dependency needs that only a download, a clone or the host's disk could tell.
      */
     @Getter
-    static final class CannotKnow extends RuntimeException {
-        private final String subject;
-
-        CannotKnow(String subject) {
-            super(subject);
-            this.subject = subject;
-        }
-    }
 
     static final class ResolvedPackageResult {
         final Package pkg;

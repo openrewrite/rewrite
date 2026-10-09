@@ -16,16 +16,13 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.MathContext;
-import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -38,44 +35,9 @@ import java.util.regex.Pattern;
  * The JavaScript semantics pnpm's code relies on, over the values {@link JsYaml} loads: objects in
  * {@code Object.keys} order, arrays as lists, numbers as doubles.
  */
-final class Js {
-
-    private static final long MAX_ARRAY_INDEX = 4294967294L;
+final class Js extends EcmaScript {
 
     private Js() {
-    }
-
-    /**
-     * {@code Object.keys}.
-     */
-    static List<String> keys(Map<String, ?> object) {
-        List<String> indices = new ArrayList<>();
-        List<String> rest = new ArrayList<>();
-        for (String key : object.keySet()) {
-            if (arrayIndex(key) >= 0) {
-                indices.add(key);
-            } else {
-                rest.add(key);
-            }
-        }
-        indices.sort((a, b) -> Long.compare(arrayIndex(a), arrayIndex(b)));
-        indices.addAll(rest);
-        return indices;
-    }
-
-    static long arrayIndex(String key) {
-        if (key.isEmpty() || key.length() > 10 || (key.length() > 1 && key.charAt(0) == '0')) {
-            return -1;
-        }
-        long index = 0;
-        for (int i = 0; i < key.length(); i++) {
-            char c = key.charAt(i);
-            if (c < '0' || c > '9') {
-                return -1;
-            }
-            index = index * 10 + (c - '0');
-        }
-        return index <= MAX_ARRAY_INDEX ? index : -1;
     }
 
     /**
@@ -139,112 +101,8 @@ final class Js {
         return "[object Object]";
     }
 
-    /**
-     * {@code Number.prototype.toString()}.
-     */
-    static String numberToString(double d) {
-        if (Double.isNaN(d)) {
-            return "NaN";
-        }
-        if (d == 0) {
-            return "0";
-        }
-        if (Double.isInfinite(d)) {
-            return d > 0 ? "Infinity" : "-Infinity";
-        }
-        if (d < 0) {
-            return "-" + numberToString(-d);
-        }
-        BigDecimal decimal = shortest(d);
-        String digits = decimal.unscaledValue().toString();
-        int n = digits.length() - decimal.scale();
-        if (n >= -5 && n <= 21) {
-            return decimal.toPlainString();
-        }
-        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
-        return mantissa + "e" + (n - 1 >= 0 ? "+" : "-") + Math.abs(n - 1);
-    }
-
-    // the shortest decimal that reads back as the same double, the nearest when several do, as JavaScript prints
-    private static BigDecimal shortest(double d) {
-        BigDecimal exact = new BigDecimal(d);
-        for (int precision = 1; precision < 17; precision++) {
-            BigDecimal nearest = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
-            if (nearest.doubleValue() == d) {
-                return nearest.stripTrailingZeros();
-            }
-            BigDecimal floor = exact.round(new MathContext(precision, RoundingMode.FLOOR));
-            BigDecimal other = floor.compareTo(nearest) == 0 ?
-                    exact.round(new MathContext(precision, RoundingMode.CEILING)) : floor;
-            if (other.doubleValue() == d) {
-                return other.stripTrailingZeros();
-            }
-        }
-        return exact.round(new MathContext(17, RoundingMode.HALF_EVEN)).stripTrailingZeros();
-    }
-
-    /**
-     * {@code String.prototype.trim}: ECMAScript white space and line terminators.
-     */
-    static String trim(String s) {
-        int start = 0;
-        int end = s.length();
-        while (start < end && isWhiteSpace(s.charAt(start))) {
-            start++;
-        }
-        while (end > start && isWhiteSpace(s.charAt(end - 1))) {
-            end--;
-        }
-        return s.substring(start, end);
-    }
-
-    /**
-     * {@code Number(string)}.
-     */
-    static double toNumber(String value) {
-        String s = trim(value);
-        if (s.isEmpty()) {
-            return 0;
-        }
-        if (DECIMAL_LITERAL.matcher(s).matches()) {
-            return Double.parseDouble(s);
-        }
-        if (s.length() > 2 && s.charAt(0) == '0') {
-            char radix = Character.toLowerCase(s.charAt(1));
-            int base = radix == 'x' ? 16 : radix == 'o' ? 8 : radix == 'b' ? 2 : 0;
-            if (base != 0) {
-                try {
-                    return new BigInteger(s.substring(2), base).doubleValue();
-                } catch (NumberFormatException ignored) {
-                    return Double.NaN;
-                }
-            }
-        }
-        return Double.NaN;
-    }
-
     private static final Pattern DECIMAL_LITERAL =
             Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
-
-    private static boolean isWhiteSpace(char c) {
-        return c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r' || c == ' ' || c == 0xA0 ||
-               c == 0x1680 || (0x2000 <= c && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F ||
-               c == 0x205F || c == 0x3000 || c == 0xFEFF;
-    }
-
-    static boolean truthy(@Nullable Object value) {
-        if (value == null || value == JsYaml.UNDEFINED || Boolean.FALSE.equals(value)) {
-            return false;
-        }
-        if (value instanceof String) {
-            return !((String) value).isEmpty();
-        }
-        if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
-    }
 
     /**
      * {@code a === b} for values held by reference only when they are objects.
@@ -368,47 +226,6 @@ final class Js {
         } else {
             out.append("{}");
         }
-    }
-
-    private static void quote(String s, StringBuilder out) {
-        out.append('"');
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    out.append("\\\"");
-                    break;
-                case '\\':
-                    out.append("\\\\");
-                    break;
-                case '\b':
-                    out.append("\\b");
-                    break;
-                case '\f':
-                    out.append("\\f");
-                    break;
-                case '\n':
-                    out.append("\\n");
-                    break;
-                case '\r':
-                    out.append("\\r");
-                    break;
-                case '\t':
-                    out.append("\\t");
-                    break;
-                default:
-                    boolean loneSurrogate = Character.isHighSurrogate(c) &&
-                                            (i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1))) ||
-                                            Character.isLowSurrogate(c) &&
-                                            (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1)));
-                    if (c < 0x20 || loneSurrogate) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-            }
-        }
-        out.append('"');
     }
 
     /**

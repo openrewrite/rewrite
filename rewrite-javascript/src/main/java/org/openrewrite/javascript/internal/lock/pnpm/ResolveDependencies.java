@@ -19,7 +19,9 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.pnpm.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;

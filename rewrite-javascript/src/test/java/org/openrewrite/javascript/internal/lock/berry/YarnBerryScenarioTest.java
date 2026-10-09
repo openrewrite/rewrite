@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -164,18 +165,18 @@ class YarnBerryScenarioTest {
         boolean ok;
         switch (kind) {
             case "cannot-know":
-                ok = detail.startsWith("the engine cannot know") && namesEvery(detail, rest);
+                ok = failure.getKind() == Kind.CANNOT_KNOW && namesEvery(detail, rest);
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
                 break;
             case "pm-rejects":
                 // a package the registry does not have is the one route that is not recorded
-                ok = detail.startsWith(YarnBerryLockRegenerator.YARN_REJECTS) && detail.contains(rest) &&
+                ok = failure.getKind() == Kind.PM_REJECTS && detail.contains(rest) &&
                      (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND);
                 break;
             case "second-install-rejects":
-                ok = detail.startsWith(YarnBerryLockRegenerator.SECOND_INSTALL);
+                ok = failure.getKind() == Kind.SECOND_INSTALL;
                 break;
             default:
                 ok = false;

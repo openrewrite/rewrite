@@ -16,8 +16,9 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 /**
  * Port of yarn src/resolvers/exotics/link-resolver.js (yarn 1.22.22): the linked directory's package.json, whose
@@ -40,7 +41,7 @@ final class LinkResolver {
         PackageResolver resolver = request.resolver;
         String location = FileResolver.location(loc, LINK_PROTOCOL_PREFIX);
         String name = PosixPath.basename(location.isEmpty() ? "." : location);
-        EventLoop.Io<@Nullable String> read = resolver.loop.io(request.io, () -> resolver.files.manifest(location));
+        Io<@Nullable String> read = Io.issue(resolver.loop, request.io, () -> resolver.files.manifest(location));
         request.awaited(read);
         return read.promise.then(text -> {
             Manifest manifest;

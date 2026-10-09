@@ -482,11 +482,11 @@ final class Braces {
             return Js.isInteger((Double) num);
         }
         return num instanceof String && !Js.trim((String) num).isEmpty() &&
-               Js.isInteger(Js.stringToNumber((String) num));
+               Js.isInteger(Js.toNumber((String) num));
     }
 
     private static double toNumber(Object value) {
-        return value instanceof Double ? (Double) value : Js.stringToNumber((String) value);
+        return value instanceof Double ? (Double) value : Js.toNumber((String) value);
     }
 
     private static String str(@Nullable String s) {

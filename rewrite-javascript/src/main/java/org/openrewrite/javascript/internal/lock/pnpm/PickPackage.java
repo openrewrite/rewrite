@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Value;
 import lombok.With;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;

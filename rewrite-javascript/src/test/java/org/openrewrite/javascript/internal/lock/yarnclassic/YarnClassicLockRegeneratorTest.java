@@ -24,6 +24,9 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EventLoop;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
@@ -600,7 +603,7 @@ class YarnClassicLockRegeneratorTest {
                                                               "\"local@link:./local\":\n  version \"0.0.0\"\n" +
                                                               "  uid \"\"\n");
         } else {
-            assertThat(result.getErrorMessage()).contains(YarnClassicLockRegenerator.CANNOT_KNOW +
+            assertThat(result.getErrorMessage()).contains("the engine cannot know" +
                                                           " the package.json of link:./local");
         }
     }
@@ -634,7 +637,7 @@ class YarnClassicLockRegeneratorTest {
         if (cannotKnow == null) {
             assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         } else {
-            assertThat(result.getErrorMessage()).contains(YarnClassicLockRegenerator.CANNOT_KNOW + " " + cannotKnow);
+            assertThat(result.getErrorMessage()).contains("the engine cannot know " + cannotKnow);
         }
     }
 
@@ -694,8 +697,8 @@ class YarnClassicLockRegeneratorTest {
             return out.toString();
         } catch (MessageError e) {
             return "error " + e.getMessage();
-        } catch (YarnClassicLockRegenerator.Rejected e) {
-            return "error " + e.getMessage().substring(YarnClassicLockRegenerator.YARN_REJECTS.length() + 2);
+        } catch (Rejected e) {
+            return "error " + e.getMessage();
         } catch (JsError e) {
             return "error " + e.getName() + ": " + e.getMessage();
         } catch (CannotKnow e) {

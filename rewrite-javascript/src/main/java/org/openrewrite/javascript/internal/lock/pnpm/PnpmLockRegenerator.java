@@ -23,6 +23,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.semver.NodeSemver;
 
@@ -43,9 +47,7 @@ import java.util.function.Supplier;
  */
 public final class PnpmLockRegenerator {
 
-    static final String PNPM_REJECTS = "pnpm rejects this edit";
-    static final String DISCARDS_LOCK = "pnpm would discard the lock and resolve everything from scratch";
-    static final String SECOND_INSTALL = "a second pnpm install over the lock written for this edit";
+    private static final LockOnlyInstall INSTALL = LockOnlyInstall.PNPM;
 
     /**
      * What the engine is given for a pnpm project.
@@ -183,8 +185,8 @@ public final class PnpmLockRegenerator {
      */
     public Result regenerate() {
         if (inputs.getLock() == null) {
-            return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no " +
-                                                                           LockfileReader.WANTED_LOCKFILE));
+            return Result.failure(INSTALL.failure(Rejected.discardsLock("the project has no " +
+                                                                        LockfileReader.WANTED_LOCKFILE)));
         }
         String written;
         try {
@@ -199,18 +201,10 @@ public final class PnpmLockRegenerator {
             }
             written = writeLock();
         } catch (RuntimeException e) {
-            return Result.failure(failure(e, ""));
+            return Result.failure(failure(e));
         }
-        try {
-            String rewritten = new PnpmLockRegenerator(inputs.toBuilder().lock(written).build()).writeLock();
-            if (!rewritten.equals(written)) {
-                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
-                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
-            }
-        } catch (RuntimeException e) {
-            return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
-        }
-        return Result.success(written);
+        return INSTALL.verify(written, again -> new PnpmLockRegenerator(inputs.toBuilder().lock(again).build())
+                .writeLock(), PnpmLockRegenerator::failure);
     }
 
     /**
@@ -302,35 +296,34 @@ public final class PnpmLockRegenerator {
         return resolve(install);
     }
 
-    private static Failure failure(RuntimeException e, String prefix) {
+    private static Failure failure(RuntimeException e) {
         if (e instanceof LockfileReader.IgnoredLockfile) {
-            return new Failure(Reason.MALFORMED_LOCK, null, prefix + DISCARDS_LOCK + ": " + e.getMessage());
+            return INSTALL.failure(Rejected.discardsLock(String.valueOf(e.getMessage())));
         }
         if (e instanceof CannotKnow) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + e.getMessage());
+            return INSTALL.failure((CannotKnow) e);
         }
         if (e instanceof ReportPeerDependencyIssues.PeerDependencyIssuesError) {
-            return new Failure(Reason.PEER_CONFLICT,
+            return INSTALL.rejects(Reason.PEER_CONFLICT,
                     ((ReportPeerDependencyIssues.PeerDependencyIssuesError) e).firstPeerName(),
-                    prefix + PNPM_REJECTS + ": [ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage());
+                    "[ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage());
         }
         if (e instanceof PnpmError) {
             String code = ((PnpmError) e).getCode();
-            return new Failure(reasonFor(code), null, prefix + PNPM_REJECTS + ": [" + code + "] " + e.getMessage());
+            return INSTALL.rejects(reasonFor(code), null, "[" + code + "] " + e.getMessage());
         }
         if (e instanceof JsError) {
             String code = ((JsError) e).getCode();
             Reason reason = "ERR_INVALID_PACKAGE_CONFIG".equals(code) ? Reason.MALFORMED_MANIFEST :
                     Reason.RESOLUTION_REQUIRED;
-            return new Failure(reason, null, prefix + PNPM_REJECTS + ": " + (code == null ? "" : "[" + code + "] ") +
-                                             e.getMessage());
+            return INSTALL.rejects(reason, null, (code == null ? "" : "[" + code + "] ") + e.getMessage());
         }
         // the lock and the env document catch their own; what reaches here is pnpm-workspace.yaml's
         if (e instanceof JsYaml.YamlException) {
-            return new Failure(Reason.MALFORMED_MANIFEST, null, prefix + PNPM_REJECTS + ": " + e.getMessage());
+            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null, String.valueOf(e.getMessage()));
         }
         if (e instanceof LockfileFormatConverters.TypeError) {
-            return new Failure(Reason.MALFORMED_LOCK, null, prefix + PNPM_REJECTS + ": TypeError: " + e.getMessage());
+            return INSTALL.rejects(Reason.MALFORMED_LOCK, null, "TypeError: " + e.getMessage());
         }
         throw e;
     }
@@ -338,11 +331,17 @@ public final class PnpmLockRegenerator {
     private static Reason reasonFor(String code) {
         switch (code) {
             case "ERR_PNPM_NO_MATCHING_VERSION":
+                return SharedError.NO_MATCHING_VERSION.getReason();
+            case "ERR_PNPM_FETCH_404":
+                return SharedError.PACKAGE_NOT_FOUND.getReason();
+            case "ERR_PNPM_UNSUPPORTED_ENGINE":
+                return SharedError.UNSUPPORTED_ENGINE.getReason();
+            case "ERR_PNPM_UNSUPPORTED_PLATFORM":
+                return SharedError.UNSUPPORTED_PLATFORM.getReason();
             case "ERR_PNPM_NO_MATURE_MATCHING_VERSION":
             case "ERR_PNPM_NO_MATCHING_VERSION_INSIDE_WORKSPACE":
             case "ERR_PNPM_NODEJS_VERSION_NOT_FOUND":
                 return Reason.VERSION_NOT_FOUND;
-            case "ERR_PNPM_FETCH_404":
             case "ERR_PNPM_WORKSPACE_PKG_NOT_FOUND":
                 return Reason.PACKAGE_NOT_FOUND;
             case "ERR_PNPM_JSON_PARSE":
@@ -355,19 +354,6 @@ public final class PnpmLockRegenerator {
             default:
                 return Reason.RESOLUTION_REQUIRED;
         }
-    }
-
-    private static String firstDifference(String a, String b) {
-        String[] as = a.split("\n", -1);
-        String[] bs = b.split("\n", -1);
-        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
-            String x = i < as.length ? as[i] : "";
-            String y = i < bs.length ? bs[i] : "";
-            if (!x.equals(y)) {
-                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
-            }
-        }
-        return "the line endings change";
     }
 
     /**

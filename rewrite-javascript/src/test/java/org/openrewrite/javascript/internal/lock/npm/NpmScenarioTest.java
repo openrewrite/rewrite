@@ -20,6 +20,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -127,19 +128,19 @@ class NpmScenarioTest {
         switch (kind) {
             case "peer-conflict":
                 ok = failure.getReason() == Reason.PEER_CONFLICT &&
-                     failure.getDetail().startsWith(NpmLockRegenerator.SECOND_INSTALL) &&
+                     failure.getKind() == Kind.SECOND_INSTALL &&
                      failure.getDetail().contains(words[1]) && failure.getDetail().contains(words[2]);
                 break;
             case "npm-rejects":
                 // a crash is npm's own code failing (no error code): the port fails there too, not always the same way;
                 // a route the stub lacked may be the failure's cause instead, unless npm's own answer was the 404
-                ok = ("crash".equals(words[1]) ? failure.getDetail().startsWith(NpmLockRegenerator.NPM_FAILS) ||
-                                                 failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS) :
-                  failure.getDetail().startsWith(NpmLockRegenerator.NPM_REJECTS + " (" + words[1] + ")")) &&
+                ok = ("crash".equals(words[1]) ? failure.getKind() == Kind.PM_FAILS ||
+                                                 failure.getKind() == Kind.PM_REJECTS :
+                  failure.getKind() == Kind.PM_REJECTS && failure.getDetail().contains("(" + words[1] + ")")) &&
                      (http.missing.isEmpty() || "E404".equals(words[1]));
                 break;
             case "cannot-know":
-                ok = failure.getDetail().startsWith(NpmLockRegenerator.CANNOT_KNOW);
+                ok = failure.getKind() == Kind.CANNOT_KNOW;
                 break;
             case "malformed":
                 ok = failure.getReason() == Reason.MALFORMED_LOCK ||
@@ -147,7 +148,7 @@ class NpmScenarioTest {
                      failure.getDetail().contains(ScenarioReplay.malformedKey(expect));
                 break;
             case "unstable":
-                ok = failure.getDetail().startsWith(NpmLockRegenerator.SECOND_INSTALL);
+                ok = failure.getKind() == Kind.SECOND_INSTALL;
                 break;
             default:
                 ok = false;

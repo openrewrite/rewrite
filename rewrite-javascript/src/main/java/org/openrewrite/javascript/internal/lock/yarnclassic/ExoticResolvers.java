@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.EventLoop;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 

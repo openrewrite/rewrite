@@ -15,7 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 /**
  * Port of yarn src/resolvers/exotics/tarball-resolver.js (yarn 1.22.22): a locked tarball url is reused, any other

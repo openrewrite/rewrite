@@ -17,8 +17,9 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.npm.Host;
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -403,7 +404,7 @@ final class PackageResolver {
         this.frozen = isFrozen;
         this.workspaceLayout = workspaceLayout;
         for (DependencyRequestPattern req : deps) {
-            rootMark = loop.mark();
+            rootMark = loop.issued();
             Promise<Void> found = find(req);
             loop.run();
             rootIndex++;

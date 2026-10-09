@@ -24,6 +24,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.WhatwgUrl;
 
@@ -40,9 +44,7 @@ import java.util.Set;
  */
 public final class YarnBerryLockRegenerator {
 
-    static final String YARN_REJECTS = "yarn rejects this edit";
-    static final String DISCARDS_LOCK = "yarn would discard the lock and resolve everything from scratch";
-    static final String SECOND_INSTALL = "a second yarn install over the lock written for this edit";
+    private static final LockOnlyInstall INSTALL = LockOnlyInstall.YARN;
 
     private static final String MERGE_CONFLICT_START = "<<<<<<<";
 
@@ -121,19 +123,6 @@ public final class YarnBerryLockRegenerator {
         }
     }
 
-    /**
-     * Yarn's own refusal of the edit, with the reason it maps to.
-     */
-    @Getter
-    static final class Rejected extends RuntimeException {
-        private final Reason reason;
-
-        Rejected(Reason reason, String message) {
-            super(message);
-            this.reason = reason;
-        }
-    }
-
     private final Inputs inputs;
     private final RegistrySource registry;
 
@@ -176,27 +165,17 @@ public final class YarnBerryLockRegenerator {
     public Result regenerate() {
         String lock = inputs.getLock();
         if (lock == null) {
-            return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no " +
-                                                                           "yarn.lock"));
+            return Result.failure(INSTALL.failure(Rejected.discardsLock("the project has no yarn.lock")));
         }
         Map<String, Object> settings = new LinkedHashMap<>();
         String written;
         try {
             written = install(lock, settings);
         } catch (RuntimeException e) {
-            return Result.failure(failure(e, ""));
+            return Result.failure(failure(e));
         }
-        try {
-            String rewritten = new YarnBerryLockRegenerator(inputs.toBuilder().lock(written).build(), registry)
-                    .install(written, settings);
-            if (!rewritten.equals(written)) {
-                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
-                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
-            }
-        } catch (RuntimeException e) {
-            return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
-        }
-        return Result.success(written);
+        return INSTALL.verify(written, again -> new YarnBerryLockRegenerator(inputs.toBuilder().lock(again).build(),
+                registry).install(again, settings), YarnBerryLockRegenerator::failure);
     }
 
     /**
@@ -213,8 +192,7 @@ public final class YarnBerryLockRegenerator {
         try {
             rootManifest = manifest("");
         } catch (Js.SyntaxError e) {
-            throw new Rejected(Reason.MALFORMED_MANIFEST, YARN_REJECTS + ": Invalid package.json in package.json " +
-                                                          "(corepack)");
+            throw Rejected.rejects(Reason.MALFORMED_MANIFEST, "Invalid package.json in package.json (corepack)");
         }
         if (rootManifest != null && rootManifest.packageManager != null) {
             parseSpec(rootManifest.packageManager);
@@ -227,8 +205,7 @@ public final class YarnBerryLockRegenerator {
         Loaded loaded = load(release, settings);
         Project project = loaded.getProject();
         if (project.lockfileLastVersion == null) {
-            throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": " + (lock.trim().isEmpty() ?
-                    "the lock is empty" : "the lock has no __metadata"));
+            throw Rejected.discardsLock(lock.trim().isEmpty() ? "the lock is empty" : "the lock has no __metadata");
         }
         settings.putAll(loaded.getMigratedSettings());
         boolean hardened = project.configuration.getOptions().getBoolean("enableHardenedMode");
@@ -269,7 +246,7 @@ public final class YarnBerryLockRegenerator {
     }
 
     private static Rejected corepackRejects(String message) {
-        return new Rejected(Reason.MALFORMED_MANIFEST, YARN_REJECTS + ": " + message + " (corepack)");
+        return Rejected.rejects(Reason.MALFORMED_MANIFEST, message + " (corepack)");
     }
 
     /**
@@ -326,10 +303,7 @@ public final class YarnBerryLockRegenerator {
         }
 
         Configuration configuration = new Configuration(options, release);
-        Project project = new Project(configuration);
-        project.now = inputs.getNow();
-        project.paths = inputs.getPaths();
-        project.files = inputs.getFiles();
+        Project project = new Project(configuration, inputs.getNow(), inputs.getPaths(), inputs.getFiles());
         project.setupResolutions(inputs.getLock());
         List<String> directories = new ArrayList<>();
         for (String location : inputs.getManifests().keySet()) {
@@ -370,31 +344,34 @@ public final class YarnBerryLockRegenerator {
         return project.persistLockfile("win32".equals(os) ? "\r\n" : "\n");
     }
 
-    private Failure failure(RuntimeException e, String prefix) {
+    private static Failure failure(RuntimeException e) {
         if (e instanceof Rejected) {
-            return new Failure(((Rejected) e).getReason(), null, prefix + e.getMessage());
+            return INSTALL.failure((Rejected) e);
         }
         if (e instanceof CannotKnow) {
-            return new Failure(((CannotKnow) e).getReason(), null, prefix + e.getMessage());
+            return INSTALL.failure((CannotKnow) e);
+        }
+        if (e instanceof Project.UnknownChecksums) {
+            return INSTALL.failure(new CannotKnow(String.valueOf(e.getMessage()), Reason.CHECKSUM_UNAVAILABLE));
+        }
+        if (e instanceof Project.HeapExhausted) {
+            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, String.valueOf(e.getMessage()));
         }
         if (e instanceof ReportError) {
             ReportError error = (ReportError) e;
-            return new Failure(reasonFor(error), null, prefix + YARN_REJECTS + ": " + error.getName() + " " +
-                                                       error.getMessage());
+            return INSTALL.rejects(reasonFor(error), null, error.getName() + " " + error.getMessage());
         }
         if (e instanceof JsYaml.YamlException) {
-            return new Failure(Reason.MALFORMED_LOCK, null, prefix + YARN_REJECTS + ": " + e);
+            return INSTALL.rejects(Reason.MALFORMED_LOCK, null, e.toString());
         }
         if (e instanceof BerryOptions.UsageError) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + YARN_REJECTS + ": Usage Error: " +
-                                                                 e.getMessage());
+            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, "Usage Error: " + e.getMessage());
         }
         if (e instanceof Js.SyntaxError) {
-            return new Failure(Reason.MALFORMED_MANIFEST, null, prefix + YARN_REJECTS + ": YN0001 SyntaxError: " +
-                                                                e.getMessage());
+            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null, "YN0001 SyntaxError: " + e.getMessage());
         }
         if (e instanceof JsError) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + YARN_REJECTS + ": YN0001 " + e);
+            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, "YN0001 " + e);
         }
         throw e;
     }
@@ -403,12 +380,12 @@ public final class YarnBerryLockRegenerator {
         String message = String.valueOf(error.getMessage());
         switch (error.getCode()) {
             case ReportError.RESOLUTION_FAILED:
-                return message.endsWith(": No candidates found") ? Reason.VERSION_NOT_FOUND :
+                return message.endsWith(": No candidates found") ? SharedError.NO_MATCHING_VERSION.getReason() :
                         Reason.RESOLUTION_REQUIRED;
             case ReportError.REMOTE_NOT_FOUND:
-                return Reason.VERSION_NOT_FOUND;
+                return SharedError.NO_MATCHING_VERSION.getReason();
             case ReportError.NETWORK_ERROR:
-                return message.endsWith("Package not found") ? Reason.PACKAGE_NOT_FOUND :
+                return message.endsWith("Package not found") ? SharedError.PACKAGE_NOT_FOUND.getReason() :
                         Reason.REGISTRY_UNREACHABLE;
             case ReportError.RESOLUTION_MISMATCH:
                 return Reason.MALFORMED_LOCK;
@@ -417,18 +394,6 @@ public final class YarnBerryLockRegenerator {
         }
     }
 
-    private static String firstDifference(String a, String b) {
-        String[] as = a.split("\n", -1);
-        String[] bs = b.split("\n", -1);
-        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
-            String x = i < as.length ? as[i] : "";
-            String y = i < bs.length ? bs[i] : "";
-            if (!x.equals(y)) {
-                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
-            }
-        }
-        return "the line endings change";
-    }
 
     // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
     private BerryOptions options() {
@@ -436,7 +401,7 @@ public final class YarnBerryLockRegenerator {
             try {
                 options = BerryOptions.load(inputs.getConfigFiles(), inputs.getEnv());
             } catch (JsError e) {
-                throw new Rejected(Reason.RESOLUTION_REQUIRED, YARN_REJECTS + ": Internal Error: " + e.getMessage());
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Internal Error: " + e.getMessage());
             }
         }
         return options;

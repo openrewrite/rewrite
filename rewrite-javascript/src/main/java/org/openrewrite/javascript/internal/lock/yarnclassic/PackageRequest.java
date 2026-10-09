@@ -16,8 +16,10 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -79,7 +81,7 @@ final class PackageRequest {
         resolver.usedRegistries.add(registry);
     }
 
-    void awaited(EventLoop.Io<?> op) {
+    void awaited(Io<?> op) {
         if (op.id >= resolver.rootMark) {
             io.add(op.id);
         }
@@ -171,7 +173,7 @@ final class PackageRequest {
                 throw new CannotKnow("whether " + pattern + "/package.json exists outside the project, which makes " +
                                      "the range " + pattern + " a file: dependency");
             }
-            EventLoop.Io<Boolean> exists = loop.io(io, () -> resolver.files.hasManifest(location) ||
+            Io<Boolean> exists = Io.issue(loop, io, () -> resolver.files.hasManifest(location) ||
                                                               resolver.files.holds(PosixPath.join(location,
                                                                       "package.json")));
             awaited(exists);

@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Builder;
-import lombok.Getter;
 import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
@@ -24,6 +23,10 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 import org.openrewrite.javascript.internal.lock.npm.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
@@ -46,11 +49,7 @@ import static java.util.Collections.singletonList;
  */
 public final class YarnClassicLockRegenerator {
 
-    static final String YARN_REJECTS = "yarn rejects this edit";
-    static final String YARN_FAILS = "yarn fails on this edit";
-    static final String CANNOT_KNOW = "the engine cannot know";
-    static final String DISCARDS_LOCK = "yarn would discard the lock and resolve everything from scratch";
-    static final String SECOND_INSTALL = "a second yarn install over the lock written for this edit";
+    private static final LockOnlyInstall INSTALL = LockOnlyInstall.YARN;
 
     /**
      * What the engine is given for a Yarn classic project.
@@ -112,19 +111,6 @@ public final class YarnClassicLockRegenerator {
         Instant now;
     }
 
-    /**
-     * yarn's own refusal or failure of the edit, with the reason it maps to.
-     */
-    @Getter
-    static final class Rejected extends RuntimeException {
-        private final Reason reason;
-
-        Rejected(Reason reason, String message) {
-            super(message);
-            this.reason = reason;
-        }
-    }
-
     private final Inputs inputs;
     private final PackumentSource registry;
 
@@ -144,25 +130,15 @@ public final class YarnClassicLockRegenerator {
     public Result regenerate() {
         String lock = inputs.getLock();
         if (lock == null) {
-            return Result.failure(new Failure(Reason.MALFORMED_LOCK, null, DISCARDS_LOCK + ": the project has no " +
-                                                                           "yarn.lock"));
+            return Result.failure(INSTALL.failure(Rejected.discardsLock("the project has no yarn.lock")));
         }
         String written;
         try {
             written = install(lock);
         } catch (RuntimeException e) {
-            return Result.failure(failure(e, ""));
+            return Result.failure(failure(e));
         }
-        try {
-            String rewritten = install(written);
-            if (!rewritten.equals(written)) {
-                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
-                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
-            }
-        } catch (RuntimeException e) {
-            return Result.failure(failure(e, SECOND_INSTALL + " would reject it: "));
-        }
-        return Result.success(written);
+        return INSTALL.verify(written, this::install, this::failure);
     }
 
     /**
@@ -186,8 +162,8 @@ public final class YarnClassicLockRegenerator {
             if (saved != null && !saved.equals(lock)) {
                 String flag = !flags.isLockfile() ? "--no-lockfile" : flags.isPureLockfile() ? "--pure-lockfile" :
                         "--frozen-lockfile";
-                throw new Rejected(Reason.RESOLUTION_REQUIRED, YARN_REJECTS + ": " + flag + " in .yarnrc (yarn " +
-                                                               "exits 0 and writes no lock)");
+                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, flag + " in .yarnrc (yarn exits 0 and writes no " +
+                                                                   "lock)");
             }
             return lock;
         }
@@ -197,19 +173,18 @@ public final class YarnClassicLockRegenerator {
     // install.js init: the steps up to saveLockfileAndIntegrity, which here writes whatever the flags say
     private @Nullable String install(YarnClassicOptions config, Lockfile lockfile, List<String> warnings) {
         if (lockfile.getLockfilev2() != null) {
-            throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": the lock is a Yarn Berry lock (" +
-                                                      "__metadata)");
+            throw Rejected.discardsLock("the lock is a Yarn Berry lock (__metadata)");
         }
         if (config.getFlags().isLockfile() && LockfileParser.CONFLICT.equals(lockfile.getParseResultType())) {
-            throw new Rejected(Reason.MALFORMED_LOCK, DISCARDS_LOCK + ": the lock's merge conflict does not merge");
+            throw Rejected.discardsLock("the lock's merge conflict does not merge");
         }
         YarnClassicOptions.Flags flags = config.getFlags();
         ResolutionMap resolutionMap = new ResolutionMap(config);
         InstallCwdRequest request = fetchRequestFromCwd(lockfile, config, resolutionMap, warnings);
         String rootText = inputs.getManifests().get("");
         if (rootText != null && Js.jsonParse(LockfileParser.stripBom(rootText)) instanceof List) {
-            throw new Rejected(Reason.MALFORMED_MANIFEST, YARN_REJECTS + ": package.json is an array, not an " +
-                                                          "object: yarn writes a lock with no entries");
+            throw Rejected.rejects(Reason.MALFORMED_MANIFEST, "package.json is an array, not an object: yarn writes " +
+                                                              "a lock with no entries");
         }
 
         List<String> errors = new ArrayList<>();
@@ -241,8 +216,8 @@ public final class YarnClassicLockRegenerator {
                     lockfile, inputs.getLock(), inputs.getHost());
         } catch (MessageError e) {
             if (!errors.isEmpty()) {
-                throw new Rejected(Reason.UNSUPPORTED_ENTRY_TYPE, YARN_REJECTS + ": " + errors.get(0) + " " +
-                                                                  e.getMessage());
+                throw Rejected.rejects(errors.get(0).startsWith("The engine ") ? SharedError.UNSUPPORTED_ENGINE :
+                        SharedError.UNSUPPORTED_PLATFORM, null, errors.get(0) + " " + e.getMessage());
             }
             throw e;
         }
@@ -390,44 +365,41 @@ public final class YarnClassicLockRegenerator {
         }
     }
 
-    private Failure failure(RuntimeException e, String prefix) {
+    private Failure failure(RuntimeException e) {
         if (e instanceof Rejected) {
-            return new Failure(((Rejected) e).getReason(), null, prefix + e.getMessage());
+            return INSTALL.failure((Rejected) e);
         }
         if (e instanceof CannotKnow) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + CANNOT_KNOW + " " +
-                                                                 ((CannotKnow) e).getSubject());
+            return INSTALL.failure((CannotKnow) e);
         }
         if (e instanceof YarnClassicOptions.NeedsEnvironment) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + CANNOT_KNOW + " the environment: " +
-                                                                 e.getMessage());
+            return INSTALL.failure(new CannotKnow("the environment: " + e.getMessage()));
         }
         if (e instanceof LocaleCompare.UnknownOrder) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, prefix + CANNOT_KNOW + " the order yarn finds the " +
-                                                                 "workspaces in: " + e.getMessage());
+            return INSTALL.failure(new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage()));
         }
         if (e instanceof MessageError) {
-            String message = e.getMessage();
-            return new Failure(reasonFor(message), null, prefix + YARN_REJECTS + ": " + message);
+            String message = String.valueOf(e.getMessage());
+            return INSTALL.rejects(reasonFor(message), null, message);
         }
         if (e instanceof NpmRegistry.NotFound) {
-            return new Failure(Reason.PACKAGE_NOT_FOUND, ((NpmRegistry.NotFound) e).getPackageName(),
-                    prefix + YARN_REJECTS + ": " + e);
+            return INSTALL.rejects(SharedError.PACKAGE_NOT_FOUND.getReason(),
+                    ((NpmRegistry.NotFound) e).getPackageName(), e.toString());
         }
         if (e instanceof JsError) {
             JsError error = (JsError) e;
             Reason reason = error.isSyntaxError() ? Reason.MALFORMED_MANIFEST : Reason.RESOLUTION_REQUIRED;
-            return new Failure(reason, null, prefix + YARN_FAILS + ": " + error);
+            return INSTALL.fails(reason, null, error.toString());
         }
         throw e;
     }
 
     private static Reason reasonFor(String message) {
         if (message.startsWith("Couldn't find any versions for") || message.startsWith("No valid versions found")) {
-            return Reason.VERSION_NOT_FOUND;
+            return SharedError.NO_MATCHING_VERSION.getReason();
         }
         if (message.startsWith("Couldn't find package")) {
-            return Reason.PACKAGE_NOT_FOUND;
+            return SharedError.PACKAGE_NOT_FOUND.getReason();
         }
         if (message.startsWith("Can't install from a lockfile of version")) {
             return Reason.UNSUPPORTED_LOCKFILE_VERSION;
@@ -441,19 +413,6 @@ public final class YarnClassicLockRegenerator {
             return Reason.MALFORMED_MANIFEST;
         }
         return Reason.RESOLUTION_REQUIRED;
-    }
-
-    private static String firstDifference(String a, String b) {
-        String[] as = a.split("\n", -1);
-        String[] bs = b.split("\n", -1);
-        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
-            String x = i < as.length ? as[i] : "";
-            String y = i < bs.length ? bs[i] : "";
-            if (!x.equals(y)) {
-                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
-            }
-        }
-        return "the files differ";
     }
 
     /**
@@ -634,7 +593,7 @@ public final class YarnClassicLockRegenerator {
         String packageManager = findPackageManager();
         if (packageManager != null && !YARN_0_OR_1.matcher(packageManager).find()) {
             String version = BUILD_METADATA.matcher(packageManager.replaceFirst("^yarn@", "")).replaceFirst("");
-            throw new Rejected(Reason.RESOLUTION_REQUIRED, YARN_REJECTS + ": This project's package.json defines " +
+            throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "This project's package.json defines " +
                                                            "\"packageManager\": \"yarn@" + version + "\". However " +
                                                            "the current global version of Yarn is 1.22.22.");
         }

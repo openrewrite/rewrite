@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -44,7 +46,7 @@ final class FillRange {
         if (step != null && !isNumber(step)) {
             return Collections.emptyList();
         }
-        double stepValue = Math.max(Math.abs(step == null ? 1 : Js.stringToNumber(step)), 1);
+        double stepValue = Math.max(Math.abs(step == null ? 1 : Js.toNumber(step)), 1);
         if (isNumber(start) && isNumber(end)) {
             return fillNumbers(start, end, step == null ? "1" : step, stepValue);
         }
@@ -52,8 +54,8 @@ final class FillRange {
     }
 
     private static List<String> fillNumbers(String start, String end, String stepString, double step) {
-        double a = Js.stringToNumber(start);
-        double b = Js.stringToNumber(end);
+        double a = Js.toNumber(start);
+        double b = Js.toNumber(end);
         if (Math.abs(a) > MAX_SAFE_INTEGER || Math.abs(b) > MAX_SAFE_INTEGER || step > MAX_SAFE_INTEGER) {
             throw new CannotKnow("the brace range {" + start + ".." + end + "} (beyond JavaScript's safe integers)");
         }
@@ -91,7 +93,7 @@ final class FillRange {
     }
 
     private static boolean isNumber(String num) {
-        return Js.isInteger(Js.stringToNumber(num));
+        return Js.isInteger(Js.toNumber(num));
     }
 
     private static boolean zeros(String input) {

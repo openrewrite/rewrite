@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.EventLoop;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
@@ -36,7 +37,7 @@ final class NpmRegistry {
     private final YarnClassicOptions config;
     private final EventLoop loop;
     private final PackumentSource source;
-    private final Map<String, EventLoop.Io<Object>> cache = new HashMap<>();
+    private final Map<String, Io<Object>> cache = new HashMap<>();
 
     NpmRegistry(YarnClassicOptions config, EventLoop loop, PackumentSource source) {
         this.config = config;
@@ -77,15 +78,15 @@ final class NpmRegistry {
      * The parsed packument; the request rejects with the registry's {@code Not found} when it has no such package.
      * A host that cannot reach the registry throws what it throws.
      */
-    EventLoop.Io<Object> request(String pathname, Set<Integer> causal) {
+    Io<Object> request(String pathname, Set<Integer> causal) {
         String registry = config.getRegistry(pathname);
         String url = getRequestUrl(registry, pathname);
-        EventLoop.Io<Object> cached = cache.get(url);
+        Io<Object> cached = cache.get(url);
         if (cached != null) {
             return cached;
         }
         String name = pathname.replaceFirst("%2f", "/");
-        EventLoop.Io<Object> io = loop.io(causal, () -> {
+        Io<Object> io = Io.issue(loop, causal, () -> {
             String body = source.packument(registry, name);
             if (body == null) {
                 throw new NotFound(url, name);

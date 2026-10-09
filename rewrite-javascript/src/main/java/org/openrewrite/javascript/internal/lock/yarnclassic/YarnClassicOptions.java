@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import lombok.AccessLevel;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 

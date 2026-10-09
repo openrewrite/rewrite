@@ -15,14 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -33,9 +32,8 @@ import java.util.regex.Pattern;
 /**
  * The JavaScript semantics Yarn's plain objects, strings and numbers follow.
  */
-final class Js {
+final class Js extends EcmaScript {
 
-    private static final long MAX_ARRAY_INDEX = 4294967294L;
     private static final Pattern DECIMAL =
             Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
     private static final Pattern RADIX_INTEGER = Pattern.compile("0(?:[xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
@@ -81,38 +79,6 @@ final class Js {
         return value instanceof Map || value instanceof List;
     }
 
-    static boolean truthy(@Nullable Object value) {
-        if (value == null || value == Syml.UNDEFINED || Boolean.FALSE.equals(value)) {
-            return false;
-        }
-        if (value instanceof String) {
-            return !((String) value).isEmpty();
-        }
-        if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
-    }
-
-    /**
-     * {@code Object.keys}: the integer keys in ascending order, then the rest in insertion order.
-     */
-    static List<String> keys(Map<String, ?> object) {
-        List<String> indices = new ArrayList<>();
-        List<String> rest = new ArrayList<>();
-        for (String key : object.keySet()) {
-            if (arrayIndex(key) >= 0) {
-                indices.add(key);
-            } else {
-                rest.add(key);
-            }
-        }
-        indices.sort((a, b) -> Long.compare(arrayIndex(a), arrayIndex(b)));
-        indices.addAll(rest);
-        return indices;
-    }
-
     /**
      * {@code Object.entries} of an object, or of an array by index.
      */
@@ -131,21 +97,6 @@ final class Js {
             }
         }
         return out;
-    }
-
-    static long arrayIndex(String key) {
-        if (key.isEmpty() || key.length() > 10 || (key.length() > 1 && key.charAt(0) == '0')) {
-            return -1;
-        }
-        long index = 0;
-        for (int i = 0; i < key.length(); i++) {
-            char c = key.charAt(i);
-            if (c < '0' || c > '9') {
-                return -1;
-            }
-            index = index * 10 + (c - '0');
-        }
-        return index <= MAX_ARRAY_INDEX ? index : -1;
     }
 
     /**
@@ -214,68 +165,8 @@ final class Js {
         return value.toString();
     }
 
-    /**
-     * {@code StrWhiteSpaceChar}: the white space and line terminators {@code trim} and {@code Number} skip.
-     */
-    static boolean isWhiteSpace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == '\u2028' || c == '\u2029' ||
-               c == '\uFEFF' || Character.getType(c) == Character.SPACE_SEPARATOR;
-    }
-
-    static String trim(String s) {
-        int start = 0;
-        int end = s.length();
-        while (start < end && isWhiteSpace(s.charAt(start))) {
-            start++;
-        }
-        while (end > start && isWhiteSpace(s.charAt(end - 1))) {
-            end--;
-        }
-        return s.substring(start, end);
-    }
-
-    /**
-     * {@code Number(s)}: a decimal literal, {@code Infinity}, or a hexadecimal, octal or binary integer, between
-     * white space; 0 for none, NaN for anything else.
-     */
-    static double stringToNumber(String s) {
-        String t = trim(s);
-        if (t.isEmpty()) {
-            return 0;
-        }
-        if (DECIMAL.matcher(t).matches()) {
-            return Double.parseDouble(t);
-        }
-        if (RADIX_INTEGER.matcher(t).matches()) {
-            char prefix = Character.toLowerCase(t.charAt(1));
-            return new BigInteger(t.substring(2), prefix == 'x' ? 16 : prefix == 'o' ? 8 : 2).doubleValue();
-        }
-        return Double.NaN;
-    }
-
     static boolean isInteger(double d) {
         return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
-    }
-
-    /**
-     * {@code Number.prototype.toString()}.
-     */
-    static String numberToString(double d) {
-        if (Double.isNaN(d) || Double.isInfinite(d)) {
-            return Double.isNaN(d) ? "NaN" : d > 0 ? "Infinity" : "-Infinity";
-        }
-        if (d == 0) {
-            return "0";
-        }
-        BigDecimal shortest = new BigDecimal(Double.toString(d)).stripTrailingZeros();
-        String digits = shortest.unscaledValue().abs().toString();
-        int n = digits.length() - shortest.scale();
-        String sign = d < 0 ? "-" : "";
-        if (n >= -5 && n <= 21) {
-            return sign + shortest.abs().toPlainString();
-        }
-        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
-        return sign + mantissa + "e" + (n - 1 >= 0 ? "+" : "-") + Math.abs(n - 1);
     }
 
     /**
@@ -330,43 +221,4 @@ final class Js {
         }
     }
 
-    private static void quote(String s, StringBuilder out) {
-        out.append('"');
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    out.append("\\\"");
-                    break;
-                case '\\':
-                    out.append("\\\\");
-                    break;
-                case '\b':
-                    out.append("\\b");
-                    break;
-                case '\f':
-                    out.append("\\f");
-                    break;
-                case '\n':
-                    out.append("\\n");
-                    break;
-                case '\r':
-                    out.append("\\r");
-                    break;
-                case '\t':
-                    out.append("\\t");
-                    break;
-                default:
-                    boolean loneSurrogate = Character.isHighSurrogate(c) ?
-                            i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1)) :
-                            Character.isLowSurrogate(c) && (i == 0 || !Character.isHighSurrogate(s.charAt(i - 1)));
-                    if (c < 0x20 || loneSurrogate) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-            }
-        }
-        out.append('"');
-    }
 }

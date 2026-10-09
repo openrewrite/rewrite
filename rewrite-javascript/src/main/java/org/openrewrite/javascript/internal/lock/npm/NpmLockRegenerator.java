@@ -21,8 +21,13 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
@@ -91,10 +96,7 @@ public final class NpmLockRegenerator {
         Map<String, String> parentManifests;
     }
 
-    static final String NPM_REJECTS = "npm rejects this edit";
-    static final String NPM_FAILS = "npm fails on this edit";
-    static final String CANNOT_KNOW = "the engine cannot know";
-    static final String SECOND_INSTALL = "a second npm install over the lock written for this edit";
+    private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
 
     private final Inputs inputs;
     private final PackumentSource registry;
@@ -133,22 +135,13 @@ public final class NpmLockRegenerator {
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
-            return Result.failure(failure(e, NPM_REJECTS, NPM_FAILS));
+            return Result.failure(failure(e));
         }
-        try {
-            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(written)), options);
+        return INSTALL.verify(written, lock -> {
+            IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock)), options);
             again.buildIdealTree();
-            String rewritten = saveIdealTree(again, options);
-            if (!rewritten.equals(written)) {
-                return Result.failure(new Failure(Reason.RESOLUTION_REQUIRED, null,
-                        SECOND_INSTALL + " would rewrite it: " + firstDifference(written, rewritten)));
-            }
-        } catch (NodeRegistryException e) {
-            throw e;
-        } catch (RuntimeException e) {
-            return Result.failure(failure(e, SECOND_INSTALL + " would reject it", SECOND_INSTALL + " would fail"));
-        }
-        return Result.success(written);
+            return saveIdealTree(again, options);
+        }, NpmLockRegenerator::failure);
     }
 
     /**
@@ -304,53 +297,55 @@ public final class NpmLockRegenerator {
         }
     }
 
-    private static Failure failure(RuntimeException e, String rejects, String fails) {
+    private static Failure failure(RuntimeException e) {
         String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
-            return new Failure(Reason.PEER_CONFLICT, conflict.getEdge().getName(),
-                    rejects + " (ERESOLVE):\n" + ExplainEresolve.explain(conflict.getExplanation(), 4));
+            return INSTALL.failure(Kind.PM_REJECTS, Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
+                    ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
         if (e instanceof CannotKnow) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " " + ((CannotKnow) e).getSubject());
+            return INSTALL.failure((CannotKnow) e);
         }
         if (e instanceof NpmOptions.NeedsEnvironment) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " the environment: " + message);
+            return INSTALL.failure(new CannotKnow("the environment: " + message));
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " the package's files: " + message);
+            return INSTALL.failure(new CannotKnow("the package's files: " + message));
         }
         if (e instanceof LocaleCompare.UnknownOrder) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, null, CANNOT_KNOW + " the order npm writes the keys in: " + message);
+            return INSTALL.failure(new CannotKnow("the order npm writes the keys in: " + message));
         }
         if (e instanceof MalformedLock) {
-            return new Failure(Reason.MALFORMED_LOCK, null,
-                    "npm would discard the lock and resolve everything from scratch: " + message);
+            return INSTALL.failure(Rejected.discardsLock(message));
         }
         if (e instanceof MalformedManifest) {
-            return new Failure(Reason.MALFORMED_MANIFEST, null, "npm cannot apply the manifest: " + message);
+            return INSTALL.fails(Reason.MALFORMED_MANIFEST, null, "it cannot apply the manifest: " + message);
         }
         if (e instanceof JsonParseEvenBetterErrors.JsonParseException) {
-            return new Failure(Reason.MALFORMED_MANIFEST, null, rejects + " (EJSONPARSE): " + message);
+            return INSTALL.failure(Kind.PM_REJECTS, Reason.MALFORMED_MANIFEST, null, "EJSONPARSE", message);
         }
         String code = e instanceof NpmError ? ((NpmError) e).getCode() : null;
         if (code == null) {
-            return new Failure(Reason.RESOLUTION_REQUIRED, packageOf(e), fails + ": " + message);
+            return INSTALL.fails(Reason.RESOLUTION_REQUIRED, packageOf(e), message);
         }
-        return new Failure(reasonFor(code), packageOf(e), rejects + " (" + code + "): " + message);
+        return INSTALL.failure(Kind.PM_REJECTS, reasonFor(code), packageOf(e), code, message);
     }
 
     private static Reason reasonFor(String code) {
         switch (code) {
             case "E404":
-                return Reason.PACKAGE_NOT_FOUND;
+                return SharedError.PACKAGE_NOT_FOUND.getReason();
             case "ETARGET":
+                return SharedError.NO_MATCHING_VERSION.getReason();
+            case "EBADPLATFORM":
+                return SharedError.UNSUPPORTED_PLATFORM.getReason();
+            case "EBADENGINE":
+                return SharedError.UNSUPPORTED_ENGINE.getReason();
             case "ENOVERSIONS":
             case "E403":
                 return Reason.VERSION_NOT_FOUND;
             case "EUNSUPPORTEDPROTOCOL":
-            case "EBADPLATFORM":
-            case "EBADENGINE":
             case "EALLOWGIT":
             case "EALLOWFILE":
             case "EALLOWDIRECTORY":
@@ -376,18 +371,5 @@ public final class NpmLockRegenerator {
             return name == null ? null : Js.string(name);
         }
         return null;
-    }
-
-    private static String firstDifference(String a, String b) {
-        String[] as = a.split("\n", -1);
-        String[] bs = b.split("\n", -1);
-        for (int i = 0; i < Math.max(as.length, bs.length); i++) {
-            String x = i < as.length ? as[i] : "";
-            String y = i < bs.length ? bs[i] : "";
-            if (!x.equals(y)) {
-                return "line " + (i + 1) + " \"" + x.trim() + "\" becomes \"" + y.trim() + "\"";
-            }
-        }
-        return "the files differ";
     }
 }

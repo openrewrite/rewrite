@@ -85,7 +85,7 @@ final class JsYamlDumper {
         return "";
     }
 
-    private static boolean isWhitespace(int c) {
+    private static boolean isWhiteSpace(int c) {
         return c == ' ' || c == '\t';
     }
 
@@ -102,23 +102,23 @@ final class JsYamlDumper {
 
     private static boolean isPlainSafe(int c, int prev, boolean inblock) {
         boolean cIsNsCharOrWhitespace = isNsCharOrWhitespace(c);
-        boolean cIsNsChar = cIsNsCharOrWhitespace && !isWhitespace(c);
+        boolean cIsNsChar = cIsNsCharOrWhitespace && !isWhiteSpace(c);
         return ((inblock ? cIsNsCharOrWhitespace :
                 cIsNsCharOrWhitespace && c != ',' && c != '[' && c != ']' && c != '{' && c != '}') &&
                 c != '#' && !(prev == ':' && !cIsNsChar)) ||
-               (isNsCharOrWhitespace(prev) && !isWhitespace(prev) && c == '#') ||
+               (isNsCharOrWhitespace(prev) && !isWhiteSpace(prev) && c == '#') ||
                (prev == ':' && cIsNsChar);
     }
 
     private static boolean isPlainSafeFirst(int c) {
-        return isPrintable(c) && c != 0xFEFF && !isWhitespace(c) &&
+        return isPrintable(c) && c != 0xFEFF && !isWhiteSpace(c) &&
                c != '-' && c != '?' && c != ':' && c != ',' && c != '[' && c != ']' && c != '{' && c != '}' &&
                c != '#' && c != '&' && c != '*' && c != '!' && c != '|' && c != '=' && c != '>' && c != '\'' &&
                c != '"' && c != '%' && c != '@' && c != '`';
     }
 
     private static boolean isPlainSafeLast(int c) {
-        return !isWhitespace(c) && c != ':';
+        return !isWhiteSpace(c) && c != ':';
     }
 
     // String.prototype.codePointAt, NaN past the end standing as -1

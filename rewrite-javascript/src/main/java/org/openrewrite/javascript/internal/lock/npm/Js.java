@@ -16,12 +16,11 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.math.MathContext;
-import java.math.RoundingMode;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -35,7 +34,7 @@ import java.util.regex.Pattern;
 /**
  * JavaScript's semantics for the values and strings npm reads from package and lock data.
  */
-final class Js {
+final class Js extends EcmaScript {
 
     /**
      * The characters {@code \s} matches in a JavaScript regular expression, for use inside a character class.
@@ -43,15 +42,7 @@ final class Js {
     static final String WHITESPACE_CLASS =
             "\\t\\n\\x0B\\f\\r \\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000\\ufeff";
 
-    /**
-     * What JavaScript reads from a property that is not there. JSON's {@code null} is Java's.
-     */
-    static final Object UNDEFINED = new Object() {
-        @Override
-        public String toString() {
-            return "undefined";
-        }
-    };
+;
 
     /**
      * A member a value inherits from its prototype, such as {@code constructor}: truthy and never a string.
@@ -89,7 +80,6 @@ final class Js {
             "trimRight trimStart");
     private static final Set<String> NUMBER_MEMBERS = members("toExponential toFixed toPrecision");
 
-    private static final long MAX_ARRAY_INDEX = 4294967294L;
     private static final Pattern DECIMAL_LITERAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
 
     private Js() {
@@ -234,25 +224,6 @@ final class Js {
     }
 
     /**
-     * The canonical array index {@code key} names, or -1.
-     */
-    static long arrayIndex(String key) {
-        int length = key.length();
-        if (length == 0 || length > 10 || (length > 1 && key.charAt(0) == '0')) {
-            return -1;
-        }
-        long index = 0;
-        for (int i = 0; i < length; i++) {
-            char c = key.charAt(i);
-            if (c < '0' || c > '9') {
-                return -1;
-            }
-            index = index * 10 + (c - '0');
-        }
-        return index <= MAX_ARRAY_INDEX ? index : -1;
-    }
-
-    /**
      * {@code a === b} for values parsed from JSON: objects and arrays are equal only to themselves.
      */
     static boolean strictEquals(@Nullable Object a, @Nullable Object b) {
@@ -350,18 +321,8 @@ final class Js {
         return val == UNDEFINED ? "undefined" : "object";
     }
 
-    static boolean truthy(@Nullable Object val) {
-        if (val == null || val == UNDEFINED || val == HOLE || Boolean.FALSE.equals(val)) {
-            return false;
-        }
-        if (val instanceof String) {
-            return !((String) val).isEmpty();
-        }
-        if (val instanceof Number) {
-            double d = ((Number) val).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
+    public static boolean truthy(@Nullable Object val) {
+        return val != HOLE && EcmaScript.truthy(val);
     }
 
     /**
@@ -396,146 +357,4 @@ final class Js {
         return time;
     }
 
-    static boolean isWhitespace(char c) {
-        return c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r' || c == ' ' || c == 0xA0 ||
-               c == 0x1680 || (c >= 0x2000 && c <= 0x200A) || c == 0x2028 || c == 0x2029 || c == 0x202F ||
-               c == 0x205F || c == 0x3000 || c == 0xFEFF;
-    }
-
-    static String trim(String s) {
-        return trimEnd(trimStart(s));
-    }
-
-    static String trimStart(String s) {
-        int start = 0;
-        while (start < s.length() && isWhitespace(s.charAt(start))) {
-            start++;
-        }
-        return s.substring(start);
-    }
-
-    static String trimEnd(String s) {
-        int end = s.length();
-        while (end > 0 && isWhitespace(s.charAt(end - 1))) {
-            end--;
-        }
-        return s.substring(0, end);
-    }
-
-    /**
-     * {@code Number.prototype.toString()} of a number parsed from JSON.
-     */
-    static String numberToString(Number n) {
-        if (n instanceof Integer || n instanceof Long || n instanceof Short || n instanceof Byte) {
-            long l = n.longValue();
-            return Math.abs(l) <= MAX_SAFE_INTEGER ? Long.toString(l) : numberToString((double) l);
-        }
-        return numberToString(n.doubleValue());
-    }
-
-    private static final long MAX_SAFE_INTEGER = (1L << 53) - 1;
-
-    // the shortest decimal that reads back as the same double, the nearest when several do, as JavaScript prints
-    private static BigDecimal shortest(double d) {
-        BigDecimal exact = new BigDecimal(d);
-        for (int precision = 1; precision < 17; precision++) {
-            BigDecimal nearest = exact.round(new MathContext(precision, RoundingMode.HALF_EVEN));
-            if (nearest.doubleValue() == d) {
-                return nearest.stripTrailingZeros();
-            }
-            // a power of two's interval is asymmetric: the far neighbor may read back when the nearest does not
-            BigDecimal floor = exact.round(new MathContext(precision, RoundingMode.FLOOR));
-            BigDecimal other = floor.compareTo(nearest) == 0 ?
-                    exact.round(new MathContext(precision, RoundingMode.CEILING)) : floor;
-            if (other.doubleValue() == d) {
-                return other.stripTrailingZeros();
-            }
-        }
-        return exact.round(new MathContext(17, RoundingMode.HALF_EVEN)).stripTrailingZeros();
-    }
-
-    private static String numberToString(double d) {
-        if (Double.isNaN(d)) {
-            return "NaN";
-        }
-        if (d == 0) {
-            return "0";
-        }
-        if (Double.isInfinite(d)) {
-            return d > 0 ? "Infinity" : "-Infinity";
-        }
-        if (d < 0) {
-            return "-" + numberToString(-d);
-        }
-        BigDecimal decimal = shortest(d);
-        String digits = decimal.unscaledValue().toString();
-        int k = digits.length();
-        int n = k - decimal.scale();
-        StringBuilder sb = new StringBuilder();
-        if (k <= n && n <= 21) {
-            sb.append(digits);
-            for (int i = k; i < n; i++) {
-                sb.append('0');
-            }
-        } else if (0 < n && n <= 21) {
-            sb.append(digits, 0, n).append('.').append(digits, n, k);
-        } else if (-6 < n && n <= 0) {
-            sb.append("0.");
-            for (int i = n; i < 0; i++) {
-                sb.append('0');
-            }
-            sb.append(digits);
-        } else {
-            sb.append(digits.charAt(0));
-            if (k > 1) {
-                sb.append('.').append(digits, 1, k);
-            }
-            sb.append('e').append(n - 1 >= 0 ? "+" : "-").append(Math.abs(n - 1));
-        }
-        return sb.toString();
-    }
-
-    /**
-     * {@code JSON.stringify} of a string.
-     */
-    static String quote(String s) {
-        StringBuilder sb = new StringBuilder(s.length() + 2).append('"');
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    sb.append("\\\"");
-                    break;
-                case '\\':
-                    sb.append("\\\\");
-                    break;
-                case '\b':
-                    sb.append("\\b");
-                    break;
-                case '\f':
-                    sb.append("\\f");
-                    break;
-                case '\n':
-                    sb.append("\\n");
-                    break;
-                case '\r':
-                    sb.append("\\r");
-                    break;
-                case '\t':
-                    sb.append("\\t");
-                    break;
-                default:
-                    boolean leads = Character.isHighSurrogate(c) && i + 1 < s.length() &&
-                                    Character.isLowSurrogate(s.charAt(i + 1));
-                    boolean trails = Character.isLowSurrogate(c) && i > 0 && Character.isHighSurrogate(s.charAt(i - 1));
-                    boolean loneSurrogate = Character.isSurrogate(c) && !leads && !trails;
-                    if (c < 0x20 || loneSurrogate) {
-                        sb.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        sb.append(c);
-                    }
-            }
-        }
-        return sb.append('"').toString();
-    }
 }

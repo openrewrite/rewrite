@@ -77,15 +77,42 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * What one regeneration is given: the edited manifest, the lock it updates, the project's other
-     * manifests as edited so far (a workspace root and the members the recipe has), by path, and the
-     * project's package-manager files by path ({@code .npmrc}, {@code bunfig.toml}, {@code .yarnrc},
-     * {@code .yarnrc.yml}, {@code pnpm-workspace.yaml}, {@code .pnpmfile.cjs}, {@code .pnpmfile.mjs}, the {@code .env}
-     * files Bun loads, and the {@code .patch} files under the project), those of the repository's directories above
-     * the project too with their {@code package.json} and those of the workspace members they list, and every path the
-     * project holds and the directories above it
-     * hold directly, when the host says. The working directory is where the package manager runs when that is not the
-     * lock's directory: a workspace member with a lock of its own that the package manager passes over for the root's.
+     * Which of the three result rules a failure falls under.
+     */
+    public enum Kind {
+        /**
+         * The package manager reads something the engine is not given.
+         */
+        CANNOT_KNOW,
+
+        /**
+         * The package manager rejects the edit with an error of its own.
+         */
+        PM_REJECTS,
+
+        /**
+         * The package manager fails on the edit with an error it does not raise on purpose.
+         */
+        PM_FAILS,
+
+        /**
+         * The package manager would discard the lock and resolve everything from scratch.
+         */
+        DISCARDS_LOCK,
+
+        /**
+         * The package manager deletes the lock.
+         */
+        DELETES_LOCK,
+
+        /**
+         * A second install over the lock written for the edit would reject or rewrite it.
+         */
+        SECOND_INSTALL
+    }
+
+    /**
+     * The edited manifest, its lock, and what else of the project the package manager reads, by path.
      */
     @Value
     @Builder
@@ -104,6 +131,7 @@ public final class LockFileRegeneration {
 
     @Value
     public static class Failure {
+        Kind kind;
         Reason reason;
         @Nullable String packageName;
         String detail;

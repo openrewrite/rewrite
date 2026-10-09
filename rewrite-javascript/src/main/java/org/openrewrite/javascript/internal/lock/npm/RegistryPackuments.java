@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;

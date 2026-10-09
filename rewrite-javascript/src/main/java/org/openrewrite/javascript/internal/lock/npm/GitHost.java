@@ -419,7 +419,7 @@ final class GitHost {
         int firstColon = arg.indexOf(':');
         int firstSpace = -1;
         for (int i = 0; i < arg.length(); i++) {
-            if (Js.isWhitespace(arg.charAt(i))) {
+            if (Js.isWhiteSpace(arg.charAt(i))) {
                 firstSpace = i;
                 break;
             }

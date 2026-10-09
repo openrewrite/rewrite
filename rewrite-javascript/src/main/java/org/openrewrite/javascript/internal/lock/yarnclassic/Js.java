@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,7 +23,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
  * The JavaScript semantics yarn's values follow: truthiness, {@code typeof}, the order {@code Object.keys} gives,
  * {@code Object.assign}, {@code JSON.parse} and {@code JSON.stringify} of strings and numbers.
  */
-final class Js {
+final class Js extends EcmaScript {
 
     /**
      * The characters JavaScript's {@code \s} matches.
@@ -46,27 +46,11 @@ final class Js {
      */
     static final String DOT = "[^\\n\\r\\u2028\\u2029]";
 
-    private static final long MAX_ARRAY_INDEX = 4294967294L;
-
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .build();
 
     private Js() {
-    }
-
-    static boolean truthy(@Nullable Object value) {
-        if (value == null || Boolean.FALSE.equals(value)) {
-            return false;
-        }
-        if (value instanceof String) {
-            return !((String) value).isEmpty();
-        }
-        if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            return d != 0 && !Double.isNaN(d);
-        }
-        return true;
     }
 
     static String typeOf(@Nullable Object value) {
@@ -83,24 +67,6 @@ final class Js {
             return "number";
         }
         return "object";
-    }
-
-    /**
-     * {@code Object.keys}: the integer keys in ascending order, then the rest in insertion order.
-     */
-    static List<String> keys(Map<String, ?> object) {
-        List<String> indices = new ArrayList<>();
-        List<String> rest = new ArrayList<>();
-        for (String key : object.keySet()) {
-            if (arrayIndex(key) >= 0) {
-                indices.add(key);
-            } else {
-                rest.add(key);
-            }
-        }
-        indices.sort((a, b) -> Long.compare(arrayIndex(a), arrayIndex(b)));
-        indices.addAll(rest);
-        return indices;
     }
 
     /**
@@ -158,21 +124,6 @@ final class Js {
             return ((Map<?, ?>) value).containsKey(key);
         }
         return (value instanceof List || value instanceof String) && get(value, key) != null;
-    }
-
-    static long arrayIndex(String key) {
-        if (key.isEmpty() || key.length() > 10 || (key.length() > 1 && key.charAt(0) == '0')) {
-            return -1;
-        }
-        long index = 0;
-        for (int i = 0; i < key.length(); i++) {
-            char c = key.charAt(i);
-            if (c < '0' || c > '9') {
-                return -1;
-            }
-            index = index * 10 + (c - '0');
-        }
-        return index <= MAX_ARRAY_INDEX ? index : -1;
     }
 
     /**
@@ -236,46 +187,6 @@ final class Js {
     }
 
     /**
-     * {@code JSON.stringify} of a string.
-     */
-    static String quote(String s) {
-        StringBuilder out = new StringBuilder(s.length() + 2).append('"');
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            switch (c) {
-                case '"':
-                    out.append("\\\"");
-                    break;
-                case '\\':
-                    out.append("\\\\");
-                    break;
-                case '\b':
-                    out.append("\\b");
-                    break;
-                case '\f':
-                    out.append("\\f");
-                    break;
-                case '\n':
-                    out.append("\\n");
-                    break;
-                case '\r':
-                    out.append("\\r");
-                    break;
-                case '\t':
-                    out.append("\\t");
-                    break;
-                default:
-                    if (c < 0x20 || isLoneSurrogate(s, i)) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-            }
-        }
-        return out.append('"').toString();
-    }
-
-    /**
      * {@code JSON.stringify} without indentation; {@code undefined} for a value it has no representation of.
      */
     static @Nullable String jsonStringify(@Nullable Object value) {
@@ -311,38 +222,6 @@ final class Js {
         return value instanceof Boolean ? value.toString() : null;
     }
 
-    private static boolean isLoneSurrogate(String s, int i) {
-        char c = s.charAt(i);
-        if (Character.isHighSurrogate(c)) {
-            return i + 1 >= s.length() || !Character.isLowSurrogate(s.charAt(i + 1));
-        }
-        if (Character.isLowSurrogate(c)) {
-            return i == 0 || !Character.isHighSurrogate(s.charAt(i - 1));
-        }
-        return false;
-    }
-
-    static boolean isWhitespace(char c) {
-        return c == '\t' || c == '\n' || c == '\u000B' || c == '\f' || c == '\r' || c == ' ' || c == '\u00A0' ||
-               c == '\u1680' || (c >= '\u2000' && c <= '\u200A') || c == '\u2028' || c == '\u2029' ||
-               c == '\u202F' || c == '\u205F' || c == '\u3000' || c == '\uFEFF';
-    }
-
-    /**
-     * {@code String.prototype.trim}.
-     */
-    static String trim(String s) {
-        int start = 0;
-        int end = s.length();
-        while (start < end && isWhitespace(s.charAt(start))) {
-            start++;
-        }
-        while (end > start && isWhitespace(s.charAt(end - 1))) {
-            end--;
-        }
-        return s.substring(start, end);
-    }
-
     /**
      * {@code String.prototype.split} by a string.
      */
@@ -362,27 +241,6 @@ final class Js {
      */
     static String splitJoin(String s, String separator, String with) {
         return String.join(with, splitString(s, separator));
-    }
-
-    /**
-     * {@code Number(s)} of a string.
-     */
-    static double toNumber(String s) {
-        String t = trim(s);
-        if (t.isEmpty()) {
-            return 0;
-        }
-        if (NON_DECIMAL.matcher(t).matches()) {
-            char radix = Character.toLowerCase(t.charAt(1));
-            return new BigInteger(t.substring(2), radix == 'x' ? 16 : radix == 'o' ? 8 : 2).doubleValue();
-        }
-        if (!DECIMAL.matcher(t).matches()) {
-            return Double.NaN;
-        }
-        if (t.endsWith("Infinity")) {
-            return t.startsWith("-") ? Double.NEGATIVE_INFINITY : Double.POSITIVE_INFINITY;
-        }
-        return Double.parseDouble(t);
     }
 
     private static final Pattern NON_DECIMAL = Pattern.compile("0([xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
@@ -441,28 +299,4 @@ final class Js {
         return string(value);
     }
 
-    /**
-     * {@code Number.prototype.toString()}.
-     */
-    static String numberToString(double d) {
-        if (Double.isNaN(d)) {
-            return "NaN";
-        }
-        if (Double.isInfinite(d)) {
-            return d > 0 ? "Infinity" : "-Infinity";
-        }
-        if (d == 0) {
-            return "0";
-        }
-        BigDecimal shortest = new BigDecimal(Double.toString(d)).stripTrailingZeros();
-        String digits = shortest.unscaledValue().abs().toString();
-        int n = digits.length() - shortest.scale();
-        String sign = d < 0 ? "-" : "";
-        if (n >= -5 && n <= 21) {
-            return sign + shortest.abs().toPlainString();
-        }
-        String mantissa = digits.length() == 1 ? digits : digits.charAt(0) + "." + digits.substring(1);
-        int exponent = n - 1;
-        return sign + mantissa + "e" + (exponent >= 0 ? "+" : "-") + Math.abs(exponent);
-    }
 }

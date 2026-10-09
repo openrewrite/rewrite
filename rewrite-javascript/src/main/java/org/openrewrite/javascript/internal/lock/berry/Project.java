@@ -16,7 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.time.Instant;
 import java.util.ArrayDeque;
@@ -82,13 +82,12 @@ final class Project {
     /**
      * The files the project holds relative to its root, when the host says.
      */
-    @Nullable
-    Set<String> paths;
+    final @Nullable Set<String> paths;
 
     /**
      * The text of the files the host read, by path from the root: the patch files.
      */
-    Map<String, String> files = Collections.emptyMap();
+    final Map<String, String> files;
 
     /**
      * {@code __metadata.version} as the lockfile spells it ({@code "8"}), {@code -1} for a Yarn 1 lockfile, null
@@ -102,7 +101,7 @@ final class Project {
     /**
      * {@code new Date()} while Yarn runs.
      */
-    Instant now = Instant.EPOCH;
+    final Instant now;
 
     /**
      * The yarn.lock Yarn read, null when the project has none.
@@ -116,8 +115,29 @@ final class Project {
     @Nullable
     Map<String, @Nullable Object> parsedLockfile;
 
-    Project(Configuration configuration) {
+    Project(Configuration configuration, Instant now, @Nullable Set<String> paths, Map<String, String> files) {
         this.configuration = configuration;
+        this.now = now;
+        this.paths = paths;
+        this.files = files;
+    }
+
+    /**
+     * Yarn defers each scheduled descriptor on a promise, so a schedule without end exhausts its heap.
+     */
+    static final class HeapExhausted extends RuntimeException {
+        HeapExhausted() {
+            super("crash: JavaScript heap out of memory in the resolution step");
+        }
+    }
+
+    /**
+     * Checksums of fetched packages the engine cannot compute, named.
+     */
+    static final class UnknownChecksums extends RuntimeException {
+        UnknownChecksums(String subject) {
+            super(subject);
+        }
     }
 
     /**
@@ -514,10 +534,7 @@ final class Project {
                 }
             }
         } catch (StackOverflowError e) {
-            // Yarn defers each scheduled descriptor on a promise, so a schedule without end exhausts its heap instead
-            throw new YarnBerryLockRegenerator.Rejected(Reason.RESOLUTION_REQUIRED,
-                    YarnBerryLockRegenerator.YARN_REJECTS + ": crash: JavaScript heap out of memory in the " +
-                    "resolution step");
+            throw new HeapExhausted();
         }
         if (unknown != null) {
             throw unknown;
@@ -1008,7 +1025,7 @@ final class Project {
             throw firstError;
         }
         if (!unknown.isEmpty()) {
-            throw new CannotKnow(String.join("; ", unknown), Reason.CHECKSUM_UNAVAILABLE);
+            throw new UnknownChecksums(String.join("; ", unknown));
         }
     }
 
@@ -1115,6 +1132,6 @@ final class Project {
         if (value == null) {
             return 0;
         }
-        return value instanceof String ? Js.stringToNumber((String) value) : Double.NaN;
+        return value instanceof String ? Js.toNumber((String) value) : Double.NaN;
     }
 }

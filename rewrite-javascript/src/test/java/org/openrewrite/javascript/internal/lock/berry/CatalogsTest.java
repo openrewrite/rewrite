@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.npm.Host;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -126,7 +127,8 @@ class CatalogsTest {
     private static Project project(String yarnrc) {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
                 Collections.emptyMap());
-        Project project = new Project(new Configuration(options, YarnRelease.of("4.10.3")));
+        Project project = new Project(new Configuration(options, YarnRelease.of("4.10.3")), Instant.EPOCH, null,
+                Collections.emptyMap());
         project.setupWorkspaces(new FastGlob(Collections.singletonList("."), null, Host.UNKNOWN),
                 cwd -> Manifest.fromText("{\"name\": \"test-project\", \"version\": \"1.0.0\"}"));
         return project;

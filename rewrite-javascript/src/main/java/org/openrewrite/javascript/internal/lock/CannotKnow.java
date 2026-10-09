@@ -13,25 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.berry;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 /**
- * What Yarn would write depends on something the engine is not given.
+ * Raised where the package manager reads something the engine is not given: a tarball's contents, a manifest that is
+ * not in the registry, the filesystem, network timing, the host. {@link #getSubject()} names it.
  */
 @Getter
-final class CannotKnow extends RuntimeException {
-
+public final class CannotKnow extends RuntimeException {
     private final String subject;
     private final Reason reason;
 
-    CannotKnow(String subject) {
+    public CannotKnow(String subject) {
         this(subject, Reason.RESOLUTION_REQUIRED);
     }
 
-    CannotKnow(String subject, Reason reason) {
+    public CannotKnow(String subject, Reason reason) {
         super("the engine cannot know " + subject);
         this.subject = subject;
         this.reason = reason;

@@ -190,12 +190,7 @@ final class JsYaml {
     /**
      * A JavaScript {@code undefined}: what {@code load} returns for a stream without documents.
      */
-    static final Object UNDEFINED = new Object() {
-        @Override
-        public String toString() {
-            return "undefined";
-        }
-    };
+    static final Object UNDEFINED = Js.UNDEFINED;
 
     private JsYaml() {
     }

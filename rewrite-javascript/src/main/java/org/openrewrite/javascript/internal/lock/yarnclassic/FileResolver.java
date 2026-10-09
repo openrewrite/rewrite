@@ -16,8 +16,9 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.npm.PosixPath;
-import org.openrewrite.javascript.internal.lock.yarnclassic.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 /**
  * Port of yarn src/resolvers/exotics/file-resolver.js (yarn 1.22.22): the directory's own package.json, copied, or
@@ -53,7 +54,7 @@ final class FileResolver {
             manifest.put("_uid", manifest.getVersion());
             return Promise.resolved(resolver.loop, manifest);
         }
-        EventLoop.Io<@Nullable String> read = resolver.loop.io(request.io, () -> resolver.files.manifest(location));
+        Io<@Nullable String> read = Io.issue(resolver.loop, request.io, () -> resolver.files.manifest(location));
         request.awaited(read);
         return read.promise.then(text -> {
             if (text == null && resolver.files.isMissing(location)) {
