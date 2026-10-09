@@ -45,11 +45,8 @@ import java.util.zip.GZIPInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The port against Yarn 4.10.3's own code (@yarnpkg/core 4.4.4, @yarnpkg/parsers 3.0.3), row by row: what Yarn
- * answers for every lock, descriptor, locator, range and registry document of the committed scenarios and for
- * strings drawn at random, from {@code src/test/resources/yarn-berry/generate/differential.js}; and the glob
- * modules Yarn 4.10.3 bundles over workspace patterns, from {@code generate/globs.js}. With
- * {@code REWRITE_BERRY_DIFFERENTIAL} naming a directory of such rows (the corpus's), those are checked too.
+ * The port against Yarn 4.10.3's own code, row by row, from {@code generate/differential.js} and {@code
+ * generate/globs.js}; {@code REWRITE_BERRY_DIFFERENTIAL} names a directory of more such rows.
  */
 class BerryDifferentialTest {
 

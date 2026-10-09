@@ -33,9 +33,8 @@ import static org.openrewrite.semver.Semver.Ecosystem.MAVEN;
 import static org.openrewrite.semver.Semver.Ecosystem.NODE;
 
 /**
- * Drives the node-semver conformance corpus (transcribed from npm/node-semver's own test fixtures,
- * see {@code src/test/resources/node-semver}) against the {@link Semver.Ecosystem#NODE} selector
- * chain and its supporting internals.
+ * The node-semver conformance corpus (npm/node-semver's own fixtures, {@code src/test/resources/node-semver}) against
+ * the {@link Semver.Ecosystem#NODE} selector chain and its internals.
  */
 class NodeSemverConformanceTest {
 

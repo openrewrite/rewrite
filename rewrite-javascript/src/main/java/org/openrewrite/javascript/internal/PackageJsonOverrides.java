@@ -32,21 +32,12 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Parses a dependency path string into segments.
-     * Accepts both {@code >} (pnpm style) and {@code /} (yarn style) as separators.
-     * Scoped packages ({@code @scope/pkg}) are kept as a single segment.
-     * <p>
-     * Examples:
-     * <ul>
-     *   <li>{@code "express>accepts"} → [{name:"express"}, {name:"accepts"}]</li>
-     *   <li>{@code "express@4.0.0>accepts"} → [{name:"express", version:"4.0.0"}, {name:"accepts"}]</li>
-     *   <li>{@code "@scope/pkg>dep"} → [{name:"@scope/pkg"}, {name:"dep"}]</li>
-     * </ul>
+     * Parses a dependency path ({@code express>accepts}, {@code express@4.0.0/accepts}) into segments at {@code >} or
+     * {@code /}; a scoped name ({@code @scope/pkg}) is one segment.
      */
     public static List<DependencyPathSegment> parsePath(String path) {
         List<DependencyPathSegment> segments = new ArrayList<>();
 
-        // Split on '>' (pnpm-style separator)
         String[] gtParts = path.split(">");
 
         for (String gtPart : gtParts) {
@@ -63,7 +54,6 @@ public final class PackageJsonOverrides {
                         String scopedPart = gtPart.substring(0, firstSlash + 1 + secondSlash);
                         segments.add(parseSegment(scopedPart));
 
-                        // Then handle the rest as separate segments
                         String rest = afterFirstSlash.substring(secondSlash + 1);
                         for (String subPart : rest.split("/")) {
                             if (!subPart.isEmpty()) {
@@ -83,7 +73,6 @@ public final class PackageJsonOverrides {
                     }
                 }
             } else {
-                // No '/', just parse the segment directly
                 segments.add(parseSegment(gtPart));
             }
         }
@@ -111,7 +100,6 @@ public final class PackageJsonOverrides {
             return new DependencyPathSegment(part, null);
         }
 
-        // Non-scoped: name or name@version
         int atIndex = part.lastIndexOf('@');
         if (atIndex > 0) {
             return new DependencyPathSegment(part.substring(0, atIndex), part.substring(atIndex + 1));
@@ -134,12 +122,8 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Applies a transitive-dependency override to a {@code package.json} document,
-     * dispatching on the package manager dialect.
-     * <p>
-     * For the no-path (global) case, formatting is preserved via
-     * {@link PackageJsonHelper}'s mutation helpers. For deep-nested paths the
-     * document is re-serialised and re-parsed (acceptable per spec).
+     * Applies a transitive-dependency override to a package.json in its package manager's dialect, keeping the
+     * formatting for a global override and re-serializing for a nested path.
      */
     public static Json.Document applyOverride(Json.Document doc,
                                               PackageManager pm,
@@ -162,9 +146,7 @@ public final class PackageJsonOverrides {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // npm / Bun: "overrides" field with nested objects
-    // -------------------------------------------------------------------------
+    // npm and Bun: "overrides", nested objects
 
     private static Json.Document applyNpmOverride(Json.Document doc,
                                                    String packageName,
@@ -187,11 +169,9 @@ public final class PackageJsonOverrides {
      */
     private static String buildNpmNestedOverride(String packageName, String newVersion,
                                                   List<DependencyPathSegment> path) {
-        // Innermost value
         StringBuilder sb = new StringBuilder();
         sb.append(jsonString(packageName)).append(": ").append(jsonString(newVersion));
 
-        // Wrap from inside out
         for (int i = path.size() - 1; i >= 0; i--) {
             DependencyPathSegment seg = path.get(i);
             String key = seg.getVersion() != null
@@ -202,9 +182,7 @@ public final class PackageJsonOverrides {
         return "{" + sb + "}";
     }
 
-    // -------------------------------------------------------------------------
-    // Yarn Classic / Berry: "resolutions" field with flat path keys
-    // -------------------------------------------------------------------------
+    // Yarn classic and Berry: "resolutions", flat path keys
 
     private static Json.Document applyYarnResolution(Json.Document doc,
                                                       String packageName,
@@ -225,9 +203,7 @@ public final class PackageJsonOverrides {
         return setFlatEntry(doc, "resolutions", key, newVersion);
     }
 
-    // -------------------------------------------------------------------------
-    // pnpm: "pnpm.overrides" nested field with flat > path keys
-    // -------------------------------------------------------------------------
+    // pnpm: "pnpm.overrides", flat > path keys
 
     private static Json.Document applyPnpmOverride(Json.Document doc,
                                                     String packageName,
@@ -249,10 +225,6 @@ public final class PackageJsonOverrides {
         return setPnpmOverridesEntry(doc, key, newVersion);
     }
 
-    // -------------------------------------------------------------------------
-    // Formatting-preserved helpers
-    // -------------------------------------------------------------------------
-
     /**
      * Sets {@code topLevelKey[entryKey] = entryValue} in a flat top-level object,
      * creating the parent object if absent. Preserves formatting.
@@ -266,11 +238,9 @@ public final class PackageJsonOverrides {
 
         Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
         if (existingScope == null) {
-            // Create the parent object with the single entry
             return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
         }
 
-        // Check if key already exists — replace or append
         for (org.openrewrite.json.tree.Json m : existingScope.getMembers()) {
             if (m instanceof Json.Member) {
                 Json.Member member = (Json.Member) m;
@@ -279,14 +249,12 @@ public final class PackageJsonOverrides {
                     if (entryValue.equals(literalString(member.getValue()))) {
                         return doc;
                     }
-                    // Replace existing entry value
                     Json.JsonObject updated = replaceMemberValue(existingScope, entryKey, entryValue);
                     return doc.withValue(replaceMemberValue(root, topLevelKey, updated));
                 }
             }
         }
 
-        // Key not present: append
         return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
     }
 
@@ -300,23 +268,15 @@ public final class PackageJsonOverrides {
 
         Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
         if (pnpmObj == null) {
-            // No pnpm object yet — create pnpm: { overrides: { key: value } }
-            // Use addDependency twice: first add the inner entry (to trigger scope creation),
-            // but we need a two-level nest. Use the reparse fallback for this edge case.
+            // no pnpm object yet: build pnpm: { overrides: { key: value } } by reparsing
             String newJson = buildPnpmSnippet(doc, key, value);
             return PackageJsonHelper.reparseJson(doc, newJson);
         }
 
-        // pnpm object exists — delegate to flat entry within the "overrides" sub-object
-        // We'll operate directly on the pnpm sub-object via reparse for simplicity.
-        // (The pnpm.overrides nesting is unusual enough that reparse is fine.)
+        // a pnpm object exists: rebuild its overrides by reparsing
         String newJson = buildPnpmSnippet(doc, key, value);
         return PackageJsonHelper.reparseJson(doc, newJson);
     }
-
-    // -------------------------------------------------------------------------
-    // Reparse-based helpers (used for deep-nested cases)
-    // -------------------------------------------------------------------------
 
     /**
      * Merges {@code newObjectJson} into the existing {@code topLevelKey} object
@@ -326,8 +286,6 @@ public final class PackageJsonOverrides {
                                                              String topLevelKey,
                                                              String newObjectJson) {
         String serialized = doc.printAll();
-        // Use Jackson-style logic: parse as map, merge, re-serialize.
-        // Simpler: build string from scratch using the existing document as source.
         try {
             com.fasterxml.jackson.databind.ObjectMapper mapper =
                     new com.fasterxml.jackson.databind.ObjectMapper();
@@ -395,10 +353,6 @@ public final class PackageJsonOverrides {
             return serialized;
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Tiny JSON helpers (avoid importing full JsonHelper as these are static utils)
-    // -------------------------------------------------------------------------
 
     private static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {

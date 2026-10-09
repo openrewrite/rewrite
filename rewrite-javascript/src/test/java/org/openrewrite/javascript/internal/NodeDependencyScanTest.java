@@ -117,9 +117,8 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Run in a workspace member that has a lock of its own, npm, Yarn classic, pnpm and Bun install at the workspace
-     * root and write its lock, leaving the member's as it was; where the package manager's own walk says so, the
-     * regeneration runs it in the member.
+     * npm, Yarn classic, pnpm and Bun run in a member with a lock of its own install at the workspace root and write
+     * its lock; where the package manager's walk says so, the regeneration runs it in the member.
      */
     @ParameterizedTest
     @CsvSource({"Npm, package-lock.json", "YarnClassic, yarn.lock", "Pnpm, pnpm-lock.yaml", "Bun, bun.lock"})
@@ -144,7 +143,8 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Which lock yarn 1.22.22, bun 1.3.10 and npm 11.17.0 write when run in packages/a, both it and the root holding one.
+     * Which lock yarn 1.22.22, bun 1.3.10 and npm 11.17.0 write when run in packages/a, both it and the root holding
+     * one.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {

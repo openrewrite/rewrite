@@ -52,10 +52,8 @@ final class Workspace {
     }
 
     /**
-     * {@code setup}: the manifest, the anchored descriptor and locator, and the directories fast-glob reports for
-     * the patterns, sorted, that hold a package.json.
-     *
-     * @param manifest the directory's package.json, null without one
+     * {@code setup}: the manifest (null without one), the anchored descriptor and locator, and the sorted directories
+     * fast-glob reports for the patterns that hold a package.json.
      */
     void setup(@Nullable Manifest manifest, FastGlob fastGlob) {
         this.manifest = manifest != null ? manifest : new Manifest();
@@ -82,9 +80,8 @@ final class Workspace {
     }
 
     /**
-     * {@code accepts}: a {@code workspace:} range naming this directory, {@code *}, {@code ^} or {@code ~}, or a
-     * semver range its version satisfies ({@code 0.0.0} without one), the latter without the protocol only under
-     * {@code enableTransparentWorkspaces}.
+     * {@code accepts}: a {@code workspace:} range naming this directory, {@code *}, {@code ^}, {@code ~}, or a range
+     * its version (else {@code 0.0.0}) satisfies, without the protocol only under {@code enableTransparentWorkspaces}.
      */
     boolean accepts(String range) {
         int protocolIndex = range.indexOf(':');

@@ -33,9 +33,8 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/arborist lib/shrinkwrap.js (npm 11.17.0): the lock as data. Loaded from the lock's
- * text, kept current as nodes enter, move and leave a tree, rebuilt from the tree by {@link #commit()}
- * and written by {@link #toString()}.
+ * Port of @npmcli/arborist lib/shrinkwrap.js (npm 11.17.0): the lock as data, rebuilt from the tree by
+ * {@link #commit()} and written by {@link #toString()}.
  */
 public final class Shrinkwrap {
 
@@ -281,9 +280,8 @@ public final class Shrinkwrap {
     }
 
     /**
-     * Arborist's {@code load()} over the files it would read from the project directory: the lock
-     * (npm-shrinkwrap.json or package-lock.json, null when there is none), yarn.lock and package.json
-     * (read only to type the dependencies of a lockfileVersion 1 lock).
+     * Arborist's {@code load()} over the lock (null when none), yarn.lock and package.json, read only to type the
+     * dependencies of a lockfileVersion 1 lock.
      */
     public Shrinkwrap load(VirtualTreeLoader.ProjectFiles files) {
         LockFile lock = files.getLock();

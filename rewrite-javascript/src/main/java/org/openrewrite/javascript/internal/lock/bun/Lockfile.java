@@ -27,12 +27,7 @@ import java.util.Map;
 
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
-/**
- * Port of bun's src/install/lockfile.zig (bun 1.3.10): the packages, the dependency buffer and the resolution
- * buffer beside it (dependency id to package id), the package index (name hash to the ids of that name, highest
- * resolution first), workspaces, trusted and patched dependencies, overrides, catalogs, and the hoisted tree the
- * last {@link #hoist} built. Package 0 is the root.
- */
+/** Port of bun's src/install/lockfile.zig (bun 1.3.10); package 0 is the root. */
 final class Lockfile {
 
     static final int TEXT_LOCKFILE_VERSION_CURRENT = 1;

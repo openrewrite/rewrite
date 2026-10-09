@@ -30,10 +30,8 @@ import java.util.Set;
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
- * Port of bun's src/install/lockfile/bun.lock.zig {@code parseIntoBinaryLockfile}, {@code PkgMap.findResolution}
- * and {@code parseAppendDependencies} (bun 1.3.10): bun.lock read once into a {@link Lockfile}. Each package's
- * dependencies are resolved by walking its key up the tree to the first key of that name, then the tree is
- * hoisted again. An error is bun's: it ignores the lock and resolves everything from scratch.
+ * Port of bun's src/install/lockfile/bun.lock.zig {@code parseIntoBinaryLockfile}, {@code PkgMap.findResolution} and
+ * {@code parseAppendDependencies} (bun 1.3.10).
  */
 final class TextLockfileReader {
 

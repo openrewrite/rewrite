@@ -25,9 +25,8 @@ import static java.util.Objects.requireNonNull;
 import static org.openrewrite.semver.Semver.isVersion;
 
 /**
- * Any of X, x, *, or + may be used to "stand in" for one of the numeric values in the [major, minor, patch] tuple.
+ * Any of X, x, * or + stands in for a numeric value of the [major, minor, patch] tuple, + for Gradle's {@code 2.+}.
  * <a href="https://github.com/npm/node-semver#x-ranges-12x-1x-12-">X-Ranges</a>.
- * The + wildcard is supported for Gradle-style dynamic versions (e.g., "2.+").
  */
 public class XRange extends LatestRelease {
     private static final Pattern X_RANGE_PATTERN = Pattern.compile("([*xX+]|\\d+)(?:\\.([*xX+]|\\d+)(?:\\.([*xX+]|\\d+))?(?:\\.([*xX+]|\\d+))?)?");

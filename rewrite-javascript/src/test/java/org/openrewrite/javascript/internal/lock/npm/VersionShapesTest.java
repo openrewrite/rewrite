@@ -37,9 +37,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Parity with arborist over a dependency whose package.json holds a version or a name of an unexpected
- * JSON type, as dumped by npm-arborist/generate/version-shapes.js. npm 11.17.0 exits 1 where a reader
- * throws: a workspace member with {@code "version": 2} and a dependent with a ranged spec.
+ * Parity with arborist over a dependency whose package.json holds a version or name of an unexpected JSON type
+ * ({@code npm-arborist/generate/version-shapes.js}).
  */
 class VersionShapesTest {
 

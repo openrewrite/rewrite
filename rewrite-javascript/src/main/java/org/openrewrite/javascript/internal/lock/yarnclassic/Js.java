@@ -146,7 +146,6 @@ final class Js extends EcmaScript {
 
     /**
      * {@code JSON.parse}, with every object's keys in the order JavaScript gives them.
-     *
      * @throws JsError a {@code SyntaxError} when the text is not JSON.
      */
     static @Nullable Object jsonParse(String text) {

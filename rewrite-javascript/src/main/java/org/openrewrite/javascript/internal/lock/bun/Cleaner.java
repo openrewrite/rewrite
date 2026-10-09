@@ -24,9 +24,8 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /**
- * Port of bun's src/install/lockfile.zig {@code cleanWithLogger}, {@code Cloner} and Package.zig
- * {@code clone} (bun 1.3.10) for an install without update requests: a new lockfile holding only the packages
- * the root reaches through resolutions, cloned depth first from the root, then hoisted again.
+ * Port of bun's src/install/lockfile.zig {@code cleanWithLogger}, {@code Cloner} and Package.zig {@code clone}
+ * (bun 1.3.10) for an install without update requests.
  */
 final class Cleaner {
 

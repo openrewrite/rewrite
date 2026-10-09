@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Port of bun's src/install/npm.zig {@code PackageManifest} and {@code PackageVersion} (bun 1.3.10): an abbreviated
- * packument as bun reads it ({@code parse}), releases and prereleases each sorted by version, and the choice of a
- * version for a range ({@code findBestVersion}, with the minimum release age filter
- * {@code findBestVersionWithFilter}).
+ * Port of bun's src/install/npm.zig {@code PackageManifest} and {@code PackageVersion} (bun 1.3.10), with
+ * {@code findBestVersion} and the minimum release age filter.
  */
 final class PackageManifest {
 

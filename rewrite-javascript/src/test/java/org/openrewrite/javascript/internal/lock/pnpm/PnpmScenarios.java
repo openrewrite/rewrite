@@ -427,9 +427,8 @@ final class PnpmScenarios {
         }
 
         /**
-         * A packument as pnpm received it: {@code http/}, else pnpm's own metadata cache of the phase (then of the
-         * other phases) under {@code probes/<phase>-cache/}, else the shared cache. A full document comes from the full
-         * mirrors, or from the abbreviated one where pnpm saved it after a release-age upgrade.
+         * A packument as pnpm received it: {@code http/}, else pnpm's metadata cache of a phase under {@code probes/},
+         * else the shared cache; a full document from the full mirrors or a release-age upgrade's save.
          */
         @Nullable
         String packument(String name, boolean full, String phase) {
@@ -479,9 +478,8 @@ final class PnpmScenarios {
         }
 
         /**
-         * The registries pnpm fetched packuments from in a phase, as its metadata cache names them (the host, a port
-         * after a {@code +}); for a recording without that cache, registry.npmjs.org and the hosts its
-         * {@code registry-hosts} file lists.
+         * The registries pnpm fetched packuments from in a phase, as its metadata cache names them; without that cache,
+         * registry.npmjs.org and the hosts its {@code registry-hosts} file lists.
          */
         Set<String> registryHosts(String phase) {
             Set<String> hosts = new TreeSet<>();

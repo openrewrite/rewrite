@@ -29,9 +29,8 @@ import java.util.Map;
 import java.util.function.Supplier;
 
 /**
- * The registry documents of a build, fetched through the run's {@link NpmRegistryClient} from the
- * registry each name is configured to, and parsed once per build so that what the build does to a
- * manifest stays its own.
+ * The registry documents of a build, fetched through the run's {@link NpmRegistryClient} from the registry each name
+ * is configured to, and parsed once per build.
  */
 public final class NpmRegistryPackuments implements PackumentSource {
 

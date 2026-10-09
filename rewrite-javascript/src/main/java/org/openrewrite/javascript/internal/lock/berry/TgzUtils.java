@@ -119,7 +119,6 @@ final class TgzUtils {
 
     /**
      * Parse's first write: a stream that starts with the gzip magic bytes is inflated, any other is read as a tar.
-     *
      * @throws ReportError when the gzip stream is corrupt, as Yarn fails to fetch the package
      */
     static byte[] maybeGunzip(byte[] tgz) {

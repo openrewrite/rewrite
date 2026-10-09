@@ -219,9 +219,8 @@ public class NodeSemver {
     }
 
     /**
-     * node-semver's {@code minSatisfying}: the lowest version the range admits, the first of equal ones.
-     *
-     * @return {@code null} when no version satisfies the range or the range is invalid.
+     * node-semver's {@code minSatisfying}: the lowest version the range admits, the first of equal ones; {@code null}
+     * when none does or the range is invalid.
      */
     public static @Nullable String minSatisfying(Collection<String> versions, String range, Options options) {
         UnionRange r = UnionRange.parse(range, options.includePrerelease, options.loose, options.release);
@@ -244,7 +243,6 @@ public class NodeSemver {
 
     /**
      * node-semver's {@code minVersion}: the lowest version the range admits, or {@code null} when it admits none.
-     *
      * @throws IllegalArgumentException when the range is invalid, as node-semver throws.
      */
     public static @Nullable String minVersion(String range, Options options) {
@@ -308,7 +306,6 @@ public class NodeSemver {
 
     /**
      * node-semver's {@code subset}: whether every version {@code sub} admits is one {@code dom} admits.
-     *
      * @throws IllegalArgumentException when either range is invalid, as node-semver throws.
      */
     public static boolean subset(String sub, String dom, Options options) {
@@ -481,7 +478,6 @@ public class NodeSemver {
 
     /**
      * {@code compare} with the versions as JSON package data may hold them, in any type.
-     *
      * @throws IllegalArgumentException when either version is invalid or not a string, as node-semver throws.
      */
     public static int compare(@Nullable Object v1, @Nullable Object v2, Options options) {
@@ -492,7 +488,6 @@ public class NodeSemver {
 
     /**
      * node-semver's {@code compareBuild}: {@code compare}, then the build metadata.
-     *
      * @throws IllegalArgumentException when either version is invalid, as node-semver throws.
      */
     public static int compareBuild(String v1, String v2, Options options) {
@@ -504,7 +499,6 @@ public class NodeSemver {
 
     /**
      * node-semver's {@code rsort}: sorted in place, highest first by {@code compareBuild}, stably.
-     *
      * @throws IllegalArgumentException when a version it compares is invalid, as node-semver throws.
      */
     public static void rsort(List<String> versions, Options options) {

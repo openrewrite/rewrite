@@ -23,10 +23,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The order bun 1.3.10 writes {@code trustedDependencies} in: the slot order of a Zig hash map sized for the whole
- * package.json list, the installed names put in the order the hoisted tree lists them. Each case is a recording
- * of the Bun corpus ({@code trusted-deps}, {@code open-trusted-order-capacity}, {@code -capacity-small},
- * {@code -many}).
+ * The order bun 1.3.10 writes {@code trustedDependencies} in, a Zig hash map's slot order, as recorded in the Bun
+ * corpus ({@code trusted-deps}, {@code open-trusted-order-capacity}, {@code -capacity-small}, {@code -many}).
  */
 class TrustedDependenciesTest {
 

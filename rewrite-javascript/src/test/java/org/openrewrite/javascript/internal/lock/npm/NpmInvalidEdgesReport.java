@@ -26,9 +26,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Writes, to the file {@code REWRITE_LOCK_INVALID_EDGES} names, every edge that is missing or invalid
- * after loading each {@code after} lock {@link NpmScenarios} finds: the edges npm itself leaves behind,
- * which the ideal tree builder must know about. Not a check; a study.
+ * Writes every missing or invalid edge of each {@code after} lock {@link NpmScenarios} finds, to the file
+ * {@code REWRITE_LOCK_INVALID_EDGES} names: a study of the edges npm leaves behind, not a check.
  */
 class NpmInvalidEdgesReport {
 

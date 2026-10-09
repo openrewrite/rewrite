@@ -22,9 +22,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * The project's manifests by location relative to its root ({@code ""} the root, {@code packages/a} a member), the
- * paths it holds when the host says, and the location yarn runs in: what yarn reads from the filesystem during an
- * install.
+ * What yarn reads from the filesystem during an install: the manifests by location ({@code ""} the root), the paths the
+ * project holds when the host says, and the location yarn runs in.
  */
 final class ProjectFiles {
 

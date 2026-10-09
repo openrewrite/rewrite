@@ -41,10 +41,8 @@ import java.util.zip.GZIPInputStream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The YAML reader and writer against @zkochan/js-yaml 0.0.11, the module pnpm 11.2.2 bundles, whose package ships
- * no tests: rows from {@code src/test/resources/pnpm/generate/yaml-differential.js} of what its {@code dump} (under
- * {@code lockfileYamlDump}'s options) writes for generated values and what its {@code load} reads, or throws, for
- * those texts, mutations of them and fragments that reach the loader's other paths.
+ * The YAML reader and writer against @zkochan/js-yaml 0.0.11, which pnpm 11.2.2 bundles, by the rows of
+ * {@code pnpm/generate/yaml-differential.js}.
  */
 class JsYamlDifferentialTest {
 

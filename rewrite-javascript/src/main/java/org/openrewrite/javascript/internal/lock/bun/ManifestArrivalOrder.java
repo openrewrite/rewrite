@@ -83,9 +83,8 @@ final class ManifestArrivalOrder {
     }
 
     /**
-     * One line per name whose required peers no package satisfied when the peers began and whose picks differ: the
-     * peer that runs first installs its pick and every later one takes that package, so the order the requirers'
-     * manifests arrived in decides which.
+     * One line per name whose required peers nothing satisfied when the peers began and whose picks differ: the order
+     * the requirers' manifests arrived in decides which pick the later peers take.
      */
     static List<String> detectPeers(Lockfile lockfile, List<Resolved> peers) {
         Map<String, List<Resolved>> byName = new LinkedHashMap<>();

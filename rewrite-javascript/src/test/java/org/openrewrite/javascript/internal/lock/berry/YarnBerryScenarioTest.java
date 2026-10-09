@@ -41,14 +41,8 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Replays every recorded edit {@link BerryScenarios} finds through {@link YarnBerryLockRegenerator}, with the
- * registry served from the scenario's {@code http/}, and asserts what the scenario's {@code expect} line says:
- * {@code exact} (the lock written equals Yarn's {@code after} byte for byte; the default when {@code after} is
- * present), {@code cannot-know <what>} (every package and spec it names), {@code malformed}, {@code pm-rejects
- * <message>} or {@code second-install-rejects}. A phase one that migrated a {@code lock-seed} is an edit of its own,
- * whose lock is {@code before}. A fixture recorded elsewhere may lack registry responses: it is replayed when a cache
- * fills them and skipped when it cannot be served. When {@code REWRITE_LOCK_YARN_BERRY_SCENARIO_RESULTS} names a
- * file, one line per edit is written there: the outcome and the first difference.
+ * Replays every recorded edit {@link BerryScenarios} finds through {@link YarnBerryLockRegenerator} and asserts its
+ * {@code expect} line; {@code REWRITE_LOCK_YARN_BERRY_SCENARIO_RESULTS} names a file for one line per edit.
  */
 class YarnBerryScenarioTest {
 

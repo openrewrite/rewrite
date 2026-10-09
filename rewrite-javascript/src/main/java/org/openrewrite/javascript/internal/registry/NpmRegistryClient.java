@@ -192,7 +192,10 @@ public class NpmRegistryClient {
         return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
-    /** The registry URL with any userinfo stripped, so a {@code user:token@host} credential never reaches a failure detail. */
+    /**
+     * The registry URL with any userinfo stripped, so a {@code user:token@host} credential never reaches a failure
+     * detail.
+     */
     private static String safeUrl(NodeRegistry registry) {
         return Urls.stripUserinfo(registry.getUrl());
     }

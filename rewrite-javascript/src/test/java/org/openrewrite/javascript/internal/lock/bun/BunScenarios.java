@@ -42,20 +42,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded Bun scenarios a test can replay: every directory holding a bun.lock under {@code lock/bun/} on the
- * test classpath (the in-repo fixtures and the downloaded ones merge there), and, when the environment variable
- * {@code REWRITE_LOCK_SCENARIOS} names a directory, every one under its {@code bun} sibling, or under the directory
- * itself when it holds Bun scenarios. {@code REWRITE_LOCK_HTTP_CACHE} names a directory of registry responses a
- * scenario's own {@code http/} falls back on.
- * <p>
- * The layout: {@code pkg-before}, {@code before}, {@code pkg},
- * {@code after}, {@code fresh}, a hand-made starting lock {@code lock-before} (copied to {@code before}), the project
- * config {@code npmrc} and {@code bunfig} (with {@code npmrc-before} and {@code bunfig-before} for the first phase),
- * the project files {@code tree-before/} and {@code tree/} copied over it before each phase, and {@code http/}.
- * What bun writes on an install that changes nothing over a lock, when it differs, is {@code <lock>-again}
- * ({@code again} for {@code after}) with {@code bun-<lock>-again.log}. The downloaded fixtures spell the edited
- * manifest {@code pkg-after}, a workspace's root {@code pkg-root} and its members {@code pkg-<name>},
- * {@code pkg-<name>-before} and {@code pkg-<name>-after}.
+ * The recorded Bun scenarios under {@code lock/bun/} on the test classpath and, when {@code REWRITE_LOCK_SCENARIOS}
+ * names a directory, under its {@code bun} sibling or itself; {@code REWRITE_LOCK_HTTP_CACHE} is the registry fallback.
  */
 final class BunScenarios {
 
@@ -121,9 +109,8 @@ final class BunScenarios {
         }
 
         /**
-         * Whether bun's install that changes nothing over this lock resolved dependencies (from scratch, or some it
-         * found changed) and wrote another lock: its bytes are the resolver's. A patched dependency makes bun run
-         * tasks, and report them, without resolving anything.
+         * Whether bun's install that changes nothing over this lock resolved dependencies and wrote another lock, whose
+         * bytes are then the resolver's; a patched dependency makes bun run tasks without resolving anything.
          */
         boolean resolvesAgain() {
             String log = againLog();

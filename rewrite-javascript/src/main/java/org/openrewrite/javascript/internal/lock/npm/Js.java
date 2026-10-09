@@ -82,10 +82,8 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code receiver[key]} for a value parsed from JSON.
-     *
-     * @return {@link #UNDEFINED} when there is no such property, {@link #INHERITED} for a prototype member.
-     * @throws IllegalArgumentException for JavaScript's TypeError on reading from null or undefined.
+     * {@code receiver[key]} for a value parsed from JSON: {@link #UNDEFINED} without such a property, {@link
+     * #INHERITED} for a prototype member; IllegalArgumentException for JavaScript's TypeError on null or undefined.
      */
     static @Nullable Object get(@Nullable Object receiver, String key) {
         if (receiver == null || receiver == UNDEFINED) {
@@ -129,10 +127,8 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code Object.entries(value)} for a value parsed from JSON: an object's integer keys in ascending
-     * order and then its other keys as inserted, or the indexes of an array or a string.
-     *
-     * @throws IllegalArgumentException for JavaScript's TypeError on null or undefined.
+     * {@code Object.entries(value)} for a value parsed from JSON (integer keys ascending, then the rest as inserted, or
+     * an array's or string's indexes); IllegalArgumentException for JavaScript's TypeError on null or undefined.
      */
     @SuppressWarnings("unchecked")
     static List<Map.Entry<String, @Nullable Object>> entries(@Nullable Object value) {
@@ -179,9 +175,8 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code delete receiver[key]} in strict mode, which every class body is: an object loses the property,
-     * an array keeps a {@link #HOLE}, and a property that cannot be deleted (a string's characters, a
-     * length) is JavaScript's TypeError.
+     * {@code delete receiver[key]} in strict mode: an object loses the property, an array keeps a {@link #HOLE}, and an
+     * undeletable property (a string's characters, a length) is JavaScript's TypeError.
      */
     static void delete(@Nullable Object receiver, String key) {
         if (receiver instanceof String || receiver instanceof List) {
@@ -338,7 +333,6 @@ final class Js extends EcmaScript {
 
     /**
      * {@code Date.parse(text)}, as {@link V8Date#parse}.
-     *
      * @throws CannotKnow for a date-time without an offset, which JavaScript reads in the host's time zone
      */
     static double dateParse(String text) {

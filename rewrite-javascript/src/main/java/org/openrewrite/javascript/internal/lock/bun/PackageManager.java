@@ -33,8 +33,7 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
 
 /**
  * Port of bun's src/install/PackageManager (bun 1.3.10) for a lock-only install: PackageManagerEnqueue.zig,
- * runTasks.zig, processDependencyList.zig, PackageManagerResolution.zig and resolvers/folder_resolver.zig. The
- * registry answers manifest requests one at a time, in the order they were made.
+ * runTasks.zig, processDependencyList.zig, PackageManagerResolution.zig and resolvers/folder_resolver.zig.
  */
 final class PackageManager {
 
@@ -492,9 +491,8 @@ final class PackageManager {
     }
 
     /**
-     * {@code FolderResolution.getOrPut} for a folder or workspace relative to the project: the package read from
-     * its package.json, which replaces a package already resolved there. Answers the package id, and 1 when the
-     * package was read now.
+     * {@code FolderResolution.getOrPut} for a folder or workspace relative to the project: the package id read from its
+     * package.json, replacing one resolved there, and 1 when it was read now.
      */
     private int[] folderResolution(Resolution.Tag tag, DependencyVersion version, String path, Dependency dependency) {
         String rel = RootRelativePath.normalize(path.replace('\\', '/'));
@@ -639,10 +637,8 @@ final class PackageManager {
     }
 
     /**
-     * {@code installWithManager}'s wait for everything but the peers, then for the peers. Where the first wait's
-     * result depends on the order the manifests arrive in, the engine cannot know it.
-     *
-     * @param packagesBefore the lockfile's package count when the install began enqueueing.
+     * {@code installWithManager}'s wait for everything but the peers, then for the peers ({@code packagesBefore}: the
+     * package count when enqueueing began); cannot-know where the first wait depends on manifest arrival order.
      */
     void resolve(int packagesBefore) {
         if (pendingTaskCount() == 0 && peerDependencies.isEmpty()) {

@@ -107,10 +107,8 @@ class LocaleCompareTest {
     }
 
     /**
-     * Node answers -1 for both: ICU tells each first string from its normalized form, the second. One has
-     * a combining character from beyond the Basic Multilingual Plane before one of a lower combining
-     * class; in the other a vowel sign from there decomposes into a contraction with the sign before it.
-     * The port refuses the first string of each rather than answer 0.
+     * Node answers -1 for both, ICU telling each first string from its normalized form; the port refuses the first
+     * rather than answer 0.
      */
     @Test
     void stringsBeyondTheBmpNotInNormalizationFormDAreRefused() {
@@ -128,10 +126,8 @@ class LocaleCompareTest {
     }
 
     /**
-     * Node answers 0 for each, as the port does: strings that are not in normalization form D but hold
-     * no contraction meeting a character from beyond the Basic Multilingual Plane. The mark U+10D25
-     * after a precomposed letter, the Gurung Khema vowel sign U+16121 after a letter that starts no
-     * contraction, a compatibility ideograph and a letter beside an unassigned character stay ordered.
+     * Node answers 0 for each, as the port does: strings not in normalization form D that hold no contraction meeting a
+     * supplementary-plane character.
      */
     @Test
     void otherUnnormalizedStringsAreOrderedAsTheirNormalizedForm() {
@@ -148,10 +144,8 @@ class LocaleCompareTest {
     }
 
     /**
-     * Node orders each of these apart from its normalized form (-1 for the first, second and fourth, +1 for
-     * the third): a contraction starter (Cyrillic \u0418, Tibetan U+0F71, Sinhala U+0DDC, whose decomposition
-     * is a contraction) followed by a mark from beyond the Basic Multilingual Plane and a mark of a lower
-     * class, or U+1138B before a vowel sign whose decomposition continues a contraction.
+     * Node orders each apart from its normalized form: a contraction starter followed by a supplementary-plane mark and
+     * a mark of a lower class, or U+1138B before a vowel sign whose decomposition continues a contraction.
      */
     @Test
     void contractionsMeetingSupplementaryCharactersAreRefused() {

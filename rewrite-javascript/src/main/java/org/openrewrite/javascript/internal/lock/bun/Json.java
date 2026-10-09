@@ -22,9 +22,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * JSON as bun's src/interchange/json.zig {@code parsePackageJSONUTF8} reads it (bun 1.3.10): comments and
- * trailing commas allowed, into bun's expression shape, where an object keeps every property in source order, a
- * repeated key included, and {@link Expr#get} answers the first.
+ * JSON as bun's src/interchange/json.zig {@code parsePackageJSONUTF8} reads it (bun 1.3.10): comments and trailing
+ * commas allowed, every property kept in source order, a repeated key too, {@link Expr#get} answering the first.
  */
 final class Json {
 

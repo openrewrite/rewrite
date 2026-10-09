@@ -24,9 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of bun's src/install/lockfile/Package/WorkspaceMap.zig {@code processNamesArray} (bun 1.3.10): the
- * workspace members a {@code workspaces} array names, by path relative to the root, with each member's name and
- * version. The directories bun walks are the project's manifests the host supplies, by location.
+ * Port of bun's src/install/lockfile/Package/WorkspaceMap.zig {@code processNamesArray} (bun 1.3.10), over the
+ * project's manifests the host supplies, by location.
  */
 final class Workspaces {
 

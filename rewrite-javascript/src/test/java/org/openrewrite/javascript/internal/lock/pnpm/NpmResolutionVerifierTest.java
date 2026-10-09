@@ -27,9 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * resolving/npm-resolver/test/createNpmResolutionVerifier.test.ts and fetchAttestationPublishedAt.test.ts of
- * pnpm 11.2.2. Not ported: canTrustPastCheck (the verification cache's, a file in pnpm's cache directory), and the
- * attestation request's URL and auth header, which the host builds from {@link RegistryMetadata#attestations}.
+ * pnpm 11.2.2's createNpmResolutionVerifier.test.ts and fetchAttestationPublishedAt.test.ts, less canTrustPastCheck (a
+ * cache file) and the attestation request's URL and auth header, the host's from {@link RegistryMetadata#attestations}.
  */
 class NpmResolutionVerifierTest {
 

@@ -80,9 +80,8 @@ class PackageResolverFindTest {
     }
 
     /**
-     * Two patterns of one name resolve to one version from different remotes, inside one root request. The lock's
-     * pattern under a locked parent resolves before anything the registry answers, so its remote is written; under
-     * a parent resolved anew, it races the registry's pattern.
+     * Two patterns of one name resolve to one version from different remotes in one root request: under a locked parent
+     * the lock's remote is written, under a parent resolved anew it races the registry's.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {

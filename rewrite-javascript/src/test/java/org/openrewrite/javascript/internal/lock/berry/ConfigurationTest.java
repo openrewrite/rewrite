@@ -27,11 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Yarn's packages/yarnpkg-core/tests/Configuration.test.ts, the cases about settings that reach a lock: the tag
- * pattern, environment interpolation, map merging, multiple rc files and the ignored environment variables. The
- * multiple-rc-files case runs with settings of each type that reach a lock in place of its test plugin's (no
- * setting of type ANY does). Not ported: secrets hiding and {@code overwrite} merging, neither of which reaches a
- * lock.
+ * Yarn's packages/yarnpkg-core/tests/Configuration.test.ts, the cases about settings that reach a lock; secrets hiding
+ * and {@code overwrite} merging reach none and are not ported.
  */
 class ConfigurationTest {
 
@@ -162,10 +159,8 @@ class ConfigurationTest {
     }
 
     /**
-     * "should merge mergeable array properties" for a string array that does not concatenate, which
-     * {@code npmPreapprovedPackages} is as {@code unsafeHttpWhitelist} is: the first source keeps its value. Yarn
-     * 4.10.3 keeps the environment's {@code ["env"]} over an rc file's {@code [rc]}. Not ported: {@code logFilters},
-     * the one array that concatenates, and the {@code overwrite} use, which no lock reads.
+     * "should merge mergeable array properties" for a string array that does not concatenate: Yarn 4.10.3 keeps the
+     * environment's {@code ["env"]} over an rc file's {@code [rc]}.
      */
     @Test
     void doesNotMergeAnArrayThatDoesNotConcatenate() {
@@ -181,9 +176,8 @@ class ConfigurationTest {
     }
 
     /**
-     * "Multiple RC files": three nested rc files, the middle one with {@code onConflict} directives, read as
-     * {@code Configuration.find} reads them from the nearest directory; Yarn 4.10.3 answers the same over these
-     * files.
+     * "Multiple RC files": three nested rc files, the middle one with {@code onConflict} directives, read from the
+     * nearest directory as {@code Configuration.find} does; Yarn 4.10.3 answers the same over these files.
      */
     @Test
     void resolvesTheStringsOfMultipleRcFiles() {

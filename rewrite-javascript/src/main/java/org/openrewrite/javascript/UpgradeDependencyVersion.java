@@ -143,7 +143,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyScan.
         if (deps == null) return;
         for (Dependency d : deps) {
             if (nameMatcher.test(d.getName())) {
-                // TODO: add semver.gt check (matches TS shouldUpgrade); for v1 we always set the new version.
+                // always the new version: unlike the TS recipe's shouldUpgrade, no semver.gt check
                 String currentVersion = d.getVersionConstraint() == null ? "" : d.getVersionConstraint();
                 if (!newVersion.equals(currentVersion)) {
                     out.add(new MatchedDependency(d.getName(), scopeName, currentVersion));

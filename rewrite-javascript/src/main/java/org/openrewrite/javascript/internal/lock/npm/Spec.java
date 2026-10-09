@@ -142,7 +142,6 @@ public final class Spec {
 
     /**
      * {@code npa(arg, where)} for a value read from package or lock data, which may not be a string.
-     *
      * @throws IllegalArgumentException npa's TypeError for a value of another type
      */
     public static Spec npa(@Nullable Object arg, @Nullable String where) {

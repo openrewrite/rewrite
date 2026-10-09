@@ -20,9 +20,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What npm reads from the machine it runs on: {@code process.version}, {@code process.platform},
- * {@code process.arch} and the libc it detects. A null member is unknown, and the checks that read it
- * count as satisfied.
+ * What npm reads from the machine it runs on: {@code process.version}, {@code process.platform}, {@code process.arch}
+ * and the libc it detects; a null member is unknown, and the checks that read it count as satisfied.
  */
 @Value
 @Builder(toBuilder = true)

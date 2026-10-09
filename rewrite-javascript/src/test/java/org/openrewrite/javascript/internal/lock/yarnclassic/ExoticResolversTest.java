@@ -22,9 +22,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * yarn 1.22.22's __tests__/resolvers/index.js, and of __tests__/resolvers/exotics/ the cases a lock-only install
- * reaches: git-resolver.js, registry-resolver.js, hosted-git-resolver.js and bitbucket-resolver.js's
- * explodeHostedGitFragment.
+ * yarn 1.22.22's __tests__/resolvers/index.js and the exotics cases a lock-only install reaches: git-resolver.js,
+ * registry-resolver.js, hosted-git-resolver.js and bitbucket-resolver.js's explodeHostedGitFragment.
  */
 class ExoticResolversTest {
 

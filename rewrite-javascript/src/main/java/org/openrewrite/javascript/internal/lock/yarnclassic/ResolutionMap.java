@@ -56,7 +56,6 @@ final class ResolutionMap {
 
     /**
      * Reads the {@code resolutions} field.
-     *
      * @throws JsError the {@code TypeError} the exotic resolvers raise on a value that is not a string.
      */
     void init(@Nullable Map<String, @Nullable Object> resolutions) {

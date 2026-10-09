@@ -26,10 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * The version-choice cases of resolving/npm-resolver/test/index.ts of pnpm 11.2.2 (the packument its mock registry
- * serves, the spec, the preferred versions, the version resolved), run through {@code parseBareSpecifier} and
- * {@code pickPackageFromMeta} as {@code resolveNpm} runs them. The cases about fetching, the store, offline modes,
- * workspace packages, errors of the registry and tarballs are the resolver's.
+ * The version-choice cases of pnpm 11.2.2's resolving/npm-resolver/test/index.ts, run through {@code
+ * parseBareSpecifier} and {@code pickPackageFromMeta} as {@code resolveNpm} runs them.
  */
 class PickPackageFromMetaTest {
 

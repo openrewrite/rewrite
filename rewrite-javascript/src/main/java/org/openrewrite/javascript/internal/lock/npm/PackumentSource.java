@@ -23,9 +23,7 @@ import java.util.Map;
 public interface PackumentSource {
 
     /**
-     * {@code GET /<name>}: the abbreviated packument, or the full one (with {@code time}) when
-     * {@code fullMetadata}.
-     *
+     * {@code GET /<name>}: the abbreviated packument, or the full one (with {@code time}) when {@code fullMetadata}.
      * @throws NpmRejection {@code E404} when the registry has no such package
      */
     Map<String, Object> packument(String name, boolean fullMetadata);

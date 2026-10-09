@@ -41,9 +41,8 @@ import static org.openrewrite.javascript.internal.lock.npm.CanPlaceDep.Result.RE
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/arborist lib/arborist/build-ideal-tree.js (npm 11.17.0) for a lock-only install over an
- * existing lock: the tree the lock describes, with every missing or invalid edge resolved from the registry
- * and placed, flags recalculated, extraneous nodes pruned, engines and platforms checked.
+ * Port of @npmcli/arborist lib/arborist/build-ideal-tree.js (npm 11.17.0) for a lock-only install over an existing
+ * lock.
  */
 public final class IdealTreeBuilder {
 
@@ -130,11 +129,8 @@ public final class IdealTreeBuilder {
     private @Nullable PackageJson rootManifest;
 
     /**
-     * @param path     the project directory, as the lock's locations are resolved against it
-     * @param files    the lock and the manifests of the project
-     * @param registry where manifests come from
-     * @param host     what npm reads from the machine; {@link Host#UNKNOWN} satisfies every check
-     * @param now      the clock {@code min-release-age} counts from
+     * {@code path}: the project directory the lock's locations resolve against; {@code host}: what npm reads from the
+     * machine ({@link Host#UNKNOWN} satisfies every check); {@code now}: the clock {@code min-release-age} counts from.
      */
     public IdealTreeBuilder(String path, VirtualTreeLoader.ProjectFiles files, NpmOptions options,
                             PackumentSource registry, Host host, Instant now) {
@@ -150,16 +146,8 @@ public final class IdealTreeBuilder {
     }
 
     /**
-     * @throws MalformedLock              for no lock or one npm would discard
-     * @throws CannotKnow                 where arborist would read a tarball, a manifest outside the registry, the
-     *                                    filesystem or the host
-     * @throws PlaceDep.CouldNotResolve   {@code ERESOLVE}
-     * @throws NpmRejection               {@code E404}, {@code EALLOW*}, ... for a dependency that is not optional
-     * @throws PickManifest.PickFailure   {@code ETARGET}
-     * @throws Node.OverrideConflict      {@code EOVERRIDE}
-     * @throws Spec.InvalidSpecException  {@code EUNSUPPORTEDPROTOCOL}, ...
-     * @throws NpmInstallChecks.UnsupportedPlatform {@code EBADPLATFORM}
-     * @throws NpmInstallChecks.UnsupportedEngine   {@code EBADENGINE} under {@code engine-strict}
+     * Throws MalformedLock for no lock or one npm discards, CannotKnow where arborist reads what the engine lacks, and
+     * npm's rejections: ERESOLVE, E404, EALLOW*, ETARGET, EOVERRIDE, EUNSUPPORTEDPROTOCOL, EBADPLATFORM, EBADENGINE.
      */
     public Node buildIdealTree() {
         if (idealTree != null) {

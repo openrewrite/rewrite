@@ -233,13 +233,8 @@ final class Project {
     }
 
     /**
-     * {@code setupWorkspaces}: when a workspace's setup ends it claims each member it lists that no workspace has
-     * claimed and starts that member's setup; the setups end in the order they start, and the workspaces are added
-     * as the reducer's promise chain adds them, each followed by the members it claimed.
-     *
-     * @param manifests a directory's package.json by its path relative to the root ({@code .} the root), null
-     *                  without one
-     * @throws CannotKnow when two workspaces whose setups may end in either order list one member
+     * {@code setupWorkspaces}: each finished setup claims the unclaimed members it lists and starts theirs; CannotKnow
+     * when two setups that may end in either order list one member.
      */
     void setupWorkspaces(FastGlob fastGlob, Function<String, @Nullable Manifest> manifests) {
         this.manifests = manifests;
@@ -437,7 +432,6 @@ final class Project {
 
     /**
      * The package.json of a directory relative to the root, null when the project holds none there.
-     *
      * @throws CannotKnow when the host says nothing of the project's files
      */
     @Nullable
@@ -450,11 +444,8 @@ final class Project {
     }
 
     /**
-     * {@code xfs.readFilePromise(path, 'utf8')} of a file relative to the root.
-     *
-     * @throws CannotKnow for a file the host holds unread, or any file it did not read when it says nothing of the
-     *                    project's files
-     * @throws JsError    Node's ENOENT for a file the project does not hold
+     * {@code xfs.readFilePromise(path, 'utf8')} of a file relative to the root: CannotKnow for a file held unread (or
+     * any, when the host says nothing of the files), Node's ENOENT JsError for a file the project does not hold.
      */
     String readFile(String path) {
         String text = files.get(path);
@@ -471,11 +462,8 @@ final class Project {
     }
 
     /**
-     * {@code resolveEverything} of an install that is not lockfile-only.
-     *
-     * @param checkResolutions whether each resolution must satisfy its descriptor without the lockfile (hardened
-     *                         mode)
-     * @throws CannotKnow only when no wave holds a resolution Yarn rejects whatever the unknown ones resolve to
+     * {@code resolveEverything} of an install that is not lockfile-only, {@code checkResolutions} in hardened mode;
+     * throws CannotKnow only when no wave holds a resolution Yarn rejects whatever the unknown ones resolve to.
      */
     void resolveEverything(LegacyMigrationResolver legacyMigrationResolver, RegistrySource registry,
                            boolean checkResolutions) {
@@ -956,7 +944,6 @@ final class Project {
 
     /**
      * {@code fetchEverything} of an install that only updates the lockfile.
-     *
      * @throws CannotKnow naming every checksum the engine cannot compute, when Yarn's own fetches all succeed
      */
     void fetchEverything(RegistrySource registry) {
@@ -1070,10 +1057,8 @@ final class Project {
     }
 
     /**
-     * {@code persistLockfile}: the generated lockfile with the line endings of the current one; null when that
-     * leaves the file as it is.
-     *
-     * @param hostEol the host's {@code os.EOL}, used when the current file has no line break
+     * {@code persistLockfile}: the generated lockfile with the current one's line endings ({@code hostEol} when it has
+     * none); null when that leaves the file as it is.
      */
     @Nullable
     String persistLockfile(String hostEol) {

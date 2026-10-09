@@ -40,9 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * node-semver 5.5.0's own test suite (test/*.js at tag v5.5.0, which yarn 1.22.22 bundles), as the calls it makes
- * to the functions yarn calls and what 5.5.0 answered, replayed with {@link Options#V5_5_0}. The rows come from
- * running the suite against a recording proxy of the module ({@code src/test/resources/node-semver/suite-5.5.0.tsv}).
+ * node-semver 5.5.0's own tests (which yarn 1.22.22 bundles): each call to a function yarn calls, with 5.5.0's answer
+ * ({@code suite-5.5.0.tsv}, written by {@code suite-5.5.0.js}), replayed with {@link Options#V5_5_0}.
  */
 class NodeSemverRelease550Test {
 

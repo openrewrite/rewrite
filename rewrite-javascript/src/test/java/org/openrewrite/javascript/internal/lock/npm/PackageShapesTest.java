@@ -39,10 +39,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Parity with arborist over package.json content whose values have unexpected JSON types, whose keys are
- * integers or whose keys name members of {@code Object.prototype}, as dumped by
- * npm-arborist/generate/package-shapes.js. npm 11.17.0 exits 1 where building the tree throws: a
- * dependency named {@code constructor}, an override that is {@code null}.
+ * Parity with arborist over package.json values of unexpected JSON types and keys naming integers or
+ * {@code Object.prototype} members ({@code npm-arborist/generate/package-shapes.js}).
  */
 class PackageShapesTest {
 

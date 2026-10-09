@@ -21,9 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * crypto/object-hasher/test/index.ts of pnpm 11.2.2, for {@code hashObjectNullableWithPrefix} (the
- * {@code packageExtensionsChecksum}). The {@code Set} cases are not ported: no value pnpm-workspace.yaml gives is a
- * {@code Set}; {@code hashObjectWithoutSorting} is not used by a lock-only install.
+ * crypto/object-hasher/test/index.ts of pnpm 11.2.2 for {@code hashObjectNullableWithPrefix}, less the {@code Set}
+ * cases (pnpm-workspace.yaml gives no {@code Set}).
  */
 class ObjectHasherTest {
 

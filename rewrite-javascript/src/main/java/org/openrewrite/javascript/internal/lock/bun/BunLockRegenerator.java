@@ -49,9 +49,7 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
 
 /**
  * Port of bun's src/install/PackageManager/install_with_manager.zig (bun 1.3.10) for {@code bun install
- * --lockfile-only}: the lock loaded, the root diffed against the edited manifests, the changed edges resolved,
- * the lockfile cleaned and written whole. The lock written is then loaded and installed again, as the next
- * install would, and must come back unchanged: a second install that rejects or rewrites it is reported instead.
+ * --lockfile-only}; the lock written must come back unchanged from a second install, or that install is reported.
  */
 public final class BunLockRegenerator {
 

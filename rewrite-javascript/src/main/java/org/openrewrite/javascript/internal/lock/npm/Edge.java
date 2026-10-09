@@ -211,10 +211,8 @@ public final class Edge {
     }
 
     /**
-     * @throws MalformedManifest        when a {@code $name} override references a dependency neither the
-     *                                  root nor this edge's package declares, as arborist throws.
-     * @throws IllegalArgumentException when the override, or what its reference names, is not a string:
-     *                                  arborist's TypeError, there or in whatever reads the spec next.
+     * @throws MalformedManifest when a {@code $name} override references a dependency neither the root nor this edge's
+     * package declares; IllegalArgumentException, arborist's TypeError, when the override is not a string.
      */
     public String getSpec() {
         if (overrides != null && truthy(overrides.getValue()) && !"*".equals(overrides.getValue()) &&

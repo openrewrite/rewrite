@@ -27,16 +27,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * An install that changes nothing, up to the point where the ideal tree builder would start placing:
- * the root from the manifest, the tree from the lock, the flags recalculated, extraneous nodes pruned,
- * the lock written back. For every lockfileVersion 2 and 3 lock npm wrote that {@link NpmScenarios}
- * finds, the bytes are the lock's own, or those npm itself writes on a second install where it rewrites
- * the lock ({@link NpmScenarios.Lock#rewritten()}). Where that second install also placed a node
- * ({@link NpmScenarios.Lock#rewritePlacesNode()}), what npm writes is the builder's to reproduce, and the
- * data alone must still write back the lock. A scenario whose {@code expect} says its override key is
- * malformed is one npm writes an empty lock for; its locks load only with the manifest before the edit. A
- * lock whose second install npm records as failing to load ({@link NpmScenarios.Lock#loadError()}) fails to
- * load here with the same error.
+ * An install that changes nothing, up to placing, for every lockfileVersion 2 and 3 lock {@link NpmScenarios} finds:
+ * the lock's own bytes, npm's own rewrite of it ({@link NpmScenarios.Lock#rewritten()}), or npm's load error.
  */
 class NpmLockRoundTripTest {
 

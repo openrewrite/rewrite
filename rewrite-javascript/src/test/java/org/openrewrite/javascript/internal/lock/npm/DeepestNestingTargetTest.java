@@ -40,15 +40,6 @@ class DeepestNestingTargetTest {
         return opts().pkg(obj("name", "b", "version", "1.2.3", "peerDependencies", obj("p", ""))).build();
     }
 
-    // root -> (a, b, file:target) PEER(p)
-    // a -> (x) PEER(p)
-    // b -> PEER(p)
-    // target -> (a, b, file:/outer) PEER(p)
-    // /outer -> (a, b) PEER(p)
-    //
-    // p can be placed under the root (because project root), or any of the
-    // 'x' nodes (because no peer dep), or in the /outer node (no resolve parent)
-    // Any other place is not allowed, because of peer dependencies.
     @Test
     void deepestNestingTargets() {
         Node tree = node(opts().path("/some/path")
@@ -74,7 +65,6 @@ class DeepestNestingTargetTest {
         Node innerX = innerA.getChildren().get("x");
         Node innerB = inner.getChildren().get("b");
 
-        // the target of the outer link dep. it can hold p, but b cannot
         Node outer = node(opts().path("/other/path")
           .pkg(obj("name", "other", "version", "1.2.3", "peerDependencies", obj("p", ""),
             "dependencies", obj("a", "", "b", "")))

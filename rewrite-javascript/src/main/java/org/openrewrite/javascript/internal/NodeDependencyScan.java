@@ -164,11 +164,8 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. A package with a
-     * lock of its own, and any pnpm package: the lock of the workspace root the package manager's own walk installs
-     * at, when regenerating that lock reproduces the install, else its own; a pnpm walk that stops ends at the
-     * workspace root whose lock's regeneration reports why. Without one: the lock of the nearest workspace root that
-     * lists the package.
+     * The lock the package manager writes for an edit of {@code packageJsonPath}: with a lock of its own, or for pnpm,
+     * the one its own walk installs into; without one, that of the nearest workspace root listing the package.
      */
     public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);
@@ -245,10 +242,8 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * The modified package.json to return when visiting {@code visited}. Visiting the lock first computes
-     * the edit from the package.json captured at scan time; when an earlier recipe in the same run has
-     * changed the package.json since, the edit is applied again on top of that change rather than
-     * reverting it.
+     * The modified package.json to return when visiting {@code visited}: the edit applied again over any change an
+     * earlier recipe in the run made since the scan.
      */
     public static SourceFile modifiedFor(ProjectState ps, SourceFile visited) {
         SourceFile modified = requireNonNull(ps.modifiedPackageJson);
@@ -259,9 +254,8 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * The manifests of the project whose lock an edit of {@code packageJsonPath} regenerates, by path, as
-     * edited so far in this run: the package.json beside the lock {@link #lockFor} names and every workspace member
-     * in the source set.
+     * The manifests of the lock an edit of {@code packageJsonPath} regenerates, by path, as edited so far: the
+     * package.json beside the lock {@link #lockFor} names and every workspace member in the source set.
      */
     public static Map<Path, String> projectManifests(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
         Path lock = lockFor(acc, packageJsonPath);

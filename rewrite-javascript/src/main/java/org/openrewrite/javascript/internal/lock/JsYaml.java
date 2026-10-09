@@ -57,7 +57,6 @@ public final class JsYaml {
         }
     }
 
-
     public static final class YamlException extends RuntimeException {
         YamlException(String message) {
             super(message);

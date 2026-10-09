@@ -39,9 +39,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Port of pnpm 11.2.2's resolving/npm-resolver/test/resolveJsr.test.ts, resolveNamedRegistry.test.ts and
- * parseBareSpecifier.test.ts, and resolving/jsr-specifier-parser/test/parse.test.ts. The registry is a stub serving
- * upstream's fixtures by URL; the auth header case is the host's (the stub records which registry was asked).
+ * Port of pnpm 11.2.2's resolveJsr, resolveNamedRegistry, parseBareSpecifier and jsr-specifier-parser tests over a stub
+ * serving upstream's fixtures by URL; the auth header case is the host's.
  */
 class NpmResolverRegistriesTest {
 

@@ -21,9 +21,8 @@ import java.util.Collections;
 import java.util.Map;
 
 /**
- * The environment a package manager runs in, as far as the host knows it. A variable the package manager reads by its
- * own name counts as unset unless the host says otherwise; one a config file names reaches the lock, so where the
- * host does not know the environment and nothing else sets it, the engine cannot know its value.
+ * The environment a package manager runs in, as far as the host knows it: its own variables count as unset unless the
+ * host says otherwise, and a config file's {@code ${VAR}} is cannot-know where the host does not know it.
  */
 public final class HostEnvironment {
 
@@ -64,7 +63,6 @@ public final class HostEnvironment {
 
     /**
      * A variable a config file names ({@code ${NAME}}), whose value reaches the lock.
-     *
      * @throws CannotKnow when the host does not know the environment and nothing else sets the variable
      */
     public @Nullable String reference(String name) {

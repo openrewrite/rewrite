@@ -39,9 +39,8 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 public final class VirtualTreeLoader {
 
     /**
-     * What a lock-only install reads from the project: the lock, a yarn.lock beside it, and the
-     * package.json of the root ({@code ""}) and of every directory a link resolves to, by location, as
-     * text or already parsed. A manifest is read once.
+     * What a lock-only install reads from the project: the lock, a yarn.lock beside it, and the package.json of the
+     * root ({@code ""}) and of every link target, by location, as text or parsed; each is read once.
      */
     public static final class ProjectFiles {
         private static final Object NONE = new Object();

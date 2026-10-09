@@ -31,9 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * A project's workspaces: Yarn sorts the paths fast-glob 3.3.2 reports and keeps those that hold a package.json.
- * Every expectation is fast-glob 3.3.2's own answer over the same directories, and those of the negated, globstar
- * and {@code ?} patterns are Yarn 4.10.3's {@code yarn workspaces list} as well.
+ * A project's workspaces: the sorted paths fast-glob 3.3.2 reports that hold a package.json, each expectation
+ * fast-glob's own answer and, for the negated, globstar and {@code ?} patterns, Yarn 4.10.3's too.
  */
 class WorkspaceTest {
 
@@ -184,9 +183,8 @@ class WorkspaceTest {
     }
 
     /**
-     * Yarn 4.10.3 lists {@code shared} after {@code packages/a}, and after {@code packages/b} when
-     * {@code packages/a}'s glob walks four thousand directories; {@code packages/b/deep} likewise follows
-     * {@code packages/a/sub/x} when {@code packages/b}'s glob is the slow one.
+     * Yarn 4.10.3 lists {@code shared} after {@code packages/a}, and after {@code packages/b} when {@code packages/a}'s
+     * glob walks four thousand directories; likewise {@code packages/b/deep} and {@code packages/a/sub/x}.
      */
     @Test
     void twoWorkspacesWhoseSetupsMayEndInEitherOrderListingOneMemberRace() {
@@ -201,9 +199,8 @@ class WorkspaceTest {
     }
 
     /**
-     * Yarn 4.10.3 on a case-sensitive APFS volume, as on Linux, and on macOS's default volume, which finds
-     * {@code Packages/a}, {@code libs/MyLib} and {@code packages/A} under the spelling the pattern gives; a deeper
-     * segment is matched against the names the directory holds on both.
+     * Yarn 4.10.3 on a case-sensitive volume and on macOS's default one, which finds {@code Packages/a}, {@code
+     * libs/MyLib} and {@code packages/A} under the pattern's spelling; a deeper segment matches the names held on both.
      */
     @Test
     void aPathInAnotherCaseIsUnknownWhereTheFileSystemMayIgnoreCase() {

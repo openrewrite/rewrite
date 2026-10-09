@@ -37,10 +37,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * hosted-git-info 9.0.3's tests: each host's valid and invalid URL tables (dumped by
- * npm-arborist/generate/hosted-git-tables.js), test/invalid.js, test/parse-url.js, and the
- * "toString respects defaults" and "string methods" cases for the representations npm resolves
- * with (ssh, sshurl, https, git, shortcut, path).
+ * hosted-git-info 9.0.3's tests for the representations npm resolves with: each host's URL tables
+ * ({@code npm-arborist/generate/hosted-git-tables.js}), invalid.js, parse-url.js and the string-method cases.
  */
 class GitHostTest {
 

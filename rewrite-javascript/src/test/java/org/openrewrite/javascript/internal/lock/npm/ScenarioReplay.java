@@ -39,9 +39,8 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * Replays a recorded scenario: the registry stub served from its {@code http/}, the host it was recorded on,
- * the regenerator's inputs and the builder for an edit, and the builder's lock-loading prefix ({@code #initTree}
- * and {@code #fixDepFlags} for an install that changes nothing).
+ * Replays a recorded scenario: the registry stub from its {@code http/}, the host it was recorded on, the regenerator's
+ * inputs and the builder for an edit, and the builder's lock-loading prefix.
  */
 final class ScenarioReplay {
 

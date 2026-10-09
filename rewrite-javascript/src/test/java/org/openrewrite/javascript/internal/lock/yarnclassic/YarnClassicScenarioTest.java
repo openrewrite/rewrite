@@ -47,14 +47,8 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Replays every recorded edit {@link YarnClassicScenarios} finds through {@link YarnClassicLockRegenerator}, with
- * the registry served from the scenario's {@code http/}, and asserts what the scenario's {@code expect} line says:
- * {@code exact} (the lock written equals yarn's {@code after} byte for byte; the default when {@code after} is
- * present), {@code cannot-know <what>} (every package and spec it names), {@code malformed}, {@code pm-rejects
- * <message>}, {@code second-install-rejects} or {@code unstable}. A fixture recorded elsewhere may lack registry
- * responses: it is replayed when a cache fills them and skipped when it cannot be served or an in-repo
- * re-recording names it in its {@code supersedes} file. When {@code REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS}
- * names a file, one line per edit is written there: the outcome and the first difference.
+ * Replays every recorded edit {@link YarnClassicScenarios} finds through {@link YarnClassicLockRegenerator} and asserts
+ * its {@code expect} line; {@code REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS} names a file for one line per edit.
  */
 class YarnClassicScenarioTest {
 
@@ -90,9 +84,8 @@ class YarnClassicScenarioTest {
     }
 
     /**
-     * The registry as the scenario recorded it, {@code http/<name>} whatever the registry's url. The downloaded
-     * fixtures recorded each packument with its versions empty and the versions they use as
-     * {@code http/<name>-<version>}: those documents fill their entries.
+     * The registry as the scenario recorded it, {@code http/<name>} whatever the registry's url; a downloaded fixture's
+     * empty versions are filled from its {@code http/<name>-<version>} documents.
      */
     static final class ScenarioRegistry implements PackumentSource {
         private static final ObjectMapper JSON = new ObjectMapper();

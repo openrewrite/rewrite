@@ -29,11 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Port of bun's src/install/lockfile/Package.zig with Package/Meta.zig and Package/Scripts.zig (bun 1.3.10): one
- * package per name and resolution, its dependencies a slice of the lockfile's dependency buffer and its
- * resolutions the same slice of the resolution buffer.
- */
+/** Port of bun's src/install/lockfile/Package.zig with Package/Meta.zig and Package/Scripts.zig (bun 1.3.10). */
 final class Package {
 
     static final int INVALID_PACKAGE_ID = Integer.MAX_VALUE;
@@ -136,9 +132,8 @@ final class Package {
     }
 
     /**
-     * {@code parseWithJSON} for a package.json read from the project: the root ({@link Features#MAIN}) or a
-     * workspace member ({@link Features#WORKSPACE}) at {@code sourceDir}, relative to the root. The workspace
-     * members the root names are read from {@code manifests}, the project's manifests by location.
+     * {@code parseWithJSON} for the root ({@link Features#MAIN}) or a workspace member ({@link Features#WORKSPACE}) at
+     * {@code sourceDir}; the members the root names are read from {@code manifests}, by location.
      */
     void parseWithJSON(Lockfile lockfile, BunOptions options, Log log, String sourceDir, Json.Expr json,
                        Features features, Map<String, String> manifests) {
@@ -334,10 +329,8 @@ final class Package {
     }
 
     /**
-     * {@code fromNPM}: the package a registry version resolves to, its dependencies appended to the lockfile's
-     * buffers unresolved, in the groups' order (dependencies, optional, peer) with the optional peers first among
-     * the peers. A peer or optional name already listed is skipped, except that an optional one replaces the plain
-     * dependency of that name.
+     * {@code fromNPM}: the package a registry version resolves to, its dependencies appended unresolved in bun's group
+     * order; a repeated peer or optional name is skipped, except that an optional one replaces the plain dependency.
      */
     static Package fromNPM(Lockfile lockfile, PackageManifest manifest, SemverVersion version,
                            PackageManifest.PackageVersion packageVersion, Features features) {

@@ -44,10 +44,8 @@ import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
 
 /**
- * PM-free end-to-end tests for {@link AddDependency} lock regeneration: a scalar-only leaf add is
- * resolved and written into the lock byte-exactly, while a closure-changing add
- * (a package with transitives) still fails loud — the lock is left untouched, both files carry a
- * {@link Markup.Warn}, and a structured {@link NodeLockRegenerationFailures} row records the reason.
+ * {@link AddDependency} lock regeneration without a package manager: a leaf add is written into the lock byte for
+ * byte; a closure-changing add fails loud, both files warned and a {@link NodeLockRegenerationFailures} row written.
  */
 class AddDependencyLockRegenTest implements RewriteTest {
 

@@ -25,9 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Port of pnpm 11.2.2's lockfile/pruner/test/index.ts over {@code pruneSharedLockfile}, the pruner a lock-only install
- * runs (from updateLockfile and over the env document). The cases of {@code pruneLockfile}, which first rewrites one
- * importer from its manifest and no install path calls, are ported where their importers already match their
- * manifests: the packages they keep and the optional flags they set are pruneSharedLockfile's.
+ * runs; {@code pruneLockfile}'s cases where their importers already match their manifests.
  */
 class UpdateLockfileTest {
 

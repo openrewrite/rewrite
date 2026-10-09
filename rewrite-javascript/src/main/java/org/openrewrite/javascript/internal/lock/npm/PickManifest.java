@@ -332,10 +332,8 @@ public final class PickManifest {
     }
 
     /**
-     * @param packument the registry document, abbreviated or full, as parsed
-     * @param wanted    a tag, version or range; null or empty for {@code defaultTag}
-     * @return the version's manifest from the packument, its {@code bin} normalized in place
-     * @throws PickFailure when nothing matches
+     * The manifest of the version {@code wanted} (a tag, version or range; null or empty for {@code defaultTag})
+     * selects, its {@code bin} normalized in place; throws PickFailure when nothing matches.
      */
     public static Map<String, Object> pickManifest(Map<String, Object> packument, @Nullable String wanted,
                                                    Options opts) {

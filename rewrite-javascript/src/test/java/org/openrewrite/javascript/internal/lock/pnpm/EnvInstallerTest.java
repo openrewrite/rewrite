@@ -28,9 +28,8 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.strings;
 
 /**
- * pnpm 11.2.2's installing/env-installer/test/resolveAndInstallConfigDeps.test.ts up to the registry: what the env
- * document records and what is left to resolve. The frozenLockfile cases are not ported (a lock-only install the
- * host runs is never frozen), nor the logger's events or the store's contents.
+ * pnpm 11.2.2's installing/env-installer/test/resolveAndInstallConfigDeps.test.ts up to the registry, less the
+ * frozenLockfile cases (a lock-only install is never frozen), the logger's events and the store's contents.
  */
 class EnvInstallerTest {
 

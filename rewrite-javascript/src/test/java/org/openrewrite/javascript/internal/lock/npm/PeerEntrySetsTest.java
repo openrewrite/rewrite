@@ -32,14 +32,6 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
  */
 class PeerEntrySetsTest {
 
-    // a -> (b, c, d)
-    // b -> PEER(d) b -> d -> e -> f <-> g
-    // c -> PEER(f, h) c -> (f <-> g, h -> g)
-    // d -> PEER(e) d -> e -> f <-> g
-    // e -> PEER(f)
-    // f -> PEER(g)
-    // g -> PEER(f)
-    // h -> PEER(g)
     @Test
     void basicTest() {
         String version = "1.0.0";
@@ -50,10 +42,8 @@ class PeerEntrySetsTest {
           .child(opts().pkg(obj("name", "d", "version", version, "peerDependencies", obj("e", ""))).build())
           .child(opts().pkg(obj("name", "e", "version", version, "peerDependencies", obj("f", ""))).build())
           .child(opts().pkg(obj("name", "f", "version", version, "peerDependencies", obj("g", ""))).build())
-          // g has an invalid dep on c, skip that one
           .child(opts().pkg(obj("name", "g", "version", version, "dependencies", obj("c", "2"),
             "peerDependencies", obj("f", ""))).build())
-          // h has an invalid peer dep on d, skip that one
           .child(opts().pkg(obj("name", "h", "version", version, "peerDependencies", obj("g", "", "d", "2")))
             .build()));
 

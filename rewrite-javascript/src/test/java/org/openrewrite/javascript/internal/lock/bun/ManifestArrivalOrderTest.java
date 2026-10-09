@@ -24,10 +24,8 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The recorded cases {@code dedupe-arrival-order} (no ms in the lock: debug@2.6.9 wants ms 2.0.0, humanize-ms@1.2.1
- * wants ^2.0.0; bun 1.3.10 wrote two different locks over eight runs) and {@code small-dedupe-arrival-existing}
- * (ms@2.0.0 locked: debug wants ^2.1.3, humanize-ms ^2.0.0; two locks over ten cold runs), and the shapes whose
- * result bun's {@code getPackageID} settles whatever the order.
+ * The recorded {@code dedupe-arrival-order} and {@code small-dedupe-arrival-existing} cases, where bun 1.3.10 wrote two
+ * locks over repeated runs, and the shapes whose result {@code getPackageID} settles whatever the order.
  */
 class ManifestArrivalOrderTest {
 

@@ -28,12 +28,8 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 /**
- * {@code Intl.Collator('en').compare}, which npm sorts with through @isaacs/string-locale-compare: the
- * Unicode Collation Algorithm over the CLDR root collation, to its third level, with canonically
- * equivalent strings equal. The data is CLDR 48 and Unicode 17, as in the ICU of Node 24. ICU itself
- * tells some strings that are not in normalization form D from that form, where a contraction meets
- * a character from beyond the Basic Multilingual Plane; rather than order such a string differently,
- * this refuses it.
+ * {@code Intl.Collator('en').compare} as Node 24's ICU answers it: the UCA over the CLDR 48 root collation to the
+ * third level; a string whose answer ICU gives differently from its NFD form's is refused.
  */
 public final class LocaleCompare {
 
@@ -286,10 +282,8 @@ public final class LocaleCompare {
         }
 
         /**
-         * Where ICU's answer for a string that is not in normalization form D is known to differ from
-         * the answer for that form: a contraction matched through a run of combining marks that the form
-         * reorders, or a contraction that a composite starts within, where a character from beyond the
-         * Basic Multilingual Plane is in the run or is the composite.
+         * Where ICU answers a string not in NFD apart from its NFD form: a contraction through marks the form reorders,
+         * or one a composite starts within, with a supplementary-plane character in the run or the composite.
          */
         private boolean orderUnknown(int[] codePoints, int[] decomposed, int[] normalized) {
             int[] rangeStart = new int[decomposed.length];

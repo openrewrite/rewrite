@@ -30,11 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 /**
- * Every yarn.lock {@link BerryScenarios} finds, read into the project with the manifests and config of its phase,
- * each workspace's package resolved again from its manifest, and the whole file written back: the keys regrouped and
- * sorted, {@code __metadata} from the configuration, every entry rendered by the serializer. The bytes are the
- * lock's own. A lock Yarn rejects fails as the scenario recorded, one it discards is malformed, and one it migrates
- * (Yarn 1) or refreshes (older than version 8) on any install comes out as Yarn's recording of such an install.
+ * Every yarn.lock {@link BerryScenarios} finds, read with its phase's manifests and config and written back whole: the
+ * lock's own bytes, or the recorded rejection, discard, migration or refresh.
  */
 class BerryLockRoundTripTest {
 
@@ -117,10 +114,8 @@ class BerryLockRoundTripTest {
     }
 
     /**
-     * A lock older than version 8 under a Yarn 4 install that changes nothing else: every locked package is
-     * resolved again from the registry (the lockfile resolver no longer answers for locators), the stored
-     * descriptors and checksums kept, the migration's {@code compressionLevel: mixed} in force; Yarn's recording of
-     * that install is the phase's lock.
+     * A lock older than version 8 under a Yarn 4 install that changes nothing else is refreshed from the registry, its
+     * descriptors and checksums kept, under {@code compressionLevel: mixed}: Yarn's recording is the phase's lock.
      */
     private static void refreshesAsYarnDoes(BerryScenarios.Lock lock, BerryScenarios.Phase phase, String expected) {
         BerryScenarios.Scenario scenario = lock.getScenario();
@@ -130,9 +125,8 @@ class BerryLockRoundTripTest {
     }
 
     /**
-     * A Yarn 1 lock under a Yarn 4 install that changes nothing else: every descriptor resolved through the lockfile,
-     * the legacy pins and the resolvers, then each registry package's checksum from its tarball; Yarn's recording
-     * of that install is the phase's lock.
+     * A Yarn 1 lock under a Yarn 4 install that changes nothing else migrates, each registry package's checksum from
+     * its tarball: Yarn's recording is the phase's lock.
      */
     private static void migratesAsYarnDoes(BerryScenarios.Lock lock, String expected) {
         BerryScenarios.Scenario scenario = lock.getScenario();

@@ -25,9 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * What npm 11.17.0 does with each {@code lockfile-version} an .npmrc can hold (the config layer's
- * parseField and flatten, then arborist's own check in its constructor) and with each boolean's
- * value (parseField maps four words; arborist reads any other string as truthy).
+ * What npm 11.17.0 does with each {@code lockfile-version} an .npmrc can hold, and with each boolean's value
+ * (parseField maps four words; arborist reads any other string as truthy).
  */
 class NpmOptionsTest {
 
@@ -101,10 +100,8 @@ class NpmOptionsTest {
         assertThat(options.isOmitLockfileRegistryResolved()).isTrue();
     }
 
-
-    // ini strips a matching pair of quotes (JSON.parse for double, the text first for single) and an unescaped
-    // ; or # comment before parseField reads the value; installed with npm 11.17.0: "false" and 'false' leave the
-    // peer chain in, "true" and "0" keep it out
+    // installed with npm 11.17.0: ini strips matching quotes and an unescaped ; or # comment first, so "false" and
+    // 'false' leave the peer chain in, "true" and "0" keep it out
     @ParameterizedTest
     @CsvSource(delimiter = '|', quoteCharacter = '~', ignoreLeadingAndTrailingWhitespace = false, value = {
       "\"false\"|false", "'false'|false", "\"true\"|true", "'true'|true", "\"0\"|true", "'0'|false", "\"null\"|false",
@@ -238,9 +235,8 @@ class NpmOptionsTest {
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 
-    // each layout installed with npm 11.17.0: global-style and legacy-bundling write install-strategy into the
-    // file's config as they flatten, so a truthy one overrides install-strategy wherever it stands and the later
-    // of the two wins; a value arborist does not know hoists
+    // installed with npm 11.17.0: a truthy global-style or legacy-bundling overrides install-strategy wherever it
+    // stands, the later of the two wins, and a value arborist does not know hoists
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
       "legacy-bundling=true+install-strategy=hoisted|NESTED",

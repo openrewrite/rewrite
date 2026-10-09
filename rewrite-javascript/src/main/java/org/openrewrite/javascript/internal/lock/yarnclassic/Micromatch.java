@@ -90,7 +90,6 @@ final class Micromatch {
 
     /**
      * {@code micromatch(files, patterns)}: the files a pattern matches, less those a {@code !} pattern does.
-     *
      * @throws JsError micromatch's TypeError for a pattern that is not a string.
      */
     static List<String> micromatch(List<String> files, @Nullable Object patterns) {
@@ -156,9 +155,8 @@ final class Micromatch {
     }
 
     /**
-     * Whether a path matches the same for every five digits preserve can draw for each id in the regex. A digit
-     * there is a literal or a class member, so it decides a match only by which of the path's digits it equals:
-     * drawing from those digits and one the path lacks covers every case.
+     * Whether a path matches alike for every five digits preserve can draw per id: drawing from the path's digits and
+     * one it lacks covers every case, since a drawn digit decides a match only by which of them it equals.
      */
     private static boolean sameForEveryDraw(String source, List<String> ids, String fp, boolean matches) {
         StringBuilder digits = new StringBuilder();

@@ -81,10 +81,8 @@ final class Picomatch {
     }
 
     /**
-     * {@code picomatch.makeRe(input, options)}.
-     *
-     * @throws JsError picomatch's TypeError for an empty input, and the TypeError an input naming a member of
-     *                 {@code Object.prototype} raises in {@code parse}
+     * {@code picomatch.makeRe(input, options)}; throws JsError, picomatch's TypeError for an empty input or one naming
+     * a member of {@code Object.prototype}.
      */
     static Pattern makeRe(String input, boolean dot) {
         return toRegex(source(input, dot, true));
@@ -92,7 +90,6 @@ final class Picomatch {
 
     /**
      * micromatch 4.0.5 {@code isMatch(str, pattern)} under its default options.
-     *
      * @throws JsError picomatch's TypeError for an empty pattern, and {@link #makeRe}'s
      */
     static boolean isMatch(String str, String pattern) {

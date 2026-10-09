@@ -35,9 +35,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * The release a project runs and the lockfile migration rules, against Yarn's own runs: {@code yarn --version}
- * under corepack 0.35.0 with the 4.5.3 release file as the {@code yarnPath} target, the locks Yarn 4.14.0 and 4.18.1
- * write for an empty project, and the recorded migrations.
+ * The release a project runs and the lockfile migration rules, against Yarn's own runs: {@code yarn --version} under
+ * corepack 0.35.0, the locks Yarn 4.14.0 and 4.18.1 write for an empty project, and the recorded migrations.
  */
 class YarnBerryLockRegeneratorTest {
 
@@ -114,9 +113,8 @@ class YarnBerryLockRegeneratorTest {
     }
 
     /**
-     * install.ts's lockfile migration rules over every lock older than version 8 a recorded phase starts from, under
-     * the phase's environment and no rc file, as the recorder ran them: the settings they migrate are the
-     * {@code .yarnrc.yml} Yarn wrote at the end of that phase.
+     * install.ts's lockfile migration rules over every lock older than version 8 a recorded phase starts from: the
+     * settings they migrate are the {@code .yarnrc.yml} Yarn wrote at the end of that phase.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("migrations")

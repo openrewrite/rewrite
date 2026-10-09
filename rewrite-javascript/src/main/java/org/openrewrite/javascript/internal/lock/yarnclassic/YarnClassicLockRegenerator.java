@@ -70,9 +70,8 @@ public final class YarnClassicLockRegenerator {
         Map<String, String> manifests;
 
         /**
-         * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory, of the directories above it in the
-         * repository and of those from {@link #cwd} up to the root, and the package.json of the directories above it,
-         * by path relative to the root ({@code ../.npmrc}, {@code packages/a/.yarnrc}).
+         * The .yarnrc, .yarnrc.yml and .npmrc files of the project's directory, the directories above it and those from
+         * {@link #cwd} up, and the package.json of the directories above, by path from the root.
          */
         @Singular
         Map<String, String> configFiles;
@@ -666,7 +665,6 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * util/fs.js {@code readJson}.
-     *
      * @throws JsError the {@code SyntaxError} of JSON that does not parse, its message naming the file.
      */
     private static @Nullable Object readJson(String file, String text) {
@@ -850,7 +848,6 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * config.js {@code getWorkspaces}: the root's workspaces config once it is eligible.
-     *
      * @throws MessageError members or a nohoist list in a root that is not private, when {@code shouldThrow}.
      */
     static @Nullable Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow,
@@ -991,11 +988,8 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * {@code saveLockfileAndIntegrity}: the lock text yarn writes for the resolver's patterns, or {@code null} when
-     * yarn leaves the file as it is. The {@code --pure-lockfile}, {@code --frozen-lockfile} and
-     * {@code --no-lockfile} flags are the caller's.
-     *
-     * @param patterns the top-level patterns of the install
+     * {@code saveLockfileAndIntegrity}: the lock text yarn writes for the install's top-level patterns, or {@code null}
+     * when yarn leaves the file as it is; the lockfile flags are the caller's.
      */
     static @Nullable String saveLockfileAndIntegrity(PackageResolver resolver, List<String> patterns,
                                                      @Nullable WorkspaceLayout workspaceLayout,
@@ -1079,9 +1073,7 @@ public final class YarnClassicLockRegenerator {
 
     /**
      * util/fs.js {@code writeFilePreservingEol}: the line ending of the file it replaces, the first CR or LF in it,
-     * else the host's {@code os.EOL}.
-     *
-     * @param os the host's {@code process.platform}, null when unknown
+     * else the host's {@code os.EOL} ({@code os} is {@code process.platform}, null when unknown).
      */
     static String writeFilePreservingEol(@Nullable String existing, String data, @Nullable String os) {
         String eol = null;

@@ -42,9 +42,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Port of @npmcli/arborist test/shrinkwrap.js. Expectations upstream keeps in snapshots, or reaches by
- * reading a tree or a fixture directory from disk, are arborist's own answers in the shrinkwrap-dumps and
- * load-virtual-dumps fixtures.
+ * Port of @npmcli/arborist test/shrinkwrap.js, upstream's snapshot and on-disk expectations being arborist's own
+ * answers in the shrinkwrap-dumps and load-virtual-dumps fixtures.
  */
 class ShrinkwrapTest {
 

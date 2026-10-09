@@ -42,13 +42,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.missing;
 
 /**
- * Replays every recorded edit {@link NpmScenarios} finds through {@link NpmLockRegenerator} against a stub
- * registry served from the scenario's {@code http/}, and asserts what the scenario's {@code expect} line says:
- * {@code exact} (the lock written equals npm's byte for byte; the default when {@code after} is present),
- * {@code peer-conflict}, {@code npm-rejects <code>}, {@code cannot-know}, {@code malformed} or {@code unstable}.
- * A fixture recorded elsewhere may lack registry responses: it is replayed when a cache fills them and
- * skipped when it cannot be served. When {@code REWRITE_LOCK_SCENARIO_RESULTS} names a file, one line per
- * edit is written there: the outcome and the first difference.
+ * Replays every recorded edit {@link NpmScenarios} finds through {@link NpmLockRegenerator} and asserts its
+ * {@code expect} line; {@code REWRITE_LOCK_SCENARIO_RESULTS} names a file for one line per edit.
  */
 class NpmScenarioTest {
 

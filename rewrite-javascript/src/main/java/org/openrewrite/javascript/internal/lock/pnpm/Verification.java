@@ -33,7 +33,6 @@ import java.util.Map;
  */
 final class Verification {
 
-
     private Verification() {
     }
 

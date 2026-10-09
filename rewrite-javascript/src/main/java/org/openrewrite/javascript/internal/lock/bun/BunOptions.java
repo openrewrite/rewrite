@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of bun's src/install/PackageManager/PackageManagerOptions.zig {@code load} (bun 1.3.10) with the install
- * settings bunfig.toml ({@code bunfig.zig}) and the project's .npmrc ({@code ini.zig loadNpmrc}) give it, in that
- * order, then the environment: the options that change what a lock-only install writes. The host's user
- * bunfig and npmrc are not an input.
+ * Port of bun's src/install/PackageManager/PackageManagerOptions.zig {@code load} (bun 1.3.10) over bunfig.toml, the
+ * project's .npmrc and the environment, in that order: the options that change what a lock-only install writes.
  */
 @Getter
 public final class BunOptions {

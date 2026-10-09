@@ -24,9 +24,8 @@ import java.util.Locale;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Port of bun's test/cli/install/hosted-git-info/from-url.test.ts (bun-v1.3.10) "valid urls": every url of
- * cases.ts {@code validGitUrls} parses to its host type, user, project, committish and default representation,
- * where the case states them. Its "invalid urls" cases are skipped in bun itself.
+ * Port of bun's test/cli/install/hosted-git-info/from-url.test.ts (bun-v1.3.10) "valid urls"; bun itself skips its
+ * "invalid urls" cases.
  */
 class HostedGitInfoTest {
 

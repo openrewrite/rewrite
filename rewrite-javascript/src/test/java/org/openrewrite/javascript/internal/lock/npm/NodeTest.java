@@ -201,7 +201,6 @@ class NodeTest {
         assertTree(at + "move new meta to top level second time (no-op)", root);
         treeCheck(root);
 
-        // replacement tests
         Node newProd = node(opts().name("prod")
           .pkg(obj("name", "prod", "version", "1.2.3", "dependencies", obj("meta", ""), "peerDependencies", obj("peer", "")))
           .path("/some/path").resolved("prod").integrity("prod"));

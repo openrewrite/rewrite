@@ -162,7 +162,6 @@ public final class PnpmLockRegenerator {
         Map<String, String> patchedDependencies;
     }
 
-
     private static final String PNPM_VERSION = "11.2.2";
 
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one

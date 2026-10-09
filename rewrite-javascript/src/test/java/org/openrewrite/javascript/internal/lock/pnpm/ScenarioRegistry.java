@@ -30,9 +30,8 @@ import java.util.Set;
 import java.util.zip.GZIPInputStream;
 
 /**
- * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked in
- * that phase. A 404 is served where pnpm's log of a phase reports one. A fixture recorded elsewhere holds packuments
- * whose version entries are empty; each is filled from its {@code http/<name>-<version>} document.
+ * The registry documents a scenario recorded for the phase that read a lock, served only for a registry pnpm asked
+ * then, with a 404 where pnpm's log reports one and a fixture's empty versions filled from its version documents.
  */
 final class ScenarioRegistry implements RegistryMetadata {
 

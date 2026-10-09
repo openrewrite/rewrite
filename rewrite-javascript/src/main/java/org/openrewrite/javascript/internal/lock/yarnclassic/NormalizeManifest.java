@@ -53,12 +53,8 @@ final class NormalizeManifest {
     }
 
     /**
-     * Normalizes a manifest in place.
-     *
-     * @param moduleLoc      the package's directory, relative to the project's ({@code ""} the project itself)
-     * @param lockfileFolder the directory of the lock, relative to the project's; null before yarn knows it
-     * @param warnings       where the warnings yarn prints are collected
-     * @throws MessageError a name yarn rejects, or a name or version that is not a string.
+     * Normalizes a manifest in place ({@code moduleLoc} and {@code lockfileFolder} relative to the project's
+     * directory); throws MessageError for a name yarn rejects, or a name or version that is not a string.
      */
     static Manifest normalizeManifest(Manifest info, String moduleLoc, @Nullable String lockfileFolder,
                                       boolean isRoot, boolean looseSemver, List<String> warnings) {

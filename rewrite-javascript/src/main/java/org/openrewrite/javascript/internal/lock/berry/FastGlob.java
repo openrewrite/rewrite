@@ -86,9 +86,8 @@ final class FastGlob {
     private final @Nullable Map<String, String> folded;
 
     /**
-     * @param manifestDirectories the directories that hold a package.json, relative to the project's root
-     *                            ({@code .} the root)
-     * @param paths               the files the project holds relative to its root, when the host says
+     * {@code manifestDirectories} holds a package.json each, relative to the root ({@code .} the root); {@code paths}
+     * are the files the project holds relative to its root, when the host says.
      */
     FastGlob(Collection<String> manifestDirectories, @Nullable Collection<String> paths, Host host) {
         directories.add(".");
@@ -135,12 +134,8 @@ final class FastGlob {
     }
 
     /**
-     * The directories the patterns match under {@code cwd}, spelled as fast-glob reports them.
-     *
-     * @param cwd the directory the patterns are relative to, from the project's root
-     * @throws JsError    what fast-glob, micromatch or the file system throws
-     * @throws CannotKnow for a pattern that reaches outside the project, or two tasks that race to report one
-     *                    directory under two spellings
+     * The directories the patterns match under {@code cwd}, spelled as fast-glob reports them; JsError as fast-glob
+     * throws, CannotKnow for a pattern leaving the project or two tasks racing on one directory.
      */
     List<String> glob(List<String> source, String cwd) {
         for (String pattern : source) {
@@ -499,7 +494,6 @@ final class FastGlob {
 
     /**
      * {@code path.resolve(cwd, path)} relative to the project's root.
-     *
      * @throws CannotKnow for a path outside the project
      */
     static String resolve(String cwd, String path) {

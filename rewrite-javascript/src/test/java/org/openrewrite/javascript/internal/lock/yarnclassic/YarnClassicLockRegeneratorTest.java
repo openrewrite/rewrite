@@ -252,9 +252,8 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * file-resolver.js rejects a target that does not exist, naming its absolute path (here relative to the root;
-     * {@code open-member-cwd-implicit-file-member-dir}); a directory without package.json is a manifest named by that
-     * absolute path, and a host that gives no paths does not say.
+     * file-resolver.js rejects a missing target by its path ({@code open-member-cwd-implicit-file-member-dir}); a
+     * directory without package.json is a manifest named by that path, and a host that gives no paths does not say.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', nullValues = "-", value = {
@@ -321,8 +320,7 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * Run in packages/a, yarn writes the lock of the root whose workspaces it matches, whatever config files sit on
-     * the way: the root's regeneration reads them from packages/a as its cwd
+     * Run in packages/a, yarn writes the lock of the root whose workspaces match, reading the config files on the way
      * ({@code open-parent-workspaces-lists-project-own-yarnrc}, {@code open-member-cwd-own-yarnrc-registry}).
      */
     @ParameterizedTest(name = "{0}")
@@ -370,9 +368,8 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * Run in packages/a, yarn walks to the packageManager from there and tests a range's directory there
-     * (package-request.js {@code normalizeRange} reads {@code config.cwd}), while it writes the root's lock
-     * ({@code open-member-cwd-package-manager-root-other}, {@code open-member-cwd-implicit-file-root-dir}).
+     * Run in packages/a, yarn finds the packageManager and tests a range's directory from there while it writes the
+     * root's lock ({@code open-member-cwd-package-manager-root-other}, {@code open-member-cwd-implicit-file-root-dir}).
      */
     @ParameterizedTest(name = "{0} in {1}")
     @CsvSource(delimiter = '|', value = {
@@ -531,9 +528,8 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * A registry the host cannot reach or that refuses its credentials is the host's failure at any depth; a
-     * package the registry does not have is yarn's: the registry's 404 for a root dependency (open-root-package-404),
-     * {@code requiredPackageNotFoundRegistry} below one (small-workspace-protocol-unpublished-name).
+     * An unreachable registry or refused credentials are the host's failure at any depth; a package the registry lacks
+     * is yarn's: open-root-package-404 at the root, small-workspace-protocol-unpublished-name below.
      */
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource(delimiter = '|', value = {
@@ -609,9 +605,8 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
-     * Workspace members are what yarn's glob finds among the project's files (yarn 1.22.22's bundled glob over the
-     * same tree found {@code packages/node_modules/package.json} and {@code yarn.json} too), not the manifests the
-     * host chose to give, and config files above the project are read as the project's own are.
+     * Workspace members are what yarn's glob finds among the project's files, not the manifests the host chose to give,
+     * and config files above the project are read as the project's own are.
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {

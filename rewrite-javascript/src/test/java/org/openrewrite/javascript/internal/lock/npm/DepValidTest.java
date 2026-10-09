@@ -28,9 +28,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Port of @npmcli/arborist test/dep-valid.js, with the duck-typed children and requestors built as
- * nodes that carry the same fields. Its "unsupported dependency type" case fakes a spec type npa has no
- * name for, which {@link Spec.Type} cannot hold: not ported.
+ * Port of @npmcli/arborist test/dep-valid.js; its "unsupported dependency type" case fakes a spec type
+ * {@link Spec.Type} cannot hold.
  */
 class DepValidTest {
 

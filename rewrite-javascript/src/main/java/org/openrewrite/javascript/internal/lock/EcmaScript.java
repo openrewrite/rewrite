@@ -73,7 +73,6 @@ public class EcmaScript {
 
     /**
      * {@code Object.keys}: the integer keys in ascending order, then the rest in insertion order.
-     *
      * @throws IllegalArgumentException for JavaScript's TypeError on null
      */
     public static List<String> keys(@Nullable Map<String, ?> object) {

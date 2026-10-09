@@ -192,11 +192,8 @@ public final class BerryOptions {
     }
 
     /**
-     * @param configFiles the rc files by path from the project's directory ({@code .yarnrc.yml},
-     *                    {@code ../.yarnrc.yml}); a file under another name is read only when
-     *                    {@code YARN_RC_FILENAME} names it
-     * @param env         the environment Yarn runs under
-     * @throws UsageError where Yarn's configuration rejects a file or a value
+     * Reads {@code configFiles}, the rc files by path from the project's directory (another name only as
+     * {@code YARN_RC_FILENAME} names it), under {@code env}; throws UsageError where Yarn's configuration rejects one.
      */
     public static BerryOptions load(Map<String, String> configFiles, HostEnvironment env) {
         BerryOptions options = new BerryOptions(env);

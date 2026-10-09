@@ -22,12 +22,7 @@ import java.util.Map;
 
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
-/**
- * Port of bun's src/install/lockfile/bun.lock.zig {@code Stringifier} (bun 1.3.10) for a lockfile loaded from text:
- * the whole bun.lock from the lockfile and its hoisted tree. The workspaces come out by path, the trusted and
- * patched dependencies in Zig hash map slot order, overrides and catalogs by name, and one {@code packages} entry
- * per placement, by tree depth and path, then name.
- */
+/** Port of bun's src/install/lockfile/bun.lock.zig {@code Stringifier} (bun 1.3.10) for a lockfile loaded from text. */
 final class TextLockfileWriter {
 
     private static final String[] GROUP_NAMES = {"dependencies", "devDependencies", "optionalDependencies",

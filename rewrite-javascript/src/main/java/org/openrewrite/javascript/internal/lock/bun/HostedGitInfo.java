@@ -22,9 +22,8 @@ import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 
 /**
- * Port of bun's src/install/hosted_git_info.zig (bun 1.3.10), the parts a lock reads: {@code isGitHubShorthand}
- * and {@code fromUrl} (host provider, representation, user, project, committish), without the formatters. bun
- * parses with WebKit's WHATWG URL parser; this port with {@link WhatwgUrl}.
+ * Port of bun's src/install/hosted_git_info.zig (bun 1.3.10): {@code isGitHubShorthand} and {@code fromUrl}, without
+ * the formatters, parsing with {@link WhatwgUrl} where bun uses WebKit's WHATWG URL parser.
  */
 final class HostedGitInfo {
 

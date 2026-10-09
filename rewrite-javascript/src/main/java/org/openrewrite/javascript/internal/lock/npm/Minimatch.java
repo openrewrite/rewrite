@@ -26,11 +26,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/**
- * Port of minimatch 10.2.5 on POSIX paths, without extglobs ({@code +(a|b)} and the like, which no
- * workspace pattern uses): literal segments, {@code *}, {@code ?}, {@code [...]} classes, brace sets
- * and {@code **}.
- */
+/** Port of minimatch 10.2.5 on POSIX paths, without extglobs, which no workspace pattern uses. */
 final class Minimatch {
 
     @Value

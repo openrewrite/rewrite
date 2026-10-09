@@ -46,16 +46,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded npm scenarios a test can replay: every directory holding a lock under {@code lock/npm/} on the
- * test classpath (the in-repo fixtures and the downloaded ones merge there), and every one under the
- * directory the environment variable {@code REWRITE_LOCK_SCENARIOS} names. {@code REWRITE_LOCK_HTTP_CACHE}
- * names a directory of registry responses a scenario's own {@code http/} falls back on. The layout is the
- * one the recorder writes ({@code pkg-before}, {@code before}, {@code pkg}, {@code after}, {@code npmrc},
- * {@code tree-before/}, {@code tree/}, {@code http/}), with a start of its own kind ({@code before-input}, a
- * hand-shaped lock), a phase's own config and yarn.lock ({@code npmrc-before}, {@code before-yarn}), a
- * variant edit by suffix ({@code before-v2}, {@code pkg-v2}, {@code after-v2}), and the second install's
- * rewrite ({@code again} of {@code after}, {@code <lock>-again} of another lock). The read-only downloaded
- * fixtures spell the edited manifest {@code pkg-after} and keep their rewrites under {@code lock/npm-again/}.
+ * The recorded npm scenarios under {@code lock/npm/} on the test classpath and under the directory {@code
+ * REWRITE_LOCK_SCENARIOS} names, in the recorder's layout; {@code REWRITE_LOCK_HTTP_CACHE} is the registry fallback.
  */
 final class NpmScenarios {
 
@@ -112,10 +104,8 @@ final class NpmScenarios {
         }
 
         /**
-         * The project's manifests by location, as {@link VirtualTreeLoader.ProjectFiles} takes them: the
-         * root's (when the scenario holds it) and every package.json of the tree directory. In the oldest
-         * layout a workspace scenario holds only the edited member's manifest; it is placed where the
-         * lock links a package of its name.
+         * The project's manifests by location: the root's, when held, and every package.json of the tree directory; the
+         * oldest layout's lone member manifest is placed where the lock links a package of its name.
          */
         Map<String, String> manifests() {
             Map<String, String> manifests = new LinkedHashMap<>();
@@ -159,10 +149,8 @@ final class NpmScenarios {
         }
 
         /**
-         * What npm writes when it installs this lock's manifest over it again, when that differs from the
-         * lock: {@code again} beside {@code after} (with {@code npm-again.log}), {@code after} itself for a
-         * {@code before} whose edit changes nothing, {@code <lock>-again} for another lock, and for a read-only
-         * fixture {@code lock/npm-again/<scenario>/<lock>}.
+         * What npm writes installing this lock's manifest over it again, when that differs: {@code again}, {@code
+         * after} for an edit that changes nothing, {@code <lock>-again}, or {@code lock/npm-again/<scenario>/<lock>}.
          */
         @Nullable
         String rewritten() {
@@ -201,9 +189,8 @@ final class NpmScenarios {
         }
 
         /**
-         * The error npm raised while loading this lock as data when it installed the lock's manifest over
-         * it again: {@code npm-again.log} records exit 1 with an error that carries no code (a rejection
-         * with a code, such as {@code ERESOLVE}, is the builder's and the lock still loads).
+         * The error npm raised loading this lock when it installed its manifest over it again: {@code npm-again.log}'s
+         * exit 1 with an error without a code (a coded rejection is the builder's, and the lock still loads).
          */
         @Nullable
         String loadError() {
@@ -507,11 +494,7 @@ final class NpmScenarios {
             return file("after");
         }
 
-        /**
-         * Every lock the scenario holds ({@code before}, {@code after}, {@code fresh}, {@code again},
-         * {@code before-input} and their {@code -v2}, {@code -dev}, {@code -reshape} variants), each with
-         * the manifest, tree, yarn.lock and npmrc of its phase.
-         */
+        /** Every lock the scenario holds, each with the manifest, tree, yarn.lock and npmrc of its phase. */
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();
             for (String file : files()) {

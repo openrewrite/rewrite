@@ -29,9 +29,8 @@ import java.util.Map;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String)} parses the
- * text and runs the {@code normalizeSteps}; {@link #syncNormalize(Map)} runs the synchronous ones, as
- * {@code Node} does on its package.
+ * Port of @npmcli/package-json 7.0.5 as arborist reads a manifest: {@link #normalize(String)} runs the
+ * {@code normalizeSteps}, {@link #syncNormalize(Map)} the synchronous ones, as {@code Node} does on its package.
  */
 @Getter
 public final class PackageJson {
@@ -64,11 +63,8 @@ public final class PackageJson {
     }
 
     /**
-     * {@code PackageJson.normalize(path)}: the manifest at a package's root as arborist loads it.
-     *
-     * @throws JsonParseEvenBetterErrors.JsonParseException as {@code Invalid package.json}
-     * @throws IllegalStateException    for a falsy JSON value ({@code Can not normalize without content})
-     * @throws IllegalArgumentException for a truthy one that is not an object or array
+     * {@code PackageJson.normalize(path)}: JsonParseException as {@code Invalid package.json}, IllegalStateException
+     * for a falsy value, IllegalArgumentException for a truthy one that is not an object or array.
      */
     @SuppressWarnings("unchecked")
     public static PackageJson normalize(String text) {

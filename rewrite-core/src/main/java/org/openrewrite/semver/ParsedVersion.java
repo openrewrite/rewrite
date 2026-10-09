@@ -28,26 +28,8 @@ import static org.openrewrite.semver.VersionComparator.PRE_RELEASE_ENDING;
 import static org.openrewrite.semver.VersionComparator.RELEASE_PATTERN;
 
 /**
- * The cached result of parsing a version string, offering two views of the same input: the
- * Maven-flavored {@link VersionComparator#RELEASE_PATTERN} match and the strict SemVer 2.0.0 view
- * (node-semver's {@code FULL} grammar, with the prerelease identifier list kept for
- * {@link #comparePrecedence}). Neither grammar subsumes the other ({@code 1.2.3.4} matches only the
- * release pattern, {@code v1.2.3} only the strict one), so both are computed for every parse.
- * <p>
- * Version selection evaluates a selector against the <em>full</em> published version list of a
- * dependency. Without caching, every candidate allocates a fresh {@link Matcher} (and its
- * capture-group array). Because parsing is pure and the same version strings recur across
- * dependencies and, at scale, across the modules of a large multi-module build, the parse results
- * are memoized here. This removes both the {@code Matcher} and the regex-group allocations for
- * repeat parses, which dominate allocation during a large multi-module dependency upgrade.
- * <p>
- * The cache is a small bounded LRU. The win comes from re-use <em>across</em> {@code upgrade(...)}
- * calls (the same version list is re-evaluated for each module of a multi-module build), so the
- * cache must outlive a single call; the LRU caps the retained footprint and evicts cold entries. The
- * distinct version-<em>string</em> set stays small even for broad upgrades because version numbers
- * repeat across the artifacts of a release train (e.g. {@code spring-boot-starter:3.0.0} and
- * {@code spring-boot-actuator:3.0.0} share the string {@code "3.0.0"}), so the working set fits
- * within the bound without thrashing.
+ * A parsed version string, memoized in a bounded LRU: the {@link VersionComparator#RELEASE_PATTERN} match and the
+ * strict SemVer 2.0.0 view (node-semver's {@code FULL} grammar), since neither grammar subsumes the other.
  */
 final class ParsedVersion {
 
@@ -82,11 +64,7 @@ final class ParsedVersion {
     private static final Pattern BACKPATCH = Pattern.compile("(.+)-(?:osera|backpatch)-\\d+", Pattern.CASE_INSENSITIVE);
     private static final Pattern NUMERIC = Pattern.compile("[0-9]+");
 
-    /**
-     * Upper bound on retained entries. Comfortably larger than the distinct version-string working
-     * set of a large multi-module upgrade (hundreds to low thousands), while keeping the retained
-     * footprint to a few hundred kilobytes.
-     */
+    /** Above the distinct version strings of a large multi-module upgrade, a few hundred kilobytes retained. */
     private static final int MAX_CACHE_SIZE = 4_096;
 
     private static final Map<String, ParsedVersion> CACHE = LruCache.bounded(MAX_CACHE_SIZE);
@@ -97,9 +75,8 @@ final class ParsedVersion {
     private final boolean matches;
 
     /**
-     * {@link VersionComparator#RELEASE_PATTERN} numeric capture groups 1..5 (major, minor, patch,
-     * micro, and a fifth component), each {@code null} when the corresponding group is absent.
-     * {@code null} as a whole when the version did not match.
+     * {@link VersionComparator#RELEASE_PATTERN}'s numeric groups 1..5, each null when absent; null when it did not
+     * match.
      */
     private final @Nullable String @Nullable [] groups;
 
@@ -268,10 +245,8 @@ final class ParsedVersion {
     }
 
     /**
-     * @param index a 1-based {@link VersionComparator#RELEASE_PATTERN} capture-group index in the
-     *              range 1..5 (major, minor, patch, micro, fifth).
-     * @return the captured numeric component, or {@code null} if that component is absent or the
-     * version did not match the release pattern.
+     * The 1-based {@link VersionComparator#RELEASE_PATTERN} group (major, minor, patch, micro, fifth), or {@code null}
+     * when it is absent or the version did not match.
      */
     @Nullable String group(int index) {
         return groups == null ? null : groups[index - 1];
@@ -441,7 +416,6 @@ final class ParsedVersion {
     // node-semver compareIdentifiers: numeric < alphanumeric; numerics compare as numbers, others as ASCII.
     /**
      * Strict SemVer precedence over version strings; node-semver's {@code compare} contract.
-     *
      * @throws IllegalArgumentException if either version is not strict SemVer
      */
     static int compareStrict(String v1, String v2) {
@@ -454,10 +428,8 @@ final class ParsedVersion {
     }
 
     /**
-     * A total order over arbitrary strings: strict pairs by {@linkplain #comparePrecedence
-     * precedence}, strict above non-semver, non-semver lexicographic. Keeps
-     * {@link VersionComparator#upgrade} safe when the current "version" is itself a range
-     * expression, as in a package.json constraint.
+     * A total order over any strings: strict pairs by precedence, strict above non-semver, non-semver lexicographic, so
+     * {@link VersionComparator#upgrade} stays safe when the current version is a range expression.
      */
     static int compareLenient(String v1, String v2) {
         ParsedVersion a = parse(v1);

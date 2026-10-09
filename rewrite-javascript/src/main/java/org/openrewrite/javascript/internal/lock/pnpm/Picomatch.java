@@ -83,7 +83,6 @@ final class Picomatch {
 
     /**
      * {@code picomatch(globs, options)}: a matcher that is true when any of the globs matches.
-     *
      * @throws JsError picomatch's TypeError for an empty glob
      */
     static Predicate<String> matcher(List<String> globs, boolean dot) {

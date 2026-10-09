@@ -27,11 +27,8 @@ import java.util.Objects;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
- * Port of pacote's {@code manifest()} (npm 11.17.0) for a registry spec ({@code lib/registry.js}: pick the
- * version, normalize it as {@code @npmcli/package-json} does for a manifest, add {@code _resolved},
- * {@code _integrity} and {@code _from} from {@code dist}) and for a directory spec ({@code lib/dir.js} over
- * the project's files). A git, file or remote spec is a {@link CannotKnow}: its manifest is not in the
- * registry.
+ * Port of pacote's {@code manifest()} (npm 11.17.0) for a registry spec ({@code lib/registry.js}) and a directory spec
+ * ({@code lib/dir.js}); a git, file or remote spec's manifest is not in the registry: {@link CannotKnow}.
  */
 final class Pacote {
 

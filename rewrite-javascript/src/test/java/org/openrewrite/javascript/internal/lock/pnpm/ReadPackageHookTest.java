@@ -29,10 +29,8 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.sortedJson;
 
 /**
- * hooks/read-package-hook/test of pnpm 11.2.2: createPackageExtender.test.ts,
- * createOptionalDependenciesRemover.test.ts, createVersionOverrider.test.ts and createReadPackageHook.ts. The
- * overrider's absolute-path cases are not ported: the port works on paths relative to the lock's directory and a host
- * path never reaches it.
+ * pnpm 11.2.2's hooks/read-package-hook tests, less the overrider's absolute-path cases: the port works on paths
+ * relative to the lock's directory.
  */
 class ReadPackageHookTest {
 

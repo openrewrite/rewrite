@@ -30,9 +30,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A regeneration's request seen from the lock's directory: the project's manifests, the package-manager files and the
- * paths the host holds, by path relative to that directory ({@code ../} for those outside it), and the directory the
- * package manager runs in, the edited manifest's.
+ * A regeneration's request seen from the lock's directory: manifests, package-manager files and held paths by path
+ * relative to it ({@code ../} outside it), and the edited manifest's directory, where the package manager runs.
  */
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)

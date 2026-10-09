@@ -27,11 +27,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * {@link PackageManifest#findBestVersion} against what bun chose, where nothing else could have been chosen: for
- * every recorded scenario whose edited manifest has a single registry dependency, a lock written from scratch
- * ({@code fresh}) holds the version bun picked from the packument the scenario recorded for it, and the package
- * bun built from that version ({@link Package#fromNPM}) has the dependencies, os, cpu, bin and integrity the lock
- * wrote for it.
+ * {@link PackageManifest#findBestVersion} against bun's choice in every scenario whose edited manifest has a single
+ * registry dependency: the version {@code fresh} locks, and the package {@link Package#fromNPM} builds from it.
  */
 class PackageManifestTest {
 

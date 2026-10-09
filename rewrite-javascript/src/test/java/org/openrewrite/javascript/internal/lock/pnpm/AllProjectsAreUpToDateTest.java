@@ -28,9 +28,8 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.lock
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
 
 /**
- * lockfile/verification/test/allProjectsAreUpToDate.test.ts of pnpm 11.2.2, the project files under the lock's
- * directory given by path. Not ported: the five local tarball cases, whose integrity needs the tarball's bytes (the
- * port reports that it cannot know them).
+ * lockfile/verification/test/allProjectsAreUpToDate.test.ts of pnpm 11.2.2, less the five local tarball cases, whose
+ * integrity needs the tarball's bytes.
  */
 class AllProjectsAreUpToDateTest {
 

@@ -37,9 +37,8 @@ import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.obj;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.opts;
 
 /**
- * Port of @npmcli/arborist test/edge.js. Upstream builds duck-typed node mocks whose resolve()
- * answers are wired by hand; here each case builds a real tree in which the edge under test
- * resolves the same way, and the snapshot's getters are asserted field by field.
+ * Port of @npmcli/arborist test/edge.js over real trees in which each edge resolves as upstream's hand-wired mocks do,
+ * the snapshot's getters asserted field by field.
  */
 class EdgeTest {
 

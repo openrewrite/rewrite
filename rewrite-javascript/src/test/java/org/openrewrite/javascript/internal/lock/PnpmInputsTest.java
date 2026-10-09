@@ -35,8 +35,6 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class PnpmInputsTest {
 
-;
-
     @Test
     void memberEditPlacesManifestsAndTheFilesUnderTheLocksDirectory() {
         Request request = Request.builder()

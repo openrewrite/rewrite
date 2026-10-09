@@ -30,11 +30,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Yarn's packages/yarnpkg-core/tests/tgzUtils.test.ts, with the archive's sha512 from @yarnpkg/core 4.4.4's
- * {@code convertToZip} under {@code compressionLevel: 0} (the release Yarn 4.10.3 bundles), as the test calls it
- * and as the npm fetcher does. "Without any workers" is not ported: the port has no worker pool, and the case runs
- * at {@code compressionLevel: mixed}. The 808 KB {@code carbon-icons-svelte-10.21.0.tgz} fixture is not committed;
- * {@code REWRITE_BERRY_TGZ_FIXTURES} names a directory holding it.
+ * Yarn's packages/yarnpkg-core/tests/tgzUtils.test.ts at {@code compressionLevel: 0}, less "without any workers" (no
+ * worker pool); {@code REWRITE_BERRY_TGZ_FIXTURES} names a directory holding the uncommitted 808 KB fixture.
  */
 class TgzUtilsTest {
 

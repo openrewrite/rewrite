@@ -68,10 +68,8 @@ final class NpmHttpUtils {
     }
 
     /**
-     * {@code getPackageMetadata} as the network answers it: {@code dist-tags}, each version cut to the cached
-     * fields, and {@code time}.
-     *
-     * @throws ReportError YN0035 when the registry has no such package
+     * {@code getPackageMetadata} as the network answers it: {@code dist-tags}, each version cut to the cached fields,
+     * and {@code time}; throws ReportError YN0035 when the registry has no such package.
      */
     static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, RegistrySource registry) {
         if (project.configuration.getOptions().getBoolean("enableOfflineMode")) {
@@ -90,7 +88,6 @@ final class NpmHttpUtils {
 
     /**
      * {@code get} of a package's tarball: a path joins the scope's registry, a url is fetched as it is.
-     *
      * @throws ReportError YN0035 when the server does not have it
      */
     static byte[] get(String path, Locator locator, String version, Project project, RegistrySource registry) {

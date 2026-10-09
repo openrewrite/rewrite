@@ -88,9 +88,7 @@ final class Manifest {
     List<String> errors = new ArrayList<>();
 
     /**
-     * {@code Manifest.fromText}: a package.json's text, a byte order mark dropped and an empty file read as
-     * {@code {}}.
-     *
+     * {@code Manifest.fromText}: a package.json's text, a byte order mark dropped and an empty file read as {@code {}}.
      * @throws Js.SyntaxError for text that is not JSON, the message naming it as Yarn does.
      */
     static Manifest fromText(String text) {

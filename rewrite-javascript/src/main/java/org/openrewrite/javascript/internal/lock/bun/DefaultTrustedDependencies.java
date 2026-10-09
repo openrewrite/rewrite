@@ -25,9 +25,8 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * Port of bun's src/install/lockfile.zig {@code default_trusted_dependencies} (bun 1.3.10): the packages whose
- * lifecycle scripts bun runs without a {@code trustedDependencies} list, from bun's
- * {@code default-trusted-dependencies.txt}, by their truncated name hash.
+ * Port of bun's src/install/lockfile.zig {@code default_trusted_dependencies} (bun 1.3.10), from bun's
+ * {@code default-trusted-dependencies.txt}, by truncated name hash.
  */
 final class DefaultTrustedDependencies {
 

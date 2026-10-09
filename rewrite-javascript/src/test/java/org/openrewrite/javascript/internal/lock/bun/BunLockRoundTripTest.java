@@ -27,11 +27,8 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * An install that changes nothing, for every bun.lock {@link BunScenarios} finds, with the manifests and config of
- * the phase that wrote it: the lock loaded into the model, its edges resolved by walking the keys, the tree
- * hoisted again, the root diffed against the manifests, the lockfile cleaned, and the whole file written. The
- * bytes are the lock's own, or what bun itself writes on that install ({@link BunScenarios.Lock#rewritten()});
- * a lock bun ignores fails to load with bun's error.
+ * An install that changes nothing, for every bun.lock {@link BunScenarios} finds: the lock's own bytes, what bun itself
+ * writes on that install ({@link BunScenarios.Lock#rewritten()}), or for a lock bun ignores, bun's error.
  */
 class BunLockRoundTripTest {
 

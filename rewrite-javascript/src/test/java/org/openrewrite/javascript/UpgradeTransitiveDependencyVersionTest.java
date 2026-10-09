@@ -26,9 +26,8 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
 /**
- * An override the package manager would not read changes nothing: pnpm 11.2.2 leaves its lock as it is over a
- * package.json {@code pnpm.overrides} ({@code lock/pnpm/overrides-legacy-pkg-json} in the corpus) and bun 1.3.10 warns
- * that it does not support nested overrides ({@code lock/bun/override-nested}).
+ * An override the package manager would not read changes nothing: pnpm 11.2.2 ignores package.json
+ * {@code pnpm.overrides} and bun 1.3.10 has no nested overrides.
  */
 class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 

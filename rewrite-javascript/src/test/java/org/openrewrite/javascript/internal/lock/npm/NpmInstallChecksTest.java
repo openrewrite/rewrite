@@ -27,9 +27,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.openrewrite.javascript.internal.lock.npm.NpmTreeSupport.json;
 
 /**
- * npm-install-checks 8.0.0 test/check-engine.js and test/check-platform.js, with the machine this
- * process runs on replaced by a known {@link Host}; the libc detection cases (which mock the OS) are not
- * ported, since the host's libc is an input here.
+ * npm-install-checks 8.0.0 test/check-engine.js and test/check-platform.js over a known {@link Host}; the libc
+ * detection cases mock the OS, whose libc is an input here.
  */
 class NpmInstallChecksTest {
 

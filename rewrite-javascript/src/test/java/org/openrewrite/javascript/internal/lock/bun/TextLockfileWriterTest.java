@@ -21,9 +21,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The bun.lock snapshots of bun's own test/cli/install/bun-lock.test.ts and catalogs.test.ts (bun-v1.3.10): each
- * lock bun wrote there, loaded, cleaned and written again, is the same bytes. The lock alone is the input; no
- * manifest stands beside a snapshot.
+ * The bun.lock snapshots of bun's own bun-lock.test.ts and catalogs.test.ts (bun-v1.3.10), each loaded, cleaned and
+ * written again to the same bytes, without a manifest beside it.
  */
 class TextLockfileWriterTest {
 

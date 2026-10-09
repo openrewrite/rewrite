@@ -44,12 +44,8 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.missing;
 
 /**
- * Replays every recorded edit {@link NpmScenarios} finds through {@link IdealTreeBuilder} against a stub
- * registry served from the scenario's {@code http/}: the built tree must be the one npm's own {@code after}
- * lock loads to (the same locations, and per location the same name, version, resolved, integrity, flags,
- * link target and lock entry), or, where npm failed, the build must fail with the code or kind the
- * scenario's {@code expect} names. When {@code REWRITE_LOCK_REPLAY_RESULTS} names a file, one line per edit
- * is written there: the outcome and the first difference.
+ * Replays every recorded edit {@link NpmScenarios} finds through {@link IdealTreeBuilder}: the tree npm's {@code after}
+ * loads to, or npm's failure; {@code REWRITE_LOCK_REPLAY_RESULTS} names a file for one line per edit.
  */
 class IdealTreeBuilderTest {
 
@@ -77,8 +73,8 @@ class IdealTreeBuilderTest {
     }
 
     /**
-     * What the comparison reads per location the lock writer emits: the fields of the task's contract,
-     * then the lock entry the node would be written as.
+     * What the comparison reads per location the lock writer emits: name, version, resolved, integrity, flags and
+     * link target, then the lock entry the node would be written as.
      */
     static Map<String, String> describe(Node tree, String path) {
         Map<String, String> out = new TreeMap<>();

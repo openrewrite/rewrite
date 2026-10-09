@@ -22,9 +22,8 @@ import org.openrewrite.javascript.NodeRegistry;
 import java.util.Map;
 
 /**
- * The registries resolved for a project. Unlike PyPI, npm routes each package name to exactly one
- * registry: a scoped name to its {@code @scope:registry} when configured, everything else to the
- * default.
+ * The registries resolved for a project: npm routes each name to one registry, a scoped name to its
+ * {@code @scope:registry} when configured, everything else to the default.
  */
 @Value
 public class NodeRegistries {

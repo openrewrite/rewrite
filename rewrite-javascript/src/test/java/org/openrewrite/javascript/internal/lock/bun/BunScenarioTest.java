@@ -45,14 +45,8 @@ import static org.assertj.core.api.Assertions.fail;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * Replays every recorded edit {@link BunScenarios} finds through {@link BunLockRegenerator}, with the registry
- * served from the scenario's {@code http/}, and asserts what the scenario's {@code expect} line says: {@code exact}
- * (the lock written equals bun's {@code after} byte for byte; the default when {@code after} is present, and with
- * no {@code after} bun deleted the lock), {@code cannot-know <what>}, {@code malformed}, {@code pm-rejects
- * <message>}, {@code second-install-rejects} or {@code unstable}. A fixture recorded elsewhere may lack registry
- * responses: it is replayed when a cache fills them and skipped when it cannot be served. When
- * {@code REWRITE_LOCK_BUN_SCENARIO_RESULTS} names a file, one line per edit is written there: the outcome and the
- * first difference.
+ * Replays every recorded edit {@link BunScenarios} finds through {@link BunLockRegenerator} and asserts its
+ * {@code expect} line; {@code REWRITE_LOCK_BUN_SCENARIO_RESULTS} names a file for one line per edit.
  */
 class BunScenarioTest {
 
@@ -86,10 +80,8 @@ class BunScenarioTest {
     }
 
     /**
-     * The registry as the scenario recorded it: {@code http/<name>}, or {@code http/<name>@full} for the full
-     * packument, from the scenario's own registry whatever its url. The downloaded fixtures recorded each
-     * packument with its versions empty and the versions they use as {@code http/<name>-<version>}: those
-     * documents fill their entries.
+     * The registry as the scenario recorded it: {@code http/<name>}, or {@code http/<name>@full}, whatever its url; a
+     * downloaded fixture's empty versions are filled from its {@code http/<name>-<version>} documents.
      */
     static final class ScenarioRegistry implements ManifestSource {
         private static final ObjectMapper JSON = new ObjectMapper();

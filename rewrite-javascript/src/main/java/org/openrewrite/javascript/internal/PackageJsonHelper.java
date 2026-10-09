@@ -77,8 +77,6 @@ public class PackageJsonHelper {
         return members;
     }
 
-    // --- ctx side-channel for cross-recipe chaining ----------------------
-
     private static final String LIVE_PACKAGE_JSON_TREES =
             "org.openrewrite.javascript.livePackageJsonTrees";
 
@@ -92,8 +90,6 @@ public class PackageJsonHelper {
         Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new HashMap<>());
         map.put(packageJsonPath, tree);
     }
-
-    // --- Reparse helpers (preserve identity + markers) ------------------
 
     public static Json.Document reparseJson(Json.Document original, String newContent) {
         JsonParser parser = new JsonParser();
@@ -136,8 +132,6 @@ public class PackageJsonHelper {
         }
         return original;
     }
-
-    // --- Marker refresh ---------------------------------------------------
 
     /**
      * Re-derive the declared-dependency lists on the marker from the modified document;
@@ -224,12 +218,9 @@ public class PackageJsonHelper {
         return null;
     }
 
-    // --- Overlay helpers -------------------------------------------------
-
     /**
-     * Re-derive {@code resolvedDependencies} on the marker by parsing {@code lockContent} (npm, Bun,
-     * yarn classic/berry, pnpm; other PMs unchanged). Throws on a parse failure, which
-     * {@link #editAndRegenerate} surfaces via {@link org.openrewrite.marker.Markup#warn}.
+     * Re-derive {@code resolvedDependencies} on the marker from {@code lockContent}; throws on a parse failure, which
+     * {@link #editAndRegenerate} surfaces as a warning.
      */
     public static SourceFile overlayResolvedDeps(SourceFile pkg,
                                                  String lockContent,
@@ -299,8 +290,6 @@ public class PackageJsonHelper {
         return out;
     }
 
-    // --- JSON mutation helpers -------------------------------------------
-
     /**
      * Add {@code name: version} to {@code scope} in {@code doc}, creating the scope if absent;
      * a no-op when {@code name} is already present.
@@ -311,7 +300,6 @@ public class PackageJsonHelper {
 
         Json.JsonObject existingScope = findObjectMember(root, scope);
         if (existingScope == null) {
-            // Detect indent unit from the first root member's prefix (e.g. "\n  " → "  ").
             String outerIndent = detectIndentUnit(root);
             String innerIndent = outerIndent + outerIndent;
 
@@ -332,7 +320,6 @@ public class PackageJsonHelper {
             return doc.withValue(appendMember(root, newScopeMember));
         }
 
-        // Member already present? Skip (Add semantics).
         for (Json m : existingScope.getMembers()) {
             if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
                 return doc;
@@ -389,7 +376,7 @@ public class PackageJsonHelper {
                 kept.add(rp);
             }
             if (kept.size() == scopeObj.getPadding().getMembers().size()) {
-                continue;  // member not present in this scope
+                continue;
             }
             changed = true;
             if (kept.isEmpty()) {
@@ -645,7 +632,6 @@ public class PackageJsonHelper {
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
     private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
-        // Ensure there's a space between ':' and the value (standard JSON formatting).
         JsonValue spacedValue = value;
         if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix().getWhitespace().isEmpty()) {
             spacedValue = ((Json.Literal) value).withPrefix(Space.SINGLE_SPACE);
@@ -656,8 +642,6 @@ public class PackageJsonHelper {
                 JsonRightPadded.build(keyLit),
                 spacedValue);
     }
-
-    // --- Edit-and-regenerate orchestration ---------------------------------
 
     @lombok.Value
     public static class EditAndRegenerateResult {
@@ -677,9 +661,8 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Apply a recipe-specific edit to a package.json, refresh its declared-deps
-     * marker, and (when the marker carries a package manager and a lock was captured
-     * at scan time) regenerate the lock file content via {@link LockFileRegeneration}.
+     * Apply a recipe's edit to a package.json, refresh its declared-dependency marker and, when it names a package
+     * manager and a lock was captured, regenerate the lock through {@link LockFileRegeneration}.
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
@@ -714,9 +697,8 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Apply an edit already made (and its lock already regenerated) to another revision of the
-     * package.json, such as one an earlier recipe in the same run changed after the edit was first
-     * computed. The declared dependencies are what the lock depends on, so {@code regen} still applies.
+     * Apply an edit already made, its lock already regenerated, to another revision of the package.json, such as one an
+     * earlier recipe in the run changed since; the declared dependencies are what the lock depends on.
      */
     public static SourceFile reapplyEdit(SourceFile packageJson,
                                          java.util.function.Function<Json.Document, Json.Document> editFn,

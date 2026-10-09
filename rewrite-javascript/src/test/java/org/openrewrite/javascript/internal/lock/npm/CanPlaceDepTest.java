@@ -31,9 +31,8 @@ import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.descri
 import static org.openrewrite.javascript.internal.lock.npm.PlacementCases.plain;
 
 /**
- * Port of @npmcli/arborist test/can-place-dep.js: its runTest table, with arborist's answers, is the
- * can-place-dep-cases fixture. Its "constructor debug throws" test is not ported, as the debug.js assertions
- * it checks are omitted.
+ * Port of @npmcli/arborist test/can-place-dep.js, its runTest table with arborist's answers in can-place-dep-cases; the
+ * "constructor debug throws" test checks the omitted debug.js assertions.
  */
 class CanPlaceDepTest {
 

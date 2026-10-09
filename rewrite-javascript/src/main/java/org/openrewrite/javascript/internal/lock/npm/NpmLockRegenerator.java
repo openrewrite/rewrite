@@ -40,9 +40,7 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of @npmcli/arborist lib/arborist/index.js and reify.js (npm 11.17.0) for {@code npm install
- * --package-lock-only}: the ideal tree built over the lock, written back as the lock. The lock written is then
- * loaded and built again, as the next install would, and must come back unchanged: a second install that
- * rejects or rewrites it is reported instead.
+ * --package-lock-only}; the lock written must come back unchanged from a second install, or that install is reported.
  */
 public final class NpmLockRegenerator {
 
@@ -206,9 +204,8 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * The project's files, with the lock's own entries standing in for the root and for the link targets
-     * outside node_modules that the host did not supply, as arborist reads a project without a package.json
-     * from its lock.
+     * The project's files, the lock's own entries standing in for the root and for link targets outside node_modules
+     * the host did not supply, as arborist reads a project without a package.json.
      */
     @SuppressWarnings("unchecked")
     static VirtualTreeLoader.ProjectFiles projectFiles(@Nullable LockFile lock, @Nullable String yarnLock,
@@ -270,7 +267,8 @@ public final class NpmLockRegenerator {
                 throw new CannotKnow("the project directory name (package.json has no name; npm names the lock " +
                                      "after the directory it runs in)");
             } else {
-                // a named root never reads it; a lock that is missing or malformed is refused before any name is written
+                // a named root never reads it; a lock that is missing or malformed is refused before any name is
+                // written
                 directoryName = "project";
             }
         }

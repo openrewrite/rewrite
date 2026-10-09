@@ -30,9 +30,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * The part of ssri (npm 11.17.0) that pacote applies to a registry manifest's {@code dist} and to the
- * integrity the caller holds. An integrity is carried as {@code String(Integrity)}: hashes grouped by
- * algorithm in first-seen order.
+ * The part of ssri (npm 11.17.0) pacote applies to a manifest's {@code dist} and the caller's integrity, carried as
+ * {@code String(Integrity)}: hashes grouped by algorithm in first-seen order.
  */
 final class Ssri {
 

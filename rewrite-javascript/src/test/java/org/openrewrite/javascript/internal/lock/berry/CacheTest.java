@@ -95,9 +95,8 @@ class CacheTest {
     }
 
     /**
-     * The downloaded fixtures' registry tarballs (a leaf, nested directories with an executable bin, a scoped and
-     * an ESM package), against the checksum Yarn 4.5.3 wrote for each; skipped when the fixtures are not on the
-     * classpath.
+     * The downloaded fixtures' registry tarballs against the checksum Yarn 4.5.3 wrote for each; skipped when the
+     * fixtures are not on the classpath.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("downloadedTarballs")

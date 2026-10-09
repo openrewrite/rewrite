@@ -46,9 +46,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
- * The recorded Yarn Berry scenarios under {@code lock/yarn-berry/} on the test classpath (the committed set and
- * the downloaded fixtures) and, when {@code REWRITE_LOCK_SCENARIOS} names a directory, under its
- * {@code yarn-berry} sibling or itself.
+ * The recorded Yarn Berry scenarios under {@code lock/yarn-berry/} on the test classpath and, when
+ * {@code REWRITE_LOCK_SCENARIOS} names a directory, under its {@code yarn-berry} sibling or itself.
  */
 final class BerryScenarios {
 
@@ -294,12 +293,8 @@ final class BerryScenarios {
         }
 
         /**
-         * The registry as the scenario recorded it: {@code http/<name>} for a packument whatever the registry's
-         * url, {@code http/<name>-<version>.tgz} for a tarball. A packument is recorded abbreviated (the downloaded
-         * fixtures' with their versions empty) beside the version documents Yarn read as {@code http/<name>-<version>},
-         * which stand in for their entries of the full packument Yarn asks for; an empty entry without one takes the
-         * shared cache's packument instead, else is a route not recorded. Through a recording registry, the
-         * documents carry its url as Yarn saw them.
+         * The registry as the scenario recorded it: {@code http/<name>} whatever the registry's url, the version
+         * documents standing in for the full packument's entries, and {@code http/<name>-<version>.tgz}.
          */
         ScenarioRegistry registry() {
             return new ScenarioRegistry(this);

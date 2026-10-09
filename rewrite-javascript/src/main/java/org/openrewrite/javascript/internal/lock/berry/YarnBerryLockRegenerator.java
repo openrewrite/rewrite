@@ -181,10 +181,8 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * One install over a lock: the lock the project holds afterwards.
-     *
-     * @param settings what the migration rules wrote to {@code .yarnrc.yml}: read as set by it, added to when this
-     *                 install migrates the lock
+     * One install over a lock: the lock the project holds afterwards; {@code settings} is what the migration rules
+     * wrote to {@code .yarnrc.yml}, added to when this install migrates the lock.
      */
     String install(String lock, Map<String, Object> settings) {
         if (lock.contains(MERGE_CONFLICT_START)) {
@@ -252,12 +250,8 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * The Yarn release the project runs: the release file {@code yarnPath} names unless {@code ignorePath} is set
-     * (the release corepack starts hands the install to it, yarnpkg-cli lib.ts {@code run}), else the root
-     * manifest's {@code packageManager}.
-     *
-     * @throws CannotKnow when neither names a version, the data has none of the one named, or it is a release
-     *                    after the one this package ports
+     * The release the project runs: {@code yarnPath}'s file unless {@code ignorePath}, else {@code packageManager};
+     * CannotKnow when neither names a version, the data lacks it, or it is later than the release ported.
      */
     YarnRelease release() {
         BerryOptions options = options();
@@ -292,10 +286,8 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * Under the release, the configuration, the project found, and the migration rules applied.
-     *
-     * @param settings what an earlier install's migration wrote to {@code .yarnrc.yml}
-     * @throws BerryOptions.UsageError where the configuration rejects a setting
+     * Under the release, the configuration, the project found, and the migration rules applied ({@code settings} from
+     * an earlier install's migration); throws BerryOptions.UsageError where the configuration rejects a setting.
      */
     Loaded load(YarnRelease release, Map<String, Object> settings) {
         BerryOptions options = options().copy();
@@ -395,7 +387,6 @@ public final class YarnBerryLockRegenerator {
                 return Reason.RESOLUTION_REQUIRED;
         }
     }
-
 
     // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
     private BerryOptions options() {

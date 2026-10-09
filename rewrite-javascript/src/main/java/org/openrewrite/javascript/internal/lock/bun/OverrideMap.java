@@ -23,9 +23,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of bun's src/install/lockfile/OverrideMap.zig (bun 1.3.10): one flat map from a package name hash to the
- * dependency every edge of that name resolves with, read from {@code overrides} or, failing that,
- * {@code resolutions}.
+ * Port of bun's src/install/lockfile/OverrideMap.zig (bun 1.3.10): one flat map from a name hash to the dependency
+ * every edge of that name resolves with, from {@code overrides}, else {@code resolutions}.
  */
 final class OverrideMap {
 

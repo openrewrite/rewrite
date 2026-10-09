@@ -27,10 +27,8 @@ import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 /**
- * An npm range as node-semver models it: an OR ({@code ||}) of AND-groups of {@link NodeComparand}
- * clauses, parsed by a direct port of node's {@code classes/range.js}. A prerelease only satisfies
- * a group when some clause names the same major.minor.patch tuple with a prerelease of its own,
- * unless {@code includePrerelease}.
+ * An npm range as node-semver's {@code classes/range.js} parses it: an OR of AND-groups of {@link NodeComparand}
+ * clauses; a prerelease satisfies a group only through a clause on its own tuple, unless {@code includePrerelease}.
  */
 class UnionRange implements VersionComparator {
 
@@ -378,8 +376,6 @@ class UnionRange implements VersionComparator {
     public String toString() {
         return range();
     }
-
-    // --- corpus-facing operations (exercised by the node-semver conformance suite) ---
 
     static boolean satisfies(String version, String range, boolean includePrerelease) {
         ParsedVersion v = ParsedVersion.parse(version);

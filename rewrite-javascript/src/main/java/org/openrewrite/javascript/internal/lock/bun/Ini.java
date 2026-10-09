@@ -27,11 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * Port of bun's src/ini.zig {@code Parser.parse} (bun 1.3.10), which reads an .npmrc: sections are nested objects,
- * {@code key[]} lines a list, {@code true}, {@code false} and {@code null} those values, a quoted value what JSON makes
- * of it, {@code ${VAR}} and {@code ${VAR?}} the environment's.
- */
+/** Port of bun's src/ini.zig {@code Parser.parse} (bun 1.3.10), which reads an .npmrc. */
 final class Ini {
 
     private static final ObjectMapper JSON = JsonMapper.builder()

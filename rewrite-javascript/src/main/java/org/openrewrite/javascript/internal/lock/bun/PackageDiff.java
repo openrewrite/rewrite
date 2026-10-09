@@ -28,10 +28,7 @@ import java.util.Set;
 
 /**
  * Port of bun's src/install/lockfile/Package.zig {@code Diff.generate} (bun 1.3.10), for an install without update
- * requests: what changed between a package in the lockfile and the same package read from its package.json.
- * A dependency is matched by name and behavior and unchanged when {@link Dependency#eql} says so; for the root,
- * an unchanged dependency maps to the old one's resolution, and a workspace edge maps only when the member's own
- * package.json has no diffs.
+ * requests.
  */
 final class PackageDiff {
 
@@ -56,9 +53,8 @@ final class PackageDiff {
     }
 
     /**
-     * @param idMapping for the root: per dependency of {@code to}, the index of the unchanged dependency of
-     *                  {@code from} it keeps the resolution of, else {@link Package#INVALID_PACKAGE_ID}.
-     * @param manifests the project's manifests by location, where a workspace member's package.json is read.
+     * {@code idMapping}: for the root, per dependency of {@code to}, the index of the unchanged dependency of {@code
+     * from} it keeps the resolution of, else {@link Package#INVALID_PACKAGE_ID}; {@code manifests} by location.
      */
     static Summary generate(BunOptions options, Log log, Lockfile fromLockfile, Lockfile toLockfile, Package from,
                             Package to, int @Nullable [] idMapping, Map<String, String> manifests) {

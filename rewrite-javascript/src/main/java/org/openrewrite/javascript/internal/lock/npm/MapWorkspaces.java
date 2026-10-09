@@ -115,10 +115,8 @@ final class MapWorkspaces {
     }
 
     /**
-     * {@code mapWorkspaces({cwd, pkg})} with the project's files standing in for its tree: every location
-     * (relative to {@code cwd}, {@code ""} for the root) that holds a package.json.
-     *
-     * @return package name to absolute path, in the order the patterns list them
+     * {@code mapWorkspaces({cwd, pkg})} over the locations holding a package.json ({@code ""} the root): package name
+     * to absolute path, in the order the patterns list them.
      */
     static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg, VirtualTreeLoader.ProjectFiles files) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();

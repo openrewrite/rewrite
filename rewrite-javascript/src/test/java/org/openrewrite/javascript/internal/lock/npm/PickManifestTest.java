@@ -324,7 +324,8 @@ class PickManifestTest {
           .hasMessageContaining("No matching version found");
     }
 
-    // beyond upstream's cases, what npm-pick-manifest 11.0.3 answers: a spread of an empty pick, and a nameless packument
+    // beyond upstream's cases, what npm-pick-manifest 11.0.3 answers: a spread of an empty pick, and a nameless
+    // packument
     @Test
     void avoidStrictWithNothingToPick() {
         Map<String, Object> oddly = packument("{\"name\":\"oddly\",\"dist-tags\":{\"latest\":\"1.0.2\"},\"versions\":{" +

@@ -175,9 +175,8 @@ final class LockfileStringifier {
     }
 
     /**
-     * The module's default export: the entries with the header yarn writes above them.
-     *
-     * @param nodeVersion {@code process.version} of the Node yarn runs under, written with {@code enableVersions}.
+     * The module's default export: the entries with the header yarn writes above them, {@code nodeVersion} written with
+     * {@code enableVersions}.
      */
     static String stringify(Map<String, @Nullable Object> obj, boolean noHeader, boolean enableVersions,
                             @Nullable String nodeVersion) {

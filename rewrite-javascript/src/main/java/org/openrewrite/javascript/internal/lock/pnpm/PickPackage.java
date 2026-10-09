@@ -137,9 +137,8 @@ final class PickPackage {
     }
 
     /**
-     * {@code pickPackage} as a lock-only install runs it: no metadata on disk, the run's own cache of each packument
-     * (abbreviated, or full for an optional dependency), and the full one fetched when the abbreviated document says
-     * the package changed after the release-age cutoff.
+     * {@code pickPackage} of a lock-only install: the run's cache of each packument (full for an optional dependency),
+     * the full one fetched when the abbreviated one says the package changed after the release-age cutoff.
      */
     static PickResult pickPackage(Map<String, Map<String, @Nullable Object>> metaCache, RegistryMetadata registry,
                                   PickPackageFromMeta.RegistryPackageSpec spec, PickerOptions pickerOpts,

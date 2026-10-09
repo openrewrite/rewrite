@@ -33,11 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
 
-/**
- * pnpm 11.2.2's {@code install --lockfile-only} under what it reads before resolving, as recorded on 2026-10-08: the
- * wanted package manager, config dependencies, pnpmfiles, an agent, the project's settings and the edits of the
- * recorded scenarios that reach the env document or the manifest reader's conversion.
- */
+/** pnpm 11.2.2's {@code install --lockfile-only} under what it reads before resolving, as recorded on 2026-10-08. */
 class PnpmLockRegeneratorTest {
 
     private static final String LOCK = "lockfileVersion: '9.0'\n\nsettings:\n  autoInstallPeers: true\n" +

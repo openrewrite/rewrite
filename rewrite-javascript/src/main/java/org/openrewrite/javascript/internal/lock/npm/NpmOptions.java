@@ -118,9 +118,8 @@ public class NpmOptions {
     boolean engineStrict;
 
     /**
-     * {@code before}, as the time value of the Date npm parses it to: NaN for an invalid date or a value
-     * that is not one, on which npm exits at its first fetch; the text itself when only V8's legacy date
-     * parser reads it, which the port lacks; null when the config leaves it unset or false.
+     * {@code before} as the time value of the Date npm parses: NaN for an invalid date (npm exits at its first fetch),
+     * the text itself when only V8's legacy date parser reads it, null when unset or false.
      */
     @Nullable
     Object before;
@@ -252,12 +251,8 @@ public class NpmOptions {
     }
 
     /**
-     * The options a project's {@code .npmrc} sets, over npm's defaults, read as npm's config loads the
-     * file ({@code ini.parse}, then {@code parseField} per key); keys this type does not hold yet are
-     * passed over.
-     *
-     * @throws NeedsEnvironment for a {@code ${VAR}} reference in the value of a key read, or in a key
-     *                          that could expand to one
+     * The options a project's {@code .npmrc} sets over npm's defaults, read as npm's config loads it; throws
+     * NeedsEnvironment for a {@code ${VAR}} in a key read or in a key that could expand to one.
      */
     public static NpmOptions fromNpmrc(@Nullable String npmrc) {
         NpmOptionsBuilder options = builder();

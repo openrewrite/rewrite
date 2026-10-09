@@ -29,8 +29,7 @@ import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKA
 
 /**
  * Port of bun's src/install/lockfile/Tree.zig (bun 1.3.10) for the {@code resolvable} method, with
- * {@code Lockfile.hoist}: a node_modules folder, the dependency whose name it carries, its parent, and the
- * dependencies hoisted into it. The tree is built from the resolution graph breadth first and is never stored.
+ * {@code Lockfile.hoist}.
  */
 final class Tree {
 
