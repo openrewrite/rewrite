@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -142,7 +143,7 @@ class YarnClassicLockRoundTripTest {
         StringBuilder out = new StringBuilder();
         try (Stream<Path> files = Files.list(scenario.getDir())) {
             files.filter(f -> f.getFileName().toString().endsWith(".log"))
-                    .forEach(f -> out.append(YarnClassicScenarios.read(f)));
+                    .forEach(f -> out.append(LockScenario.read(f)));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

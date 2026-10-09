@@ -17,20 +17,13 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.LockScenario;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,16 +32,12 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
- * The recorded Bun scenarios under {@code lock/bun/} on the test classpath and, when {@code REWRITE_LOCK_SCENARIOS}
- * names a directory, under its {@code bun} sibling or itself; {@code REWRITE_LOCK_HTTP_CACHE} is the registry fallback.
+ * The recorded Bun scenarios ({@link LockScenario#discover}) in the recorder's layout: each lock with the manifests,
+ * npmrc and bunfig of its phase.
  */
 final class BunScenarios {
-
-    static final String SCENARIOS_ENV = "REWRITE_LOCK_SCENARIOS";
-    static final String HTTP_CACHE_ENV = "REWRITE_LOCK_HTTP_CACHE";
 
     private static final List<String> LOCKS = Arrays.asList("before", "after", "fresh");
     private static final Pattern MEMBER_MANIFEST = Pattern.compile("^pkg-(.+?)(?:-(before|after))?$");
@@ -149,33 +138,9 @@ final class BunScenarios {
         }
     }
 
-    @Getter
-    static final class Scenario {
-        private final String name;
-        private final String label;
-        private final Path dir;
-        private final @Nullable Path httpCache;
-
+    static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
-            this.name = name;
-            this.label = label;
-            this.dir = dir;
-            this.httpCache = httpCache;
-        }
-
-        boolean has(String file) {
-            return Files.isRegularFile(dir.resolve(file));
-        }
-
-        @Nullable
-        String file(String file) {
-            return has(file) ? read(dir.resolve(file)) : null;
-        }
-
-        @Nullable
-        String expect() {
-            String expect = file("expect");
-            return expect == null ? null : expect.trim();
+            super(name, label, dir, httpCache);
         }
 
         /**
@@ -197,11 +162,6 @@ final class BunScenarios {
                 }
             }
             return Instant.now();
-        }
-
-        @Nullable
-        String recordedWith() {
-            return file("recorded-with");
         }
 
         /**
@@ -247,21 +207,6 @@ final class BunScenarios {
                 paths.add("bun.lock");
             }
             return paths;
-        }
-
-        private Map<String, String> tree(String treeDir) {
-            Path root = dir.resolve(treeDir);
-            Map<String, String> out = new TreeMap<>();
-            if (!Files.isDirectory(root)) {
-                return out;
-            }
-            try (Stream<Path> walk = Files.walk(root)) {
-                walk.filter(Files::isRegularFile)
-                        .forEach(p -> out.put(root.relativize(p).toString().replace('\\', '/'), read(p)));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return out;
         }
 
         @Nullable
@@ -338,93 +283,10 @@ final class BunScenarios {
             }
             return paths;
         }
-
-        List<String> files() {
-            try (Stream<Path> list = Files.list(dir)) {
-                List<String> names = new ArrayList<>();
-                list.filter(Files::isRegularFile).forEach(p -> names.add(p.getFileName().toString()));
-                Collections.sort(names);
-                return names;
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        /**
-         * A recorded registry response: {@code http/<name>} (an abbreviated packument) or {@code http/<name>-<version>}
-         * (a manifest), from the scenario, else from the shared cache.
-         */
-        @Nullable
-        String http(String name) {
-            Path own = dir.resolve("http").resolve(name);
-            if (Files.isRegularFile(own)) {
-                return read(own);
-            }
-            if (httpCache != null && Files.isRegularFile(httpCache.resolve(name))) {
-                return read(httpCache.resolve(name));
-            }
-            return null;
-        }
-
-        @Override
-        public String toString() {
-            return name;
-        }
     }
 
     static List<Scenario> discover() {
-        Map<String, Scenario> found = new TreeMap<>();
-        List<Path> classpathRoots = new ArrayList<>();
-        try {
-            Enumeration<URL> roots = BunScenarios.class.getClassLoader().getResources("lock/bun");
-            while (roots.hasMoreElements()) {
-                URL url = roots.nextElement();
-                if ("file".equals(url.getProtocol())) {
-                    classpathRoots.add(Paths.get(url.toURI()));
-                }
-            }
-        } catch (IOException | URISyntaxException e) {
-            throw new IllegalStateException(e);
-        }
-        String cache = System.getenv(HTTP_CACHE_ENV);
-        Path httpCache = cache != null && !cache.isEmpty() && Files.isDirectory(Paths.get(cache)) ?
-                Paths.get(cache) : null;
-        for (Path root : classpathRoots) {
-            collect(root, httpCache, found);
-        }
-        Path corpus = corpusRoot();
-        if (corpus != null) {
-            collect(corpus, httpCache, found);
-        }
-        return new ArrayList<>(found.values());
-    }
-
-    private static @Nullable Path corpusRoot() {
-        String corpus = System.getenv(SCENARIOS_ENV);
-        if (corpus == null || corpus.isEmpty() || !Files.isDirectory(Paths.get(corpus))) {
-            return null;
-        }
-        Path dir = Paths.get(corpus);
-        if ("bun".equals(String.valueOf(dir.getFileName()))) {
-            return dir;
-        }
-        Path sibling = dir.resolveSibling("bun");
-        return Files.isDirectory(sibling) ? sibling : null;
-    }
-
-    private static void collect(Path root, @Nullable Path httpCache, Map<String, Scenario> found) {
-        try (Stream<Path> walk = Files.walk(root, 1)) {
-            walk.filter(Files::isDirectory).forEach(dir -> {
-                if (dir.equals(root) || !isScenario(dir)) {
-                    return;
-                }
-                String name = root.relativize(dir).toString().replace('\\', '/');
-                String label = found.containsKey(name) ? name + " (" + root + ")" : name;
-                found.put(label, new Scenario(name, label, dir, httpCache));
-            });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return LockScenario.discover("bun", BunScenarios::isScenario, Scenario::new);
     }
 
     private static boolean isScenario(Path dir) {
@@ -434,13 +296,5 @@ final class BunScenarios {
             }
         }
         return false;
-    }
-
-    private static String read(Path path) {
-        try {
-            return new String(Files.readAllBytes(path), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 }
