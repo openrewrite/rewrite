@@ -23,17 +23,15 @@ import org.openrewrite.javascript.internal.lock.V8Date;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 /**
- * The JavaScript semantics pnpm's code relies on, over the values {@link JsYaml} loads: objects in
- * {@code Object.keys} order, arrays as lists, numbers as doubles.
+ * The JavaScript semantics pnpm's code relies on beyond the shared model: the dates and binary values
+ * {@link JsYaml} loads, Ramda's {@code equals}, spread copies.
  */
 final class Js extends EcmaScript {
 
@@ -52,72 +50,24 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code String(value)} for the values a YAML document or package.json holds.
+     * {@code String(value)} for the values a YAML document or package.json holds; a date's text is cannot-know.
      */
-    static String string(@Nullable Object value) {
-        if (value == null) {
-            return "null";
-        }
-        if (value == JsYaml.UNDEFINED) {
-            return "undefined";
-        }
-        if (value instanceof String) {
-            return (String) value;
-        }
-        if (value instanceof Number) {
-            return numberToString(((Number) value).doubleValue());
-        }
-        if (value instanceof Boolean) {
-            return value.toString();
-        }
-        if (value instanceof List) {
-            StringBuilder out = new StringBuilder();
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) {
-                    out.append(',');
-                }
-                Object item = list.get(i);
-                if (item != null) {
-                    out.append(string(item));
-                }
-            }
-            return out.toString();
-        }
-        if (value instanceof byte[]) {
-            StringBuilder out = new StringBuilder();
-            byte[] bytes = (byte[]) value;
-            for (int i = 0; i < bytes.length; i++) {
-                if (i > 0) {
-                    out.append(',');
-                }
-                out.append(bytes[i] & 0xFF);
-            }
-            return out.toString();
-        }
-        if (value instanceof JsYaml.Timestamp) {
+    public static String string(@Nullable Object value) {
+        if (holdsDate(value)) {
             throw new CannotKnow("the text of a date (Date.prototype.toString follows the host's time zone)");
         }
-        return "[object Object]";
+        return EcmaScript.string(value);
     }
 
-    private static final Pattern DECIMAL_LITERAL =
-            Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
-
-    /**
-     * {@code a === b} for values held by reference only when they are objects.
-     */
-    static boolean strictEquals(@Nullable Object a, @Nullable Object b) {
-        if (a == null || b == null) {
-            return a == b;
+    private static boolean holdsDate(@Nullable Object value) {
+        if (value instanceof List) {
+            for (Object item : (List<?>) value) {
+                if (holdsDate(item)) {
+                    return true;
+                }
+            }
         }
-        if (a instanceof Number && b instanceof Number) {
-            return ((Number) a).doubleValue() == ((Number) b).doubleValue();
-        }
-        if (a instanceof String || a instanceof Boolean) {
-            return a.equals(b);
-        }
-        return a == b;
+        return value instanceof JsYaml.Timestamp;
     }
 
     /**
@@ -169,106 +119,38 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code JSON.stringify} without indentation; {@code "undefined"} for a value it does not serialize, as a
-     * template literal prints its result.
+     * {@code JSON.stringify} as a template literal prints it, {@code "undefined"} for undefined; a date as its
+     * {@code toJSON}, any other object YAML gives beyond JSON as one without keys.
      */
-    static String jsonStringify(@Nullable Object value) {
-        if (value == JsYaml.UNDEFINED) {
-            return "undefined";
-        }
-        StringBuilder out = new StringBuilder();
-        stringify(value, out);
-        return out.toString();
+    public static String jsonStringify(@Nullable Object value) {
+        String json = EcmaScript.jsonStringify(json(value));
+        return json == null ? "undefined" : json;
     }
 
     @SuppressWarnings("unchecked")
-    private static void stringify(@Nullable Object value, StringBuilder out) {
-        if (value == null) {
-            out.append("null");
-        } else if (value instanceof String) {
-            quote((String) value, out);
-        } else if (value instanceof Boolean) {
-            out.append(value);
-        } else if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            out.append(Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d));
-        } else if (value instanceof JsYaml.Timestamp) {
-            quote(((JsYaml.Timestamp) value).toIsoString(), out);
-        } else if (value instanceof List) {
-            out.append('[');
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) {
-                    out.append(',');
-                }
-                Object item = list.get(i);
-                stringify(item == JsYaml.UNDEFINED ? null : item, out);
-            }
-            out.append(']');
-        } else if (value instanceof Map) {
-            out.append('{');
-            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) value;
-            boolean first = true;
-            for (String key : keys(map)) {
-                Object member = map.get(key);
-                if (member == JsYaml.UNDEFINED) {
-                    continue;
-                }
-                if (!first) {
-                    out.append(',');
-                }
-                first = false;
-                quote(key, out);
-                out.append(':');
-                stringify(member, out);
-            }
-            out.append('}');
-        } else {
-            out.append("{}");
-        }
-    }
-
-    /**
-     * {@code typeof}.
-     */
-    static String typeOf(@Nullable Object value) {
-        if (value == null) {
-            return "object";
-        }
-        if (value == JsYaml.UNDEFINED) {
-            return "undefined";
-        }
-        if (value instanceof String) {
-            return "string";
-        }
-        if (value instanceof Number) {
-            return "number";
-        }
-        if (value instanceof Boolean) {
-            return "boolean";
-        }
-        return "object";
-    }
-
-    /**
-     * The own enumerable keys of a JavaScript value used as an object: an object's, an array's indices, a
-     * string's character positions; nothing for anything else.
-     */
-    @SuppressWarnings("unchecked")
-    static Set<String> ownKeys(@Nullable Object value) {
-        Set<String> keys = new LinkedHashSet<>();
+    private static @Nullable Object json(@Nullable Object value) {
         if (value instanceof Map) {
-            keys.addAll(keys((Map<String, ?>) value));
-        } else if (value instanceof List) {
-            for (int i = 0; i < ((List<?>) value).size(); i++) {
-                keys.add(String.valueOf(i));
+            Map<String, @Nullable Object> object = new LinkedHashMap<>();
+            for (Map.Entry<String, ?> member : ((Map<String, ?>) value).entrySet()) {
+                object.put(member.getKey(), json(member.getValue()));
             }
-        } else if (value instanceof String) {
-            for (int i = 0; i < ((String) value).length(); i++) {
-                keys.add(String.valueOf(i));
-            }
+            return object;
         }
-        return keys;
+        if (value instanceof List) {
+            List<@Nullable Object> array = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                array.add(json(item));
+            }
+            return array;
+        }
+        if (value instanceof JsYaml.Timestamp) {
+            return ((JsYaml.Timestamp) value).toIsoString();
+        }
+        if (value == null || value == UNDEFINED || value instanceof String || value instanceof Number ||
+            value instanceof Boolean) {
+            return value;
+        }
+        return new LinkedHashMap<>();
     }
 
     /**

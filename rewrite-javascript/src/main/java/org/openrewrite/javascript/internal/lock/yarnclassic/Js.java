@@ -30,8 +30,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The JavaScript semantics yarn's values follow: truthiness, {@code typeof}, the order {@code Object.keys} gives,
- * {@code Object.assign}, {@code JSON.parse} and {@code JSON.stringify} of strings and numbers.
+ * Yarn's values as the port holds them, undefined as null: property reads, {@code Object.assign}, {@code JSON.parse},
+ * string splits and template literals.
  */
 final class Js extends EcmaScript {
 
@@ -47,37 +47,13 @@ final class Js extends EcmaScript {
     private Js() {
     }
 
-    static String typeOf(@Nullable Object value) {
-        if (value == null) {
-            return "undefined";
-        }
-        if (value instanceof String) {
-            return "string";
-        }
-        if (value instanceof Boolean) {
-            return "boolean";
-        }
-        if (value instanceof Number) {
-            return "number";
-        }
-        return "object";
+    public static String typeOf(@Nullable Object value) {
+        return EcmaScript.typeOf(value == null ? UNDEFINED : value);
     }
 
-    /**
-     * {@code Object.keys} of any value yarn iterates: an array's and a string's indices, a primitive's none.
-     */
-    @SuppressWarnings("unchecked")
-    static List<String> keys(@Nullable Object value) {
-        if (value instanceof Map) {
-            return keys((Map<String, ?>) value);
-        }
-        List<String> indices = new ArrayList<>();
-        int length = value instanceof List ? ((List<?>) value).size() :
-                value instanceof String ? ((String) value).length() : 0;
-        for (int i = 0; i < length; i++) {
-            indices.add(String.valueOf(i));
-        }
-        return indices;
+    // the keys of any value yarn iterates, as a spread finds them: none for undefined
+    public static List<String> keys(@Nullable Object value) {
+        return ownKeys(value);
     }
 
     /**
@@ -180,42 +156,6 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code JSON.stringify} without indentation; {@code undefined} for a value it has no representation of.
-     */
-    static @Nullable String jsonStringify(@Nullable Object value) {
-        if (value == null) {
-            return "null";
-        }
-        if (value instanceof String) {
-            return quote((String) value);
-        }
-        if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            return Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d);
-        }
-        if (value instanceof Map) {
-            StringBuilder out = new StringBuilder("{");
-            Map<?, ?> map = (Map<?, ?>) value;
-            for (String key : keys(value)) {
-                String item = jsonStringify(map.get(key));
-                if (item != null) {
-                    out.append(out.length() > 1 ? "," : "").append(quote(key)).append(':').append(item);
-                }
-            }
-            return out.append('}').toString();
-        }
-        if (value instanceof List) {
-            List<String> items = new ArrayList<>();
-            for (Object item : (List<?>) value) {
-                String s = jsonStringify(item);
-                items.add(s == null ? "null" : s);
-            }
-            return "[" + String.join(",", items) + "]";
-        }
-        return value instanceof Boolean ? value.toString() : null;
-    }
-
-    /**
      * {@code String.prototype.split} by a string.
      */
     static String[] splitString(String s, String separator) {
@@ -250,27 +190,8 @@ final class Js extends EcmaScript {
         return (int) (new BigDecimal(d).toBigInteger().longValue() & 0xFFFFFFFFL);
     }
 
-    /**
-     * {@code String(value)} of a JavaScript value as yarn holds them.
-     */
-    static String string(@Nullable Object value) {
-        if (value == null) {
-            return "undefined";
-        }
-        if (value instanceof Number) {
-            return numberToString(((Number) value).doubleValue());
-        }
-        if (value instanceof Map) {
-            return "[object Object]";
-        }
-        if (value instanceof List) {
-            List<String> parts = new ArrayList<>();
-            for (Object item : (List<?>) value) {
-                parts.add(item == null ? "" : string(item));
-            }
-            return String.join(",", parts);
-        }
-        return value.toString();
+    public static String string(@Nullable Object value) {
+        return EcmaScript.string(value == null ? UNDEFINED : value);
     }
 
     /**

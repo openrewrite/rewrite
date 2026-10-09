@@ -46,16 +46,6 @@ final class Js extends EcmaScript {
         }
     };
 
-    /**
-     * The hole {@code delete array[i]} leaves: no key for {@link #entries}, {@link #UNDEFINED} when read.
-     */
-    static final Object HOLE = new Object() {
-        @Override
-        public String toString() {
-            return "undefined";
-        }
-    };
-
     // the prototypes of V8 13.6, which Node 24 runs npm 11 on
     private static final Set<String> OBJECT_MEMBERS = members(
             "__defineGetter__ __defineSetter__ __lookupGetter__ __lookupSetter__ __proto__ constructor " +
@@ -165,17 +155,6 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code Object.keys(value)}, in the order of {@link #entries}.
-     */
-    static List<String> keys(@Nullable Object value) {
-        List<String> keys = new ArrayList<>();
-        for (Map.Entry<String, @Nullable Object> entry : entries(value)) {
-            keys.add(entry.getKey());
-        }
-        return keys;
-    }
-
-    /**
      * {@code delete receiver[key]} in strict mode: an object loses the property, an array keeps a {@link #HOLE}, and an
      * undeletable property (a string's characters, a length) is JavaScript's TypeError.
      */
@@ -209,19 +188,6 @@ final class Js extends EcmaScript {
                 array.set((int) index, HOLE);
             }
         }
-    }
-
-    /**
-     * {@code a === b} for values parsed from JSON: objects and arrays are equal only to themselves.
-     */
-    static boolean strictEquals(@Nullable Object a, @Nullable Object b) {
-        if (a instanceof Number && b instanceof Number) {
-            return ((Number) a).doubleValue() == ((Number) b).doubleValue();
-        }
-        if (a instanceof String || a instanceof Boolean) {
-            return a.equals(b);
-        }
-        return a == b;
     }
 
     /**
@@ -261,56 +227,6 @@ final class Js extends EcmaScript {
             return toNumber(string(val));
         }
         return Double.NaN;
-    }
-
-    /**
-     * {@code String(value)} for a value parsed from JSON.
-     */
-    static String string(@Nullable Object val) {
-        if (val == null || val == UNDEFINED || val == INHERITED || val instanceof Boolean) {
-            return String.valueOf(val);
-        }
-        if (val instanceof Number) {
-            return numberToString((Number) val);
-        }
-        if (val instanceof String) {
-            return (String) val;
-        }
-        if (val instanceof List) {
-            List<?> array = (List<?>) val;
-            StringBuilder sb = new StringBuilder();
-            for (int i = 0; i < array.size(); i++) {
-                if (i > 0) {
-                    sb.append(',');
-                }
-                Object element = array.get(i);
-                if (element != null && element != UNDEFINED && element != HOLE) {
-                    sb.append(string(element));
-                }
-            }
-            return sb.toString();
-        }
-        return "[object Object]";
-    }
-
-    /**
-     * How JavaScript's TypeError names a primitive it cannot create a property on.
-     */
-    static String typeOf(Object val) {
-        if (val instanceof Number) {
-            return "number";
-        }
-        if (val instanceof Boolean) {
-            return "boolean";
-        }
-        if (val instanceof String) {
-            return "string";
-        }
-        return val == UNDEFINED ? "undefined" : "object";
-    }
-
-    public static boolean truthy(@Nullable Object val) {
-        return val != HOLE && EcmaScript.truthy(val);
     }
 
     /**

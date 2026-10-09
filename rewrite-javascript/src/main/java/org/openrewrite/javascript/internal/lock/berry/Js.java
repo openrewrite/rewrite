@@ -15,28 +15,23 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
-import org.openrewrite.javascript.internal.lock.EcmaScript;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
- * The JavaScript semantics Yarn's plain objects, strings and numbers follow.
+ * Yarn's plain objects as the port holds them: property reads, {@code Object.entries} and {@code JSON.parse}.
  */
 final class Js extends EcmaScript {
-
-    private static final Pattern DECIMAL =
-            Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?)");
-    private static final Pattern RADIX_INTEGER = Pattern.compile("0(?:[xX][0-9a-fA-F]+|[oO][0-7]+|[bB][01]+)");
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
@@ -133,91 +128,8 @@ final class Js extends EcmaScript {
         return value;
     }
 
-    /**
-     * {@code String(value)} for the values a manifest holds.
-     */
-    static String string(@Nullable Object value) {
-        if (value == null) {
-            return "null";
-        }
-        if (value instanceof Double) {
-            double d = (Double) value;
-            if (d == Math.rint(d) && !Double.isInfinite(d) && Math.abs(d) < 1e21) {
-                return String.valueOf((long) d);
-            }
-            return String.valueOf(d);
-        }
-        if (value instanceof Map) {
-            return "[object Object]";
-        }
-        if (value instanceof List) {
-            StringBuilder out = new StringBuilder();
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) {
-                    out.append(',');
-                }
-                Object item = list.get(i);
-                out.append(item == null || item == Syml.UNDEFINED ? "" : string(item));
-            }
-            return out.toString();
-        }
-        return value.toString();
-    }
-
     static boolean isInteger(double d) {
         return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
     }
 
-    /**
-     * {@code JSON.stringify} of the values a parsed object holds: maps in their order, lists, strings, numbers,
-     * booleans and null.
-     */
-    static String jsonStringify(@Nullable Object value) {
-        StringBuilder out = new StringBuilder();
-        stringify(value, out);
-        return out.toString();
-    }
-
-    private static void stringify(@Nullable Object value, StringBuilder out) {
-        if (value == null) {
-            out.append("null");
-        } else if (value instanceof String) {
-            quote((String) value, out);
-        } else if (value instanceof Boolean) {
-            out.append(value);
-        } else if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            out.append(Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString(d));
-        } else if (value instanceof Map) {
-            out.append('{');
-            boolean first = true;
-            for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet()) {
-                if (entry.getValue() == Syml.UNDEFINED) {
-                    continue;
-                }
-                if (!first) {
-                    out.append(',');
-                }
-                first = false;
-                quote(String.valueOf(entry.getKey()), out);
-                out.append(':');
-                stringify(entry.getValue(), out);
-            }
-            out.append('}');
-        } else if (value instanceof List) {
-            out.append('[');
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                if (i > 0) {
-                    out.append(',');
-                }
-                Object item = list.get(i);
-                stringify(item == Syml.UNDEFINED ? null : item, out);
-            }
-            out.append(']');
-        } else {
-            throw new IllegalArgumentException("not a JSON value: " + value.getClass());
-        }
-    }
 }

@@ -27,8 +27,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The JavaScript value semantics every port follows: truthiness, {@code Object.keys} order, white space, and the
- * conversions between numbers and strings. Each port's {@code Js} extends it with its own object model.
+ * The JavaScript value model every port follows: truthiness, {@code typeof}, {@code String()}, {@code JSON.stringify},
+ * strict equality, keys and their order, white space. Each port's {@code Js} extends it with its own object model.
  */
 public class EcmaScript {
 
@@ -36,6 +36,16 @@ public class EcmaScript {
      * What JavaScript reads from a property that is not there. JSON's {@code null} is Java's.
      */
     public static final Object UNDEFINED = new Object() {
+        @Override
+        public String toString() {
+            return "undefined";
+        }
+    };
+
+    /**
+     * The hole {@code delete array[i]} leaves: no key, {@link #UNDEFINED} when read.
+     */
+    public static final Object HOLE = new Object() {
         @Override
         public String toString() {
             return "undefined";
@@ -58,7 +68,7 @@ public class EcmaScript {
     }
 
     public static boolean truthy(@Nullable Object value) {
-        if (value == null || value == UNDEFINED || Boolean.FALSE.equals(value)) {
+        if (value == null || value == UNDEFINED || value == HOLE || Boolean.FALSE.equals(value)) {
             return false;
         }
         if (value instanceof String) {
@@ -91,6 +101,162 @@ public class EcmaScript {
         indices.sort((a, b) -> Long.compare(arrayIndex(a), arrayIndex(b)));
         indices.addAll(rest);
         return indices;
+    }
+
+    /**
+     * {@code Object.keys(value)}: an array's indices but its holes', a string's; none for a number or a boolean.
+     * @throws IllegalArgumentException for JavaScript's TypeError on null or undefined
+     */
+    public static List<String> keys(@Nullable Object value) {
+        if (value == null || value == UNDEFINED) {
+            throw new IllegalArgumentException("Cannot convert undefined or null to object");
+        }
+        return ownKeys(value);
+    }
+
+    /**
+     * The keys a spread or {@code for...in} enumerates: {@link #keys(Object)}, and none for null or undefined.
+     */
+    @SuppressWarnings("unchecked")
+    public static List<String> ownKeys(@Nullable Object value) {
+        if (value instanceof Map) {
+            return keys((Map<String, ?>) value);
+        }
+        List<String> indices = new ArrayList<>();
+        if (value instanceof List) {
+            List<?> array = (List<?>) value;
+            for (int i = 0; i < array.size(); i++) {
+                if (array.get(i) != HOLE) {
+                    indices.add(String.valueOf(i));
+                }
+            }
+        } else if (value instanceof String) {
+            for (int i = 0; i < ((String) value).length(); i++) {
+                indices.add(String.valueOf(i));
+            }
+        }
+        return indices;
+    }
+
+    /**
+     * {@code typeof}; {@code "object"} for null and for every object, of the model or a port's own.
+     */
+    public static String typeOf(@Nullable Object value) {
+        if (value == UNDEFINED) {
+            return "undefined";
+        }
+        if (value instanceof String) {
+            return "string";
+        }
+        if (value instanceof Number) {
+            return "number";
+        }
+        if (value instanceof Boolean) {
+            return "boolean";
+        }
+        return "object";
+    }
+
+    /**
+     * {@code a === b}: numbers by value, strings and booleans by content, everything else by identity.
+     */
+    public static boolean strictEquals(@Nullable Object a, @Nullable Object b) {
+        if (a instanceof Number && b instanceof Number) {
+            return ((Number) a).doubleValue() == ((Number) b).doubleValue();
+        }
+        if (a instanceof String || a instanceof Boolean) {
+            return a.equals(b);
+        }
+        return a == b;
+    }
+
+    /**
+     * {@code String(value)}: an array joined with commas, its null, undefined and holes empty, a byte array as a
+     * {@code Uint8Array}, any other object {@code [object Object]}; a port's own sentinel by its {@code toString}.
+     */
+    public static String string(@Nullable Object value) {
+        if (value == null) {
+            return "null";
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        if (value instanceof Number) {
+            return numberToString((Number) value);
+        }
+        if (value instanceof List) {
+            StringBuilder out = new StringBuilder();
+            List<?> array = (List<?>) value;
+            for (int i = 0; i < array.size(); i++) {
+                if (i > 0) {
+                    out.append(',');
+                }
+                Object element = array.get(i);
+                if (element != null && element != UNDEFINED && element != HOLE) {
+                    out.append(string(element));
+                }
+            }
+            return out.toString();
+        }
+        if (value instanceof byte[]) {
+            StringBuilder out = new StringBuilder();
+            byte[] bytes = (byte[]) value;
+            for (int i = 0; i < bytes.length; i++) {
+                if (i > 0) {
+                    out.append(',');
+                }
+                out.append(bytes[i] & 0xFF);
+            }
+            return out.toString();
+        }
+        if (value instanceof Map) {
+            return "[object Object]";
+        }
+        return value.toString();
+    }
+
+    /**
+     * {@code JSON.stringify(value)} without indentation, objects in {@link #keys(Map)} order; null where it gives
+     * undefined, as it does for undefined and for anything that is not a JSON value.
+     */
+    @SuppressWarnings("unchecked")
+    public static @Nullable String jsonStringify(@Nullable Object value) {
+        if (value == null) {
+            return "null";
+        }
+        if (value instanceof String) {
+            return quote((String) value);
+        }
+        if (value instanceof Boolean) {
+            return value.toString();
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            return Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString((Number) value);
+        }
+        if (value instanceof List) {
+            StringBuilder out = new StringBuilder("[");
+            List<?> array = (List<?>) value;
+            for (int i = 0; i < array.size(); i++) {
+                String element = jsonStringify(array.get(i));
+                out.append(i > 0 ? "," : "").append(element == null ? "null" : element);
+            }
+            return out.append(']').toString();
+        }
+        if (value instanceof Map) {
+            StringBuilder out = new StringBuilder("{");
+            Map<String, ?> object = (Map<String, ?>) value;
+            for (String key : keys(object)) {
+                String member = jsonStringify(object.get(key));
+                if (member != null) {
+                    out.append(out.length() > 1 ? "," : "");
+                    quote(key, out);
+                    out.append(':').append(member);
+                }
+            }
+            return out.append('}').toString();
+        }
+        return null;
     }
 
     /**
