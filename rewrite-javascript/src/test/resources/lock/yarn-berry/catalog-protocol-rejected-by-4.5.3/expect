@@ -1,1 +1,1 @@
-pm-rejects YN0001 Error: ms@catalog: isn't supported by any available resolver
+pm-fails YN0001 Error: ms@catalog: isn't supported by any available resolver

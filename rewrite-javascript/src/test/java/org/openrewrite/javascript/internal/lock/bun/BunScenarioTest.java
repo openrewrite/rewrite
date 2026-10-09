@@ -223,7 +223,8 @@ class BunScenarioTest {
                 ok = failure.getReason() == Reason.MALFORMED_LOCK;
                 break;
             case "pm-rejects":
-                ok = failure.getKind() == Kind.PM_REJECTS &&
+            case "pm-fails":
+                ok = failure.getKind() == (kind.equals("pm-rejects") ? Kind.PM_REJECTS : Kind.PM_FAILS) &&
                      failure.getDetail().contains(rest.replaceFirst("^error: ", "")) && http.missing.isEmpty();
                 break;
             case "second-install-rejects":

@@ -1,1 +1,1 @@
-pm-rejects Invalid version. Must be a string. Got type "number".
+pm-fails Invalid version. Must be a string. Got type "number".

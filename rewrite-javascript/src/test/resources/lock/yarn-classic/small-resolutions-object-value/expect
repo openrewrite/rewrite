@@ -1,1 +1,1 @@
-pm-rejects TypeError: Cannot convert object to primitive value
+pm-fails TypeError: Cannot convert object to primitive value

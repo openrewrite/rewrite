@@ -269,7 +269,7 @@ class NodeDependencyScanTest {
       ".npmrc              | //r.example/:tokenHelper=x               | TOKEN_HELPER_IN_PROJECT_CONFIG",
       ".npmrc              | //r.example/:_auth=x                     | ERR_PNPM_AUTH_INVALID_BASE64",
       ".npmrc              | unread                                   | .npmrc (its contents were not read)",
-      "pnpm-workspace.yaml | packages: [                              | pnpm rejects this edit",
+      "pnpm-workspace.yaml | packages: [                              | pnpm fails on this edit",
       "pnpm-workspace.yaml | packages: 5                              | packages field is not an array",
       "pnpm-workspace.yaml | packages: [packages/*]\\ncatalog: [1]    | Expected catalog field to be an object",
       "pnpm-workspace.yaml | packages: [packages/*, ../shared/*]      | ../shared",
@@ -370,7 +370,7 @@ class NodeDependencyScanTest {
                   acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
                   ctx);
                 assertThat(result).isNotNull();
-                assertThat(result.getErrorMessage()).contains("pnpm rejects this edit");
+                assertThat(result.getErrorMessage()).contains("pnpm fails on this edit");
             }
         }
     }

@@ -1,1 +1,1 @@
-pm-rejects TypeError: micromatch.matcher(): pattern should be a string, regex, or function.
+pm-fails TypeError: micromatch.matcher(): pattern should be a string, regex, or function.

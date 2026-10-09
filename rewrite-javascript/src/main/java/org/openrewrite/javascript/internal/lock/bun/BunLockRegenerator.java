@@ -22,7 +22,6 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -292,7 +291,7 @@ public final class BunLockRegenerator {
             if (e instanceof Json.SyntaxError || e instanceof TextLockfileReader.ParseError || !log.hasErrors()) {
                 throw e;
             }
-            throw new Rejected(Kind.PM_REJECTS, Reason.MALFORMED_MANIFEST, null, log.errors.get(0));
+            throw Rejected.rejects(Reason.MALFORMED_MANIFEST, log.errors.get(0));
         }
         PackageManager manager = install.getManager();
 
@@ -301,7 +300,7 @@ public final class BunLockRegenerator {
         List<String> failed = PackageManager.verifyResolutions(cleaned, manager.options);
         if (!failed.isEmpty()) {
             String first = manager.log.errors.isEmpty() ? "" : manager.log.errors.get(0) + "; ";
-            throw new Rejected(Kind.PM_REJECTS, reasonFor(manager.log.errors),
+            throw Rejected.rejects(reasonFor(manager.log.errors),
                     failed.get(0).replaceFirst("@[^@]*$", ""),
                     first + failed.get(0) + " failed to resolve");
         }
@@ -310,7 +309,7 @@ public final class BunLockRegenerator {
         }
         String written = install.write(cleaned);
         if (written == null) {
-            throw new Rejected(Kind.DELETES_LOCK, Reason.RESOLUTION_REQUIRED, null, "the root has no package left");
+            throw Rejected.deletesLock("the root has no package left");
         }
         return written;
     }
@@ -373,17 +372,11 @@ public final class BunLockRegenerator {
     }
 
     private static Failure failure(RuntimeException e) {
-        if (e instanceof Rejected) {
-            return INSTALL.failure((Rejected) e);
-        }
-        if (e instanceof CannotKnow) {
-            return INSTALL.failure((CannotKnow) e);
-        }
         if (e instanceof Json.SyntaxError) {
-            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null,
-                    "ParserError: failed to parse package.json: " + e.getMessage());
+            return INSTALL.failure(Rejected.rejects(Reason.MALFORMED_MANIFEST,
+                    "ParserError: failed to parse package.json: " + e.getMessage()));
         }
-        throw e;
+        return INSTALL.failure(e);
     }
 
     static LoadResult loadFromCwd(@Nullable String lock, BunOptions options) {

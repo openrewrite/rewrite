@@ -54,7 +54,6 @@ class YarnClassicScenarioTest {
 
     static final String RESULTS_ENV = "REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS";
     private static final Pattern SYNTAX_ERROR_HEAD = Pattern.compile("^SyntaxError: (\\.\\./)*package\\.json:");
-    private static final Pattern JS_ERROR = Pattern.compile("([A-Z][A-Za-z]*)?Error( \\[[A-Z_]+])?: ");
 
     private static final List<String> results = Collections.synchronizedList(new ArrayList<>());
 
@@ -210,13 +209,13 @@ class YarnClassicScenarioTest {
                 ok = failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
                 break;
             case "pm-rejects":
-                // yarn prints its own messages bare and JavaScript's errors by name, which the registry's 404 is
-                // too; a package the registry does not have is the one route that is not recorded
-                ok = (failure.getKind() == Kind.PM_REJECTS ||
-                      JS_ERROR.matcher(rest).lookingAt() && failure.getKind() == Kind.PM_FAILS) &&
-                     saysWhatYarnSaid(detail, rest) &&
+                // a package the registry does not have is the one route that is not recorded
+                ok = failure.getKind() == Kind.PM_REJECTS && saysWhatYarnSaid(detail, rest) &&
                      (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND &&
                       (rest.startsWith("Couldn't find package") || rest.endsWith(": Not found")));
+                break;
+            case "pm-fails":
+                ok = failure.getKind() == Kind.PM_FAILS && saysWhatYarnSaid(detail, rest) && http.missing.isEmpty();
                 break;
             case "second-install-rejects":
             case "unstable":

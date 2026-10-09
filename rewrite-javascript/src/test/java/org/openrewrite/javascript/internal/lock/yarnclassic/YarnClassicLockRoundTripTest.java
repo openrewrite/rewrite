@@ -114,7 +114,7 @@ class YarnClassicLockRoundTripTest {
         try {
             regenerator.requireRelease(YarnClassicOptions.rc(inputs.getConfigFiles()));
         } catch (CannotKnow | JsError e) {
-            assertThat(lock.getScenario().expect()).matches("(cannot-know|pm-rejects) .*");
+            assertThat(lock.getScenario().expect()).matches("(cannot-know|pm-fails) .*");
             assumeFalse(true, "yarn 1.22.22 does not run this install: " + e.getMessage());
         }
         YarnClassicOptions options = YarnClassicOptions.load(inputs.getConfigFiles(), inputs.getEnv());

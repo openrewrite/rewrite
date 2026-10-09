@@ -68,6 +68,6 @@ class JsrResolverTest {
         Failure failure = result.get().getFailure();
         assertThat(failure).isNotNull();
         assertThat(failure.getDetail())
-                .isEqualTo("yarn rejects this edit: crash: JavaScript heap out of memory in the resolution step");
+                .isEqualTo("yarn fails on this edit: crash: JavaScript heap out of memory in the resolution step");
     }
 }

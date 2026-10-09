@@ -368,29 +368,27 @@ public final class YarnClassicLockRegenerator {
     }
 
     private Failure failure(RuntimeException e) {
-        if (e instanceof Rejected) {
-            return INSTALL.failure((Rejected) e);
-        }
-        if (e instanceof CannotKnow) {
-            return INSTALL.failure((CannotKnow) e);
-        }
+        return INSTALL.failure(outcome(e));
+    }
+
+    private static RuntimeException outcome(RuntimeException e) {
         if (e instanceof LocaleCompare.UnknownOrder) {
-            return INSTALL.failure(new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage()));
+            return new CannotKnow("the order yarn finds the workspaces in: " + e.getMessage());
         }
         if (e instanceof MessageError) {
             String message = String.valueOf(e.getMessage());
-            return INSTALL.rejects(reasonFor(message), null, message);
+            return Rejected.rejects(reasonFor(message), message);
         }
         if (e instanceof NpmRegistry.NotFound) {
-            return INSTALL.rejects(SharedError.PACKAGE_NOT_FOUND.getReason(),
-                    ((NpmRegistry.NotFound) e).getPackageName(), e.toString());
+            return Rejected.rejects(SharedError.PACKAGE_NOT_FOUND, ((NpmRegistry.NotFound) e).getPackageName(),
+                    e.toString());
         }
         if (e instanceof JsError) {
             JsError error = (JsError) e;
             Reason reason = error.isSyntaxError() ? Reason.MALFORMED_MANIFEST : Reason.RESOLUTION_REQUIRED;
-            return INSTALL.fails(reason, null, error.toString());
+            return Rejected.crashes(reason, null, error.toString());
         }
-        throw e;
+        return e;
     }
 
     private static Reason reasonFor(String message) {

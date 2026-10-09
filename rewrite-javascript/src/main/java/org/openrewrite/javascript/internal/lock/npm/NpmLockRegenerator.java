@@ -21,7 +21,6 @@ import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -299,38 +298,42 @@ public final class NpmLockRegenerator {
     }
 
     private static Failure failure(RuntimeException e) {
+        return INSTALL.failure(outcome(e));
+    }
+
+    private static RuntimeException outcome(RuntimeException e) {
         String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
         if (e instanceof PlaceDep.CouldNotResolve) {
             PlaceDep.PeerConflict conflict = ((PlaceDep.CouldNotResolve) e).getConflict();
-            return INSTALL.failure(Kind.PM_REJECTS, Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
+            return Rejected.coded(Reason.PEER_CONFLICT, conflict.getEdge().getName(), "ERESOLVE",
                     ExplainEresolve.explain(conflict.getExplanation(), 4));
         }
         if (e instanceof CannotKnow) {
-            return INSTALL.failure((CannotKnow) e);
+            return e;
         }
         if (e instanceof NpmOptions.NeedsEnvironment) {
-            return INSTALL.failure(new CannotKnow("the environment: " + message));
+            return new CannotKnow("the environment: " + message);
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
-            return INSTALL.failure(new CannotKnow("the package's files: " + message));
+            return new CannotKnow("the package's files: " + message);
         }
         if (e instanceof LocaleCompare.UnknownOrder) {
-            return INSTALL.failure(new CannotKnow("the order npm writes the keys in: " + message));
+            return new CannotKnow("the order npm writes the keys in: " + message);
         }
         if (e instanceof MalformedLock) {
-            return INSTALL.failure(Rejected.discardsLock(message));
+            return Rejected.discardsLock(message);
         }
         if (e instanceof MalformedManifest) {
-            return INSTALL.fails(Reason.MALFORMED_MANIFEST, null, "it cannot apply the manifest: " + message);
+            return Rejected.crashes(Reason.MALFORMED_MANIFEST, null, "it cannot apply the manifest: " + message);
         }
         if (e instanceof JsonParseEvenBetterErrors.JsonParseException) {
-            return INSTALL.failure(Kind.PM_REJECTS, Reason.MALFORMED_MANIFEST, null, "EJSONPARSE", message);
+            return Rejected.coded(Reason.MALFORMED_MANIFEST, null, "EJSONPARSE", message);
         }
         String code = e instanceof NpmError ? ((NpmError) e).getCode() : null;
         if (code == null) {
-            return INSTALL.fails(Reason.RESOLUTION_REQUIRED, packageOf(e), message);
+            return Rejected.crashes(Reason.RESOLUTION_REQUIRED, packageOf(e), message);
         }
-        return INSTALL.failure(Kind.PM_REJECTS, reasonFor(code), packageOf(e), code, message);
+        return Rejected.coded(reasonFor(code), packageOf(e), code, message);
     }
 
     private static Reason reasonFor(String code) {

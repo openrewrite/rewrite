@@ -65,7 +65,7 @@ class BerryLockRoundTripTest {
         try {
             loaded = regenerator.load(release);
         } catch (JsYaml.YamlException e) {
-            assertThat(expect).as("Yarn rejects the lock").isEqualTo("pm-rejects " + e);
+            assertThat(expect).as("Yarn fails on the lock").isEqualTo("pm-fails " + e);
             return;
         }
         Project project = loaded.getProject();

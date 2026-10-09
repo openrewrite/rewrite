@@ -297,35 +297,37 @@ public final class PnpmLockRegenerator {
     }
 
     private static Failure failure(RuntimeException e) {
+        return INSTALL.failure(outcome(e));
+    }
+
+    // pnpm's own errors carry an ERR_PNPM_ code; any other it prints as [ERROR], Node's uncaught ones with a stack
+    private static RuntimeException outcome(RuntimeException e) {
         if (e instanceof LockfileReader.IgnoredLockfile) {
-            return INSTALL.failure(Rejected.discardsLock(String.valueOf(e.getMessage())));
-        }
-        if (e instanceof CannotKnow) {
-            return INSTALL.failure((CannotKnow) e);
+            return Rejected.discardsLock(String.valueOf(e.getMessage()));
         }
         if (e instanceof ReportPeerDependencyIssues.PeerDependencyIssuesError) {
-            return INSTALL.rejects(Reason.PEER_CONFLICT,
+            return Rejected.rejects(Reason.PEER_CONFLICT,
                     ((ReportPeerDependencyIssues.PeerDependencyIssuesError) e).firstPeerName(),
                     "[ERR_PNPM_PEER_DEP_ISSUES] " + e.getMessage());
         }
         if (e instanceof PnpmError) {
             String code = ((PnpmError) e).getCode();
-            return INSTALL.rejects(reasonFor(code), null, "[" + code + "] " + e.getMessage());
+            return Rejected.rejects(reasonFor(code), "[" + code + "] " + e.getMessage());
         }
         if (e instanceof JsError) {
             String code = ((JsError) e).getCode();
             Reason reason = "ERR_INVALID_PACKAGE_CONFIG".equals(code) ? Reason.MALFORMED_MANIFEST :
                     Reason.RESOLUTION_REQUIRED;
-            return INSTALL.rejects(reason, null, (code == null ? "" : "[" + code + "] ") + e.getMessage());
+            return Rejected.crashes(reason, null, (code == null ? "" : "[" + code + "] ") + e.getMessage());
         }
         // the lock and the env document catch their own; what reaches here is pnpm-workspace.yaml's
         if (e instanceof JsYaml.YamlException) {
-            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null, String.valueOf(e.getMessage()));
+            return Rejected.crashes(Reason.MALFORMED_MANIFEST, null, String.valueOf(e.getMessage()));
         }
         if (e instanceof LockfileFormatConverters.TypeError) {
-            return INSTALL.rejects(Reason.MALFORMED_LOCK, null, "TypeError: " + e.getMessage());
+            return Rejected.crashes(Reason.MALFORMED_LOCK, null, "TypeError: " + e.getMessage());
         }
-        throw e;
+        return e;
     }
 
     private static Reason reasonFor(String code) {

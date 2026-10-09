@@ -127,12 +127,13 @@ class NpmScenarioTest {
                      failure.getDetail().contains(words[1]) && failure.getDetail().contains(words[2]);
                 break;
             case "npm-rejects":
-                // a crash is npm's own code failing (no error code): the port fails there too, not always the same way;
                 // a route the stub lacked may be the failure's cause instead, unless npm's own answer was the 404
-                ok = ("crash".equals(words[1]) ? failure.getKind() == Kind.PM_FAILS ||
-                                                 failure.getKind() == Kind.PM_REJECTS :
-                  failure.getKind() == Kind.PM_REJECTS && failure.getDetail().contains("(" + words[1] + ")")) &&
+                ok = failure.getKind() == Kind.PM_REJECTS && failure.getDetail().contains("(" + words[1] + ")") &&
                      (http.missing.isEmpty() || "E404".equals(words[1]));
+                break;
+            case "pm-fails":
+                // an error without a code of npm's own: the port fails there too, not always with npm's words
+                ok = failure.getKind() == Kind.PM_FAILS && http.missing.isEmpty();
                 break;
             case "cannot-know":
                 ok = failure.getKind() == Kind.CANNOT_KNOW;

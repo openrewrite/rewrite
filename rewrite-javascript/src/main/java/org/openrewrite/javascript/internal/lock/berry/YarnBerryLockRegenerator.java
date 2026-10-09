@@ -339,35 +339,38 @@ public final class YarnBerryLockRegenerator {
     }
 
     private static Failure failure(RuntimeException e) {
-        if (e instanceof Rejected) {
-            return INSTALL.failure((Rejected) e);
-        }
-        if (e instanceof CannotKnow) {
-            return INSTALL.failure((CannotKnow) e);
-        }
+        return INSTALL.failure(outcome(e));
+    }
+
+    // a plain Error reaches Yarn's report as YN0001, or uncaught as Internal Error or its stack: none is Yarn's own
+    private static RuntimeException outcome(RuntimeException e) {
         if (e instanceof Project.UnknownChecksums) {
-            return INSTALL.failure(new CannotKnow(String.valueOf(e.getMessage()), Reason.CHECKSUM_UNAVAILABLE));
+            return new CannotKnow(String.valueOf(e.getMessage()), Reason.CHECKSUM_UNAVAILABLE);
         }
         if (e instanceof Project.HeapExhausted) {
-            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, String.valueOf(e.getMessage()));
+            return Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, String.valueOf(e.getMessage()));
         }
         if (e instanceof ReportError) {
             ReportError error = (ReportError) e;
-            return INSTALL.rejects(reasonFor(error), null, error.getName() + " " + error.getMessage());
+            String message = error.getName() + " " + error.getMessage();
+            boolean crash = error.getCode() == ReportError.EXCEPTION ||
+                            error.getCode() == ReportError.STACK_OVERFLOW_RESOLUTION;
+            return crash ? Rejected.crashes(reasonFor(error), null, message) :
+                    Rejected.rejects(reasonFor(error), message);
         }
         if (e instanceof JsYaml.YamlException) {
-            return INSTALL.rejects(Reason.MALFORMED_LOCK, null, e.toString());
+            return Rejected.crashes(Reason.MALFORMED_LOCK, null, e.toString());
         }
         if (e instanceof BerryOptions.UsageError) {
-            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, "Usage Error: " + e.getMessage());
+            return Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Usage Error: " + e.getMessage());
         }
         if (e instanceof Js.SyntaxError) {
-            return INSTALL.rejects(Reason.MALFORMED_MANIFEST, null, "YN0001 SyntaxError: " + e.getMessage());
+            return Rejected.crashes(Reason.MALFORMED_MANIFEST, null, "YN0001 SyntaxError: " + e.getMessage());
         }
         if (e instanceof JsError) {
-            return INSTALL.rejects(Reason.RESOLUTION_REQUIRED, null, "YN0001 " + e);
+            return Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "YN0001 " + e);
         }
-        throw e;
+        return e;
     }
 
     private static Reason reasonFor(ReportError error) {
@@ -394,7 +397,7 @@ public final class YarnBerryLockRegenerator {
             try {
                 options = BerryOptions.load(inputs.getConfigFiles(), HostEnvironment.of(inputs.getEnv()));
             } catch (JsError e) {
-                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Internal Error: " + e.getMessage());
+                throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
             }
         }
         return options;

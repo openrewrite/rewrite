@@ -1,1 +1,1 @@
-pm-rejects Invalid comparator: >=x.y
+pm-fails Invalid comparator: >=x.y

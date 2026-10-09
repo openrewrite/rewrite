@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -26,8 +25,8 @@ import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
- * A package manager's lock-only install as a port runs it: its failures, worded with the command's name, and the
- * second install over the lock written, which must change nothing.
+ * A package manager's lock-only install as a port runs it: its failures, each of the kind {@link #kindOf} names and
+ * worded with the command's name, and the second install over the lock written, which must change nothing.
  */
 public final class LockOnlyInstall {
 
@@ -43,33 +42,76 @@ public final class LockOnlyInstall {
     }
 
     /**
-     * @param code the package manager's error code, when it words its errors by one
+     * The one rule for a failure's kind: what the engine cannot see, the package manager's own verdict, an error with
+     * no code of its own, or what it does to the lock instead of installing over it.
      */
-    public Failure failure(Kind kind, Reason reason, @Nullable String packageName, @Nullable String code,
-                           String message) {
-        String lead = kind == Kind.CANNOT_KNOW ? "the engine cannot know " :
-                describe(kind) + (code == null ? "" : " (" + code + ")") + ": ";
-        return new Failure(kind, reason, packageName, lead + message);
-    }
-
-    public Failure failure(CannotKnow e) {
-        return failure(Kind.CANNOT_KNOW, e.getReason(), null, null, e.getSubject());
-    }
-
-    public Failure failure(Rejected e) {
-        return failure(e.getKind(), e.getReason(), e.getPackageName(), null, String.valueOf(e.getMessage()));
-    }
-
-    public Failure rejects(Reason reason, @Nullable String packageName, String message) {
-        return failure(Kind.PM_REJECTS, reason, packageName, null, message);
-    }
-
-    public Failure fails(Reason reason, @Nullable String packageName, String message) {
-        return failure(Kind.PM_FAILS, reason, packageName, null, message);
+    public static Kind kindOf(RuntimeException outcome) {
+        if (outcome instanceof CannotKnow) {
+            return Kind.CANNOT_KNOW;
+        }
+        if (outcome instanceof NodeRegistryException) {
+            NodeRegistryException.Reason reason = ((NodeRegistryException) outcome).getReason();
+            return reason == NodeRegistryException.Reason.PACKAGE_NOT_FOUND ||
+                   reason == NodeRegistryException.Reason.VERSION_NOT_FOUND ? Kind.PM_REJECTS : Kind.CANNOT_KNOW;
+        }
+        if (outcome instanceof Rejected) {
+            switch (((Rejected) outcome).getOutcome()) {
+                case VERDICT:
+                    return Kind.PM_REJECTS;
+                case CRASH:
+                    return Kind.PM_FAILS;
+                case DISCARDS_LOCK:
+                    return Kind.DISCARDS_LOCK;
+                case DELETES_LOCK:
+                    return Kind.DELETES_LOCK;
+            }
+        }
+        throw outcome;
     }
 
     /**
-     * The written lock, once the second install over it changes nothing; else the failure.
+     * @param outcome a {@link CannotKnow} or a {@link Rejected}; anything else is rethrown
+     */
+    public Failure failure(RuntimeException outcome) {
+        if (outcome instanceof CannotKnow) {
+            CannotKnow e = (CannotKnow) outcome;
+            return new Failure(kindOf(e), e.getReason(), null, "the engine cannot know " + e.getSubject());
+        }
+        if (!(outcome instanceof Rejected)) {
+            throw outcome;
+        }
+        Rejected e = (Rejected) outcome;
+        Kind kind = kindOf(e);
+        return new Failure(kind, e.getReason(), e.getPackageName(), describe(kind) +
+                (e.getCode() == null ? "" : " (" + e.getCode() + ")") + ": " + e.getMessage());
+    }
+
+    /**
+     * The registry's answer to a document the package manager asked for, the engine as its client.
+     */
+    public static Failure failure(NodeRegistryException e) {
+        Reason reason;
+        switch (e.getReason()) {
+            case AUTH_FAILED:
+                reason = Reason.AUTH_FAILED;
+                break;
+            case PACKAGE_NOT_FOUND:
+                reason = SharedError.PACKAGE_NOT_FOUND.getReason();
+                break;
+            case VERSION_NOT_FOUND:
+                reason = SharedError.NO_MATCHING_VERSION.getReason();
+                break;
+            case UNREACHABLE:
+            default:
+                reason = Reason.REGISTRY_UNREACHABLE;
+                break;
+        }
+        return new Failure(kindOf(e), reason, e.getPackageName(), String.valueOf(e.getMessage()));
+    }
+
+    /**
+     * The written lock, once the second install over it changes nothing; else the failure. What the engine cannot
+     * know there stays cannot-know.
      */
     public Result verify(String written, UnaryOperator<String> install,
                          Function<RuntimeException, Failure> failureOf) {
@@ -80,6 +122,10 @@ public final class LockOnlyInstall {
             throw e;
         } catch (RuntimeException e) {
             Failure failure = failureOf.apply(e);
+            if (failure.getKind() == Kind.CANNOT_KNOW) {
+                return Result.failure(new Failure(Kind.CANNOT_KNOW, failure.getReason(), failure.getPackageName(),
+                        failure.getDetail() + " (in " + describe(Kind.SECOND_INSTALL) + ")"));
+            }
             return Result.failure(new Failure(Kind.SECOND_INSTALL, failure.getReason(), failure.getPackageName(),
                     describe(Kind.SECOND_INSTALL) + (failure.getKind() == Kind.PM_FAILS ? " would fail: " :
                             " would reject it: ") + failure.getDetail()));

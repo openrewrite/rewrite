@@ -1,1 +1,1 @@
-pm-rejects YAMLException: can not read a block mapping entry; a multiline key may not be an implicit key
+pm-fails YAMLException: can not read a block mapping entry; a multiline key may not be an implicit key

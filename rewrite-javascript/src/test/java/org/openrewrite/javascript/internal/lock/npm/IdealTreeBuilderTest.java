@@ -247,8 +247,11 @@ class IdealTreeBuilderTest {
         switch (kind) {
             case "npm-rejects":
                 // a route the stub lacked may be the failure's cause instead, unless npm's own answer was the 404
-                ok = ("crash".equals(words[1]) || words[1].equals(code)) &&
-                     (http.missing.isEmpty() || "E404".equals(words[1]));
+                ok = words[1].equals(code) && (http.missing.isEmpty() || "E404".equals(words[1]));
+                break;
+            case "pm-fails":
+                // an error without a code of npm's own
+                ok = code == null && !(e instanceof CannotKnow) && http.missing.isEmpty();
                 break;
             case "cannot-know":
                 ok = e instanceof CannotKnow || e instanceof NpmOptions.NeedsEnvironment ||

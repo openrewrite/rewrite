@@ -1,1 +1,1 @@
-pm-rejects Error: Cannot find module
+pm-fails Error: Cannot find module

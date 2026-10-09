@@ -195,6 +195,9 @@ class PnpmScenarioTest {
             case "pm-rejects":
                 ok = failure.getKind() == Kind.PM_REJECTS && detail.contains(rest);
                 break;
+            case "pm-fails":
+                ok = failure.getKind() == Kind.PM_FAILS && detail.contains(rest);
+                break;
             case "second-install-rejects":
                 ok = failure.getKind() == Kind.SECOND_INSTALL && detail.contains(code) &&
                      namesEvery(detail, rest);

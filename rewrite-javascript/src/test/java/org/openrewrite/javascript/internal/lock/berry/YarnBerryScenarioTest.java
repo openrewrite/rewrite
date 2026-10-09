@@ -169,6 +169,9 @@ class YarnBerryScenarioTest {
                 ok = failure.getKind() == Kind.PM_REJECTS && detail.contains(rest) &&
                      (http.missing.isEmpty() || failure.getReason() == Reason.PACKAGE_NOT_FOUND);
                 break;
+            case "pm-fails":
+                ok = failure.getKind() == Kind.PM_FAILS && detail.contains(rest) && http.missing.isEmpty();
+                break;
             case "second-install-rejects":
                 ok = failure.getKind() == Kind.SECOND_INSTALL;
                 break;

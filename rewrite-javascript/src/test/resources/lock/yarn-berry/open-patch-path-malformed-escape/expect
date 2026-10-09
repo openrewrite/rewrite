@@ -1,1 +1,1 @@
-pm-rejects YN0001 URIError: URI malformed
+pm-fails YN0001 URIError: URI malformed
