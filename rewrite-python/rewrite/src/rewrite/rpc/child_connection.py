@@ -61,7 +61,8 @@ def _engine_roots() -> list:
     return roots
 
 
-def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> list:
+def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None, log_file=None,
+                  trace_rpc_messages=False) -> list:
     cmd = [
         str(venv_manager.venv_python(venv_dir)),
         "-m", "rewrite.rpc.server",
@@ -69,6 +70,10 @@ def child_command(venv_dir: Path, bundle_dist: str, attribution_name=None) -> li
     ]
     if attribution_name:
         cmd += ["--attribution-name", attribution_name]
+    if log_file:
+        cmd += ["--log-file", log_file]
+    if trace_rpc_messages:
+        cmd.append("--trace-rpc-messages")
     return cmd
 
 

@@ -109,6 +109,9 @@ _pending_responses: Dict[Any, dict] = {}
 # Flag for trace mode
 _trace_rpc = False
 
+# Set via --log-file; forwarded to bundle children so recipe code logs to the same file.
+_log_file: Optional[str] = None
+
 # Python version to parse (read from environment, default to "3")
 # Set REWRITE_PYTHON_VERSION to "2" or "2.7" to parse Python 2 code
 _python_version = os.environ.get("REWRITE_PYTHON_VERSION", "3")
@@ -2804,7 +2807,9 @@ def _get_facade():
                         len(removed), _recipe_install_dir, ", ".join(removed))
         _facade = Facade(BundleChildren(sys.executable, _recipe_install_dir,
                                         upstream=_serve_child_object,
-                                        on_child_replaced=_hub_drop_bundle),
+                                        on_child_replaced=_hub_drop_bundle,
+                                        log_file=_log_file,
+                                        trace_rpc_messages=_trace_rpc),
                          hub_pull=_hub_pull_child_edit,
                          hub_drop=_hub_forget,
                          local_visit=_hub_local_visit,
@@ -3224,6 +3229,19 @@ def _close_metrics() -> None:
 FATAL_EXIT_CODE = 8
 
 
+def _configure_logging(log_file: Optional[str], trace_rpc_messages: bool) -> None:
+    global _log_file
+    _log_file = log_file
+    root = logging.getLogger()
+    if log_file:
+        prefix = f'[{_child_bundle}] ' if _child_bundle else ''
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setFormatter(logging.Formatter(f'%(asctime)s - {prefix}%(levelname)s - %(message)s'))
+        root.addHandler(file_handler)
+    if trace_rpc_messages:
+        root.setLevel(logging.DEBUG)
+
+
 def main():
     """Main entry point for the RPC server."""
     global _trace_rpc
@@ -3257,14 +3275,8 @@ def main():
         global _attribution_name
         _attribution_name = args.attribution_name
 
-    if args.log_file:
-        file_handler = logging.FileHandler(args.log_file)
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        logger.addHandler(file_handler)
-
-    if args.trace_rpc_messages:
-        logger.setLevel(logging.DEBUG)
-        _trace_rpc = True
+    _configure_logging(args.log_file, args.trace_rpc_messages)
+    _trace_rpc = args.trace_rpc_messages
 
     logger.info("Python RPC server starting...")
 
