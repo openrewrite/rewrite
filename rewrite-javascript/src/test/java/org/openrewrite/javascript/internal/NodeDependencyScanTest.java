@@ -336,6 +336,46 @@ class NodeDependencyScanTest {
     }
 
     /**
+     * Without a lock at the workspace root, a walk that stops leaves the member's own lock, whose regeneration reads
+     * the same files and reports it; a member without one has no lock to keep in step, as any lockless project.
+     */
+    @Test
+    void aPnpmWalkThatStopsWhereTheRootHoldsNoLock() {
+        for (boolean ownLock : new boolean[]{false, true}) {
+            NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+            if (ownLock) {
+                NodeDependencyScan.captureLock(acc, PlainText.builder()
+                  .sourcePath(Paths.get("packages/a/pnpm-lock.yaml")).text("own lock").build());
+            }
+            NodeDependencyScan.ProjectState root = acc.projects.computeIfAbsent(ROOT,
+              k -> new NodeDependencyScan.ProjectState());
+            root.capturedPackageJson = PlainText.builder().sourcePath(ROOT).text("{\"name\":\"root\",\"private\":true}")
+              .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm,
+                singletonList("packages/a/package.json")))))
+              .build();
+            SourceFile member = PlainText.builder().sourcePath(MEMBER)
+              .text("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}")
+              .markers(Markers.build(singletonList(nodeResolutionResult(PackageManager.Pnpm)))).build();
+            acc.projects.computeIfAbsent(MEMBER, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson =
+              member;
+            capture(acc, "pnpm-workspace.yaml", "packages: [");
+
+            NodeDependencyScan.linkWorkspaceMembers(acc);
+
+            assertThat(NodeDependencyScan.lockFor(acc, MEMBER))
+              .isEqualTo(ownLock ? Paths.get("packages/a/pnpm-lock.yaml") : null);
+            if (ownLock) {
+                ExecutionContext ctx = new InMemoryExecutionContext();
+                LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member, null,
+                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
+                  ctx);
+                assertThat(result).isNotNull();
+                assertThat(result.getErrorMessage()).contains("pnpm rejects this edit");
+            }
+        }
+    }
+
+    /**
      * The marker's .npmrc is the repository root's, so it stands in for an unread root .npmrc in the walk from a
      * member as in the regeneration: unshared, the member's own lock.
      */
