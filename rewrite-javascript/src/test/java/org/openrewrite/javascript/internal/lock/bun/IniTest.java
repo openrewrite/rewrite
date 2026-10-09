@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Ports bun's test/js/bun/ini/ini.test.ts (bun-v1.3.10): its env var cases, from {@code ini-cases.json} (written by
+ * Ports bun's test/js/bun/ini/ini.test.ts (bun-v1.3.10): its env var cases, from {@code ini-cases} (written by
  * {@code generate/ini-cases.js}), and its parse cases.
  */
 class IniTest {
@@ -46,7 +46,7 @@ class IniTest {
 
     static List<Arguments> envVarCases() throws IOException {
         List<Arguments> cases = new ArrayList<>();
-        try (InputStream is = IniTest.class.getResourceAsStream("ini-cases.json")) {
+        try (InputStream is = IniTest.class.getResourceAsStream("ini-cases")) {
             for (JsonNode c : MAPPER.readTree(is)) {
                 cases.add(Arguments.of(c.get("name").asText(), c.get("ini").asText(),
                         MAPPER.convertValue(c.get("env"), Map.class), MAPPER.convertValue(c.get("expected"), Map.class)));

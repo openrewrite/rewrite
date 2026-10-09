@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes ini-cases.json: the envVarTest cases of bun's test/js/bun/ini/ini.test.ts (bun-v1.3.10), each with its
+// Writes ini-cases: the envVarTest cases of bun's test/js/bun/ini/ini.test.ts (bun-v1.3.10), each with its
 // name, the .ini text, the environment and the object bun's parser makes of it.
 //
-// Usage: node ini-cases.js <path to ini.test.ts> > ini-cases.json
+// Usage: node ini-cases.js <path to ini.test.ts> > ini-cases
 const fs = require('fs');
 
 const source = fs.readFileSync(process.argv[2], 'utf8')
