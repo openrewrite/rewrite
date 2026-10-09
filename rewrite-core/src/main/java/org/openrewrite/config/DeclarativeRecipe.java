@@ -287,7 +287,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
+            return visitorAfterPrecondition(bellwether.isPreconditionApplicable(), delegate.getVisitor());
         }
 
         @Override
@@ -388,7 +388,7 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
-            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
+            return visitorAfterPrecondition(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
         }
 
         @Override
@@ -602,6 +602,53 @@ public class DeclarativeRecipe extends ScanningRecipe<DeclarativeRecipe.Accumula
             return conditions.get(0);
         }
         return Preconditions.or(conditions.toArray(new TreeVisitor[0]));
+    }
+
+    /**
+     * When the bellwether has admitted this source file, expose that on the execution context for the
+     * delegate visit and clear it afterwards. {@code delegateVisitor} is always obtained by the caller,
+     * including when the precondition does not apply.
+     */
+    private static TreeVisitor<?, ExecutionContext> visitorAfterPrecondition(
+            boolean preconditionApplicable, TreeVisitor<?, ExecutionContext> delegateVisitor) {
+        if (!preconditionApplicable) {
+            return TreeVisitor.noop();
+        }
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return delegateVisitor.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+                markPreconditionApplicable(ctx);
+                try {
+                    return delegateVisitor.visit(tree, ctx, parent);
+                } finally {
+                    clearPreconditionApplicable(ctx);
+                }
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                markPreconditionApplicable(ctx);
+                try {
+                    return delegateVisitor.visit(tree, ctx);
+                } finally {
+                    clearPreconditionApplicable(ctx);
+                }
+            }
+        };
+    }
+
+    private static void markPreconditionApplicable(ExecutionContext ctx) {
+        // Avoid ExecutionContext.putMessage: WatchableExecutionContext treats that as a recipe change.
+        ctx.getMessages().put(ExecutionContext.PRECONDITION_APPLICABLE, Boolean.TRUE);
+    }
+
+    private static void clearPreconditionApplicable(ExecutionContext ctx) {
+        ctx.getMessages().remove(ExecutionContext.PRECONDITION_APPLICABLE);
     }
 
     private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {

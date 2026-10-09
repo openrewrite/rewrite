@@ -92,7 +92,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Only if using",
             description = "Used to determine if the dependency will be added and in which scope it should be placed. " +
-                          "Required for multi-module projects to avoid adding dependencies unnecessarily.",
+                          "When set, the dependency is added only to modules that use the specified type.",
             example = "org.junit.jupiter.api.*",
             required = false)
     @Nullable
@@ -255,7 +255,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                     }
                 }
 
-                if (onlyIfUsing == null && isSubprojectOfParentInRepository(acc)) {
+                if (onlyIfUsing == null &&
+                        !Boolean.TRUE.equals(ctx.getMessage(ExecutionContext.PRECONDITION_APPLICABLE)) &&
+                        isSubprojectOfParentInRepository(acc)) {
                     return maven;
                 }
                 if (isAggregatorNotUsedAsParent()) {

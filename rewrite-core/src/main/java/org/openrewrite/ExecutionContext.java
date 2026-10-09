@@ -50,6 +50,12 @@ public interface ExecutionContext extends RpcCodec<ExecutionContext> {
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
     String SCANNING_MUTATION_VALIDATION = "org.openrewrite.test.scanningMutationValidation";
 
+    /**
+     * {@link Boolean#TRUE} for the duration of a recipe visit that a declarative precondition has already admitted.
+     * Absent on every other visit, including runs with no precondition.
+     */
+    String PRECONDITION_APPLICABLE = "org.openrewrite.preconditionApplicable";
+
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
         putMessageInCollection("org.openrewrite.internal.treeObservers", observer,
