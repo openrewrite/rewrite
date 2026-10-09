@@ -20,9 +20,12 @@
 //   globs-scan.tsv.gz        pattern            -> scan's parts and tinyglobby's isDynamicPattern
 //   globs-workspaces.tsv.gz  directories, patterns -> @pnpm/workspace.projects-reader findWorkspaceProjectsNoCheck's
 //                                                 project directories (relative, sorted) or !<error>
-// Patterns are drawn from a seeded generator.
+// Patterns are drawn from a seeded generator. Each tree is built a few directories below a directory of its own, so
+// a pattern that climbs out of the project finds only what the generator made. With --rows, the rows of an existing
+// output directory are answered again instead.
 //
 // Usage: NODE_PATH=<pnpm>/dist/node_modules node globs.js <out-dir> <seed> <count>
+//        NODE_PATH=<pnpm>/dist/node_modules node globs.js --rows <rows-dir> <out-dir>
 'use strict';
 
 const fs = require('fs');
@@ -38,11 +41,14 @@ for (const [name, version] of [['tinyglobby', '0.2.16'], ['picomatch', '4.0.4'],
     throw new Error(`${name} ${actual} is not the ${version} pnpm 11.2.2 bundles`);
 }
 
-const [outDir, seedArg, countArg] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const rowsDir = args[0] === '--rows' ? args[1] : null;
+const [outDir, seedArg, countArg] = rowsDir ? [args[2]] : args;
 if (!outDir)
-  throw new Error('usage: node globs.js <out-dir> <seed> <count>');
+  throw new Error('usage: node globs.js <out-dir> <seed> <count> | --rows <rows-dir> <out-dir>');
 
 const escape = s => s.replace(/\\/g, '\\\\').replace(/\t/g, '\\t').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+const unescape = s => s.replace(/\\([\\tnr])/g, (m, c) => ({'\\': '\\', t: '\t', n: '\n', r: '\r'})[c]);
 
 function mulberry32(seed) {
   return () => {
@@ -98,14 +104,9 @@ for (let i = 0; i < count; i++)
 for (const s of SEGMENTS)
   patterns.push(s);
 
-const picomatchRows = [];
-const scanRows = [];
-for (const p of new Set(patterns)) {
-  const pattern = p.startsWith('!') && p[1] !== '(' ? p.slice(1) : p;
-  if (pattern === '')
-    continue;
-  scanRows.push([escape(pattern), escape(JSON.stringify(scan(pattern, {parts: true}).parts)),
-    load('tinyglobby').isDynamicPattern(pattern) ? '1' : '0']);
+const scanRow = pattern => [escape(pattern), escape(JSON.stringify(scan(pattern, {parts: true}).parts)),
+  load('tinyglobby').isDynamicPattern(pattern) ? '1' : '0'];
+const picomatchRow = pattern => {
   let source;
   const tests = {};
   try {
@@ -119,8 +120,8 @@ for (const p of new Set(patterns)) {
   } catch (error) {
     source = `!${error.name}: ${error.message}`;
   }
-  picomatchRows.push([escape(pattern), escape(source), escape(JSON.stringify(tests))]);
-}
+  return [escape(pattern), escape(source), escape(JSON.stringify(tests))];
+};
 
 // @pnpm/workspace.projects-reader findPackages + findWorkspaceProjectsNoCheck as pnpm 11.2.2 runs them
 const lexCompare = (a, b) => a < b ? -1 : a > b ? 1 : 0;
@@ -136,9 +137,40 @@ async function findWorkspaceProjects(root, patterns) {
   return dirs.sort(lexCompare);
 }
 
+// deeper than any pattern climbs, so `..` only ever reaches directories the generator made
+const sandbox = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'pnpm-globs-')));
+const tree = path.join(sandbox, 'u', 'v', 'w', 'x', 'y', 'z', 'root');
+async function membersRow(dirs, list) {
+  for (const pattern of list) {
+    if (pattern.split('/').filter(s => s === '..').length >= 7)
+      throw new Error(`${pattern} climbs above the sandbox`);
+  }
+  fs.rmSync(sandbox, {recursive: true, force: true});
+  fs.mkdirSync(tree, {recursive: true});
+  for (const d of dirs) {
+    fs.mkdirSync(path.join(tree, d), {recursive: true});
+    fs.writeFileSync(path.join(tree, d, 'package.json'), '{}');
+  }
+  let answer;
+  try {
+    answer = JSON.stringify(await findWorkspaceProjects(tree, list));
+  } catch (error) {
+    answer = `!${error.name}: ${error.message.split(tree).join('<root>').split(sandbox).join('<sandbox>')}`;
+  }
+  return [escape(JSON.stringify(dirs)), escape(JSON.stringify(list)), escape(answer)];
+}
+
+const picomatchRows = [];
+const scanRows = [];
 const workspacesRows = [];
-const tree = fs.mkdtempSync(path.join(os.tmpdir(), 'pnpm-globs-'));
-async function workspaces() {
+async function draws() {
+  for (const p of new Set(patterns)) {
+    const pattern = p.startsWith('!') && p[1] !== '(' ? p.slice(1) : p;
+    if (pattern === '')
+      continue;
+    scanRows.push(scanRow(pattern));
+    picomatchRows.push(picomatchRow(pattern));
+  }
   const rows = Math.floor(count / 4);
   for (let i = 0; i < rows; i++) {
     const dirs = DIRECTORIES.filter(() => random() < 0.5);
@@ -148,21 +180,19 @@ async function workspaces() {
     const n = 1 + Math.floor(random() * 3);
     for (let j = 0; j < n; j++)
       list.push(draw());
-    fs.rmSync(tree, {recursive: true, force: true});
-    fs.mkdirSync(tree, {recursive: true});
-    for (const d of dirs) {
-      fs.mkdirSync(path.join(tree, d), {recursive: true});
-      fs.writeFileSync(path.join(tree, d, 'package.json'), '{}');
-    }
-    let answer;
-    try {
-      answer = JSON.stringify(await findWorkspaceProjects(fs.realpathSync(tree), list));
-    } catch (error) {
-      answer = `!${error.name}: ${error.message}`;
-    }
-    workspacesRows.push([escape(JSON.stringify(dirs)), escape(JSON.stringify(list)), escape(answer)]);
+    workspacesRows.push(await membersRow(dirs, list));
   }
-  fs.rmSync(tree, {recursive: true, force: true});
+}
+
+async function answerAgain() {
+  const read = name => zlib.gunzipSync(fs.readFileSync(path.join(rowsDir, name))).toString('utf8')
+    .split('\n').filter(Boolean).map(line => line.split('\t').map(unescape));
+  for (const row of read('globs-scan.tsv.gz'))
+    scanRows.push(scanRow(row[0]));
+  for (const row of read('globs-picomatch.tsv.gz'))
+    picomatchRows.push(picomatchRow(row[0]));
+  for (const row of read('globs-workspaces.tsv.gz'))
+    workspacesRows.push(await membersRow(JSON.parse(row[0]), JSON.parse(row[1])));
 }
 
 const write = (name, rows) => {
@@ -172,7 +202,8 @@ const write = (name, rows) => {
   console.log(name, rows.length);
 };
 
-workspaces().then(() => {
+(rowsDir ? answerAgain() : draws()).then(() => {
+  fs.rmSync(sandbox, {recursive: true, force: true});
   write('globs-picomatch.tsv.gz', picomatchRows);
   write('globs-scan.tsv.gz', scanRows);
   write('globs-workspaces.tsv.gz', workspacesRows);
