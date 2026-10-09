@@ -283,7 +283,45 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
         merged = inheritChild(merged, recessive, "inherited");
         merged = mergeChild(merged, recessive, "configuration", (d, r) -> mergeDom(d, r, true));
         merged = mergeChild(merged, recessive, "dependencies", RemoveDuplicatePluginDeclarations::mergeDependencies);
-        return mergeChild(merged, recessive, "executions", RemoveDuplicatePluginDeclarations::mergeExecutions);
+        return mergeChild(merged, withoutUninheritedExecutions(recessive), "executions",
+                RemoveDuplicatePluginDeclarations::mergeExecutions);
+    }
+
+    /**
+     * Maven's merge only carries over the earlier declaration's executions that are inherited, so one marked
+     * {@code <inherited>false</inherited>}, or belonging to a plugin marked so, never ran.
+     */
+    private static Xml.Tag withoutUninheritedExecutions(Xml.Tag plugin) {
+        Xml.Tag executions = plugin.getChild("executions").orElse(null);
+        if (executions == null) {
+            return plugin;
+        }
+        boolean pluginInherited = isInherited(plugin, true);
+        Map<Content, List<Content>> comments = leadingComments(contentOf(executions));
+        Set<Content> dropped = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (Xml.Tag execution : executions.getChildren("execution")) {
+            if (!isInherited(execution, pluginInherited)) {
+                dropped.add(execution);
+                dropped.addAll(comments.get(execution));
+            }
+        }
+        if (dropped.isEmpty()) {
+            return plugin;
+        }
+        List<Content> content = contentOf(plugin);
+        List<Content> remaining = contentOf(executions);
+        remaining.removeIf(dropped::contains);
+        if (remaining.stream().noneMatch(c -> c instanceof Xml.Tag && "execution".equals(((Xml.Tag) c).getName()))) {
+            content.remove(indexOf(content, executions));
+        } else {
+            content.set(indexOf(content, executions), executions.withContent(remaining));
+        }
+        return plugin.withContent(content);
+    }
+
+    private static boolean isInherited(Xml.Tag tag, boolean otherwise) {
+        String inherited = trimmedChildValue(tag, "inherited", null);
+        return inherited == null ? otherwise : Boolean.parseBoolean(inherited);
     }
 
     private static Xml.Tag mergeDependencies(Xml.Tag dominant, Xml.Tag recessive) {
