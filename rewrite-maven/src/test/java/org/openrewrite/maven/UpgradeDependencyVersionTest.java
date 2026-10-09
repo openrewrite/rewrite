@@ -2087,7 +2087,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexus() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2112,7 +2114,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void deriveFromNexusUpgrade() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2177,7 +2181,9 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void badManagedVersion() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("*", "*", "latest.patch", null, null, null))
+            .executionContext(centralWithDirectoryListings())
+            .recipeExecutionContext(centralWithDirectoryListings()),
           pomXml(
             """
               <project>
@@ -2197,6 +2203,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    /**
+     * Some old artifacts have no maven-metadata.xml on Maven Central, only its HTML directory listing.
+     * Pinning Central keeps a ~/.m2/settings.xml mirror, which may serve no listings, out of resolution.
+     */
+    private static MavenExecutionContextView centralWithDirectoryListings() {
+        return MavenExecutionContextView.view(new InMemoryExecutionContext())
+          .setRepositories(singletonList(MavenRepository.builder()
+            .id("central")
+            .uri("https://repo.maven.apache.org/maven2")
+            .knownToExist(true)
+            .build()));
     }
 
     @Test
