@@ -430,6 +430,36 @@ class TestTemplateApply:
         # The first slot keeps the id of the node it replaces
         assert all(i in result_ids for i in captured_ids)
 
+    def test_substituted_trailing_comma_keeps_its_layout(self):
+        x = capture('x')
+        y = capture('y')
+        tmpl = template("{x} += {y}", x=x, y=y)
+
+        class Rule(Recipe):
+            @property
+            def name(self) -> str:
+                return "test.AugmentedAssign"
+
+            @property
+            def display_name(self) -> str:
+                return "Augmented assign"
+
+            @property
+            def description(self) -> str:
+                return "Rewrites `w = w + v` as `w += v`."
+
+            def editor(self):
+                class Visitor(PythonVisitor[ExecutionContext]):
+                    def visit_assignment(self, a, p):
+                        a = super().visit_assignment(a, p)
+                        return tmpl.apply(self.cursor, values={'x': a.variable, 'y': a.assignment.right})
+                return Visitor()
+
+        RecipeSpec(recipe=Rule()).rewrite_run(
+            python("w = w + (0,)\n", "w += (0,)\n"),
+            python("w = w + (\n    0,\n    1,\n)\n", "w += (\n    0,\n    1,\n)\n"),
+        )
+
     def test_apply_no_captures_returns_tree(self):
         """Test that apply with no captures returns a tree."""
         tmpl = template("x + 1")

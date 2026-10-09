@@ -353,7 +353,8 @@ class SpacesVisitor(PythonVisitor):
 
             if last:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -388,7 +389,8 @@ class SpacesVisitor(PythonVisitor):
 
             if index == args_size - 1:
                 arg = space_after(arg, use_space and arg.markers.find_first(TrailingComma) is None)
-                arg = arg.replace(markers=arg.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                arg = arg.replace(markers=arg.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, use_space)))
             else:
                 arg = space_after(arg, self._style.other.before_comma)
 
@@ -428,7 +430,8 @@ class SpacesVisitor(PythonVisitor):
                 c = space_before_right_padded_element(c, self._style.other.after_comma)
 
             if idx == arg_size - 1:
-                c = c.replace(markers=c.markers.compute_by_type(TrailingComma, self._remap_trailing_comma_space))
+                c = c.replace(markers=c.markers.compute_by_type(
+                    TrailingComma, lambda tc: _trailing_comma_suffix(tc, self._style.within.braces)))
 
             return c
 
@@ -527,8 +530,11 @@ class SpacesVisitor(PythonVisitor):
         cc = cc.padding.replace(iterated_list=space_before_left_padded_element(cc.padding.iterated_list, True))
         return cc
 
-    def _remap_trailing_comma_space(self, tc: TrailingComma) -> TrailingComma:
-        return tc.replace(suffix=update_space(tc.suffix, self._style.other.after_comma))
+
+def _trailing_comma_suffix(tc: TrailingComma, within: bool) -> TrailingComma:
+    # The suffix runs up to the closing bracket, so the space inside the brackets governs it.
+    # A tuple without parentheses has no closing bracket, and the token after it brings its own space.
+    return tc.replace(suffix=update_space(tc.suffix, within))
 
 
 def space_before(j: J2, add_space: bool) -> J2:
