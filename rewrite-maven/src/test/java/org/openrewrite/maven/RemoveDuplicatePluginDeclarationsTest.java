@@ -1406,4 +1406,61 @@ class RemoveDuplicatePluginDeclarationsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void straightenInconsistentIndentationOfMovedContent() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-javadoc-plugin</artifactId>
+              \t\t\t\t<configuration>
+              \t\t\t\t\t<aggregate>true</aggregate>
+              \t\t\t\t</configuration>
+              \t\t\t</plugin>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-jar-plugin</artifactId>
+              \t\t\t</plugin>
+                            <plugin>
+                                <artifactId>maven-javadoc-plugin</artifactId>
+                                <version>3.2.0</version>
+                                <configuration>
+                                        <doclint>none</doclint>
+                                </configuration>
+                              </plugin>
+              \t\t</plugins>
+              \t</build>
+              </project>
+              """,
+            """
+              <project>
+              \t<groupId>com.example</groupId>
+              \t<artifactId>my-app</artifactId>
+              \t<version>1.0.0</version>
+              \t<build>
+              \t\t<plugins>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-javadoc-plugin</artifactId>
+              \t\t\t\t<version>3.2.0</version>
+              \t\t\t\t<configuration>
+              \t\t\t\t\t<doclint>none</doclint>
+              \t\t\t\t\t<aggregate>true</aggregate>
+              \t\t\t\t</configuration>
+              \t\t\t</plugin>
+              \t\t\t<plugin>
+              \t\t\t\t<artifactId>maven-jar-plugin</artifactId>
+              \t\t\t</plugin>
+              \t\t</plugins>
+              \t</build>
+              </project>
+              """
+          )
+        );
+    }
 }

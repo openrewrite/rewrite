@@ -538,30 +538,41 @@ public class RemoveDuplicatePluginDeclarations extends Recipe {
     }
 
     /**
-     * Converts the indentation of {@code xml} from one style to another, level by level, so content moved between
-     * declarations doesn't mix tabs and spaces or sit at a different depth than its siblings.
+     * Rewrites the indentation of {@code xml} from one style to another so content moved between declarations
+     * doesn't mix tabs and spaces. Each line is indented by its depth in the tree, which also straightens out a
+     * declaration that was inconsistently indented to begin with.
      */
     private static <X extends Xml> X reindent(X xml, Indent from, Indent to) {
-        String toUnit = from.unit.isEmpty() || to.unit.isEmpty() ? from.unit : to.unit;
-        if (from.base.equals(to.base) && from.unit.equals(toUnit)) {
+        if (from.equals(to)) {
             return xml;
         }
+        String unit = to.unit.isEmpty() ? from.unit : to.unit;
         //noinspection unchecked
         return (X) new XmlVisitor<Integer>() {
             @Override
             public Xml preVisit(Xml tree, Integer p) {
                 String prefix = tree.getPrefix();
                 int lineStart = prefix.lastIndexOf('\n') + 1;
-                if (lineStart == 0 || !prefix.startsWith(from.base, lineStart)) {
+                if (lineStart == 0 || tree instanceof Xml.CharData) {
                     return tree;
                 }
-                String rest = prefix.substring(lineStart + from.base.length());
-                StringBuilder indent = new StringBuilder(to.base);
-                while (!from.unit.isEmpty() && rest.startsWith(from.unit)) {
-                    indent.append(toUnit);
-                    rest = rest.substring(from.unit.length());
+                String indent;
+                if (unit.isEmpty() || tree instanceof Xml.Attribute) {
+                    String current = prefix.substring(lineStart);
+                    indent = current.startsWith(from.base) ? to.base + current.substring(from.base.length()) : current;
+                } else {
+                    StringBuilder levels = new StringBuilder(to.base);
+                    for (int i = depth(tree); i > 0; i--) {
+                        levels.append(unit);
+                    }
+                    indent = levels.toString();
                 }
-                return tree.withPrefix(prefix.substring(0, lineStart) + indent + rest);
+                return tree.withPrefix(prefix.substring(0, lineStart) + indent);
+            }
+
+            private int depth(Xml tree) {
+                int enclosingTags = (int) getCursor().getPathAsStream(Xml.Tag.class::isInstance).count();
+                return tree instanceof Xml.Tag || tree instanceof Xml.Tag.Closing ? enclosingTags - 1 : enclosingTags;
             }
         }.visitNonNull(xml, 0);
     }
