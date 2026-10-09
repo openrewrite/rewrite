@@ -17,9 +17,11 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -27,7 +29,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveRedundantProperties(null, null, null));
+        spec.recipe(new RemoveRedundantProperties(null, null));
     }
 
     @DocumentExample
@@ -186,7 +188,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void onlyRemoveIfValuesMatchEnabled() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
           mavenProject("parent",
             pomXml(
               """
@@ -243,7 +245,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeWithNamePattern() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties("*.version", null)),
           mavenProject("parent",
             pomXml(
               """
@@ -428,7 +430,7 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removePropertyWithExpressionValue() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
           mavenProject("parent",
             pomXml(
               """
@@ -729,7 +731,8 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void removeSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+            .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
               <project>
@@ -761,7 +764,8 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     @Test
     void keepValuesThatDifferFromSuperPomDefaults() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+            .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           pomXml(
             """
               <project>
@@ -780,9 +784,10 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     }
 
     @Test
-    void keepSuperPomDefaultsWhenNotIncluded() {
+    void keepSuperPomDefaultsBeforeMaven3_10() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, null)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+            .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.9.11"))),
           pomXml(
             """
               <project>
@@ -800,9 +805,29 @@ class RemoveRedundantPropertiesTest implements RewriteTest {
     }
 
     @Test
+    void keepSuperPomDefaultsWithoutBuildToolMarker() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>standalone</artifactId>
+                <version>1.0.0</version>
+                <properties>
+                  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                </properties>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void keepSuperPomDefaultThatOverridesParent() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveRedundantProperties(null, true, true)),
+          spec -> spec.recipe(new RemoveRedundantProperties(null, true))
+            .allSources(source -> source.markers(new BuildTool(randomId(), BuildTool.Type.Maven, "3.10.0"))),
           mavenProject("parent",
             pomXml(
               """

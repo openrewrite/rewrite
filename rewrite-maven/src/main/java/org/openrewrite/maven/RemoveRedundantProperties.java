@@ -22,10 +22,12 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -40,6 +42,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantProperties extends Recipe {
+    private static final Version FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS = new Version("3.10.0");
     private static final Map<String, String> SUPER_POM_DEFAULTS = new HashMap<>();
 
     static {
@@ -62,19 +65,12 @@ public class RemoveRedundantProperties extends Recipe {
     @Nullable
     Boolean onlyIfValuesMatch;
 
-    @Option(displayName = "Include super POM defaults",
-            description = "Also treat the properties that the Maven 3.10 and later super POM defines as inherited: " +
-                    "`project.build.sourceEncoding` and `project.reporting.outputEncoding` as `UTF-8`, and " +
-                    "`project.build.outputTimestamp` as `1980-02-01T00:00:00Z`. A property that no parent POM defines " +
-                    "is only removed when its value equals that default. Earlier Maven versions do not have these " +
-                    "defaults, so only enable this for builds that run on Maven 3.10 or later. Default `false`.",
-            required = false)
-    @Nullable
-    Boolean includeSuperPomDefaults;
-
     String displayName = "Remove redundant properties";
 
-    String description = "Remove properties when a parent POM specifies the same property.";
+    String description = "Remove properties when a parent POM specifies the same property. When the project is built " +
+            "with Maven 3.10 or later, according to its `BuildTool` marker, the super POM's defaults count as well: " +
+            "`project.build.sourceEncoding` and `project.reporting.outputEncoding` set to `UTF-8`, and " +
+            "`project.build.outputTimestamp` set to `1980-02-01T00:00:00Z` are removed when no parent POM sets them.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -136,11 +132,19 @@ public class RemoveRedundantProperties extends Recipe {
 
             private boolean equalsSuperPomDefault(Xml.Tag tag, MavenResolutionResult mrr) {
                 String superPomDefault = SUPER_POM_DEFAULTS.get(tag.getName());
-                if (!Boolean.TRUE.equals(includeSuperPomDefaults) || superPomDefault == null) {
+                if (superPomDefault == null || !isBuiltWithSuperPomDefaults()) {
                     return false;
                 }
                 return tag.getValue()
                         .map(value -> superPomDefault.equalsIgnoreCase(mrr.getPom().getValue(value)))
+                        .orElse(false);
+            }
+
+            private boolean isBuiltWithSuperPomDefaults() {
+                return getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                        .findFirst(BuildTool.class)
+                        .filter(buildTool -> buildTool.getType() == BuildTool.Type.Maven)
+                        .map(buildTool -> new Version(buildTool.getVersion()).compareTo(FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS) >= 0)
                         .orElse(false);
             }
         };

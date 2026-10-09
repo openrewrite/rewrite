@@ -63,25 +63,22 @@ recipeList:
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.MigrateToMaven3_10
 displayName: Migrate to Maven 3.10
-description: Migrates a project to Maven 3.10. Maven 3.10 rejects some POMs that earlier Maven 3 versions built with a warning, such as POMs with duplicate dependency or plugin declarations. This recipe fixes those POMs, removes encoding and output timestamp properties that now equal the Maven 3.10 super POM defaults, and updates an existing Maven wrapper to Maven 3.10.
+description: Migrates a project to Maven 3.10. Maven 3.10 rejects some POMs that earlier Maven 3 versions built with a warning, such as POMs with duplicate dependency or plugin declarations. This recipe fixes those POMs, updates an existing Maven wrapper to Maven 3.10, and then removes encoding and output timestamp properties that equal the Maven 3.10 super POM defaults.
 recipeList:
   - org.openrewrite.maven.RemoveDuplicatePluginDeclarations
   - org.openrewrite.maven.RemoveDuplicateDependencies
-  - org.openrewrite.maven.RemoveRedundantProperties:
-      namePattern: project.build.sourceEncoding
-      onlyIfValuesMatch: true
-      includeSuperPomDefaults: true
-  - org.openrewrite.maven.RemoveRedundantProperties:
-      namePattern: project.reporting.outputEncoding
-      onlyIfValuesMatch: true
-      includeSuperPomDefaults: true
-  - org.openrewrite.maven.RemoveRedundantProperties:
-      namePattern: project.build.outputTimestamp
-      onlyIfValuesMatch: true
-      includeSuperPomDefaults: true
   - org.openrewrite.maven.UpdateMavenWrapper:
       distributionVersion: 3.10.x
       addIfMissing: false
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.build.sourceEncoding
+      onlyIfValuesMatch: true
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.reporting.outputEncoding
+      onlyIfValuesMatch: true
+  - org.openrewrite.maven.RemoveRedundantProperties:
+      namePattern: project.build.outputTimestamp
+      onlyIfValuesMatch: true
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.maven.MigrateToMaven4
