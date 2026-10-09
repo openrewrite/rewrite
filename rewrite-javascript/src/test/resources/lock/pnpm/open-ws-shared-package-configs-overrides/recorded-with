@@ -1,0 +1,5 @@
+pnpm 11.2.2, node v24.19.0, 2026-10-09T13:45:56Z
+before exit=0, after exit=0
+again exit=0
+phase times: before at 2026-10-09T13:45:54Z, after at 2026-10-09T13:45:55Z, again at 2026-10-09T13:45:55Z
+platform os=darwin cpu=arm64 libc=

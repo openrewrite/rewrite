@@ -1,0 +1,1 @@
+[ERR_PNPM_GLOBAL_INSTALL_NOT_SUPPORTED] "pnpm install -g" is not supported. Use "pnpm add -g <pkg>" to install global packages.

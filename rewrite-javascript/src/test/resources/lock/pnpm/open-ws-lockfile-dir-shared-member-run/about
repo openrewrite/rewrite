@@ -1,0 +1,1 @@
+In a shared workspace with lockfileDir . pnpm run in packages/b writes every project into packages/b's lock; b adds abbrev.

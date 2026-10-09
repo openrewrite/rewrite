@@ -1,0 +1,7 @@
+Scope: all 2 workspace projects
+? Verifying lockfile against supply-chain policies (2 entries)...
+✓ Lockfile passes supply-chain policies (2 entries in 69ms)
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 3, reused 0, downloaded 0, added 0, done
+
+Done in 260ms using pnpm v11.2.2

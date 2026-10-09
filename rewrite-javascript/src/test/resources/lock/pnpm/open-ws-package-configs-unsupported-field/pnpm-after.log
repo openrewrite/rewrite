@@ -1,0 +1,2 @@
+Scope: all 2 workspace projects
+[ERR_PNPM_PROJECT_CONFIG_UNSUPPORTED_FIELD] Field autoInstallPeers is not supported but was specified

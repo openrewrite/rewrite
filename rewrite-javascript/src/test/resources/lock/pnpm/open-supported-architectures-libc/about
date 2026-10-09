@@ -1,0 +1,1 @@
+With supportedArchitectures libc glibc pnpm reads full metadata: the root adds lightningcss-linux-x64-gnu, whose entry gains libc.

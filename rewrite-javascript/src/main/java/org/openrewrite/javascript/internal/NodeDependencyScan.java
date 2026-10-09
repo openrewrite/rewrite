@@ -133,8 +133,9 @@ public final class NodeDependencyScan {
     /**
      * The lock the package manager writes when it installs for an edit of {@code packageJsonPath}. A package with a
      * lock of its own, and any pnpm package: the lock of the workspace root the package manager's own walk installs
-     * at, when regenerating that lock reproduces the install, else its own, whose regeneration reports what the
-     * package manager does. Without one: the lock of the nearest workspace root that lists the package.
+     * at, when regenerating that lock reproduces the install, else its own; a pnpm walk that stops ends at the
+     * workspace root whose lock's regeneration reports why. Without one: the lock of the nearest workspace root that
+     * lists the package.
      */
     public static @Nullable Path lockFor(Accumulator acc, Path packageJsonPath) {
         ProjectState ps = acc.projects.get(packageJsonPath);

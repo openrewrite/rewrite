@@ -30,7 +30,8 @@ import java.util.Set;
 
 /**
  * A recipe's request as the pnpm regenerator takes it, by path from the workspace directory pnpm finds from the lock's
- * (the nearest holding a pnpm-workspace.yaml, else the lock's own); the marker's {@code .npmrc} when the host has none.
+ * (the nearest holding a pnpm-workspace.yaml, read or not, else the lock's own); the marker's {@code .npmrc} when the
+ * host has none.
  */
 final class PnpmInputs {
 
@@ -100,10 +101,14 @@ final class PnpmInputs {
                 .build();
     }
 
-    // findWorkspaceDir from the lock's directory up, over the package-manager files the host handed
+    // findWorkspaceDir from the lock's directory up, over the files the host holds, read or not
     private static String workspaceDir(Request request, String lockDir) {
+        Set<Path> held = new LinkedHashSet<>(request.getPackageManagerFiles().keySet());
+        if (request.getProjectPaths() != null) {
+            held.addAll(request.getProjectPaths());
+        }
         String found = null;
-        for (Path file : request.getPackageManagerFiles().keySet()) {
+        for (Path file : held) {
             Path name = file.getFileName();
             String dir = NpmInputs.directory(file);
             if (name != null && WORKSPACE_MANIFEST.equals(name.toString()) && NpmInputs.up(lockDir, dir) != null &&

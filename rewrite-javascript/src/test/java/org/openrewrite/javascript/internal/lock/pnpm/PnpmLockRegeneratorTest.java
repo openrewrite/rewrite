@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.Collections;
@@ -225,6 +227,36 @@ class PnpmLockRegeneratorTest {
         assertThat(install("pnpmfile: hooks/missing.cjs\nignorePnpmfile: true", null).getWritten()).isEqualTo(LOCK);
         assertThat(install(LOCK, MANIFEST, "ignorePnpmfile: true",
           Collections.singletonMap(".pnpmfile.cjs", "module.exports = {}")).getWritten()).isEqualTo(LOCK);
+    }
+
+    /**
+     * getConfig copies every camelCase key of pnpm-workspace.yaml into the options the install reads
+     * (studies/pnpm-settings.md): one that changes the lock or the outcome and that the port does not read is
+     * cannot-know.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"update: true", "updatePackageManifest: true", "latest: true", "dedupe: true",
+      "fixLockfile: true", "forceFullResolution: true", "resolutionOnly: true", "frozenLockfile: true",
+      "frozenLockfileIfExists: true", "ignorePackageManifest: true", "saveLockfile: false",
+      "pruneLockfileImporters: false", "workspace: true", "ignoredPackages: [x]", "rootProjectManifestDir: x", "packageManager: {name: pnpm}",
+      "wantedPackageManager: {name: pnpm}", "dir: x", "workspacePackagePatterns: [x]", "production: true",
+      "only: dev", "dev: true", "optional: false", "recursiveInstall: false", "workspaceRoot: true", "filter: [x]",
+      "filterProd: [x]", "offline: true", "preferOffline: true", "lockfileDir: x", "lockfileDir: /abs",
+      "lockfileDir: 5"})
+    void anInstallOptionTheWorkspaceManifestSetsIsCannotKnow(String setting) {
+        assertThatThrownBy(() -> install("packages:\n  - '.'\n" + setting, null)).isInstanceOf(CannotKnow.class);
+    }
+
+    /**
+     * Rows of studies/pnpm-settings.md that do not reach the lock, and a name no typed code on the install path reads.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"nodeLinker: hoisted", "dedupeDirectDeps: true", "depth: 5", "sort: false",
+      "hoistPattern: ['*']", "shamefullyHoist: true", "modulesDir: nm", "allowBuilds: {x: true}", "runtime: false",
+      "ci: true", "optimisticRepeatInstall: false", "lockfileDir: .", "registry: https://r.example/",
+      "includeWorkspaceRoot: true", "notASetting: 1"})
+    void aSettingThatDoesNotReachTheLockChangesNothing(String setting) {
+        assertThat(install("packages:\n  - '.'\n" + setting, null).getWritten()).isEqualTo(LOCK);
     }
 
     /**

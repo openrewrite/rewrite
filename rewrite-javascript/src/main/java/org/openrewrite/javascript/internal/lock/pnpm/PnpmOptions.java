@@ -997,6 +997,13 @@ final class PnpmOptions {
     }
 
     /**
+     * Whether pnpm-workspace.yaml or the environment sets the setting.
+     */
+    boolean isExplicitlySet(String name) {
+        return explicitlySetKeys.contains(name) && !CLI_OPTIONS.contains(kebabCase(name));
+    }
+
+    /**
      * The overrides, their {@code $name} references replaced by the root manifest's specifiers.
      */
     @SuppressWarnings("unchecked")

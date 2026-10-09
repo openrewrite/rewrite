@@ -114,7 +114,7 @@ public final class NativeLockEngine {
                     return 0;
             }
         } catch (RuntimeException e) {
-            // what stops the walk stops the regeneration of the manifest's own lock too, which reports it
+            // npm, Bun and Yarn classic walk only from a manifest with its own lock, whose regeneration reports this
             return 0;
         }
     }

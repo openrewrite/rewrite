@@ -1,0 +1,1 @@
+With sharedWorkspaceLockfile false and pnpmfile [] pnpm loads no default pnpmfile, b's own .pnpmfile.cjs included; b adds abbrev.
