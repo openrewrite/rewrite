@@ -286,10 +286,9 @@ export function maybeBind(
 
     // `bindImport`'s own lookup finds and reuses a member-specific binding on its own, so
     // refusal here only has to gate the point where it would create a new one.
-    const requires = options.style === undefined
+    const refuseCreate = (options.typeOnly ?? false) && (options.style === undefined
         ? cu !== undefined && isCommonJs(cu)
-        : options.style === ImportStyle.CommonJS;
-    const refuseCreate = (options.typeOnly ?? false) && requires;
+        : options.style === ImportStyle.CommonJS);
     return bindImport(visitor, {
         ...options,
         preferredName: options.preferredName ?? (isWholeModule ? derivedBindingName(module) : undefined)

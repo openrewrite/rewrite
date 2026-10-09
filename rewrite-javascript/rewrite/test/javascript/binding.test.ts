@@ -77,11 +77,18 @@ describe("moduleBindings", () => {
         expect(seen.moduleSystem).toBe("esm");
     });
 
-    test("an AMD factory's own require and exports parameters do not make the file CommonJS", async () => {
+    test("a require inside a function makes the file CommonJS, unless the function binds require itself", async () => {
         const spec = new RecipeSpec();
         const seen: {moduleSystem?: string} = {};
         spec.recipe = fromVisitor(captureBindings(seen));
+        await spec.rewriteRun(javascript(`function f() {\n    return require('fs');\n}`));
+        expect(seen.moduleSystem).toBe("commonjs");
+
         await spec.rewriteRun(javascript(`define(function (require, exports) { const a = require("a"); exports.x = a; });`));
+        expect(seen.moduleSystem).toBe("none");
+
+        // An `await` inside a function is not a top-level one.
+        await spec.rewriteRun(javascript(`async function f() {\n    await g();\n}`));
         expect(seen.moduleSystem).toBe("none");
     });
 
@@ -2387,10 +2394,6 @@ describe("maybeBind on a CommonJS file", () => {
             `exports.f = target();`,
             `const p = require('path');\n\nexports.f = p.target();`
         )).toBe("p");
-        expect(await bindWith({module: "path"},
-            `function f() {\n    return require('fs');\n}\ntarget();`,
-            `const path = require('path');\n\nfunction f() {\n    return require('fs');\n}\npath.target();`
-        )).toBe("path");
     });
 
     test("a require joins and follows only the file's leading requires, which every top-level use comes after", async () => {

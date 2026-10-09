@@ -257,38 +257,9 @@ export function moduleScopeBindings(cu: JS.CompilationUnit): ModuleScopeBinding[
     return bindings;
 }
 
-/** Whether a top-level statement already marks the file as a module: an import or any export form. */
+/** Whether the file's syntax makes it an ES module: an import, any export form, or a top-level `await`. */
 export function hasEsmSyntax(cu: JS.CompilationUnit): boolean {
-    return cu.statements.some(stmt => {
-        const element = stmt.element;
-        // `export {a, b}`, `export * from` and `export default` are their own statement kinds;
-        // `export class`/`function`/`const` instead carry `export` as a modifier on the
-        // declaration itself, the same way TypeScript's own AST models it.
-        const modifiers = (element as {modifiers?: J.Modifier[]} | undefined)?.modifiers;
-        return element?.kind === JS.Kind.Import ||
-            element?.kind === JS.Kind.ExportDeclaration ||
-            element?.kind === JS.Kind.ExportAssignment ||
-            (modifiers?.some(m => m.keyword === "export") ?? false);
-    }) || hasTopLevelAwait(cu);
-}
-
-/**
- * Whether a statement holds an `await` outside any function of its own — legal only at module
- * top level, unlike an `await` inside an `async function`, which says nothing about the file.
- */
-function hasTopLevelAwait(cu: JS.CompilationUnit): boolean {
-    let found = false;
-    walk(cu.statements, node => {
-        if (found) {
-            return false;
-        }
-        if (node.kind === JS.Kind.Await) {
-            found = true;
-            return false;
-        }
-        return node.kind !== J.Kind.MethodDeclaration && node.kind !== J.Kind.Lambda;
-    });
-    return found;
+    return moduleSyntax(cu) === "esm";
 }
 
 /** Whether the file is a CommonJS module, which binds a module it gains with `require`. */
@@ -297,34 +268,105 @@ export function isCommonJs(cu: JS.CompilationUnit): boolean {
         return true;
     }
     // Node treats these as ES modules regardless of what they contain. `.js`/`.ts`/`.tsx` stay
-    // ambiguous and fall through to the statements below.
+    // ambiguous and fall through to the syntax.
     if (cu.sourcePath.endsWith(".mjs") || cu.sourcePath.endsWith(".mts")) {
         return false;
     }
-    if (hasEsmSyntax(cu)) {
-        return false;
+    return moduleSyntax(cu) === "commonjs";
+}
+
+/** A tree is immutable, so an edited file is a new compilation unit and is read afresh. */
+const moduleSyntaxes = new WeakMap<JS.CompilationUnit, "esm" | "commonjs" | "none">();
+
+/**
+ * What the file's syntax makes it, in one pass. ES module syntax wins over CommonJS. The top-level
+ * statements are read first, and only a file without an import or export is walked, for a top-level
+ * `await`. A file with no top-level `require` or `exports` assignment is also searched inside its
+ * functions, except one binding `require`, `exports` or `module` itself, as an AMD factory does.
+ */
+function moduleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
+    let syntax = moduleSyntaxes.get(cu);
+    if (syntax === undefined) {
+        moduleSyntaxes.set(cu, syntax = readModuleSyntax(cu));
     }
-    // A `require` call or an `exports` access marks the file at any depth, inside a function too.
-    let found = false;
+    return syntax;
+}
+
+function readModuleSyntax(cu: JS.CompilationUnit): "esm" | "commonjs" | "none" {
+    let commonJs = false;
+    for (const stmt of cu.statements) {
+        if (isEsmStatement(stmt.element)) {
+            return "esm";
+        }
+        commonJs ||= isRequireStatement(stmt.element) || assignsExports(stmt.element);
+    }
+    let esm = false;
     walk(cu.statements, node => {
-        found ||= node.kind === J.Kind.MethodInvocation && isRequireCall(node as J.MethodInvocation) ||
-            node.kind === J.Kind.FieldAccess && isExportsAccess(node as J.FieldAccess);
-        return !found && !bindsCommonJsName(node);
+        if (esm || node.kind === JS.Kind.Await) {
+            esm = true;
+            return false;
+        }
+        if (!awaitlessKinds.has(node.kind)) {
+            commonJs ||= marksCommonJs(node);
+            return true;
+        }
+        // An `await` in here says nothing about the file, but a `require` still does.
+        if (!commonJs && !bindsCommonJsName(node)) {
+            walk(node, inner => {
+                commonJs ||= marksCommonJs(inner);
+                return !commonJs && (inner === node || !bindsCommonJsName(inner));
+            });
+        }
+        return false;
     });
-    return found;
+    return esm ? "esm" : commonJs ? "commonjs" : "none";
+}
+
+/** An import or any export form. */
+function isEsmStatement(element: J | undefined): boolean {
+    // `export {a, b}`, `export * from` and `export default` are statements of their own.
+    // `export class`, `function` and `const` carry `export` as a modifier, as TypeScript's AST does.
+    const modifiers = (element as {modifiers?: J.Modifier[]} | undefined)?.modifiers;
+    return element?.kind === JS.Kind.Import ||
+        element?.kind === JS.Kind.ExportDeclaration ||
+        element?.kind === JS.Kind.ExportAssignment ||
+        (modifiers?.some(m => m.keyword === "export") ?? false);
+}
+
+/** Function bodies and type declarations, where no `await` belongs to the module's top level. */
+const awaitlessKinds = new Set<string>([
+    J.Kind.MethodDeclaration, JS.Kind.ComputedPropertyMethodDeclaration, J.Kind.Lambda, JS.Kind.TypeDeclaration
+]);
+
+function marksCommonJs(node: {kind: string}): boolean {
+    return node.kind === J.Kind.MethodInvocation && isRequireCall(node as J.MethodInvocation) ||
+        node.kind === J.Kind.FieldAccess && isExportsAccess(node as J.FieldAccess);
 }
 
 const commonJsNames = new Set(['require', 'exports', 'module']);
 
-/** Whether `node` is a function whose parameters bind `require`, `exports` or `module`, as an AMD factory's do. */
+/** Whether `node` is a function whose parameters bind `require`, `exports` or `module`. */
 function bindsCommonJsName(node: {kind: string}): boolean {
     const parameters: J.RightPadded<J>[] = node.kind === J.Kind.MethodDeclaration
         ? (node as J.MethodDeclaration).parameters.elements
         : node.kind === J.Kind.Lambda ? (node as J.Lambda).parameters.parameters : [];
     return parameters.some(({element}) => (isIdentifier(element)
         ? [element.simpleName]
-        : declarationsOf(element).flatMap(d => d.variables.flatMap(v => bindingNames(v.element.name).map(b => b.name))))
+        : declarationsOf(element).flatMap(d =>
+            d.variables.flatMap(v => bindingNames(v.element.name).map(b => b.name))))
         .some(name => commonJsNames.has(name)));
+}
+
+/** An assignment to `exports.x` or `module.exports`, or a property below either. */
+function assignsExports(statement: J | undefined): boolean {
+    let target = statement?.kind === J.Kind.Assignment ? (statement as J.Assignment).variable : undefined;
+    while (target?.kind === J.Kind.FieldAccess) {
+        if (isExportsAccess(target as J.FieldAccess)) {
+            return true;
+        }
+        target = (target as J.FieldAccess).target;
+    }
+    return false;
 }
 
 /** `exports.x` or `module.exports`, where a CommonJS module publishes what it exports. */
