@@ -23,9 +23,9 @@
  *     <li>npm-install-checks: Copyright (c) Robert Kowalski and Isaac Z. Schlueter ("Authors")</li>
  *     <li>pacote: Copyright (c) Isaac Z. Schlueter, Kat Marchán, npm, Inc., and Contributors</li>
  *     <li>ssri: Copyright (c) npm, Inc.</li>
- *     <li>npm-package-arg: Copyright (c) npm, Inc.</li>
- *     <li>hosted-git-info: Copyright (c) 2015, Rebecca Turner</li>
- *     <li>validate-npm-package-name: Copyright (c) 2015, npm, Inc</li>
+ *     <li>npm-package-arg, which {@code internal.lock.Spec} ports: Copyright (c) npm, Inc.</li>
+ *     <li>hosted-git-info, which {@code internal.lock.GitHost} ports: Copyright (c) 2015, Rebecca Turner</li>
+ *     <li>validate-npm-package-name, which {@code internal.lock.Spec} holds: Copyright (c) 2015, npm, Inc</li>
  *     <li>@npmcli/package-json: Copyright GitHub Inc.</li>
  *     <li>@npmcli/name-from-folder: Copyright npm, Inc.</li>
  *     <li>@npmcli/map-workspaces: Copyright npm, Inc.</li>

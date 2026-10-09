@@ -13,12 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.PosixPath;
-import org.openrewrite.javascript.internal.lock.WhatwgUrl;
+import org.openrewrite.javascript.internal.lock.npm.NpmError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -28,9 +27,12 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.EcmaScript.UNDEFINED;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.string;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.trim;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURIComponent;
 import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURIComponent;
-import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of npm-package-arg 13.0.2 ({@code lib/npa.js}, its {@code Result}) on POSIX paths: what a
@@ -154,20 +156,20 @@ public final class Spec {
         if (arg == null) {
             throw new IllegalArgumentException("Cannot read properties of null (reading 'name')");
         }
-        if (arg == Js.UNDEFINED) {
+        if (arg == UNDEFINED) {
             throw new IllegalArgumentException("Cannot read properties of undefined (reading 'indexOf')");
         }
         if (!(arg instanceof Map) && !(arg instanceof List)) {
             throw new IllegalArgumentException("arg.indexOf is not a function");
         }
-        Object name = Js.get(arg, "name");
-        Object rawSpec = Js.get(arg, "rawSpec");
-        Object argWhere = Js.get(arg, "where");
+        Object name = get(arg, "name");
+        Object rawSpec = get(arg, "rawSpec");
+        Object argWhere = get(arg, "where");
         String resolvedWhere = truthy(where) ? where : argWhere instanceof String ? (String) argWhere : null;
         if (truthy(name) && truthy(rawSpec)) {
             if (!(name instanceof String)) {
-                String pkgid = Js.string(name) + "@" + Js.string(rawSpec);
-                throw new InvalidSpecException("Invalid package name \"" + Js.string(name) + "\" of package \"" +
+                String pkgid = string(name) + "@" + string(rawSpec);
+                throw new InvalidSpecException("Invalid package name \"" + string(name) + "\" of package \"" +
                                                pkgid + "\": name must be a string.", "EINVALIDPACKAGENAME");
             }
             if (!(rawSpec instanceof String)) {
@@ -175,7 +177,12 @@ public final class Spec {
             }
             return resolve((String) name, (String) rawSpec, resolvedWhere);
         }
-        return npa(Js.get(arg, "raw"), resolvedWhere);
+        return npa(get(arg, "raw"), resolvedWhere);
+    }
+
+    // arg[key] of the object or array npa was given, for a key no prototype has
+    private static @Nullable Object get(Object arg, String key) {
+        return arg instanceof Map && ((Map<?, ?>) arg).containsKey(key) ? ((Map<?, ?>) arg).get(key) : UNDEFINED;
     }
 
     public static Spec npa(String arg, @Nullable String where) {
@@ -264,7 +271,7 @@ public final class Spec {
     /**
      * The spec as {@code OverrideSet} reads a key after clearing its name.
      */
-    Spec withoutName() {
+    public Spec withoutName() {
         Spec copy = new Spec(this);
         copy.name = "";
         return copy;
@@ -472,7 +479,7 @@ public final class Spec {
 
     private static Spec fromRegistry(Spec res) {
         res.registry = true;
-        String spec = Js.trim(res.rawSpec);
+        String spec = trim(res.rawSpec);
         res.saveSpec = null;
         res.fetchSpec = spec;
         String version = NodeSemver.valid(spec, NodeSemver.Options.LOOSE);
@@ -507,7 +514,7 @@ public final class Spec {
         if (name.startsWith("_")) {
             errors.add("name cannot start with an underscore");
         }
-        if (!Js.trim(name).equals(name)) {
+        if (!trim(name).equals(name)) {
             errors.add("name cannot contain leading or trailing spaces");
         }
         for (String excludedName : new String[]{"node_modules", "favicon.ico"}) {

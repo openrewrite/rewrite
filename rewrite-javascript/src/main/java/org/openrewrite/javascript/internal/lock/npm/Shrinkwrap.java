@@ -20,6 +20,7 @@ import lombok.Setter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.util.ArrayList;
 import java.util.Arrays;

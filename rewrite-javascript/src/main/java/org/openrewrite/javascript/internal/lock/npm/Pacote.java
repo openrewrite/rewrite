@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

@@ -16,6 +16,8 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.GitHost;
+import org.openrewrite.javascript.internal.lock.Spec;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 

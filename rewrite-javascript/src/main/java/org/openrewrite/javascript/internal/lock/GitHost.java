@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,26 +28,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static org.openrewrite.javascript.internal.lock.EcmaScript.isWhiteSpace;
+import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURIComponent;
-import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
  * Port of hosted-git-info 9.0.3 ({@code lib/index.js}, {@code hosts.js}, {@code from-url.js},
  * {@code parse-url.js}): the git hosts npm recognizes and the URL forms it writes for them.
  */
-final class GitHost {
+public final class GitHost {
 
     /**
      * The options hosted-git-info's templates read; an unset option defers to the host's own.
      */
     @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-    static final class Opts {
-        static final Opts NONE = new Opts(null, null);
+    public static final class Opts {
+        public static final Opts NONE = new Opts(null, null);
 
         private final @Nullable Boolean noGitPlus;
         private final @Nullable Boolean noCommittish;
 
-        static Opts of(@Nullable Boolean noGitPlus, @Nullable Boolean noCommittish) {
+        public static Opts of(@Nullable Boolean noGitPlus, @Nullable Boolean noCommittish) {
             return new Opts(noGitPlus, noCommittish);
         }
 
@@ -256,15 +256,15 @@ final class GitHost {
         this.info = HOSTS.get(type);
     }
 
-    String getDomain() {
+    public String getDomain() {
         return info.domain;
     }
 
-    static @Nullable GitHost fromUrl(@Nullable String giturl) {
+    public static @Nullable GitHost fromUrl(@Nullable String giturl) {
         return fromUrl(giturl, Opts.NONE);
     }
 
-    static @Nullable GitHost fromUrl(@Nullable String giturl, Opts opts) {
+    public static @Nullable GitHost fromUrl(@Nullable String giturl, Opts opts) {
         if (giturl == null || giturl.isEmpty()) {
             return null;
         }
@@ -353,39 +353,39 @@ final class GitHost {
         return fill(info.templates.get(representation), this, over);
     }
 
-    String hash() {
+    public String hash() {
         return truthy(committish) ? "#" + committish : "";
     }
 
-    @Nullable String ssh(Opts over) {
+    public @Nullable String ssh(Opts over) {
         return fill("ssh", over);
     }
 
-    @Nullable String sshurl(Opts over) {
+    public @Nullable String sshurl(Opts over) {
         return fill("sshurl", over);
     }
 
-    @Nullable String https(Opts over) {
+    public @Nullable String https(Opts over) {
         return fill("https", over);
     }
 
-    @Nullable String git(Opts over) {
+    public @Nullable String git(Opts over) {
         return fill("git", over);
     }
 
-    @Nullable String shortcut(Opts over) {
+    public @Nullable String shortcut(Opts over) {
         return fill("shortcut", over);
     }
 
-    @Nullable String path(Opts over) {
+    public @Nullable String path(Opts over) {
         return fill("path", over);
     }
 
-    @Nullable String getDefaultRepresentation() {
+    public @Nullable String getDefaultRepresentation() {
         return defaultRepresentation;
     }
 
-    @Nullable String toString(Opts over) {
+    public @Nullable String toString(Opts over) {
         if (defaultRepresentation != null) {
             switch (defaultRepresentation) {
                 case "ssh":
@@ -420,7 +420,7 @@ final class GitHost {
         int firstColon = arg.indexOf(':');
         int firstSpace = -1;
         for (int i = 0; i < arg.length(); i++) {
-            if (Js.isWhiteSpace(arg.charAt(i))) {
+            if (isWhiteSpace(arg.charAt(i))) {
                 firstSpace = i;
                 break;
             }
