@@ -43,6 +43,7 @@ from rewrite.python.markers import (
     PythonResolutionResult, Quoted, RaiseTuple, SuppressNewline, TupleExceptClause,
 )
 from rewrite.python.style import IntelliJ, SpacesStyle
+from rewrite.python.template.replacement import SubstitutedValue
 from rewrite.rpc.python_receiver import PythonRpcReceiver
 from rewrite.rpc.receive_queue import RpcReceiveQueue
 from rewrite.rpc.send_queue import RpcSendQueue
@@ -92,9 +93,9 @@ _SAMPLES = [
     IntelliJ(),
 ]
 
-# Nothing in this package attaches one, and it names no host type to be sent as,
-# so the send queue refuses it rather than lose it.
-_CANNOT_TRAVEL = {UnknownJavaMarker}
+# Nothing in this package attaches an UnknownJavaMarker, and a SubstitutedValue lives only within
+# Template.apply. Neither names a host type to be sent as, so the send queue refuses them rather than lose them.
+_CANNOT_TRAVEL = {SubstitutedValue, UnknownJavaMarker}
 
 
 def _marker_types():
