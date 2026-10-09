@@ -119,6 +119,108 @@ public class ChangeMethodTargetToStatic extends Recipe {
         }
 
         /**
+         * Returns true when dropping the receiver cannot change program behavior. Expressions that can have side
+         * effects or throw return false.
+         */
+        private boolean isSafeToDiscard(@Nullable Expression expression) {
+            Expression unwrapped = Expression.unwrap(expression);
+            if (unwrapped == null || unwrapped instanceof J.Empty || unwrapped instanceof J.Literal) {
+                return true;
+            }
+            if (unwrapped instanceof J.Identifier) {
+                JavaType.Variable fieldType = ((J.Identifier) unwrapped).getFieldType();
+                return fieldType == null || !fieldType.hasFlags(Flag.Volatile);
+            }
+            if (unwrapped instanceof J.FieldAccess) {
+                J.FieldAccess fieldAccess = (J.FieldAccess) unwrapped;
+                if (isTypeReference(fieldAccess)) {
+                    return true;
+                }
+                JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
+                return isTypeReference(fieldAccess.getTarget()) &&
+                       (fieldType == null || !fieldType.hasFlags(Flag.Volatile));
+            }
+            if (unwrapped instanceof J.NewClass) {
+                // `new A().staticMethod()` is the shape this recipe exists to rewrite, so the instantiation is
+                // dropped even though a constructor can throw. Its arguments still have to stand on their own.
+                J.NewClass newClass = (J.NewClass) unwrapped;
+                if (newClass.getBody() != null || newClass.getEnclosing() != null) {
+                    return false;
+                }
+                for (Expression argument : newClass.getArguments()) {
+                    if (!isSafeToDiscard(argument)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+            return false;
+        }
+
+        /**
+         * Returns true when every receiver and argument in a matched call chain is safe to drop.
+         */
+        private boolean collapsesOntoTargetType(@Nullable Expression expression) {
+            Expression unwrapped = Expression.unwrap(expression);
+            if (!(unwrapped instanceof J.MethodInvocation)) {
+                return false;
+            }
+            J.MethodInvocation qualifier = (J.MethodInvocation) unwrapped;
+            if (isAlreadyStaticCallOnTargetType(qualifier.getSelect(), qualifier) ||
+                !methodMatcher.matches(qualifier, matchUnknownTypes) ||
+                !(isSafeToDiscard(qualifier.getSelect()) || collapsesOntoTargetType(qualifier.getSelect()))) {
+                return false;
+            }
+            for (Expression argument : qualifier.getArguments()) {
+                if (!isSafeToDiscard(argument)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        /**
+         * Returns true when this expression is the receiver of another matched call. The outer call then decides
+         * whether the whole chain is safe to rewrite.
+         */
+        private boolean isQualifierOfMatchedCall(Expression expression) {
+            Cursor parent = getCursor().getParentTreeCursor();
+            while (parent.getValue() instanceof J.Parentheses) {
+                parent = parent.getParentTreeCursor();
+            }
+            Object value = parent.getValue();
+            if (value instanceof J.MethodInvocation) {
+                J.MethodInvocation outer = (J.MethodInvocation) value;
+                return Expression.unwrap(outer.getSelect()) == expression &&
+                       !isAlreadyStaticCallOnTargetType(outer.getSelect(), outer) &&
+                       methodMatcher.matches(outer, matchUnknownTypes);
+            }
+            if (value instanceof J.MemberReference) {
+                J.MemberReference outer = (J.MemberReference) value;
+                return Expression.unwrap(outer.getContaining()) == expression &&
+                       !isAlreadyStaticCallOnTargetType(outer.getContaining(), outer) &&
+                       methodMatcher.matches(outer);
+            }
+            return false;
+        }
+
+        /**
+         * Returns true for a type name, {@code this}, or {@code Outer.this}.
+         */
+        private boolean isTypeReference(@Nullable Expression expression) {
+            if (expression instanceof J.Identifier) {
+                J.Identifier identifier = (J.Identifier) expression;
+                return identifier.getFieldType() == null || "this".equals(identifier.getSimpleName());
+            }
+            if (expression instanceof J.FieldAccess) {
+                J.Identifier name = ((J.FieldAccess) expression).getName();
+                return (name.getFieldType() == null || "this".equals(name.getSimpleName())) &&
+                       name.getType() instanceof JavaType.FullyQualified;
+            }
+            return false;
+        }
+
+        /**
          * Transform the method type to reflect the new declaring type and static flag.
          */
         private JavaType.Method transformMethodType(JavaType.Method methodType) {
@@ -140,7 +242,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
             J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
             Expression select = method.getSelect();
             if (!isAlreadyStaticCallOnTargetType(select, method) &&
-                methodMatcher.matches(method, matchUnknownTypes)) {
+                methodMatcher.matches(method, matchUnknownTypes) &&
+                !isQualifierOfMatchedCall(method) &&
+                (isSafeToDiscard(select) || collapsesOntoTargetType(select))) {
                 JavaType.Method transformedType = null;
                 if (method.getMethodType() != null) {
                     maybeRemoveImport(method.getMethodType().getDeclaringType());
@@ -150,7 +254,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                     maybeAddImport(fullyQualifiedTargetTypeName, m.getSimpleName(), !matchUnknownTypes);
                 } else {
                     maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
-                    m = method.withSelect(
+                    m = m.withSelect(
                             new J.Identifier(randomId(),
                                     select == null ?
                                             Space.EMPTY :
@@ -174,14 +278,15 @@ public class ChangeMethodTargetToStatic extends Recipe {
             J.MemberReference m = (J.MemberReference) super.visitMemberReference(memberRef, ctx);
             Expression containing = memberRef.getContaining();
             if (!isAlreadyStaticCallOnTargetType(containing, memberRef) &&
-                methodMatcher.matches(memberRef)) {
+                methodMatcher.matches(memberRef) &&
+                (isTypeReference(containing) || collapsesOntoTargetType(containing))) {
                 JavaType.Method transformedType = null;
                 if (memberRef.getMethodType() != null) {
                     maybeRemoveImport(memberRef.getMethodType().getDeclaringType());
                     transformedType = transformMethodType(memberRef.getMethodType());
                 }
                 maybeAddImport(fullyQualifiedTargetTypeName, !matchUnknownTypes);
-                m = memberRef.withContaining(
+                m = m.withContaining(
                         new J.Identifier(randomId(),
                                 containing.getPrefix(),
                                 Markers.EMPTY,
