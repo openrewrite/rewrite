@@ -82,8 +82,8 @@ class TyTypesClient:
             virtual_env: Optional path to a virtual environment whose
                 ``site-packages`` ty-types should use to resolve the project's
                 third-party dependencies. When provided it is exported as
-                ``VIRTUAL_ENV`` to the subprocess and takes precedence over the
-                running interpreter's ``sys.prefix`` fallback. The normal parse
+                ``VIRTUAL_ENV`` to the subprocess and takes precedence over a
+                ``.venv`` in the project root. The normal parse
                 path uses this to point ty-types at a dependency workspace built
                 from the project's ``pyproject.toml`` so that supertypes reaching
                 into installed dependencies (e.g. ``class User(BaseModel)``)
