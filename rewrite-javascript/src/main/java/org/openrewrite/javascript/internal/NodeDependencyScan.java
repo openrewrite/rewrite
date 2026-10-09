@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,10 +51,8 @@ public final class NodeDependencyScan {
     private NodeDependencyScan() {
     }
 
-    // the four .env files are the ones bun install loads (env_loader.zig loadDefaultFiles for .production)
     private static final List<String> PACKAGE_MANAGER_FILES = Arrays.asList(
-            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs",
-            ".env", ".env.local", ".env.production", ".env.production.local");
+            ".npmrc", "bunfig.toml", ".yarnrc", ".yarnrc.yml", "pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs");
 
     public static final class Accumulator {
         public final Map<Path, ProjectState> projects = new HashMap<>();
@@ -63,6 +63,8 @@ public final class NodeDependencyScan {
         public final Set<Path> paths = new HashSet<>();
         /** The package.json each {@link #lockFor} walk from one with its own lock, or a pnpm one, ended at. */
         final Map<Path, Path> installRoots = new HashMap<>();
+        /** A .env file visited before any bun.lock beside it, uncopied until one arrives or the scan ends. */
+        final Map<Path, SourceFile> envBeforeBunLock = new HashMap<>();
     }
 
     /**
@@ -79,17 +81,32 @@ public final class NodeDependencyScan {
     }
 
     /**
-     * Note a file the scan visits and keep its contents when it is a package manager's configuration file or a
-     * patch file; true when {@code sf} is one. A {@link Quark} has a path and no contents.
+     * Note a file the scan visits and keep its contents when a package manager reads it: true when {@code sf} is
+     * such a file. A .env file's contents are kept only beside a bun.lock; a {@link Quark} has none.
      */
     public static boolean capturePackageManagerFile(Accumulator acc, SourceFile sf) {
-        acc.paths.add(sf.getSourcePath());
-        Path name = sf.getSourcePath().getFileName();
-        if (name == null || !PACKAGE_MANAGER_FILES.contains(name.toString()) && !isPatch(sf.getSourcePath())) {
+        Path path = sf.getSourcePath();
+        acc.paths.add(path);
+        Path name = path.getFileName();
+        if (name == null) {
+            return false;
+        }
+        if (DotEnv.FILES.contains(name.toString())) {
+            if (sf instanceof Quark) {
+                return true;
+            }
+            if (acc.locks.containsKey(bunLockBeside(path))) {
+                acc.packageManagerFiles.put(path, sf.printAll());
+            } else {
+                acc.envBeforeBunLock.put(path, sf);
+            }
+            return true;
+        }
+        if (!PACKAGE_MANAGER_FILES.contains(name.toString()) && !isPatch(path)) {
             return false;
         }
         if (!(sf instanceof Quark)) {
-            acc.packageManagerFiles.put(sf.getSourcePath(), sf.printAll());
+            acc.packageManagerFiles.put(path, sf.printAll());
         }
         return true;
     }
@@ -98,10 +115,13 @@ public final class NodeDependencyScan {
         return path.toString().endsWith(".patch");
     }
 
-    // only bun install loads them
     private static boolean isDotEnv(Path path) {
         Path name = path.getFileName();
-        return name != null && name.toString().startsWith(".env");
+        return name != null && DotEnv.FILES.contains(name.toString());
+    }
+
+    private static Path bunLockBeside(Path file) {
+        return file.resolveSibling(LockFileRegeneration.BUN.getLockFile());
     }
 
     public static final class ProjectState {
@@ -123,10 +143,19 @@ public final class NodeDependencyScan {
         acc.projects.computeIfAbsent(packagePath, k -> new ProjectState());
         acc.locks.put(lock.getSourcePath(), lock.printAll());
         acc.lockToPackage.put(lock.getSourcePath(), packagePath);
+        Iterator<Map.Entry<Path, SourceFile>> env = acc.envBeforeBunLock.entrySet().iterator();
+        while (env.hasNext()) {
+            Map.Entry<Path, SourceFile> file = env.next();
+            if (bunLockBeside(file.getKey()).equals(lock.getSourcePath())) {
+                acc.packageManagerFiles.put(file.getKey(), file.getValue().printAll());
+                env.remove();
+            }
+        }
     }
 
     /** Give each package.json the content of the lock {@link #lockFor} says its edits regenerate. */
     public static void linkWorkspaceMembers(Accumulator acc) {
+        acc.envBeforeBunLock.clear();
         acc.installRoots.clear();
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             Path lock = lockFor(acc, project.getKey());

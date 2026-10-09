@@ -16,12 +16,11 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -30,16 +29,13 @@ import java.util.Map;
  */
 final class BunInputs {
 
-    private static final List<String> DOT_ENV = Arrays.asList(".env.production.local", ".env.local",
-            ".env.production", ".env");
-
     private BunInputs() {
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
-            if (file.getKey().endsWith(".patch") || DOT_ENV.contains(file.getKey())) {
+            if (file.getKey().endsWith(".patch") || DotEnv.FILES.contains(file.getKey())) {
                 files.put(file.getKey(), file.getValue());
             }
         }

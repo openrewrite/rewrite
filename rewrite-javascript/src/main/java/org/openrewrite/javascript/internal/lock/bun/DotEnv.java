@@ -28,13 +28,13 @@ import java.util.Set;
  * Port of bun's src/env_loader.zig (bun 1.3.10): the .env files an install loads from the root over the process
  * environment, in its order, and their parser.
  */
-final class DotEnv {
+public final class DotEnv {
 
     /**
      * {@code loadDefaultFiles} for {@code .production}, the suffix an install loads with: an earlier file's value
      * is kept over a later one's, and the process environment over all of them.
      */
-    static final List<String> FILES = Arrays.asList(".env.production.local", ".env.local", ".env.production", ".env");
+    public static final List<String> FILES = Arrays.asList(".env.production.local", ".env.local", ".env.production", ".env");
 
     private static final String WHITESPACE = "\t\u000B\f  \n\r";
 
