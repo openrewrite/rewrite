@@ -18,6 +18,7 @@ from typing import List
 
 import pytest
 
+from rewrite.java import JavaType
 from rewrite.java.tree import MethodInvocation
 from rewrite.python import MethodMatcher
 from rewrite.python.method_matcher import (
@@ -178,6 +179,13 @@ class TestArgumentMatching:
     def test_multiple_varargs_rejected(self):
         with pytest.raises(ValueError, match="Only one"):
             MethodMatcher.create("foo.Bar baz(.., ..)")
+
+    def test_typed_arg_matches_a_union_whose_members_besides_none_all_match(self):
+        str_arg = MethodMatcher.create("foo.Bar baz(str)")._argument_matchers[0]
+        string, null = JavaType.Primitive.String, JavaType.Primitive.Null
+        assert str_arg.matches(JavaType.Union(_bounds=[string, null]))
+
+        assert not str_arg.matches(JavaType.Union(_bounds=[JavaType.Primitive.Int, string]))
 
 
 class TestMethodMatcherRepr:

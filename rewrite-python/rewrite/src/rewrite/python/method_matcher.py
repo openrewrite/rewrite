@@ -583,6 +583,11 @@ class TypedArgumentMatcher(ArgumentMatcher):
                    _type_matcher=_type_matcher_for(type_pattern))
 
     def matches(self, arg_type) -> bool:
+        if isinstance(arg_type, JavaType.Union):
+            # Patterns have no union syntax, so `str` names an argument that may also be None.
+            members = [b for b in arg_type.bounds if b is not JavaType.Primitive.Null]
+            return bool(members) and all(self.matches(b) for b in members)
+
         fqn = _get_fqn(arg_type)
         if fqn is None:
             return False
