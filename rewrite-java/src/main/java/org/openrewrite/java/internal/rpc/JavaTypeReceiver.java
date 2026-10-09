@@ -17,6 +17,7 @@ package org.openrewrite.java.internal.rpc;
 
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.rpc.RpcCodec;
 import org.openrewrite.rpc.RpcReceiveQueue;
 
 import java.util.Arrays;
@@ -70,6 +71,12 @@ public class JavaTypeReceiver extends JavaTypeVisitor<RpcReceiveQueue> {
 
     @Override
     public JavaType visitClass(JavaType.Class aClass, RpcReceiveQueue q) {
+        // Mirrors JavaTypeSender: a Class carrying its own codec reads back the
+        // compact wire form, which the structural read below would mis-count.
+        if (aClass instanceof RpcCodec) {
+            //noinspection unchecked
+            return ((RpcCodec<JavaType.Class>) aClass).rpcReceive(aClass, q);
+        }
         long flags = q.receive((Number) aClass.getFlagsBitMap()).longValue();
         JavaType.FullyQualified.Kind kind = q.receiveAndGet(aClass.getKind(), k -> JavaType.FullyQualified.Kind.valueOf(k.toString()));
         String fqn = q.receive(aClass.getFullyQualifiedName());
