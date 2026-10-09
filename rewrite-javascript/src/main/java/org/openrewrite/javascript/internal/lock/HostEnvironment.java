@@ -19,35 +19,50 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * The environment a package manager runs in, as far as the host knows it: its own variables count as unset unless the
- * host says otherwise, and a config file's {@code ${VAR}} is cannot-know where the host does not know it.
+ * host says otherwise, and a {@code ${VAR}} the host does not know is cannot-know where its value is read.
  */
 public final class HostEnvironment {
 
-    public static final HostEnvironment UNKNOWN = new HostEnvironment(Collections.emptyMap(), false);
+    public static final HostEnvironment UNKNOWN = new HostEnvironment(Collections.emptyMap(), false,
+            Collections.emptySet());
 
     private final Map<String, String> variables;
     private final boolean complete;
 
-    private HostEnvironment(Map<String, String> variables, boolean complete) {
+    /**
+     * The variables a project's file set from a {@code ${VAR}} the host does not know.
+     */
+    private final Set<String> unknown;
+
+    private HostEnvironment(Map<String, String> variables, boolean complete, Set<String> unknown) {
         this.variables = variables;
         this.complete = complete;
+        this.unknown = unknown;
     }
 
     /**
      * @param variables the process environment; null when the host does not know it
      */
     public static HostEnvironment of(@Nullable Map<String, String> variables) {
-        return variables == null ? UNKNOWN : new HostEnvironment(variables, true);
+        return variables == null ? UNKNOWN : new HostEnvironment(variables, true, Collections.emptySet());
     }
 
     /**
      * The variables known, with those a project's file sets (Bun's .env files) beside the process's.
      */
     public HostEnvironment with(Map<String, String> known) {
-        return new HostEnvironment(known, complete);
+        return with(known, Collections.emptySet());
+    }
+
+    /**
+     * @param unknown the variables among {@code known} whose values expand a {@code ${VAR}} the host does not know
+     */
+    public HostEnvironment with(Map<String, String> known, Set<String> unknown) {
+        return new HostEnvironment(known, complete, unknown);
     }
 
     public Map<String, String> known() {
@@ -55,9 +70,18 @@ public final class HostEnvironment {
     }
 
     /**
+     * Whether the value of {@code name} is what the host says: set, or unset in an environment the host knows.
+     */
+    public boolean settles(String name) {
+        return !unknown.contains(name) && (complete || variables.containsKey(name));
+    }
+
+    /**
      * A variable the package manager reads by its own name ({@code BUN_CONFIG_REGISTRY}, {@code YARN_*}).
+     * @throws CannotKnow when a project's file set it from a variable the host does not know
      */
     public @Nullable String setting(String name) {
+        requireKnown(name);
         return variables.get(name);
     }
 
@@ -66,11 +90,19 @@ public final class HostEnvironment {
      * @throws CannotKnow when the host does not know the environment and nothing else sets the variable
      */
     public @Nullable String reference(String name) {
+        requireKnown(name);
         String value = variables.get(name);
         if (value == null && !complete) {
             throw new CannotKnow("the environment variable " + name + " a config file names (the host does not " +
                                  "know the environment)");
         }
         return value;
+    }
+
+    private void requireKnown(String name) {
+        if (unknown.contains(name)) {
+            throw new CannotKnow("the environment variable " + name + " (a .env file sets it from a variable the " +
+                                 "host does not know)");
+        }
     }
 }

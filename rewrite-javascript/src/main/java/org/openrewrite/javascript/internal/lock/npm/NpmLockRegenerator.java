@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
@@ -34,6 +35,7 @@ import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
@@ -70,6 +72,19 @@ public final class NpmLockRegenerator {
          */
         @Nullable
         String npmrc;
+
+        /**
+         * The files the project holds relative to the lock's directory, when the host says; an .npmrc among them the
+         * host did not read is unknown.
+         */
+        @Nullable
+        Set<String> paths;
+
+        /**
+         * The environment npm runs in; null when the host does not know it.
+         */
+        @Nullable
+        Map<String, String> env;
 
         @Builder.Default
         Host host = Host.UNKNOWN;
@@ -119,7 +134,10 @@ public final class NpmLockRegenerator {
                 throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
                                      ", whose workspaces list this project, and writes that root's lock");
             }
-            options = NpmOptions.fromNpmrc(inputs.getNpmrc());
+            if (inputs.getNpmrc() == null && inputs.getPaths() != null && inputs.getPaths().contains(".npmrc")) {
+                throw new CannotKnow(".npmrc (its contents were not read)");
+            }
+            options = NpmOptions.fromNpmrc(inputs.getNpmrc(), HostEnvironment.of(inputs.getEnv()));
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }
@@ -310,9 +328,6 @@ public final class NpmLockRegenerator {
         }
         if (e instanceof CannotKnow) {
             return e;
-        }
-        if (e instanceof NpmOptions.NeedsEnvironment) {
-            return new CannotKnow("the environment: " + message);
         }
         if (e instanceof PackageJson.NeedsPackageFiles) {
             return new CannotKnow("the package's files: " + message);

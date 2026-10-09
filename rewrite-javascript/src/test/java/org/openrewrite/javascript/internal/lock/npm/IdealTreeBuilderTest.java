@@ -254,7 +254,7 @@ class IdealTreeBuilderTest {
                 ok = code == null && !(e instanceof CannotKnow) && http.missing.isEmpty();
                 break;
             case "cannot-know":
-                ok = e instanceof CannotKnow || e instanceof NpmOptions.NeedsEnvironment ||
+                ok = e instanceof CannotKnow ||
                      e instanceof PackageJson.NeedsPackageFiles;
                 break;
             case "malformed":

@@ -21,8 +21,8 @@ import java.time.Instant;
 import java.util.Collections;
 
 /**
- * The npm regenerator's inputs: the lock's directory's own .npmrc, and the package.json of each directory above it
- * when npm runs in that directory.
+ * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json of
+ * each directory above it when npm runs in that directory.
  */
 final class NpmInputs {
 
@@ -37,6 +37,7 @@ final class NpmInputs {
         return Inputs.builder()
                 .lock(dir.getLock())
                 .npmrc(dir.file(".npmrc"))
+                .paths(dir.pathsUnder(""))
                 .host(host)
                 .now(now)
                 .directoryName(dir.name())

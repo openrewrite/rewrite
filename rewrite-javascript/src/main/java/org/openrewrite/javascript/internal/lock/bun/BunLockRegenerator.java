@@ -398,9 +398,8 @@ public final class BunLockRegenerator {
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
     static PendingInstall installWithManager(Inputs inputs, @Nullable ManifestSource registry, Log log) {
-        HostEnvironment env = HostEnvironment.of(inputs.getEnv());
         BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
-                env.with(DotEnv.load(env.known(), inputs.getFiles())));
+                DotEnv.load(HostEnvironment.of(inputs.getEnv()), inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(inputs.getLock(), options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();

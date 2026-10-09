@@ -18,8 +18,12 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -209,22 +213,23 @@ class NpmOptionsTest {
           .hasMessage("Cannot set properties of null (setting 'b')");
     }
 
-    // the environment npm would expand ${VAR} from is not an input: a reference in a value read, or in a key that
-    // could expand to one, is a failure; an escaped reference is the literal text
+    // the host's environment rule: a ${VAR} the host does not know, in a value read or in a key that could expand to
+    // one, is cannot-know; an escaped reference is the literal text
     @Test
     void environmentReferences() {
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${LFV}\n"))
-          .isInstanceOf(NpmOptions.NeedsEnvironment.class)
-          .hasMessage("\"${LFV}\" in the npmrc reads the environment, which is not known");
+          .isInstanceOf(CannotKnow.class)
+          .hasMessage("the engine cannot know the environment variable LFV a config file names (the host does not " +
+                      "know the environment)");
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("legacy-peer-deps=${LPD?}\n"))
-          .isInstanceOf(NpmOptions.NeedsEnvironment.class);
+          .isInstanceOf(CannotKnow.class);
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("legacy-peer-deps=\"${LPD}\"\n"))
-          .isInstanceOf(NpmOptions.NeedsEnvironment.class);
+          .isInstanceOf(CannotKnow.class);
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("${K}=true\n"))
-          .isInstanceOf(NpmOptions.NeedsEnvironment.class)
-          .hasMessage("\"${K}\" in the npmrc reads the environment, which is not known");
+          .isInstanceOf(CannotKnow.class)
+          .hasMessageContaining("the environment variable K ");
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("${K}-peer-deps=true\n"))
-          .isInstanceOf(NpmOptions.NeedsEnvironment.class);
+          .isInstanceOf(CannotKnow.class);
         assertThat(NpmOptions.fromNpmrc("//${REG}/:_authToken=x\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
         assertThat(NpmOptions.fromNpmrc("//r/:_authToken=${TOKEN}\nlegacy-peer-deps=true\n").isLegacyPeerDeps())
           .isTrue();
@@ -232,6 +237,21 @@ class NpmOptionsTest {
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=\\${LFV}\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
         assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${}\n"))
+          .hasMessage("Invalid lockfileVersion config: NaN");
+    }
+
+    // @npmcli/config env-replace.js under an environment the host knows: a set variable expands, an unset one stays
+    // as written, or is empty under ?
+    @Test
+    void environmentReferencesTheHostKnows() {
+        Map<String, String> env = new HashMap<>();
+        env.put("LFV", "2");
+        env.put("K", "legacy");
+        HostEnvironment known = HostEnvironment.of(env);
+        assertThat(NpmOptions.fromNpmrc("lockfile-version=${LFV}\n", known).getLockfileVersion()).isEqualTo(2);
+        assertThat(NpmOptions.fromNpmrc("${K}-peer-deps=true\n", known).isLegacyPeerDeps()).isTrue();
+        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=${LPD?}\n", known).isLegacyPeerDeps()).isFalse();
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${UNSET}\n", known))
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 

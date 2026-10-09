@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 
 import java.math.BigDecimal;
@@ -28,6 +30,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,15 +45,6 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 public class NpmOptions {
 
     public static final NpmOptions DEFAULT = NpmOptions.builder().build();
-
-    /**
-     * Thrown where npm would expand an environment variable in the npmrc: the environment is not an input.
-     */
-    public static final class NeedsEnvironment extends IllegalStateException {
-        NeedsEnvironment(String text) {
-            super("\"" + text + "\" in the npmrc reads the environment, which is not known");
-        }
-    }
 
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}?]+)(\\?)?\\}");
     private static final Pattern LEADING_INTEGER = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*([+-]?\\d+)");
@@ -251,11 +245,15 @@ public class NpmOptions {
         return Math.abs(ms) > 8.64e15 ? Double.NaN : ms;
     }
 
-    /**
-     * The options a project's {@code .npmrc} sets over npm's defaults, read as npm's config loads it; throws
-     * NeedsEnvironment for a {@code ${VAR}} in a key read or in a key that could expand to one.
-     */
     public static NpmOptions fromNpmrc(@Nullable String npmrc) {
+        return fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
+    }
+
+    /**
+     * The options a project's {@code .npmrc} sets over npm's defaults, read as npm's config loads it; a
+     * {@code ${VAR}} in a key read, or in a key that could expand to one, follows the host's environment.
+     */
+    public static NpmOptions fromNpmrc(@Nullable String npmrc, HostEnvironment env) {
         NpmOptionsBuilder options = builder();
         if (npmrc == null) {
             return options.build();
@@ -271,132 +269,134 @@ public class NpmOptions {
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
-            Pattern expansions = expansions(entry.getKey());
-            if (expansions != null) {
+            String key;
+            try {
+                key = envReplace(entry.getKey(), env);
+            } catch (CannotKnow e) {
+                Pattern expansions = Objects.requireNonNull(expansions(entry.getKey()));
                 for (String name : KEYS) {
                     if (expansions.matcher(name).matches()) {
-                        throw new NeedsEnvironment(entry.getKey());
+                        throw e;
                     }
                 }
                 continue;
             }
-            String key = envReplace(entry.getKey());
             Object value = entry.getValue();
             switch (key) {
                 case "lockfile-version":
-                    options.lockfileVersion(lockfileVersion(parseField(value, Type.LITERAL)));
+                    options.lockfileVersion(lockfileVersion(parseField(value, Type.LITERAL, env)));
                     break;
                 case "legacy-peer-deps":
-                    options.legacyPeerDeps(truthy(parseField(value, Type.BOOLEAN)));
+                    options.legacyPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "install-links":
-                    options.installLinks(truthy(parseField(value, Type.BOOLEAN)));
+                    options.installLinks(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "omit-lockfile-registry-resolved":
-                    options.omitLockfileRegistryResolved(truthy(parseField(value, Type.BOOLEAN)));
+                    options.omitLockfileRegistryResolved(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "prefer-dedupe":
-                    options.preferDedupe(truthy(parseField(value, Type.BOOLEAN)));
+                    options.preferDedupe(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "strict-peer-deps":
-                    options.strictPeerDeps(truthy(parseField(value, Type.BOOLEAN)));
+                    options.strictPeerDeps(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "force":
-                    options.force(truthy(parseField(value, Type.BOOLEAN)));
+                    options.force(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "engine-strict":
-                    options.engineStrict(truthy(parseField(value, Type.BOOLEAN)));
+                    options.engineStrict(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "save":
-                    options.save(truthy(parseField(value, Type.BOOLEAN)));
+                    options.save(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "format-package-lock":
-                    options.formatPackageLock(truthy(parseField(value, Type.BOOLEAN)));
+                    options.formatPackageLock(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "dry-run":
-                    options.dryRun(truthy(parseField(value, Type.BOOLEAN)));
+                    options.dryRun(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "global":
-                    options.global(truthy(parseField(value, Type.BOOLEAN)));
+                    options.global(truthy(parseField(value, Type.BOOLEAN, env)));
                     break;
                 case "location":
                     // location's flatten turns global on, in the file's own order with global's
-                    if ("global".equals(parseField(value, Type.LITERAL))) {
+                    if ("global".equals(parseField(value, Type.LITERAL, env))) {
                         options.global(true);
                     }
                     break;
                 case "install-strategy":
                     options.installStrategy(InstallStrategy.of(installStrategyWritten != null ? installStrategyWritten :
-                            parseField(value, Type.LITERAL)));
+                            parseField(value, Type.LITERAL, env)));
                     break;
                 case "global-style":
-                    if (truthy(parseField(value, Type.BOOLEAN))) {
+                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "shallow";
                         options.installStrategy(InstallStrategy.SHALLOW);
                     }
                     break;
                 case "legacy-bundling":
-                    if (truthy(parseField(value, Type.BOOLEAN))) {
+                    if (truthy(parseField(value, Type.BOOLEAN, env))) {
                         installStrategyWritten = "nested";
                         options.installStrategy(InstallStrategy.NESTED);
                     }
                     break;
                 case "before":
-                    Object before = parseField(value, Type.LITERAL);
+                    Object before = parseField(value, Type.LITERAL, env);
                     options.beforeConfigured(true);
                     options.before(before == null || before == Js.UNDEFINED || Boolean.FALSE.equals(before) ? null :
                             before instanceof String ? dateField((String) before) : Double.NaN);
                     break;
                 case "min-release-age":
-                    options.minReleaseAge(parseField(value, Type.NUMBER));
+                    options.minReleaseAge(parseField(value, Type.NUMBER, env));
                     break;
                 case "min-release-age-exclude":
-                    options.minReleaseAgeExclude(parseListField(value, Type.STRING));
+                    options.minReleaseAgeExclude(parseListField(value, Type.STRING, env));
                     break;
                 case "omit":
-                    omit = parseListField(value, Type.LITERAL);
+                    omit = parseListField(value, Type.LITERAL, env);
                     break;
                 case "include":
-                    include = parseListField(value, Type.LITERAL);
+                    include = parseListField(value, Type.LITERAL, env);
                     break;
                 case "only":
-                    only = parseField(value, Type.LITERAL);
+                    only = parseField(value, Type.LITERAL, env);
                     break;
                 case "production":
-                    production = parseField(value, Type.BOOLEAN);
+                    production = parseField(value, Type.BOOLEAN, env);
                     break;
                 case "dev":
-                    dev = parseField(value, Type.BOOLEAN);
+                    dev = parseField(value, Type.BOOLEAN, env);
                     break;
                 case "optional":
-                    optional = parseField(value, Type.BOOLEAN);
+                    optional = parseField(value, Type.BOOLEAN, env);
                     break;
                 case "also":
-                    also = parseField(value, Type.LITERAL);
+                    also = parseField(value, Type.LITERAL, env);
                     break;
                 case "allow-git":
-                    options.allowGit(allowField(value));
+                    options.allowGit(allowField(value, env));
                     break;
                 case "allow-file":
-                    options.allowFile(allowField(value));
+                    options.allowFile(allowField(value, env));
                     break;
                 case "allow-directory":
-                    options.allowDirectory(allowField(value));
+                    options.allowDirectory(allowField(value, env));
                     break;
                 case "allow-remote":
-                    options.allowRemote(allowField(value));
+                    options.allowRemote(allowField(value, env));
                     break;
                 case "os":
-                    options.os(platformField(value));
+                    options.os(platformField(value, env));
                     break;
                 case "cpu":
-                    options.cpu(platformField(value));
+                    options.cpu(platformField(value, env));
                     break;
                 case "libc":
-                    options.libc(platformField(value));
+                    options.libc(platformField(value, env));
                     break;
                 case "tag":
-                    Object tag = parseField(value, Type.STRING);
+                    Object tag = parseField(value, Type.STRING, env);
                     options.tag(truthy(tag) ? Js.string(tag) : null);
                     break;
                 default:
@@ -408,8 +408,8 @@ public class NpmOptions {
     }
 
     // arborist reads the allow-* option as `?? 'all'`
-    private static String allowField(@Nullable Object f) {
-        Object value = parseField(f, Type.LITERAL);
+    private static String allowField(@Nullable Object f, HostEnvironment env) {
+        Object value = parseField(f, Type.LITERAL, env);
         return value == null || value == Js.UNDEFINED ? "all" : Js.string(value);
     }
 
@@ -455,7 +455,7 @@ public class NpmOptions {
     }
 
     // npm's parseField for one value of the definition's type
-    private static @Nullable Object parseField(@Nullable Object f, Type type) {
+    private static @Nullable Object parseField(@Nullable Object f, Type type, HostEnvironment env) {
         if (!(f instanceof String)) {
             return f;
         }
@@ -477,7 +477,7 @@ public class NpmOptions {
                     break;
             }
         }
-        s = envReplace(s);
+        s = envReplace(s, env);
         if (type == Type.NUMBER && (s.isEmpty() || NUMBER.matcher(s).matches())) {
             return Js.toNumber(s);
         }
@@ -491,21 +491,21 @@ public class NpmOptions {
     }
 
     // a [null, String] definition read where only a truthy string means anything (`environment.os || current`)
-    private static @Nullable String platformField(@Nullable Object f) {
-        Object value = parseField(f, Type.STRING);
+    private static @Nullable String platformField(@Nullable Object f, HostEnvironment env) {
+        Object value = parseField(f, Type.STRING, env);
         return truthy(value) ? Js.string(value) : null;
     }
 
     // parseField for an Array definition: a string splits on blank lines, each element parsed as its own type
-    private static List<Object> parseListField(@Nullable Object f, Type elementType) {
+    private static List<Object> parseListField(@Nullable Object f, Type elementType, HostEnvironment env) {
         List<Object> out = new ArrayList<>();
         if (f instanceof List) {
             for (Object element : (List<?>) f) {
-                out.add(element instanceof String ? parseField(element, elementType) : element);
+                out.add(element instanceof String ? parseField(element, elementType, env) : element);
             }
         } else if (f instanceof String) {
             for (String element : Js.trim((String) f).split("\n\n")) {
-                out.add(parseField(element, elementType));
+                out.add(parseField(element, elementType, env));
             }
         } else if (f != null) {
             out.add(f);
@@ -513,16 +513,21 @@ public class NpmOptions {
         return out;
     }
 
-    // npm's envReplace with no environment to read from: a reference is a failure, an escaped one is literal
-    private static String envReplace(String f) {
+    // @npmcli/config env-replace.js: an unset ${NAME} stays as written, ${NAME?} becomes empty; an escaped one is literal
+    private static String envReplace(String f, HostEnvironment env) {
         Matcher m = ENV_EXPR.matcher(f);
         StringBuffer out = new StringBuffer();
         while (m.find()) {
             String esc = m.group(1);
-            if (esc.length() % 2 == 0) {
-                throw new NeedsEnvironment(f);
+            String replacement;
+            if (esc.length() % 2 == 1) {
+                replacement = m.group().substring((esc.length() + 1) / 2);
+            } else {
+                String value = env.reference(m.group(2));
+                replacement = esc.substring(esc.length() / 2) +
+                              (value != null ? value : m.group(3) != null ? "" : "${" + m.group(2) + "}");
             }
-            m.appendReplacement(out, Matcher.quoteReplacement(m.group().substring((esc.length() + 1) / 2)));
+            m.appendReplacement(out, Matcher.quoteReplacement(replacement));
         }
         m.appendTail(out);
         return out.toString();

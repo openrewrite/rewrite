@@ -16,12 +16,15 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Port of bun's test/cli/run/env.test.ts (bun-v1.3.10): the parser cases and the file precedence an install
@@ -202,5 +205,26 @@ class DotEnvTest {
     @Test
     void aKeyDefinedLaterInTheSameFileOverridesAnEarlierOne() {
         assertThat(parse("FOO=first\nFOO=second\n")).containsEntry("FOO", "second");
+    }
+
+    // the host's environment rule: a value expanding a variable an unknown environment may set is unknown where read
+    @Test
+    void aValueThatExpandsAVariableTheHostDoesNotKnowIsUnknown() {
+        Map<String, String> env = files(".env", "BUN_CONFIG_REGISTRY=${MIRROR}\nB=$BUN_CONFIG_REGISTRY/x\n" +
+                                                "C=${MISSING:-d}\nPLAIN=p\nSELF=$PLAIN\n");
+
+        HostEnvironment unknown = DotEnv.load(HostEnvironment.UNKNOWN, env);
+        assertThat(unknown.setting("PLAIN")).isEqualTo("p");
+        assertThat(unknown.setting("SELF")).isEqualTo("p");
+        for (String name : new String[]{"BUN_CONFIG_REGISTRY", "B", "C"}) {
+            assertThatThrownBy(() -> unknown.setting(name)).isInstanceOf(CannotKnow.class)
+              .hasMessageContaining("the environment variable " + name);
+            assertThatThrownBy(() -> unknown.reference(name)).isInstanceOf(CannotKnow.class);
+        }
+
+        HostEnvironment known = DotEnv.load(HostEnvironment.of(Collections.singletonMap("MIRROR", "https://m/")), env);
+        assertThat(known.setting("BUN_CONFIG_REGISTRY")).isEqualTo("https://m/");
+        assertThat(known.setting("B")).isEqualTo("https://m//x");
+        assertThat(known.setting("C")).isEqualTo("d");
     }
 }

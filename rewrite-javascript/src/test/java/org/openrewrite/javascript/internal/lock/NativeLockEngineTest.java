@@ -510,7 +510,7 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.RESOLUTION_REQUIRED);
-        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the environment: \"${LPD}\"");
+        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the environment variable LPD ");
     }
 
     @Test

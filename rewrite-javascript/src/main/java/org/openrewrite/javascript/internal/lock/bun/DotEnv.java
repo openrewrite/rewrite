@@ -16,11 +16,13 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -44,14 +46,23 @@ public final class DotEnv {
     }
 
     static Map<String, String> load(Map<String, String> process, Map<String, String> files) {
-        Map<String, String> map = new LinkedHashMap<>(process);
+        return load(HostEnvironment.of(process), files).known();
+    }
+
+    /**
+     * The process environment with the files' variables; one whose value expands a variable the host does not know
+     * is unknown.
+     */
+    static HostEnvironment load(HostEnvironment process, Map<String, String> files) {
+        Map<String, String> map = new LinkedHashMap<>(process.known());
+        Set<String> unknown = new LinkedHashSet<>();
         for (String file : FILES) {
             String contents = files.get(file);
             if (contents != null) {
-                new Parser(contents).parse(map);
+                new Parser(contents, process, unknown).parse(map);
             }
         }
-        return map;
+        return process.with(map, unknown);
     }
 
     /**
@@ -59,16 +70,21 @@ public final class DotEnv {
      * the later one, and the file's own values are expanded afterwards.
      */
     static void parse(String src, Map<String, String> map) {
-        new Parser(src).parse(map);
+        new Parser(src, HostEnvironment.of(map), new HashSet<>()).parse(map);
     }
 
     private static final class Parser {
         private final String src;
         private int pos;
         private final StringBuilder valueBuffer = new StringBuilder();
+        private final HostEnvironment process;
+        private final Set<String> unknown;
+        private boolean expandsUnknown;
 
-        Parser(String src) {
+        Parser(String src, HostEnvironment process, Set<String> unknown) {
             this.src = src;
+            this.process = process;
+            this.unknown = unknown;
         }
 
         void parse(Map<String, String> map) {
@@ -91,9 +107,13 @@ public final class DotEnv {
                 if (i++ < count) {
                     continue;
                 }
+                expandsUnknown = false;
                 String expanded = expandValue(map, entry.getValue());
                 if (expanded != null) {
                     entry.setValue(expanded);
+                }
+                if (expandsUnknown) {
+                    unknown.add(entry.getKey());
                 }
             }
         }
@@ -241,7 +261,11 @@ public final class DotEnv {
                         while (end < value.length() && isExpansionKeyChar(value.charAt(end))) {
                             end++;
                         }
-                        String lookup = map.get(value.substring(keyStart, end));
+                        String name = value.substring(keyStart, end);
+                        String lookup = map.get(name);
+                        if (lookup == null ? !process.settles(name) : unknown.contains(name)) {
+                            expandsUnknown = true;
+                        }
                         String defaultValue = "";
                         if (value.startsWith(":-", end)) {
                             end += 2;
