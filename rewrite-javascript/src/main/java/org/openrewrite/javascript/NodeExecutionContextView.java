@@ -76,7 +76,7 @@ public class NodeExecutionContextView extends DelegatingExecutionContext {
      * so its packument/manifest caches are reused across the execution.
      */
     public NpmRegistryClient getRegistryClient() {
-        return (NpmRegistryClient) getMessages().computeIfAbsent(REGISTRY_CLIENT,
+        return computeMessageIfAbsent(REGISTRY_CLIENT,
                 k -> new NpmRegistryClient(HttpSenderExecutionContextView.view(this).getHttpSender()));
     }
 }

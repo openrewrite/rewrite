@@ -18,6 +18,12 @@ package org.openrewrite;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.scheduling.WorkingDirectoryExecutionContextView;
 
+import java.util.AbstractMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+
+import static java.util.Collections.unmodifiableMap;
 import static org.openrewrite.Recipe.PANIC;
 
 public class CursorValidatingExecutionContextView extends DelegatingExecutionContext {
@@ -51,7 +57,26 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
     }
 
     @Override
+    public Map<String, @Nullable Object> getMessages() {
+        Map<String, @Nullable Object> messages = super.getMessages();
+        return getMessage(VALIDATE_CTX_MUTATION, false) ? new ValidatingMessages(messages) : messages;
+    }
+
+    @Override
     public void putMessage(String key, @Nullable Object value) {
+        assertMutationAllowed(key);
+        super.putMessage(key, value);
+    }
+
+    @Override
+    public <T> T computeMessageIfAbsent(String key, Function<? super String, ? extends T> defaultValue) {
+        return super.computeMessageIfAbsent(key, k -> {
+            assertMutationAllowed(k);
+            return defaultValue.apply(k);
+        });
+    }
+
+    private void assertMutationAllowed(String key) {
         boolean mutationAllowed =
                 !getMessage(VALIDATE_CTX_MUTATION, false) ||
                 VALIDATE_CURSOR_ACYCLIC.equals(key) ||
@@ -62,6 +87,10 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 DataTableExecutionContextView.DATA_TABLE_STORE.equals(key) ||
                 WorkingDirectoryExecutionContextView.WORKING_DIRECTORY_ROOT.equals(key) ||
                 ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT.equals(key) ||
+                key.startsWith(Singleton.class.getName()) ||
+                "org.openrewrite.python.liveDepsTrees".equals(key) ||
+                "org.openrewrite.javascript.livePackageJsonTrees".equals(key) ||
+                "org.openrewrite.javascript.registryClient".equals(key) ||
                 key.startsWith("org.openrewrite.maven") // MavenExecutionContextView stores metrics
                 || key.startsWith("io.moderne"); // We ought to know what we're doing
         assert mutationAllowed : "Recipe mutated execution context key \"" + key + "\". " +
@@ -69,6 +98,40 @@ public class CursorValidatingExecutionContextView extends DelegatingExecutionCon
                 "recipes, opening the door for difficult to debug recipe composition errors. " +
                 "If you need to store state within the execution of a single recipe use Cursor messaging. " +
                 "If you want to pass state between recipes, use a ScanningRecipe instead.";
-        super.putMessage(key, value);
+    }
+
+    private class ValidatingMessages extends AbstractMap<String, @Nullable Object> {
+        private final Map<String, @Nullable Object> messages;
+
+        ValidatingMessages(Map<String, @Nullable Object> messages) {
+            this.messages = messages;
+        }
+
+        @Override
+        public Set<Entry<String, @Nullable Object>> entrySet() {
+            return unmodifiableMap(messages).entrySet();
+        }
+
+        @Override
+        public @Nullable Object get(Object key) {
+            return messages.get(key);
+        }
+
+        @Override
+        public boolean containsKey(Object key) {
+            return messages.containsKey(key);
+        }
+
+        @Override
+        public @Nullable Object put(String key, @Nullable Object value) {
+            assertMutationAllowed(key);
+            return messages.put(key, value);
+        }
+
+        @Override
+        public @Nullable Object remove(Object key) {
+            assertMutationAllowed(String.valueOf(key));
+            return messages.remove(key);
+        }
     }
 }
