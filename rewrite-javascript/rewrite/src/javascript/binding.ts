@@ -117,9 +117,10 @@ export function moduleBindings(
     const cu = compilationUnitOf(visitor);
     const bound = cu === undefined ? [] : moduleObjectBindings(cu);
     return {
-        moduleSystem: cu === undefined ? "none" :
-            isCommonJs(cu) ? "commonjs" :
-            hasEsmSyntax(cu) ? "esm" : "none",
+        // Read on demand, so a caller asking only for bindings never reads the file's module syntax.
+        get moduleSystem() {
+            return cu === undefined ? "none" : isCommonJs(cu) ? "commonjs" : hasEsmSyntax(cu) ? "esm" : "none";
+        },
         moduleOf: localName => bound.find(b => b.name === localName)?.module,
         bindingOf: module => bound.find(b => sameModule(b.module, module))?.name
     };
