@@ -29,10 +29,11 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 /**
- * Regenerate a JavaScript project's lock file natively — without executing the package manager — through the port of
- * that package manager's own install that {@link NativeLockEngine} dispatches to. A pre-configured instance exists per
- * {@link PackageManager}; {@link #forPackageManager(PackageManager)} selects one.
+ * Regenerates a JavaScript project's lock without running its package manager, through the port that
+ * {@link NativeLockEngine} dispatches to; {@link #forPackageManager(PackageManager)} selects the instance.
  */
 public final class LockFileRegeneration {
 
@@ -130,17 +131,17 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * Insert a data-table row for a failed regeneration, from the structured {@link Failure} when
-     * present, else the plain error message and the recipe's target package.
+     * Insert a data-table row for a failed regeneration, naming the recipe's target package when the failure names
+     * none.
      */
     public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
                                         Path packageJsonPath, Result result, @Nullable String defaultPackageName) {
-        Failure failure = result.getFailure();
+        Failure failure = requireNonNull(result.getFailure());
         table.insertRow(ctx, new NodeLockRegenerationFailures.Row(
                 packageJsonPath.toString(),
-                failure != null && failure.getPackageName() != null ? failure.getPackageName() : defaultPackageName,
-                failure != null ? failure.getReason().toString() : null,
-                failure != null ? failure.getDetail() : String.valueOf(result.getErrorMessage())));
+                failure.getPackageName() != null ? failure.getPackageName() : defaultPackageName,
+                failure.getReason().toString(),
+                failure.getDetail()));
     }
 
     private final PackageManager pm;

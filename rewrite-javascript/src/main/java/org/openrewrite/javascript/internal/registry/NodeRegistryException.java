@@ -30,8 +30,7 @@ public class NodeRegistryException extends RuntimeException {
         UNREACHABLE,
         AUTH_FAILED,
         PACKAGE_NOT_FOUND,
-        VERSION_NOT_FOUND,
-        MALFORMED_MANIFEST
+        VERSION_NOT_FOUND
     }
 
     private final Reason reason;

@@ -16,15 +16,13 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The full packuments and the tarballs a Yarn Berry install reads, from the registry Yarn's own config names; the
- * host's credentials go only to the registry the host configured them for.
+ * The full packuments and the tarballs a Yarn Berry install reads, from the registry Yarn's own config names.
  */
 final class YarnBerryRegistrySource implements RegistrySource {
 
@@ -38,11 +36,8 @@ final class YarnBerryRegistrySource implements RegistrySource {
 
     @Override
     public @Nullable String packument(String registry, String name) {
-        NodeRegistry configured = registries.registryFor(name);
-        NodeRegistry target = trimSlash(configured.getUrl()).equals(trimSlash(registry)) ? configured :
-                anonymous(registry, configured);
         try {
-            return client.getPackumentText(target, name, true);
+            return client.getPackumentText(registries.registryFor(name, registry), name, true);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -53,24 +48,13 @@ final class YarnBerryRegistrySource implements RegistrySource {
 
     @Override
     public byte @Nullable [] tarball(String url, String name, String version) {
-        NodeRegistry configured = registries.registryFor(name);
-        NodeRegistry target = url.startsWith(trimSlash(configured.getUrl()) + "/") ? configured :
-                anonymous(url, configured);
         try {
-            return client.getTarball(target, name, version, url);
+            return client.getTarball(registries.registryFor(name, url), name, version, url);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
             }
             throw e;
         }
-    }
-
-    private static NodeRegistry anonymous(String url, NodeRegistry configured) {
-        return new NodeRegistry(null, url, null, null, null, null, false, null, configured.isStrictSsl(), false);
-    }
-
-    private static String trimSlash(String url) {
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 }

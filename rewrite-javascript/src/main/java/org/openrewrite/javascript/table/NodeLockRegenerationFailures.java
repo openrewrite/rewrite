@@ -44,8 +44,7 @@ public class NodeLockRegenerationFailures extends DataTable<NodeLockRegeneration
 
         @Column(displayName = "Reason",
                 description = "The structured failure reason, e.g. REGISTRY_UNREACHABLE, RESOLUTION_REQUIRED or " +
-                        "PEER_CONFLICT. Absent for unstructured failures.")
-        @Nullable
+                        "PEER_CONFLICT.")
         String reason;
 
         @Column(displayName = "Detail",

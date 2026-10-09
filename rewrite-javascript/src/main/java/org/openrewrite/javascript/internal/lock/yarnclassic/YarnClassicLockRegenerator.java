@@ -487,12 +487,15 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * How many directories above the project's the workspace root is whose lock yarn writes when run in the project's
-     * directory, which an install at that root with the project's directory as {@link Inputs#getCwd() cwd} writes;
-     * else 0. Under {@code --focus} yarn runs a focused install in the project's directory instead.
+     * How many directories above the project the workspace root is whose lock yarn writes when run in the project;
+     * 0 when it installs here, as under {@code --focus}, or the walk fails, which {@link #regenerate()} reports.
      */
     public static int installRoot(Inputs inputs) {
-        return new YarnClassicLockRegenerator(inputs).installRoot();
+        try {
+            return new YarnClassicLockRegenerator(inputs).installRoot();
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 
     private int installRoot() {

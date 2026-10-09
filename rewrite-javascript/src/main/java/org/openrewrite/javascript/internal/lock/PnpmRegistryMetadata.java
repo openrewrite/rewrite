@@ -23,8 +23,7 @@ import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The packuments and attestations a pnpm install reads, from the registry pnpm's own config names for each package;
- * the host's credentials go only to the registry the host configured them for.
+ * The packuments and attestations a pnpm install reads, from the registry pnpm's own config names for each package.
  */
 final class PnpmRegistryMetadata implements RegistryMetadata {
 
@@ -39,7 +38,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     @Override
     public @Nullable String packument(String registry, String name, boolean fullMetadata) {
         try {
-            return client.getPackumentText(target(registry, name), name, fullMetadata);
+            return client.getPackumentText(registries.registryFor(name, registry), name, fullMetadata);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -54,7 +53,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
         String url = base + "-/npm/v1/attestations/" + (name.startsWith("@") ? name.replace("/", "%2F") : name) +
                      "@" + version;
         try {
-            return client.getDocumentText(target(registry, name), name, version, url);
+            return client.getDocumentText(registries.registryFor(name, registry), name, version, url);
         } catch (NodeRegistryException e) {
             // fetchAttestationPublishedAt answers undefined for any failure, and pnpm reads the full document instead
             return null;
@@ -73,15 +72,5 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
             }
             throw e;
         }
-    }
-
-    private NodeRegistry target(String registry, String name) {
-        NodeRegistry configured = registries.registryFor(name);
-        return trimSlash(configured.getUrl()).equals(trimSlash(registry)) ? configured :
-                new NodeRegistry(null, registry, null, null, null, null, false, null, configured.isStrictSsl(), false);
-    }
-
-    private static String trimSlash(String url) {
-        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 }

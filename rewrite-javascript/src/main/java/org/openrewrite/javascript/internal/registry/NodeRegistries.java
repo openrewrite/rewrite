@@ -53,4 +53,25 @@ public class NodeRegistries {
         }
         return defaultRegistry;
     }
+
+    /**
+     * The registry a request for {@code packageName} to {@code url} goes through: the host's for that name when
+     * {@code url} is its URL or under it, since the host's credentials go nowhere else; otherwise {@code url} without.
+     */
+    public NodeRegistry registryFor(String packageName, String url) {
+        NodeRegistry configured = registryFor(packageName);
+        String base = trimSlash(configured.getUrl());
+        String target = trimSlash(url);
+        if (target.equals(base)) {
+            return configured;
+        }
+        if (target.startsWith(base + "/")) {
+            return configured.withUrl(url);
+        }
+        return new NodeRegistry(null, url, null, null, null, null, false, null, configured.isStrictSsl(), false);
+    }
+
+    private static String trimSlash(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
+    }
 }

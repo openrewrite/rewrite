@@ -64,7 +64,8 @@ changes only when a recording says so.
   dependent on its locked version, Bun re-resolves every edge of a changed workspace member), so a fresh install of the
   same manifest may differ.
 - The shared engine of ADR 0011 is gone: `GraphBuilder`, `RegistryAdapter`, `ResolutionGraph`, `ResolvedNode`,
-  `LockEditSet`, `LockPatcher`, `LockJson`, `LockYaml`, `YarnLock`, `EngineFailure` and every per-format diff and
-  patcher. The regeneration request no longer carries the pre-edit manifest its per-dependency proof read.
+  `LockEditSet`, `LockPatcher`, `LockJson`, `LockYaml`, `YarnLock`, `EngineFailure`, every per-format diff and
+  patcher, and the registry client's typed packument and manifest. The regeneration request no longer carries the
+  pre-edit manifest its per-dependency proof read.
 - The maintenance commitment is tracking five resolvers: each port names its source version, and a new release is a
   diff against that version, replayed against the corpus.

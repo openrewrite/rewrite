@@ -253,10 +253,22 @@ public final class BunLockRegenerator {
     }
 
     /**
+     * How many directories above the project bun installs, writing that root's bun.lock; 0 when it installs here or
+     * the walk fails, which {@link #regenerate()} reports, as it walks first.
+     */
+    public static int installRoot(Inputs inputs) {
+        try {
+            return findWorkspaceRoot(inputs);
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    /**
      * PackageManager.init: how many directories above the project bun installs, at the first package.json above
      * with workspaces when they list the project, writing that root's bun.lock; 0 when it installs here.
      */
-    public static int findWorkspaceRoot(Inputs inputs) {
+    private static int findWorkspaceRoot(Inputs inputs) {
         String manifest = inputs.getManifests().get("");
         if (manifest == null) {
             return 0;

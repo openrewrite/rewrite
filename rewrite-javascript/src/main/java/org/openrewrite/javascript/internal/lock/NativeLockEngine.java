@@ -40,10 +40,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import java.time.Instant;
 
 /**
- * Builds the project's package manager's inputs from the {@link Request} and runs the port of that package manager's
- * own install: {@link NpmLockRegenerator}, {@link BunLockRegenerator}, {@link YarnClassicLockRegenerator},
- * {@link YarnBerryLockRegenerator} or {@link PnpmLockRegenerator}. There is no shell-out (it would leak registry
- * credentials).
+ * Builds the package manager's inputs from the {@link Request} and runs the port of its own install.
  */
 public final class NativeLockEngine {
 
@@ -74,29 +71,24 @@ public final class NativeLockEngine {
 
     /**
      * How many directories above the edited manifest's the workspace root is whose lock the package manager writes
-     * when run in the manifest's directory, found by the package manager's own walk, when regenerating that root's
-     * lock reproduces it; else 0. Yarn Berry's project is the nearest directory with a yarn.lock, the manifest's own.
+     * when run in the manifest's directory, by that package manager's own walk; else 0.
      */
     public static int installRoot(PackageManager pm, Request request) {
-        if (pm == PackageManager.Pnpm) {
-            return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
-                    PnpmInputs.NO_REGISTRY));
-        }
-        try {
-            switch (pm) {
-                case Npm:
-                    return NpmLockRegenerator.loadLocalPrefix(NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
-                case Bun:
-                    return BunLockRegenerator.findWorkspaceRoot(BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
-                case YarnClassic:
-                    return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
-                            Instant.EPOCH));
-                default:
-                    return 0;
-            }
-        } catch (RuntimeException e) {
-            // these walk only from a manifest with its own lock, whose regeneration reports this
-            return 0;
+        switch (pm) {
+            case Npm:
+                return NpmLockRegenerator.installRoot(NpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+            case Bun:
+                return BunLockRegenerator.installRoot(BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH));
+            case YarnClassic:
+                return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(request, Host.UNKNOWN,
+                        Instant.EPOCH));
+            case YarnBerry:
+                return YarnBerryLockRegenerator.installRoot();
+            case Pnpm:
+                return PnpmLockRegenerator.installRoot(PnpmInputs.from(request, Host.UNKNOWN, Instant.EPOCH,
+                        PnpmInputs.NO_REGISTRY));
+            default:
+                return 0;
         }
     }
 
@@ -158,9 +150,6 @@ public final class NativeLockEngine {
                 break;
             case VERSION_NOT_FOUND:
                 reason = Reason.VERSION_NOT_FOUND;
-                break;
-            case MALFORMED_MANIFEST:
-                reason = Reason.MALFORMED_MANIFEST;
                 break;
             case UNREACHABLE:
             default:

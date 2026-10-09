@@ -162,6 +162,14 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
+     * Configuration.findProjectCwd: Yarn's project is the nearest directory holding a yarn.lock, so a project with a
+     * lock of its own, the only one the scan asks about, installs here: 0.
+     */
+    public static int installRoot() {
+        return 0;
+    }
+
+    /**
      * The lock Yarn writes for the edited manifests over the project's lock, or the failure, after a second install
      * over the written lock, with the settings the first wrote, changed nothing.
      */

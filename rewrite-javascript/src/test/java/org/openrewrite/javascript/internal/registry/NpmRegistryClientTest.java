@@ -27,6 +27,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Deque;
 import java.util.List;
@@ -46,70 +47,41 @@ class NpmRegistryClientTest {
     @Test
     void packumentAcceptsInstallV1WithJsonFallback() {
         StubHttpSender sender = new StubHttpSender();
-        sender.enqueueJson(200, "{\"dist-tags\":{\"latest\":\"4.17.21\"}," +
-                "\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}");
-        var client = new NpmRegistryClient(sender);
+        String body = "{\"dist-tags\":{\"latest\":\"4.17.21\"},\"versions\":{\"4.17.20\":{},\"4.17.21\":{}}}";
+        sender.enqueueJson(200, body);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        AbbreviatedPackument packument = client.getPackument(registry(), "lodash");
+        String packument = client.getPackumentText(registry(), "lodash", false);
 
         assertThat(sender.last().getUrl().getPath()).isEqualTo("/lodash");
         assertThat(sender.last().getRequestHeaders())
                 .containsEntry("Accept", "application/vnd.npm.install-v1+json; q=1.0, application/json; q=0.8, */*");
-        assertThat(packument.getVersions()).containsExactly("4.17.20", "4.17.21");
-        assertThat(packument.getDistTags()).containsEntry("latest", "4.17.21");
+        assertThat(packument).isEqualTo(body);
     }
 
     @Test
-    void scopedNameEncodesSlashAndReadsLicenseFromFullManifest() {
+    void scopedNameEncodesSlashInTheManifestPath() {
         StubHttpSender sender = new StubHttpSender();
-        sender.enqueueJson(200, "{\"name\":\"@angular/core\",\"version\":\"17.3.0\",\"license\":\"MIT\"," +
-                "\"dist\":{\"tarball\":\"https://r/t.tgz\",\"shasum\":\"abc\",\"integrity\":\"sha512-x\"}}");
-        var client = new NpmRegistryClient(sender);
+        String body = "{\"name\":\"@angular/core\",\"version\":\"17.3.0\",\"license\":\"MIT\"}";
+        sender.enqueueJson(200, body);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        VersionManifest manifest = client.getManifest(registry(), "@angular/core", "17.3.0");
+        String manifest = client.getManifestText(registry(), "@angular/core", "17.3.0");
 
         assertThat(sender.last().getUrl().getPath()).isEqualTo("/@angular%2Fcore/17.3.0");
         assertThat(sender.last().getRequestHeaders()).containsEntry("Accept", "application/json");
-        assertThat(manifest.getLicenseString()).isEqualTo("MIT");
-        assertThat(manifest.getDist().getIntegrity()).isEqualTo("sha512-x");
-        assertThat(manifest.getDist().getTarball()).isEqualTo("https://r/t.tgz");
-    }
-
-    @Test
-    void manifestParsesLayoutSurfaces() {
-        StubHttpSender sender = new StubHttpSender();
-        sender.enqueueJson(200, "{\"name\":\"esbuild\",\"version\":\"0.20.0\"," +
-                "\"dependencies\":{\"a\":\"^1.0.0\"},\"optionalDependencies\":{\"b\":\"^2.0.0\"}," +
-                "\"peerDependencies\":{\"react\":\">=17\"},\"peerDependenciesMeta\":{\"react\":{\"optional\":true}}," +
-                "\"os\":[\"linux\"],\"cpu\":[\"x64\"],\"engines\":{\"node\":\">=18\"}," +
-                "\"scripts\":{\"postinstall\":\"node install.js\"}," +
-                "\"bundledDependencies\":[\"a\"]," +
-                "\"dist\":{\"tarball\":\"t\",\"shasum\":\"s\",\"integrity\":\"sha512-y\"}}");
-        var client = new NpmRegistryClient(sender);
-
-        VersionManifest manifest = client.getManifest(registry(), "esbuild", "0.20.0");
-
-        assertThat(manifest.getDependencies()).containsEntry("a", "^1.0.0");
-        assertThat(manifest.getOptionalDependencies()).containsEntry("b", "^2.0.0");
-        assertThat(manifest.getPeerDependencies()).containsEntry("react", ">=17");
-        assertThat(manifest.getPeerDependenciesMeta().get("react").get("optional").asBoolean()).isTrue();
-        assertThat(manifest.getOs()).containsExactly("linux");
-        assertThat(manifest.getCpu()).containsExactly("x64");
-        assertThat(manifest.getEngines()).containsEntry("node", ">=18");
-        assertThat(manifest.getBundleDependencies()).containsExactly("a");
-        // hasInstallScript absent -> derived from an install script in `scripts`
-        assertThat(manifest.getHasInstallScript()).isTrue();
+        assertThat(manifest).isEqualTo(body);
     }
 
     @Test
     void bearerTokenHeader() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
-        var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "https://registry.test/", "tok123", null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry authed = new NodeRegistry(null, "https://registry.test/", "tok123", null, null, null,
                 true, null, true, false);
 
-        client.getPackument(authed, "lodash");
+        client.getPackumentText(authed, "lodash", false);
 
         assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Bearer tok123");
     }
@@ -118,13 +90,14 @@ class NpmRegistryClientTest {
     void basicAuthHeader() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
-        var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "https://registry.test/", null, "user", "secret", null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry authed = new NodeRegistry(null, "https://registry.test/", null, "user", "secret", null,
                 false, null, true, false);
 
-        client.getPackument(authed, "lodash");
+        client.getPackumentText(authed, "lodash", false);
 
-        var expected = "Basic " + Base64.getEncoder().encodeToString("user:secret".getBytes(StandardCharsets.UTF_8));
+        String expected = "Basic " +
+                          Base64.getEncoder().encodeToString("user:secret".getBytes(StandardCharsets.UTF_8));
         assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", expected);
     }
 
@@ -132,11 +105,11 @@ class NpmRegistryClientTest {
     void preEncodedAuthPassedThroughVerbatim() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
-        var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "https://registry.test/", null, null, null, "dXNlcjpwYXNz",
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry authed = new NodeRegistry(null, "https://registry.test/", null, null, null, "dXNlcjpwYXNz",
                 false, null, true, false);
 
-        client.getPackument(authed, "lodash");
+        client.getPackumentText(authed, "lodash", false);
 
         assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Basic dXNlcjpwYXNz");
     }
@@ -145,11 +118,11 @@ class NpmRegistryClientTest {
     void authNotSentOverHttp() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
-        var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "http://registry.test/", "tok123", null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry authed = new NodeRegistry(null, "http://registry.test/", "tok123", null, null, null,
                 true, null, true, false);
 
-        client.getPackument(authed, "lodash");
+        client.getPackumentText(authed, "lodash", false);
 
         assertThat(sender.last().getRequestHeaders()).doesNotContainKey("Authorization");
     }
@@ -158,11 +131,11 @@ class NpmRegistryClientTest {
     void urlUserinfoNeverLeaksIntoFailureDetail() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(404);
-        var client = new NpmRegistryClient(sender);
-        var authed = new NodeRegistry(null, "https://user:s3cr3ttoken@registry.test/", null, null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry authed = new NodeRegistry(null, "https://user:s3cr3ttoken@registry.test/", null, null, null, null,
                 false, null, true, false);
 
-        assertThatThrownBy(() -> client.getPackument(authed, "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(authed, "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
                     assertThat(e.getMessage()).doesNotContain("s3cr3ttoken");
                     assertThat(e.getRegistryUrl()).doesNotContain("s3cr3ttoken");
@@ -173,9 +146,9 @@ class NpmRegistryClientTest {
     void packument404IsPackageNotFound() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(404);
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "nope"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "nope", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.PACKAGE_NOT_FOUND));
     }
@@ -184,9 +157,9 @@ class NpmRegistryClientTest {
     void manifest404IsVersionNotFound() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(404);
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getManifest(registry(), "lodash", "9.9.9"))
+        assertThatThrownBy(() -> client.getManifestText(registry(), "lodash", "9.9.9"))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.VERSION_NOT_FOUND));
     }
@@ -195,9 +168,9 @@ class NpmRegistryClientTest {
     void unauthorizedIsAuthFailed() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(401);
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED));
     }
@@ -206,9 +179,9 @@ class NpmRegistryClientTest {
     void forbiddenIsAuthFailed() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(403);
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED));
     }
@@ -217,9 +190,9 @@ class NpmRegistryClientTest {
     void serverErrorIsUnreachable() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueStatus(500);
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE));
     }
@@ -228,9 +201,9 @@ class NpmRegistryClientTest {
     void connectionFailureIsUnreachable() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueConnectionFailure();
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
                     assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE);
                     assertThat(e.getRegistryUrl()).isEqualTo("http://registry.test/");
@@ -240,11 +213,11 @@ class NpmRegistryClientTest {
     @Test
     void unresolvedPlaceholderRefusesBeforeAnyRequest() {
         StubHttpSender sender = new StubHttpSender();
-        var client = new NpmRegistryClient(sender);
-        var unresolved = new NodeRegistry(null, "http://registry.test/", null, null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry unresolved = new NodeRegistry(null, "http://registry.test/", null, null, null, null,
                 false, null, true, true);
 
-        assertThatThrownBy(() -> client.getPackument(unresolved, "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(unresolved, "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE));
         assertThat(sender.sendCount).isZero();
@@ -254,11 +227,11 @@ class NpmRegistryClientTest {
     void unresolvedCredentialsAreSentAsWritten() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(200, "{\"versions\":{}}");
-        var client = new NpmRegistryClient(sender);
-        var unresolved = new NodeRegistry(null, "https://registry.test/", "${NPM_TOKEN}", null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry unresolved = new NodeRegistry(null, "https://registry.test/", "${NPM_TOKEN}", null, null, null,
                 false, null, true, false).withUnresolvedCredentialPlaceholders(singletonList("${NPM_TOKEN}"));
 
-        client.getPackument(unresolved, "lodash");
+        client.getPackumentText(unresolved, "lodash", false);
 
         assertThat(sender.last().getRequestHeaders()).containsEntry("Authorization", "Bearer ${NPM_TOKEN}");
     }
@@ -267,10 +240,11 @@ class NpmRegistryClientTest {
     void rejectedRequestNamesUnresolvedPlaceholders() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(401, "{}");
-        var client = new NpmRegistryClient(sender);
-        var unresolved = registry().withUnresolvedCredentialPlaceholders(List.of("${NPM_USER}", "${NPM_PASS}"));
+        NpmRegistryClient client = new NpmRegistryClient(sender);
+        NodeRegistry unresolved = registry()
+                .withUnresolvedCredentialPlaceholders(Arrays.asList("${NPM_USER}", "${NPM_PASS}"));
 
-        assertThatThrownBy(() -> client.getPackument(unresolved, "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(unresolved, "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
                     assertThat(e.getReason()).isEqualTo(Reason.AUTH_FAILED);
                     assertThat(e.getMessage())
@@ -283,33 +257,21 @@ class NpmRegistryClientTest {
     void rejectedRequestWithoutUnresolvedPlaceholdersHasNoHint() {
         StubHttpSender sender = new StubHttpSender();
         sender.enqueueJson(403, "{}");
-        var client = new NpmRegistryClient(sender);
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        assertThatThrownBy(() -> client.getPackument(registry(), "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(registry(), "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class,
                         e -> assertThat(e.getMessage()).isEqualTo("HTTP 403 from http://registry.test/lodash"));
     }
 
     @Test
-    void malformedManifestIsMalformed() {
-        StubHttpSender sender = new StubHttpSender();
-        sender.enqueueJson(200, "not json {");
-        var client = new NpmRegistryClient(sender);
-
-        assertThatThrownBy(() -> client.getManifest(registry(), "lodash", "4.17.21"))
-                .isInstanceOfSatisfying(NodeRegistryException.class,
-                        e -> assertThat(e.getReason()).isEqualTo(Reason.MALFORMED_MANIFEST));
-    }
-
-    @Test
     void manifestCachedPerRun() {
         StubHttpSender sender = new StubHttpSender();
-        sender.enqueueJson(200, "{\"name\":\"lodash\",\"version\":\"4.17.21\"," +
-                "\"dist\":{\"tarball\":\"t\",\"shasum\":\"s\",\"integrity\":\"i\"}}");
-        var client = new NpmRegistryClient(sender);
+        sender.enqueueJson(200, "{\"name\":\"lodash\",\"version\":\"4.17.21\"}");
+        NpmRegistryClient client = new NpmRegistryClient(sender);
 
-        VersionManifest first = client.getManifest(registry(), "lodash", "4.17.21");
-        VersionManifest second = client.getManifest(registry(), "lodash", "4.17.21");
+        String first = client.getManifestText(registry(), "lodash", "4.17.21");
+        String second = client.getManifestText(registry(), "lodash", "4.17.21");
 
         assertThat(second).isSameAs(first);
         assertThat(sender.sendCount).isEqualTo(1);
@@ -317,11 +279,11 @@ class NpmRegistryClientTest {
 
     @Test
     void cafileWithDefaultSenderFailsLoud() {
-        var client = new NpmRegistryClient(new HttpUrlConnectionSender());
-        var withCa = new NodeRegistry(null, "https://corp.example.com/", null, null, null, null,
+        NpmRegistryClient client = new NpmRegistryClient(new HttpUrlConnectionSender());
+        NodeRegistry withCa = new NodeRegistry(null, "https://corp.example.com/", null, null, null, null,
                 false, "/etc/certs/corp.pem", true, false);
 
-        assertThatThrownBy(() -> client.getPackument(withCa, "lodash"))
+        assertThatThrownBy(() -> client.getPackumentText(withCa, "lodash", false))
                 .isInstanceOfSatisfying(NodeRegistryException.class, e -> {
                     assertThat(e.getReason()).isEqualTo(Reason.UNREACHABLE);
                     assertThat(e.getMessage()).contains("custom CA");

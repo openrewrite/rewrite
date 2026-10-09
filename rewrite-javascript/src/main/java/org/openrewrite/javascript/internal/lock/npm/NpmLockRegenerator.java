@@ -152,10 +152,22 @@ public final class NpmLockRegenerator {
     }
 
     /**
+     * How many directories above the project npm installs, writing that directory's lock; 0 when it installs here or
+     * the walk fails, which {@link #regenerate()} reports, as it walks first.
+     */
+    public static int installRoot(Inputs inputs) {
+        try {
+            return loadLocalPrefix(inputs);
+        } catch (RuntimeException e) {
+            return 0;
+        }
+    }
+
+    /**
      * @npmcli/config {@code loadLocalPrefix}: how many directories above the project npm installs, at the nearest
      * whose workspaces map the project, writing that directory's lock; 0 when it installs here.
      */
-    public static int loadLocalPrefix(Inputs inputs) {
+    private static int loadLocalPrefix(Inputs inputs) {
         String manifest = inputs.getManifests().get("");
         if (manifest == null) {
             return 0;
