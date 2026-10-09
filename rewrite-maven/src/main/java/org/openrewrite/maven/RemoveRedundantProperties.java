@@ -22,13 +22,16 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.maven.tree.Version;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -39,6 +42,15 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class RemoveRedundantProperties extends Recipe {
+    private static final Version FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS = new Version("3.10.0");
+    private static final Map<String, String> SUPER_POM_DEFAULTS = new HashMap<>();
+
+    static {
+        SUPER_POM_DEFAULTS.put("project.build.sourceEncoding", "UTF-8");
+        SUPER_POM_DEFAULTS.put("project.reporting.outputEncoding", "UTF-8");
+        SUPER_POM_DEFAULTS.put("project.build.outputTimestamp", "1980-02-01T00:00:00Z");
+    }
+
     @Option(displayName = "Property name",
             description = "Property name glob expression pattern used to match properties that should be checked.",
             example = "*.version",
@@ -55,7 +67,10 @@ public class RemoveRedundantProperties extends Recipe {
 
     String displayName = "Remove redundant properties";
 
-    String description = "Remove properties when a parent POM specifies the same property.";
+    String description = "Remove properties when a parent POM specifies the same property. When the project is built " +
+            "with Maven 3.10 or later, according to its `BuildTool` marker, the super POM's defaults count as well: " +
+            "`project.build.sourceEncoding` and `project.reporting.outputEncoding` set to `UTF-8`, and " +
+            "`project.build.outputTimestamp` set to `1980-02-01T00:00:00Z` are removed when no parent POM sets them.";
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -105,13 +120,31 @@ public class RemoveRedundantProperties extends Recipe {
                 }
                 String parentPropertyValue = parentProperties.get(tag.getName());
                 if (parentPropertyValue == null) {
-                    return false;
+                    return equalsSuperPomDefault(tag, mrr);
                 }
                 if (!Boolean.TRUE.equals(onlyIfValuesMatch)) {
                     return true;
                 }
                 return tag.getValue()
                         .map(parentPropertyValue::equals)
+                        .orElse(false);
+            }
+
+            private boolean equalsSuperPomDefault(Xml.Tag tag, MavenResolutionResult mrr) {
+                String superPomDefault = SUPER_POM_DEFAULTS.get(tag.getName());
+                if (superPomDefault == null || !isBuiltWithSuperPomDefaults()) {
+                    return false;
+                }
+                return tag.getValue()
+                        .map(value -> superPomDefault.equalsIgnoreCase(mrr.getPom().getValue(value)))
+                        .orElse(false);
+            }
+
+            private boolean isBuiltWithSuperPomDefaults() {
+                return getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                        .findFirst(BuildTool.class)
+                        .filter(buildTool -> buildTool.getType() == BuildTool.Type.Maven)
+                        .map(buildTool -> new Version(buildTool.getVersion()).compareTo(FIRST_MAVEN_WITH_SUPER_POM_DEFAULTS) >= 0)
                         .orElse(false);
             }
         };
