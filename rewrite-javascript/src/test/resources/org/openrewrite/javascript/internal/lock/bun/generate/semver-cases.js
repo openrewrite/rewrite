@@ -15,8 +15,10 @@
  */
 // Writes semver-cases.tsv: bun's answers to every Bun.semver call of test/cli/install/semver.test.ts, and to a sample
 // of the ranges and versions the given Bun scenarios' locks and packuments name (`kind version range answer` rows).
+// With --rows, bun answers the rows of an existing semver-cases.tsv again instead.
 //
 // Usage: node semver-cases.js <bun checkout>/test/cli/install <Bun scenarios directory> > semver-cases.tsv
+//        node semver-cases.js --rows semver-cases.tsv > semver-cases.tsv.new
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -27,12 +29,32 @@ const bun = spawnSync('sh', ['-c', 'command -v bun'], {encoding: 'utf8'}).stdout
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semver-cases-'))
 const enc = s => s.replace(/\\/g, '\\\\').replace(/\t/g, '\\t').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
 
+if (install === '--rows') {
+  fs.writeFileSync(path.join(tmp, 'rows.ts'), `
+const enc = ${enc.toString()};
+const dec = (s: string) => s.replace(/\\\\([\\\\tnr])/g, (m: string, c: string) =>
+  ({"\\\\": "\\\\", t: "\\t", n: "\\n", r: "\\r"} as any)[c]);
+const out: string[] = [];
+for (const line of require("fs").readFileSync(${JSON.stringify(path.resolve(scenarios))}, "utf8").split("\\n")) {
+  if (!line) continue;
+  const [kind, a, b] = line.split("\\t").map(dec);
+  const r = kind === "satisfies" ? Bun.semver.satisfies(a, b) : Bun.semver.order(a, b);
+  out.push([kind, enc(a), enc(b), String(r)].join("\\t"));
+}
+process.stdout.write(out.join("\\n") + "\\n");
+`)
+  spawnSync(bun, ['run', 'rows.ts'], {cwd: tmp, stdio: 'inherit'})
+  fs.rmSync(tmp, {recursive: true, force: true})
+  process.exit(0)
+}
+
 fs.copyFileSync(path.join(install, 'semver-fixture.js'), path.join(tmp, 'semver-fixture.js'))
 fs.mkdirSync(path.join(tmp, '__snapshots__'))
 fs.copyFileSync(path.join(install, '__snapshots__', 'semver.test.ts.snap'),
   path.join(tmp, '__snapshots__', 'semver.test.ts.snap'))
 fs.writeFileSync(path.join(tmp, 'semver.test.ts'), 'import { afterAll, describe, test, expect } from "bun:test";\n' +
-  fs.readFileSync(path.join(install, 'semver.test.ts'), 'utf8').replace(/^const \{ satisfies, order \} = Bun\.semver;$/m,
+  fs.readFileSync(path.join(install, 'semver.test.ts'), 'utf8')
+    .replace(/^const \{ satisfies, order \} = Bun\.semver;$/m,
     'import { satisfies, order, flush } from "./recorder.ts";') +
   `afterAll(() => flush(${JSON.stringify(path.join(tmp, 'test-rows.tsv'))}));\n`)
 fs.writeFileSync(path.join(tmp, 'recorder.ts'), `
