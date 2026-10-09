@@ -27,9 +27,8 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
@@ -96,9 +95,9 @@ class BunInputsTest {
         Request request = Request.builder()
           .packageJson("{}")
           .lock("{}")
-          .marker(nodeResolutionResult(PackageManager.Bun).withNpmrcConfigs(List.of(
-            new Npmrc(NpmrcScope.User, Map.of("registry", "https://user.example/")),
-            new Npmrc(NpmrcScope.Project, Map.of("registry", "https://project.example/")))))
+          .marker(nodeResolutionResult(PackageManager.Bun).withNpmrcConfigs(Arrays.asList(
+            new Npmrc(NpmrcScope.User, singletonMap("registry", "https://user.example/")),
+            new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://project.example/")))))
           .build();
 
         Inputs inputs = BunInputs.from(request, Host.UNKNOWN, Instant.EPOCH);

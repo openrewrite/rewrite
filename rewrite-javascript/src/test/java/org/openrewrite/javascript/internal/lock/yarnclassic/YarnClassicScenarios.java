@@ -127,6 +127,11 @@ final class YarnClassicScenarios {
         private final Path dir;
         private final @Nullable Path httpCache;
 
+        /**
+         * The in-repo scenario that re-records this downloaded fixture and names it in its {@code supersedes} file.
+         */
+        private @Nullable Scenario supersededBy;
+
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             this.name = name;
             this.label = label;
@@ -386,6 +391,17 @@ final class YarnClassicScenarios {
         Path corpus = corpusRoot();
         if (corpus != null) {
             collect(corpus, httpCache, found);
+        }
+        for (Scenario scenario : found.values()) {
+            String supersedes = scenario.file("supersedes");
+            if (supersedes != null) {
+                for (String name : supersedes.trim().split("\\s+")) {
+                    Scenario superseded = found.get(name);
+                    if (superseded != null && superseded.file("recorded-with") == null) {
+                        superseded.supersededBy = scenario;
+                    }
+                }
+            }
         }
         return new ArrayList<>(found.values());
     }

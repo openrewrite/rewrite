@@ -1,1 +1,1 @@
-YarnClassicAddLockRegenTest.conflictingTransitiveAddFailsLoud as yarn runs it: adding is-odd (is-number ^6) beside is-number@^7.0.0 adds a second is-number entry.
+A transitive range that conflicts with a root dependency, as yarn runs it: adding is-odd (is-number ^6) beside is-number@^7.0.0 adds a second is-number entry.

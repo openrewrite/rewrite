@@ -51,9 +51,9 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * {@code exact} (the lock written equals yarn's {@code after} byte for byte; the default when {@code after} is
  * present), {@code cannot-know <what>} (every package and spec it names), {@code malformed}, {@code pm-rejects
  * <message>}, {@code second-install-rejects} or {@code unstable}. A fixture recorded elsewhere may lack registry
- * responses: it is replayed when a cache fills them and skipped when it cannot be served. When
- * {@code REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS} names a file, one line per edit is written there: the outcome
- * and the first difference.
+ * responses: it is replayed when a cache fills them and skipped when it cannot be served or an in-repo
+ * re-recording names it in its {@code supersedes} file. When {@code REWRITE_LOCK_YARN_CLASSIC_SCENARIO_RESULTS}
+ * names a file, one line per edit is written there: the outcome and the first difference.
  */
 class YarnClassicScenarioTest {
 
@@ -178,6 +178,10 @@ class YarnClassicScenarioTest {
         String after = scenario.file("after");
         ScenarioRegistry http = new ScenarioRegistry(scenario);
         String label = scenario.getLabel();
+        if (scenario.getSupersededBy() != null) {
+            record(label, "skipped", "superseded by " + scenario.getSupersededBy().getName());
+            assumeTrue(false, label + " is superseded by " + scenario.getSupersededBy().getName());
+        }
 
         Result result = new YarnClassicLockRegenerator(scenario.inputs(false, scenario.file("before")), http)
                 .regenerate();
