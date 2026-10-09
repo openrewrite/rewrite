@@ -619,6 +619,41 @@ describe('RemoveImport visitor', () => {
             );
         });
 
+        test('a member-scoped removal leaves a destructured require of another module alone', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile} = require('fs-extra');
+                    `
+                )
+            );
+        });
+
+        test('a module-wide removal drops the unused members of a destructured require', async () => {
+            const spec = new RecipeSpec();
+            spec.recipe = fromVisitor(new RemoveImport("fs"));
+
+            //language=typescript
+            await spec.rewriteRun(
+                typescript(
+                    `
+                        const {readFile, writeFile} = require('fs');
+
+                        writeFile('test.txt', 'content');
+                    `,
+                    `
+                        const {writeFile} = require('fs');
+
+                        writeFile('test.txt', 'content');
+                    `
+                )
+            );
+        });
+
         test('should remove destructured require', async () => {
             const spec = new RecipeSpec();
             spec.recipe = fromVisitor(new RemoveImport("fs", "readFile"));
