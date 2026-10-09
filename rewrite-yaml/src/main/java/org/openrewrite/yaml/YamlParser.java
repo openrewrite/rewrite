@@ -53,7 +53,8 @@ import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s+(@[^\n\r@]+@)");
-    // Only match single-line Helm templates that don't span multiple lines
+    // Single-line Helm templates without braces inside. This is the fallback for templates that
+    // findHelmTemplateEnd() cannot delimit, such as ones holding an unbalanced quote
     private static final Pattern HELM_TEMPLATE_PATTERN = Pattern.compile("\\{\\{[^{}\\n\\r]*}}");
     // Match single-brace placeholder templates like {C App} that contain at least one space
     // These are invalid YAML but used by some tools as placeholders
@@ -125,14 +126,27 @@ public class YamlParser implements org.openrewrite.Parser {
 
         // First, replace all Helm templates with UUIDs
         String processedSource = yamlSource;
+        StringBuilder helmBuffer = new StringBuilder(processedSource.length());
         Matcher helmMatcher = HELM_TEMPLATE_PATTERN.matcher(processedSource);
-        StringBuffer helmBuffer = new StringBuffer();
-        while (helmMatcher.find()) {
+        int helmPos = 0;
+        int helmStart;
+        while ((helmStart = processedSource.indexOf("{{", helmPos)) != -1) {
+            int helmEnd = findHelmTemplateEnd(processedSource, helmStart);
+            if (helmEnd == -1) {
+                helmMatcher.region(helmStart, processedSource.length());
+                helmEnd = helmMatcher.lookingAt() ? helmMatcher.end() : -1;
+            }
+            if (helmEnd == -1) {
+                helmBuffer.append(processedSource, helmPos, helmStart + 1);
+                helmPos = helmStart + 1;
+                continue;
+            }
             String uuid = UUID.randomUUID().toString();
-            helmTemplateByUuid.put(uuid, helmMatcher.group());
-            helmMatcher.appendReplacement(helmBuffer, uuid);
+            helmTemplateByUuid.put(uuid, processedSource.substring(helmStart, helmEnd));
+            helmBuffer.append(processedSource, helmPos, helmStart).append(uuid);
+            helmPos = helmEnd;
         }
-        helmMatcher.appendTail(helmBuffer);
+        helmBuffer.append(processedSource, helmPos, processedSource.length());
         processedSource = helmBuffer.toString();
 
         // Convert standalone Helm template lines (lines where a UUID is the only content)
@@ -275,7 +289,11 @@ public class YamlParser implements org.openrewrite.Parser {
                         int startIndex = commentAwareIndexOf(Arrays.asList(':', '-'), fullPrefix) + 1;
                         Yaml.Tag tag = null;
                         if (mappingStartEvent.getTag() != null) {
-                            String prefixAfterColon = fullPrefix.substring(startIndex);
+                            // When the mapping is not the value of a mapping entry the delimiter found above may be a colon inside
+                            // the tag itself, or a dash that comes after it, so the tag search then begins at the start of the prefix
+                            int tagIndex = fullPrefix.indexOf('!');
+                            int tagSearchStart = tagIndex != -1 && tagIndex < startIndex ? 0 : startIndex;
+                            String prefixAfterColon = fullPrefix.substring(tagSearchStart);
                             final int tagStartIndex = prefixAfterColon.indexOf('!');
                             String tagPrefix = prefixAfterColon.substring(0, tagStartIndex);
                             int i = tagStartIndex;
@@ -284,9 +302,12 @@ public class YamlParser implements org.openrewrite.Parser {
                             }
                             // Cannot use sse.getTag() here, because it is sometimes expanded, e.g. `!!seq` becomes `tag:yaml.org,2002:seq`
                             String tagName = prefixAfterColon.substring(tagStartIndex, i);
-                            String tagSuffix = prefixAfterColon.substring(i, prefixAfterColon.length() - 2);
+                            // Everything up to the end of the line holding the first key belongs to the tag's suffix, including
+                            // any comments. The first key's indentation is not part of it, as it is the prefix of the first entry.
+                            String afterTagName = prefixAfterColon.substring(i);
+                            String tagSuffix = afterTagName.substring(0, afterTagName.lastIndexOf('\n') + 1);
                             tag = createTag(tagPrefix, Markers.EMPTY, tagName, tagSuffix);
-                            lastEnd = lastEnd + startIndex + i + 1;
+                            lastEnd = lastEnd + tagSearchStart + i + tagSuffix.length();
                         }
 
                         String startBracePrefix = null;
@@ -690,6 +711,74 @@ public class YamlParser implements org.openrewrite.Parser {
 
 
     /**
+     * Find the end of the Helm template action starting with {@code {{} at {@code start}.
+     * Unlike {@link #HELM_TEMPLATE_PATTERN} this allows braces inside quoted strings, such as
+     * {@code "${2}"}, and, for comments and trimmed actions ({@code {{- ... }}}, {@code {{ ... -}}}),
+     * line breaks. Any other brace outside a quoted string means this
+     * is not an action, but e.g. nested flow mappings, so that is left to SnakeYAML.
+     *
+     * @return the index just past the closing {@code }}}, or -1 if there is no well-formed action at {@code start}
+     */
+    private static int findHelmTemplateEnd(String s, int start) {
+        int i = start + 2;
+        boolean multiline = s.startsWith("{{-", start) || s.startsWith("{{/*", start);
+        boolean sawLineBreak = false;
+        int commentStart = s.startsWith("{{/*", start) ? i :
+                s.startsWith("{{- /*", start) ? i + 2 : -1;
+        if (commentStart != -1) {
+            int commentEnd = s.indexOf("*/", commentStart + 2);
+            if (commentEnd == -1) {
+                return -1;
+            }
+            i = commentEnd + 2;
+            if (s.startsWith(" -", i) || s.startsWith("-", i)) {
+                i += s.charAt(i) == ' ' ? 2 : 1;
+            }
+            return s.startsWith("}}", i) ? i + 2 : -1;
+        }
+        for (; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '\n':
+                case '\r':
+                    sawLineBreak = true;
+                    break;
+                case '}':
+                    // A line break is only accepted in an action that signals it is a template: `{{-` and
+                    // comments (above), or a closing `-}}` trimming the whitespace that follows
+                    return s.startsWith("}}", i) && (!sawLineBreak || multiline || s.charAt(i - 1) == '-') ? i + 2 : -1;
+                case '{':
+                    return -1;
+                case '"':
+                    for (i++; i < s.length() && s.charAt(i) != '"'; i++) {
+                        if (s.charAt(i) == '\\') {
+                            i++;
+                        } else if (s.charAt(i) == '\n' || s.charAt(i) == '\r') {
+                            return -1; // not a Go template string, which cannot span lines
+                        }
+                    }
+                    if (i >= s.length()) {
+                        return -1;
+                    }
+                    break;
+                case '`':
+                    int rawEnd = s.indexOf('`', i + 1);
+                    if (rawEnd == -1) {
+                        return -1;
+                    }
+                    if (s.substring(i, rawEnd).indexOf('\n') != -1) {
+                        sawLineBreak = true;
+                    }
+                    i = rawEnd;
+                    break;
+                default:
+                    break;
+            }
+        }
+        return -1;
+    }
+
+    /**
      * After Helm templates have been replaced with UUIDs, lines consisting entirely
      * of a UUID are standalone control flow directives. A bare UUID on its own line
      * creates invalid YAML, so we prepend # to make it a YAML comment. {@code commentedUuids}
@@ -730,9 +819,12 @@ public class YamlParser implements org.openrewrite.Parser {
             }
 
             if (helmUuids.contains(trimmed)) {
-                result.append(lineContent, 0, indent);
+                // Keep whatever whitespace surrounded the placeholder, so the line prints as it was
+                int leading = lineContent.indexOf(trimmed);
+                result.append(lineContent, 0, leading);
                 result.append('#');
                 result.append(trimmed);
+                result.append(lineContent, leading + trimmed.length(), lineContent.length());
                 commentedUuids.add(trimmed);
             } else {
                 result.append(lineContent);

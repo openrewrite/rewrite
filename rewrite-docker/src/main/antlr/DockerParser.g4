@@ -342,6 +342,7 @@ sourceList
 
 sourcePath
     : UNQUOTED_TEXT
+    | EQUALS  // Part of a path such as a URL query string (?file=a/b.jar); regrouped by the visitor
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
@@ -357,6 +358,7 @@ destination
 
 destinationPath
     : UNQUOTED_TEXT
+    | EQUALS  // Part of a path such as a URL query string (?file=a/b.jar); regrouped by the visitor
     | DOUBLE_QUOTED_STRING
     | SINGLE_QUOTED_STRING
     | ENV_VAR
