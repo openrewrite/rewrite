@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
@@ -23,6 +24,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.junit.jupiter.api.Timeout.ThreadMode.SEPARATE_THREAD;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.java.Assertions.srcMainResources;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -891,6 +893,77 @@ class RemoveUnusedPropertiesTest implements RewriteTest {
               </build>
             </project>
             """
+          )
+        );
+    }
+
+    @Test
+    @Timeout(value = 20, threadMode = SEPARATE_THREAD)
+    void customPatternDoesNotBacktrackOverLongResourceLines() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveUnusedProperties(".*powermock.*")),
+          mavenProject("my-project",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <properties>
+                    <powermock.version>2.0.9</powermock.version>
+                  </properties>
+
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("@x${x".repeat(50_000) + "\n${powermock.version}")
+            )
+          )
+        );
+    }
+
+    @Test
+    void customPatternKeepsPropertyPrecededByAnotherUsageOnSameLine() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveUnusedProperties(".*powermock.*")),
+          mavenProject("my-project",
+            pomXml(
+              """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <properties>
+                    <powermock.version>2.0.9</powermock.version>
+                  </properties>
+
+                  <build>
+                    <resources>
+                      <resource>
+                        <directory>src/main/resources</directory>
+                        <filtering>true</filtering>
+                      </resource>
+                    </resources>
+                  </build>
+                </project>
+                """
+            ),
+            srcMainResources(
+              text("${a} ${powermock.version} @b@ @powermock.version@")
+            )
           )
         );
     }
