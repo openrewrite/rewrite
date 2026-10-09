@@ -266,6 +266,14 @@ public class CSharpRewriteRpc extends RewriteRpc {
         }
     }
 
+    /**
+     * The framework (BCL) assembly names {@code targetFramework} compiles against, from its reference
+     * assemblies rather than the runtime the engine runs on.
+     */
+    public List<String> frameworkAssemblies(String targetFramework) {
+        return Arrays.asList(send("FrameworkAssemblies", new FrameworkAssemblies(targetFramework), String[].class));
+    }
+
     public static Builder builder() {
         return new Builder();
     }

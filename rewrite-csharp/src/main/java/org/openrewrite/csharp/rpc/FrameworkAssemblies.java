@@ -16,21 +16,13 @@
 package org.openrewrite.csharp.rpc;
 
 import lombok.Value;
-import org.jspecify.annotations.Nullable;
 import org.openrewrite.rpc.request.RpcRequest;
 
 /**
- * One dependency whose public API to enumerate, named by its NuGet coordinate; the assets nearest
- * {@code targetFramework} are enumerated. A {@code null} version names a BCL assembly among
- * {@code targetFramework}'s reference assemblies instead ({@code id} is then an assembly name like
- * {@code System.Linq}, see {@link CSharpRewriteRpc#frameworkAssemblies}).
+ * Asks for the framework (BCL) assembly names {@code targetFramework} compiles against, each a valid
+ * {@link Dependency#getId()} for a {@code null}-version dependency of that framework.
  */
 @Value
-public class Dependency implements RpcRequest {
-    String id;
-
-    @Nullable
-    String version;
-
+public class FrameworkAssemblies implements RpcRequest {
     String targetFramework;
 }

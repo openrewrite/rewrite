@@ -479,8 +479,8 @@ public class RewriteRpcServer
 
     /// <summary>
     /// Enumerates the exported public types of one dependency named by its NuGet coordinate:
-    /// resolves the coordinate to assemblies (<see cref="ResolveDependency"/>), reads their
-    /// public API (resolving symbols against the shared framework) into
+    /// resolves the coordinate to assemblies (<see cref="ResolveDependencyAsync"/>), reads their
+    /// public API (resolving symbols against the target framework's reference assemblies) into
     /// <see cref="JavaType"/> and streams the resulting top-level types back as one
     /// ref-deduplicated <see cref="RpcObjectData"/> batch — the same wire format
     /// <see cref="GetObject"/> uses, but rooted at a list of types rather than a tree.
@@ -488,12 +488,12 @@ public class RewriteRpcServer
     /// tree-transfer refs).
     /// </summary>
     [JsonRpcMethod("DependencyTypes", UseSingleObjectParameterDeserialization = true)]
-    public Task<List<RpcObjectData>> DependencyTypes(DependencyRequest request)
+    public async Task<List<RpcObjectData>> DependencyTypes(DependencyRequest request)
     {
         var key = request.Id + '\0' + request.Version + '\0' + request.TargetFramework;
         if (!_pendingDependencyTypes.TryGetValue(key, out var data))
         {
-            var (own, references) = ResolveDependency(request);
+            var (own, references) = await ResolveDependencyAsync(request);
             Log.Debug("RPC DependencyTypes: {Id} {Version} -> {OwnCount} own, {RefCount} reference assemblies",
                 request.Id, request.Version, own.Count, references.Count);
             var types = AssemblyTypeEnumerator.Enumerate(own, references);
@@ -522,7 +522,21 @@ public class RewriteRpcServer
         {
             _pendingDependencyTypes.TryRemove(key, out _);
         }
-        return Task.FromResult(batch);
+        return batch;
+    }
+
+    /// <summary>
+    /// The names of the framework (BCL) assemblies a target framework compiles against, from
+    /// its reference assemblies rather than the runtime this process runs on. Each name is a
+    /// valid <see cref="DependencyRequest.Id"/> for a null-version request of that framework.
+    /// </summary>
+    [JsonRpcMethod("FrameworkAssemblies", UseSingleObjectParameterDeserialization = true)]
+    public async Task<List<string>> FrameworkAssemblies(FrameworkAssembliesRequest request)
+    {
+        var framework = await FrameworkReferences.ResolveAsync(request.TargetFramework)
+            ?? throw new DirectoryNotFoundException(
+                $"No reference assemblies found for {request.TargetFramework}");
+        return framework.Modules.Select(m => Path.GetFileNameWithoutExtension(m)).ToList();
     }
 
     private static object TypeId(JavaType.FullyQualified type) =>
@@ -534,22 +548,28 @@ public class RewriteRpcServer
     }
 
     /// <summary>
-    /// Resolves a coordinate to assembly paths: a null version names a BCL assembly in this
-    /// runtime's shared framework directory; otherwise the NuGet package's lib/ (or ref/)
-    /// assets nearest the target framework. References are always the shared framework.
+    /// Resolves a coordinate to assembly paths: a null version names a framework (BCL) assembly
+    /// among the target framework's reference assemblies; otherwise the NuGet package's lib/ (or
+    /// ref/) assets nearest the target framework. References are the target framework's reference
+    /// assemblies, or this runtime's shared framework when the package targets a framework whose
+    /// reference assemblies are unavailable.
     /// </summary>
-    private static (List<string> Own, List<string> References) ResolveDependency(DependencyRequest request)
+    private static async Task<(List<string> Own, List<string> References)> ResolveDependencyAsync(
+        DependencyRequest request)
     {
-        var bclDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
-        var bcl = Directory.GetFiles(bclDir, "*.dll").ToList();
+        var framework = await FrameworkReferences.ResolveAsync(request.TargetFramework);
         if (request.Version == null)
         {
-            var dll = Path.Combine(bclDir, request.Id + ".dll");
-            if (!File.Exists(dll))
+            if (framework == null)
             {
-                throw new FileNotFoundException($"BCL assembly '{request.Id}' not found in {bclDir}", dll);
+                throw new DirectoryNotFoundException(
+                    $"No reference assemblies found for {request.TargetFramework}");
             }
-            return ([dll], bcl);
+            var dll = framework.Modules.FirstOrDefault(m => string.Equals(
+                          Path.GetFileNameWithoutExtension(m), request.Id, StringComparison.OrdinalIgnoreCase))
+                      ?? throw new FileNotFoundException(
+                          $"Framework assembly '{request.Id}' is not part of {request.TargetFramework}");
+            return ([dll], framework.All.ToList());
         }
 
         var root = Environment.GetEnvironmentVariable("NUGET_PACKAGES")
@@ -560,7 +580,9 @@ public class RewriteRpcServer
             ?? NearestAssets(Path.Combine(package, "ref"), target)
             ?? throw new InvalidOperationException(
                 $"No assemblies compatible with {request.TargetFramework} in {package}");
-        return (own, bcl);
+        var references = framework?.All.ToList()
+            ?? Directory.GetFiles(Path.GetDirectoryName(typeof(object).Assembly.Location)!, "*.dll").ToList();
+        return (own, references);
     }
 
     /// <summary>
@@ -2406,10 +2428,16 @@ public class DependencyRequest
     /// <summary>NuGet package id, or a BCL assembly name when <see cref="Version"/> is null.</summary>
     public string Id { get; set; } = "";
 
-    /// <summary>Package version; null names a BCL assembly in the runtime's shared framework.</summary>
+    /// <summary>Package version; null names a BCL assembly among the target framework's reference assemblies.</summary>
     public string? Version { get; set; }
 
-    /// <summary>Framework whose nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    /// <summary>Framework whose reference assemblies and nearest lib/ assets to enumerate, e.g. "net10.0".</summary>
+    public string TargetFramework { get; set; } = "";
+}
+
+public class FrameworkAssembliesRequest
+{
+    /// <summary>Target framework whose reference assemblies to list, e.g. "net48".</summary>
     public string TargetFramework { get; set; } = "";
 }
 

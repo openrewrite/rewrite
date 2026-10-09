@@ -109,7 +109,7 @@ internal static class MSBuildEnvironment
         return null;
     }
 
-    private static IEnumerable<string> CandidateDotnetRoots()
+    internal static IEnumerable<string> CandidateDotnetRoots()
     {
         var host = Environment.GetEnvironmentVariable("DOTNET_HOST_PATH");
         if (!string.IsNullOrEmpty(host) && File.Exists(host))

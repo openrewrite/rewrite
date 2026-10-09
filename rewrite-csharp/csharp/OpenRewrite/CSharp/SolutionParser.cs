@@ -223,7 +223,7 @@ internal static class SolutionRestore
         await Gate.WaitAsync(ct);
         try
         {
-            var cacheDir = Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
+            var cacheDir = NetFrameworkCacheDir;
             using var sourceFailures = NuGetSourceFailures.Begin(
                 "the .NET Framework build assets", NuGetResolver.EnabledSourceUrls(cacheDir));
 
@@ -241,12 +241,7 @@ internal static class SolutionRestore
             var missing = new List<string>();
             foreach (var version in frameworkVersions)
             {
-                if (!ReferenceAssemblyRoots.TryGetValue(version, out var root))
-                {
-                    root = await ResolveReferenceAssemblyRootAsync(version, cacheDir, ct);
-                    ReferenceAssemblyRoots[version] = root;
-                }
-
+                var root = await CachedReferenceAssemblyRootAsync(version, cacheDir, ct);
                 if (root == null)
                     missing.Add(version);
                 else if (!roots.Contains(root, StringComparer.OrdinalIgnoreCase))
@@ -265,6 +260,36 @@ internal static class SolutionRestore
         {
             Gate.Release();
         }
+    }
+
+    internal static async Task<string?> NetFrameworkReferenceAssemblyRootAsync(string version, CancellationToken ct)
+    {
+        await Gate.WaitAsync(ct);
+        try
+        {
+            var cacheDir = NetFrameworkCacheDir;
+            using var sourceFailures = NuGetSourceFailures.Begin(
+                "the .NET Framework reference assemblies", NuGetResolver.EnabledSourceUrls(cacheDir));
+            return await CachedReferenceAssemblyRootAsync(version, cacheDir, ct);
+        }
+        finally
+        {
+            Gate.Release();
+        }
+    }
+
+    private static string NetFrameworkCacheDir =>
+        Path.Combine(Path.GetTempPath(), "openrewrite-netfx-build-assets");
+
+    private static async Task<string?> CachedReferenceAssemblyRootAsync(
+        string version, string cacheDir, CancellationToken ct)
+    {
+        if (!ReferenceAssemblyRoots.TryGetValue(version, out var root))
+        {
+            root = await ResolveReferenceAssemblyRootAsync(version, cacheDir, ct);
+            ReferenceAssemblyRoots[version] = root;
+        }
+        return root;
     }
 
     /// <summary>
