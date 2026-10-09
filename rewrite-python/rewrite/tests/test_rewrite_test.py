@@ -488,26 +488,28 @@ class TestUvHelper:
                 types[mi.name.simple_name] = mi.type
                 return super().visit_method_invocation(mi, p)
 
-        RecipeSpec().rewrite_run(
-            *uv(
-                pyproject(
-                    """
-                    [project]
-                    name = "test"
-                    version = "0.0.0"
-                    requires-python = ">=3.10"
-                    dependencies = ["semver==3.0.4"]
-                    """
-                ),
-                python(
-                    """
-                    import semver
-                    v = semver.Version(1, 2, 3)
-                    """,
-                    before_recipe=lambda cu: Collect().visit(cu, None),
-                ),
-            )
+        specs = uv(
+            pyproject(
+                """
+                [project]
+                name = "test"
+                version = "0.0.0"
+                requires-python = ">=3.10"
+                dependencies = ["semver==3.0.4"]
+                """
+            ),
+            python(
+                """
+                import semver
+                v = semver.Version(1, 2, 3)
+                """,
+                before_recipe=lambda cu: Collect().visit(cu, None),
+            ),
         )
+        if specs[0].project_root is None:
+            pytest.skip("uv could not build the workspace")
+
+        RecipeSpec().rewrite_run(*specs)
 
         assert isinstance(types["Version"], JavaType.FullyQualified)
         assert types["Version"].fully_qualified_name == "semver.version.Version"

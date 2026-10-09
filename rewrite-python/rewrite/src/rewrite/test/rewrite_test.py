@@ -318,8 +318,8 @@ class RecipeSpec:
 
             try:
                 from rewrite.python.ty_client import TyTypesClient
-                # ty prefers an inherited VIRTUAL_ENV to the uv() workspace's
-                # own venv, which is the one holding the declared dependencies.
+                # Without an explicit venv, ty-types resolves against the runner's
+                # environment, not the uv() workspace's venv holding the dependencies.
                 venv = Path(root) / ".venv"
                 ty_client = TyTypesClient(
                     virtual_env=str(venv) if venv.is_dir() else None,
