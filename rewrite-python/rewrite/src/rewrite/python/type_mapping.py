@@ -87,7 +87,6 @@ _PYTHON_PRIMITIVES: Dict[str, JavaType.Primitive] = {
     'bool': JavaType.Primitive.Boolean,
     'None': JavaType.Primitive.Null,
     'NoneType': JavaType.Primitive.Null,
-    'bytes': JavaType.Primitive.String,  # Close enough for matching
     'LiteralString': JavaType.Primitive.String,
 }
 
@@ -719,20 +718,23 @@ class PythonTypeMapping:
             # `tuple` has a single generic parameter, so typeArgs conflates
             # `tuple[int, str]` with `tuple[int | str, ...]`. Subclasses inherit
             # elements from `tuple` without being generic, so only `tuple` takes them.
+            # A homogeneous (`T, ...`) element is an array of `T`, as a Java varargs
+            # parameter is, which keeps `tuple[int, ...]` apart from `tuple[int]`.
             tuple_elements = (descriptor.get('tupleElements')
                               if class_name == 'tuple' and module_name == 'builtins'
                               else None)
             if isinstance(tuple_elements, list):
-                arg_ids = [element.get('typeId') for element in tuple_elements
-                           if isinstance(element, dict)]
+                args = [(element.get('typeId'), element.get('kind') == 'homogeneous')
+                        for element in tuple_elements if isinstance(element, dict)]
             else:
-                arg_ids = descriptor.get('typeArgs') or []
+                args = [(arg_id, False) for arg_id in descriptor.get('typeArgs') or []]
 
-            resolved_args = []
-            for arg_id in arg_ids:
+            resolved_args: List[JavaType] = []
+            for arg_id, homogeneous in args:
                 arg_type = self._resolve_type(arg_id) if arg_id is not None else None
                 if arg_type is not None:
-                    resolved_args.append(arg_type)
+                    resolved_args.append(JavaType.Array(_elem_type=arg_type)
+                                         if homogeneous else arg_type)
             if resolved_args:
                 param = JavaType.Parameterized()
                 param._type = base_class
@@ -751,23 +753,16 @@ class PythonTypeMapping:
             return JavaType.Primitive.String
 
         elif kind == 'bytesLiteral':
-            return JavaType.Primitive.String
+            return self._class_reference({'className': 'bytes', 'moduleName': 'builtins'})
 
         elif kind == 'union':
-            # Resolve all non-None members into a Union type.
-            # For Optional[X] (= X | None) with a single real member, unwrap to just X.
+            # `None` is a member like any other, so a recipe can tell `X | None` from `X`.
             resolved_bounds = []
             for member_id in descriptor.get('members', []):
-                member = self._type_registry.get(member_id)
-                if member:
-                    member_kind = member.get('kind')
-                    # Skip None/NoneType members
-                    if member_kind == 'instance' and member.get('className') in ('None', 'NoneType'):
-                        continue
-                    resolved = self._resolve_type(member_id)
-                    if resolved is not None:
-                        resolved_bounds.append(resolved)
-            if not resolved_bounds:
+                resolved = self._resolve_type(member_id)
+                if resolved is not None:
+                    resolved_bounds.append(resolved)
+            if all(b is JavaType.Primitive.Null for b in resolved_bounds):
                 return _UNKNOWN
             if len(resolved_bounds) == 1:
                 return resolved_bounds[0]
@@ -1080,7 +1075,7 @@ class PythonTypeMapping:
 
     def _constant_type(self, node: ast.Constant) -> Optional[JavaType]:
         """Get the type for a constant/literal node."""
-        if isinstance(node.value, (str, bytes)):
+        if isinstance(node.value, str):
             return JavaType.Primitive.String
         elif isinstance(node.value, bool):
             return JavaType.Primitive.Boolean
@@ -1093,7 +1088,7 @@ class PythonTypeMapping:
             return JavaType.Primitive.Long if -2 ** 63 <= node.value < 2 ** 63 else JavaType.Primitive.None_
         elif isinstance(node.value, float):
             return JavaType.Primitive.Double
-        elif isinstance(node.value, complex):
+        elif isinstance(node.value, (bytes, complex)):
             # A literal's type slot holds a JavaType.Primitive, and J.Literal#withType
             # drops a class type put there.
             return JavaType.Primitive.None_

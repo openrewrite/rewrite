@@ -145,11 +145,16 @@ export class RpcSendQueue {
     private before?: any;
 
     constructor(private readonly refs: ReferenceMap,
-                private readonly sourceFileType: string | undefined,
+                private sourceFileType: string | undefined,
                 private readonly trace: boolean) {
     }
 
     async generate(after: any, before: any): Promise<RpcObjectData[]> {
+        // A recipe may change the source file type
+        const afterType = after?.kind;
+        if (typeof afterType === "string" && RpcCodecs.isSourceFileType(afterType)) {
+            this.sourceFileType = afterType;
+        }
         await this.send(after, before);
 
         const result = this.q;
@@ -529,9 +534,9 @@ export class RpcReceiveQueue {
         if (!this.rootReceived) {
             this.rootReceived = true;
             // A recipe may change the source file type
-            if (message.state === RpcObjectState.ADD && message.valueType &&
-                RpcCodecs.isSourceFileType(message.valueType)) {
-                this.sourceFileType = message.valueType;
+            const rootType = message.state === RpcObjectState.ADD ? message.valueType : (before as any)?.kind;
+            if (typeof rootType === "string" && RpcCodecs.isSourceFileType(rootType)) {
+                this.sourceFileType = rootType;
             }
         }
         let ref: number | undefined;

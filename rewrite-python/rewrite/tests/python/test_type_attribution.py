@@ -984,25 +984,50 @@ class TestUnionTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_union_return_type(self):
-        """Function returning Optional[str] should have str or Unknown return type."""
+    def test_optional_keeps_none_as_a_union_member(self):
         source = '''
             from typing import Optional
-            def maybe_name() -> Optional[str]:
-                return "Alice"
+            def f(x: bool | None, o: Optional[int]) -> Optional[str]:
+                x
+                o
+                return None
 
-            maybe_name()
+            f(None, None)
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            call = tree.body[2].value  # maybe_name()
-            result = mapping.method_invocation_type(call)
-            assert result is not None
-            assert result._name == 'maybe_name'
-            # Return type should resolve to str (unwrapping Optional).
-            # May be Unknown if ty-types doesn't emit descriptors for union members.
-            if result._return_type is not None and not isinstance(result._return_type, JavaType.Unknown):
-                assert result._return_type == JavaType.Primitive.String
+            body = tree.body[1].body
+            for reference, member in ((body[0].value, JavaType.Primitive.Boolean),
+                                      (body[1].value, JavaType.Primitive.Int)):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Union)
+                assert set(result.bounds) == {member, JavaType.Primitive.Null}
+            returned = mapping.method_invocation_type(tree.body[2].value)._return_type
+            assert set(returned.bounds) == {JavaType.Primitive.String, JavaType.Primitive.Null}
+        finally:
+            _cleanup_mapping(mapping, tmpdir, client)
+
+    def test_optional_of_an_unresolved_type_is_unknown_rather_than_none(self):
+        mapping = PythonTypeMapping("", file_path=None)
+        mapping._type_registry[1] = {'kind': 'instance', 'className': 'None'}
+        mapping._type_registry[2] = {'kind': 'union', 'members': [999, 1]}
+        assert isinstance(mapping._resolve_type(2), JavaType.Unknown)
+
+    def test_bytes_is_a_class_distinct_from_str(self):
+        source = '''
+            def f(b: bytes):
+                b
+                inferred = b"x"
+                inferred
+        '''
+        mapping, tree, tmpdir, client = _make_mapping(source)
+        try:
+            body = tree.body[0].body
+            for reference in (body[0].value, body[2].value):
+                result = mapping.type(reference)
+                assert isinstance(result, JavaType.Class)
+                assert result.fully_qualified_name == 'bytes'
+                assert result.supertype is not None
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
@@ -1111,15 +1136,18 @@ class TestTupleElements:
         assert result._type_parameters == [JavaType.Primitive.Int,
                                            JavaType.Primitive.String]
 
-    def test_homogeneous_element_becomes_single_type_parameter(self):
+    def test_homogeneous_element_becomes_array_type_parameter(self):
         mapping = PythonTypeMapping("", file_path=None)
         mapping._type_registry[1] = {'kind': 'instance', 'className': 'int'}
+        # tuple[*tuple[int, ...], int]
         mapping._type_registry[400] = self._tuple_descriptor(
-            [{'typeId': 1, 'kind': 'homogeneous'}], type_args=[1])
+            [{'typeId': 1, 'kind': 'homogeneous'}, {'typeId': 1, 'kind': 'fixed'}],
+            type_args=[1])
 
         result = mapping._resolve_type(400)
         assert isinstance(result, JavaType.Parameterized)
-        assert result._type_parameters == [JavaType.Primitive.Int]
+        assert result._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int),
+                                           JavaType.Primitive.Int]
 
     def test_type_var_tuple_element_resolves(self):
         mapping = PythonTypeMapping("", file_path=None)
@@ -1196,16 +1224,21 @@ class TestTupleElementsWithTyTypes:
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
-    def test_homogeneous_tuple_has_one_element(self):
+    def test_homogeneous_tuple_differs_from_one_tuple(self):
         source = '''
             def homo() -> tuple[int, ...]: ...
+            def one() -> tuple[int]: ...
             homo()
+            one()
         '''
         mapping, tree, tmpdir, client = _make_mapping(source)
         try:
-            result = mapping.type(tree.body[1].value)
-            assert isinstance(result, JavaType.Parameterized)
-            assert result._type_parameters == [JavaType.Primitive.Int]
+            homo = mapping.type(tree.body[2].value)
+            one = mapping.type(tree.body[3].value)
+            assert isinstance(homo, JavaType.Parameterized)
+            assert homo._type_parameters == [JavaType.Array(_elem_type=JavaType.Primitive.Int)]
+            assert isinstance(one, JavaType.Parameterized)
+            assert one._type_parameters == [JavaType.Primitive.Int]
         finally:
             _cleanup_mapping(mapping, tmpdir, client)
 
