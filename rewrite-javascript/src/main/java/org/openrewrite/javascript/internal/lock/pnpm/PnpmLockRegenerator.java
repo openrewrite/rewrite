@@ -228,9 +228,13 @@ public final class PnpmLockRegenerator {
             if (into.isEmpty()) {
                 return workspaceRoot;
             }
+            if (!into.equals(lockDir) || inputs.getLock() != null) {
+                return 0;
+            }
             // under lockfileDir pnpm run here would start a lock of every project; run at the root, it writes that one
-            return into.equals(lockDir) && inputs.getLock() == null &&
-                   Js.truthy(loadOptions(inputs).get("lockfileDir")) ? workspaceRoot : 0;
+            PnpmOptions options = loadOptions(inputs);
+            return Js.truthy(options.get("lockfileDir")) && FindPackages.findWorkspaceProjects(manifestDirs(inputs),
+                    options.getWorkspacePackagePatterns()).contains(lockDir) ? workspaceRoot : 0;
         } catch (RuntimeException e) {
             return workspaceRoot;
         }

@@ -214,7 +214,9 @@ class NodeDependencyScanTest {
       "tools/x    | shared   | true  | tools/x/pnpm-lock.yaml |",
       "tools/x    | unshared | true  | tools/x/pnpm-lock.yaml |",
       "packages/a | here     | true  | packages/a/pnpm-lock.yaml |",
-      "packages/a | here     | false | pnpm-lock.yaml | run in packages/a it installs into packages/a/pnpm-lock.yaml"
+      "packages/a | here     | false | pnpm-lock.yaml | run in packages/a it installs into packages/a/pnpm-lock.yaml",
+      "tools/x    | here     | true  | tools/x/pnpm-lock.yaml |",
+      "tools/x    | here     | false | |"
     })
     void aPnpmProjectGoesToTheLockItsWorkspaceInstallsItInto(String dir, String workspace, boolean ownLock,
                                                             String written, String reported) {
