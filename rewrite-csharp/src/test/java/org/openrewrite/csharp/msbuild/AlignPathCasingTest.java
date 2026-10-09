@@ -16,9 +16,15 @@
 package org.openrewrite.csharp.msbuild;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.csharp.table.PathCasingMismatches;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.XmlParser;
+
+import java.nio.file.Path;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
@@ -29,6 +35,40 @@ class AlignPathCasingTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AlignPathCasing());
+    }
+
+    static Set<String> msBuildXmlExtensions() {
+        return AlignPathCasing.MSBUILD_XML_EXTENSIONS;
+    }
+
+    @ParameterizedTest
+    @MethodSource("msBuildXmlExtensions")
+    void everyMatchedFileIsParsedAsXml(String extension) {
+        assertThat(new XmlParser().accept(Path.of("Project." + extension))).isTrue();
+    }
+
+    @Test
+    void alignsVcxprojItemPath() {
+        rewriteRun(
+          xml(
+            """
+              <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                <ItemGroup>
+                  <ClCompile Include="SRC\\Main.cpp" />
+                </ItemGroup>
+              </Project>
+              """,
+            """
+              <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+                <ItemGroup>
+                  <ClCompile Include="src\\Main.cpp" />
+                </ItemGroup>
+              </Project>
+              """,
+            spec -> spec.path("native/Native.vcxproj")
+          ),
+          text("int main() {}", spec -> spec.path("native/src/Main.cpp"))
+        );
     }
 
     @Test
