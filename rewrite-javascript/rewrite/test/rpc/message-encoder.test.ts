@@ -15,7 +15,7 @@
  */
 import {PassThrough} from "stream";
 import {StreamMessageReader, StreamMessageWriter} from "vscode-jsonrpc/node";
-import {chunkedJsonEncoder, jsonFragments} from "../../src/rpc/message-encoder";
+import {chunkedJsonEncoder, encodeFragmented, jsonFragments} from "../../src/rpc/message-encoder";
 
 // Values whose fragment stream must concatenate to exactly JSON.stringify(value). Excludes
 // top-level undefined/function/symbol (JSON.stringify yields undefined there), which never occurs
@@ -78,9 +78,10 @@ describe("chunked JSON message encoder", () => {
         expect(Buffer.from(bytes).equals(expected)).toBe(true);
     });
 
-    test("multi-buffer path stays byte-identical past the flush threshold", async () => {
+    test("multi-buffer path stays byte-identical past the flush threshold", () => {
         // A payload whose serialized form comfortably exceeds the 1 MiB flush threshold, forcing
-        // several Buffer flushes + concat — the path a large recipe tree exercises.
+        // several Buffer flushes + concat — the path a large recipe tree exercises. Called directly:
+        // a megabyte is far below the cap, so encode() would answer from one stringify.
         const big = {
             jsonrpc: "2.0",
             id: 42,
@@ -94,17 +95,41 @@ describe("chunked JSON message encoder", () => {
         } as any;
         const expected = Buffer.from(JSON.stringify(big), "utf-8");
         expect(expected.length).toBeGreaterThan(1 << 20); // actually crossed the threshold
-        const bytes = await chunkedJsonEncoder.encode(big, {charset: "utf-8"});
-        expect(Buffer.from(bytes).equals(expected)).toBe(true);
+        expect(encodeFragmented(big, "utf-8").equals(expected)).toBe(true);
     });
 
-    test("surrogate pairs survive fragment boundaries", async () => {
+    test("surrogate pairs survive fragment boundaries", () => {
         // Emoji (surrogate pairs) live entirely within a single scalar fragment, so UTF-8 encoding
         // per flush never splits one. Repeat enough to span a flush boundary.
         const value = {s: "😀".repeat(400_000)};
         const msg = {jsonrpc: "2.0", id: 1, result: value} as any;
-        const bytes = await chunkedJsonEncoder.encode(msg, {charset: "utf-8"});
-        expect(Buffer.from(bytes).equals(Buffer.from(JSON.stringify(msg), "utf-8"))).toBe(true);
+        expect(encodeFragmented(msg, "utf-8").equals(Buffer.from(JSON.stringify(msg), "utf-8"))).toBe(true);
+    });
+
+    test("falls back to the fragment walk when the message cannot be one string", async () => {
+        // The real trigger is a document past String.kMaxLength, which a test cannot afford to
+        // build; a property that throws RangeError once reproduces the same control flow.
+        let threw = false;
+        const result = {
+            get recipeList() {
+                if (!threw) {
+                    threw = true;
+                    throw new RangeError("Invalid string length");
+                }
+                return [{name: "org.example.R"}];
+            }
+        };
+        const bytes = await chunkedJsonEncoder.encode({jsonrpc: "2.0", id: 1, result} as any, {charset: "utf-8"});
+        expect(threw).toBe(true);
+        expect(Buffer.from(bytes).toString("utf-8"))
+            .toBe('{"jsonrpc":"2.0","id":1,"result":{"recipeList":[{"name":"org.example.R"}]}}');
+    });
+
+    test("a cycle is reported rather than recursing until the stack ends", async () => {
+        const result: any = {};
+        result.self = result;
+        await expect(chunkedJsonEncoder.encode({jsonrpc: "2.0", id: 1, result} as any, {charset: "utf-8"}))
+            .rejects.toThrow(TypeError);
     });
 
     test("round-trips through StreamMessageWriter/Reader framing", async () => {

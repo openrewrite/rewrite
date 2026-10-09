@@ -92,30 +92,53 @@ export function* jsonFragments(value: unknown): Generator<string> {
 }
 
 /**
+ * Streams {@link jsonFragments} into Buffers so that no more than one flush window is a JS string
+ * at a time, raising the outbound ceiling from V8's String.kMaxLength to Node's Buffer.MAX_LENGTH.
+ * Content-Length still needs the whole body up front, so this is a ceiling raise and not true
+ * streaming.
+ *
+ * Exported because {@link chunkedJsonEncoder} reaches it only above the cap: a test of the walk has
+ * to call it directly.
+ */
+export function encodeFragmented(msg: unknown, charset: BufferEncoding): Buffer {
+    const buffers: Buffer[] = [];
+    let pending = "";
+    for (const fragment of jsonFragments(msg)) {
+        pending += fragment;
+        if (pending.length >= FLUSH_THRESHOLD) {
+            buffers.push(Buffer.from(pending, charset));
+            pending = "";
+        }
+    }
+    if (pending.length > 0) {
+        buffers.push(Buffer.from(pending, charset));
+    }
+    return Buffer.concat(buffers);
+}
+
+/**
  * A drop-in replacement for vscode-jsonrpc's default `application/json` content-type encoder that
- * serializes a message to UTF-8 bytes without ever materializing the whole document as a single JS
- * string. The default encoder does {@code Buffer.from(JSON.stringify(msg))}; a large enough
- * PrepareRecipe response (a deep recipe tree) overflows V8's single-string limit and throws
- * "RangeError: Invalid string length", hanging the RPC call. Streaming the
- * fragments into a Buffer raises the ceiling to Node's Buffer.MAX_LENGTH (multiple GB) while
- * producing byte-identical output. (True unbounded streaming needs chunked framing — Content-Length
- * still requires the whole body up front — so this is a ceiling raise, not a removal.)
+ * keeps a message serializable past V8's single-string limit. The default encoder does {@code
+ * Buffer.from(JSON.stringify(msg))}; a large enough PrepareRecipe response (a deep recipe tree)
+ * overflows that limit and throws "RangeError: Invalid string length", hanging the RPC call.
+ *
+ * Below the limit it takes the default's own single-string path: {@link encodeFragmented} would
+ * assemble exactly that string anyway, at a yield per scalar, key and structural token to get
+ * there — ~5x slower on a thousand-element batch. Only a message that cannot be one string pays
+ * for the walk, as {@link chunkedJsonDecoder} does inbound.
  */
 export const chunkedJsonEncoder: JsonRpcContentTypeEncoder = {
     name: "application/json",
     encode(msg: Message, options: { charset: BufferEncoding }): Promise<Uint8Array> {
-        const buffers: Buffer[] = [];
-        let pending = "";
-        for (const fragment of jsonFragments(msg)) {
-            pending += fragment;
-            if (pending.length >= FLUSH_THRESHOLD) {
-                buffers.push(Buffer.from(pending, options.charset));
-                pending = "";
+        try {
+            return Promise.resolve(Buffer.from(JSON.stringify(msg), options.charset));
+        } catch (err) {
+            // A cycle or a bigint is a TypeError the walk cannot serialize either — and would meet
+            // by recursing until the stack ended. Only the string limit is worth a second attempt.
+            if (!(err instanceof RangeError)) {
+                return Promise.reject(err);
             }
         }
-        if (pending.length > 0) {
-            buffers.push(Buffer.from(pending, options.charset));
-        }
-        return Promise.resolve(Buffer.concat(buffers));
+        return Promise.resolve(encodeFragmented(msg, options.charset));
     }
 };
