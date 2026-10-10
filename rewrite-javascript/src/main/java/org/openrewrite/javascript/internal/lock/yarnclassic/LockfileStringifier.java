@@ -78,7 +78,7 @@ final class LockfileStringifier {
         if (str instanceof Number) {
             return Js.numberToString(((Number) str).doubleValue());
         }
-        String s = (String) str;
+        String s = Js.string(str);
         return shouldWrapKey(s) ? Js.quote(s) : s;
     }
 
@@ -164,7 +164,8 @@ final class LockfileStringifier {
                 wrapped.add(maybeWrap(valKey));
             }
             String keyLine = String.join(", ", wrapped);
-            if (val instanceof String || val instanceof Boolean || val instanceof Number) {
+            String type = Js.typeOf(val);
+            if ("string".equals(type) || "boolean".equals(type) || "number".equals(type)) {
                 lines.add(keyLine + " " + maybeWrap(val));
             } else {
                 lines.add(keyLine + ":\n" + stringify(val, indent + "  ", false) + (topLevel ? "\n" : ""));

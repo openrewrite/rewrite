@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -187,9 +188,26 @@ class NormalizeManifestTest {
     @Test
     void cannotKnowWhereTheProjectSitsForAnAbsoluteTarget() {
         Manifest info = new Manifest(object("{\"dependencies\": {\"x\": \"/opt/lib\"}}"));
-        assertThatThrownBy(() -> NormalizeManifest.resolveRelative(info, "", ""))
+        NormalizeManifest.resolveRelative(info, "", "");
+        Object target = Js.get(info.get("dependencies"), "x");
+        assertThat(Js.typeOf(target)).isEqualTo("string");
+        assertThatThrownBy(() -> Js.string(target))
                 .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("where the project sits on disk")
                 .hasMessageContaining("x@file:/opt/lib");
+    }
+
+    @Test
+    void aCacheRelativeDevDependencyThatCleanDependenciesMovesStaysUnknown() {
+        Manifest info = new Manifest(object("{\"name\": \"t\", \"version\": \"1.0.0\", \"dependencies\": {\"x\": " +
+                                            "\"*\"}, \"devDependencies\": {\"x\": \"file:../x\"}, " +
+                                            "\"peerDependencies\": {\"y\": \"link:../y\"}}"));
+        NormalizeManifest.normalizeManifest(info, null, "", false, false, new ArrayList<>());
+        assertThat(info.get("devDependencies")).isEqualTo(new LinkedHashMap<>());
+        assertThatThrownBy(() -> Js.string(Js.get(info.get("dependencies"), "x")))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("where yarn's cache sits, which the devDependencies entry x@file:../x of t");
+        assertThat(Js.get(info.get("peerDependencies"), "y")).isInstanceOf(UnknownPath.class);
     }
 
     @Test

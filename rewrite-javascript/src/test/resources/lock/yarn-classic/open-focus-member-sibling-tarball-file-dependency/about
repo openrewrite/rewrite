@@ -1,0 +1,1 @@
+yarn --focus run in packages/a: the sibling zz-openrewrite-sib resolves from the registry and its tarball, whose package.json has a file: dependency, is fetched; the workspace fetcher keeps the local manifest.

@@ -1,0 +1,1 @@
+A fresh pick whose tarball package.json has a file: devDependency: yarn makes it relative to its cache, and writes only dependencies and optionalDependencies into the lock.

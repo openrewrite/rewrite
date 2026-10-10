@@ -1,0 +1,1 @@
+A fresh pick whose tarball package.json lists the same name in dependencies as * and in devDependencies as a file: path: cleanDependencies moves the cache-relative path into dependencies.

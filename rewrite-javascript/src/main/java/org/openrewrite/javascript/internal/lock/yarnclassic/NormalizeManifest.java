@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -137,7 +136,7 @@ final class NormalizeManifest {
 
     /**
      * {@code file:} and {@code link:} dependencies made relative to the lock's directory; an absolute target, or any
-     * in yarn's cache, is cannot-know, as yarn writes it relative to where the project or the cache sits on disk.
+     * in yarn's cache, becomes an {@link UnknownPath}, as yarn writes it relative to where the project or cache sits.
      */
     @SuppressWarnings("unchecked")
     static void resolveRelative(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder) {
@@ -171,14 +170,18 @@ final class NormalizeManifest {
                     throw new JsError(JsError.TYPE_ERROR, "Cannot assign to read only property '" + name +
                                                           "' of string '" + dependencies + "'");
                 }
+                Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) dependencies;
                 String unprefixed = value.substring(prefix.length());
                 if (unprefixed.startsWith("/")) {
-                    throw new CannotKnow("where the project sits on disk, which the " +
-                            dependencyType + " entry " + name + "@" + value + " is written relative to");
+                    map.put(name, new UnknownPath("where the project sits on disk, which the " + dependencyType +
+                                                  " entry " + name + "@" + value + " is written relative to"));
+                    continue;
                 }
                 if (moduleLoc == null) {
-                    throw new CannotKnow("where yarn's cache sits, which the " + dependencyType + " entry " + name +
-                                         "@" + value + " of " + Js.string(info.getName()) + " is written relative to");
+                    map.put(name, new UnknownPath("where yarn's cache sits, which the " + dependencyType + " entry " +
+                                                  name + "@" + value + " of " + Js.string(info.getName()) +
+                                                  " is written relative to"));
+                    continue;
                 }
                 boolean hasPathPrefix = PATH_PREFIX.matcher(unprefixed).find();
                 String project = deeperThanAnyClimb(lockfileFolder, moduleLoc, unprefixed);
@@ -193,7 +196,7 @@ final class NormalizeManifest {
                 } else if (hasPathPrefix && !RELATIVE_PREFIX.matcher(relativeTarget).find()) {
                     relativeTarget = "./" + relativeTarget;
                 }
-                ((Map<String, @Nullable Object>) dependencies).put(name, prefix + relativeTarget);
+                map.put(name, prefix + relativeTarget);
             }
         }
     }
@@ -280,13 +283,13 @@ final class NormalizeManifest {
             depTypes.add(deps);
         }
 
-        Map<String, String[]> nonTrivialDeps = new LinkedHashMap<>();
+        Map<String, DependencyTuple> nonTrivialDeps = new LinkedHashMap<>();
         for (int t = 0; t < depTypes.size(); t++) {
             Map<String, @Nullable Object> deps = depTypes.get(t);
             for (String name : Js.keys(deps)) {
                 Object version = deps.get(name);
                 if (!nonTrivialDeps.containsKey(name) && Js.truthy(version) && !"*".equals(version)) {
-                    nonTrivialDeps.put(name, new String[]{types.get(t), Js.string(version)});
+                    nonTrivialDeps.put(name, new DependencyTuple(types.get(t), version));
                 }
             }
         }
@@ -296,14 +299,15 @@ final class NormalizeManifest {
             Map<String, @Nullable Object> deps = depTypes.get(t);
             for (String name : Js.keys(deps)) {
                 Object version = deps.get(name);
-                String[] dep = nonTrivialDeps.get(name);
+                DependencyTuple dep = nonTrivialDeps.get(name);
                 if (dep != null) {
-                    if (Js.truthy(version) && !"*".equals(version) && !dep[1].equals(Js.string(version)) && isRoot) {
+                    if (Js.truthy(version) && !"*".equals(version) && !Js.strictEquals(version, dep.version) &&
+                        isRoot) {
                         warn.warn(Lang.format("$0 has dependency $1 with range $2 that collides with a dependency in " +
-                                              "$3 of the same name with version $4", dep[0], name, dep[1],
-                                types.get(t), version));
+                                              "$3 of the same name with version $4", dep.type, name,
+                                shown(dep.version), types.get(t), shown(version)));
                     }
-                    version = dep[1];
+                    version = dep.version;
                 }
                 if (setDeps.contains(name)) {
                     deps.remove(name);
@@ -313,5 +317,20 @@ final class NormalizeManifest {
                 }
             }
         }
+    }
+
+    private static final class DependencyTuple {
+        final String type;
+        final Object version;
+
+        DependencyTuple(String type, Object version) {
+            this.type = type;
+            this.version = version;
+        }
+    }
+
+    // a warning reaches no lock, so one naming a path yarn makes relative to the disk need not know it
+    private static @Nullable Object shown(@Nullable Object version) {
+        return version instanceof UnknownPath ? version.toString() : version;
     }
 }

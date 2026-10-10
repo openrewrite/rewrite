@@ -1,0 +1,1 @@
+A fresh pick whose tarball package.json (not its packument) has a file: dependency: yarn writes it relative to its cache into the lock.

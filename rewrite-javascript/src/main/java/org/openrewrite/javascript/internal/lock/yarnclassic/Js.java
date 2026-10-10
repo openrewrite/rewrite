@@ -48,7 +48,7 @@ final class Js extends EcmaScript {
     }
 
     public static String typeOf(@Nullable Object value) {
-        return EcmaScript.typeOf(value == null ? UNDEFINED : value);
+        return value instanceof UnknownPath ? "string" : EcmaScript.typeOf(value == null ? UNDEFINED : value);
     }
 
     // the keys of any value yarn iterates, as a spread finds them: none for undefined
@@ -191,6 +191,9 @@ final class Js extends EcmaScript {
     }
 
     public static String string(@Nullable Object value) {
+        if (value instanceof UnknownPath) {
+            throw ((UnknownPath) value).read();
+        }
         return EcmaScript.string(value == null ? UNDEFINED : value);
     }
 
