@@ -27,6 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static java.nio.charset.StandardCharsets.ISO_8859_1;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 /**
  * Port of bun's src/env_loader.zig (bun 1.3.10): the .env files an install loads from the root over the process
  * environment, in its order, and their parser.
@@ -50,15 +53,27 @@ public final class DotEnv {
      * is unknown.
      */
     static HostEnvironment load(HostEnvironment process, Map<String, String> files) {
-        Map<String, String> map = new LinkedHashMap<>(process.known());
+        Map<String, String> map = new LinkedHashMap<>();
+        for (Map.Entry<String, String> variable : process.known().entrySet()) {
+            map.put(variable.getKey(), bytes(variable.getValue()));
+        }
         Set<String> unknown = new LinkedHashSet<>();
         for (String file : FILES) {
             String contents = files.get(file);
             if (contents != null) {
-                new Parser(contents, process, unknown).parse(map);
+                new Parser(bytes(contents), process, unknown).parse(map);
             }
         }
-        return process.with(map, unknown);
+        Map<String, String> decoded = new LinkedHashMap<>();
+        for (Map.Entry<String, String> variable : map.entrySet()) {
+            decoded.put(variable.getKey(), new String(variable.getValue().getBytes(ISO_8859_1), UTF_8));
+        }
+        return process.with(decoded, unknown);
+    }
+
+    // the loader reads UTF-8 bytes, so its white space 0xa0 is a byte, never the c2 before it in U+00A0
+    private static String bytes(String text) {
+        return new String(text.getBytes(UTF_8), ISO_8859_1);
     }
 
     private static final class Parser {

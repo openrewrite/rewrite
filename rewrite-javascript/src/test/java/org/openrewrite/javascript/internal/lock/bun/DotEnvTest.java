@@ -204,6 +204,14 @@ class DotEnvTest {
         assertThat(env.get("LARGE3")).hasSize(3000);
     }
 
+    // bun 1.3.10 `bun -e` over this .env: the loader skips and trims the byte 0xa0, never the c2 before it
+    @Test
+    void aNoBreakSpaceIsWhiteSpaceByItsLastByteOnly() {
+        Map<String, String> env = parse("A= x\nB=x \n C=x\nD=\"x \"\n");
+        assertThat(env).containsEntry("A", " x").containsEntry("B", "x�").containsEntry("D", "x ")
+          .doesNotContainKey("C");
+    }
+
     @Test
     void aKeyDefinedLaterInTheSameFileOverridesAnEarlierOne() {
         assertThat(parse("FOO=first\nFOO=second\n")).containsEntry("FOO", "second");

@@ -1,0 +1,1 @@
+A .env line <U+00A0>BUN_CONFIG_REGISTRY=https://registry.npmmirror.com/: the c2 byte is neither white space nor a key character, so bun skips the line.

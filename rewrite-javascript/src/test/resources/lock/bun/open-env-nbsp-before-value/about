@@ -1,0 +1,1 @@
+A .env line BUN_CONFIG_REGISTRY=<U+00A0>https://registry.npmmirror.com/: bun trims bytes, keeps the c2 0xa0 pair whole, and the value does not start with https://.
