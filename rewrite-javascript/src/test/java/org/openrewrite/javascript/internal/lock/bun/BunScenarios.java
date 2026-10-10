@@ -17,9 +17,8 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.Host;
-import org.openrewrite.javascript.internal.lock.Ini;
+import org.openrewrite.javascript.internal.lock.HostRegistries;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -50,7 +49,6 @@ final class BunScenarios {
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
-    private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
     private BunScenarios() {
     }
@@ -311,24 +309,7 @@ final class BunScenarios {
         NodeRegistries userConfig(Phase phase) {
             String npmrc = phase == Phase.BEFORE && has("user-npmrc-before") ? file("user-npmrc-before") :
                     file("user-npmrc");
-            if (npmrc == null || npmrc.isEmpty()) {
-                return null;
-            }
-            NodeRegistry defaultRegistry = registry(null, BunOptions.DEFAULT_REGISTRY);
-            Map<String, NodeRegistry> byScope = new LinkedHashMap<>();
-            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
-                Matcher scope = SCOPED_REGISTRY.matcher(entry.getKey());
-                if ("registry".equals(entry.getKey())) {
-                    defaultRegistry = registry(null, String.valueOf(entry.getValue()));
-                } else if (scope.matches()) {
-                    byScope.put(scope.group(1), registry(scope.group(1), String.valueOf(entry.getValue())));
-                }
-            }
-            return new NodeRegistries(defaultRegistry, byScope, null, null, null);
-        }
-
-        private static NodeRegistry registry(@Nullable String scope, String url) {
-            return new NodeRegistry(scope, url, null, null, null, null, false, null, true, false);
+            return npmrc == null || npmrc.isEmpty() ? null : HostRegistries.fromUserNpmrc(npmrc, getDir());
         }
 
         @Nullable
