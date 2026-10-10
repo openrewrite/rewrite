@@ -55,8 +55,9 @@ class BunInputsTest {
         assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
     }
 
+    // bun 1.3.10 reads a patch file wherever patchedDependencies names it (corpus open-patched-above-lock)
     @Test
-    void patchFilesUnderTheRootAreTheProjectsFiles() {
+    void patchFilesWhereverTheyLieAreTheProjectsFiles() {
         Request request = Request.builder()
           .packageJson("{\"name\":\"p\",\"patchedDependencies\":{\"ms@2.1.3\":\"patches/ms@2.1.3.patch\"}}")
           .lock("{}")
@@ -69,7 +70,7 @@ class BunInputsTest {
 
         Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", ".env");
+        assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", ".env", "../other/patches/x.patch");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
         assertThat(inputs.getPaths()).isNull();
     }

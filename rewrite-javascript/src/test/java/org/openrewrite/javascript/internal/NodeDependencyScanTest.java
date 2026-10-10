@@ -677,6 +677,26 @@ class NodeDependencyScanTest {
     }
 
     /**
+     * bun 1.3.10 reads a patch file wherever patchedDependencies names it, above the lock's directory too
+     * ({@code open-patched-above-lock}).
+     */
+    @Test
+    void aPatchFileAboveTheLockReachesTheRegeneration() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        Path manifest = Paths.get("apps/web/package.json");
+        captureFile(acc, "apps/web/bun.lock", "lock");
+        project(acc, manifest, "{\"name\":\"web\",\"patchedDependencies\":{\"ms@2.1.3\":" +
+                               "\"../../patches/ms@2.1.3.patch\"}}", nodeResolutionResult(PackageManager.Bun));
+        capture(acc, "patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          manifest);
+
+        assertThat(files.getPackageManagerFiles()).containsKey(Paths.get("patches/ms@2.1.3.patch"));
+    }
+
+    /**
      * pnpm installs every project of a workspace whose projects keep their own locks in one run, so a member's
      * regeneration gets the other projects' locks; npm's gets none.
      */

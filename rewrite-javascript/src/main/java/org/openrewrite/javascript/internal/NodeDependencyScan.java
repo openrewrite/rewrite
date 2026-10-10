@@ -324,9 +324,9 @@ public final class NodeDependencyScan {
             if (!readBy(regeneration, file.getKey())) {
                 continue;
             }
-            if (directories.contains(dir) || above(dir, directories) ||
-                (file.getKey().toString().endsWith(".patch") || readAsManifest(regeneration, file.getKey())) &&
-                under(dir, directories)) {
+            // a patch file is wherever the manifest's patchedDependencies says, above the lock too
+            if (directories.contains(dir) || above(dir, directories) || file.getKey().toString().endsWith(".patch") ||
+                readAsManifest(regeneration, file.getKey()) && under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }

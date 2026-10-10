@@ -42,6 +42,7 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.test.SourceSpecs.text;
 
 /**
  * {@link AddDependency} lock regeneration without a package manager: a leaf add is written into the lock byte for
@@ -86,6 +87,25 @@ class AddDependencyLockRegenTest implements RewriteTest {
                         })),
                 packageLock(resource("lock/npm/add-leaf/before"), resource("lock/npm/add-leaf/after"),
                         s -> s.noTrim())
+        );
+    }
+
+    // recorded with bun 1.3.10 (lock/bun/open-env-registry): the scan keeps the .env beside bun.lock, and bun's
+    // install takes NPM_CONFIG_REGISTRY from it
+    @Test
+    void aBunProjectsEnvFileNamesTheRegistryItsLockIsWrittenFrom() {
+        String scenario = "lock/bun/open-env-registry/";
+        routes.put("https://registry.npmmirror.com/is-number", resource(scenario + "http/is-number"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("is-number", "7.0.0", "dependencies")).executionContext(ctx),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Bun, dependency("ms", "2.1.3")), s -> s.after(actual -> {
+                            assertThat(actual).contains("\"is-number\": \"7.0.0\"");
+                            return actual;
+                        })),
+                text(resource(scenario + "tree/.env"), s -> s.path(".env").noTrim()),
+                text(resource(scenario + "before"), resource(scenario + "after"), s -> s.path("bun.lock").noTrim())
         );
     }
 

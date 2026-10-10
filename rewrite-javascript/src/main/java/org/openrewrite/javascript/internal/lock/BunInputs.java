@@ -44,7 +44,13 @@ final class BunInputs {
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
-            if (file.getKey().endsWith(".patch") || DotEnv.FILES.contains(file.getKey())) {
+            if (DotEnv.FILES.contains(file.getKey())) {
+                files.put(file.getKey(), file.getValue());
+            }
+        }
+        // a patch file is wherever patchedDependencies says, above the lock's directory too
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            if (file.getKey().endsWith(".patch")) {
                 files.put(file.getKey(), file.getValue());
             }
         }
