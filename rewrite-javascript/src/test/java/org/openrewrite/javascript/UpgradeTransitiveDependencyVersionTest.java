@@ -210,6 +210,17 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         memberCompose(new Scenario("yarn-classic/override-recipe-member-compose"), PackageManager.YarnClassic);
     }
 
+    // recorded with Bun 1.3.10: the root's override and a member's range in one install
+    @Test
+    void bunBeforeALaterRecipeChangesAMemberInEveryVisitOrder() {
+        Recipe override = new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null);
+        Recipe upgrade = new UpgradeDependencyVersion("is-number", null, "^7.0.0");
+        new CatalogRecording("upgrade-transitive", "bun", "override-recipe-then-member-upgrade")
+          .assertEveryVisitOrder(override, upgrade);
+        new CatalogRecording("upgrade-transitive", "bun", "override-recipe-then-member-upgrade")
+          .assertEveryVisitOrder(upgrade, override);
+    }
+
     @Test
     void pnpmAfterAnEarlierRecipeChangedTheReleaseInEveryVisitOrder() {
         Scenario s = new Scenario("pnpm/override-recipe-release-changed-earlier");

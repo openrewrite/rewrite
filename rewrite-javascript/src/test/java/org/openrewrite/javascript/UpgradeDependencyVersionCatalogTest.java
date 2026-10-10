@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.Recipe;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
@@ -243,31 +244,20 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
-    // recorded with Bun 1.3.10: the root's override and the member's range, in every visit order
-    @Test
-    void anUpgradeAfterAnOverrideInOneRunRegeneratesWithTheOverride() {
-        CatalogRecording recording = new CatalogRecording("bun", "catalog-compose-override-then-member");
-        rewriteRun(
-          spec -> spec.recipes(new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null),
-              new UpgradeDependencyVersion("is-number", null, "^7.0.0"))
-            .executionContext(recording.ctx()),
-          recording.sources()
-        );
-        recording.assertEveryVisitOrder(new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null),
-          new UpgradeDependencyVersion("is-number", null, "^7.0.0"));
-    }
-
-    @Test
-    void anOverrideAfterAnUpgradeInOneRunRegeneratesWithTheUpgrade() {
-        CatalogRecording recording = new CatalogRecording("bun", "catalog-compose-override-then-member");
-        rewriteRun(
-          spec -> spec.recipes(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
-              new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null))
-            .executionContext(recording.ctx()),
-          recording.sources()
-        );
-        recording.assertEveryVisitOrder(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
-          new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null));
+    // the catalog entry moves and the override of the same package is declined, whichever recipe runs first
+    @ParameterizedTest(name = "{0}/{1}")
+    @CsvSource(delimiter = '|', textBlock = """
+      pnpm       | catalog-entry-one-importer      | wrappy    | 1.0.2
+      pnpm       | catalog-entry-named             | is-number | ^7.0.0
+      bun        | catalog-workspaces-catalog-edit | ms        | 2.1.3
+      yarn-berry | catalog-yarnrc-named-edit       | is-number | ^7.0.0
+      """)
+    void anOverrideOfACatalogDeclaredPackageLeavesTheUpgradeToTheCatalog(String family, String scenario, String name,
+                                                                          String version) {
+        Recipe upgrade = new UpgradeDependencyVersion(name, null, version);
+        Recipe override = new UpgradeTransitiveDependencyVersion(name, version.replace("^", ""), null);
+        new CatalogRecording(family, scenario).assertEveryVisitOrder(override, upgrade);
+        new CatalogRecording(family, scenario).assertEveryVisitOrder(upgrade, override);
     }
 
     // recorded with pnpm 11.2.2: without a lock it still counts every project its packages match, so the cleanup
