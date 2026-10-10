@@ -192,6 +192,23 @@ public final class BerryOptions {
     }
 
     /**
+     * Configuration.findRcFiles's walk: of {@code files}, by path from the project's directory, those in the directory
+     * Yarn runs in ({@code startingCwd}, from there too) or in one above it.
+     */
+    public static Map<String, String> findRcFiles(String startingCwd, Map<String, String> files) {
+        Map<String, String> found = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : files.entrySet()) {
+            String path = file.getKey();
+            String dir = path.contains("/") ? path.substring(0, path.lastIndexOf('/')) : "";
+            if (dir.isEmpty() || dir.matches("\\.\\.(/\\.\\.)*") || startingCwd.equals(dir) ||
+                startingCwd.startsWith(dir + "/")) {
+                found.put(path, file.getValue());
+            }
+        }
+        return found;
+    }
+
+    /**
      * Reads {@code configFiles}, the rc files by path from the project's directory, from where Yarn runs up (another
      * name only as {@code YARN_RC_FILENAME} names it), under {@code env}; throws UsageError where Yarn rejects one.
      */

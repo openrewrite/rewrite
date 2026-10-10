@@ -1,0 +1,1 @@
+The root, packages/, the member packages/a and its sibling packages/b each hold a .yarnrc.yml whose packageExtensions give is-number a different ms; Yarn run in the member reads the rc files from there up (Configuration.findRcFiles), the nearest wins, the sibling's is not read.

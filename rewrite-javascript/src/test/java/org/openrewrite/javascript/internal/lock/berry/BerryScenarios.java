@@ -247,19 +247,19 @@ final class BerryScenarios {
                     env.put("YARN_NPM_REGISTRY_SERVER", registry);
                 }
             }
-            // the edit runs where run-dir names, reading the rc files from there up
+            // the edit runs where run-dir names
             String runsIn = phase == Phase.AFTER && has("run-dir") ? String.valueOf(file("run-dir")).trim() : "";
             Map<String, String> patchFiles = new LinkedHashMap<>();
+            Map<String, String> rcFiles = new LinkedHashMap<>();
             for (Map.Entry<String, String> file : tree(phase).entrySet()) {
                 String path = file.getKey();
-                String parent = path.contains("/") ? path.substring(0, path.lastIndexOf('/')) : "";
                 if (path.endsWith(".patch")) {
                     patchFiles.put(path, file.getValue());
-                } else if (path.endsWith("/" + BerryOptions.DEFAULT_RC_FILENAME) &&
-                           (runsIn.equals(parent) || runsIn.startsWith(parent + "/"))) {
-                    configFiles.put(path, file.getValue());
+                } else if (path.endsWith("/" + BerryOptions.DEFAULT_RC_FILENAME)) {
+                    rcFiles.put(path, file.getValue());
                 }
             }
+            configFiles.putAll(BerryOptions.findRcFiles(runsIn, rcFiles));
             return YarnBerryLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))

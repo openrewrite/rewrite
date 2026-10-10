@@ -68,6 +68,19 @@ class BerryOptionsTest {
         assertThat(options.get("enableTransparentWorkspaces")).isEqualTo(false);
     }
 
+    // open-member-yarnrc-chain-run-in-member: Yarn 4.10.3 run in packages/a reads no sibling's rc file, nor one below
+    @Test
+    void findRcFilesKeepsTheDirectoryYarnRunsInAndThoseAboveIt() {
+        Map<String, String> files = new LinkedHashMap<>();
+        for (String path : new String[]{"../.yarnrc.yml", "../x/.yarnrc.yml", ".yarnrc.yml", "packages/.yarnrc.yml",
+          "packages/a/.yarnrc.yml", "packages/b/.yarnrc.yml", "packages/a/b/.yarnrc.yml"}) {
+            files.put(path, "");
+        }
+        assertThat(BerryOptions.findRcFiles("packages/a", files)).containsOnlyKeys("../.yarnrc.yml", ".yarnrc.yml",
+          "packages/.yarnrc.yml", "packages/a/.yarnrc.yml");
+        assertThat(BerryOptions.findRcFiles("", files)).containsOnlyKeys("../.yarnrc.yml", ".yarnrc.yml");
+    }
+
     @Test
     void mapSettingsMergeAcrossFiles() {
         Map<String, String> files = new LinkedHashMap<>();

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.lock.berry.BerryOptions;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 
 import java.time.Instant;
@@ -38,10 +39,10 @@ final class YarnBerryInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
-        Map<String, String> configFiles = new LinkedHashMap<>();
+        Map<String, String> rcFiles = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
-            if (file.getKey().matches("(\\.\\./)*" + "\\.yarnrc\\.yml") || onTheWayTo(file.getKey(), dir.getRunsIn())) {
-                configFiles.put(file.getKey(), file.getValue());
+            if (file.getKey().equals(RC_FILENAME) || file.getKey().endsWith("/" + RC_FILENAME)) {
+                rcFiles.put(file.getKey(), file.getValue());
             }
         }
         Map<String, String> patches = new LinkedHashMap<>();
@@ -53,7 +54,7 @@ final class YarnBerryInputs {
         return Inputs.builder()
                 .lock(dir.getLock())
                 .manifests(dir.manifestsUnder(""))
-                .configFiles(configFiles)
+                .configFiles(BerryOptions.findRcFiles(dir.getRunsIn(), rcFiles))
                 .runsIn(dir.getRunsIn())
                 .files(patches)
                 .paths(dir.pathsUnder(""))
@@ -69,14 +70,5 @@ final class YarnBerryInputs {
     static Predicate<String> holds(LockDirectory dir) {
         return path -> dir.holds(path) || "yarn.lock".equals(path) && dir.getLock() != null ||
                        "package.json".equals(path) && dir.getManifests().containsKey("");
-    }
-
-    // an rc file in a directory between the lock's and the one Yarn runs in, or in that one
-    private static boolean onTheWayTo(String path, String runsIn) {
-        if (!path.endsWith("/" + RC_FILENAME) || path.startsWith("../")) {
-            return false;
-        }
-        String parent = path.substring(0, path.length() - RC_FILENAME.length() - 1);
-        return runsIn.equals(parent) || runsIn.startsWith(parent + "/");
     }
 }
