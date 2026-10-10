@@ -22,6 +22,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
 
 import java.io.IOException;
@@ -167,16 +168,16 @@ class IdealTreeBuilderTest {
         NpmScenarios.Edit edit = ScenarioReplay.edit("add-leaf-dev");
         String path = ScenarioReplay.projectPath(edit.getStart().getText());
         ScenarioRegistry http = new ScenarioRegistry(edit.getScenario());
-        assertThatThrownBy(() -> ScenarioReplay.builder(edit, http, path, NpmOptions.fromNpmrc("before=2021/04/23\n"))
-          .buildIdealTree())
+        assertThatThrownBy(() -> ScenarioReplay.builder(edit, http, path,
+          NpmOptions.fromNpmrc("before=2021/04/23\n", HostEnvironment.UNKNOWN)).buildIdealTree())
           .isInstanceOf(CannotKnow.class)
           .hasMessageContaining("before=2021/04/23");
-        assertThatThrownBy(() -> ScenarioReplay.builder(edit, http, path, NpmOptions.fromNpmrc("before=abc\n"))
-          .buildIdealTree())
+        assertThatThrownBy(() -> ScenarioReplay.builder(edit, http, path,
+          NpmOptions.fromNpmrc("before=abc\n", HostEnvironment.UNKNOWN)).buildIdealTree())
           .isInstanceOf(NpmRejection.class)
           .hasMessage("Invalid time value");
-        assertThatCode(() -> ScenarioReplay.builder(edit, http, path,
-          NpmOptions.fromNpmrc("before=2021/04/23\nmin-release-age-exclude=left-pad\n")).buildIdealTree())
+        assertThatCode(() -> ScenarioReplay.builder(edit, http, path, NpmOptions.fromNpmrc(
+          "before=2021/04/23\nmin-release-age-exclude=left-pad\n", HostEnvironment.UNKNOWN)).buildIdealTree())
           .doesNotThrowAnyException();
     }
 
@@ -188,7 +189,7 @@ class IdealTreeBuilderTest {
         String kind = ScenarioReplay.kind(expect);
         NpmScenarios.Lock result = edit.getResult();
         String path = ScenarioReplay.projectPath(result != null ? result.getText() : edit.getStart().getText());
-        NpmOptions options = NpmOptions.fromNpmrc(scenario.npmrc());
+        NpmOptions options = NpmOptions.fromNpmrc(scenario.npmrc(), HostEnvironment.UNKNOWN);
         ScenarioRegistry http = new ScenarioRegistry(scenario);
         String label = scenario.getLabel() + "/" + edit.getStart().getFileName();
 

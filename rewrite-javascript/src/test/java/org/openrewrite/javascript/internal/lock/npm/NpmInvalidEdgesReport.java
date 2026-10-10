@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -45,8 +46,8 @@ class NpmInvalidEdgesReport {
                 String row = scenario.getName() + "\t" + lock.getFileName() + "\t";
                 Node tree;
                 try {
-                    tree = ScenarioReplay.load(lock, NpmOptions.fromNpmrc(lock.getNpmrc()),
-                      ScenarioReplay.projectPath(lock.getText()));
+                    NpmOptions options = NpmOptions.fromNpmrc(lock.getNpmrc(), HostEnvironment.UNKNOWN);
+                    tree = ScenarioReplay.load(lock, options, ScenarioReplay.projectPath(lock.getText()));
                 } catch (RuntimeException e) {
                     lines.add(row + "\t\t\t\t\t" + "load failed: " + e.getMessage().replace('\n', ' '));
                     continue;

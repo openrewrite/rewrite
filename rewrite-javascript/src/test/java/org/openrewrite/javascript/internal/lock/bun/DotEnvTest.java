@@ -33,9 +33,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class DotEnvTest {
 
     private static Map<String, String> parse(String src) {
-        Map<String, String> map = new LinkedHashMap<>();
-        DotEnv.parse(src, map);
-        return map;
+        return load(Collections.emptyMap(), files(".env", src));
+    }
+
+    private static Map<String, String> load(Map<String, String> process, Map<String, String> files) {
+        return DotEnv.load(HostEnvironment.of(process), files).known();
     }
 
     private static Map<String, String> files(String... pairs) {
@@ -48,26 +50,26 @@ class DotEnvTest {
 
     @Test
     void envFileIsLoaded() {
-        assertThat(DotEnv.load(Collections.emptyMap(), files(".env", "FOO=bar\n"))).containsEntry("FOO", "bar");
+        assertThat(load(Collections.emptyMap(), files(".env", "FOO=bar\n"))).containsEntry("FOO", "bar");
     }
 
     @Test
     void envLocalOverridesEnv() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=fail\nBAR=baz\n", ".env.local", "FOO=bar\n"));
         assertThat(env).containsEntry("FOO", "bar").containsEntry("BAR", "baz");
     }
 
     @Test
     void envProductionOverridesEnvAndEnvLocalIsRead() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=fail\nBAR=baz\n", ".env.production", "FOO=bar\n", ".env.local", "LOCAL=true\n"));
         assertThat(env).containsEntry("FOO", "bar").containsEntry("BAR", "baz").containsEntry("LOCAL", "true");
     }
 
     @Test
     void envDevelopmentAndEnvTestIgnored() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=.env\n", ".env.development", "FOO=.env.development\n",
             ".env.development.local", "FOO=.env.development.local\n", ".env.test", "FOO=.env.test\n",
             ".env.test.local", "FOO=.env.test.local\n"));
@@ -76,7 +78,7 @@ class DotEnvTest {
 
     @Test
     void processEnvOverridesEverythingElse() {
-        Map<String, String> env = DotEnv.load(Collections.singletonMap("FOO", "override"),
+        Map<String, String> env = load(Collections.singletonMap("FOO", "override"),
           files(".env", "FOO=.env\n", ".env.production", "FOO=.env.production\n",
             ".env.production.local", "FOO=.env.production.local\n", ".env.local", "FOO=.env.local\n"));
         assertThat(env).containsEntry("FOO", "override");
@@ -84,7 +86,7 @@ class DotEnvTest {
 
     @Test
     void envProductionLocalOverridesEnvLocal() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=.env\n", ".env.production", "FOO=.env.production\n",
             ".env.production.local", "FOO=.env.production.local\n", ".env.local", "FOO=.env.local\n"));
         assertThat(env).containsEntry("FOO", ".env.production.local");
@@ -92,14 +94,14 @@ class DotEnvTest {
 
     @Test
     void envLocalOverridesEnvProduction() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=.env\n", ".env.production", "FOO=.env.production\n", ".env.local", "FOO=.env.local\n"));
         assertThat(env).containsEntry("FOO", ".env.local");
     }
 
     @Test
     void envProductionOverridesEnv() {
-        Map<String, String> env = DotEnv.load(Collections.emptyMap(),
+        Map<String, String> env = load(Collections.emptyMap(),
           files(".env", "FOO=.env\n", ".env.production", "FOO=.env.production\n"));
         assertThat(env).containsEntry("FOO", ".env.production");
     }

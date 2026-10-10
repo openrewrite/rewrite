@@ -302,7 +302,7 @@ public final class PnpmLockRegenerator {
         return INSTALL.failure(outcome(e));
     }
 
-    // pnpm's own errors carry an ERR_PNPM_ code; any other it prints as [ERROR], Node's uncaught ones with a stack
+    // pnpm's own errors carry an ERR_PNPM_ code, though main.ts's printError logs none; an error without one crashes
     private static RuntimeException outcome(RuntimeException e) {
         if (e instanceof LockfileReader.IgnoredLockfile) {
             return Rejected.discardsLock(String.valueOf(e.getMessage()));

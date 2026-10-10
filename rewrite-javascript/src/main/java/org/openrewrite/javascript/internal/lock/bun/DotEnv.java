@@ -45,10 +45,6 @@ public final class DotEnv {
     private DotEnv() {
     }
 
-    static Map<String, String> load(Map<String, String> process, Map<String, String> files) {
-        return load(HostEnvironment.of(process), files).known();
-    }
-
     /**
      * The process environment with the files' variables; one whose value expands a variable the host does not know
      * is unknown.
@@ -63,14 +59,6 @@ public final class DotEnv {
             }
         }
         return process.with(map, unknown);
-    }
-
-    /**
-     * {@code Parser.parse} of one file: a key the map already holds keeps its value, a key the file sets twice takes
-     * the later one, and the file's own values are expanded afterwards.
-     */
-    static void parse(String src, Map<String, String> map) {
-        new Parser(src, HostEnvironment.of(map), new HashSet<>()).parse(map);
     }
 
     private static final class Parser {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -34,10 +35,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class NpmOptionsTest {
 
+    private static NpmOptions fromNpmrc(@Nullable String npmrc) {
+        return NpmOptions.fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
+    }
+
     @Test
     void defaults() {
-        assertThat(NpmOptions.fromNpmrc(null)).isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("")).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc(null)).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc("")).isEqualTo(NpmOptions.DEFAULT);
         assertThat(NpmOptions.DEFAULT.getLockfileVersion()).isNull();
         assertThat(NpmOptions.DEFAULT.isLegacyPeerDeps()).isFalse();
     }
@@ -47,7 +52,7 @@ class NpmOptionsTest {
       "2, 2", "' 3 ', 3", "+2, 2", "1.5, 1", "2abc, 2", "null,", "undefined,"
     })
     void lockfileVersionNpmAccepts(String value, Integer expected) {
-        assertThat(NpmOptions.fromNpmrc("lockfile-version=" + value).getLockfileVersion()).isEqualTo(expected);
+        assertThat(fromNpmrc("lockfile-version=" + value).getLockfileVersion()).isEqualTo(expected);
     }
 
     @ParameterizedTest
@@ -55,29 +60,29 @@ class NpmOptionsTest {
       "4, 4", "abc, NaN", "'', ''", "false, false", "true, NaN", "0, 0", "-1, -1", "0x10, 0"
     })
     void lockfileVersionNpmRejects(String value, String reported) {
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=" + value))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version=" + value))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("Invalid lockfileVersion config: " + reported);
     }
 
     @Test
     void bareKeyIsTrue() {
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version"))
           .hasMessage("Invalid lockfileVersion config: NaN");
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer-deps").isLegacyPeerDeps()).isTrue();
     }
 
     // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
     // later global=false wins (npm 11.17.0: global=false then location=global is ESHRINKWRAPGLOBAL)
     @Test
     void locationGlobalIsGlobal() {
-        assertThat(NpmOptions.fromNpmrc("location=global").isGlobal()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("location=\"global\"").isGlobal()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("location=user").isGlobal()).isFalse();
-        assertThat(NpmOptions.fromNpmrc("global=false\nlocation=global").isGlobal()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("location=global\nglobal=false").isGlobal()).isFalse();
-        assertThat(NpmOptions.fromNpmrc("global=1").isGlobal()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("global=null").isGlobal()).isFalse();
+        assertThat(fromNpmrc("location=global").isGlobal()).isTrue();
+        assertThat(fromNpmrc("location=\"global\"").isGlobal()).isTrue();
+        assertThat(fromNpmrc("location=user").isGlobal()).isFalse();
+        assertThat(fromNpmrc("global=false\nlocation=global").isGlobal()).isTrue();
+        assertThat(fromNpmrc("location=global\nglobal=false").isGlobal()).isFalse();
+        assertThat(fromNpmrc("global=1").isGlobal()).isTrue();
+        assertThat(fromNpmrc("global=null").isGlobal()).isFalse();
     }
 
     // each value installed with npm 11.17.0: the peer chain of arb-legacy-peer-deps-add stays out when legacy
@@ -87,15 +92,15 @@ class NpmOptionsTest {
       "undefined, false", "null, false", "'', true", "'true ', true", "' false', false"
     })
     void booleansAreNpmConfigsTruthiness(String value, boolean expected) {
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=" + value).isLegacyPeerDeps()).isEqualTo(expected);
-        assertThat(NpmOptions.fromNpmrc("install-links=" + value).isInstallLinks()).isEqualTo(expected);
-        assertThat(NpmOptions.fromNpmrc("omit-lockfile-registry-resolved=" + value).isOmitLockfileRegistryResolved())
+        assertThat(fromNpmrc("legacy-peer-deps=" + value).isLegacyPeerDeps()).isEqualTo(expected);
+        assertThat(fromNpmrc("install-links=" + value).isInstallLinks()).isEqualTo(expected);
+        assertThat(fromNpmrc("omit-lockfile-registry-resolved=" + value).isOmitLockfileRegistryResolved())
           .isEqualTo(expected);
     }
 
     @Test
     void otherKeysPassOver() {
-        NpmOptions options = NpmOptions.fromNpmrc("# comment\n; another\nforce=true\nlegacy-peer-deps=true\n\n" +
+        NpmOptions options = fromNpmrc("# comment\n; another\nforce=true\nlegacy-peer-deps=true\n\n" +
                                                   "install-links=false\nomit-lockfile-registry-resolved=1\n" +
                                                   "lockfile-version=3\n");
         assertThat(options.getLockfileVersion()).isEqualTo(3);
@@ -115,7 +120,7 @@ class NpmOptionsTest {
       "\tfalse|false", "false\t|false", ";|true", "#|true", "\\|true"
     })
     void iniQuotesCommentsAndEscapes(String value, boolean expected) {
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=" + value + "\n").isLegacyPeerDeps()).isEqualTo(expected);
+        assertThat(fromNpmrc("legacy-peer-deps=" + value + "\n").isLegacyPeerDeps()).isEqualTo(expected);
     }
 
     // installed with npm 11.17.0: "2" and '2' write a v2 lock, "abc" exits 1 with NaN
@@ -126,7 +131,7 @@ class NpmOptionsTest {
       "1e3|1", "2,3|2", "\u00a02|2", "03|3", "2-|2", "1_0|1", "2.9|2"
     })
     void iniLockfileVersionNpmAccepts(String value, Integer expected) {
-        assertThat(NpmOptions.fromNpmrc("lockfile-version=" + value + "\n").getLockfileVersion()).isEqualTo(expected);
+        assertThat(fromNpmrc("lockfile-version=" + value + "\n").getLockfileVersion()).isEqualTo(expected);
     }
 
     @ParameterizedTest
@@ -136,52 +141,52 @@ class NpmOptionsTest {
       "-2|-2", "Infinity|NaN", "00|0", "+-2|NaN", "٢|NaN"
     })
     void iniLockfileVersionNpmRejects(String value, String reported) {
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=" + value + "\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version=" + value + "\n"))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("Invalid lockfileVersion config: " + (reported == null ? "" : reported));
     }
 
     @Test
     void iniKeys() {
-        assertThat(NpmOptions.fromNpmrc(" legacy-peer-deps = true \n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("\"legacy-peer-deps\"=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("'[\"legacy-peer-deps\"]'=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("Legacy-Peer-Deps=true\n").isLegacyPeerDeps()).isFalse();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps;x=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer\\;-deps=true\n").isLegacyPeerDeps()).isFalse();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps==true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\nlegacy-peer-deps=false\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc(" legacy-peer-deps = true \n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("\"legacy-peer-deps\"=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("'[\"legacy-peer-deps\"]'=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("Legacy-Peer-Deps=true\n").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("legacy-peer-deps;x=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer\\;-deps=true\n").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("legacy-peer-deps==true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer-deps=true\nlegacy-peer-deps=false\n").isLegacyPeerDeps())
           .isFalse();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\r\nlockfile-version=2\r\n").getLockfileVersion())
+        assertThat(fromNpmrc("legacy-peer-deps=true\r\nlockfile-version=2\r\n").getLockfileVersion())
           .isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\rlockfile-version=2\r").getLockfileVersion())
+        assertThat(fromNpmrc("legacy-peer-deps=true\rlockfile-version=2\r").getLockfileVersion())
           .isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc("\ufefflegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("\u00a0# x\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\u2028lockfile-version=2\n"))
+        assertThat(fromNpmrc("\ufefflegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("\u00a0# x\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer-deps=true\u2028lockfile-version=2\n"))
           .isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("a.b=null\n__proto__=true\nlegacy-peer-deps=true\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc("a.b=null\n__proto__=true\nlegacy-peer-deps=true\n").isLegacyPeerDeps())
           .isTrue();
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("'null'=true\n"))
+        assertThatThrownBy(() -> fromNpmrc("'null'=true\n"))
           .hasMessage("Cannot read properties of null (reading 'length')");
     }
 
     // an array value is truthy whatever it holds, and parseInt reads String(array)
     @Test
     void iniArrays() {
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps[]=false\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\nlegacy-peer-deps[]=false\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc("legacy-peer-deps[]=false\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer-deps=true\nlegacy-peer-deps[]=false\n").isLegacyPeerDeps())
           .isTrue();
-        assertThat(NpmOptions.fromNpmrc("[]=true\n")).isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("lockfile-version[]=2\nlockfile-version[]=3\n").getLockfileVersion())
+        assertThat(fromNpmrc("[]=true\n")).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc("lockfile-version[]=2\nlockfile-version[]=3\n").getLockfileVersion())
           .isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc("lockfile-version[]=2\nlockfile-version=3\n").getLockfileVersion())
+        assertThat(fromNpmrc("lockfile-version[]=2\nlockfile-version=3\n").getLockfileVersion())
           .isEqualTo(2);
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version[]=null\nlockfile-version[]=2\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version[]=null\nlockfile-version[]=2\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version[]=true\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version[]=true\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version[]=\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version[]=\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 
@@ -189,27 +194,27 @@ class NpmOptionsTest {
     // string form; a dotted section nests
     @Test
     void iniSections() {
-        assertThat(NpmOptions.fromNpmrc("[section]\nlegacy-peer-deps=true\nlockfile-version=2\n"))
+        assertThat(fromNpmrc("[section]\nlegacy-peer-deps=true\nlockfile-version=2\n"))
           .isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("[section]   \nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("[section]\nx=1\n[]\nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("[__proto__]\nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
-        assertThat(NpmOptions.fromNpmrc("[legacy-peer-deps]\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("[\"legacy-peer-deps\"]\nx=1\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=false\n[legacy-peer-deps]\nx=1\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc("[section]   \nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc("[section]\nx=1\n[]\nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc("[__proto__]\nlegacy-peer-deps=true\n")).isEqualTo(NpmOptions.DEFAULT);
+        assertThat(fromNpmrc("[legacy-peer-deps]\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("[\"legacy-peer-deps\"]\nx=1\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("legacy-peer-deps=false\n[legacy-peer-deps]\nx=1\n").isLegacyPeerDeps())
           .isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=true\n[legacy-peer-deps]\nx=1\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc("legacy-peer-deps=true\n[legacy-peer-deps]\nx=1\n").isLegacyPeerDeps())
           .isTrue();
-        assertThat(NpmOptions.fromNpmrc("lockfile-version=2\n[lockfile-version]\nx=1\n").getLockfileVersion())
+        assertThat(fromNpmrc("lockfile-version=2\n[lockfile-version]\nx=1\n").getLockfileVersion())
           .isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc("[a.legacy-peer-deps]\nx=1\n").isLegacyPeerDeps()).isFalse();
-        assertThat(NpmOptions.fromNpmrc("[legacy-peer-deps.b]\nx=1\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("[legacy-peer\\.deps]\nx=1\n").isLegacyPeerDeps()).isFalse();
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("[lockfile-version]\n"))
+        assertThat(fromNpmrc("[a.legacy-peer-deps]\nx=1\n").isLegacyPeerDeps()).isFalse();
+        assertThat(fromNpmrc("[legacy-peer-deps.b]\nx=1\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("[legacy-peer\\.deps]\nx=1\n").isLegacyPeerDeps()).isFalse();
+        assertThatThrownBy(() -> fromNpmrc("[lockfile-version]\n"))
           .hasMessage("Cannot convert object to primitive value");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("[lockfile-version]\nlockfile-version=2\n"))
+        assertThatThrownBy(() -> fromNpmrc("[lockfile-version]\nlockfile-version=2\n"))
           .hasMessage("Cannot convert object to primitive value");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("a=null\n[a.b]\nlegacy-peer-deps=true\n"))
+        assertThatThrownBy(() -> fromNpmrc("a=null\n[a.b]\nlegacy-peer-deps=true\n"))
           .hasMessage("Cannot set properties of null (setting 'b')");
     }
 
@@ -217,26 +222,27 @@ class NpmOptionsTest {
     // one, is cannot-know; an escaped reference is the literal text
     @Test
     void environmentReferences() {
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${LFV}\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version=${LFV}\n"))
           .isInstanceOf(CannotKnow.class)
           .hasMessage("the engine cannot know the environment variable LFV a config file names (the host does not " +
                       "know the environment)");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("legacy-peer-deps=${LPD?}\n"))
+        assertThatThrownBy(() -> fromNpmrc("legacy-peer-deps=${LPD?}\n"))
           .isInstanceOf(CannotKnow.class);
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("legacy-peer-deps=\"${LPD}\"\n"))
+        assertThatThrownBy(() -> fromNpmrc("legacy-peer-deps=\"${LPD}\"\n"))
           .isInstanceOf(CannotKnow.class);
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("${K}=true\n"))
+        assertThatThrownBy(() -> fromNpmrc("${K}=true\n"))
           .isInstanceOf(CannotKnow.class)
-          .hasMessageContaining("the environment variable K ");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("${K}-peer-deps=true\n"))
+          .hasMessage("the engine cannot know the environment variable K a config file names (the host does not " +
+                      "know the environment)");
+        assertThatThrownBy(() -> fromNpmrc("${K}-peer-deps=true\n"))
           .isInstanceOf(CannotKnow.class);
-        assertThat(NpmOptions.fromNpmrc("//${REG}/:_authToken=x\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("//r/:_authToken=${TOKEN}\nlegacy-peer-deps=true\n").isLegacyPeerDeps())
+        assertThat(fromNpmrc("//${REG}/:_authToken=x\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
+        assertThat(fromNpmrc("//r/:_authToken=${TOKEN}\nlegacy-peer-deps=true\n").isLegacyPeerDeps())
           .isTrue();
-        assertThat(NpmOptions.fromNpmrc("\\${K}=true\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=\\${LFV}\n"))
+        assertThat(fromNpmrc("\\${K}=true\nlegacy-peer-deps=true\n").isLegacyPeerDeps()).isTrue();
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version=\\${LFV}\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${}\n"))
+        assertThatThrownBy(() -> fromNpmrc("lockfile-version=${}\n"))
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 
@@ -274,7 +280,7 @@ class NpmOptionsTest {
       "legacy-bundling=0+install-strategy=shallow|NESTED"
     })
     void installStrategyFlattensAsNpmDoes(String npmrc, NpmOptions.InstallStrategy expected) {
-        assertThat(NpmOptions.fromNpmrc(npmrc.replace('+', '\n') + "\n").getInstallStrategy()).isEqualTo(expected);
+        assertThat(fromNpmrc(npmrc.replace('+', '\n') + "\n").getInstallStrategy()).isEqualTo(expected);
     }
 
     // installed with npm 11.17.0: before=abc exits 1 with "Invalid time value" at the first fetch, since nopt
@@ -283,28 +289,28 @@ class NpmOptionsTest {
     void beforeAndMinReleaseAge() {
         Instant now = Instant.parse("2026-10-06T12:00:00Z");
         double day = 86400000d;
-        assertThat(NpmOptions.fromNpmrc("before=2021-04-23T16:24:00.000Z\n").before(now))
+        assertThat(fromNpmrc("before=2021-04-23T16:24:00.000Z\n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T16:24:00Z").toEpochMilli());
-        assertThat(NpmOptions.fromNpmrc("before=2021-04-23\n").before(now))
+        assertThat(fromNpmrc("before=2021-04-23\n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
-        assertThat(NpmOptions.fromNpmrc("before=abc\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("before=\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("before=true\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("before=false\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("before=null\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=7\n").before(now)).isEqualTo(now.toEpochMilli() - 7 * day);
-        assertThat(NpmOptions.fromNpmrc("min-release-age\n").before(now)).isEqualTo(now.toEpochMilli() - day);
-        assertThat(NpmOptions.fromNpmrc("min-release-age=0\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=\n").before(now)).isNull();
+        assertThat(fromNpmrc("before=abc\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=true\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=false\n").before(now)).isNull();
+        assertThat(fromNpmrc("before=null\n").before(now)).isNull();
+        assertThat(fromNpmrc("min-release-age=7\n").before(now)).isEqualTo(now.toEpochMilli() - 7 * day);
+        assertThat(fromNpmrc("min-release-age\n").before(now)).isEqualTo(now.toEpochMilli() - day);
+        assertThat(fromNpmrc("min-release-age=0\n").before(now)).isNull();
+        assertThat(fromNpmrc("min-release-age=\n").before(now)).isNull();
         // ini itself reads the literal as null, quoted or not
-        assertThat(NpmOptions.fromNpmrc("min-release-age=null\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=\"null\"\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("min-release-age=NaN\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("min-release-age=abc\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("min-release-age=Infinity\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("min-release-age=1e12\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("min-release-age=7\nbefore=null\n").before(now)).isNull();
-        assertThat(NpmOptions.fromNpmrc("before=2021-04-23\nmin-release-age=7\n").before(now))
+        assertThat(fromNpmrc("min-release-age=null\n").before(now)).isNull();
+        assertThat(fromNpmrc("min-release-age=\"null\"\n").before(now)).isNull();
+        assertThat(fromNpmrc("min-release-age=NaN\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("min-release-age=abc\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("min-release-age=Infinity\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("min-release-age=1e12\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("min-release-age=7\nbefore=null\n").before(now)).isNull();
+        assertThat(fromNpmrc("before=2021-04-23\nmin-release-age=7\n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
     }
 
@@ -313,36 +319,36 @@ class NpmOptionsTest {
     @Test
     void beforeOnlyTheLegacyDateParserReadsIsKeptAsText() {
         Instant now = Instant.parse("2026-10-06T12:00:00Z");
-        assertThat(NpmOptions.fromNpmrc("before=2021/04/23\n").before(now)).isEqualTo("2021/04/23");
-        assertThat(NpmOptions.fromNpmrc("before=Apr 23 2021\n").before(now)).isEqualTo("Apr 23 2021");
-        assertThat(NpmOptions.fromNpmrc("before=0\n").before(now)).isEqualTo("0");
-        assertThat(NpmOptions.fromNpmrc("before=2021-4-23\n").before(now)).isEqualTo("2021-4-23");
-        assertThat(NpmOptions.fromNpmrc("before= 2021-04-23 \n").before(now))
+        assertThat(fromNpmrc("before=2021/04/23\n").before(now)).isEqualTo("2021/04/23");
+        assertThat(fromNpmrc("before=Apr 23 2021\n").before(now)).isEqualTo("Apr 23 2021");
+        assertThat(fromNpmrc("before=0\n").before(now)).isEqualTo("0");
+        assertThat(fromNpmrc("before=2021-4-23\n").before(now)).isEqualTo("2021-4-23");
+        assertThat(fromNpmrc("before= 2021-04-23 \n").before(now))
           .isEqualTo((double) Instant.parse("2021-04-23T00:00:00Z").toEpochMilli());
-        assertThat(NpmOptions.fromNpmrc("before=Apr\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("before=now\n").before(now)).isEqualTo(Double.NaN);
-        assertThat(NpmOptions.fromNpmrc("before=\u0661\u0662\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=Apr\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=now\n").before(now)).isEqualTo(Double.NaN);
+        assertThat(fromNpmrc("before=\u0661\u0662\n").before(now)).isEqualTo(Double.NaN);
     }
 
     // pacote reads `opts.defaultTag || 'latest'`
     @Test
     void tag() {
-        assertThat(NpmOptions.fromNpmrc("").getTag()).isEqualTo("latest");
-        assertThat(NpmOptions.fromNpmrc("tag=beta\n").getTag()).isEqualTo("beta");
-        assertThat(NpmOptions.fromNpmrc("tag=\n").getTag()).isNull();
-        assertThat(NpmOptions.fromNpmrc("tag=null\n").getTag()).isNull();
+        assertThat(fromNpmrc("").getTag()).isEqualTo("latest");
+        assertThat(fromNpmrc("tag=beta\n").getTag()).isEqualTo("beta");
+        assertThat(fromNpmrc("tag=\n").getTag()).isNull();
+        assertThat(fromNpmrc("tag=null\n").getTag()).isNull();
     }
 
     // installed with npm 11.17.0: allow-directory=bogus still refuses a non-root directory dependency
     // (EALLOWDIRECTORY), as nopt's rejection comes after the options are flattened; arborist reads `?? 'all'`
     @Test
     void allowValuesAreReadAsArboristReads() {
-        assertThat(NpmOptions.fromNpmrc("allow-git=null\n").getAllowGit()).isEqualTo("all");
-        assertThat(NpmOptions.fromNpmrc("allow-git=undefined\n").getAllowGit()).isEqualTo("all");
-        assertThat(NpmOptions.fromNpmrc("allow-directory=root\n").getAllowDirectory()).isEqualTo("root");
-        assertThat(NpmOptions.fromNpmrc("allow-directory=bogus\n").getAllowDirectory()).isEqualTo("bogus");
-        assertThat(NpmOptions.fromNpmrc("allow-file\n").getAllowFile()).isEqualTo("true");
-        assertThat(NpmOptions.fromNpmrc("allow-remote=\n").getAllowRemote()).isEmpty();
+        assertThat(fromNpmrc("allow-git=null\n").getAllowGit()).isEqualTo("all");
+        assertThat(fromNpmrc("allow-git=undefined\n").getAllowGit()).isEqualTo("all");
+        assertThat(fromNpmrc("allow-directory=root\n").getAllowDirectory()).isEqualTo("root");
+        assertThat(fromNpmrc("allow-directory=bogus\n").getAllowDirectory()).isEqualTo("bogus");
+        assertThat(fromNpmrc("allow-file\n").getAllowFile()).isEqualTo("true");
+        assertThat(fromNpmrc("allow-remote=\n").getAllowRemote()).isEmpty();
         assertThat(NpmOptions.DEFAULT.getAllowGit()).isEqualTo("all");
     }
 }

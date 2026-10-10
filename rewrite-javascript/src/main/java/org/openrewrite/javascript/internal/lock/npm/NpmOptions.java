@@ -245,10 +245,6 @@ public class NpmOptions {
         return Math.abs(ms) > 8.64e15 ? Double.NaN : ms;
     }
 
-    public static NpmOptions fromNpmrc(@Nullable String npmrc) {
-        return fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
-    }
-
     /**
      * The options a project's {@code .npmrc} sets over npm's defaults, read as npm's config loads it; a
      * {@code ${VAR}} in a key read, or in a key that could expand to one, follows the host's environment.
