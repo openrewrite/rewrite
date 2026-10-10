@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -33,8 +34,8 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * A JavaScript regular expression source as V8 reads it without the {@code u} flag (the syntax of ECMAScript Annex
- * B), translated to a {@link Pattern} source over the same strings, and {@code String.prototype.replace} over it.
+ * A JavaScript regular expression source as V8 reads it, without the {@code u} flag (ECMAScript Annex B) or with it,
+ * translated to a {@link Pattern} source over the same strings, and {@code String.prototype.replace} over it.
  */
 public final class V8RegExp {
 
@@ -50,6 +51,13 @@ public final class V8RegExp {
     private static final char[][] WHITESPACE = {{'\t', '\r'}, {' ', ' '}, {'\u00A0', '\u00A0'}, {'\u1680', '\u1680'},
             {'\u2000', '\u200A'}, {'\u2028', '\u2029'}, {'\u202F', '\u202F'}, {'\u205F', '\u205F'},
             {'\u3000', '\u3000'}, {'\uFEFF', '\uFEFF'}};
+    private static final String HEX_DIGITS = "0123456789abcdefABCDEF";
+    private static final String SYNTAX_CHARACTERS = "^$\\.*+?()[]{}|/";
+    private static final Set<String> GENERAL_CATEGORIES = new HashSet<>(Arrays.asList("L", "Lu", "Ll", "Lt", "Lm",
+            "Lo", "M", "Mn", "Mc", "Me", "N", "Nd", "Nl", "No", "P", "Pc", "Pd", "Ps", "Pe", "Pi", "Pf", "Po", "S",
+            "Sm", "Sc", "Sk", "So", "Z", "Zs", "Zl", "Zp", "C", "Cc", "Cf", "Cs", "Co", "Cn"));
+    private static final Pattern GROUP_NAME = Pattern.compile("[A-Za-z_$][A-Za-z0-9_$]*>");
+    private static final int LOOKAHEAD = -2;
 
     private V8RegExp() {
     }
@@ -66,6 +74,26 @@ public final class V8RegExp {
             return Pattern.compile(java);
         } catch (PatternSyntaxException e) {
             throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
+        }
+    }
+
+    /**
+     * {@code new RegExp(source, "u")}, Java matching code points as V8 then does; a property names a General_Category.
+     * @throws JsError V8's SyntaxError; CannotKnow for what the translation leaves out (scripts, named references)
+     */
+    public static Pattern compileUnicode(String source) {
+        String[] reason = new String[1];
+        String java = toJava(source, true, reason);
+        if (java == null) {
+            if (reason[0] == null) {
+                throw new CannotKnow("how V8 reads the regular expression /" + source + "/u");
+            }
+            throw new JsError(JsError.SYNTAX_ERROR, "Invalid regular expression: /" + source + "/u: " + reason[0]);
+        }
+        try {
+            return Pattern.compile(java);
+        } catch (PatternSyntaxException e) {
+            throw new CannotKnow("how V8 reads the regular expression /" + source + "/u");
         }
     }
 
@@ -200,6 +228,11 @@ public final class V8RegExp {
      * The source as a Java regular expression, or null for a source V8 rejects.
      */
     public static @Nullable String toJava(String source) {
+        return toJava(source, false, new String[1]);
+    }
+
+    // with the u flag, reason[0] is V8's message for a source it rejects, or null where the translation cannot say
+    private static @Nullable String toJava(String source, boolean unicode, String[] reason) {
         int captures = 0;
         boolean named = false;
         for (int i = 0; i < source.length(); i++) {
@@ -207,8 +240,11 @@ public final class V8RegExp {
             if (c == '\\') {
                 i++;
             } else if (c == '[') {
-                int end = classEnd(source, i);
+                int end = unicode ? classExtent(source, i) : classEnd(source, i);
                 if (end < 0) {
+                    if (unicode) {
+                        break;
+                    }
                     return null;
                 }
                 i = end - 1;
@@ -224,17 +260,20 @@ public final class V8RegExp {
         }
 
         StringBuilder out = new StringBuilder();
-        // each open group: its capture number, or 0 for a non-capturing group or lookahead, -1 for a lookbehind
+        // each open group: its capture number, 0 for a non-capturing group, LOOKAHEAD or -1 for a lookbehind
         Deque<Integer> open = new ArrayDeque<>();
         Set<Integer> closed = new HashSet<>();
         int opened = 0;
         boolean atom = false;
+        boolean afterLookaround = false;
         int i = 0;
         while (i < source.length()) {
             char c = source.charAt(i);
+            boolean lookaround = false;
             switch (c) {
                 case '\\': {
                     if (i + 1 == source.length()) {
+                        reason[0] = "\\ at end of pattern";
                         return null;
                     }
                     char e = source.charAt(i + 1);
@@ -257,6 +296,17 @@ public final class V8RegExp {
                             i = end;
                             break;
                         }
+                        if (unicode) {
+                            reason[0] = "Invalid escape";
+                            return null;
+                        }
+                    }
+                    if (e == 'k' && unicode && !named) {
+                        boolean reference = source.startsWith("<", i + 2) &&
+                                            GROUP_NAME.matcher(source).region(i + 3, source.length()).lookingAt();
+                        reason[0] = reference ? "Invalid named capture referenced" :
+                                !source.startsWith("<", i + 2) ? "Invalid named reference" : null;
+                        return null;
                     }
                     if (e == 'k' && named) {
                         int close = source.indexOf('>', i + 3);
@@ -269,13 +319,16 @@ public final class V8RegExp {
                         break;
                     }
                     List<String> item = new ArrayList<>();
-                    i = escape(source, i + 1, item, false);
+                    i = escape(source, i + 1, item, false, unicode, reason);
+                    if (i < 0) {
+                        return null;
+                    }
                     out.append(item.get(0));
                     atom = true;
                     break;
                 }
                 case '[': {
-                    int end = translateClass(source, i, out);
+                    int end = translateClass(source, i, out, unicode, reason);
                     if (end < 0) {
                         return null;
                     }
@@ -284,8 +337,12 @@ public final class V8RegExp {
                     break;
                 }
                 case '(': {
-                    if (source.startsWith("(?:", i) || source.startsWith("(?=", i) || source.startsWith("(?!", i)) {
+                    if (source.startsWith("(?:", i)) {
                         open.push(0);
+                        out.append(source, i, i + 3);
+                        i += 3;
+                    } else if (source.startsWith("(?=", i) || source.startsWith("(?!", i)) {
+                        open.push(LOOKAHEAD);
                         out.append(source, i, i + 3);
                         i += 3;
                     } else if (source.startsWith("(?<=", i) || source.startsWith("(?<!", i)) {
@@ -312,11 +369,13 @@ public final class V8RegExp {
                 }
                 case ')': {
                     if (open.isEmpty()) {
+                        reason[0] = "Unmatched ')'";
                         return null;
                     }
                     int group = open.pop();
                     closed.add(group);
-                    atom = group >= 0;
+                    atom = group >= 0 || group == LOOKAHEAD && !unicode;
+                    lookaround = group < 0;
                     out.append(')');
                     i++;
                     break;
@@ -341,6 +400,7 @@ public final class V8RegExp {
                 case '+':
                 case '?': {
                     if (!atom) {
+                        reason[0] = afterLookaround ? "Invalid quantifier" : "Nothing to repeat";
                         return null;
                     }
                     out.append(c);
@@ -351,15 +411,20 @@ public final class V8RegExp {
                 case '{': {
                     int end = bracedQuantifier(source, i);
                     if (end == -2) {
+                        reason[0] = atom ? "numbers out of order in {} quantifier" : null;
                         return null;
                     }
                     if (end > 0) {
                         if (!atom) {
+                            reason[0] = afterLookaround ? "Invalid quantifier" : "Nothing to repeat";
                             return null;
                         }
                         out.append(source, i, end);
                         i = lazy(source, end, out);
                         atom = false;
+                    } else if (unicode) {
+                        reason[0] = atom ? "Incomplete quantifier" : "Lone quantifier brackets";
+                        return null;
                     } else {
                         out.append("\\{");
                         atom = true;
@@ -367,14 +432,42 @@ public final class V8RegExp {
                     }
                     break;
                 }
+                case '}':
+                case ']':
+                    if (unicode) {
+                        reason[0] = "Lone quantifier brackets";
+                        return null;
+                    }
+                    out.append(literal(c));
+                    atom = true;
+                    i++;
+                    break;
                 default:
                     out.append(literal(c));
                     atom = true;
                     i++;
                     break;
             }
+            afterLookaround = lookaround;
         }
-        return open.isEmpty() ? out.toString() : null;
+        if (!open.isEmpty()) {
+            reason[0] = "Unterminated group";
+            return null;
+        }
+        return out.toString();
+    }
+
+    // the index after the class that opens at i, or -1 when nothing closes it
+    private static int classExtent(String source, int i) {
+        for (int j = i + 1; j < source.length(); j++) {
+            char c = source.charAt(j);
+            if (c == '\\') {
+                j++;
+            } else if (c == ']') {
+                return j + 1;
+            }
+        }
+        return -1;
     }
 
     private static int lazy(String source, int i, StringBuilder out) {
@@ -415,11 +508,11 @@ public final class V8RegExp {
 
     private static int classEnd(String source, int i) {
         StringBuilder ignored = new StringBuilder();
-        return translateClass(source, i, ignored);
+        return translateClass(source, i, ignored, false, new String[1]);
     }
 
     // the index after the class, -1 when it is unterminated or holds a range out of order
-    private static int translateClass(String source, int start, StringBuilder out) {
+    private static int translateClass(String source, int start, StringBuilder out, boolean unicode, String[] reason) {
         int i = start + 1;
         boolean negated = i < source.length() && source.charAt(i) == '^';
         if (negated) {
@@ -428,6 +521,7 @@ public final class V8RegExp {
         List<String> items = new ArrayList<>();
         while (true) {
             if (i >= source.length()) {
+                reason[0] = "Unterminated character class";
                 return -1;
             }
             char c = source.charAt(i);
@@ -436,15 +530,27 @@ public final class V8RegExp {
                 break;
             }
             List<String> from = new ArrayList<>();
-            i = classAtom(source, i, from);
+            i = classAtom(source, i, from, unicode, reason);
+            if (i < 0) {
+                return -1;
+            }
             if (i + 1 < source.length() && source.charAt(i) == '-' && source.charAt(i + 1) != ']') {
                 List<String> to = new ArrayList<>();
-                int next = classAtom(source, i + 1, to);
+                int next = classAtom(source, i + 1, to, unicode, reason);
+                if (next < 0) {
+                    return -1;
+                }
                 if (from.size() == 2 && to.size() == 2) {
-                    if (from.get(1).charAt(0) > to.get(1).charAt(0)) {
+                    boolean outOfOrder = unicode ? from.get(1).codePointAt(0) > to.get(1).codePointAt(0) :
+                            from.get(1).charAt(0) > to.get(1).charAt(0);
+                    if (outOfOrder) {
+                        reason[0] = "Range out of order in character class";
                         return -1;
                     }
                     items.add(from.get(0) + "-" + to.get(0));
+                } else if (unicode) {
+                    reason[0] = "Invalid character class";
+                    return -1;
                 } else {
                     items.add(from.get(0));
                     items.add(literal('-'));
@@ -467,20 +573,33 @@ public final class V8RegExp {
         return i;
     }
 
-    // one class atom: its Java form, then the character itself when it is one character
-    private static int classAtom(String source, int i, List<String> atom) {
+    // one class atom: its Java form, then the character itself when it is one character (a code point with the u flag)
+    private static int classAtom(String source, int i, List<String> atom, boolean unicode, String[] reason) {
         char c = source.charAt(i);
+        if (unicode && Character.isHighSurrogate(c) && i + 1 < source.length() &&
+            Character.isLowSurrogate(source.charAt(i + 1))) {
+            atom.add(literal(c) + literal(source.charAt(i + 1)));
+            atom.add(source.substring(i, i + 2));
+            return i + 2;
+        }
         if (c != '\\' || i + 1 == source.length()) {
             atom.add(literal(c));
             atom.add(String.valueOf(c));
             return i + 1;
         }
-        return escape(source, i + 1, atom, true);
+        return escape(source, i + 1, atom, true, unicode, reason);
     }
 
-    // an escape after its backslash: its Java form, and the character when it is one
-    private static int escape(String source, int i, List<String> item, boolean inClass) {
+    // an escape after its backslash: its Java form, and the character when it is one; -1 where the u flag rejects it
+    private static int escape(String source, int i, List<String> item, boolean inClass, boolean unicode,
+                              String[] reason) {
         char e = source.charAt(i);
+        if (unicode) {
+            int next = unicodeEscape(source, i, item, inClass, reason);
+            if (next != 0) {
+                return next;
+            }
+        }
         switch (e) {
             case 'd':
             case 'D':
@@ -539,6 +658,111 @@ public final class V8RegExp {
         }
     }
 
+    // what the u flag reads otherwise: 0 to read the escape as without it, -1 where V8 rejects it
+    private static int unicodeEscape(String source, int i, List<String> item, boolean inClass, String[] reason) {
+        char e = source.charAt(i);
+        switch (e) {
+            case 'd':
+            case 'D':
+            case 'w':
+            case 'W':
+            case 's':
+            case 'S':
+            case 'b':
+            case 'f':
+            case 'n':
+            case 'r':
+            case 't':
+            case 'v':
+                return 0;
+            case 'c': {
+                char next = i + 1 < source.length() ? source.charAt(i + 1) : 0;
+                if (next >= 'a' && next <= 'z' || next >= 'A' && next <= 'Z') {
+                    return 0;
+                }
+                reason[0] = "Invalid Unicode escape";
+                return -1;
+            }
+            case 'x':
+                if (hex(source, i + 1, 2)) {
+                    return 0;
+                }
+                reason[0] = "Invalid escape";
+                return -1;
+            case 'u':
+                return unicodeCodePoint(source, i, item, reason);
+            case 'p':
+            case 'P':
+                return property(source, i, item, inClass, reason);
+            case '0':
+                if (i + 1 < source.length() && source.charAt(i + 1) >= '0' && source.charAt(i + 1) <= '9') {
+                    reason[0] = "Invalid decimal escape";
+                    return -1;
+                }
+                return character('\0', i + 1, item);
+            default:
+                if (e >= '1' && e <= '7') {
+                    reason[0] = "Invalid decimal escape";
+                    return -1;
+                }
+                if (SYNTAX_CHARACTERS.indexOf(e) >= 0 || inClass && e == '-') {
+                    return character(e, i + 1, item);
+                }
+                reason[0] = "Invalid escape";
+                return -1;
+        }
+    }
+
+    // \\uXXXX, a surrogate pair of two, or \\u{X...} as one code point
+    private static int unicodeCodePoint(String source, int i, List<String> item, String[] reason) {
+        if (source.startsWith("{", i + 1)) {
+            int close = source.indexOf('}', i + 2);
+            String digits = close < 0 ? "" : source.substring(i + 2, close);
+            if (!digits.isEmpty() && hex(digits, 0, digits.length()) &&
+                new BigInteger(digits, 16).compareTo(BigInteger.valueOf(Character.MAX_CODE_POINT)) <= 0) {
+                return codePoint(Integer.parseInt(digits, 16), close + 1, item);
+            }
+            reason[0] = "Invalid Unicode escape";
+            return -1;
+        }
+        if (!hex(source, i + 1, 4)) {
+            reason[0] = "Invalid Unicode escape";
+            return -1;
+        }
+        char c = (char) Integer.parseInt(source.substring(i + 1, i + 5), 16);
+        if (Character.isHighSurrogate(c) && source.startsWith("\\u", i + 5) && hex(source, i + 7, 4)) {
+            char low = (char) Integer.parseInt(source.substring(i + 7, i + 11), 16);
+            if (Character.isLowSurrogate(low)) {
+                return codePoint(Character.toCodePoint(c, low), i + 11, item);
+            }
+        }
+        return character(c, i + 5, item);
+    }
+
+    private static int codePoint(int cp, int next, List<String> item) {
+        String s = new String(Character.toChars(cp));
+        item.add(s.length() == 1 ? literal(s.charAt(0)) : literal(s.charAt(0)) + literal(s.charAt(1)));
+        item.add(s);
+        return next;
+    }
+
+    // \\p{name} or \\P{name} for a General_Category value, which Java names alike
+    private static int property(String source, int i, List<String> item, boolean inClass, String[] reason) {
+        int close = source.startsWith("{", i + 1) ? source.indexOf('}', i + 2) : -1;
+        if (close < 0) {
+            reason[0] = inClass ? "Invalid property name in character class" : "Invalid property name";
+            return -1;
+        }
+        String name = source.substring(i + 2, close);
+        String value = name.startsWith("General_Category=") ? name.substring("General_Category=".length()) :
+                name.startsWith("gc=") ? name.substring("gc=".length()) : name;
+        if (!GENERAL_CATEGORIES.contains(value)) {
+            throw new CannotKnow("how V8 reads the property \\" + source.charAt(i) + "{" + name + "}");
+        }
+        item.add("\\" + source.charAt(i) + "{" + value + "}");
+        return close + 1;
+    }
+
     private static int character(char c, int next, List<String> item) {
         item.add(literal(c));
         item.add(String.valueOf(c));
@@ -550,7 +774,7 @@ public final class V8RegExp {
             return false;
         }
         for (int j = i; j < i + n; j++) {
-            if (Character.digit(source.charAt(j), 16) < 0) {
+            if (HEX_DIGITS.indexOf(source.charAt(j)) < 0) {
                 return false;
             }
         }

@@ -487,3 +487,147 @@
 {"test":"RegExp","fn":"match","args":["\\-","-"],"out":["-"]}
 {"test":"RegExp","fn":"match","args":["(?<a>.)(?<b>.)","xy"],"out":["xy","x","y"]}
 {"test":"RegExp","fn":"match","args":["(?<a>x)|(?<a>y)","y"],"out":["y",{"$":"undefined"},"y"]}
+{"test":"RegExp","fn":"match","args":["\\-","-","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\-/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\,",",","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\,/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\#","#","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\#/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\ "," ","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\ /u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\!","!","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\!/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\/","/","u"],"out":["/"]}
+{"test":"RegExp","fn":"match","args":["\\.","a.b","u"],"out":["."]}
+{"test":"RegExp","fn":"match","args":["\\{","{","u"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["[\\-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[\\,]",",","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\,]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\!]","!","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\!]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\c1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\c1/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\c","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\c/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\x4","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\x4/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\x","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\x/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\x]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\x]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\u12","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u12/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["[\\u12]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\u12]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{1F600}","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["\\u{110000}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{110000}/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{}/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{1F600","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\u{1F600/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["\\u{0}","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["\\1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\1/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\8","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\8/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\9","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\9/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["(a)\\1","aa","u"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["(a)\\2","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(a)\\2/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\0","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["\\00","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\00/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["\\07","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\07/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\0]","\u0000","u"],"out":["\u0000"]}
+{"test":"RegExp","fn":"match","args":["[\\00]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\00]/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\1]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\1]/u: Invalid decimal escape"}}
+{"test":"RegExp","fn":"match","args":["[\\8]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\8]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /}/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /]/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["a{1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{,2}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{,2}/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{1,","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1,/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["a{1,2","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{1,2/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["{1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["x{1}","xx","u"],"out":["x"]}
+{"test":"RegExp","fn":"match","args":["a{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a{2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["a|*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a|*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["^*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["$*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /$*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b*/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b+","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b+/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(*)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(*)/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["a**","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a**/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a)*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a)*/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?!a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?!a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a)*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a)*/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<!a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<!a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["[\\d-z]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\d-z]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[a-\\d]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[a-\\d]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[\\p{L}-z]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\p{L}-z]/u: Invalid character class"}}
+{"test":"RegExp","fn":"match","args":["[\\w-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[-\\w]","w","u"],"out":["w"]}
+{"test":"RegExp","fn":"match","args":["[a-]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["[b-a]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[b-a]/u: Range out of order in character class"}}
+{"test":"RegExp","fn":"match","args":["[","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["[a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[a/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["[\\]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\]/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /a)/u: Unmatched ')'"}}
+{"test":"RegExp","fn":"match","args":["(a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?:a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?:a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?<n>a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<n>a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?=a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["\\","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\/u: \\ at end of pattern"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k/u: Invalid named reference"}}
+{"test":"RegExp","fn":"match","args":["(?<n>a)\\k<n>","aa","u"],"out":["aa","a"]}
+{"test":"RegExp","fn":"match","args":["(?x)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?x)/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)|(?<a>y)","y","u"],"out":["y",{"$":"undefined"},"y"]}
+{"test":"RegExp","fn":"match","args":["\\p{L}","é","u"],"out":["é"]}
+{"test":"RegExp","fn":"match","args":["\\P{L}","a1","u"],"out":["1"]}
+{"test":"RegExp","fn":"match","args":["\\p{Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{gc=Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{General_Category=Lu}","aB","u"],"out":["B"]}
+{"test":"RegExp","fn":"match","args":["\\p{Lu}*","AB","u"],"out":["AB"]}
+{"test":"RegExp","fn":"match","args":["\\p{Letter}","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["\\p{Script=Greek}","a","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\p{ASCII}","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["\\p{Foo}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{Foo}/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\P","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\P/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["\\p{L","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\p{L/u: Invalid property name"}}
+{"test":"RegExp","fn":"match","args":["[\\p]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\p]/u: Invalid property name in character class"}}
+{"test":"RegExp","fn":"match","args":["[\\p{L}\\p{Nl}]","1Ⅰ","u"],"out":["Ⅰ"]}
+{"test":"RegExp","fn":"match","args":["[^\\p{Z}\\p{C}]"," x","u"],"out":["x"]}
+{"test":"RegExp","fn":"match","args":["[\\x00-\\x7f]","éa","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["[\\t\\r\\n\\v\\f]","a\u000b","u"],"out":["\u000b"]}
+{"test":"RegExp","fn":"match","args":["\\b","a","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["[\\b]","\b","u"],"out":["\b"]}
+{"test":"RegExp","fn":"match","args":["\\B","ab","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["[\\B]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\B]/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\c_]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\c_]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":["[\\c]","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\c]/u: Invalid Unicode escape"}}
+{"test":"RegExp","fn":"match","args":[".","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["^.$","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["^[\\p{L}]$","😀","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["[^/]*?","ab","u"],"out":[""]}
+{"test":"RegExp","fn":"match","args":["(?:a|b)","b","u"],"out":["b"]}
+{"test":"RegExp","fn":"match","args":["\\d\\w\\s","1a ","u"],"out":["1a "]}
+{"test":"RegExp","fn":"match","args":["[\\s]"," ","u"],"out":[" "]}
+{"test":"RegExp","fn":"match","args":["\\a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\a/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\e","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\e/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\_","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\_/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["\\$","$","u"],"out":["$"]}
+{"test":"RegExp","fn":"match","args":["\\^","^","u"],"out":["^"]}
+{"test":"RegExp","fn":"match","args":["\\|","|","u"],"out":["|"]}
+{"test":"RegExp","fn":"match","args":["\\(","(","u"],"out":["("]}
+{"test":"RegExp","fn":"match","args":["\\)",")","u"],"out":[")"]}
+{"test":"RegExp","fn":"match","args":["\\[","[","u"],"out":["["]}
+{"test":"RegExp","fn":"match","args":["\\]","]","u"],"out":["]"]}
+{"test":"RegExp","fn":"match","args":["\\}","}","u"],"out":["}"]}
+{"test":"RegExp","fn":"match","args":["\\*","*","u"],"out":["*"]}
+{"test":"RegExp","fn":"match","args":["\\+","+","u"],"out":["+"]}
+{"test":"RegExp","fn":"match","args":["\\?","?","u"],"out":["?"]}
+{"test":"RegExp","fn":"match","args":["\\\\","\\","u"],"out":["\\"]}
+{"test":"RegExp","fn":"match","args":["[\\]]","]","u"],"out":["]"]}
+{"test":"RegExp","fn":"match","args":["[\\[]","[","u"],"out":["["]}
+{"test":"RegExp","fn":"match","args":["[\\\\]","\\","u"],"out":["\\"]}
+{"test":"RegExp","fn":"match","args":["[\\^]","^","u"],"out":["^"]}
+{"test":"RegExp","fn":"match","args":["[\\$]","$","u"],"out":["$"]}
+{"test":"RegExp","fn":"match","args":["[\\/]","/","u"],"out":["/"]}
+{"test":"RegExp","fn":"match","args":["[\\.]",".","u"],"out":["."]}
+{"test":"RegExp","fn":"match","args":["[\\{]","{","u"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["[\\|]","|","u"],"out":["|"]}
+{"test":"RegExp","fn":"match","args":["[\\-a]","-","u"],"out":["-"]}
+{"test":"RegExp","fn":"match","args":["\\-x","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\-x/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\u{1F600}-\\u{1F602}]","😁","u"],"out":["😁"]}
+{"test":"RegExp","fn":"match","args":["[\\uD83D\\uDE00-\\uD83D\\uDE02]","😁","u"],"out":["😁"]}
+{"test":"RegExp","fn":"match","args":["\\uD83D\\uDE00*","😀😀","u"],"out":["😀😀"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[\\p{L}\\p{Nl}][^/]*?x$","ab😀x","u"],"out":["ab😀x"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$","ab-x","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$/u: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)[^/]*?\\.js$","a.js","u"],"out":["a.js"]}
+{"test":"RegExp","fn":"match","args":["^(?!\\.)([\\p{L}]|[^\\p{Z}\\p{C}])$",".","u"],"out":null}

@@ -21,8 +21,10 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,13 +34,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Node 24.19.0's answers ({@code generate/node-builtins.js}): {@code new RegExp(source)} matched against a subject or
- * V8's SyntaxError, and {@code String.prototype.replace} with GetSubstitution's {@code $} patterns.
+ * Node 24.19.0's answers ({@code generate/node-builtins.js}): {@code new RegExp(source)}, with or without the u flag,
+ * matched against a subject or V8's SyntaxError, and {@code String.prototype.replace} with its {@code $} patterns.
  */
 class V8RegExpTest {
 
     // a group name used twice, which V8 13.6 allows across alternatives and Java never does
     private static final List<String> CANNOT_KNOW = Collections.singletonList("(?<a>x)|(?<a>y)");
+
+    // with the u flag, also a property other than a General_Category and a group other than V8's four
+    private static final List<String> UNICODE_CANNOT_KNOW = Arrays.asList("(?<a>x)|(?<a>y)", "\\p{Letter}",
+      "\\p{Script=Greek}", "\\p{ASCII}", "\\p{Foo}", "(?x)");
 
     static Stream<Call> calls() {
         return UpstreamCalls.read(EcmaScriptTest.BUILTINS).stream()
@@ -55,6 +61,10 @@ class V8RegExpTest {
             return;
         }
         String regExp = (String) Objects.requireNonNull(call.arg(0));
+        if ("u".equals(call.arg(2))) {
+            answersAsV8DoesWithTheUFlag(call, regExp, source);
+            return;
+        }
         if (CANNOT_KNOW.contains(regExp)) {
             assertThatThrownBy(() -> V8RegExp.compile(regExp)).isInstanceOf(CannotKnow.class);
             return;
@@ -66,6 +76,18 @@ class V8RegExpTest {
         }
         assertThat(pattern).isNotNull();
         assertThat(match(pattern, source)).isEqualTo(call.getOut());
+    }
+
+    private static void answersAsV8DoesWithTheUFlag(Call call, String regExp, String subject) {
+        Map<String, @Nullable Object> threw = call.getThrew();
+        if (UNICODE_CANNOT_KNOW.contains(regExp)) {
+            assertThatThrownBy(() -> V8RegExp.compileUnicode(regExp)).isInstanceOf(CannotKnow.class);
+        } else if (threw != null) {
+            assertThatThrownBy(() -> V8RegExp.compileUnicode(regExp)).isInstanceOf(JsError.class)
+              .hasToString(threw.get("name") + ": " + threw.get("message"));
+        } else {
+            assertThat(match(V8RegExp.compileUnicode(regExp), subject)).isEqualTo(call.getOut());
+        }
     }
 
     // String.prototype.match without the g flag: the match and its groups, undefined for one that did not take part
