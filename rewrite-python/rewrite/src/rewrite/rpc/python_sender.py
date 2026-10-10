@@ -26,6 +26,52 @@ if TYPE_CHECKING:
     from rewrite.rpc.send_queue import RpcSendQueue
 
 
+
+# The dispatch _visit performed with up to 38 isinstance calls per node. Order is load-bearing
+# -- FormattedString.Value before FormattedString, the ComprehensionExpression members before
+# ComprehensionExpression, MatchCase.Pattern before MatchCase -- so rather than flatten it to
+# exact types, the ladder is walked once per concrete type and the winner cached.
+_DISPATCH: tuple = (
+    (CompilationUnit, '_visit_compilation_unit'),
+    (Async, '_visit_async'),
+    (Await, '_visit_await'),
+    (Binary, '_visit_binary'),
+    (ChainedAssignment, '_visit_chained_assignment'),
+    (ExceptionType, '_visit_exception_type'),
+    (LiteralType, '_visit_literal_type'),
+    (TypeHint, '_visit_type_hint'),
+    (ExpressionStatement, '_visit_expression_statement'),
+    (ExpressionTypeTree, '_visit_expression_type_tree'),
+    (StatementExpression, '_visit_statement_expression'),
+    (MultiImport, '_visit_multi_import'),
+    (KeyValue, '_visit_key_value'),
+    (DictLiteral, '_visit_dict_literal'),
+    (CollectionLiteral, '_visit_collection_literal'),
+    (FormattedString.Value, '_visit_formatted_string_value'),
+    (FormattedString, '_visit_formatted_string'),
+    (Pass, '_visit_pass'),
+    (Shebang, '_visit_shebang'),
+    (TrailingElseWrapper, '_visit_trailing_else_wrapper'),
+    (ComprehensionExpression.Condition, '_visit_comprehension_condition'),
+    (ComprehensionExpression.Clause, '_visit_comprehension_clause'),
+    (ComprehensionExpression, '_visit_comprehension_expression'),
+    (TypeAlias, '_visit_type_alias'),
+    (YieldFrom, '_visit_yield_from'),
+    (UnionType, '_visit_union_type'),
+    (VariableScope, '_visit_variable_scope'),
+    (Del, '_visit_del'),
+    (SpecialParameter, '_visit_special_parameter'),
+    (Star, '_visit_star'),
+    (NamedArgument, '_visit_named_argument'),
+    (TypeHintedExpression, '_visit_type_hinted_expression'),
+    (ErrorFrom, '_visit_error_from'),
+    (MatchCase.Pattern, '_visit_match_case_pattern'),
+    (MatchCase, '_visit_match_case'),
+    (Slice, '_visit_slice'),
+    (ParseError, '_visit_parse_error'),
+    (J, '_visit_java'),
+)
+
 class PythonRpcSender:
     """Sender that mirrors Java's PythonSender for RPC serialization."""
 
@@ -34,6 +80,8 @@ class PythonRpcSender:
         # re-entrant occurrence prints just the name, so signatures of recursive
         # bounds (e.g. T extends Comparable<T>) stay finite.
         self._type_var_name_stack: set = set()
+        # Concrete type -> bound visitor, resolved by _DISPATCH on first sight of a type.
+        self._dispatch: dict = {}
 
     def send(self, after: Any, before: Any, q: 'RpcSendQueue') -> None:
         """Entry point for sending an object."""
@@ -82,85 +130,17 @@ class PythonRpcSender:
                 self._pre_visit(tree, q)
 
         # Then dispatch to type-specific visitor
-        tree_type = type(tree).__name__
 
-        if isinstance(tree, CompilationUnit):
-            self._visit_compilation_unit(tree, q)
-        elif isinstance(tree, Async):
-            self._visit_async(tree, q)
-        elif isinstance(tree, Await):
-            self._visit_await(tree, q)
-        elif isinstance(tree, Binary):
-            self._visit_binary(tree, q)
-        elif isinstance(tree, ChainedAssignment):
-            self._visit_chained_assignment(tree, q)
-        elif isinstance(tree, ExceptionType):
-            self._visit_exception_type(tree, q)
-        elif isinstance(tree, LiteralType):
-            self._visit_literal_type(tree, q)
-        elif isinstance(tree, TypeHint):
-            self._visit_type_hint(tree, q)
-        elif isinstance(tree, ExpressionStatement):
-            self._visit_expression_statement(tree, q)
-        elif isinstance(tree, ExpressionTypeTree):
-            self._visit_expression_type_tree(tree, q)
-        elif isinstance(tree, StatementExpression):
-            self._visit_statement_expression(tree, q)
-        elif isinstance(tree, MultiImport):
-            self._visit_multi_import(tree, q)
-        elif isinstance(tree, KeyValue):
-            self._visit_key_value(tree, q)
-        elif isinstance(tree, DictLiteral):
-            self._visit_dict_literal(tree, q)
-        elif isinstance(tree, CollectionLiteral):
-            self._visit_collection_literal(tree, q)
-        elif isinstance(tree, FormattedString.Value):
-            self._visit_formatted_string_value(tree, q)
-        elif isinstance(tree, FormattedString):
-            self._visit_formatted_string(tree, q)
-        elif isinstance(tree, Pass):
-            self._visit_pass(tree, q)
-        elif isinstance(tree, Shebang):
-            self._visit_shebang(tree, q)
-        elif isinstance(tree, TrailingElseWrapper):
-            self._visit_trailing_else_wrapper(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Condition):
-            self._visit_comprehension_condition(tree, q)
-        elif isinstance(tree, ComprehensionExpression.Clause):
-            self._visit_comprehension_clause(tree, q)
-        elif isinstance(tree, ComprehensionExpression):
-            self._visit_comprehension_expression(tree, q)
-        elif isinstance(tree, TypeAlias):
-            self._visit_type_alias(tree, q)
-        elif isinstance(tree, YieldFrom):
-            self._visit_yield_from(tree, q)
-        elif isinstance(tree, UnionType):
-            self._visit_union_type(tree, q)
-        elif isinstance(tree, VariableScope):
-            self._visit_variable_scope(tree, q)
-        elif isinstance(tree, Del):
-            self._visit_del(tree, q)
-        elif isinstance(tree, SpecialParameter):
-            self._visit_special_parameter(tree, q)
-        elif isinstance(tree, Star):
-            self._visit_star(tree, q)
-        elif isinstance(tree, NamedArgument):
-            self._visit_named_argument(tree, q)
-        elif isinstance(tree, TypeHintedExpression):
-            self._visit_type_hinted_expression(tree, q)
-        elif isinstance(tree, ErrorFrom):
-            self._visit_error_from(tree, q)
-        elif isinstance(tree, MatchCase.Pattern):
-            self._visit_match_case_pattern(tree, q)
-        elif isinstance(tree, MatchCase):
-            self._visit_match_case(tree, q)
-        elif isinstance(tree, Slice):
-            self._visit_slice(tree, q)
-        elif isinstance(tree, ParseError):
-            self._visit_parse_error(tree, q)
-        elif isinstance(tree, J):
-            # Delegate to Java visitor for Java types
-            self._visit_java(tree, q)
+        handler = self._dispatch.get(type(tree))
+        if handler is None:
+            for cls, name in _DISPATCH:
+                if isinstance(tree, cls):
+                    handler = getattr(self, name)
+                    break
+            else:
+                return  # as the ladder did: an unmatched tree is not sent
+            self._dispatch[type(tree)] = handler
+        handler(tree, q)
 
     def _pre_visit(self, j: J, q: 'RpcSendQueue') -> None:
         """Handle common J fields: id, prefix, markers."""
