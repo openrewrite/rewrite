@@ -36,7 +36,6 @@ import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
  */
 final class LegacyMigrationResolver implements Resolver {
 
-
     /**
      * {@code IMPORTED_PATTERNS}: each pattern with the reference it makes from the entry's version and the match.
      */

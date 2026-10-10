@@ -86,7 +86,6 @@ class MinimatchTest {
         assertThat(Minimatch.minimatch(path, pattern, o)).isEqualTo(expected);
     }
 
-
     // rows printed by the yarnclassic test resources' generate/minimatch-rows.js
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource(delimiter = ';', value = {
