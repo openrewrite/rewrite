@@ -258,8 +258,8 @@ public final class YarnClassicLockRegenerator {
     }
 
     /**
-     * Where yarn run in the project's directory installs and writes its lock: here under {@code --focus}; a walk that
-     * fails, which {@link #regenerate()} reports, stops here.
+     * Where yarn run in the project's directory installs and writes its lock, a {@code --focus} install's too; a walk
+     * that fails, which {@link #regenerate()} reports, stops here.
      */
     public static InstallRoot installRoot(Inputs inputs) {
         try {
@@ -269,7 +269,7 @@ public final class YarnClassicLockRegenerator {
             cli.main();
             int workspaceRoot = new Config(inputs).findWorkspaceRoot(YarnClassicOptions.looseSemver(rc),
                     new ArrayList<>());
-            return new InstallRoot(workspaceRoot <= 0 || YarnClassicOptions.focus(rc) ? 0 : workspaceRoot, false);
+            return new InstallRoot(Math.max(workspaceRoot, 0), false);
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }

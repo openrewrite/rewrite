@@ -38,15 +38,24 @@ final class TarballFetcher {
             "sha256", "sha384", "sha512", "sha3", "sha3-256", "sha3-384", "sha3-512", "sha3_256", "sha3_384",
             "sha3_512");
 
-    private final PackageReference ref;
     private final PackageRemote remote;
+    private final @Nullable Object name;
+    private final @Nullable Object version;
+    private final String dest;
     private final RegistrySource registry;
     private final YarnClassicOptions config;
     private final List<String> warnings;
 
-    TarballFetcher(PackageReference ref, RegistrySource registry, YarnClassicOptions config, List<String> warnings) {
-        this.ref = ref;
-        this.remote = ref.remote;
+    /**
+     * What package-fetcher.js {@code fetchOneRemote} hands the fetcher: the remote, the name and version a package
+     * without a manifest gets, the cache directory.
+     */
+    TarballFetcher(PackageRemote remote, @Nullable Object name, @Nullable Object version, String dest,
+                   RegistrySource registry, YarnClassicOptions config, List<String> warnings) {
+        this.remote = remote;
+        this.name = name;
+        this.version = version;
+        this.dest = dest;
         this.registry = registry;
         this.config = config;
         this.warnings = warnings;
@@ -58,8 +67,8 @@ final class TarballFetcher {
      */
     @Nullable
     Object fetch() {
-        return manifest(fetchTarball(), PackageFetcher.generateModuleCachePath(ref), Js.string(remote.registry),
-                ref.name, ref.version, config.isLooseSemver(), warnings);
+        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver(),
+                warnings);
     }
 
     /**
@@ -98,12 +107,12 @@ final class TarballFetcher {
         String pathname = url.path == null ? null : url.path.replaceFirst("\\?.*", "");
         boolean isRelativePath = url.protocol != null ? DRIVE.matcher(url.protocol).find() :
                 pathname != null && RELATIVE_PATH.matcher(pathname).find();
-        String pkg = Js.string(ref.name) + "@" + Js.string(ref.version);
+        String pkg = Js.string(name) + "@" + Js.string(version);
         if (isFilePath || isRelativePath) {
             throw new CannotKnow("the tarball " + reference + " of " + pkg + " (a file on disk)");
         }
         byte[] tarball = registry.tarball(reference, Js.string(Js.truthy(remote.packageName) ? remote.packageName :
-                ref.name), Js.string(ref.version));
+                name), Js.string(version));
         if (tarball == null) {
             throw new CannotKnow("whether yarn's cache holds " + pkg + ", whose tarball " + reference +
                                  " answers 404 (yarn fails on a cold cache and installs from a warm one)");
@@ -150,7 +159,7 @@ final class TarballFetcher {
         for (String candidate : Js.keys(expected.hashes)) {
             String name = candidate.toLowerCase(Locale.ROOT);
             if (!digestible(name)) {
-                throw new CannotKnow("whether the tarball of " + Js.string(ref.name) + "@" + Js.string(ref.version) +
+                throw new CannotKnow("whether the tarball of " + Js.string(name) + "@" + Js.string(version) +
                                      " matches its " + candidate + " integrity");
             }
             if (algorithm == null ||

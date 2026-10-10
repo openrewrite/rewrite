@@ -109,6 +109,8 @@ final class Install {
             PackageResolver resolver = new PackageResolver(options, lockfile, resolutionMap, registry,
                     new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost(),
                     warnings);
+            resolver.focus = config.isFocus();
+            resolver.focusedWorkspaceName = config.getFocusedWorkspaceName();
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
             if (!resolver.races.isEmpty()) {

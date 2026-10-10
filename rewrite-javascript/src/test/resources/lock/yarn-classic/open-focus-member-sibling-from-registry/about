@@ -1,0 +1,1 @@
+yarn --focus run in packages/a: its sibling packages/b is focus-sib 1.0.0 with no dependencies, while the registry focus-sib@1.0.0 depends on left-pad 1.3.0. Does the root lock take the registry manifest, and the bumped ms?

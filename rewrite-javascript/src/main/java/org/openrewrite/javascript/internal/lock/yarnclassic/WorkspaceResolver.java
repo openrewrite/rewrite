@@ -17,9 +17,11 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
+
 /**
  * Port of yarn src/resolvers/contextual/workspace-resolver.js (yarn 1.22.22): a pattern a workspace member
- * satisfies resolves to the member's own manifest.
+ * satisfies resolves to the member's own manifest, or, under {@code --focus}, to the registry's of its version.
  */
 final class WorkspaceResolver {
 
@@ -38,22 +40,44 @@ final class WorkspaceResolver {
         return workspaceLayout != null && workspaceLayout.getManifestByPattern(pattern) != null;
     }
 
-    Manifest resolve() {
+    Manifest resolve(@Nullable Manifest downloadedManifest) {
         WorkspaceLayout.Workspace workspace = workspaceLayout.getManifestByPattern(request.pattern);
         if (workspace == null) {
             throw new JsError(JsError.INVARIANT_VIOLATION, "expected workspace");
         }
         Manifest manifest = workspace.getManifest();
+        if (manifest.remote != null && manifest.remote.registryRemote != null) {
+            return manifest;
+        }
         Object registry = manifest.get("_registry");
         if (!Js.truthy(registry)) {
             throw new JsError(JsError.INVARIANT_VIOLATION, "expected reference");
         }
         String hash = "";
-        if (manifest.remote != null && Js.truthy(manifest.remote.hash)) {
+        PackageRemote registryRemote = null;
+        if (downloadedManifest != null && Js.strictEquals(manifest.getVersion(), downloadedManifest.getVersion())) {
+            registryRemote = downloadedManifest.remote;
+            if (registryRemote == null) {
+                throw new JsError(JsError.INVARIANT_VIOLATION, "missing remote info");
+            }
+            hash = registryRemote.hash;
+            for (String key : new ArrayList<>(manifest.data.keySet())) {
+                if (!key.startsWith("_")) {
+                    manifest.data.remove(key);
+                }
+            }
+            manifest.data.putAll(downloadedManifest.data);
+            manifest.remote = downloadedManifest.remote;
+        } else if (manifest.remote != null && Js.truthy(manifest.remote.hash)) {
+            registryRemote = manifest.remote.registryRemote;
             hash = manifest.remote.hash;
+        }
+        if (registryRemote != null) {
+            registryRemote = registryRemote.copy();
         }
         PackageRemote remote = manifest.remote == null ? new PackageRemote() : manifest.remote;
         remote.type = "workspace";
+        remote.registryRemote = registryRemote;
         remote.registry = registry;
         remote.hash = hash;
         remote.reference = workspace.getLoc();

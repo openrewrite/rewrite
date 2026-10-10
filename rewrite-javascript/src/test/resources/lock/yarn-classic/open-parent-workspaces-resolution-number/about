@@ -1,0 +1,1 @@
+The repository's package.json lists mid/* as workspaces, is not private and resolves ms to the number 1: yarn 1.22.22 run in mid/app installs at the repository's root and fails in resolutionMap.init before getWorkspaces rejects the root.

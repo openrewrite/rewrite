@@ -56,6 +56,13 @@ final class PackageResolver {
     @Nullable
     WorkspaceLayout workspaceLayout;
 
+    /**
+     * config.js {@code focus} and {@code focusedWorkspaceName}.
+     */
+    boolean focus;
+    @Nullable
+    Object focusedWorkspaceName;
+
     int rootIndex;
     int rootMark;
     int nextCopyHash;

@@ -50,4 +50,23 @@ final class PackageRemote {
 
     @Nullable
     Object packageName;
+
+    /**
+     * A workspace's: the registry's tarball of the same version, which a {@code --focus} install fetches.
+     */
+    @Nullable
+    PackageRemote registryRemote;
+
+    PackageRemote copy() {
+        PackageRemote copy = new PackageRemote();
+        copy.type = type;
+        copy.registry = registry;
+        copy.reference = reference;
+        copy.resolved = resolved;
+        copy.hash = hash;
+        copy.integrity = integrity;
+        copy.packageName = packageName;
+        copy.registryRemote = registryRemote;
+        return copy;
+    }
 }

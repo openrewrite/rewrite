@@ -205,9 +205,22 @@ final class PackageRequest {
         if (exoticResolver != null) {
             return findExoticVersionInfo(exoticResolver, pattern);
         }
-        if (WorkspaceResolver.isWorkspace(pattern, resolver.workspaceLayout)) {
-            return Promise.resolved(resolver.loop,
-                    new WorkspaceResolver(this, resolver.workspaceLayout).resolve());
+        WorkspaceLayout workspaceLayout = resolver.workspaceLayout;
+        if (WorkspaceResolver.isWorkspace(pattern, workspaceLayout)) {
+            WorkspaceResolver workspaceResolver = new WorkspaceResolver(this, workspaceLayout);
+            if (resolver.focus && !pattern.contains(String.valueOf(workspaceLayout.virtualManifestName)) &&
+                !pattern.startsWith(Js.templateString(resolver.focusedWorkspaceName) + "@")) {
+                WorkspaceLayout.Workspace localInfo = workspaceLayout.getManifestByPattern(pattern);
+                if (localInfo == null) {
+                    throw new JsError(JsError.INVARIANT_VIOLATION, "expected local info for " + pattern);
+                }
+                Manifest localManifest = localInfo.getManifest();
+                String requestPattern = Js.templateString(localManifest.getName()) + "@" +
+                                        Js.templateString(localManifest.getVersion());
+                return findVersionOnRegistry(requestPattern).then(manifest ->
+                        Promise.resolved(resolver.loop, workspaceResolver.resolve(manifest)));
+            }
+            return Promise.resolved(resolver.loop, workspaceResolver.resolve(null));
         }
         return findVersionOnRegistry(pattern);
     }

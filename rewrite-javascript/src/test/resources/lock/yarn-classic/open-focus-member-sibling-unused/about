@@ -1,0 +1,1 @@
+yarn --focus run in packages/a, which does not depend on its sibling focus-sib 1.0.0: the workspace aggregator still resolves the sibling from the registry.

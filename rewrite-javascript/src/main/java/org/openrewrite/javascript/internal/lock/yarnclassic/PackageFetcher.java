@@ -51,8 +51,20 @@ final class PackageFetcher {
     static Fetcher remote(PackageResolver resolver, RegistrySource registry, YarnClassicOptions config) {
         return ref -> {
             Manifest pkg = resolver.patterns.get(ref.patterns.get(0));
+            String dest = generateModuleCachePath(ref);
             if ("workspace".equals(ref.remote.type)) {
-                return pkg;
+                PackageRemote registryRemote = ref.remote.registryRemote;
+                if (registryRemote == null) {
+                    return pkg;
+                }
+                // workspace-fetcher.js reads the workspace's own manifest again after fetching the registry's tarball
+                String loc = String.valueOf(ref.remote.reference);
+                Manifest local = Config.tryManifest(loc, String.valueOf(resolver.files.manifest(loc)),
+                        config.isLooseSemver(), false, "", resolver.warnings);
+                new TarballFetcher(registryRemote, local.getName(), local.getVersion(), dest, registry, config,
+                        resolver.warnings).fetch();
+                local.put("_uid", local.getVersion());
+                return local;
             }
             if ("copy".equals(ref.remote.type)) {
                 Manifest copy = pkg.copy();
@@ -61,7 +73,8 @@ final class PackageFetcher {
             }
             Map<String, @Nullable Object> entry = pkg.locked;
             if (entry == null && "tarball".equals(ref.remote.type)) {
-                return new TarballFetcher(ref, registry, config, resolver.warnings).fetch();
+                return new TarballFetcher(ref.remote, ref.name, ref.version, dest, registry, config,
+                        resolver.warnings).fetch();
             }
             Manifest locked = new Manifest();
             locked.put("name", entry == null ? pkg.getName() : entry.get("name"));

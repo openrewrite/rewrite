@@ -1,0 +1,1 @@
+yarn run in packages/a with --focus in the root .yarnrc, which yarn reads from packages/a up: the same focused install.

@@ -53,6 +53,8 @@ final class Config {
      */
     private @Nullable Manifest lockfileFolderManifest;
 
+    private boolean focus;
+
     /**
      * The name of the workspace a {@code --focus} install runs for: the manifest's where yarn runs.
      */
@@ -70,10 +72,11 @@ final class Config {
         boolean looseSemver = YarnClassicOptions.looseSemver(rc);
         requireWorkspaceRootAbove(looseSemver);
         workspaceRoot = findWorkspaceRoot(looseSemver, warnings);
-        if (YarnClassicOptions.focus(rc) && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
+        focus = YarnClassicOptions.focus(rc);
+        if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
             throw new MessageError("This command can only be run inside an individual workspace.");
         }
-        if (YarnClassicOptions.focus(rc)) {
+        if (focus) {
             focusedWorkspaceName = readRootManifest(looseSemver, warnings).getName();
         }
         YarnClassicOptions config = YarnClassicOptions.load(rc, inputs.configFilesFromCwd(), inputs.getEnv());

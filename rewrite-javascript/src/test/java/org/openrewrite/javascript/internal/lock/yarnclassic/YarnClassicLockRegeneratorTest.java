@@ -352,10 +352,10 @@ class YarnClassicLockRegeneratorTest {
 
     /**
      * A packageManager yarn 1 accepts leaves the install at the root, which walks from the project's directory as
-     * {@code cwd}; {@code --focus} makes it a focused install there instead.
+     * {@code cwd}; a {@code --focus} install writes the root's lock too ({@code open-focus-root-yarnrc}).
      */
     @Test
-    void installsAtTheRootWithAPackageManagerBelowItAndNotUnderFocus() {
+    void installsAtTheRootWithAPackageManagerBelowItAndUnderFocus() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a\"]}")
@@ -367,7 +367,25 @@ class YarnClassicLockRegeneratorTest {
                 "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build()))
                 .isEqualTo(new InstallRoot(1, false));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.configFile("../.yarnrc", "--focus true\n").build()))
-                .isEqualTo(InstallRoot.HERE);
+                .isEqualTo(new InstallRoot(1, false));
+    }
+
+    /**
+     * config.js init rejects {@code --focus} without a workspace root or run at the root; run in a member below the
+     * lock's root it is a focused install ({@code open-focus-member-sibling-from-registry}).
+     */
+    @Test
+    void rejectsFocusOnlyWithoutARootOrRunAtIt() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", WORKSPACE_ROOT)
+                .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+                .configFile(".yarnrc", "--focus true\n")
+                .now(Instant.EPOCH);
+        assertThat(untilTheFirstStep(inputs.build()))
+                .isEqualTo("error This command can only be run inside an individual workspace.");
+        assertThat(untilTheFirstStep(inputs.cwd("packages/a").build())).startsWith("requests ");
+        assertThat(untilTheFirstStep(inputs.manifest("", ROOT).cwd("").build()))
+                .isEqualTo("error This command can only be run inside an individual workspace.");
     }
 
     /**
