@@ -44,8 +44,8 @@ class NpmTagResolverTest {
         BerryScenarios.ScenarioRegistry recorded = scenario.registry();
         RegistrySource withoutDistTags = new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name) {
-                String text = recorded.packument(registry, name);
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+                String text = recorded.packument(registry, name, authorization);
                 if (text == null) {
                     return null;
                 }
@@ -56,8 +56,8 @@ class NpmTagResolverTest {
             }
 
             @Override
-            public byte @Nullable [] tarball(String url, String name, String version) {
-                return recorded.tarball(url, name, version);
+            public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
+                return recorded.tarball(url, name, version, authorization);
             }
         };
         Failure failure = new YarnBerryLockRegenerator(scenario.inputs(BerryScenarios.Phase.AFTER, before),

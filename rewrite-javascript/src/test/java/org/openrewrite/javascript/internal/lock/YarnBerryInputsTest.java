@@ -110,6 +110,24 @@ class YarnBerryInputsTest {
         assertThat(unnamed.getHomeFiles().get(".yarnrc.yml")).isEmpty();
     }
 
+    /**
+     * The host's credentials are the default registry's npmRegistries entry and each scope's own settings, where
+     * NpmHttpUtils.getAuthenticationHeader finds them (NpmHttpUtilsTest.sendsTheCredentialsYarnSends).
+     */
+    @Test
+    void theHostsCredentialsAreTheHomeDirectorysYarnrc() {
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null,
+          false, null, true, false));
+        NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm/", null, "u", "p", null, true, null,
+          true, false);
+
+        assertThat(YarnBerryInputs.userYarnrc(new NodeRegistries(registry, scopes, null, null, null))).isEqualTo(
+          "npmRegistryServer: \"https://r.example/npm/\"\nnpmRegistries:\n  \"//r.example/npm\":\n" +
+          "    npmAuthIdent: \"u:p\"\n    npmAlwaysAuth: true\nnpmScopes:\n  \"corp\":\n" +
+          "    npmRegistryServer: \"https://corp.example.com/\"\n    npmAuthToken: \"corp-token\"\n");
+    }
+
     private static NodeRegistry registry(String url) {
         return new NodeRegistry(null, url, null, null, null, null, false, null, true, false);
     }

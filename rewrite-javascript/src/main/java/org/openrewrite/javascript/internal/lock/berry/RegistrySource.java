@@ -18,7 +18,8 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What a Yarn Berry install reads from the network: full packuments and tarballs.
+ * What a Yarn Berry install reads from the network: full packuments and tarballs, each with the Authorization header
+ * Yarn sends, null for none.
  */
 public interface RegistrySource {
 
@@ -26,11 +27,11 @@ public interface RegistrySource {
      * The packument's text, null when the registry answers 404.
      */
     @Nullable
-    String packument(String registry, String name);
+    String packument(String registry, String name, @Nullable String authorization);
 
     /**
      * The tarball at the url, which holds the package {@code name} at {@code version}; null when the server answers
      * 404.
      */
-    byte @Nullable [] tarball(String url, String name, String version);
+    byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization);
 }

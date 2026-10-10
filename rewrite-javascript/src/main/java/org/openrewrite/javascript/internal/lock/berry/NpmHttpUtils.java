@@ -20,7 +20,9 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +84,8 @@ final class NpmHttpUtils {
         }
         String registryUrl = getScopeRegistry(ident.scope, project.configuration);
         return project.packageMetadata.computeIfAbsent(registryUrl + getIdentUrl(ident), key -> {
-            String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident));
+            String packument = registry.packument(registryUrl, StructUtils.stringifyIdent(ident),
+                    getAuthenticationHeader(registryUrl, ident.scope, project.configuration));
             if (packument == null) {
                 throw new ReportError(ReportError.NETWORK_ERROR, "Package not found");
             }
@@ -97,11 +100,62 @@ final class NpmHttpUtils {
     static byte[] get(String path, Locator locator, String version, Project project, RegistrySource registry) {
         String registryUrl = getScopeRegistry(locator.scope, project.configuration);
         byte[] tarball = registry.tarball(path.startsWith("/") ? registryUrl + path : path,
-                StructUtils.stringifyIdent(locator), version);
+                StructUtils.stringifyIdent(locator), version,
+                getAuthenticationHeader(registryUrl, locator.scope, project.configuration));
         if (tarball == null) {
             throw new ReportError(ReportError.NETWORK_ERROR, "Package not found");
         }
         return tarball;
+    }
+
+    /**
+     * {@code getAuthenticationHeader} of a GET: a scoped package's credentials on a best effort, another's only under
+     * npmAlwaysAuth, where no credentials are Yarn's YN0033.
+     */
+    static @Nullable String getAuthenticationHeader(String registry, @Nullable String scope,
+                                                    Configuration configuration) {
+        boolean bestEffort = scope != null && !scope.isEmpty();
+        Map<String, @Nullable Object> effectiveConfiguration = getAuthConfiguration(registry, scope, configuration);
+        if (!bestEffort && !Boolean.TRUE.equals(effectiveConfiguration.get("npmAlwaysAuth"))) {
+            return null;
+        }
+        Object npmAuthToken = effectiveConfiguration.get("npmAuthToken");
+        if (Js.truthy(npmAuthToken)) {
+            return "Bearer " + Js.string(npmAuthToken);
+        }
+        Object npmAuthIdent = effectiveConfiguration.get("npmAuthIdent");
+        if (Js.truthy(npmAuthIdent)) {
+            String ident = Js.string(npmAuthIdent);
+            return "Basic " + (ident.contains(":") ?
+                    Base64.getEncoder().encodeToString(ident.getBytes(StandardCharsets.UTF_8)) : ident);
+        }
+        if (!bestEffort) {
+            throw new ReportError(ReportError.AUTHENTICATION_NOT_FOUND, "No authentication configured for request");
+        }
+        return null;
+    }
+
+    // getAuthConfiguration: the scope's entry when it holds credentials, the registry's, else the top level's
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> getAuthConfiguration(String registry, @Nullable String scope,
+                                                                      Configuration configuration) {
+        Object scopeConfiguration = scope == null ? null : configuration.getMap("npmScopes").get(scope);
+        if (scopeConfiguration instanceof Map && (Js.truthy(((Map<?, ?>) scopeConfiguration).get("npmAuthIdent")) ||
+                                                  Js.truthy(((Map<?, ?>) scopeConfiguration).get("npmAuthToken")))) {
+            return (Map<String, @Nullable Object>) scopeConfiguration;
+        }
+        Map<String, @Nullable Object> registries = configuration.getMap("npmRegistries");
+        String normalizedRegistry = normalizeRegistry(registry);
+        Object entry = registries.containsKey(normalizedRegistry) ? registries.get(normalizedRegistry) :
+                registries.get(normalizedRegistry.replaceFirst("^[a-z]+:", ""));
+        if (entry instanceof Map) {
+            return (Map<String, @Nullable Object>) entry;
+        }
+        Map<String, @Nullable Object> topLevel = new LinkedHashMap<>();
+        for (String key : new String[]{"npmAlwaysAuth", "npmAuthIdent", "npmAuthToken"}) {
+            topLevel.put(key, configuration.get(key));
+        }
+        return topLevel;
     }
 
     private static Map<String, @Nullable Object> pickMetadata(@Nullable Object packument) {

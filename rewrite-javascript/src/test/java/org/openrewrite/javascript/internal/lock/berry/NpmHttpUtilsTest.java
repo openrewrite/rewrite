@@ -15,12 +15,16 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
-import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Yarn's packages/plugin-npm/tests/NpmSemverFetcher.test.js, every {@code isConventionalTarballUrl} case,
@@ -106,5 +110,44 @@ class NpmHttpUtilsTest {
             assertThat(NpmHttpUtils.normalizeRegistry(registry) + "/bar").as(registry)
                     .isEqualTo(registry.replaceAll("/+$", "") + "/bar");
         }
+    }
+
+    /**
+     * The Authorization header Yarn 4.10.3 sent for ms and @types/ms, metadata and tarball alike, under each home
+     * .yarnrc.yml, recorded through a registry logging the header: a scoped package's on a best effort.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "npmAuthToken: top-token|-|Bearer top-token",
+            "npmAuthToken: top-token\\nnpmAlwaysAuth: true|Bearer top-token|Bearer top-token",
+            "npmRegistries:\\n  'http://127.0.0.1:4893':\\n    npmAuthToken: entry-token\\n    npmAlwaysAuth: true|" +
+            "Bearer entry-token|Bearer entry-token",
+            "npmRegistries:\\n  '//127.0.0.1:4893':\\n    npmAuthIdent: 'u:p'\\n    npmAlwaysAuth: true|Basic dTpw|" +
+            "Basic dTpw",
+            "npmScopes:\\n  types:\\n    npmRegistryServer: 'http://127.0.0.1:4893'\\n    npmAuthToken: scope-token|-|" +
+            "Bearer scope-token"
+    })
+    void sendsTheCredentialsYarnSends(String settings, @Nullable String unscoped, @Nullable String scoped) {
+        Configuration configuration = BerryScenarios.restricted(Configuration.load(Collections.singletonMap(
+                ".yarnrc.yml", "npmRegistryServer: 'http://127.0.0.1:4893'\n" + settings.replace("\\n", "\n") +
+                               "\n"), HostEnvironment.of(Collections.emptyMap())), YarnRelease.of("4.10.3"));
+        String registry = NpmHttpUtils.getScopeRegistry(null, configuration);
+        assertThat(NpmHttpUtils.getAuthenticationHeader(registry, null, configuration)).isEqualTo(unscoped);
+        assertThat(NpmHttpUtils.getAuthenticationHeader(NpmHttpUtils.getScopeRegistry("types", configuration),
+                "types", configuration)).isEqualTo(scoped);
+    }
+
+    /**
+     * npmAlwaysAuth without credentials: Yarn 4.10.3 fails the unscoped request with YN0033.
+     */
+    @Test
+    void alwaysAuthWithoutCredentialsIsYarnsError() {
+        Configuration configuration = BerryScenarios.restricted(Configuration.load(Collections.singletonMap(
+                ".yarnrc.yml", "npmAlwaysAuth: true\n"), HostEnvironment.of(Collections.emptyMap())),
+                YarnRelease.of("4.10.3"));
+        assertThatThrownBy(() -> NpmHttpUtils.getAuthenticationHeader(registry, null, configuration))
+                .isInstanceOf(ReportError.class)
+                .hasMessage("No authentication configured for request");
+        assertThat(NpmHttpUtils.getAuthenticationHeader(registry, "types", configuration)).isNull();
     }
 }

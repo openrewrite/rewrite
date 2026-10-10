@@ -75,12 +75,12 @@ final class BerryScenarios {
      */
     static final RegistrySource NO_REGISTRY = new RegistrySource() {
         @Override
-        public @Nullable String packument(String registry, String name) {
+        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
             return null;
         }
 
         @Override
-        public byte @Nullable [] tarball(String url, String name, String version) {
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
             return null;
         }
     };
@@ -405,7 +405,7 @@ final class BerryScenarios {
         }
 
         @Override
-        public @Nullable String packument(String registry, String name) {
+        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
             byte[] body = http(mirror, name);
             if (body == null) {
@@ -429,7 +429,7 @@ final class BerryScenarios {
         }
 
         @Override
-        public byte @Nullable [] tarball(String url, String name, String version) {
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
             String file = name + "-" + version + ".tgz";
             byte[] tgz = http(mirror(url, "npmjs", "yarnpkg"), file);
             if (tgz == null) {

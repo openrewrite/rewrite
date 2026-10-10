@@ -67,15 +67,21 @@ final class YarnBerryInputs {
     }
 
     /**
-     * The registries as .yarnrc.yml settings ({@code npmRegistryServer}, {@code npmScopes}); npm's own default,
-     * which the host also reports when nothing names a registry, is left unnamed.
+     * The registries as .yarnrc.yml settings, the default's credentials as its {@code npmRegistries} entry; npm's
+     * own default, which the host also reports when nothing names a registry, is left unnamed.
      */
     static String userYarnrc(NodeRegistries registries) {
         StringBuilder yarnrc = new StringBuilder();
         NodeRegistry registry = registries.getDefaultRegistry();
-        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || registry.getAuthToken() != null ||
-            registry.getAuthBase64() != null || registry.getUsername() != null) {
+        boolean credentials = registry.getAuthToken() != null || registry.getAuthBase64() != null ||
+                              registry.getUsername() != null && registry.getPassword() != null;
+        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || credentials) {
             yarnrc.append("npmRegistryServer: ").append(EcmaScript.quote(registry.getUrl())).append('\n');
+        }
+        if (credentials || registry.isAlwaysAuth()) {
+            String key = registry.getUrl().replaceFirst("/\\z", "").replaceFirst("^[a-z]+:", "");
+            yarnrc.append("npmRegistries:\n  ").append(EcmaScript.quote(key)).append(":\n");
+            credentials(yarnrc, registry, "    ");
         }
         if (!registries.getByScope().isEmpty()) {
             yarnrc.append("npmScopes:\n");
@@ -83,9 +89,26 @@ final class YarnBerryInputs {
                 yarnrc.append("  ").append(EcmaScript.quote(scoped.getKey().substring(1))).append(":\n")
                         .append("    npmRegistryServer: ").append(EcmaScript.quote(scoped.getValue().getUrl()))
                         .append('\n');
+                credentials(yarnrc, scoped.getValue(), "    ");
             }
         }
         return yarnrc.toString();
+    }
+
+    private static void credentials(StringBuilder yarnrc, NodeRegistry registry, String indent) {
+        if (registry.getAuthToken() != null) {
+            yarnrc.append(indent).append("npmAuthToken: ").append(EcmaScript.quote(registry.getAuthToken()))
+                    .append('\n');
+        } else if (registry.getAuthBase64() != null) {
+            yarnrc.append(indent).append("npmAuthIdent: ").append(EcmaScript.quote(registry.getAuthBase64()))
+                    .append('\n');
+        } else if (registry.getUsername() != null && registry.getPassword() != null) {
+            yarnrc.append(indent).append("npmAuthIdent: ")
+                    .append(EcmaScript.quote(registry.getUsername() + ":" + registry.getPassword())).append('\n');
+        }
+        if (registry.isAlwaysAuth()) {
+            yarnrc.append(indent).append("npmAlwaysAuth: true\n");
+        }
     }
 
     private static Inputs project(LockDirectory dir, Host host, Instant now) {
