@@ -1,0 +1,1 @@
+pnpm remove wrappy in member a, the only declaration in the workspace, with cleanupUnusedCatalogs.

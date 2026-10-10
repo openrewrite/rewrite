@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+cleanupUnusedCatalogs: 'false'
+catalogs:
+  legacy:
+    is-number: ^7.0.0

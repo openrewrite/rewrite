@@ -21,6 +21,7 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.SourceSpec;
@@ -173,6 +174,51 @@ final class CatalogRecording {
             sources.add(lock == null ? text(read("before"), spec) : text(read("before"), lock, spec));
         }
         return sources.toArray(new SourceSpecs[0]);
+    }
+
+    /**
+     * The pnpm files as the package manager's command left them, where the install over them fails with
+     * {@code failure}: each manifest the command changed and the lock, left as it was, marked with it.
+     */
+    SourceSpecs[] sourcesWhoseInstallFails(String failure) {
+        List<SourceSpecs> sources = new ArrayList<>();
+        Map<String, String> before = tree("tree-before");
+        Map<String, String> after = new TreeMap<>(before);
+        after.putAll(tree("tree"));
+        List<String> members = new ArrayList<>();
+        for (String path : before.keySet()) {
+            if (path.endsWith("package.json")) {
+                members.add(path);
+            }
+        }
+        sources.add(failing(read("pkg-before"), read("pkg"), nodeResolutionResult(pm, members), "package.json",
+                failure));
+        for (String path : members) {
+            sources.add(failing(before.get(path), after.get(path), nodeResolutionResult(pm), path, failure));
+        }
+        sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), read("workspace")),
+                "pnpm-workspace.yaml"));
+        sources.add(pnpmLock(read("before"), null, s -> s.noTrim().after(actual -> actual).afterRecipe(doc -> {
+            assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                    .isEqualTo(read("before"));
+            assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                    .hasValueSatisfying(w -> assertThat(w.getMessage()).contains(failure));
+        })));
+        return sources.toArray(new SourceSpecs[0]);
+    }
+
+    private static SourceSpecs failing(String before, String after, NodeResolutionResult marker, String path,
+                                       String failure) {
+        if (before.equals(after)) {
+            return packageJson(before, null, marker, s -> s.path(path).noTrim());
+        }
+        return packageJson(before, null, marker, s -> s.path(path).noTrim().after(actual -> actual)
+                .afterRecipe(doc -> {
+                    assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                            .isEqualTo(after);
+                    assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                            .hasValueSatisfying(w -> assertThat(w.getMessage()).contains(failure));
+                }));
     }
 
     // a yaml spec whose null after is no change, not a deletion

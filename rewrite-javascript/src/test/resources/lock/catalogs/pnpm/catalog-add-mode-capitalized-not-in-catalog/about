@@ -1,0 +1,1 @@
+pnpm add is-number@7.0.0 in member a, catalogMode: Strict (neither manual nor strict); the root declares is-number ^7.0.0 and ms and wrappy catalog: (catalog ms 2.1.3, wrappy 1.0.2).

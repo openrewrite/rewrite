@@ -31,7 +31,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
  * A {@code catalog:} reference is upgraded in its catalog entry, and the lock follows as the package manager wrote it
- * in the recordings under {@code catalogs/}; a value that is no version range is left alone and recorded.
+ * in the recordings under {@code lock/catalogs/};a value that is no version range is left alone and recorded.
  */
 class UpgradeDependencyVersionCatalogTest implements RewriteTest {
 

@@ -1,0 +1,8 @@
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+[WARN] Skip adding wrappy to the default catalog because it already exists as 1.0.1. Please use `pnpm update` to update the catalogs.
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ wrappy 1.0.2
+
+Done in 176ms using pnpm v11.2.2

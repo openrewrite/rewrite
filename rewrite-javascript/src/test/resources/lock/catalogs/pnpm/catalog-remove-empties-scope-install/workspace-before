@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+cleanupUnusedCatalogs: true
+catalog:
+  is-number: 7.0.0
+  wrappy: 1.0.2

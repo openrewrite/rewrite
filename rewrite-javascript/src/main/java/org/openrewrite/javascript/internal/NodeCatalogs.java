@@ -15,22 +15,27 @@
  */
 package org.openrewrite.javascript.internal;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Value;
+import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.DataTable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 
+import java.math.BigInteger;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -40,29 +45,28 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
+import static java.util.Collections.singletonMap;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 /**
  * A workspace's catalogs as its package manager reads them (pnpm from pnpm-workspace.yaml, Yarn from .yarnrc.yml, Bun
  * from the root package.json), by catalog then alias; an edit changes the document in place.
  */
-@Value
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-public class NodeCatalogs {
-
-    /**
-     * The default catalog's name here.
-     */
-    public static final String DEFAULT = "";
+@Getter
+public abstract class NodeCatalogs {
 
     private static final String PROTOCOL = "catalog:";
     private static final Pattern YAML_NON_STRING = Pattern.compile(
@@ -73,20 +77,17 @@ public class NodeCatalogs {
             "|[tT]rue|TRUE|[fF]alse|FALSE|[yY]es|YES|[nN]o|NO|[oO]n|ON|[oO]ff|OFF");
     private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
 
-    PackageManager packageManager;
-
     /**
-     * The file the package manager reads them from, as this cycle's edits leave it.
+     * The file the package manager reads them from.
      */
-    SourceFile document;
+    private final SourceFile document;
 
-    Map<String, Map<String, String>> catalogs;
+    private final Map<String, Map<String, String>> catalogs;
 
-    /**
-     * pnpm's message when the default catalog is spelled both ways, which it rejects.
-     */
-    @Nullable
-    String misconfiguration;
+    private NodeCatalogs(SourceFile document, Map<String, Map<String, String>> catalogs) {
+        this.document = document;
+        this.catalogs = catalogs;
+    }
 
     /**
      * The name of the file {@code pm} reads catalogs from, in the workspace root; null for one without catalogs.
@@ -105,42 +106,18 @@ public class NodeCatalogs {
      * The catalogs {@code document} declares by {@code pm}'s rules; null when it is not the file {@code pm} reads them
      * from, or a Bun package.json without workspaces.
      */
-    public static @Nullable NodeCatalogs read(PackageManager pm, SourceFile document) {
-        if (pm == PackageManager.Bun) {
-            if (!(document instanceof Json.Document) || bunBase((Json.Document) document) == null) {
-                return null;
-            }
-            return new NodeCatalogs(pm, document, bunCatalogs((Json.Document) document), null);
+    public static @Nullable NodeCatalogs read(@Nullable PackageManager pm, SourceFile document) {
+        if (pm == PackageManager.Pnpm && document instanceof Yaml.Documents) {
+            return new Pnpm((Yaml.Documents) document);
         }
-        if ((pm != PackageManager.Pnpm && pm != PackageManager.YarnBerry) || !(document instanceof Yaml.Documents)) {
-            return null;
+        if (pm == PackageManager.YarnBerry && document instanceof Yaml.Documents) {
+            return new YarnBerry((Yaml.Documents) document);
         }
-        Yaml.Mapping root = yamlRoot((Yaml.Documents) document);
-        Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
-        String misconfiguration = null;
-        Yaml.Mapping catalog = root == null ? null : mapping(root, "catalog");
-        Yaml.Mapping named = root == null ? null : mapping(root, "catalogs");
-        if (catalog != null) {
-            catalogs.put(DEFAULT, scalars(catalog));
+        if (pm == PackageManager.Bun && document instanceof Json.Document &&
+            Bun.base((Json.Document) document) != null) {
+            return new Bun((Json.Document) document);
         }
-        if (named != null) {
-            for (Yaml.Mapping.Entry group : named.getEntries()) {
-                if (!(group.getValue() instanceof Yaml.Mapping)) {
-                    continue;
-                }
-                String name = group.getKey().getValue();
-                if (pm == PackageManager.Pnpm && "default".equals(name)) {
-                    if (catalog != null) {
-                        misconfiguration = "The 'default' catalog was defined multiple times. " +
-                                           "Use the 'catalog' field or 'catalogs.default', but not both.";
-                        continue;
-                    }
-                    name = DEFAULT;
-                }
-                catalogs.put(name, scalars((Yaml.Mapping) group.getValue()));
-            }
-        }
-        return new NodeCatalogs(pm, document, catalogs, misconfiguration);
+        return null;
     }
 
     /**
@@ -161,17 +138,7 @@ public class NodeCatalogs {
     /**
      * The catalog a dependency value names, by the package manager's rules; null when it is no catalog reference.
      */
-    public @Nullable String catalogOf(String value) {
-        if (!value.startsWith(PROTOCOL)) {
-            return null;
-        }
-        String name = value.substring(PROTOCOL.length());
-        if (packageManager == PackageManager.Pnpm) {
-            name = name.trim();
-            return name.isEmpty() || "default".equals(name) ? DEFAULT : name;
-        }
-        return packageManager == PackageManager.Bun ? name.trim() : name;
-    }
+    public abstract @Nullable String catalogOf(String value);
 
     /**
      * The specifier the catalog's entry for {@code alias} holds; null when there is none.
@@ -191,184 +158,479 @@ public class NodeCatalogs {
     }
 
     /**
-     * pnpm's {@code catalogMode} as pnpm-workspace.yaml sets it: manual, prefer or strict.
-     */
-    public String getCatalogMode() {
-        String mode = packageManager == PackageManager.Pnpm ? topLevelScalar("catalogMode") : null;
-        return mode == null ? "manual" : mode;
-    }
-
-    /**
-     * Whether pnpm drops the entries no importer references ({@code cleanupUnusedCatalogs}).
-     */
-    public boolean isCleanupUnusedCatalogs() {
-        return packageManager == PackageManager.Pnpm && "true".equals(topLevelScalar("cleanupUnusedCatalogs"));
-    }
-
-    /**
      * The catalogs with the entry's specifier replaced in place, quoting kept: null when the catalog has no such entry
      * or one that is not a version range (a block scalar, another protocol), these catalogs when it already holds it.
      */
-    public @Nullable NodeCatalogs withSpecifier(String catalog, String alias, String specifier) {
-        String current = specifier(catalog, alias);
-        if (current == null || !isVersionSpec(alias, current)) {
-            return null;
-        }
-        if (current.equals(specifier)) {
-            return this;
-        }
-        if (document instanceof Json.Document) {
-            List<String> path = bunPath((Json.Document) document, catalog);
-            return reread(PackageJsonHelper.withStringMember((Json.Document) document, path, alias, specifier));
-        }
-        Yaml.Documents docs = (Yaml.Documents) document;
-        Yaml.Scalar scalar = entryScalar(yamlRoot(docs), yamlPath(catalog), alias);
-        if (scalar == null || scalar.getStyle() == Yaml.Scalar.Style.LITERAL ||
-            scalar.getStyle() == Yaml.Scalar.Style.FOLDED) {
-            return null;
-        }
-        Yaml.Scalar rewritten = scalar.withValue(specifier);
-        if (scalar.getStyle() == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(specifier)) {
-            rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
-        }
-        return reread(replaceScalar(docs, scalar, rewritten));
-    }
+    public abstract @Nullable NodeCatalogs withSpecifier(String catalog, String alias, String specifier);
 
     /**
      * The catalogs with {@code alias: specifier} in the catalog, its entry replaced or added where pnpm's workspace
-     * manifest writer puts a new key, and the catalog created when there is none.
+     * manifest writer puts a new key, the catalog created when there is none; null when it cannot be added in place.
      */
-    public NodeCatalogs withEntry(String catalog, String alias, String specifier) {
-        String current = specifier(catalog, alias);
-        if (specifier.equals(current)) {
-            return this;
-        }
-        if (document instanceof Json.Document) {
-            List<String> path = bunPath((Json.Document) document, catalog);
-            return reread(PackageJsonHelper.withStringMember((Json.Document) document, path, alias, specifier));
-        }
-        Yaml.Documents docs = (Yaml.Documents) document;
-        Yaml.Mapping root = yamlRoot(docs);
-        if (current != null) {
-            Yaml.Scalar scalar = entryScalar(root, yamlPath(catalog), alias);
-            if (scalar != null && scalar.getStyle() != Yaml.Scalar.Style.LITERAL &&
-                scalar.getStyle() != Yaml.Scalar.Style.FOLDED) {
-                Yaml.Scalar rewritten = scalar.withValue(specifier);
-                if (scalar.getStyle() == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(specifier)) {
-                    rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
-                }
-                return reread(replaceScalar(docs, scalar, rewritten));
-            }
-        }
-        Yaml.Mapping base = root == null ? new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null,
-                null) : root;
-        return reread(withRoot(docs, put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base))));
-    }
-
-    /**
-     * pnpm's {@code removePackagesFromWorkspaceCatalog}: the catalogs without the entries no importer's declarations
-     * nor a {@code catalog:} override reference, and without a catalog left empty.
-     */
-    public NodeCatalogs withoutUnused(Collection<Map<String, String>> declarations) {
-        if (!(document instanceof Yaml.Documents) || packageManager != PackageManager.Pnpm || declarations.isEmpty()) {
-            return this;
-        }
-        Yaml.Documents docs = (Yaml.Documents) document;
-        Yaml.Mapping root = yamlRoot(docs);
-        if (root == null || mapping(root, "catalog") == null && mapping(root, "catalogs") == null) {
-            return this;
-        }
-        Map<String, Set<String>> references = new HashMap<>();
-        for (Map<String, String> declared : declarations) {
-            for (Map.Entry<String, String> dependency : declared.entrySet()) {
-                references.computeIfAbsent(dependency.getKey(), k -> new HashSet<>()).add(dependency.getValue());
-            }
-        }
-        Yaml.Mapping overrides = mapping(root, "overrides");
-        if (overrides != null) {
-            for (Map.Entry<String, String> override : scalars(overrides).entrySet()) {
-                if (override.getValue().startsWith(PROTOCOL)) {
-                    references.computeIfAbsent(overrideTarget(override.getKey()), k -> new HashSet<>())
-                            .add(override.getValue());
-                }
-            }
-        }
-        Yaml.Mapping cleaned = root;
-        Yaml.Mapping catalog = mapping(root, "catalog");
-        if (catalog != null) {
-            Yaml.Mapping kept = retain(catalog, references, null);
-            cleaned = kept.getEntries().isEmpty() ? without(cleaned, "catalog") : with(cleaned, "catalog", kept);
-        }
-        Yaml.Mapping named = mapping(cleaned, "catalogs");
-        if (named != null) {
-            List<Yaml.Mapping.Entry> groups = new ArrayList<>();
-            boolean changed = false;
-            for (Yaml.Mapping.Entry group : named.getEntries()) {
-                if (!(group.getValue() instanceof Yaml.Mapping)) {
-                    groups.add(group);
-                    continue;
-                }
-                Yaml.Mapping kept = retain((Yaml.Mapping) group.getValue(), references, group.getKey().getValue());
-                changed |= kept != group.getValue();
-                if (!kept.getEntries().isEmpty()) {
-                    groups.add(kept == group.getValue() ? group : group.withValue(kept));
-                }
-            }
-            if (groups.isEmpty()) {
-                cleaned = without(cleaned, "catalogs");
-            } else if (changed) {
-                cleaned = with(cleaned, "catalogs", named.withEntries(firstPrefix(named.getEntries(), groups)));
-            }
-        }
-        return cleaned == root ? this : reread(withRoot(docs, cleaned));
-    }
+    public abstract @Nullable NodeCatalogs withEntry(String catalog, String alias, String specifier);
 
     public String print() {
         return document.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
-    private NodeCatalogs reread(SourceFile edited) {
-        NodeCatalogs read = read(packageManager, edited);
-        return read == null ? this : read;
+    /**
+     * Whether a catalog is written in YAML's flow style, which is neither read nor edited here.
+     */
+    public boolean isFlowStyle() {
+        return false;
     }
 
-    private @Nullable String topLevelScalar(String key) {
-        Yaml.Mapping root = document instanceof Yaml.Documents ? yamlRoot((Yaml.Documents) document) : null;
-        if (root == null) {
-            return null;
-        }
-        for (Yaml.Mapping.Entry entry : root.getEntries()) {
-            if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Scalar) {
-                return ((Yaml.Scalar) entry.getValue()).getValue();
-            }
-        }
-        return null;
-    }
+    abstract NodeCatalogs reread(SourceFile edited);
 
     private static boolean isVersionSpec(String alias, String value) {
-        try {
-            return Spec.ofDependency(alias, value).isVersionSpec();
-        } catch (IllegalArgumentException e) {
+        Spec spec = classify(alias, value);
+        return spec != null && spec.isVersionSpec();
+    }
+
+    /**
+     * pnpm's catalogs from pnpm-workspace.yaml, keyed as pnpm keys them ({@code default} for {@code catalog} and
+     * {@code catalogs.default}), with the settings {@code pnpm add} and {@code pnpm remove} read beside them.
+     */
+    public static final class Pnpm extends YamlCatalogs {
+
+        public enum CatalogMode {
+            MANUAL, PREFER, STRICT
+        }
+
+        private static final String DEFAULT = "default";
+
+        Pnpm(Yaml.Documents document) {
+            super(document, read(yamlRoot(document)));
+        }
+
+        private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
+            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
+            Yaml.Mapping catalog = root == null ? null : mapping(root, "catalog");
+            Yaml.Mapping named = root == null ? null : mapping(root, "catalogs");
+            if (catalog != null) {
+                catalogs.put(DEFAULT, scalars(catalog));
+            }
+            if (named != null) {
+                for (Yaml.Mapping.Entry group : named.getEntries()) {
+                    Yaml.Mapping entries = asMapping(group.getValue());
+                    if (entries != null && !(catalog != null && DEFAULT.equals(group.getKey().getValue()))) {
+                        catalogs.put(group.getKey().getValue(), scalars(entries));
+                    }
+                }
+            }
+            return catalogs;
+        }
+
+        @Override
+        public @Nullable String catalogOf(String value) {
+            if (!value.startsWith(PROTOCOL)) {
+                return null;
+            }
+            String name = EcmaScript.trim(value.substring(PROTOCOL.length()));
+            return name.isEmpty() ? DEFAULT : name;
+        }
+
+        /**
+         * {@code catalogMode}: manual when unset or {@code manual}, strict when {@code strict}; any other value lets
+         * pnpm add a version outside the catalog, as prefer does.
+         */
+        public CatalogMode getCatalogMode() {
+            Yaml.Block mode = setting("catalogMode");
+            if (mode == null || mode instanceof Yaml.Scalar && "manual".equals(value((Yaml.Scalar) mode))) {
+                return CatalogMode.MANUAL;
+            }
+            return mode instanceof Yaml.Scalar && "strict".equals(value((Yaml.Scalar) mode)) ? CatalogMode.STRICT :
+                    CatalogMode.PREFER;
+        }
+
+        /**
+         * Whether {@code cleanupUnusedCatalogs} is a value JavaScript holds true.
+         */
+        public boolean isCleanupUnusedCatalogs() {
+            Yaml.Block cleanup = setting("cleanupUnusedCatalogs");
+            if (cleanup == null) {
+                return false;
+            }
+            return !(cleanup instanceof Yaml.Scalar) || EcmaScript.truthy(value((Yaml.Scalar) cleanup));
+        }
+
+        /**
+         * {@code saveCatalogName} as pnpm reads it into a string; null when unset or null.
+         */
+        public @Nullable String getSaveCatalogName() {
+            Yaml.Block name = setting("saveCatalogName");
+            Object value = name instanceof Yaml.Scalar ? value((Yaml.Scalar) name) : null;
+            return value == null ? null : EcmaScript.string(value);
+        }
+
+        /**
+         * pnpm's {@code removePackagesFromWorkspaceCatalog}: without the entries no project's dependencies nor a
+         * {@code catalog:} override reference, and without a catalog left empty; null when that is no edit in place.
+         */
+        public @Nullable NodeCatalogs withoutUnused(Collection<Map<String, Map<String, String>>> projects) {
+            Yaml.Documents docs = (Yaml.Documents) getDocument();
+            Yaml.Mapping root = yamlRoot(docs);
+            if (projects.isEmpty() || root == null) {
+                return this;
+            }
+            if (isFlowStyle()) {
+                return null;
+            }
+            if (mapping(root, "catalog") == null && mapping(root, "catalogs") == null) {
+                return this;
+            }
+            Map<String, Set<String>> references = new HashMap<>();
+            for (Map<String, Map<String, String>> project : projects) {
+                for (Map<String, String> scope : project.values()) {
+                    for (Map.Entry<String, String> dependency : scope.entrySet()) {
+                        references.computeIfAbsent(dependency.getKey(), k -> new HashSet<>())
+                                .add(dependency.getValue());
+                    }
+                }
+            }
+            Yaml.Mapping overrides = mapping(root, "overrides");
+            if (overrides != null) {
+                for (Map.Entry<String, String> override : scalars(overrides).entrySet()) {
+                    if (override.getValue().startsWith(PROTOCOL)) {
+                        references.computeIfAbsent(overrideTarget(override.getKey()), k -> new HashSet<>())
+                                .add(override.getValue());
+                    }
+                }
+            }
+            Yaml.Mapping cleaned = root;
+            Yaml.Mapping catalog = mapping(root, "catalog");
+            if (catalog != null) {
+                Yaml.Mapping kept = retain(catalog, references, null);
+                cleaned = kept.getEntries().isEmpty() ? without(cleaned, "catalog") : with(cleaned, "catalog", kept);
+            }
+            Yaml.Mapping named = mapping(cleaned, "catalogs");
+            if (named != null) {
+                List<Yaml.Mapping.Entry> groups = new ArrayList<>();
+                boolean changed = false;
+                for (Yaml.Mapping.Entry group : named.getEntries()) {
+                    Yaml.Mapping entries = asMapping(group.getValue());
+                    if (entries == null) {
+                        groups.add(group);
+                        continue;
+                    }
+                    Yaml.Mapping kept = retain(entries, references, group.getKey().getValue());
+                    changed |= kept != entries || kept.getEntries().isEmpty();
+                    if (!kept.getEntries().isEmpty()) {
+                        groups.add(kept == entries ? group : group.withValue(kept));
+                    }
+                }
+                if (groups.isEmpty()) {
+                    cleaned = without(cleaned, "catalogs");
+                } else if (changed) {
+                    cleaned = with(cleaned, "catalogs", named.withEntries(firstPrefix(named.getEntries(), groups)));
+                }
+            }
+            return cleaned == root ? this : reread(withRoot(docs, cleaned));
+        }
+
+        @Override
+        NodeCatalogs reread(SourceFile edited) {
+            return new Pnpm((Yaml.Documents) edited);
+        }
+
+        // pnpm writes the default catalog where it is, `catalog` when it is neither place
+        @Override
+        List<String> yamlPath(String catalog) {
+            if (!DEFAULT.equals(catalog)) {
+                return Arrays.asList("catalogs", catalog);
+            }
+            Yaml.Mapping root = yamlRoot((Yaml.Documents) getDocument());
+            if (root != null && mapping(root, "catalog") == null) {
+                Yaml.Mapping named = mapping(root, "catalogs");
+                if (named != null && mapping(named, DEFAULT) != null) {
+                    return Arrays.asList("catalogs", DEFAULT);
+                }
+            }
+            return singletonList("catalog");
+        }
+
+        private Yaml.@Nullable Block setting(String key) {
+            Yaml.Mapping root = yamlRoot((Yaml.Documents) getDocument());
+            if (root != null) {
+                for (Yaml.Mapping.Entry entry : root.getEntries()) {
+                    if (key.equals(entry.getKey().getValue())) {
+                        return entry.getValue();
+                    }
+                }
+            }
+            return null;
+        }
+
+        // the entries of `catalog` (name null) or `catalogs.<name>` a reference keeps
+        private static Yaml.Mapping retain(Yaml.Mapping catalog, Map<String, Set<String>> references,
+                                           @Nullable String name) {
+            List<Yaml.Mapping.Entry> kept = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
+                Set<String> referenced = references.getOrDefault(entry.getKey().getValue(), Collections.emptySet());
+                if (referenced.contains(PROTOCOL) || name != null && referenced.contains(PROTOCOL + name)) {
+                    kept.add(entry);
+                }
+            }
+            return kept.size() == catalog.getEntries().size() ? catalog :
+                    catalog.withEntries(firstPrefix(catalog.getEntries(), kept));
+        }
+
+        // parsePkgAndParentSelector's target package of an override key: `a>b@1` -> b
+        private static String overrideTarget(String selector) {
+            String target = selector.substring(selector.lastIndexOf('>') + 1);
+            int at = target.indexOf('@', target.startsWith("@") ? 1 : 0);
+            return at < 0 ? target : target.substring(0, at);
+        }
+    }
+
+    /**
+     * Yarn's catalogs from .yarnrc.yml: {@code catalog} for {@code catalog:}, {@code catalogs.<name>} otherwise.
+     */
+    public static final class YarnBerry extends YamlCatalogs {
+
+        YarnBerry(Yaml.Documents document) {
+            super(document, read(yamlRoot(document)));
+        }
+
+        private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
+            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
+            Yaml.Mapping catalog = root == null ? null : mapping(root, "catalog");
+            Yaml.Mapping named = root == null ? null : mapping(root, "catalogs");
+            if (catalog != null) {
+                catalogs.put("", scalars(catalog));
+            }
+            if (named != null) {
+                for (Yaml.Mapping.Entry group : named.getEntries()) {
+                    Yaml.Mapping entries = asMapping(group.getValue());
+                    if (entries != null && !group.getKey().getValue().isEmpty()) {
+                        catalogs.put(group.getKey().getValue(), scalars(entries));
+                    }
+                }
+            }
+            return catalogs;
+        }
+
+        @Override
+        public @Nullable String catalogOf(String value) {
+            return value.startsWith(PROTOCOL) ? value.substring(PROTOCOL.length()) : null;
+        }
+
+        @Override
+        NodeCatalogs reread(SourceFile edited) {
+            return new YarnBerry((Yaml.Documents) edited);
+        }
+
+        @Override
+        List<String> yamlPath(String catalog) {
+            return catalog.isEmpty() ? singletonList("catalog") : Arrays.asList("catalogs", catalog);
+        }
+    }
+
+    /**
+     * Bun's catalogs from the root package.json: {@code workspaces.catalog(s)} when the workspaces object holds one,
+     * the top-level {@code catalog(s)} otherwise.
+     */
+    public static final class Bun extends NodeCatalogs {
+
+        Bun(Json.Document document) {
+            super(document, read(document));
+        }
+
+        private static Map<String, Map<String, String>> read(Json.Document document) {
+            Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
+            Json.JsonObject base = base(document);
+            if (base == null) {
+                return catalogs;
+            }
+            Json catalog = member(base, "catalog");
+            if (catalog instanceof Json.JsonObject) {
+                catalogs.put("", strings((Json.JsonObject) catalog));
+            }
+            Json named = member(base, "catalogs");
+            if (named instanceof Json.JsonObject) {
+                for (Json m : ((Json.JsonObject) named).getMembers()) {
+                    if (m instanceof Json.Member && ((Json.Member) m).getValue() instanceof Json.JsonObject) {
+                        String name = string(((Json.Member) m).getKey());
+                        if (name != null && !name.isEmpty()) {
+                            catalogs.put(name, strings((Json.JsonObject) ((Json.Member) m).getValue()));
+                        }
+                    }
+                }
+            }
+            return catalogs;
+        }
+
+        @Override
+        public @Nullable String catalogOf(String value) {
+            return value.startsWith(PROTOCOL) ? value.substring(PROTOCOL.length()).trim() : null;
+        }
+
+        @Override
+        public @Nullable NodeCatalogs withSpecifier(String catalog, String alias, String specifier) {
+            String current = specifier(catalog, alias);
+            if (current == null || !isVersionSpec(alias, current)) {
+                return null;
+            }
+            return current.equals(specifier) ? this : withEntry(catalog, alias, specifier);
+        }
+
+        @Override
+        public NodeCatalogs withEntry(String catalog, String alias, String specifier) {
+            if (specifier.equals(specifier(catalog, alias))) {
+                return this;
+            }
+            Json.Document document = (Json.Document) getDocument();
+            return reread(PackageJsonHelper.withStringMember(document, path(document, catalog), alias, specifier));
+        }
+
+        @Override
+        NodeCatalogs reread(SourceFile edited) {
+            return new Bun((Json.Document) edited);
+        }
+
+        // Bun's Package.parse: the workspaces object when it declares a catalog, else the root when it has workspaces
+        static Json.@Nullable JsonObject base(Json.Document document) {
+            if (!(document.getValue() instanceof Json.JsonObject)) {
+                return null;
+            }
+            Json.JsonObject root = (Json.JsonObject) document.getValue();
+            Json workspaces = member(root, "workspaces");
+            if (workspaces == null) {
+                return null;
+            }
+            if (workspaces instanceof Json.JsonObject && (member((Json.JsonObject) workspaces, "catalog") != null ||
+                                                          member((Json.JsonObject) workspaces, "catalogs") != null)) {
+                return (Json.JsonObject) workspaces;
+            }
+            return root;
+        }
+
+        private static List<String> path(Json.Document document, String catalog) {
+            List<String> path = new ArrayList<>();
+            if (base(document) != document.getValue()) {
+                path.add("workspaces");
+            }
+            if (catalog.isEmpty()) {
+                path.add("catalog");
+            } else {
+                path.add("catalogs");
+                path.add(catalog);
+            }
+            return path;
+        }
+
+        private static Map<String, String> strings(Json.JsonObject object) {
+            Map<String, String> out = new LinkedHashMap<>();
+            for (Json m : object.getMembers()) {
+                if (m instanceof Json.Member) {
+                    String key = string(((Json.Member) m).getKey());
+                    String value = string(((Json.Member) m).getValue());
+                    if (key != null && value != null) {
+                        out.put(key, value);
+                    }
+                }
+            }
+            return out;
+        }
+    }
+
+    /**
+     * Catalogs in a YAML file, edited one scalar or one key at a time.
+     */
+    abstract static class YamlCatalogs extends NodeCatalogs {
+
+        private final boolean flowStyle;
+
+        YamlCatalogs(Yaml.Documents document, Map<String, Map<String, String>> catalogs) {
+            super(document, catalogs);
+            this.flowStyle = flowStyle(yamlRoot(document));
+        }
+
+        /**
+         * The keys leading from the document's root to the catalog's mapping.
+         */
+        abstract List<String> yamlPath(String catalog);
+
+        @Override
+        public boolean isFlowStyle() {
+            return flowStyle;
+        }
+
+        @Override
+        public @Nullable NodeCatalogs withSpecifier(String catalog, String alias, String specifier) {
+            String current = specifier(catalog, alias);
+            if (flowStyle || current == null || !isVersionSpec(alias, current)) {
+                return null;
+            }
+            return current.equals(specifier) ? this : replaced(catalog, alias, specifier);
+        }
+
+        @Override
+        public @Nullable NodeCatalogs withEntry(String catalog, String alias, String specifier) {
+            String current = specifier(catalog, alias);
+            if (flowStyle) {
+                return null;
+            }
+            if (specifier.equals(current)) {
+                return this;
+            }
+            if (current != null) {
+                return replaced(catalog, alias, specifier);
+            }
+            Yaml.Documents docs = (Yaml.Documents) getDocument();
+            Yaml.Mapping root = yamlRoot(docs);
+            if (root == null && (docs.getDocuments().isEmpty() ||
+                                 !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Scalar) ||
+                                 !((Yaml.Scalar) docs.getDocuments().get(0).getBlock()).getValue().isEmpty())) {
+                return null;
+            }
+            Yaml.Mapping base = root == null ?
+                    new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
+            Yaml.Mapping edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base));
+            return edited == null ? null : reread(withRoot(docs, edited));
+        }
+
+        private @Nullable NodeCatalogs replaced(String catalog, String alias, String specifier) {
+            Yaml.Documents docs = (Yaml.Documents) getDocument();
+            Yaml.Scalar scalar = entryScalar(yamlRoot(docs), yamlPath(catalog), alias);
+            if (scalar == null || scalar.getStyle() == Yaml.Scalar.Style.LITERAL ||
+                scalar.getStyle() == Yaml.Scalar.Style.FOLDED) {
+                return null;
+            }
+            Yaml.Scalar rewritten = scalar.withValue(specifier);
+            if (scalar.getStyle() == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(specifier)) {
+                rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
+            }
+            return reread(replaceScalar(docs, scalar, rewritten));
+        }
+
+        // the YAML parser reads a flow mapping as one scalar
+        private static boolean flowStyle(Yaml.@Nullable Mapping root) {
+            List<Yaml.Block> values = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : root == null ? Collections.<Yaml.Mapping.Entry>emptyList() :
+                    root.getEntries()) {
+                if ("catalog".equals(entry.getKey().getValue()) || "catalogs".equals(entry.getKey().getValue())) {
+                    values.add(entry.getValue());
+                    if (entry.getValue() instanceof Yaml.Mapping && "catalogs".equals(entry.getKey().getValue())) {
+                        for (Yaml.Mapping.Entry group : ((Yaml.Mapping) entry.getValue()).getEntries()) {
+                            values.add(group.getValue());
+                        }
+                    }
+                }
+            }
+            for (Yaml.Block value : values) {
+                if (value instanceof Yaml.Mapping && ((Yaml.Mapping) value).getOpeningBracePrefix() != null &&
+                    !((Yaml.Mapping) value).getEntries().isEmpty() ||
+                    value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
+                    ((Yaml.Scalar) value).getValue().startsWith("{") && !emptyFlow(value)) {
+                    return true;
+                }
+            }
             return false;
         }
     }
 
-    // the catalog's mapping keys: pnpm writes the default catalog where it is, `catalog` when it is neither place
-    private List<String> yamlPath(String catalog) {
-        if (!DEFAULT.equals(catalog)) {
-            return Arrays.asList("catalogs", catalog);
-        }
-        Yaml.Mapping root = yamlRoot((Yaml.Documents) document);
-        if (packageManager == PackageManager.Pnpm && root != null && mapping(root, "catalog") == null) {
-            Yaml.Mapping named = mapping(root, "catalogs");
-            if (named != null && mapping(named, "default") != null) {
-                return Arrays.asList("catalogs", "default");
-            }
-        }
-        return singletonList("catalog");
-    }
-
-    private static Yaml.@Nullable Mapping yamlRoot(Yaml.Documents docs) {
+    static Yaml.@Nullable Mapping yamlRoot(Yaml.Documents docs) {
         if (docs.getDocuments().isEmpty() || !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Mapping)) {
             return null;
         }
@@ -387,10 +649,24 @@ public class NodeCatalogs {
     private static Yaml.@Nullable Mapping mapping(Yaml.Mapping mapping, String key) {
         for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
             if (key.equals(entry.getKey().getValue())) {
-                return entry.getValue() instanceof Yaml.Mapping ? (Yaml.Mapping) entry.getValue() : null;
+                return asMapping(entry.getValue());
             }
         }
         return null;
+    }
+
+    // a mapping, or `{}`, which the YAML parser reads as a scalar
+    private static Yaml.@Nullable Mapping asMapping(Yaml.@Nullable Block value) {
+        if (value instanceof Yaml.Mapping) {
+            return (Yaml.Mapping) value;
+        }
+        return emptyFlow(value) ? new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) :
+                null;
+    }
+
+    private static boolean emptyFlow(Yaml.@Nullable Block value) {
+        return value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
+               "{}".equals(((Yaml.Scalar) value).getValue().replaceAll("\\s", ""));
     }
 
     private static Map<String, String> scalars(Yaml.Mapping mapping) {
@@ -428,17 +704,15 @@ public class NodeCatalogs {
         }.visitNonNull(docs, 0);
     }
 
-    // `mapping` with `alias: specifier` under the keys path[depth..], each created where missing
-    private static Yaml.Mapping put(Yaml.Mapping mapping, List<String> path, int depth, String alias, String specifier,
-                                    String unit) {
+    // `mapping` with `alias: specifier` under the keys path[depth..], each created where missing; null where a key on
+    // the path holds no block mapping
+    private static Yaml.@Nullable Mapping put(Yaml.Mapping mapping, List<String> path, int depth, String alias,
+                                              String specifier, String unit) {
         String indent = depth == 0 ? "" : repeat(unit, depth);
         if (depth == path.size()) {
-            for (int i = 0; i < mapping.getEntries().size(); i++) {
-                Yaml.Mapping.Entry entry = mapping.getEntries().get(i);
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
                 if (alias.equals(entry.getKey().getValue())) {
-                    List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-                    entries.set(i, entry.withValue(scalar(" ", specifier)));
-                    return mapping.withEntries(entries);
+                    return null;
                 }
             }
             return insert(mapping, newEntry(indent, alias, scalar(" ", specifier)), false);
@@ -446,16 +720,22 @@ public class NodeCatalogs {
         String key = path.get(depth);
         for (int i = 0; i < mapping.getEntries().size(); i++) {
             Yaml.Mapping.Entry entry = mapping.getEntries().get(i);
-            if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Mapping) {
+            if (key.equals(entry.getKey().getValue())) {
+                if (!(entry.getValue() instanceof Yaml.Mapping)) {
+                    return null;
+                }
+                Yaml.Mapping child = put((Yaml.Mapping) entry.getValue(), path, depth + 1, alias, specifier, unit);
+                if (child == null) {
+                    return null;
+                }
                 List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-                entries.set(i, entry.withValue(put((Yaml.Mapping) entry.getValue(), path, depth + 1, alias,
-                        specifier, unit)));
+                entries.set(i, entry.withValue(child));
                 return mapping.withEntries(entries);
             }
         }
         Yaml.Mapping child = put(new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
                 path, depth + 1, alias, specifier, unit);
-        return insert(mapping, newEntry(indent, key, child), depth == 0);
+        return child == null ? null : insert(mapping, newEntry(indent, key, child), depth == 0);
     }
 
     // where pnpm's reorderRecursive puts a new key: sorted in when the keys are sorted (packages first at the top
@@ -543,19 +823,6 @@ public class NodeCatalogs {
         return out.toString();
     }
 
-    private static Yaml.Mapping retain(Yaml.Mapping catalog, Map<String, Set<String>> references,
-                                       @Nullable String name) {
-        List<Yaml.Mapping.Entry> kept = new ArrayList<>();
-        for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
-            Set<String> referenced = references.getOrDefault(entry.getKey().getValue(), Collections.emptySet());
-            if (referenced.contains(PROTOCOL) || name != null && referenced.contains(PROTOCOL + name)) {
-                kept.add(entry);
-            }
-        }
-        return kept.size() == catalog.getEntries().size() ? catalog :
-                catalog.withEntries(firstPrefix(catalog.getEntries(), kept));
-    }
-
     // the first remaining entry takes the prefix of the first original one
     private static List<Yaml.Mapping.Entry> firstPrefix(List<Yaml.Mapping.Entry> original,
                                                         List<Yaml.Mapping.Entry> kept) {
@@ -590,67 +857,62 @@ public class NodeCatalogs {
         return mapping.withEntries(firstPrefix(mapping.getEntries(), kept));
     }
 
-    // parsePkgAndParentSelector's target package of an override key: `a>b@1` -> b
-    private static String overrideTarget(String selector) {
-        String target = selector.substring(selector.lastIndexOf('>') + 1);
-        int at = target.indexOf('@', target.startsWith("@") ? 1 : 0);
-        return at < 0 ? target : target.substring(0, at);
+    // a plain scalar as js-yaml's core schema reads it (null, boolean, number or string), a quoted one as a string
+    private static @Nullable Object value(Yaml.Scalar scalar) {
+        String text = scalar.getValue();
+        if (scalar.getStyle() != Yaml.Scalar.Style.PLAIN) {
+            return text;
+        }
+        switch (text) {
+            case "":
+            case "~":
+            case "null":
+            case "Null":
+            case "NULL":
+                return null;
+            case "true":
+            case "True":
+            case "TRUE":
+                return true;
+            case "false":
+            case "False":
+            case "FALSE":
+                return false;
+            default:
+                Double number = yamlNumber(text);
+                return number == null ? text : number;
+        }
     }
 
-    // Bun's Package.parse: the workspaces object when it declares a catalog, else the root when it has workspaces
-    private static Json.@Nullable JsonObject bunBase(Json.Document document) {
-        if (!(document.getValue() instanceof Json.JsonObject)) {
+    private static final Pattern YAML_INT = Pattern.compile(
+            "[-+]?(?:0b[01_]*[01][01_]*|0x[0-9a-fA-F_]*[0-9a-fA-F][0-9a-fA-F_]*|0o[0-7_]*[0-7][0-7_]*" +
+            "|0|0?[0-9][0-9_]*)");
+    private static final Pattern YAML_FLOAT = Pattern.compile(
+            "[-+]?[0-9][0-9_]*(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?" +
+            "|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN)");
+
+    private static @Nullable Double yamlNumber(String text) {
+        if (text.endsWith("_")) {
             return null;
         }
-        Json.JsonObject root = (Json.JsonObject) document.getValue();
-        Json workspaces = member(root, "workspaces");
-        if (workspaces == null) {
+        String value = text.replace("_", "");
+        double sign = value.startsWith("-") ? -1 : 1;
+        String digits = value.startsWith("-") || value.startsWith("+") ? value.substring(1) : value;
+        if (YAML_INT.matcher(text).matches()) {
+            int radix = digits.startsWith("0b") ? 2 : digits.startsWith("0x") ? 16 : digits.startsWith("0o") ? 8 : 10;
+            return sign * new BigInteger(radix == 10 ? digits : digits.substring(2), radix).doubleValue();
+        }
+        if (!YAML_FLOAT.matcher(text).matches()) {
             return null;
         }
-        if (workspaces instanceof Json.JsonObject && (member((Json.JsonObject) workspaces, "catalog") != null ||
-                                                      member((Json.JsonObject) workspaces, "catalogs") != null)) {
-            return (Json.JsonObject) workspaces;
+        String lower = digits.toLowerCase();
+        if (".inf".equals(lower)) {
+            return sign * Double.POSITIVE_INFINITY;
         }
-        return root;
-    }
-
-    private static List<String> bunPath(Json.Document document, String catalog) {
-        Json.JsonObject base = bunBase(document);
-        List<String> path = new ArrayList<>();
-        if (base != document.getValue()) {
-            path.add("workspaces");
+        if (".nan".equals(lower)) {
+            return Double.NaN;
         }
-        if (DEFAULT.equals(catalog)) {
-            path.add("catalog");
-        } else {
-            path.add("catalogs");
-            path.add(catalog);
-        }
-        return path;
-    }
-
-    private static Map<String, Map<String, String>> bunCatalogs(Json.Document document) {
-        Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
-        Json.JsonObject base = bunBase(document);
-        if (base == null) {
-            return catalogs;
-        }
-        Json catalog = member(base, "catalog");
-        if (catalog instanceof Json.JsonObject) {
-            catalogs.put(DEFAULT, strings((Json.JsonObject) catalog));
-        }
-        Json named = member(base, "catalogs");
-        if (named instanceof Json.JsonObject) {
-            for (Json m : ((Json.JsonObject) named).getMembers()) {
-                if (m instanceof Json.Member && ((Json.Member) m).getValue() instanceof Json.JsonObject) {
-                    String name = string(((Json.Member) m).getKey());
-                    if (name != null) {
-                        catalogs.put(name, strings((Json.JsonObject) ((Json.Member) m).getValue()));
-                    }
-                }
-            }
-        }
-        return catalogs;
+        return sign * Double.parseDouble(lower.startsWith(".") ? "0" + lower : lower);
     }
 
     private static @Nullable Json member(Json.JsonObject object, String key) {
@@ -662,20 +924,6 @@ public class NodeCatalogs {
         return null;
     }
 
-    private static Map<String, String> strings(Json.JsonObject object) {
-        Map<String, String> out = new LinkedHashMap<>();
-        for (Json m : object.getMembers()) {
-            if (m instanceof Json.Member) {
-                String key = string(((Json.Member) m).getKey());
-                String value = string(((Json.Member) m).getValue());
-                if (key != null && value != null) {
-                    out.put(key, value);
-                }
-            }
-        }
-        return out;
-    }
-
     private static @Nullable String string(@Nullable Object node) {
         if (node instanceof Json.Literal && ((Json.Literal) node).getValue() instanceof String) {
             return (String) ((Json.Literal) node).getValue();
@@ -684,31 +932,374 @@ public class NodeCatalogs {
     }
 
     /**
-     * A dependency recipe's scan with the catalogs its projects read, read once a cycle, and the edits this cycle
-     * decides on them.
+     * Whether YAML reads {@code value} written without quotes as this string.
+     */
+    static boolean canBePlainScalar(String value) {
+        if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
+            return false;
+        }
+        if (PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0 || !value.equals(value.trim())) {
+            return false;
+        }
+        if (value.contains(": ") || value.contains(" #") || value.endsWith(":") ||
+            YAML_NON_STRING.matcher(value).matches()) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if (c < 0x20 || c == 0x7F) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * How a dependency recipe decides one manifest's edit.
+     */
+    @FunctionalInterface
+    public interface Decider {
+        void decide(Decision decision, ExecutionContext ctx);
+    }
+
+    /**
+     * How a dependency recipe records a lock regeneration that failed.
+     */
+    @FunctionalInterface
+    public interface FailureRow {
+        void insert(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Result result);
+    }
+
+    /**
+     * What a recipe decides for one manifest from one revision of it: the manifest's edit, the catalog edits that edit
+     * needs, and the edits it declines.
+     */
+    public static final class Decision {
+        private final Accumulator acc;
+
+        @Getter
+        private final Path path;
+
+        /**
+         * The manifest decided from.
+         */
+        @Getter
+        private final Json.Document manifest;
+
+        private SourceFile from;
+        private @Nullable Function<Json.Document, Json.Document> manifestEdit;
+        private final List<UnaryOperator<NodeCatalogs>> catalogEdits = new ArrayList<>();
+        private final Set<String> declines = new LinkedHashSet<>();
+
+        private Decision(Accumulator acc, Path path, Json.Document manifest) {
+            this.acc = acc;
+            this.path = path;
+            this.manifest = manifest;
+            this.from = manifest;
+        }
+
+        /**
+         * The catalogs the manifest's package manager reads for it, with the edits decided so far.
+         */
+        public @Nullable NodeCatalogs catalogs() {
+            CatalogFile file = acc.catalogFile(path);
+            return file == null ? null : file.current();
+        }
+
+        public void editManifest(Function<Json.Document, Json.Document> edit) {
+            Function<Json.Document, Json.Document> before = manifestEdit;
+            manifestEdit = before == null ? edit : before.andThen(edit);
+        }
+
+        /**
+         * Edit the catalogs the manifest reads; false, editing nothing, when the edit cannot be made.
+         */
+        public boolean editCatalogs(Function<NodeCatalogs, @Nullable NodeCatalogs> edit) {
+            CatalogFile file = acc.catalogFile(path);
+            NodeCatalogs current = file == null ? null : file.current();
+            NodeCatalogs edited = current == null ? null : edit.apply(current);
+            if (file == null || edited == null) {
+                return false;
+            }
+            if (edited != current) {
+                UnaryOperator<NodeCatalogs> op = c -> {
+                    NodeCatalogs e = edit.apply(c);
+                    return e == null ? c : e;
+                };
+                catalogEdits.add(op);
+                file.append(op, edited);
+            }
+            return true;
+        }
+
+        public void decline(String message) {
+            declines.add(message);
+        }
+
+        /**
+         * Write {@code row} once a cycle.
+         */
+        public <R> void insertRow(DataTable<R> table, ExecutionContext ctx, R row) {
+            if (acc.rows.add(row)) {
+                table.insertRow(ctx, row);
+            }
+        }
+
+        private boolean edits() {
+            return manifestEdit != null || !catalogEdits.isEmpty();
+        }
+    }
+
+    // a catalog file as scanned and the edits decided on it, applied in decision order
+    private static final class CatalogFile {
+        final Path path;
+        final NodeCatalogs scanned;
+        final List<UnaryOperator<NodeCatalogs>> edits = new ArrayList<>();
+        NodeCatalogs current;
+        int applied;
+
+        CatalogFile(NodeCatalogs scanned) {
+            this.path = scanned.getPath();
+            this.scanned = scanned;
+            this.current = scanned;
+        }
+
+        NodeCatalogs current() {
+            while (applied < edits.size()) {
+                current = edits.get(applied++).apply(current);
+            }
+            return current;
+        }
+
+        void append(UnaryOperator<NodeCatalogs> edit, NodeCatalogs result) {
+            current();
+            edits.add(edit);
+            current = result;
+            applied = edits.size();
+        }
+
+        void reset() {
+            edits.clear();
+            current = scanned;
+            applied = 0;
+        }
+
+        NodeCatalogs replay(NodeCatalogs base) {
+            for (UnaryOperator<NodeCatalogs> edit : edits) {
+                base = edit.apply(base);
+            }
+            return base;
+        }
+    }
+
+    /**
+     * A dependency recipe's scan and its decisions this cycle, made in generate from the scanned manifests and again
+     * at visit time for a manifest an earlier recipe changed, while nothing written yet depends on them.
      */
     public static final class Accumulator {
         public final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
-        public final Map<Path, PackageJsonHelper.EditAndRegenerateResult> results = new LinkedHashMap<>();
-        public final Set<Object> rows = new HashSet<>();
-
-        /**
-         * The manifest edit this cycle decides for each package.json, by its path.
-         */
-        public final Map<Path, Function<Json.Document, Json.Document>> manifestEdits = new HashMap<>();
-
-        /**
-         * The messages of the edits this cycle declines, by the package.json they leave unchanged.
-         */
-        public final Map<Path, Set<String>> declines = new HashMap<>();
+        private final Set<Object> rows = new HashSet<>();
         private final Map<Path, SourceFile> files = new HashMap<>();
-        private final Map<Path, NodeCatalogs> read = new HashMap<>();
-        private final Map<Path, List<UnaryOperator<NodeCatalogs>>> edits = new LinkedHashMap<>();
+        private final Map<Path, @Nullable CatalogFile> catalogFiles = new HashMap<>();
+        private final Map<Path, @Nullable CatalogFile> catalogFileOf = new HashMap<>();
+        private final Map<Path, Decision> decisions = new LinkedHashMap<>();
+        private final Map<Path, PackageJsonHelper.EditAndRegenerateResult> results = new LinkedHashMap<>();
+        private final Set<Path> written = new HashSet<>();
 
         /**
-         * Of a lock's {@code importers}, the one regenerated last this cycle, whose lock holds every edit made before.
+         * Note what a dependency recipe's scan reads from {@code sf}.
          */
-        public @Nullable Path lastRegenerated(List<Path> importers) {
+        public void scan(SourceFile sf) {
+            Path p = sf.getSourcePath();
+            String basename = String.valueOf(p.getFileName());
+            if (sf instanceof Yaml.Documents && (basename.equals(fileName(PackageManager.Pnpm)) ||
+                                                basename.equals(fileName(PackageManager.YarnBerry)))) {
+                files.put(p, sf);
+            }
+            if (NodeDependencyScan.capturePackageManagerFile(scan, sf)) {
+                return;
+            }
+            if (PackageJsonHelper.isLockFile(basename)) {
+                if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
+                    NodeDependencyScan.captureLock(scan, sf);
+                }
+                return;
+            }
+            if (sf instanceof Json.Document && "package.json".equals(basename) &&
+                sf.getMarkers().findFirst(NodeResolutionResult.class).isPresent()) {
+                scan.projects.computeIfAbsent(p, k -> new NodeDependencyScan.ProjectState()).capturedPackageJson = sf;
+            }
+        }
+
+        /**
+         * Decide every scanned manifest's edit.
+         */
+        public void decideAll(ExecutionContext ctx, Decider decider) {
+            for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : new TreeMap<>(scan.projects).entrySet()) {
+                SourceFile pkg = project.getValue().capturedPackageJson;
+                if (pkg != null) {
+                    decide(project.getKey(), pkg, ctx, decider);
+                }
+            }
+        }
+
+        /**
+         * The catalogs the package manager of {@code packageJson} reads for it, with this cycle's edits.
+         */
+        public @Nullable NodeCatalogs of(Path packageJson) {
+            CatalogFile file = catalogFile(packageJson);
+            return file == null ? null : file.current();
+        }
+
+        /**
+         * The visitor applying this cycle's decisions: catalog files edited in place, manifests edited or marked
+         * declined, and each lock regenerated once from its importers as edited.
+         */
+        public TreeVisitor<Tree, ExecutionContext> visitor(Decider decider, FailureRow failureRow) {
+            NodeDependencyScan.linkWorkspaceMembers(scan);
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public Tree preVisit(Tree tree, ExecutionContext ctx) {
+                    stopAfterPreVisit();
+                    if (!(tree instanceof SourceFile)) {
+                        return tree;
+                    }
+                    SourceFile sf = (SourceFile) tree;
+                    Path p = sf.getSourcePath();
+                    SourceFile catalogFile = editedFile(ctx, sf);
+                    if (catalogFile != null) {
+                        return catalogFile;
+                    }
+                    NodeDependencyScan.ProjectState ps = scan.projects.get(p);
+                    if (ps != null && ps.capturedPackageJson != null) {
+                        decide(p, sf, ctx, decider);
+                        Decision decision = decisions.get(p);
+                        if (decision != null && decision.manifestEdit != null || holdsCatalogEdits(p)) {
+                            regenerate(ps, sf, ctx);
+                        }
+                        SourceFile out = sf;
+                        if (ps.modifiedPackageJson != null) {
+                            out = NodeDependencyScan.modifiedFor(ps, sf);
+                            PackageJsonHelper.putLiveTree(ctx, p, out);
+                            if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
+                                recordFailure(ctx, ps, p, failureRow);
+                                out = warn(out, "lock regeneration failed: " + ps.regenResult.getErrorMessage());
+                            }
+                        }
+                        for (String decline : decision == null ? Collections.<String>emptySet() : decision.declines) {
+                            out = warn(out, decline);
+                        }
+                        if (out != sf) {
+                            return out;
+                        }
+                    }
+                    List<Path> importers = NodeDependencyScan.lockImporters(scan, p);
+                    Path last = regenerateLock(ctx, importers, decider);
+                    NodeDependencyScan.ProjectState lps = last == null ? null : scan.projects.get(last);
+                    if (lps != null && lps.regenResult != null) {
+                        if (lps.regenResult.isSuccess()) {
+                            return PackageJsonHelper.reparseLock(sf, lps.regenResult.getLockFileContent());
+                        }
+                        recordFailure(ctx, lps, last, failureRow);
+                        return warn(sf, "lock regeneration failed: " + lps.regenResult.getErrorMessage());
+                    }
+                    return tree;
+                }
+            };
+        }
+
+        // decide path's edit from this revision of its manifest, unless what this recipe wrote depends on the last one
+        private void decide(Path path, SourceFile manifest, ExecutionContext ctx, Decider decider) {
+            Decision previous = decisions.get(path);
+            if (!(manifest instanceof Json.Document) || previous != null && previous.from == manifest) {
+                return;
+            }
+            if (previous != null && (results.containsKey(path) || written.contains(path))) {
+                previous.from = manifest;
+                return;
+            }
+            Map<Path, String> before = previous == null ? emptyMap() : writtenCatalogs(ctx);
+            Decision decision = new Decision(this, path, (Json.Document) manifest);
+            decisions.put(path, decision);
+            if (previous != null) {
+                rebuild();
+            }
+            decider.decide(decision, ctx);
+            CatalogFile file = decision.edits() ? catalogFile(path) : null;
+            if (file != null && file.current().isFlowStyle() && output(ctx, file, file.current()) == null) {
+                decision.manifestEdit = null;
+                decision.catalogEdits.clear();
+                decision.decline("cleanupUnusedCatalogs would make pnpm rewrite the flow-style catalogs of " +
+                                 file.path + ", so this edit was not made");
+                rebuild();
+            }
+            if (previous != null) {
+                rebuild();
+                if (!before.equals(writtenCatalogs(ctx))) {
+                    previous.from = manifest;
+                    decisions.put(path, previous);
+                    rebuild();
+                }
+            }
+        }
+
+        private void rebuild() {
+            for (CatalogFile file : catalogFiles.values()) {
+                if (file != null) {
+                    file.reset();
+                }
+            }
+            for (Decision decision : decisions.values()) {
+                CatalogFile file = decision.catalogEdits.isEmpty() ? null : catalogFile(decision.path);
+                if (file != null) {
+                    file.edits.addAll(decision.catalogEdits);
+                }
+            }
+        }
+
+        private Map<Path, String> writtenCatalogs(ExecutionContext ctx) {
+            Map<Path, String> out = new HashMap<>();
+            for (CatalogFile file : catalogFiles.values()) {
+                if (file != null && written.contains(file.path)) {
+                    NodeCatalogs output = output(ctx, file, file.current());
+                    out.put(file.path, output == null ? "" : output.print());
+                }
+            }
+            return out;
+        }
+
+        // the lock's importers regenerated as this cycle edits them; the one regenerated last holds every edit
+        private @Nullable Path regenerateLock(ExecutionContext ctx, List<Path> importers, Decider decider) {
+            for (Path importer : importers) {
+                NodeDependencyScan.ProjectState ips = scan.projects.get(importer);
+                if (ips == null || ips.capturedPackageJson == null || results.containsKey(importer)) {
+                    continue;
+                }
+                SourceFile pkg = current(ctx, importer, ips);
+                decide(importer, pkg, ctx, decider);
+                Decision decision = decisions.get(importer);
+                if (decision != null && decision.manifestEdit != null) {
+                    regenerate(ips, pkg, ctx);
+                    if (ips.modifiedPackageJson != null) {
+                        PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
+                    }
+                }
+            }
+            if (lastRegenerated(importers) == null) {
+                for (int i = importers.size() - 1; i >= 0; i--) {
+                    NodeDependencyScan.ProjectState ips = scan.projects.get(importers.get(i));
+                    CatalogFile file = catalogFile(importers.get(i));
+                    if (ips != null && ips.capturedPackageJson != null && file != null && !file.edits.isEmpty()) {
+                        regenerate(ips, current(ctx, importers.get(i), ips), ctx);
+                        break;
+                    }
+                }
+            }
+            written.addAll(importers);
+            return lastRegenerated(importers);
+        }
+
+        private @Nullable Path lastRegenerated(List<Path> importers) {
             Path last = null;
             for (Map.Entry<Path, PackageJsonHelper.EditAndRegenerateResult> result : results.entrySet()) {
                 if (importers.contains(result.getKey()) && result.getValue().getRegenResult() != null) {
@@ -718,138 +1309,133 @@ public class NodeCatalogs {
             return last;
         }
 
-        /**
-         * Note a file the scan visits that holds catalogs: pnpm-workspace.yaml or .yarnrc.yml.
-         */
-        public void capture(SourceFile sf) {
-            String name = String.valueOf(sf.getSourcePath().getFileName());
-            if (sf instanceof Yaml.Documents && (name.equals(fileName(PackageManager.Pnpm)) ||
-                                                name.equals(fileName(PackageManager.YarnBerry)))) {
-                files.put(sf.getSourcePath(), sf);
+        private static SourceFile current(ExecutionContext ctx, Path packageJson, NodeDependencyScan.ProjectState ps) {
+            SourceFile live = PackageJsonHelper.getLiveTree(ctx, packageJson);
+            return live == null ? requireNonNull(ps.capturedPackageJson) : live;
+        }
+
+        private void regenerate(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
+            Path path = pkg.getSourcePath();
+            if (results.containsKey(path)) {
+                return;
+            }
+            Decision decision = decisions.get(path);
+            Function<Json.Document, Json.Document> manifestEdit = decision == null || decision.manifestEdit == null ?
+                    Function.identity() : decision.manifestEdit;
+            Function<Json.Document, Json.Document> edit = doc -> withCatalogEdits(manifestEdit.apply(doc));
+            PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(pkg, edit,
+                    editedFiles(ctx, path), ps.capturedLockContent, NodeDependencyScan.projectFiles(scan, ctx, path),
+                    ctx);
+            results.put(path, r);
+            if (r.isChanged()) {
+                ps.modifiedPackageJson = r.getModifiedPackageJson();
+                ps.regenResult = r.getRegenResult();
+                ps.editedFrom = pkg;
+                ps.edit = edit;
             }
         }
 
-        /**
-         * The catalogs the package manager of {@code packageJson} reads for it, as this cycle's edits leave them.
-         */
-        public @Nullable NodeCatalogs of(Path packageJson) {
-            PackageManager pm = packageManager(packageJson);
-            Path file = pm == null ? null : file(pm, packageJson);
-            if (pm == null || file == null) {
+        private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJson,
+                                   FailureRow failureRow) {
+            if (!ps.failureRecorded && ps.regenResult != null) {
+                ps.failureRecorded = true;
+                failureRow.insert(ctx, packageJson, ps.regenResult);
+            }
+        }
+
+        // the catalog files other than a manifest that a regeneration for packageJson reads, as this cycle leaves them;
+        // Bun's root manifest, as edited so far, when packageJson is another
+        private Map<Path, String> editedFiles(ExecutionContext ctx, Path packageJson) {
+            CatalogFile file = catalogFile(packageJson);
+            if (file == null || file.path.equals(packageJson)) {
+                return emptyMap();
+            }
+            NodeCatalogs output;
+            if (file.scanned instanceof Bun) {
+                if (file.edits.isEmpty()) {
+                    return emptyMap();
+                }
+                SourceFile live = PackageJsonHelper.getLiveTree(ctx, file.path);
+                output = live instanceof Json.Document ? file.replay(file.scanned.reread(live)) : file.current();
+            } else {
+                output = output(ctx, file, file.current());
+            }
+            written.add(file.path);
+            return output == null || output.getDocument() == file.scanned.getDocument() ? emptyMap() :
+                    singletonMap(file.path, output.print());
+        }
+
+        // a catalog file as visited, with this cycle's edits, when they change it
+        private @Nullable SourceFile editedFile(ExecutionContext ctx, SourceFile visited) {
+            Path path = visited.getSourcePath();
+            CatalogFile file = !files.containsKey(path) ? null : catalogFileAt(path,
+                    String.valueOf(path.getFileName()).equals(fileName(PackageManager.Pnpm)) ? PackageManager.Pnpm :
+                            PackageManager.YarnBerry);
+            if (file == null) {
                 return null;
             }
-            NodeCatalogs catalogs = read.computeIfAbsent(file, f -> {
-                SourceFile document = pm == PackageManager.Bun ? captured(f) : files.get(f);
-                return document == null ? null : read(pm, document);
-            });
-            if (catalogs == null) {
-                return null;
-            }
-            for (UnaryOperator<NodeCatalogs> edit : edits.getOrDefault(file, emptyList())) {
-                catalogs = edit.apply(catalogs);
-            }
-            return catalogs;
+            written.add(file.path);
+            NodeCatalogs edited = visited == file.scanned.getDocument() ? file.current() :
+                    file.replay(file.scanned.reread(visited));
+            NodeCatalogs output = output(ctx, file, edited);
+            return output == null || output.getDocument() == visited ? null : output.getDocument();
         }
 
-        /**
-         * Keep an edit decided on the catalogs of {@code packageJson}; it applies to every later read of them, and
-         * one that cannot apply to a later revision leaves it as it is.
-         */
-        public void edit(Path packageJson, Function<NodeCatalogs, @Nullable NodeCatalogs> edit) {
-            NodeCatalogs catalogs = of(packageJson);
-            if (catalogs != null) {
-                edits.computeIfAbsent(catalogs.getPath(), k -> new ArrayList<>()).add(c -> {
-                    NodeCatalogs edited = edit.apply(c);
-                    return edited == null ? c : edited;
-                });
+        // pnpm's cleanupUnusedCatalogs, which any install it runs applies, when this cycle edits the workspace
+        private @Nullable NodeCatalogs output(ExecutionContext ctx, CatalogFile file, NodeCatalogs edited) {
+            if (!(edited instanceof Pnpm) || !((Pnpm) edited).isCleanupUnusedCatalogs()) {
+                return edited;
             }
-        }
-
-        /**
-         * The catalog files this cycle edits that a regeneration for {@code packageJson} reads, by path; Bun's root
-         * manifest, as edited so far, when {@code packageJson} is another.
-         */
-        public Map<Path, String> editedFiles(ExecutionContext ctx, Path packageJson) {
-            NodeCatalogs catalogs = of(packageJson);
-            if (catalogs == null || !edits.containsKey(catalogs.getPath()) ||
-                catalogs.getPath().equals(packageJson)) {
-                return Collections.emptyMap();
-            }
-            SourceFile live = catalogs.getDocument() instanceof Json.Document ?
-                    PackageJsonHelper.getLiveTree(ctx, catalogs.getPath()) : null;
-            if (live instanceof Json.Document) {
-                return Collections.singletonMap(catalogs.getPath(), withCatalogEdits((Json.Document) live)
-                        .printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
-            }
-            return Collections.singletonMap(catalogs.getPath(), catalogs.print());
-        }
-
-        /**
-         * {@code visited} as this cycle's catalog edits leave it, when it is a catalog file other than a manifest.
-         */
-        public @Nullable SourceFile editedFile(SourceFile visited) {
-            if (!files.containsKey(visited.getSourcePath()) || !edits.containsKey(visited.getSourcePath())) {
-                return null;
-            }
-            PackageManager pm = String.valueOf(visited.getSourcePath().getFileName())
-                    .equals(fileName(PackageManager.Pnpm)) ? PackageManager.Pnpm : PackageManager.YarnBerry;
-            NodeCatalogs catalogs = read(pm, visited);
-            if (catalogs == null) {
-                return null;
-            }
-            for (UnaryOperator<NodeCatalogs> edit : edits.get(visited.getSourcePath())) {
-                catalogs = edit.apply(catalogs);
-            }
-            return catalogs.getDocument() == visited ? null : catalogs.getDocument();
-        }
-
-        /**
-         * {@code doc} with this cycle's catalog edits when it is the Bun root manifest holding them.
-         */
-        public Json.Document withCatalogEdits(Json.Document doc) {
-            List<UnaryOperator<NodeCatalogs>> edited = edits.get(doc.getSourcePath());
-            NodeCatalogs catalogs = edited == null ? null : read(PackageManager.Bun, doc);
-            if (catalogs == null) {
-                return doc;
-            }
-            for (UnaryOperator<NodeCatalogs> edit : edited) {
-                catalogs = edit.apply(catalogs);
-            }
-            return (Json.Document) catalogs.getDocument();
-        }
-
-        /**
-         * Whether this cycle edits catalogs that {@code packageJson}'s package manager reads for it.
-         */
-        public boolean editsCatalogsOf(Path packageJson) {
-            NodeCatalogs catalogs = of(packageJson);
-            return catalogs != null && edits.containsKey(catalogs.getPath());
-        }
-
-        /**
-         * The declarations of every project the scan holds under {@code root}'s directory, as edited so far.
-         */
-        public List<Map<String, String>> declarations(ExecutionContext ctx, Path root,
-                                                      Map<Path, SourceFile> edited) {
-            Path dir = root.getParent();
-            List<Map<String, String>> out = new ArrayList<>();
+            boolean touched = false;
+            List<Map<String, Map<String, String>>> projects = new ArrayList<>();
             for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
-                if (project.getValue().capturedPackageJson == null ||
-                    dir != null && !project.getKey().startsWith(dir)) {
+                SourceFile captured = project.getValue().capturedPackageJson;
+                if (captured == null || catalogFile(project.getKey()) != file) {
                     continue;
                 }
-                SourceFile current = edited.get(project.getKey());
-                if (current == null) {
-                    current = PackageJsonHelper.getLiveTree(ctx, project.getKey());
+                Decision decision = decisions.get(project.getKey());
+                touched |= decision != null && decision.edits();
+                SourceFile live = PackageJsonHelper.getLiveTree(ctx, project.getKey());
+                SourceFile doc = live != null ? live : decision != null ? decision.from : captured;
+                if (doc instanceof Json.Document && decision != null && decision.manifestEdit != null) {
+                    doc = decision.manifestEdit.apply((Json.Document) doc);
                 }
-                if (current == null) {
-                    current = project.getValue().capturedPackageJson;
-                }
-                for (Map<String, String> scope : PackageJsonHelper.declaredDependencies(current).values()) {
-                    out.add(scope);
-                }
+                projects.add(PackageJsonHelper.declaredDependencies(doc));
             }
-            return out;
+            return touched ? ((Pnpm) edited).withoutUnused(projects) : edited;
+        }
+
+        // Bun's root manifest with this cycle's catalog edits
+        private Json.Document withCatalogEdits(Json.Document doc) {
+            CatalogFile file = catalogFiles.get(doc.getSourcePath());
+            if (file == null || file.edits.isEmpty() || !(file.scanned instanceof Bun)) {
+                return doc;
+            }
+            written.add(file.path);
+            return (Json.Document) file.replay(file.scanned.reread(doc)).getDocument();
+        }
+
+        private boolean holdsCatalogEdits(Path packageJson) {
+            CatalogFile file = catalogFile(packageJson);
+            return file != null && file.path.equals(packageJson) && !file.edits.isEmpty();
+        }
+
+        private @Nullable CatalogFile catalogFile(Path packageJson) {
+            if (!catalogFileOf.containsKey(packageJson)) {
+                PackageManager pm = packageManager(packageJson);
+                Path path = pm == null ? null : file(pm, packageJson);
+                catalogFileOf.put(packageJson, pm == null || path == null ? null : catalogFileAt(path, pm));
+            }
+            return catalogFileOf.get(packageJson);
+        }
+
+        private @Nullable CatalogFile catalogFileAt(Path path, PackageManager pm) {
+            if (!catalogFiles.containsKey(path)) {
+                SourceFile document = pm == PackageManager.Bun ? captured(path) : files.get(path);
+                NodeCatalogs catalogs = document == null ? null : read(pm, document);
+                catalogFiles.put(path, catalogs == null ? null : new CatalogFile(catalogs));
+            }
+            return catalogFiles.get(path);
         }
 
         /**
@@ -895,7 +1481,7 @@ public class NodeCatalogs {
                 Path candidate = dir == null ? Paths.get(name) : dir.resolve(name);
                 if (pm == PackageManager.Bun) {
                     SourceFile manifest = captured(candidate);
-                    if (manifest instanceof Json.Document && bunBase((Json.Document) manifest) != null) {
+                    if (manifest instanceof Json.Document && Bun.base((Json.Document) manifest) != null) {
                         return candidate;
                     }
                 } else if (files.containsKey(candidate)) {
@@ -945,28 +1531,9 @@ public class NodeCatalogs {
             }
             return null;
         }
-    }
 
-    /**
-     * Whether YAML reads {@code value} written without quotes as this string.
-     */
-    static boolean canBePlainScalar(String value) {
-        if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
-            return false;
+        private static <T extends Tree> T warn(T tree, String message) {
+            return Markup.markup(tree, new Markup.Warn(randomId(), message, null));
         }
-        if (PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0 || !value.equals(value.trim())) {
-            return false;
-        }
-        if (value.contains(": ") || value.contains(" #") || value.endsWith(":") ||
-            YAML_NON_STRING.matcher(value).matches()) {
-            return false;
-        }
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c < 0x20 || c == 0x7F) {
-                return false;
-            }
-        }
-        return true;
     }
 }

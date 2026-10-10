@@ -1,0 +1,13 @@
+[ERROR] Invalid Version: ^1.0.0
+
+pnpm: Invalid Version: ^1.0.0
+    at new _SemVer (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:2431:17)
+    at compare2 (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:2842:38)
+    at Object.eq (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:2926:32)
+    at installSome (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:160604:237)
+    at _install (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:160519:17)
+    at async mutateModules (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:160357:19)
+    at async recursive (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:166247:124)
+    at async recursiveInstallThenUpdateWorkspaceState (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:166905:27)
+    at async installDeps (file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:166704:7)
+    at async file://<home>/.npm-global/lib/node_modules/pnpm/dist/pnpm.mjs:274560:19

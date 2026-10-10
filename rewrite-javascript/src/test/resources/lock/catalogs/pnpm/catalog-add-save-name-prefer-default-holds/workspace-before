@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+catalogMode: prefer
+saveCatalogName: tools
+catalog:
+  wrappy: 1.0.2

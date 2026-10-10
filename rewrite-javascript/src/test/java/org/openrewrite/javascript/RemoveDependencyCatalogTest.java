@@ -15,13 +15,22 @@
  */
 package org.openrewrite.javascript;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
+import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.yaml.Assertions.yaml;
+
 /**
- * A removal in a pnpm workspace with catalogs, as {@code pnpm remove} wrote it in the recordings under
- * {@code catalogs/pnpm}: the catalog loses the entries no project references only under {@code cleanupUnusedCatalogs}.
+ * A removal in a pnpm workspace with catalogs, as {@code pnpm remove} wrote it in {@code lock/catalogs/pnpm}: the
+ * catalog loses the entries no project references only under {@code cleanupUnusedCatalogs}.
  */
 class RemoveDependencyCatalogTest implements RewriteTest {
 
@@ -34,12 +43,70 @@ class RemoveDependencyCatalogTest implements RewriteTest {
       catalog-remove-strict                | wrappy
       catalog-remove-strict-cleanup        | wrappy
       catalog-remove-named-cleanup         | is-number
+      catalog-remove-last-cleanup          | wrappy
+      catalog-remove-empties-scope-install | wrappy
+      catalog-remove-cleanup-capitalized-true | wrappy
+      catalog-remove-cleanup-quoted-false  | wrappy
+      catalog-remove-cleanup-no            | wrappy
       """)
     void removedAsPnpmRemovedIt(String scenario, String name) {
         CatalogRecording recording = new CatalogRecording("pnpm", scenario);
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency(name, null)).executionContext(recording.ctx()),
           recording.sources()
+        );
+    }
+
+    @Test
+    void declinedWhenTheCleanupWouldRewriteAFlowStyleCatalog() {
+        String member = """
+          {
+            "name": "a",
+            "dependencies": {
+              "wrappy": "catalog:"
+            }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
+            .noTrim().after(actual -> actual).afterRecipe(doc -> {
+                assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                  .isEqualTo(member);
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(w ->
+                  assertThat(w.getMessage()).contains("flow-style catalogs"));
+            })),
+          yaml("""
+            packages:
+              - packages/*
+            cleanupUnusedCatalogs: true
+            catalog: {wrappy: 1.0.2}
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
+    @Test
+    void aDependencyAnEarlierRecipeAddedInTheSameCycle() {
+        rewriteRun(
+          spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
+              new AddDependency("right-pad", "^1.0.0", null), new RemoveDependency("left-pad", null))
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          packageJson("""
+            {
+              "name": "consumer",
+              "dependencies": {
+                "is-number": "^7.0.0"
+              }
+            }
+            """, """
+            {
+              "name": "consumer",
+              "dependencies": {
+                "is-number": "^7.0.0",
+                "right-pad": "^1.0.0"
+              }
+            }
+            """, nodeResolutionResult(PackageManager.Npm))
         );
     }
 }

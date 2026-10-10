@@ -29,8 +29,8 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
 
 /**
- * In a pnpm workspace with catalogs the dependency is added as {@code pnpm add} added it in the recordings under
- * {@code catalogs/pnpm}, under each {@code catalogMode}, with and without {@code cleanupUnusedCatalogs}.
+ * In a pnpm workspace with catalogs the dependency is added as {@code pnpm add} added it in {@code lock/catalogs/pnpm},
+ * under each {@code catalogMode} and {@code saveCatalogName}, with and without {@code cleanupUnusedCatalogs}.
  */
 class AddDependencyCatalogTest implements RewriteTest {
 
@@ -62,17 +62,83 @@ class AddDependencyCatalogTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(textBlock = """
-      strict
-      strict-cleanup
+    @CsvSource(delimiter = '|', textBlock = """
+      catalog-add-save-name-manual               | wrappy    | 1.0.2
+      catalog-add-save-name-prefer               | wrappy    | 1.0.2
+      catalog-add-save-name-strict-in-catalog    | wrappy    | 1.0.2
+      catalog-add-save-name-prefer-mismatch      | wrappy    | 1.0.2
+      catalog-add-save-name-manual-mismatch      | wrappy    | 1.0.2
+      catalog-add-save-name-default-holds        | wrappy    | 1.0.2
+      catalog-add-save-name-default-differs      | wrappy    | 1.0.2
+      catalog-add-save-name-prefer-default-holds | wrappy    | 1.0.2
+      catalog-add-save-name-default              | wrappy    | 1.0.2
+      catalog-add-save-name-null                 | wrappy    | 1.0.2
+      catalog-add-mode-capitalized-mismatch      | wrappy    | 1.0.1
+      catalog-add-mode-capitalized-not-in-catalog | is-number | 7.0.0
+      catalog-add-mode-null-mismatch             | wrappy    | 1.0.1
       """)
-    void strictModeRejectsAVersionOutsideTheCatalog(String mode) {
-        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-add-root-declares-mismatch-" + mode);
+    void savedWhereSaveCatalogNameAndCatalogModeSayAsPnpmAddedIt(String scenario, String name, String version) {
+        CatalogRecording recording = new CatalogRecording("pnpm", scenario);
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("wrappy", "1.0.1", null)).executionContext(recording.ctx())
+          spec -> spec.recipe(new AddDependency(name, version, null)).executionContext(recording.ctx()),
+          recording.sources()
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      catalog-add-root-declares-mismatch-strict         | 1.0.1  | rejects
+      catalog-add-root-declares-mismatch-strict-cleanup | 1.0.1  | rejects
+      catalog-add-save-name-strict-mismatch             | 1.0.2  | rejects
+      catalog-add-prefer-range                          | ^1.0.0 | fails
+      """)
+    void declinedWherePnpmAddStops(String scenario, String version, String how) {
+        String detail = "rejects".equals(how) ? "pnpm rejects this edit: [ERR_PNPM_CATALOG_VERSION_MISMATCH] Wanted " +
+          "dependency outside the version range defined in catalog" :
+          "pnpm fails on this edit: TypeError: Invalid Version: ^1.0.0";
+        CatalogRecording recording = new CatalogRecording("pnpm", scenario);
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("wrappy", version, null)).executionContext(recording.ctx())
             .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).contains("ERR_PNPM_CATALOG_VERSION_MISMATCH"))),
-          recording.sources("packages/a/package.json", "ERR_PNPM_CATALOG_VERSION_MISMATCH")
+              .satisfies(row -> {
+                  assertThat(row.getDetail()).isEqualTo(detail);
+                  assertThat(row.getReason()).isEqualTo("RESOLUTION_REQUIRED");
+              })),
+          recording.sources("packages/a/package.json", detail)
+        );
+    }
+
+    @Test
+    void anEmptySaveCatalogNameIsWrittenAsPnpmAddWritesItAndItsInstallRejects() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-add-save-name-empty");
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("wrappy", "1.0.2", null)).executionContext(recording.ctx())
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getDetail()).contains("ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC"))),
+          recording.sourcesWhoseInstallFails("ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC")
+        );
+    }
+
+    @Test
+    void anAdditionAnEarlierRecipeMadeRoomForInTheSameCycle() {
+        rewriteRun(
+          spec -> spec.recipes(new RemoveDependency("left-pad", null), new AddDependency("left-pad", "^2.0.0", null))
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          packageJson("""
+            {
+              "name": "consumer",
+              "dependencies": {
+                "left-pad": "^1.3.0"
+              }
+            }
+            """, """
+            {
+              "name": "consumer",
+              "dependencies": {
+                "left-pad": "^2.0.0"
+              }
+            }
+            """, nodeResolutionResult(PackageManager.Npm))
         );
     }
 

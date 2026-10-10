@@ -1,0 +1,1 @@
+pnpm add wrappy@1.0.2 in member a, catalogMode prefer, saveCatalogName tools, the default catalog holds wrappy 1.0.2; the root declares wrappy ^1.0.0.

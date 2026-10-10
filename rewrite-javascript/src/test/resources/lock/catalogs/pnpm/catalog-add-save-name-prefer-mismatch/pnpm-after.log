@@ -1,0 +1,8 @@
+../..                                    | [WARN] Catalog version mismatch for "wrappy": using direct version "1.0.2" instead of catalog version "1.0.1".
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ wrappy catalog:tools
+
+Done in 189ms using pnpm v11.2.2

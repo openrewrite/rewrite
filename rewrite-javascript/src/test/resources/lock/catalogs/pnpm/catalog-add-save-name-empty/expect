@@ -1,0 +1,1 @@
+not-reproduced pnpm add with saveCatalogName '' writes catalog: and puts the entry in catalogs.'', which the next install rejects; catalog-add-save-name-empty-install is that install

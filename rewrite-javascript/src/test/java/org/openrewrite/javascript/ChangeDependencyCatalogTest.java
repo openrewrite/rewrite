@@ -28,10 +28,11 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
  * A rename of a {@code catalog:} reference keeps the reference and gives the catalog the new name's entry, as the
- * recordings under {@code catalogs/} were installed; a value pointing elsewhere is declined, marked and recorded.
+ * recordings under {@code lock/catalogs/} were installed; a value pointing elsewhere is declined, marked and recorded.
  */
 class ChangeDependencyCatalogTest implements RewriteTest {
 
@@ -104,6 +105,68 @@ class ChangeDependencyCatalogTest implements RewriteTest {
             .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyProtocolsSkipped.class)).isEmpty()),
           packageJson(manifest("github:me/old-fork"), manifest("^2.0.0").replace("acme-logger", "acme-log"),
             nodeResolutionResult(PackageManager.Pnpm))
+        );
+    }
+
+    @Test
+    void anEntryTheNewNameAlreadyHasIsKept() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("wrappy", "is-number", null, null)),
+          packageJson("""
+            {
+              "name": "a",
+              "dependencies": {
+                "wrappy": "catalog:"
+              }
+            }
+            """, """
+            {
+              "name": "a",
+              "dependencies": {
+                "is-number": "catalog:"
+              }
+            }
+            """, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")),
+          packageJson("""
+            {
+              "name": "b",
+              "dependencies": {
+                "is-number": "catalog:"
+              }
+            }
+            """, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/b/package.json")),
+          yaml("""
+            packages:
+              - packages/*
+            catalog:
+              is-number: 7.0.0
+              wrappy: 1.0.2
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
+    @Test
+    void aDependencyAnEarlierRecipeAddedInTheSameCycle() {
+        rewriteRun(
+          spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),
+              new ChangeDependency("left-pad", "pad-left", "^2.0.0", null))
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          packageJson("""
+            {
+              "name": "consumer",
+              "dependencies": {
+                "is-number": "^7.0.0"
+              }
+            }
+            """, """
+            {
+              "name": "consumer",
+              "dependencies": {
+                "is-number": "^7.0.0",
+                "pad-left": "^2.0.0"
+              }
+            }
+            """, nodeResolutionResult(PackageManager.Npm))
         );
     }
 

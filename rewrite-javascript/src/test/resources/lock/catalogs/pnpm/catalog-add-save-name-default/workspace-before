@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+saveCatalogName: default
+catalogs:
+  tools:
+    ms: 2.1.3

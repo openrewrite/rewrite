@@ -1,0 +1,1 @@
+not-reproduced pnpm add stops before installing (ERR_PNPM_CATALOG_VERSION_MISMATCH); AddDependency pins it
