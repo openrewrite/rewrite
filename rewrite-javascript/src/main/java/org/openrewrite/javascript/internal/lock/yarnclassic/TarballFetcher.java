@@ -38,7 +38,7 @@ final class TarballFetcher {
             "sha256", "sha384", "sha512", "sha3", "sha3-256", "sha3-384", "sha3-512", "sha3_256", "sha3_384",
             "sha3_512");
 
-    private final PackageRemote remote;
+    final PackageRemote remote;
     private final @Nullable Object name;
     private final @Nullable Object version;
     private final String dest;
@@ -98,11 +98,23 @@ final class TarballFetcher {
 
     // _fetch: a local path is the filesystem's; any other reference is the registry's, verified, gunzipped, untarred
     private TarFs fetchTarball() {
-        String reference = String.valueOf(remote.reference);
-        boolean isFilePath = reference.startsWith("file:");
-        if (isFilePath) {
-            reference = reference.substring("file:".length());
+        byte[] tarball = download();
+        TarFs extracted = untar(reference(), tarball);
+        Ssri.Integrity integrity = integrity(remote);
+        if (integrity != null && integrity.hashes.isEmpty()) {
+            throw new MessageError(reference() + ": " + Lang.format("Integrity checked failed for $0 (none of " +
+                                                                    "the specified algorithms are supported)",
+                    remote.packageName));
         }
+        return extracted;
+    }
+
+    /**
+     * {@code _fetch}'s request: the registry's tarball, checked against the remote's sha1 and integrity.
+     */
+    byte[] download() {
+        String reference = reference();
+        boolean isFilePath = String.valueOf(remote.reference).startsWith("file:");
         ExoticResolvers.LegacyUrl url = ExoticResolvers.LegacyUrl.parse(reference);
         String pathname = url.path == null ? null : url.path.replaceFirst("\\?.*", "");
         boolean isRelativePath = url.protocol != null ? DRIVE.matcher(url.protocol).find() :
@@ -117,19 +129,36 @@ final class TarballFetcher {
             throw new CannotKnow("whether yarn's cache holds " + pkg + ", whose tarball " + reference +
                                  " answers 404 (yarn fails on a cold cache and installs from a warm one)");
         }
-        Ssri.Integrity integrity = Js.truthy(remote.integrity) ? Ssri.parse(remote.integrity) : null;
-        if (Js.truthy(remote.hash) && !matches(tarball, Ssri.fromHex(remote.hash, "sha1")) ||
-            integrity != null && !integrity.hashes.isEmpty() && !matches(tarball, integrity)) {
+        if (mismatches(tarball, remote)) {
             throw new CannotKnow("whether yarn's cache holds " + pkg + ", whose tarball " + reference +
                                  " does not match the integrity the registry gives it");
         }
-        TarFs extracted = untar(reference, tarball);
-        if (integrity != null && integrity.hashes.isEmpty()) {
-            throw new MessageError(reference + ": " + Lang.format("Integrity checked failed for $0 (none of the " +
-                                                                  "specified algorithms are supported)",
-                    remote.packageName));
-        }
-        return extracted;
+        return tarball;
+    }
+
+    /**
+     * Whether a tarball is the one another remote of this package names by its sha1 or its integrity.
+     */
+    boolean isNamedBy(byte[] tarball, PackageRemote other) {
+        Ssri.Integrity integrity = integrity(other);
+        return (Js.truthy(other.hash) || integrity != null && !integrity.hashes.isEmpty()) &&
+               !mismatches(tarball, other);
+    }
+
+    private boolean mismatches(byte[] tarball, PackageRemote expected) {
+        Ssri.Integrity integrity = integrity(expected);
+        return Js.truthy(expected.hash) && !matches(tarball, Ssri.fromHex(expected.hash, "sha1")) ||
+               integrity != null && !integrity.hashes.isEmpty() && !matches(tarball, integrity);
+    }
+
+    private static Ssri.@Nullable Integrity integrity(PackageRemote of) {
+        return Js.truthy(of.integrity) ? Ssri.parse(of.integrity) : null;
+    }
+
+    // the reference _fetch requests, without its file: prefix
+    private String reference() {
+        String reference = String.valueOf(remote.reference);
+        return reference.startsWith("file:") ? reference.substring("file:".length()) : reference;
     }
 
     /**

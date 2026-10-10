@@ -113,10 +113,6 @@ final class Install {
             resolver.focusedWorkspaceName = config.getFocusedWorkspaceName();
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
                     request.getWorkspaceLayout());
-            if (!resolver.races.isEmpty()) {
-                throw new CannotKnow("which of " + String.join("; ", resolver.races) + " yarn resolves first: " +
-                                     "the entry they share follows the order the registry answers in");
-            }
             List<String> topLevelPatterns = request.getPatterns();
             flatten(resolver, topLevelPatterns, request.getManifest(), request.isFlat());
             bailout(topLevelPatterns, request.getWorkspaceLayout(), lockfile, flags);
@@ -379,6 +375,7 @@ final class Install {
         if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
             return null;
         }
+        resolver.requireNoRaces();
         if (flags.isUpdateChecksums()) {
             for (Manifest manifest : resolver.getManifests()) {
                 if (manifest.reference != null && "tarball".equals(manifest.reference.remote.type)) {

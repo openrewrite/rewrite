@@ -137,7 +137,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         String detail = failure.getDetail();
         switch (expect.getKind()) {
             case "cannot-know":
-                return failure.getKind() == Kind.CANNOT_KNOW && namesEvery(detail, rest);
+                return failure.getKind() == Kind.CANNOT_KNOW && namesEvery(detail, rest) && http.missing.isEmpty();
             case "malformed":
                 return failure.getReason() == Reason.MALFORMED_LOCK || failure.getReason() == Reason.MALFORMED_MANIFEST;
             case "pm-rejects":

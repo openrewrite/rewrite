@@ -1,0 +1,1 @@
+open-order-race-small under .yarnrc --pure-lockfile true: yarn resolves and fetches, then writes no lock.

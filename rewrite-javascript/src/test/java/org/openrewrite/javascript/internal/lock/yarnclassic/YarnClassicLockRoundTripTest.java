@@ -244,6 +244,9 @@ class YarnClassicLockRoundTripTest {
             info.reference = ref;
         }
         resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), ref -> {
+            if ("link".equals(ref.remote.type)) {
+                return PackageFetcher.linkMock();
+            }
             Map<String, @Nullable Object> entry = lockfile.getLocked(ref.patterns.get(0));
             Manifest pkg = new Manifest();
             pkg.put("name", entry.get("name"));

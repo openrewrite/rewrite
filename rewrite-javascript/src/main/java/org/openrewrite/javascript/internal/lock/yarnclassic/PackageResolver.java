@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.Host;
@@ -71,7 +72,27 @@ final class PackageResolver {
      * Patterns that joined an entry another pattern of the same version created first, where the other could have
      * come first and the entries differ: the bytes follow network timing.
      */
-    final List<String> races = new ArrayList<>();
+    final List<Race> races = new ArrayList<>();
+
+    /**
+     * Two entries of one version yarn may resolve in either order: the one resolved first here, which the patterns
+     * share, and the other's own.
+     */
+    @Value
+    static class Race {
+        String description;
+        Manifest first;
+        Manifest other;
+
+        CannotKnow cannotKnow(String why) {
+            return new CannotKnow("which of " + description + " yarn resolves first: " + why);
+        }
+
+        @Override
+        public String toString() {
+            return description;
+        }
+    }
 
     @Value
     static class DelayedResolve {
@@ -500,8 +521,23 @@ final class PackageResolver {
             fingerprint(info.remote).equals(fingerprint(resolved.remote))) {
             return;
         }
-        races.add(creator.pattern + " (" + describe(creator, resolved) + ") and " + request.pattern + " (" +
-                  describe(request, info) + ")");
+        races.add(new Race(creator.pattern + " (" + describe(creator, resolved) + ") and " + request.pattern + " (" +
+                           describe(request, info) + ")", resolved, info));
+    }
+
+    /**
+     * The lock text the races leave open: each shared entry takes the remote of the pattern yarn resolves first.
+     */
+    void requireNoRaces() {
+        if (races.isEmpty()) {
+            return;
+        }
+        List<String> each = new ArrayList<>();
+        for (Race race : races) {
+            each.add(race.getDescription());
+        }
+        throw new CannotKnow("which of " + String.join("; ", each) + " yarn resolves first: the entry they share " +
+                             "follows the order the registry answers in");
     }
 
     private static String describe(PackageRequest request, Manifest manifest) {

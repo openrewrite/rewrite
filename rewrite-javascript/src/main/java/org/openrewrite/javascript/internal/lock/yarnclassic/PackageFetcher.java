@@ -16,8 +16,10 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,10 +33,12 @@ final class PackageFetcher {
 
     private static final Pattern SLUG_CHARS = Pattern.compile("[^@a-z0-9]+");
     private static final Pattern SLUG_EDGES = Pattern.compile("^-+|-+\\z");
+    private static final String RACED_FETCH = "the fetch step downloads the entry they share from the first one's " +
+                                              "remote, and ";
 
     /**
-     * {@code fetchOneRemote}'s package for a reference: the package.json of its tarball, git checkout or directory;
-     * a .yarn-metadata.json a tarball ships hands over its manifest, of whatever type.
+     * {@code fetchOneRemote}'s package for a reference: the package.json of its tarball, git checkout or directory,
+     * a link's mock; a .yarn-metadata.json a tarball ships hands over its manifest, of whatever type.
      */
     interface Fetcher {
         @Nullable
@@ -50,6 +54,14 @@ final class PackageFetcher {
      */
     static Fetcher remote(PackageResolver resolver, RegistrySource registry, YarnClassicOptions config) {
         return ref -> {
+            for (PackageResolver.Race race : resolver.races) {
+                if (race.getFirst().reference == ref) {
+                    requireOneTarball(race, ref, registry, config, resolver.warnings);
+                }
+            }
+            if ("link".equals(ref.remote.type)) {
+                return linkMock();
+            }
             Manifest pkg = resolver.patterns.get(ref.patterns.get(0));
             String dest = generateModuleCachePath(ref);
             if ("workspace".equals(ref.remote.type)) {
@@ -87,6 +99,62 @@ final class PackageFetcher {
     }
 
     /**
+     * The tarball a raced reference is fetched from, whichever entry yarn resolves first: a reused entry stands for
+     * the one it names by its sha1 or integrity, one picked anew is downloaded.
+     */
+    private static void requireOneTarball(PackageResolver.Race race, PackageReference ref, RegistrySource registry,
+                                          YarnClassicOptions config, List<String> warnings) {
+        TarballFetcher first = tarballFetcher(race, race.getFirst(), ref, registry, config, warnings);
+        TarballFetcher other = tarballFetcher(race, race.getOther(), ref, registry, config, warnings);
+        byte[] firstTarball = download(race, race.getFirst(), first);
+        byte[] otherTarball = download(race, race.getOther(), other);
+        boolean same;
+        if (firstTarball != null && otherTarball != null) {
+            same = Arrays.equals(firstTarball, otherTarball);
+        } else if (firstTarball != null) {
+            same = first.isNamedBy(firstTarball, other.remote);
+        } else if (otherTarball != null) {
+            same = other.isNamedBy(otherTarball, first.remote);
+        } else {
+            same = nameOneTarball(first.remote, other.remote);
+        }
+        if (!same) {
+            throw race.cannotKnow(RACED_FETCH + "the two remotes do not name one tarball");
+        }
+    }
+
+    private static TarballFetcher tarballFetcher(PackageResolver.Race race, Manifest side, PackageReference ref,
+                                                 RegistrySource registry, YarnClassicOptions config,
+                                                 List<String> warnings) {
+        PackageRemote remote = side.remote;
+        if (remote == null || side.locked == null && !"tarball".equals(remote.type)) {
+            throw race.cannotKnow(RACED_FETCH + "one of them is not a registry tarball");
+        }
+        return new TarballFetcher(remote, ref.name, ref.version, generateModuleCachePath(ref), registry, config,
+                warnings);
+    }
+
+    private static byte @Nullable [] download(PackageResolver.Race race, Manifest side, TarballFetcher fetcher) {
+        if (side.locked != null) {
+            return null;
+        }
+        try {
+            return fetcher.download();
+        } catch (CannotKnow e) {
+            throw race.cannotKnow(RACED_FETCH + e.getMessage());
+        }
+    }
+
+    // two lock entries' remotes, by every sha1 and integrity both carry
+    private static boolean nameOneTarball(PackageRemote a, PackageRemote b) {
+        boolean hashes = Js.truthy(a.hash) && Js.truthy(b.hash);
+        boolean integrities = Js.truthy(a.integrity) && Js.truthy(b.integrity);
+        return (hashes || integrities) &&
+               (!hashes || String.valueOf(a.hash).equals(b.hash)) &&
+               (!integrities || Ssri.stringify(a.integrity).equals(Ssri.stringify(b.integrity)));
+    }
+
+    /**
      * {@code fetch}: each package's fetched manifest in place of the resolver's; an optional one whose fetch fails
      * keeps the resolver's, and its cache directory, which yarn removes, goes into {@code unfetched}.
      */
@@ -115,7 +183,7 @@ final class PackageFetcher {
             PackageReference ref = pkg.reference;
             Object fetched;
             try {
-                fetched = "link".equals(ref.remote.type) ? linkMock() : fetcher.fetch(ref);
+                fetched = fetcher.fetch(ref);
             } catch (JsError | MessageError e) {
                 if (!Js.truthy(ref.optional)) {
                     throw e;
