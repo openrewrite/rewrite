@@ -85,11 +85,12 @@ class TgzUtilsTest {
 
     // node-tar 6.1.11's entries for headers with a NUL before a line terminator and long pax numbers (tar-headers.js)
     @Test
-    @SuppressWarnings("unchecked")
     void readsHeadersAsNodeTarDoes() throws IOException {
-        List<Map<String, Object>> expected = (List<Map<String, Object>>) EcmaScript.jsonParse(
-                new String(resource("node-tar-headers.json"), StandardCharsets.UTF_8));
-        List<Map<String, Object>> entries = new ArrayList<>();
+        List<Object> expected = new ArrayList<>();
+        for (String line : new String(resource("node-tar-headers.jsonl"), StandardCharsets.UTF_8).split("\n")) {
+            expected.add(EcmaScript.jsonParse(line));
+        }
+        List<Object> entries = new ArrayList<>();
         for (TgzUtils.TarEntry entry : TgzUtils.parseTar(TgzUtils.maybeGunzip(resource("node-tar-headers.tgz")))) {
             Map<String, Object> read = new LinkedHashMap<>();
             read.put("type", entry.type);

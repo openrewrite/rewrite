@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 // Writes tgz-utils/node-tar-headers.tgz, whose headers hold a NUL before a line terminator and pax numbers past
-// Number's safe integers, and node-tar-headers.json, the entries node-tar 6.1.11's Parse (Yarn 4.10.3's) emits for it.
+// Number's safe integers, and node-tar-headers.jsonl, the entries node-tar 6.1.11's Parse (Yarn 4.10.3's) emits for it.
 // Usage: NODE_PATH=<dir holding tar 6.1.11> node tar-headers.js <out-dir>
 const fs = require('fs')
 const path = require('path')
@@ -85,6 +85,6 @@ parser.on('entry', entry => {
 parser.on('end', () => {
   const out = process.argv[2]
   fs.writeFileSync(path.join(out, 'node-tar-headers.tgz'), archive)
-  fs.writeFileSync(path.join(out, 'node-tar-headers.json'), JSON.stringify(entries, null, 1) + '\n')
+  fs.writeFileSync(path.join(out, 'node-tar-headers.jsonl'), entries.map(e => JSON.stringify(e)).join('\n') + '\n')
 })
 parser.end(archive)
