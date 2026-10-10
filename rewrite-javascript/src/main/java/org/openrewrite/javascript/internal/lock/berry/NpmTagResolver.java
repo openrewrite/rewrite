@@ -65,10 +65,13 @@ final class NpmTagResolver implements Resolver {
         Project project = opts.getProject();
         Map<String, @Nullable Object> registryData = NpmHttpUtils.getPackageMetadata(descriptor, project,
                 opts.getRegistry());
-        Object distTags = registryData.get("dist-tags");
-        if (distTags == Syml.UNDEFINED) {
+        if (!registryData.containsKey("dist-tags")) {
             throw new ReportError(ReportError.REMOTE_INVALID, "Registry returned invalid data - missing " +
                                                               "\"dist-tags\" field");
+        }
+        Object distTags = registryData.get("dist-tags");
+        if (distTags == null || distTags == Syml.UNDEFINED) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot convert undefined or null to object");
         }
         Object version = Js.get(distTags, tag);
         if (version == Syml.UNDEFINED) {

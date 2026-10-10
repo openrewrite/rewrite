@@ -1,0 +1,1 @@
+The edit changes lwt-dist 1.0.0 to the tag latest, and the registry document's dist-tags is null: pickPackageMetadata keeps the key, so NpmTagResolver passes its hasOwn check and Object.hasOwn(null, tag) is a TypeError (YN0001).

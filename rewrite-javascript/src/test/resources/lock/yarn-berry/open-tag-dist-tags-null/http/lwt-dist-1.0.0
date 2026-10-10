@@ -1,0 +1,9 @@
+{
+  "name": "lwt-dist",
+  "version": "1.0.0",
+  "dist": {
+    "shasum": "df3aa37bb408f1823038befcecbc6c5a7d8b33f4",
+    "integrity": "sha512-WEUeoystEwx8yK4JmC6QhgqEgrb3dEtXiaV+HcsU2V63qLTSYbl7T7wP5GB0fRl+p9G+rJp0jvFNlDXHYAUpsA==",
+    "tarball": "https://registry.npmjs.org/lwt-dist/-/lwt-dist-1.0.0.tgz"
+  }
+}

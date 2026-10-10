@@ -1,0 +1,18 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ TypeError: lwt-dist@npm:latest: Cannot convert undefined or null to object
+    at Object.hasOwn (<anonymous>)
+    at zD.getCandidates (<corepack>/v1/yarn/4.10.3/yarn.js:695:7951)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async rm.getCandidates (<corepack>/v1/yarn/4.10.3/yarn.js:141:1271)
+    at async rm.getCandidates (<corepack>/v1/yarn/4.10.3/yarn.js:141:1271)
+    at async <corepack>/v1/yarn/4.10.3/yarn.js:209:8412
+    at async qE (<corepack>/v1/yarn/4.10.3/yarn.js:140:45027)
+    at async mt (<corepack>/v1/yarn/4.10.3/yarn.js:209:8394)
+    at async Promise.allSettled (index 0)
+    at async Uu (<corepack>/v1/yarn/4.10.3/yarn.js:140:44361)
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 19ms
+over=before
+exit=1
+no lock written
