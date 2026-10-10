@@ -52,42 +52,53 @@ final class YarnClassicInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host) {
-        return from(dir, host, null);
+        return from(dir, host, null, null);
     }
 
     /**
-     * With the host's registry configuration as the home directory's .npmrc, which yarn reads under the project's.
+     * With the home directory's .npmrc, which yarn reads under the project's: {@code user}, the host's registries as
+     * the user's own config (null for none), holding the credentials {@code credentials} has as well.
      */
-    static Inputs from(LockDirectory dir, Host host, @Nullable NodeRegistries registries) {
+    static Inputs from(LockDirectory dir, Host host, @Nullable NodeRegistries user,
+                       @Nullable NodeRegistries credentials) {
         Inputs.InputsBuilder inputs = project(dir).host(host);
-        if (registries != null) {
-            inputs.homeFile(".npmrc", userNpmrc(registries));
+        if (user != null) {
+            inputs.homeFile(".npmrc", userNpmrc(user, credentials == null ? user : credentials));
         }
         return inputs.build();
     }
 
     /**
-     * The registries and their credentials as .npmrc lines; npm's own default, which the host also reports when
-     * nothing names a registry, is left unnamed.
+     * {@code user}'s registries as .npmrc lines, with their credentials and {@code credentials}' others; npm's own
+     * default, the host's answer when nothing names one, stays unnamed.
      */
-    static String userNpmrc(NodeRegistries registries) {
+    static String userNpmrc(NodeRegistries user, NodeRegistries credentials) {
         StringBuilder npmrc = new StringBuilder();
-        NodeRegistry registry = registries.getDefaultRegistry();
+        Set<String> keys = new LinkedHashSet<>();
+        NodeRegistry registry = user.getDefaultRegistry();
         if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || hasCredentials(registry)) {
             npmrc.append("registry=").append(registry.getUrl()).append('\n');
         }
-        credentials(npmrc, registry);
-        for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
+        credentials(npmrc, registry, keys);
+        alwaysAuth(npmrc, registry);
+        for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
             npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
-            credentials(npmrc, scoped.getValue());
+            credentials(npmrc, scoped.getValue(), keys);
+            alwaysAuth(npmrc, scoped.getValue());
+        }
+        credentials(npmrc, credentials.getDefaultRegistry(), keys);
+        for (NodeRegistry scoped : credentials.getByScope().values()) {
+            credentials(npmrc, scoped, keys);
         }
         return npmrc.toString();
     }
 
-    // keyed by the registry's url without its protocol, as yarn's getRegistryOption looks them up
-    private static void credentials(StringBuilder npmrc, NodeRegistry registry) {
-        String key = registry.getUrl().replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*:", "");
-        key = key.endsWith("/") ? key : key + "/";
+    // keyed by the registry's url without its protocol, as yarn's getRegistryOption looks them up, once per key
+    private static void credentials(StringBuilder npmrc, NodeRegistry registry, Set<String> keys) {
+        String key = key(registry);
+        if (!hasCredentials(registry) || !keys.add(key)) {
+            return;
+        }
         if (registry.getAuthToken() != null) {
             npmrc.append(key).append(":_authToken=").append(EcmaScript.quote(registry.getAuthToken())).append('\n');
         } else if (registry.getAuthBase64() != null) {
@@ -97,9 +108,17 @@ final class YarnClassicInputs {
                     .append(key).append(":_password=").append(EcmaScript.quote(Base64.getEncoder().encodeToString(
                             registry.getPassword().getBytes(StandardCharsets.UTF_8)))).append('\n');
         }
+    }
+
+    private static void alwaysAuth(StringBuilder npmrc, NodeRegistry registry) {
         if (registry.isAlwaysAuth()) {
-            npmrc.append(key).append(":always-auth=true\n");
+            npmrc.append(key(registry)).append(":always-auth=true\n");
         }
+    }
+
+    private static String key(NodeRegistry registry) {
+        String key = registry.getUrl().replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*:", "");
+        return key.endsWith("/") ? key : key + "/";
     }
 
     private static boolean hasCredentials(NodeRegistry registry) {

@@ -1,0 +1,1 @@
+Run in packages/a: $HOME/.npmrc names the mirror, no project .npmrc; ms 2.1.2 -> 2.1.3.

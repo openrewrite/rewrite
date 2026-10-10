@@ -32,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class YarnClassicInputsTest {
 
@@ -60,7 +61,7 @@ class YarnClassicInputsTest {
           .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://registry.npmmirror.com/\n")
           .packageManagerFile(Paths.get("repo/packages/a/.yarnrc"), "registry \"https://example.com\"\n");
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(builder.build()), Host.UNKNOWN, null);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(builder.build()), Host.UNKNOWN, null, null);
 
         assertThat(inputs.getLock()).isEqualTo("# yarn lockfile v1\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "local");
@@ -73,7 +74,7 @@ class YarnClassicInputsTest {
         assertThat(inputs.getCwd()).isEqualTo("packages/a");
         Inputs fromRoot = YarnClassicInputs.from(
           LockDirectory.of(builder.packageJsonPath(Paths.get("repo/package.json"))
-          .packageJson("{\"private\":true,\"workspaces\":[\"packages/*\"]}").build()), Host.UNKNOWN, null);
+          .packageJson("{\"private\":true,\"workspaces\":[\"packages/*\"]}").build()), Host.UNKNOWN, null, null);
         assertThat(fromRoot.getCwd()).isEmpty();
         assertThat(fromRoot.getConfigFiles()).containsOnlyKeys(".yarnrc", ".npmrc");
     }
@@ -88,7 +89,7 @@ class YarnClassicInputsTest {
             Paths.get("other/.npmrc"))))
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null, null);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc");
         assertThat(inputs.getConfigFiles()).isEmpty();
@@ -114,7 +115,7 @@ class YarnClassicInputsTest {
             Paths.get("README.md"), Paths.get("repo/other/.npmrc"), Paths.get("repo/web/src/index.js"))))
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null, null);
 
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../.yarnrc", "../../../.npmrc");
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "../.yarnrc", "../../.yarnrc.yml",
@@ -135,7 +136,7 @@ class YarnClassicInputsTest {
           .packageJsonPath(Paths.get("web/app/package.json"))
           .packageManagerFile(Paths.get("package.json"), "{\"private\":true,\"workspaces\":[\"web/*\"]}");
 
-        Inputs listed = YarnClassicInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, null);
+        Inputs listed = YarnClassicInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, null, null);
 
         assertThat(listed.getDirectory()).isEqualTo("web/app");
         assertThat(new YarnClassicLockRegenerator(listed, NO_REGISTRY).regenerate().getErrorMessage())
@@ -144,7 +145,8 @@ class YarnClassicInputsTest {
                      "this project's");
 
         Inputs unlisted = YarnClassicInputs.from(
-          LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()), Host.UNKNOWN, null);
+          LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()), Host.UNKNOWN, null,
+          null);
 
         assertThat(unlisted.getDirectory()).isEqualTo("tools/app");
         assertThat(new YarnClassicLockRegenerator(unlisted, NO_REGISTRY).regenerate().isSuccess())
@@ -185,9 +187,9 @@ class YarnClassicInputsTest {
         scopes.put("@types", registry("https://registry.npmmirror.com/"));
 
         Inputs mirrored = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN,
-          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null));
+          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null), null);
         Inputs unnamed = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN,
-          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null));
+          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null), null);
 
         assertThat(mirrored.getHomeFiles()).containsOnlyKeys(".npmrc");
         assertThat(mirrored.getHomeFiles().get(".npmrc"))
@@ -208,10 +210,51 @@ class YarnClassicInputsTest {
         NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm", null, "u", "p", null, true, null, true,
           false);
 
-        assertThat(YarnClassicInputs.userNpmrc(new NodeRegistries(registry, scopes, null, null, null))).isEqualTo(
+        NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
+        assertThat(YarnClassicInputs.userNpmrc(user, user)).isEqualTo(
           "registry=https://r.example/npm\n//r.example/npm/:username=\"u\"\n//r.example/npm/:_password=\"cA==\"\n" +
           "//r.example/npm/:always-auth=true\n@corp:registry=https://corp.example.com/\n" +
           "//corp.example.com/:_authToken=\"corp-token\"\n");
+    }
+
+    /**
+     * A registry only the project's .npmrc names keeps the credentials the host holds for it, as a user's own .npmrc
+     * holds them, while the registry the package comes from stays the project's choice.
+     */
+    @Test
+    void theHostsCredentialsForARegistryTheProjectNamesAreTheHomeDirectorysToo() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+          .lock("")
+          .packageJsonPath(Paths.get("package.json"))
+          .packageManagerFile(Paths.get(".npmrc"), "@corp:registry=https://corp.example.com/\n")
+          .build();
+        NodeRegistries user = new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(),
+          null, null, null);
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null,
+          false, null, true, false));
+        NodeRegistries credentials = new NodeRegistries(registry("https://registry.npmjs.org/"), scopes, null, null,
+          null);
+
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, user, credentials);
+        Map<String, @Nullable String> asked = new LinkedHashMap<>();
+        new YarnClassicLockRegenerator(inputs, new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+                asked.put(registry + name, authorization);
+                return null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version,
+                                             @Nullable String authorization) {
+                return null;
+            }
+        }).regenerate();
+
+        assertThat(inputs.getHomeFiles().get(".npmrc")).isEqualTo("//corp.example.com/:_authToken=\"corp-token\"\n");
+        assertThat(asked).containsExactly(entry("https://corp.example.com/@corp/a", "Bearer corp-token"));
     }
 
     private static NodeRegistry registry(String url) {
@@ -233,7 +276,7 @@ class YarnClassicInputsTest {
           .packageManagerFile(Paths.get("repo/other/package.json"), "{\"packageManager\":\"yarn@4.10.3\"}")
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, null, null);
 
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../package.json", "../../../package.json");
         assertThat(new YarnClassicLockRegenerator(inputs, NO_REGISTRY).regenerate().getErrorMessage())

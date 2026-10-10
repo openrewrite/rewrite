@@ -15,9 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
+import org.openrewrite.javascript.internal.lock.berry.RegistrySource;
+import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
@@ -29,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.entry;
 
 class YarnBerryInputsTest {
 
@@ -52,7 +56,7 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("repo/app/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null, null);
 
         assertThat(inputs.getLock()).isEqualTo("__metadata:\n  version: 8\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
@@ -76,7 +80,7 @@ class YarnBerryInputsTest {
             Paths.get("repo/packages/a/package.json"), Paths.get("other/.yarnrc.yml"))))
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null, null);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc.yml",
           "packages/a/package.json");
@@ -98,9 +102,9 @@ class YarnBerryInputsTest {
         scopes.put("@types", registry("https://registry.npmmirror.com/"));
 
         Inputs mirrored = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null));
+          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null), null);
         Inputs unnamed = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null));
+          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null), null);
 
         assertThat(mirrored.getHomeFiles()).containsOnlyKeys(".yarnrc.yml");
         assertThat(mirrored.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
@@ -122,10 +126,56 @@ class YarnBerryInputsTest {
         NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm/", null, "u", "p", null, true, null,
           true, false);
 
-        assertThat(YarnBerryInputs.userYarnrc(new NodeRegistries(registry, scopes, null, null, null))).isEqualTo(
+        NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
+        assertThat(YarnBerryInputs.userYarnrc(user, user)).isEqualTo(
           "npmRegistryServer: \"https://r.example/npm/\"\nnpmRegistries:\n  \"//r.example/npm\":\n" +
           "    npmAuthIdent: \"u:p\"\n    npmAlwaysAuth: true\nnpmScopes:\n  \"corp\":\n" +
           "    npmRegistryServer: \"https://corp.example.com/\"\n    npmAuthToken: \"corp-token\"\n");
+    }
+
+    /**
+     * A registry only the project's .yarnrc.yml names keeps the credentials the host holds for it as an npmRegistries
+     * entry, while the registry the package comes from stays the project's choice.
+     */
+    @Test
+    void theHostsCredentialsForARegistryTheProjectNamesAreTheHomeDirectorysToo() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"packageManager\":\"yarn@4.10.3\"," +
+                       "\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+          .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n" +
+                "  resolution: \"p@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
+          .packageJsonPath(Paths.get("package.json"))
+          .packageManagerFile(Paths.get(".yarnrc.yml"),
+            "npmScopes:\n  corp:\n    npmRegistryServer: \"https://corp.example.com\"\n")
+          .build();
+        NodeRegistries user = new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(),
+          null, null, null);
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null,
+          false, null, true, false));
+        NodeRegistries credentials = new NodeRegistries(registry("https://registry.npmjs.org/"), scopes, null, null,
+          null);
+
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, user,
+          credentials);
+        Map<String, @Nullable String> asked = new LinkedHashMap<>();
+        String error = new YarnBerryLockRegenerator(inputs, new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+                asked.put(registry + " " + name, authorization);
+                return null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version,
+                                             @Nullable String authorization) {
+                return null;
+            }
+        }).regenerate().getErrorMessage();
+
+        assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
+          "npmRegistries:\n  \"//corp.example.com\":\n    npmAuthToken: \"corp-token\"\n");
+        assertThat(asked).as(String.valueOf(error)).containsExactly(entry("https://corp.example.com @corp/a", "Bearer corp-token"));
     }
 
     private static NodeRegistry registry(String url) {

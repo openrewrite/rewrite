@@ -24,7 +24,10 @@ import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.I
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -53,61 +56,95 @@ final class YarnBerryInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
-        return from(dir, host, now, null);
+        return from(dir, host, now, null, null);
     }
 
     /**
-     * With the host's registry configuration as the home directory's .yarnrc.yml, which Yarn reads under the
-     * project's rc files.
+     * With the home directory's .yarnrc.yml, which Yarn reads under the project's rc files: {@code user}, the host's
+     * registries as the user's own config (null for none), holding the credentials {@code credentials} has as well.
      */
-    static Inputs from(LockDirectory dir, Host host, Instant now, @Nullable NodeRegistries registries) {
+    static Inputs from(LockDirectory dir, Host host, Instant now, @Nullable NodeRegistries user,
+                       @Nullable NodeRegistries credentials) {
         Inputs inputs = project(dir, host, now);
-        return registries == null ? inputs :
-                inputs.toBuilder().homeFile(DEFAULT_RC_FILENAME, userYarnrc(registries)).build();
+        return user == null ? inputs : inputs.toBuilder()
+                .homeFile(DEFAULT_RC_FILENAME, userYarnrc(user, credentials == null ? user : credentials)).build();
     }
 
     /**
-     * The registries as .yarnrc.yml settings, the default's credentials as its {@code npmRegistries} entry; npm's
-     * own default, which the host also reports when nothing names a registry, is left unnamed.
+     * {@code user}'s registries as .yarnrc.yml settings, the default's and {@code credentials}' other credentials as
+     * {@code npmRegistries} entries; npm's own default, the host's answer when nothing names one, stays unnamed.
      */
-    static String userYarnrc(NodeRegistries registries) {
+    static String userYarnrc(NodeRegistries user, NodeRegistries credentials) {
         StringBuilder yarnrc = new StringBuilder();
-        NodeRegistry registry = registries.getDefaultRegistry();
-        boolean credentials = registry.getAuthToken() != null || registry.getAuthBase64() != null ||
-                              registry.getUsername() != null && registry.getPassword() != null;
-        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || credentials) {
+        NodeRegistry registry = user.getDefaultRegistry();
+        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || hasCredentials(registry)) {
             yarnrc.append("npmRegistryServer: ").append(EcmaScript.quote(registry.getUrl())).append('\n');
         }
-        if (credentials || registry.isAlwaysAuth()) {
-            String key = registry.getUrl().replaceFirst("/\\z", "").replaceFirst("^[a-z]+:", "");
-            yarnrc.append("npmRegistries:\n  ").append(EcmaScript.quote(key)).append(":\n");
-            credentials(yarnrc, registry, "    ");
+        StringBuilder entries = new StringBuilder();
+        Set<String> keys = new LinkedHashSet<>();
+        if (hasCredentials(registry) || registry.isAlwaysAuth()) {
+            entry(entries, registry, keys);
+            alwaysAuth(entries, registry);
         }
-        if (!registries.getByScope().isEmpty()) {
+        for (NodeRegistry scoped : user.getByScope().values()) {
+            if (hasCredentials(scoped)) {
+                keys.add(key(scoped));
+            }
+        }
+        List<NodeRegistry> others = new ArrayList<>();
+        others.add(credentials.getDefaultRegistry());
+        others.addAll(credentials.getByScope().values());
+        for (NodeRegistry other : others) {
+            if (hasCredentials(other) && !keys.contains(key(other))) {
+                entry(entries, other, keys);
+            }
+        }
+        if (entries.length() > 0) {
+            yarnrc.append("npmRegistries:\n").append(entries);
+        }
+        if (!user.getByScope().isEmpty()) {
             yarnrc.append("npmScopes:\n");
-            for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
+            for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
                 yarnrc.append("  ").append(EcmaScript.quote(scoped.getKey().substring(1))).append(":\n")
                         .append("    npmRegistryServer: ").append(EcmaScript.quote(scoped.getValue().getUrl()))
                         .append('\n');
-                credentials(yarnrc, scoped.getValue(), "    ");
+                credentials(yarnrc, scoped.getValue());
+                alwaysAuth(yarnrc, scoped.getValue());
             }
         }
         return yarnrc.toString();
     }
 
-    private static void credentials(StringBuilder yarnrc, NodeRegistry registry, String indent) {
+    private static void entry(StringBuilder entries, NodeRegistry registry, Set<String> keys) {
+        keys.add(key(registry));
+        entries.append("  ").append(EcmaScript.quote(key(registry))).append(":\n");
+        credentials(entries, registry);
+    }
+
+    // npmRegistries' key, as getRegistryConfiguration's lookup without the protocol finds it
+    private static String key(NodeRegistry registry) {
+        return registry.getUrl().replaceFirst("/\\z", "").replaceFirst("^[a-z]+:", "");
+    }
+
+    private static boolean hasCredentials(NodeRegistry registry) {
+        return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
+               registry.getUsername() != null && registry.getPassword() != null;
+    }
+
+    private static void credentials(StringBuilder yarnrc, NodeRegistry registry) {
         if (registry.getAuthToken() != null) {
-            yarnrc.append(indent).append("npmAuthToken: ").append(EcmaScript.quote(registry.getAuthToken()))
-                    .append('\n');
+            yarnrc.append("    npmAuthToken: ").append(EcmaScript.quote(registry.getAuthToken())).append('\n');
         } else if (registry.getAuthBase64() != null) {
-            yarnrc.append(indent).append("npmAuthIdent: ").append(EcmaScript.quote(registry.getAuthBase64()))
-                    .append('\n');
+            yarnrc.append("    npmAuthIdent: ").append(EcmaScript.quote(registry.getAuthBase64())).append('\n');
         } else if (registry.getUsername() != null && registry.getPassword() != null) {
-            yarnrc.append(indent).append("npmAuthIdent: ")
+            yarnrc.append("    npmAuthIdent: ")
                     .append(EcmaScript.quote(registry.getUsername() + ":" + registry.getPassword())).append('\n');
         }
+    }
+
+    private static void alwaysAuth(StringBuilder yarnrc, NodeRegistry registry) {
         if (registry.isAlwaysAuth()) {
-            yarnrc.append(indent).append("npmAlwaysAuth: true\n");
+            yarnrc.append("    npmAlwaysAuth: true\n");
         }
     }
 
