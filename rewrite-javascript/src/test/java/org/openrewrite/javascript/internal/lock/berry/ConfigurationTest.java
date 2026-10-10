@@ -400,10 +400,7 @@ class ConfigurationTest {
     }
 
     @Test
-    void theReleaseIsNamedByPackageManagerOrByYarnPathsFileName() {
-        assertThat(Configuration.packageManagerVersion("yarn@4.10.3+sha512.abc")).isEqualTo("4.10.3");
-        assertThat(Configuration.packageManagerVersion("yarn@^4.10.0")).isNull();
-        assertThat(Configuration.packageManagerVersion(null)).isNull();
+    void theReleaseYarnPathNamesIsInItsFileName() {
         assertThat(Configuration.yarnPathVersion(".yarn/releases/yarn-4.10.3.cjs")).isEqualTo("4.10.3");
         assertThat(Configuration.yarnPathVersion(".yarn/releases/yarn.cjs")).isNull();
     }

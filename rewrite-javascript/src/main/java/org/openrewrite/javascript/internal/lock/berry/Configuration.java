@@ -53,7 +53,6 @@ public final class Configuration {
     public static final String HOME = "~/";
     private static final String ENVIRONMENT_PREFIX = "yarn_";
     private static final Pattern YARN_RELEASE = Pattern.compile("(?:^|/)yarn-(\\d+\\.\\d+\\.\\d+[^/]*?)\\.c?js$");
-    private static final Pattern PACKAGE_MANAGER = Pattern.compile("^yarn@(\\d+\\.\\d+\\.\\d+(?:-[^+]*)?)(?:\\+.*)?$");
     private static final Pattern LEADING_SEPARATORS = Pattern.compile("^[_.\\- ]+");
     private static final Pattern SEPARATED_WORD = Pattern.compile("[_.\\- ]+(\\w|\\z)");
     private static final Pattern DIGITS_WORD = Pattern.compile("\\d+(\\w|\\z)");
@@ -359,17 +358,6 @@ public final class Configuration {
             }
         }
         return null;
-    }
-
-    /**
-     * The version a root manifest's {@code packageManager} names ({@code yarn@4.10.3}, with or without a hash).
-     */
-    static @Nullable String packageManagerVersion(@Nullable String packageManager) {
-        if (packageManager == null) {
-            return null;
-        }
-        Matcher m = PACKAGE_MANAGER.matcher(packageManager);
-        return m.find() ? m.group(1) : null;
     }
 
     /**

@@ -96,7 +96,7 @@ class YarnBerryLockRegeneratorTest {
 
     /**
      * corepack's findProjectSpec refuses a project naming another package manager, yarnPath or not
-     * ({@code open-corepack-member-names-pnpm}); a version it accepts that no release is spelled as is unknown.
+     * ({@code open-corepack-member-names-pnpm}); a version it accepts runs as semver parses it, cached or not.
      */
     @Test
     void corepackDecidesBeforeTheReleaseIsRead() {
@@ -105,10 +105,12 @@ class YarnBerryLockRegeneratorTest {
                 .hasMessage("This project is configured to use pnpm because package.json has a \"packageManager\" " +
                             "field (corepack)");
         for (String spec : new String[]{"yarn@v4.10.3", "yarn@4.10.3 "}) {
-            assertThatThrownBy(() -> release(spec, null, Collections.emptyMap())).as(spec)
-                    .isInstanceOf(CannotKnow.class)
-                    .hasMessageContaining("the Yarn release corepack runs for " + spec + " (");
+            assertThat(release(spec, null, Collections.emptyMap())).as(spec).isEqualTo("4.10.3");
         }
+        assertThatThrownBy(() -> release("pnpm@9.15.0", null, Collections.singletonMap(
+                "COREPACK_ENABLE_PROJECT_SPEC", "0")))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("the Yarn release that runs");
     }
 
     /**

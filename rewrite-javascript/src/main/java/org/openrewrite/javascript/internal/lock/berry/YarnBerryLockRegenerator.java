@@ -260,13 +260,12 @@ public final class YarnBerryLockRegenerator {
             }
         } else {
             if (spec == null) {
-                throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no " +
-                                     "yarnPath)");
+                throw new CannotKnow("the Yarn release that runs (corepack falls back to its own default and no " +
+                                     "yarnPath names one)");
             }
-            version = Configuration.packageManagerVersion("yarn@" + spec.getRange());
+            version = SpecUtils.installVersion(spec);
             if (version == null) {
-                throw new CannotKnow("the Yarn release corepack runs for yarn@" + spec.getRange() + " (a version " +
-                                     "corepack accepts that no release is spelled as)");
+                throw new CannotKnow("the Yarn release at " + spec.getRange() + " (corepack downloads it)");
             }
         }
         YarnRelease release = YarnRelease.of(version);

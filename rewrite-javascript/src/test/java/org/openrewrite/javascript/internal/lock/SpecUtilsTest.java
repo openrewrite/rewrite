@@ -142,6 +142,58 @@ class SpecUtilsTest {
         assertThat(actual).isEqualTo(answer);
     }
 
+    /**
+     * What {@code corepack yarn --version} runs over each package.json (corepack 0.35.0, cache empty or not): the
+     * release installVersion starts, or corepack's usage error (it names another package manager's file by full path).
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "{\"packageManager\":\"yarn@4.10.3\"}|4.10.3",
+            "{\"packageManager\":\"yarn@v4.10.3\"}|4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3 \"}|4.10.3",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"4.10.3\"}}}|4.10.3",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"}}}|Invalid package manager specification in " +
+            "package.json (yarn@*); expected a semver version (corepack)",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"^4.10.0\"}}}|Invalid package " +
+            "manager specification in package.json (yarn@^4.10.0); expected a semver version (corepack)",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"," +
+            "\"version\":\"^4.10.0\"}}}|4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"," +
+            "\"onFail\":\"warn\"}}}|4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":\"yarn\"}}|4.10.3",
+            "{\"packageManager\":\"yarn@1\"}|Invalid package manager specification in package.json (yarn@1); " +
+            "expected a semver version (corepack)",
+            "{\"packageManager\":\"yarn\"}|No version specified for yarn in \"packageManager\" of package.json " +
+            "(corepack)",
+            "{\"packageManager\":\"bun@1.3.10\"}|Unsupported package manager specification (bun@1.3.10) (corepack)",
+            "{\"packageManager\":null}|Invalid package manager specification in package.json; expected a string " +
+            "(corepack)",
+            "{\"packageManager\":4}|Invalid package manager specification in package.json; expected a string " +
+            "(corepack)",
+            "{\"packageManager\":\"pnpm@9.15.0\"}|This project is configured to use pnpm because package.json has a " +
+            "\"packageManager\" field (corepack)"
+    })
+    void runsTheReleaseCorepackRuns(String manifest, String answer) {
+        String actual;
+        try {
+            SpecUtils.Descriptor spec = SpecUtils.findProjectSpec("", 0, dir -> dir.isEmpty() ? manifest : null,
+                    "yarn", HostEnvironment.of(Collections.emptyMap()));
+            actual = spec == null ? "none" : String.valueOf(SpecUtils.installVersion(spec));
+        } catch (Rejected e) {
+            actual = e.getMessage();
+        }
+        assertThat(actual).isEqualTo(answer);
+    }
+
+    /**
+     * Under COREPACK_ENABLE_PROJECT_SPEC=0 corepack runs its own default whatever the project names.
+     */
+    @Test
+    void readsNoSpecWithoutTheProjectSpec() {
+        assertThat(SpecUtils.findProjectSpec("", 0, dir -> "{\"packageManager\":\"pnpm@9.15.0\"}", "yarn",
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_PROJECT_SPEC", "0")))).isNull();
+    }
+
     private static @Nullable String nothing() {
         return null;
     }

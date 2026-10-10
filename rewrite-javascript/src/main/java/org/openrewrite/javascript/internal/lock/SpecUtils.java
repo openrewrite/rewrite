@@ -27,8 +27,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 /**
- * Port of corepack sources/specUtils.ts {@code parseSpec}, {@code parsePackageJSON} and {@code loadSpec}, and of
- * Engine.ts {@code findProjectSpec}'s check of the package manager a project names (corepack 0.35.0).
+ * Port of corepack sources/specUtils.ts {@code parseSpec}, {@code parsePackageJSON} and {@code loadSpec}, of
+ * Engine.ts {@code findProjectSpec} and of the version corepackUtils.ts {@code installVersion} runs (corepack 0.35.0).
  */
 public final class SpecUtils {
 
@@ -231,6 +231,9 @@ public final class SpecUtils {
     public static @Nullable Descriptor findProjectSpec(String initialCwd, int levels,
                                                        Function<String, @Nullable String> manifest, String name,
                                                        HostEnvironment env) {
+        if ("0".equals(env.setting("COREPACK_ENABLE_PROJECT_SPEC"))) {
+            return null;
+        }
         Lookup lookup = loadSpec(initialCwd, levels, manifest);
         if (lookup.getTarget() == null || lookup.getRawPmSpec() == EcmaScript.UNDEFINED) {
             return null;
@@ -244,6 +247,15 @@ public final class SpecUtils {
         }
         throw corepackRejects("This project is configured to use " + spec.getName() + " because " +
                               lookup.getTarget() + " has a \"packageManager\" field");
+    }
+
+    /**
+     * The version corepackUtils.ts {@code installVersion} installs and runs for a spec findProjectSpec returned,
+     * {@code semver.parse(range).version}; null for a URL.
+     */
+    public static @Nullable String installVersion(Descriptor spec) {
+        return WhatwgUrl.tryParse(spec.getRange()) == null ? NodeSemver.valid(spec.getRange(),
+                NodeSemver.Options.DEFAULT) : null;
     }
 
     // object[key], UNDEFINED where it lacks the key or is no object
