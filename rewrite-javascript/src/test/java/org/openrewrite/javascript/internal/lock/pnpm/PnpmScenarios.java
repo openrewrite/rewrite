@@ -39,6 +39,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * The recorded pnpm scenarios ({@link LockScenario#discover}) in the recorder's layout, with each lock's phase inputs
  * and the registry documents pnpm received.
@@ -283,10 +285,13 @@ final class PnpmScenarios {
 
         /**
          * The locks of the other projects as the edit's install found them, where the recording kept every project's
-         * ({@code probes/before-locks/}).
+         * ({@code probes/before-locks/}), else the root's ({@code probes/before-root-lock}).
          */
         Map<String, String> otherLocks() {
             Map<String, String> out = new TreeMap<>(tree("probes/before-locks"));
+            if (out.isEmpty() && has("probes/before-root-lock")) {
+                out.put(LockfileReader.WANTED_LOCKFILE, requireNonNull(file("probes/before-root-lock")));
+            }
             out.remove(RootRelativePath.join(lockDir(), LockfileReader.WANTED_LOCKFILE));
             return out;
         }

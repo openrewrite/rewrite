@@ -128,6 +128,14 @@ public final class NativeLockEngine {
         return pm == PackageManager.Pnpm && PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(fileName);
     }
 
+    /**
+     * Whether the package manager's install also reads the locks of the workspace's other projects: pnpm's of a
+     * workspace whose projects keep their own, which it installs in the same run.
+     */
+    public static boolean readsOtherLocks(PackageManager pm) {
+        return pm == PackageManager.Pnpm;
+    }
+
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);

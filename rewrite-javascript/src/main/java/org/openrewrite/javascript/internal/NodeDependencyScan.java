@@ -302,7 +302,7 @@ public final class NodeDependencyScan {
 
     /**
      * {@link #projectManifests}, the package-manager files beside or above them, the package.json of each directory
-     * above and of the members those list, and the paths under or directly above them.
+     * above and of the members those list, the other locks a package manager reads, and the paths the walks read.
      */
     public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
         return projectFiles(acc, ctx, packageJsonPath, projectManifests(acc, ctx, packageJsonPath));
@@ -332,6 +332,15 @@ public final class NodeDependencyScan {
         }
         Path root = directory(manifests.isEmpty() ? packageJsonPath : manifests.keySet().iterator().next());
         Path edited = directory(packageJsonPath);
+        if (regeneration != null && regeneration.readsOtherLocks()) {
+            Path own = root.resolve(regeneration.getLockFile());
+            for (Map.Entry<Path, String> lock : acc.locks.entrySet()) {
+                if (!lock.getKey().equals(own) &&
+                    regeneration.getLockFile().equals(String.valueOf(lock.getKey().getFileName()))) {
+                    files.put(lock.getKey(), lock.getValue());
+                }
+            }
+        }
         for (Map.Entry<Path, ProjectState> project : acc.projects.entrySet()) {
             Path dir = directory(project.getKey());
             SourceFile captured = project.getValue().capturedPackageJson;

@@ -19,6 +19,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.time.Instant;
@@ -121,6 +123,25 @@ class PnpmLockRegeneratorTest {
     }
 
     private static final String WITH = "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"wrappy\":\"1.0.2\"},";
+
+    /**
+     * pnpm installs every project of a workspace whose projects keep their own locks in the same run, so another
+     * project's lock the host holds without its contents is unknown.
+     */
+    @Test
+    void anotherProjectsLockTheHostDidNotReadIsCannotKnow() {
+        PnpmScenarios.Scenario scenario = scenario("open-ws-unshared-other-project-resolves");
+        PnpmLockRegenerator.Inputs given = PnpmScenarioTest.inputs(scenario, scenario.file("before"));
+        Map<String, String> files = new LinkedHashMap<>(given.getFiles());
+        assertThat(files.remove("packages/b/pnpm-lock.yaml")).isNotNull();
+
+        Result result = new PnpmLockRegenerator(given.toBuilder().clearFiles().files(files).build(),
+          new ScenarioRegistry(scenario, "after")).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).contains("packages/b/pnpm-lock.yaml (its contents were not read)");
+    }
 
     @Test
     void anAddedDevEnginesRuntimeIsAnEditPnpmResolves() {

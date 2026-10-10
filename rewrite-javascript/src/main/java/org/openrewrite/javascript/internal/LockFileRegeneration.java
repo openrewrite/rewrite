@@ -269,6 +269,13 @@ public final class LockFileRegeneration {
     }
 
     /**
+     * Whether its install also reads the locks of the workspace's other projects.
+     */
+    public boolean readsOtherLocks() {
+        return NativeLockEngine.readsOtherLocks(pm);
+    }
+
+    /**
      * @param ctx supplies the {@code HttpSender} and host-configured registries/credentials
      * @return the new lock content, or a structured failure
      */

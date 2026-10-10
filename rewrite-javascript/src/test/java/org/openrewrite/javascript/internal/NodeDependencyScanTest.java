@@ -676,6 +676,37 @@ class NodeDependencyScanTest {
         assertThat(result.getFailure().getDetail()).contains("libs/x/package.json (its contents were not read)");
     }
 
+    /**
+     * pnpm installs every project of a workspace whose projects keep their own locks in one run, so a member's
+     * regeneration gets the other projects' locks; npm's gets none.
+     */
+    @ParameterizedTest
+    @CsvSource({"Pnpm, pnpm-lock.yaml, true", "Npm, package-lock.json, false"})
+    void theOtherProjectsLocksGoWhereThePackageManagerReadsThem(PackageManager pm, String lockName, boolean read) {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        captureFile(acc, lockName, "root lock");
+        captureFile(acc, "packages/a/" + lockName, "a lock");
+        captureFile(acc, "packages/b/" + lockName, "b lock");
+        project(acc, ROOT, "{\"name\":\"root\",\"private\":true}", nodeResolutionResult(pm));
+        project(acc, MEMBER, "{\"name\":\"a\",\"version\":\"1.0.0\"}", nodeResolutionResult(pm));
+        project(acc, Paths.get("packages/b/package.json"), "{\"name\":\"b\",\"version\":\"1.0.0\"}",
+          nodeResolutionResult(pm));
+        capture(acc, "pnpm-workspace.yaml", "packages:\n  - packages/*\nsharedWorkspaceLockfile: false\n");
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
+          MEMBER);
+
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("packages/a/" + lockName));
+        if (read) {
+            assertThat(files.getPackageManagerFiles()).containsEntry(Paths.get(lockName), "root lock")
+              .containsEntry(Paths.get("packages/b/" + lockName), "b lock")
+              .doesNotContainKey(Paths.get("packages/a/" + lockName));
+        } else {
+            assertThat(files.getPackageManagerFiles().keySet()).noneMatch(p -> p.endsWith(lockName));
+        }
+    }
+
     private static void captureFile(NodeDependencyScan.Accumulator acc, String path, String text) {
         SourceFile file = PlainText.builder().sourcePath(Paths.get(path)).text(text).build();
         NodeDependencyScan.capturePackageManagerFile(acc, file);

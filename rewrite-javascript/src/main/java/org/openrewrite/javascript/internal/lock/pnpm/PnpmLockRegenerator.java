@@ -280,7 +280,10 @@ public final class PnpmLockRegenerator {
                 // getContext runs its readPackage hooks over its manifest, so its lock cannot say whether it resolves
                 throw sharesCacheWith(dir);
             }
-            String lock = inputs.getFiles().get(RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE));
+            String lockPath = RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE);
+            String lock = inputs.getFiles().get(lockPath);            if (lock == null && inputs.getPaths() != null && inputs.getPaths().contains(lockPath)) {
+                throw new CannotKnow(lockPath + " (its contents were not read)");
+            }
             if (lock == null) {
                 continue;
             }
