@@ -41,7 +41,7 @@ import static org.openrewrite.javascript.internal.NodeCatalogs.DEFAULT;
 
 /**
  * Each catalog read and edit against what pnpm 11.2.2, Yarn 4.10.3 and Bun 1.3.10 read or wrote in the recordings
- * under {@code catalogs/}.
+ * under {@code lock/catalogs/}.
  */
 class NodeCatalogsTest {
 
@@ -232,7 +232,7 @@ class NodeCatalogsTest {
     }
 
     static String file(String path) {
-        try (InputStream in = NodeCatalogsTest.class.getResourceAsStream("/catalogs/" + path)) {
+        try (InputStream in = NodeCatalogsTest.class.getResourceAsStream("/lock/catalogs/" + path)) {
             if (in == null) {
                 throw new IllegalArgumentException(path);
             }

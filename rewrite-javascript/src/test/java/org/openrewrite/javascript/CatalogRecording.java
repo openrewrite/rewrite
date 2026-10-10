@@ -53,7 +53,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
- * A recording under {@code catalogs/<family>/<scenario>/} as a recipe run's sources: each file before the edit and
+ * A recording under {@code lock/catalogs/<family>/<scenario>/} as a recipe run's sources: each file before the edit and
  * as the package manager left it, and its registry responses served offline.
  */
 final class CatalogRecording {
@@ -66,7 +66,7 @@ final class CatalogRecording {
     final List<String> unserved = new ArrayList<>();
 
     CatalogRecording(String family, String scenario) {
-        URL url = CatalogRecording.class.getResource("/catalogs/" + family + "/" + scenario);
+        URL url = CatalogRecording.class.getResource("/lock/catalogs/" + family + "/" + scenario);
         if (url == null) {
             throw new IllegalArgumentException(family + "/" + scenario);
         }
