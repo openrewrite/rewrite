@@ -64,7 +64,7 @@ class PackageResolverFindTest {
             "1.0|TypeError: Invalid Version: 1.0",
     })
     void getHighestRangeVersionMatchReadsVersionsAsSemverDoes(@Nullable String version, @Nullable String outcome) {
-        PackageResolver resolver = new PackageResolver(YarnClassicOptions.defaults(), new Lockfile());
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), new Lockfile());
         Manifest manifest = new Manifest();
         manifest.put("name", "p");
         manifest.put("version", version);
@@ -113,7 +113,7 @@ class PackageResolverFindTest {
     private static PackageResolver resolve(String lock, Map<String, String> registry, String... roots) {
         YarnClassicOptions options = YarnClassicOptions.defaults();
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
-                new ResolutionMap(options), (url, name) -> registry.get(name),
+                new ResolutionMap(options), YarnClassicScenarios.packuments((url, name) -> registry.get(name)),
                 new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
         List<DependencyRequestPattern> requests = new ArrayList<>();
         for (String root : roots) {

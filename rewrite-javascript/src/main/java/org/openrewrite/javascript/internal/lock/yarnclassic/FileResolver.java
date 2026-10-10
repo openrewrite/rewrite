@@ -66,7 +66,7 @@ final class FileResolver {
                 throw new CannotKnow("the package.json of " + FILE_PROTOCOL_PREFIX + loc + ", which the project's " +
                                      "manifests do not include");
             }
-            Manifest manifest = YarnClassicLockRegenerator.tryManifest(location, text, request.config.isLooseSemver(),
+            Manifest manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
                     false, "", resolver.warnings);
             PackageRemote remote = new PackageRemote();
             remote.type = "copy";

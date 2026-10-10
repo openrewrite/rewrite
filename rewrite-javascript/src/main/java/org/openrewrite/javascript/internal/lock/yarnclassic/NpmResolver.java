@@ -195,7 +195,6 @@ final class NpmResolver {
             }
 
             Manifest info = new Manifest(data);
-            info.packageJson = new LinkedHashMap<>(data);
             if (dist != null && Js.truthy(Js.get(dist, "tarball"))) {
                 String tarball = cleanRegistry(config, Js.templateString(Js.get(dist, "tarball")));
                 Object shasum = Js.get(dist, "shasum");

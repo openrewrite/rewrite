@@ -15,16 +15,24 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,6 +49,9 @@ import java.util.regex.Pattern;
 final class YarnClassicScenarios {
 
     static final String FAMILY = "yarn-classic";
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String FIXTURE_TARBALLS = "lock/" + FAMILY + "/fixture-tarballs/";
 
     private static final List<String> LOCKS = Arrays.asList("before", "after", "again");
     private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
@@ -114,6 +125,65 @@ final class YarnClassicScenarios {
     static final class Scenario extends LockScenario {
         Scenario(String name, String label, Path dir, @Nullable Path httpCache) {
             super(name, label, dir, httpCache);
+        }
+
+        /**
+         * A tarball the scenario recorded; a downloaded fixture, which predates tarballs, finds the registry's in
+         * {@code lock/yarn-classic/fixture-tarballs/}.
+         */
+        byte @Nullable [] tarball(String file) {
+            byte[] tgz = httpBytes(file);
+            if (tgz != null || recordedWith() != null) {
+                return tgz;
+            }
+            try (InputStream in = YarnClassicScenarios.class.getClassLoader()
+                    .getResourceAsStream(FIXTURE_TARBALLS + file)) {
+                if (in == null) {
+                    return null;
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] buffer = new byte[8192];
+                for (int n; (n = in.read(buffer)) > 0; ) {
+                    out.write(buffer, 0, n);
+                }
+                return out.toByteArray();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        byte @Nullable [] bytes(String file) {
+            try {
+                Path path = getDir().resolve(file);
+                return Files.isRegularFile(path) ? Files.readAllBytes(path) : null;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
+        /**
+         * Whether the recorder's registry answered 404 for this url's path ({@code registry-config}'s
+         * {@code notFound}).
+         */
+        boolean notFound(String url) {
+            String config = file("registry-config");
+            if (config == null) {
+                return false;
+            }
+            try {
+                JsonNode notFound = JSON.readTree(config).get("notFound");
+                String path = URI.create(url).getRawPath();
+                if (notFound != null) {
+                    for (JsonNode p : notFound) {
+                        if (p.asText().equals(path)) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
 
         /**
@@ -293,6 +363,35 @@ final class YarnClassicScenarios {
 
     static List<Scenario> discover() {
         return LockScenario.discover(FAMILY, YarnClassicScenarios::isScenario, Scenario::new);
+    }
+
+    interface Packuments {
+        @Nullable
+        String packument(String registry, String name);
+    }
+
+    /**
+     * A registry of packuments that holds no tarball.
+     */
+    static RegistrySource packuments(Packuments packuments) {
+        return new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name) {
+                return packuments.packument(registry, name);
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version) {
+                return null;
+            }
+        };
+    }
+
+    static final RegistrySource NO_REGISTRY = packuments((registry, name) -> null);
+
+    static PackageResolver resolver(YarnClassicOptions options, Lockfile lockfile) {
+        return new PackageResolver(options, lockfile, new ResolutionMap(options), NO_REGISTRY,
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
     }
 
     private static boolean isScenario(Path dir) {

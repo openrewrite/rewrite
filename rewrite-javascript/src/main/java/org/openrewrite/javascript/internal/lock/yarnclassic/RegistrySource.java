@@ -18,9 +18,9 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The registry documents a Yarn classic install reads.
+ * What yarn requests from a registry: packuments, and the tarballs of the versions it picks anew.
  */
-public interface PackumentSource {
+public interface RegistrySource {
 
     /**
      * {@code GET <registry><name>} with yarn's {@code Accept} header: the abbreviated packument, or null when the
@@ -28,4 +28,9 @@ public interface PackumentSource {
      */
     @Nullable
     String packument(String registry, String name);
+
+    /**
+     * {@code GET} of a version's {@code dist.tarball}: its bytes, or null when the registry answers 404.
+     */
+    byte @Nullable [] tarball(String url, String name, String version);
 }

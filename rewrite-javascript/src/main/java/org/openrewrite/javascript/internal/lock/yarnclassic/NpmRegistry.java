@@ -36,10 +36,10 @@ final class NpmRegistry {
 
     private final YarnClassicOptions config;
     private final EventLoop loop;
-    private final PackumentSource source;
+    private final RegistrySource source;
     private final Map<String, Io<Object>> cache = new HashMap<>();
 
-    NpmRegistry(YarnClassicOptions config, EventLoop loop, PackumentSource source) {
+    NpmRegistry(YarnClassicOptions config, EventLoop loop, RegistrySource source) {
         this.config = config;
         this.loop = loop;
         this.source = source;

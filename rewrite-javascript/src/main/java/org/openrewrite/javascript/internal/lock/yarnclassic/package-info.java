@@ -16,9 +16,9 @@
 /**
  * Yarn classic's lockfile and resolver model, ported from yarn 1.22.22 (yarnpkg/yarn, tag v1.22.22): src/lockfile,
  * src/package-resolver.js, src/package-request.js, src/package-reference.js, src/resolution-map.js,
- * src/workspace-layout.js, src/package-compatibility.js, src/package-fetcher.js, src/resolvers,
- * src/util/normalize-manifest, src/util/normalize-pattern.js, the config that reaches a lock (src/config.js, src/rc.js,
- * src/registries) and src/cli/commands/install.js. It is distributed under
+ * src/workspace-layout.js, src/package-compatibility.js, src/package-fetcher.js, src/fetchers, src/resolvers,
+ * src/util/normalize-manifest, src/util/normalize-pattern.js, src/util/fs.js, the config that reaches a lock
+ * (src/config.js, src/rc.js, src/registries), src/cli/index.js and src/cli/commands/install.js. It is distributed under
  * the BSD 2-Clause License:
  * <pre>
  * Copyright (c) 2016-present, Yarn Contributors. All rights reserved.
@@ -70,8 +70,10 @@
  * {@code Micromatch} micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff 2.0.0, {@code Braces} braces
  * 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
  * randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob
- * 0.3.2 and {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles
- * them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the MIT License:
+ * 0.3.2, {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, {@code GunzipMaybe} gunzip-maybe
+ * 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1 and {@code TarFs} tar-fs 1.16.3, as
+ * yarn 1.22.22 bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed
+ * under the MIT License:
  * <ul>
  *     <li>deep-equal: James Halliday</li>
  *     <li>brace-expansion, balanced-match: Copyright (c) 2013 Julian Gruber</li>
@@ -86,6 +88,10 @@
  *     <li>is-dotfile: Copyright (c) 2015-2017, Jon Schlinkert</li>
  *     <li>repeat-element: Copyright (c) 2015 Jon Schlinkert</li>
  *     <li>randomatic: Copyright (c) 2013-2017, Jon Schlinkert</li>
+ *     <li>gunzip-maybe: Copyright (c) 2016 Mathias Buus</li>
+ *     <li>tar-stream, tar-fs: Copyright (c) 2014 Mathias Buus</li>
+ *     <li>is-gzip: Kevin Mårtensson</li>
+ *     <li>is-deflate: Copyright (c) 2016 Thomas Watson Steen</li>
  * </ul>
  * <pre>
  * Permission is hereby granted, free of charge, to any person obtaining a copy of

@@ -27,6 +27,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -99,7 +100,7 @@ class YarnClassicLockRoundTripTest {
     private static boolean installsAbove(YarnClassicScenarios.Lock lock) {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         boolean looseSemver = YarnClassicOptions.looseSemver(YarnClassicOptions.rc(inputs.getConfigFiles()));
-        if (new YarnClassicLockRegenerator(inputs).findWorkspaceRoot(looseSemver, new ArrayList<>()) <= 0) {
+        if (new Config(inputs).findWorkspaceRoot(looseSemver, new ArrayList<>()) <= 0) {
             return false;
         }
         assertThat(lock.getScenario().expect()).startsWith("cannot-know");
@@ -111,9 +112,8 @@ class YarnClassicLockRoundTripTest {
      */
     private static @Nullable Loaded load(YarnClassicScenarios.Lock lock) {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
-        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(inputs);
         try {
-            regenerator.requireRelease(YarnClassicOptions.rc(inputs.getConfigFiles()));
+            new Cli(inputs).start(YarnClassicOptions.rc(inputs.getConfigFiles()));
         } catch (CannotKnow | JsError e) {
             assertThat(lock.getScenario().expect()).matches("(cannot-know|pm-fails) .*");
             assumeFalse(true, "yarn 1.22.22 does not run this install: " + e.getMessage());
@@ -136,7 +136,7 @@ class YarnClassicLockRoundTripTest {
             assertThat(lock.getScenario().expect()).startsWith("malformed");
             return null;
         }
-        return new Loaded(lock, regenerator, options, lockfile);
+        return new Loaded(lock, inputs, options, lockfile);
     }
 
     private static String logs(YarnClassicScenarios.Scenario scenario) {
@@ -152,37 +152,38 @@ class YarnClassicLockRoundTripTest {
 
     private static final class Loaded {
         final YarnClassicScenarios.Lock lock;
-        final YarnClassicLockRegenerator regenerator;
+        final YarnClassicLockRegenerator.Inputs inputs;
         final YarnClassicOptions options;
         final Lockfile lockfile;
         final PackageResolver resolver;
         final List<String> warnings = new ArrayList<>();
 
-        Loaded(YarnClassicScenarios.Lock lock, YarnClassicLockRegenerator regenerator, YarnClassicOptions options,
+        Loaded(YarnClassicScenarios.Lock lock, YarnClassicLockRegenerator.Inputs inputs, YarnClassicOptions options,
                Lockfile lockfile) {
             this.lock = lock;
-            this.regenerator = regenerator;
+            this.inputs = inputs;
             this.options = options;
             this.lockfile = lockfile;
             this.resolver = reuseEveryEntry(lockfile, options, warnings);
         }
 
         String write() {
-            return YarnClassicLockRegenerator.writeFilePreservingEol(lock.getText(), LockfileStringifier.stringify(
+            return Fs.writeFilePreservingEol(lock.getText(), LockfileStringifier.stringify(
                     lockfile.getLockfile(resolver.patterns), false, options.isEnableLockfileVersions(),
                     lock.getScenario().nodeVersion()), lock.getScenario().host().getOs());
         }
 
         @Nullable
         String save() {
-            YarnClassicOptions options = regenerator.init(warnings);
+            Config config = new Config(inputs);
+            YarnClassicOptions options = YarnClassicLockRegenerator.init(inputs, config, warnings);
             YarnClassicOptions.Flags flags = options.getFlags();
             if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
                 return null;
             }
-            YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(lockfile, options,
-                    new ResolutionMap(options), warnings);
-            return YarnClassicLockRegenerator.saveLockfileAndIntegrity(resolver, request.getPatterns(),
+            Install.InstallCwdRequest request = new Install(inputs, config, options, YarnClassicScenarios.NO_REGISTRY,
+                    warnings).fetchRequestFromCwd(lockfile, new ResolutionMap(options));
+            return Install.saveLockfileAndIntegrity(resolver, request.getPatterns(),
                     request.getWorkspaceLayout(), options, lockfile, lock.getText(), lock.getScenario().host());
         }
 
@@ -191,10 +192,11 @@ class YarnClassicLockRoundTripTest {
          * entry's version no longer satisfies its pattern's range (a name the resolutions cover aside).
          */
         boolean resolvesAgain() {
-            YarnClassicOptions options = regenerator.init(warnings);
+            Config config = new Config(inputs);
+            YarnClassicOptions options = YarnClassicLockRegenerator.init(inputs, config, warnings);
             ResolutionMap resolutionMap = new ResolutionMap(options);
-            YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(lockfile, options,
-                    resolutionMap, warnings);
+            Install.InstallCwdRequest request = new Install(inputs, config, options, YarnClassicScenarios.NO_REGISTRY,
+                    warnings).fetchRequestFromCwd(lockfile, resolutionMap);
             for (String pattern : request.getPatterns()) {
                 if ((request.getWorkspaceLayout() == null ||
                      request.getWorkspaceLayout().getManifestByPattern(pattern) == null) &&
@@ -222,7 +224,7 @@ class YarnClassicLockRoundTripTest {
      */
     @SuppressWarnings("unchecked")
     static PackageResolver reuseEveryEntry(Lockfile lockfile, YarnClassicOptions options, List<String> warnings) {
-        PackageResolver resolver = new PackageResolver(options, lockfile);
+        PackageResolver resolver = YarnClassicScenarios.resolver(options, lockfile);
         if (!(lockfile.getCache() instanceof Map)) {
             return resolver;
         }
@@ -251,7 +253,7 @@ class YarnClassicLockRoundTripTest {
             pkg.put("dependencies", entry.get("dependencies"));
             pkg.put("optionalDependencies", entry.get("optionalDependencies"));
             return pkg;
-        }, warnings));
+        }, warnings, new HashSet<>()));
         return resolver;
     }
 

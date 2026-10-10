@@ -72,13 +72,8 @@ final class PackageResolver {
         Manifest info;
     }
 
-    PackageResolver(YarnClassicOptions config, Lockfile lockfile) {
-        this(config, lockfile, new ResolutionMap(config), (registry, name) -> null,
-                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
-    }
-
     PackageResolver(YarnClassicOptions config, Lockfile lockfile, ResolutionMap resolutionMap,
-                    PackumentSource registry, ProjectFiles files, Host host, List<String> warnings) {
+                    RegistrySource registry, ProjectFiles files, Host host, List<String> warnings) {
         this.config = config;
         this.lockfile = lockfile;
         this.resolutionMap = resolutionMap;

@@ -47,12 +47,6 @@ final class Manifest {
     @Nullable
     Map<String, @Nullable Object> locked;
 
-    /**
-     * The registry's document of a version picked anew, which stands for the package.json of its tarball.
-     */
-    @Nullable
-    Map<String, @Nullable Object> packageJson;
-
     Manifest() {
         this(new LinkedHashMap<>());
     }
@@ -70,7 +64,6 @@ final class Manifest {
         copy.reference = reference;
         copy.fresh = fresh;
         copy.locked = locked;
-        copy.packageJson = packageJson;
         return copy;
     }
 

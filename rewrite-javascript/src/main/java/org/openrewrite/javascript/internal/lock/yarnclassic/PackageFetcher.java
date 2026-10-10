@@ -21,10 +21,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Port of yarn src/package-fetcher.js {@code fetch} and config.js {@code generateUniquePackageSlug} (yarn 1.22.22).
+ * Port of yarn src/package-fetcher.js and config.js {@code generateUniquePackageSlug} (yarn 1.22.22).
  */
 final class PackageFetcher {
 
@@ -32,17 +33,51 @@ final class PackageFetcher {
     private static final Pattern SLUG_EDGES = Pattern.compile("^-+|-+\\z");
 
     /**
-     * The package.json a fetch reads for a reference, normalized: from the tarball, the git checkout or the
-     * directory.
+     * {@code fetchOneRemote}'s package for a reference: the package.json of its tarball, git checkout or directory;
+     * a .yarn-metadata.json a tarball ships hands over its manifest, of whatever type.
      */
     interface Fetcher {
-        Manifest fetch(PackageReference ref);
+        @Nullable
+        Object fetch(PackageReference ref);
     }
 
     private PackageFetcher() {
     }
 
-    static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, List<String> warnings) {
+    /**
+     * {@code fetchOneRemote} with what stands for each remote's package.json: a version picked anew reads its
+     * tarball's, a reused lock entry is what it holds, a directory reads its own.
+     */
+    static Fetcher remote(PackageResolver resolver, RegistrySource registry, YarnClassicOptions config) {
+        return ref -> {
+            Manifest pkg = resolver.patterns.get(ref.patterns.get(0));
+            if ("workspace".equals(ref.remote.type)) {
+                return pkg;
+            }
+            if ("copy".equals(ref.remote.type)) {
+                Manifest copy = pkg.copy();
+                copy.data.remove("_uid");
+                return copy;
+            }
+            Map<String, @Nullable Object> entry = pkg.locked;
+            if (entry == null && "tarball".equals(ref.remote.type)) {
+                return new TarballFetcher(ref, registry, config, resolver.warnings).fetch();
+            }
+            Manifest locked = new Manifest();
+            locked.put("name", entry == null ? pkg.getName() : entry.get("name"));
+            locked.put("version", entry == null ? pkg.getVersion() : entry.get("version"));
+            locked.put("dependencies", entry == null ? pkg.get("dependencies") : entry.get("dependencies"));
+            locked.put("optionalDependencies", entry == null ? pkg.get("optionalDependencies") :
+                    entry.get("optionalDependencies"));
+            return locked;
+        };
+    }
+
+    /**
+     * {@code fetch}: each package's fetched manifest in place of the resolver's; an optional one whose fetch fails
+     * keeps the resolver's, and its cache directory, which yarn removes, goes into {@code unfetched}.
+     */
+    static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, List<String> warnings, Set<String> unfetched) {
         Map<String, PackageReference> pkgsPerDest = new HashMap<>();
         List<Manifest> kept = new ArrayList<>();
         for (Manifest pkg : pkgs) {
@@ -65,7 +100,22 @@ final class PackageFetcher {
         List<Manifest> out = new ArrayList<>();
         for (Manifest pkg : kept) {
             PackageReference ref = pkg.reference;
-            Manifest newPkg = "link".equals(ref.remote.type) ? linkMock() : fetcher.fetch(ref);
+            Object fetched;
+            try {
+                fetched = "link".equals(ref.remote.type) ? linkMock() : fetcher.fetch(ref);
+            } catch (JsError | MessageError e) {
+                if (!Js.truthy(ref.optional)) {
+                    throw e;
+                }
+                warnings.add(String.valueOf(e.getMessage()));
+                unfetched.add(generateModuleCachePath(ref));
+                fetched = null;
+            }
+            if (!Js.truthy(fetched)) {
+                out.add(pkg);
+                continue;
+            }
+            Manifest newPkg = fetched instanceof Manifest ? (Manifest) fetched : Config.manifest(fetched, "_reference");
             newPkg.reference = ref;
             newPkg.remote = ref.remote;
             newPkg.put("name", pkg.getName());

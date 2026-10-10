@@ -53,10 +53,10 @@ final class NormalizeManifest {
     }
 
     /**
-     * Normalizes a manifest in place ({@code moduleLoc} and {@code lockfileFolder} relative to the project's
-     * directory); throws MessageError for a name yarn rejects, or a name or version that is not a string.
+     * Normalizes a manifest in place ({@code moduleLoc}, null for yarn's cache, and {@code lockfileFolder} relative to
+     * the project); throws MessageError for a name yarn rejects, or a name or version that is not a string.
      */
-    static Manifest normalizeManifest(Manifest info, String moduleLoc, @Nullable String lockfileFolder,
+    static Manifest normalizeManifest(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder,
                                       boolean isRoot, boolean looseSemver, List<String> warnings) {
         Object name = info.getName();
         Object version = info.getVersion();
@@ -136,11 +136,11 @@ final class NormalizeManifest {
     }
 
     /**
-     * {@code file:} and {@code link:} dependencies made relative to the lock's directory; an absolute target is
-     * cannot-know, as yarn writes it relative to where the project sits on disk.
+     * {@code file:} and {@code link:} dependencies made relative to the lock's directory; an absolute target, or any
+     * in yarn's cache, is cannot-know, as yarn writes it relative to where the project or the cache sits on disk.
      */
     @SuppressWarnings("unchecked")
-    static void resolveRelative(Manifest info, String moduleLoc, @Nullable String lockfileFolder) {
+    static void resolveRelative(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder) {
         if (lockfileFolder == null) {
             return;
         }
@@ -175,6 +175,10 @@ final class NormalizeManifest {
                 if (unprefixed.startsWith("/")) {
                     throw new CannotKnow("where the project sits on disk, which the " +
                             dependencyType + " entry " + name + "@" + value + " is written relative to");
+                }
+                if (moduleLoc == null) {
+                    throw new CannotKnow("where yarn's cache sits, which the " + dependencyType + " entry " + name +
+                                         "@" + value + " of " + Js.string(info.getName()) + " is written relative to");
                 }
                 boolean hasPathPrefix = PATH_PREFIX.matcher(unprefixed).find();
                 String project = deeperThanAnyClimb(lockfileFolder, moduleLoc, unprefixed);

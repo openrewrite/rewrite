@@ -28,7 +28,7 @@ class PackageResolverTest {
 
     @Test
     void addPatternDoesNotAddDuplicates() {
-        PackageResolver resolver = new PackageResolver(YarnClassicOptions.defaults(), new Lockfile());
+        PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), new Lockfile());
         Manifest manifest = new Manifest();
         manifest.put("name", "name");
         resolver.addPattern("patternOne", manifest);

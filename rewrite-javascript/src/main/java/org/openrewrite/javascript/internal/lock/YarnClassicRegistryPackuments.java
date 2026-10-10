@@ -16,15 +16,15 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.yarnclassic.PackumentSource;
+import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The packuments a Yarn classic install reads, from the registry yarn's own config names.
+ * The packuments and tarballs a Yarn classic install reads, from the registry yarn's own config names.
  */
-final class YarnClassicRegistryPackuments implements PackumentSource {
+final class YarnClassicRegistryPackuments implements RegistrySource {
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
@@ -40,6 +40,19 @@ final class YarnClassicRegistryPackuments implements PackumentSource {
             return client.getPackumentText(registries.registryFor(name, registry), name, false);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    @Override
+    public byte @Nullable [] tarball(String url, String name, String version) {
+        try {
+            return client.getTarball(registries.registryFor(name, url), name, version, url);
+        } catch (NodeRegistryException e) {
+            if (e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND ||
+                e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
             }
             throw e;

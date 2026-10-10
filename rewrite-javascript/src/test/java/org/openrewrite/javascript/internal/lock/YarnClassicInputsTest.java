@@ -15,8 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
+import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
@@ -28,6 +30,18 @@ import java.util.HashSet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class YarnClassicInputsTest {
+
+    private static final RegistrySource NO_REGISTRY = new RegistrySource() {
+        @Override
+        public @Nullable String packument(String registry, String name) {
+            return null;
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version) {
+            return null;
+        }
+    };
 
     @Test
     void memberEditPlacesManifestsAndReadsTheRootConfig() {
@@ -75,7 +89,7 @@ class YarnClassicInputsTest {
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc");
         assertThat(inputs.getConfigFiles()).isEmpty();
-        assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
+        assertThat(new YarnClassicLockRegenerator(inputs, NO_REGISTRY).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know .yarnrc (its contents were not read)");
     }
 
@@ -102,7 +116,7 @@ class YarnClassicInputsTest {
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../.yarnrc", "../../../.npmrc");
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "../.yarnrc", "../../.yarnrc.yml",
           "../../../.npmrc", "../../../README.md");
-        assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
+        assertThat(new YarnClassicLockRegenerator(inputs, NO_REGISTRY).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know ../../.yarnrc.yml (its contents were not read)");
     }
 
@@ -121,7 +135,7 @@ class YarnClassicInputsTest {
         Inputs listed = YarnClassicInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(listed.getDirectory()).isEqualTo("web/app");
-        assertThat(new YarnClassicLockRegenerator(listed, (registry, name) -> null).regenerate().getErrorMessage())
+        assertThat(new YarnClassicLockRegenerator(listed, NO_REGISTRY).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the lock yarn writes for this edit: yarn installs " +
                      "at the workspace root ../../, whose workspaces list web/app, and writes ../../yarn.lock, not " +
                      "this project's");
@@ -131,7 +145,7 @@ class YarnClassicInputsTest {
           Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(unlisted.getDirectory()).isEqualTo("tools/app");
-        assertThat(new YarnClassicLockRegenerator(unlisted, (registry, name) -> null).regenerate().isSuccess())
+        assertThat(new YarnClassicLockRegenerator(unlisted, NO_REGISTRY).regenerate().isSuccess())
           .isTrue();
     }
 
@@ -153,7 +167,7 @@ class YarnClassicInputsTest {
         Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../package.json", "../../../package.json");
-        assertThat(new YarnClassicLockRegenerator(inputs, (registry, name) -> null).regenerate().getErrorMessage())
+        assertThat(new YarnClassicLockRegenerator(inputs, NO_REGISTRY).regenerate().getErrorMessage())
           .isEqualTo("RESOLUTION_REQUIRED: yarn rejects this edit: This project's package.json defines " +
                      "\"packageManager\": \"yarn@pnpm@9.15.0\". However the current global version of Yarn is " +
                      "1.22.22.");

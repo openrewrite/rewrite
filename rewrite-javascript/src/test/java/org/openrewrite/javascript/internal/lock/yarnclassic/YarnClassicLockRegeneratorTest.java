@@ -98,7 +98,7 @@ class YarnClassicLockRegeneratorTest {
     @MethodSource("installs")
     void stopsWhereYarnStops(String name, YarnClassicScenarios.Scenario scenario, boolean before,
                              @Nullable String lock, String log) {
-        String outcome = untilTheFirstStep(new YarnClassicLockRegenerator(scenario.inputs(before, lock)));
+        String outcome = untilTheFirstStep((scenario.inputs(before, lock)));
         String expected = errorBeforeTheSteps(log);
         Matcher syntaxError = expected == null ? null : MANIFEST_SYNTAX_ERROR.matcher(expected);
         if (outcome.startsWith(CANNOT_KNOW)) {
@@ -296,7 +296,7 @@ class YarnClassicLockRegeneratorTest {
                 .directory(directory)
                 .now(Instant.EPOCH)
                 .build();
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs))).startsWith(outcome);
+        assertThat(untilTheFirstStep((inputs))).startsWith(outcome);
     }
 
     /**
@@ -310,13 +310,13 @@ class YarnClassicLockRegeneratorTest {
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a*\"]}")
                 .now(Instant.EPOCH);
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.build()))).isEqualTo(CANNOT_KNOW +
+        assertThat(untilTheFirstStep((inputs.build()))).isEqualTo(CANNOT_KNOW +
                 "whether the workspaces of ../package.json list this project, whose directory in the repository the " +
                 "host did not give");
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.directory("app").build()))).isEqualTo(
+        assertThat(untilTheFirstStep((inputs.directory("app").build()))).isEqualTo(
                 CANNOT_KNOW + "the lock yarn writes for this edit: yarn installs at the workspace root ../, whose " +
                 "workspaces list app, and writes ../yarn.lock, not this project's");
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.directory("b").build())))
+        assertThat(untilTheFirstStep((inputs.directory("b").build())))
                 .isEqualTo("requests");
     }
 
@@ -394,7 +394,7 @@ class YarnClassicLockRegeneratorTest {
                                 "\"packageManager\":\"pnpm@9.15.0\"}")
                     .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"," +
                                             "\"packageManager\":\"yarn@1.22.22\"}");
-            assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs.build())))
+            assertThat(untilTheFirstStep((inputs.build())))
                     .startsWith(outcome);
             return;
         }
@@ -402,7 +402,8 @@ class YarnClassicLockRegeneratorTest {
                 .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}").build();
         YarnClassicOptions options = YarnClassicOptions.defaults();
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
-                (url, name) -> null, new ProjectFiles(built.getManifests(), built.getPaths(), built.getCwd()),
+                YarnClassicScenarios.NO_REGISTRY, new ProjectFiles(built.getManifests(), built.getPaths(),
+                built.getCwd()),
                 Host.UNKNOWN, new ArrayList<>());
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("x@lib")
                 .registry("npm").optional(false).parentNames(new ArrayList<>()).build(), resolver);
@@ -440,13 +441,13 @@ class YarnClassicLockRegeneratorTest {
                 .directory("mid/app")
                 .now(Instant.EPOCH)
                 .build();
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs))).startsWith(outcome);
+        assertThat(untilTheFirstStep((inputs))).startsWith(outcome);
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("probes")
     void stopsWhereYarnStopsWhenProbed(String label, YarnClassicLockRegenerator.Inputs inputs, String outcome) {
-        assertThat(untilTheFirstStep(new YarnClassicLockRegenerator(inputs))).isEqualTo(outcome);
+        assertThat(untilTheFirstStep((inputs))).isEqualTo(outcome);
     }
 
     /**
@@ -469,12 +470,11 @@ class YarnClassicLockRegeneratorTest {
             "\"packages/*\", \"dependencies\": {\"ms\": \"2.1.3\"}}|ms@2.1.3",
     })
     void requestsTheAggregatorOfAnyWorkspaceRoot(String label, String manifest, String patterns) {
-        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs
-                .builder().manifest("", manifest).now(Instant.EPOCH).build());
         List<String> warnings = new ArrayList<>();
-        YarnClassicOptions options = regenerator.init(warnings);
-        YarnClassicLockRegenerator.InstallCwdRequest request = regenerator.fetchRequestFromCwd(
-                regenerator.lockfile(options), options, new ResolutionMap(options), warnings);
+        Run install = install(YarnClassicLockRegenerator.Inputs.builder().manifest("", manifest)
+                .now(Instant.EPOCH).build(), warnings);
+        Install.InstallCwdRequest request = install.install.fetchRequestFromCwd(install.install.lockfile(),
+                new ResolutionMap(install.options));
         List<String> requested = new ArrayList<>();
         for (DependencyRequestPattern dep : request.getRequests()) {
             String pattern = dep.getPattern();
@@ -502,13 +502,13 @@ class YarnClassicLockRegeneratorTest {
 
     @Test
     void warnsOfANohoistListWhileNohoistIsOff() {
-        YarnClassicLockRegenerator regenerator = withMember("{\"name\": \"r\", \"version\": \"1.0.0\", " +
+        YarnClassicLockRegenerator.Inputs inputs = withMember("{\"name\": \"r\", \"version\": \"1.0.0\", " +
                                                             "\"private\": true, \"workspaces\": {\"packages\": [], " +
                                                             "\"nohoist\": [\"**/x\"]}}",
                 "workspaces-nohoist-experimental false\n");
         List<String> warnings = new ArrayList<>();
-        YarnClassicOptions options = regenerator.init(warnings);
-        regenerator.fetchRequestFromCwd(regenerator.lockfile(options), options, new ResolutionMap(options), warnings);
+        Run install = install(inputs, warnings);
+        install.install.fetchRequestFromCwd(install.install.lockfile(), new ResolutionMap(install.options));
         assertThat(warnings).contains("\"r\" defines nohoist but the feature is disabled in your Yarn config " +
                                       "(\"workspaces-nohoist-experimental\" in .yarnrc file)");
     }
@@ -518,13 +518,12 @@ class YarnClassicLockRegeneratorTest {
      */
     @Test
     void warnsOfACollisionUnderEachRootRead() {
-        YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs
-                .builder().manifest("", "{\"name\": \"p\", \"version\": \"1.0.0\", \"dependencies\": " +
-                                        "{\"ms\": \"^2.1.0\"}, \"devDependencies\": {\"ms\": \"2.1.2\"}}")
-                .now(Instant.EPOCH).build());
         List<String> warnings = new ArrayList<>();
-        YarnClassicOptions options = regenerator.init(warnings);
-        regenerator.fetchRequestFromCwd(regenerator.lockfile(options), options, new ResolutionMap(options), warnings);
+        Run install = install(YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\": \"p\", \"version\": \"1.0.0\", \"dependencies\": " +
+                              "{\"ms\": \"^2.1.0\"}, \"devDependencies\": {\"ms\": \"2.1.2\"}}")
+                .now(Instant.EPOCH).build(), warnings);
+        install.install.fetchRequestFromCwd(install.install.lockfile(), new ResolutionMap(install.options));
         String collision = ": \"dependencies\" has dependency \"ms\" with range \"^2.1.0\" that collides with a " +
                            "dependency in \"devDependencies\" of the same name with version \"2.1.2\"";
         assertThat(warnings).containsExactly("package.json" + collision, "p@1.0.0" + collision);
@@ -546,7 +545,9 @@ class YarnClassicLockRegeneratorTest {
             "\"child-dep@^1.0.0\" required by \"root-dep@^1.0.0\" on the \"npm\" registry.",
     })
     void typesARegistryFailureByWhatFailed(String unfetched, String answer, @Nullable String failure) {
-        PackumentSource registry = (url, name) -> {
+        RegistrySource registry = new RegistrySource() {
+            @Override
+            public @Nullable String packument(String url, String name) {
             if (name.equals(unfetched)) {
                 if ("absent".equals(answer)) {
                     return null;
@@ -559,6 +560,12 @@ class YarnClassicLockRegeneratorTest {
                    ("root-dep".equals(name) ? "\"dependencies\":{\"child-dep\":\"^1.0.0\"}," : "") +
                    "\"dist\":{\"tarball\":\"https://registry.npmjs.org/" + name + "/-/" + name + "-1.0.0.tgz\"," +
                    "\"shasum\":\"abc\"}}}}";
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version) {
+                return null;
+            }
         };
         YarnClassicLockRegenerator regenerator = new YarnClassicLockRegenerator(YarnClassicLockRegenerator.Inputs
                 .builder()
@@ -639,7 +646,7 @@ class YarnClassicLockRegeneratorTest {
         }
     }
 
-    private static YarnClassicLockRegenerator withMember(String root, @Nullable String yarnrc) {
+    private static YarnClassicLockRegenerator.Inputs withMember(String root, @Nullable String yarnrc) {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", root)
                 .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}")
@@ -647,7 +654,7 @@ class YarnClassicLockRegeneratorTest {
         if (yarnrc != null) {
             inputs.configFile(".yarnrc", yarnrc);
         }
-        return new YarnClassicLockRegenerator(inputs.build());
+        return inputs.build();
     }
 
     private static Arguments probe(String label, String manifest, @Nullable String lock, @Nullable String yarnrc,
@@ -666,6 +673,22 @@ class YarnClassicLockRegeneratorTest {
         return Arguments.of(label, inputs.build(), outcome);
     }
 
+    private static final class Run {
+        final Install install;
+        final YarnClassicOptions options;
+
+        Run(Install install, YarnClassicOptions options) {
+            this.install = install;
+            this.options = options;
+        }
+    }
+
+    private static Run install(YarnClassicLockRegenerator.Inputs inputs, List<String> warnings) {
+        Config config = new Config(inputs);
+        YarnClassicOptions options = YarnClassicLockRegenerator.init(inputs, config, warnings);
+        return new Run(new Install(inputs, config, options, YarnClassicScenarios.NO_REGISTRY, warnings), options);
+    }
+
     private static Map<String, String> env(String... keysAndValues) {
         Map<String, String> env = new LinkedHashMap<>();
         for (int i = 0; i < keysAndValues.length; i += 2) {
@@ -682,14 +705,14 @@ class YarnClassicLockRegeneratorTest {
      * config.js {@code init}, install.js {@code run} and {@code fetchRequestFromCwd}: {@code error <what yarn
      * prints>}, or {@code requests} and the requested patterns.
      */
-    private static String untilTheFirstStep(YarnClassicLockRegenerator regenerator) {
+    private static String untilTheFirstStep(YarnClassicLockRegenerator.Inputs inputs) {
         try {
             List<String> warnings = new ArrayList<>();
-            YarnClassicOptions options = regenerator.init(warnings);
-            Lockfile lockfile = regenerator.lockfile(options);
+            Run install = install(inputs, warnings);
+            Lockfile lockfile = install.install.lockfile();
             StringBuilder out = new StringBuilder("requests");
-            for (DependencyRequestPattern request : regenerator.fetchRequestFromCwd(lockfile, options,
-                    new ResolutionMap(options), warnings).getRequests()) {
+            for (DependencyRequestPattern request : install.install.fetchRequestFromCwd(lockfile,
+                    new ResolutionMap(install.options)).getRequests()) {
                 out.append(' ').append(request.getPattern());
             }
             return out.toString();

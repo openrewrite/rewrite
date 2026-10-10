@@ -56,11 +56,12 @@ class YarnClassicScenarioTest extends LockScenarioTest {
     }
 
     /**
-     * The registry as the scenario recorded it, {@code http/<name>} whatever the registry's url; a downloaded fixture's
-     * empty versions are filled from its {@code http/<name>-<version>} documents.
+     * The registry as the scenario recorded it, {@code http/<name>} and {@code http/<name>-<version>.tgz} whatever the
+     * registry's url, a 404 where its {@code registry-config} said; a downloaded fixture's empty versions are filled
+     * from its {@code http/<name>-<version>} documents, its tarballs from the re-recording that names it.
      */
     static final class ScenarioRegistry extends RecordedRegistry<YarnClassicScenarios.Scenario>
-            implements PackumentSource {
+            implements RegistrySource {
         ScenarioRegistry(YarnClassicScenarios.Scenario scenario) {
             super(scenario);
         }
@@ -74,6 +75,20 @@ class YarnClassicScenarioTest extends LockScenarioTest {
                 return null;
             }
             return withRecordedVersions(name, body);
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version) {
+            if (scenario.notFound(url)) {
+                return null;
+            }
+            String file = name + "-" + version + ".tgz";
+            String mirror = mirror(url, "npmjs", "yarnpkg");
+            byte[] tgz = mirror == null ? scenario.tarball(file) : scenario.bytes(mirror + "/" + file);
+            if (tgz == null) {
+                notRecorded(file + " " + url);
+            }
+            return tgz;
         }
     }
 

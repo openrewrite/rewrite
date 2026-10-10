@@ -55,7 +55,7 @@ final class LinkResolver {
                 throw new CannotKnow("the package.json of " + LINK_PROTOCOL_PREFIX + loc + ", which the project's " +
                                      "manifests do not include");
             } else {
-                manifest = YarnClassicLockRegenerator.tryManifest(location, text, request.config.isLooseSemver(),
+                manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
                         false, "", resolver.warnings);
             }
             PackageRemote remote = new PackageRemote();
