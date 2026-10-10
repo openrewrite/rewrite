@@ -5,17 +5,17 @@ __metadata:
   version: 8
   cacheKey: 10c0
 
+"lwc-base@npm:1.0.0":
+  version: 1.0.0
+  resolution: "lwc-base@npm:1.0.0"
+  checksum: 10c0/cd173cdb5203b07ec63ad019be11ee4ab403d4ddac83e2a53ac7c671836b50adfc1538af1b04651612a55bc367cf46cc92c0ea5b2be9cccc934ffb53cfda8cd0
+  languageName: node
+  linkType: hard
+
 "p@workspace:.":
   version: 0.0.0-use.local
   resolution: "p@workspace:."
   dependencies:
-    wrappy: "npm:1.0.2"
+    lwc-base: "npm:1.0.0"
   languageName: unknown
   linkType: soft
-
-"wrappy@npm:1.0.2":
-  version: 1.0.2
-  resolution: "wrappy@npm:1.0.2"
-  checksum: 10c0/56fece1a4018c6a6c8e28fbc88c87e0fbf4ea8fd64fc6c63b18f4acc4bd13e0ad2515189786dd2c30d3eec9663d70f4ecf699330002f8ccb547e4a18231fc9f0
-  languageName: node
-  linkType: hard

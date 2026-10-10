@@ -3,6 +3,6 @@
   "version": "1.0.0",
   "packageManager": "yarn@4.10.3",
   "dependencies": {
-    "wrappy": "1.0.2"
+    "lwc-base": "1.0.0"
   }
 }

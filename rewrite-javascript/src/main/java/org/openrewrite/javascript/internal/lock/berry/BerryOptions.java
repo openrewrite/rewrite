@@ -135,6 +135,13 @@ public final class BerryOptions {
         DEFINITIONS.put("npmScopes", Definition.map(Definition.shape(scope)));
         DEFINITIONS.put("npmRegistries", Definition.map(Definition.shape(registry)));
 
+        Map<String, Definition> architectures = new LinkedHashMap<>();
+        for (String property : new String[]{"os", "cpu", "libc"}) {
+            architectures.put(property, new Definition(Type.STRING, Collections.singletonList("current"), null, true,
+                    Collections.emptyMap(), null));
+        }
+        DEFINITIONS.put("supportedArchitectures", Definition.shape(architectures));
+
         DEFINITIONS.put("catalog", Definition.map(Definition.of(Type.STRING, null)));
         DEFINITIONS.put("catalogs", Definition.map(Definition.map(Definition.of(Type.STRING, null))));
     }

@@ -37,14 +37,28 @@ final class Cache {
     }
 
     /**
-     * {@code fetchPackageFromCache} for a locator the lockfile has no checksum for: a package whose presence is
-     * conditional has its checksum hidden, any other gets the checksum of the archive the loader makes.
+     * What a fetcher's loader brings back from the network: the archive, whose checksum the cache computes.
      */
-    static @Nullable String fetchPackageFromCache(Locator locator, Supplier<String> loader, Project project) {
-        if (project.conditionalLocators.contains(locator.locatorHash)) {
+    interface Archive {
+        String checksum();
+    }
+
+    /**
+     * {@code fetchPackageFromCache} for a locator the lockfile has no checksum for: a disabled package is mocked; a
+     * conditional one is loaded with its checksum hidden, unless the lockfile held it, whose entry stands in for
+     * its registry archive; any other gets the checksum of the archive the loader brings.
+     */
+    static @Nullable String fetchPackageFromCache(Locator locator, Supplier<Archive> loader, Project project) {
+        if (project.disabledLocators.contains(locator.locatorHash)) {
             return null;
         }
-        return loader.get();
+        if (project.conditionalLocators.contains(locator.locatorHash)) {
+            if (!project.lockfileHeld(locator)) {
+                loader.get();
+            }
+            return null;
+        }
+        return loader.get().checksum();
     }
 
     /**

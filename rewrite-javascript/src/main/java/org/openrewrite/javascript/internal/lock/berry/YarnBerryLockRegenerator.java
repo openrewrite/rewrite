@@ -275,7 +275,8 @@ public final class YarnBerryLockRegenerator {
         }
 
         Configuration configuration = new Configuration(options, release);
-        Project project = new Project(configuration, inputs.getNow(), inputs.getPaths(), inputs.getFiles());
+        Project project = new Project(configuration, inputs.getNow(), inputs.getPaths(), inputs.getFiles(),
+                inputs.getHost());
         project.setupResolutions(inputs.getLock());
         List<String> directories = new ArrayList<>();
         for (String location : inputs.getManifests().keySet()) {

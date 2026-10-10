@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Host;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -45,6 +46,36 @@ final class Configuration {
     Configuration(BerryOptions options, YarnRelease release) {
         this.options = options;
         this.release = release;
+    }
+
+    /**
+     * {@code getSupportedArchitectures}, {@code current} the host's; where the host does not say, the check counts
+     * as satisfied (null: every value).
+     */
+    Map<String, @Nullable List<String>> getSupportedArchitectures(Host host) {
+        Map<String, @Nullable Object> supported = options.getMap("supportedArchitectures");
+        Map<String, @Nullable List<String>> out = new LinkedHashMap<>();
+        out.put("os", current(supported.get("os"), host.getOs()));
+        out.put("cpu", current(supported.get("cpu"), host.getCpu()));
+        out.put("libc", current(supported.get("libc"), host.getLibc()));
+        return out;
+    }
+
+    private static @Nullable List<String> current(@Nullable Object values, @Nullable String host) {
+        if (!(values instanceof List)) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        for (Object value : (List<?>) values) {
+            if (!"current".equals(value)) {
+                out.add(Js.string(value));
+            } else if (host == null) {
+                return null;
+            } else {
+                out.add(host);
+            }
+        }
+        return out;
     }
 
     /**

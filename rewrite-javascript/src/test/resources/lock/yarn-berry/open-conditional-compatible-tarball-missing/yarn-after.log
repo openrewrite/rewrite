@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + lwc-host@npm:1.0.0, lwc-darwin@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwc-darwin%2F-%2Flwc-darwin-1.0.1.tgz
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0035: │ lwc-darwin@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwc-darwin%2F-%2Flwc-darwin-1.0.1.tgz: Package not found
+➤ YN0035: │   Response Code: 404 (Not Found)
+➤ YN0035: │   Request Method: GET
+➤ YN0035: │   Request URL: http://127.0.0.1:47391/lwc-darwin/-/lwc-darwin-1.0.1.tgz
+➤ YN0000: └ Completed in 0s 244ms
+➤ YN0000: · Failed with errors in 0s 268ms

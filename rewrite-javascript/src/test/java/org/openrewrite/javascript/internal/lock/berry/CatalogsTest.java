@@ -129,7 +129,7 @@ class CatalogsTest {
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
                 HostEnvironment.of(Collections.emptyMap()));
         Project project = new Project(new Configuration(options, YarnRelease.of("4.10.3")), Instant.EPOCH, null,
-                Collections.emptyMap());
+                Collections.emptyMap(), Host.UNKNOWN);
         project.setupWorkspaces(new FastGlob(Collections.singletonList("."), null, Host.UNKNOWN),
                 cwd -> Manifest.fromText("{\"name\": \"test-project\", \"version\": \"1.0.0\"}"));
         return project;

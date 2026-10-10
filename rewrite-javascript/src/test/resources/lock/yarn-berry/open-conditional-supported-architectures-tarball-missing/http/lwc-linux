@@ -1,0 +1,20 @@
+{
+  "name": "lwc-linux",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwc-linux",
+      "version": "1.0.0",
+      "os": [
+        "linux"
+      ],
+      "dist": {
+        "shasum": "01014cb77c04ac68f31f353b3348f57d41c7152a",
+        "integrity": "sha512-Ctkqr0fXTMLFMIeN91Ng8G0btRQMtmQ86YnVbR4MAQGkPlljKdP0KMEyI/p/bW1VBmybuSqkxZe3iLbxYeCHQw==",
+        "tarball": "https://registry.npmjs.org/lwc-linux/-/lwc-linux-1.0.1.tgz"
+      }
+    }
+  }
+}

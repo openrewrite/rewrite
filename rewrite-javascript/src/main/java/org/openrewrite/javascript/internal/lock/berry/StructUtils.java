@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 final class StructUtils {
 
     private static final String VIRTUAL_PROTOCOL = "virtual:";
+    private static final Pattern CONDITION_REGEX = Pattern.compile("(os|cpu|libc)=([a-z0-9_-]+)");
     // JavaScript's `.`, which unlike Java's also matches U+0085
     private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
     private static final Pattern IDENT_REGEXP = Pattern.compile("^(?:@([^/]+?)/)?([^@/]+)\\z");
@@ -294,6 +295,21 @@ final class StructUtils {
             throw new JsError(JsError.ERROR, "Missing bindings (" + range + ")");
         }
         return new Range(protocol, source, rawSelector, selectorParams, params);
+    }
+
+    /**
+     * {@code isPackageCompatible}: an architecture the set leaves null supports every value.
+     */
+    static boolean isPackageCompatible(Package pkg, Map<String, @Nullable List<String>> architectures) {
+        if (!Js.truthy(pkg.conditions)) {
+            return true;
+        }
+        // the parser hands on only a token the pattern finds in
+        return Tinylogic.parse(Js.string(pkg.conditions), CONDITION_REGEX, specifier -> {
+            Matcher match = CONDITION_REGEX.matcher(specifier);
+            List<String> supported = match.find() ? architectures.get(match.group(1)) : null;
+            return supported == null || supported.contains(match.group(2));
+        });
     }
 
     @Value

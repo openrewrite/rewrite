@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.time.Instant;
@@ -61,6 +62,7 @@ final class Project {
 
     final Set<String> accessibleLocators = new LinkedHashSet<>();
     final Set<String> conditionalLocators = new LinkedHashSet<>();
+    final Set<String> disabledLocators = new LinkedHashSet<>();
     final Map<String, Package> originalPackages = new LinkedHashMap<>();
     final Set<String> optionalBuilds = new LinkedHashSet<>();
 
@@ -116,11 +118,18 @@ final class Project {
     @Nullable
     Map<String, @Nullable Object> parsedLockfile;
 
-    Project(Configuration configuration, Instant now, @Nullable Set<String> paths, Map<String, String> files) {
+    /**
+     * The machine Yarn runs on, whose architecture {@code current} names.
+     */
+    final Host host;
+
+    Project(Configuration configuration, Instant now, @Nullable Set<String> paths, Map<String, String> files,
+            Host host) {
         this.configuration = configuration;
         this.now = now;
         this.paths = paths;
         this.files = files;
+        this.host = host;
     }
 
     /**
@@ -289,6 +298,15 @@ final class Project {
         workspaces.add(workspace);
         workspacesByCwd.put(workspace.getRelativeCwd(), workspace);
         workspacesByIdent.put(workspace.getAnchoredLocator().identHash, workspace);
+    }
+
+    boolean lockfileHeld(Locator locator) {
+        for (Locator locked : lockfileLocators.values()) {
+            if (locked.locatorHash.equals(locator.locatorHash)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     Workspace getTopLevelWorkspace() {
@@ -501,11 +519,17 @@ final class Project {
             pass.allResolutions.remove(descriptorHash);
         }
 
+        Map<String, @Nullable List<String>> supportedArchitectures = configuration.getSupportedArchitectures(host);
         Set<String> newConditionalLocators = new LinkedHashSet<>();
+        Set<String> newDisabledLocators = new LinkedHashSet<>();
         for (Package pkg : pass.allPackages.values()) {
-            if (pkg.conditions != null && newOptionalBuilds.contains(pkg.locatorHash)) {
-                newConditionalLocators.add(pkg.locatorHash);
+            if (pkg.conditions == null || !newOptionalBuilds.contains(pkg.locatorHash)) {
+                continue;
             }
+            if (!StructUtils.isPackageCompatible(pkg, supportedArchitectures)) {
+                newDisabledLocators.add(pkg.locatorHash);
+            }
+            newConditionalLocators.add(pkg.locatorHash);
         }
 
         storedResolutions = pass.allResolutions;
@@ -515,6 +539,8 @@ final class Project {
         accessibleLocators.addAll(newAccessibleLocators);
         conditionalLocators.clear();
         conditionalLocators.addAll(newConditionalLocators);
+        disabledLocators.clear();
+        disabledLocators.addAll(newDisabledLocators);
         originalPackages.clear();
         originalPackages.putAll(pass.originalPackages);
         optionalBuilds.clear();

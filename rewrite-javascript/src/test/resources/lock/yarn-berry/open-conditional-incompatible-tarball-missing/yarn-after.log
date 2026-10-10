@@ -1,0 +1,11 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + lwc-host@npm:1.0.0, lwc-linux@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwc-linux%2F-%2Flwc-linux-1.0.1.tgz
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ A package was added to the project (+ 0.64 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 63ms
