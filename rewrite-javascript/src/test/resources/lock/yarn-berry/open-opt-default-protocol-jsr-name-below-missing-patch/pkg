@@ -1,0 +1,9 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "is-number": "patch:is-number@npm%3A7.0.0#./missing.patch",
+    "x": "portal:./x"
+  }
+}

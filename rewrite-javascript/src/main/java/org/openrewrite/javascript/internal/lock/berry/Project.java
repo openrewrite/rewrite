@@ -527,7 +527,7 @@ final class Project {
 
     /**
      * {@code resolveEverything} of an install that is not lockfile-only, {@code checkResolutions} in hardened mode;
-     * throws CannotKnow only when no wave holds a resolution Yarn rejects whatever the unknown ones resolve to.
+     * throws the first failing wave's failure once it settles, else a CannotKnow, unless a chain exhausts the heap.
      */
     void resolveEverything(LegacyMigrationResolver legacyMigrationResolver, RegistrySource registry,
                            boolean checkResolutions) {
@@ -544,9 +544,14 @@ final class Project {
             pass.resolutionQueue.add(Collections.singletonList(workspace.getAnchoredDescriptor()));
         }
         CannotKnow unknown = null;
+        RuntimeException failure = null;
+        ResolutionChain.Endless exhausted = null;
+        // past the wave Yarn throws from, what it scheduled resolves on in the background
         while (!pass.resolutionQueue.isEmpty()) {
             List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
             pass.resolutionQueue.clear();
+            RuntimeException rejected = null;
+            ResolutionChain.Endless pending = null;
             for (List<Descriptor> dependencies : copy) {
                 for (Descriptor descriptor : dependencies) {
                     try {
@@ -555,9 +560,30 @@ final class Project {
                         if (unknown == null) {
                             unknown = e;
                         }
+                    } catch (ResolutionChain.Endless e) {
+                        if (e.getEnding() == ResolutionChain.Ending.HEAP_EXHAUSTED) {
+                            exhausted = exhausted == null ? e : exhausted;
+                        } else if (e.getEnding() == ResolutionChain.Ending.EMPTY_EVENT_LOOP) {
+                            pending = pending == null ? e : pending;
+                        } else if (rejected == null) {
+                            rejected = e;
+                        }
+                    } catch (RuntimeException e) {
+                        if (rejected == null) {
+                            rejected = e;
+                        }
                     }
                 }
             }
+            if (failure == null) {
+                failure = pending != null ? pending : rejected;
+            }
+        }
+        if (exhausted != null) {
+            throw exhausted;
+        }
+        if (failure != null) {
+            throw failure;
         }
         if (unknown != null) {
             throw unknown;

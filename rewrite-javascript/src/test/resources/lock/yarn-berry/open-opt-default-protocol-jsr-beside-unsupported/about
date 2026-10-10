@@ -1,0 +1,1 @@
+open-opt-default-protocol-jsr-edit with a root dependency a@foo:bar beside ms: the root's dependencies are bound before any is scheduled, binding a finds no resolver for foo:, and ms never starts, so Yarn fails on a.

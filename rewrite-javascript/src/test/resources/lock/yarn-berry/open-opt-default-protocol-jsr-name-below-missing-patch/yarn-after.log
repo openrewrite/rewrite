@@ -1,0 +1,5 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ Error: is-number@patch:is-number@npm%3A7.0.0#./missing.patch::locator=p%40workspace%3A.: ENOENT: no such file or directory, open '<tmp>/project/missing.patch'
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 155ms

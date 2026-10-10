@@ -1,0 +1,1 @@
+open-opt-default-protocol-jsr-edit with a root dependency on is-number patched by a file the project lacks: is-number fails (ENOENT) in the wave of the root's dependencies, where ms resolves through a new name each pass without end, so Yarn runs out of heap.

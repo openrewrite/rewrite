@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import lombok.Getter;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,9 +26,31 @@ import java.util.List;
  */
 final class ResolutionChain {
 
-    static final String STACK_EXHAUSTED = "YN0001 RangeError: Maximum call stack size exceeded";
-    static final String EMPTY_EVENT_LOOP = "ERROR: Yarn is terminating due to an unexpected empty event loop.";
-    static final String HEAP_EXHAUSTED = "crash: JavaScript heap out of memory in the resolution step";
+    /**
+     * How Yarn ends a resolution that never does, with what it prints.
+     */
+    enum Ending {
+        /**
+         * The call that recursed throws, and its resolution fails like any other.
+         */
+        STACK_EXHAUSTED("YN0001 RangeError: Maximum call stack size exceeded"),
+
+        /**
+         * The resolution awaits itself and never settles; Yarn exits once nothing else is left to run.
+         */
+        EMPTY_EVENT_LOOP("ERROR: Yarn is terminating due to an unexpected empty event loop."),
+
+        /**
+         * The resolution never settles and keeps scheduling, even after Yarn has failed on something else.
+         */
+        HEAP_EXHAUSTED("crash: JavaScript heap out of memory in the resolution step");
+
+        final String message;
+
+        Ending(String message) {
+            this.message = message;
+        }
+    }
 
     private final List<Descriptor> descriptors = new ArrayList<>();
     private final List<Resolver> resolvers = new ArrayList<>();
@@ -37,9 +61,13 @@ final class ResolutionChain {
     /**
      * A resolution that never ends, with what Yarn prints when it gives up and the chain that comes back.
      */
+    @Getter
     static final class Endless extends RuntimeException {
-        Endless(String message) {
-            super(message);
+        private final Ending ending;
+
+        Endless(Ending ending, String chain) {
+            super(ending.message + " (" + chain + ")");
+            this.ending = ending;
         }
     }
 
@@ -72,9 +100,9 @@ final class ResolutionChain {
             }
             if (earlier.descriptorHash.equals(descriptor.descriptorHash)) {
                 // within one call Yarn recurses; through the scheduler it awaits its own pending resolution
-                throw new Endless((i >= step ? STACK_EXHAUSTED : EMPTY_EVENT_LOOP) + " (the resolution chain " +
-                                  names(i, descriptor) + " revisits " +
-                                  StructUtils.stringifyDescriptor(descriptor) + ")");
+                throw new Endless(i >= step ? Ending.STACK_EXHAUSTED : Ending.EMPTY_EVENT_LOOP,
+                        "the resolution chain " + names(i, descriptor) + " revisits " +
+                        StructUtils.stringifyDescriptor(descriptor));
             }
             if (first < 0) {
                 first = i;
@@ -82,9 +110,9 @@ final class ResolutionChain {
             passes++;
         }
         if (passes == 2) {
-            throw new Endless((first >= step ? STACK_EXHAUSTED : HEAP_EXHAUSTED) + " (the resolution chain " +
-                              names(first, descriptor) + " revisits " + descriptor.range +
-                              " under a new name each time)");
+            throw new Endless(first >= step ? Ending.STACK_EXHAUSTED : Ending.HEAP_EXHAUSTED,
+                    "the resolution chain " + names(first, descriptor) + " revisits " + descriptor.range +
+                    " under a new name each time");
         }
         descriptors.add(descriptor);
         resolvers.add(resolver);

@@ -1,0 +1,57 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+
+<--- Last few GCs --->
+
+[31734:0xa9280c000]    75848 ms: Mark-Compact 3859.4 (4279.7) -> 3851.5 (4271.1) MB, pooled: 9 MB, 54.54 / 0.00 ms  (average mu = 0.281, current mu = 0.256) allocation failure; scavenge might not succeed
+[31734:0xa9280c000]    75922 ms: Mark-Compact 3859.8 (4280.1) -> 3852.2 (4272.0) MB, pooled: 9 MB, 56.62 / 0.00 ms  (average mu = 0.257, current mu = 0.234) allocation failure; scavenge might not succeed
+
+FATAL ERROR: Ineffective mark-compacts near heap limit Allocation failed - JavaScript heap out of memory
+----- Native stack trace -----
+
+ 1: 0x104d219f4 node::OOMErrorHandler(char const*, v8::OOMDetails const&) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 2: 0x104f9c000 v8::internal::V8::FatalProcessOutOfMemory(v8::internal::Isolate*, char const*, v8::OOMDetails const&) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 3: 0x1051fb4b4 v8::internal::Heap::stack() [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 4: 0x1051fe888 v8::internal::Heap::HasLowYoungGenerationAllocationRate() [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 5: 0x10520fa7c v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags)::$_1::operator()() const [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 6: 0x10520f350 void heap::base::Stack::SetMarkerAndCallbackImpl<v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags)::$_1>(heap::base::Stack*, void*, void const*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 7: 0x105bc3be0 PushAllRegistersAndIterateStack [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 8: 0x1051f91b8 v8::internal::Heap::CollectGarbage(v8::internal::AllocationSpace, v8::internal::GarbageCollectionReason, v8::GCCallbackFlags) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+ 9: 0x1051edec4 v8::internal::HeapAllocator::AllocateRawWithRetryOrFailSlowPath(int, v8::internal::AllocationType, v8::internal::AllocationOrigin, v8::internal::AllocationAlignment) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+10: 0x1051bcf98 v8::internal::FactoryBase<v8::internal::Factory>::NewRawOneByteString(int, v8::internal::AllocationType) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+11: 0x104fce758 v8::internal::DirectHandle<v8::internal::String> v8::internal::String::SlowFlatten<v8::internal::DirectHandle>(v8::internal::Isolate*, v8::internal::DirectHandle<v8::internal::ConsString>, v8::internal::AllocationType) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+12: 0x104fc6640 v8::String::ValueView::ValueView(v8::Isolate*, v8::Local<v8::String>) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+13: 0x104e871f8 node::StringBytes::StorageSize(v8::Isolate*, v8::Local<v8::Value>, node::encoding) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+14: 0x104f50d20 void node::crypto::Decode<node::crypto::Hash>(v8::FunctionCallbackInfo<v8::Value> const&, void (*)(node::crypto::Hash*, v8::FunctionCallbackInfo<v8::Value> const&, char const*, unsigned long)) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+15: 0x105c1a818 Builtins_CallApiCallbackGeneric [<home>/.nvm/versions/node/v24.19.0/bin/node]
+16: 0x12f6e8648 
+17: 0x12f67a8f4 
+18: 0x12f73e5b8 
+19: 0x12f73ef90 
+20: 0x12f6a71f8 
+21: 0x105ccc948 Builtins_ArrayPrototypeFind [<home>/.nvm/versions/node/v24.19.0/bin/node]
+22: 0x12f64af04 
+23: 0x105c18bec Builtins_InterpreterEntryTrampoline [<home>/.nvm/versions/node/v24.19.0/bin/node]
+24: 0x12f6ae8f0 
+25: 0x105d2ce58 Builtins_PromiseFulfillReactionJob [<home>/.nvm/versions/node/v24.19.0/bin/node]
+26: 0x105c46bd0 Builtins_RunMicrotasks [<home>/.nvm/versions/node/v24.19.0/bin/node]
+27: 0x105c167b0 Builtins_JSRunMicrotasksEntry [<home>/.nvm/versions/node/v24.19.0/bin/node]
+28: 0x10513f690 v8::internal::(anonymous namespace)::Invoke(v8::internal::Isolate*, v8::internal::(anonymous namespace)::InvokeParams const&) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+29: 0x10513ff04 v8::internal::(anonymous namespace)::InvokeWithTryCatch(v8::internal::Isolate*, v8::internal::(anonymous namespace)::InvokeParams const&) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+30: 0x105140040 v8::internal::Execution::TryRunMicrotasks(v8::internal::Isolate*, v8::internal::MicrotaskQueue*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+31: 0x10516ede4 v8::internal::MicrotaskQueue::RunMicrotasks(v8::internal::Isolate*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+32: 0x10516f744 v8::internal::MicrotaskQueue::PerformCheckpoint(v8::Isolate*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+33: 0x104bff0b8 node::InternalCallbackScope::Close() [<home>/.nvm/versions/node/v24.19.0/bin/node]
+34: 0x104bff3b0 node::InternalMakeCallback(node::Environment*, v8::Local<v8::Object>, v8::Local<v8::Object>, v8::Local<v8::Function>, int, v8::Local<v8::Value>*, node::async_context, v8::Local<v8::Value>) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+35: 0x104c17f80 node::AsyncWrap::MakeCallback(v8::Local<v8::Function>, int, v8::Local<v8::Value>*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+36: 0x104d28b10 node::fs::FSReqCallback::Resolve(v8::Local<v8::Value>) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+37: 0x104d29218 node::fs::AfterNoArgs(uv_fs_s*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+38: 0x104d17444 node::MakeLibuvRequestCallback<uv_fs_s, void (*)(uv_fs_s*)>::Wrapper(uv_fs_s*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+39: 0x105befaf8 uv__work_done [<home>/.nvm/versions/node/v24.19.0/bin/node]
+40: 0x105bf3548 uv__async_io [<home>/.nvm/versions/node/v24.19.0/bin/node]
+41: 0x105c07e40 uv__io_poll [<home>/.nvm/versions/node/v24.19.0/bin/node]
+42: 0x105bf3e9c uv_run [<home>/.nvm/versions/node/v24.19.0/bin/node]
+43: 0x104c006a8 node::SpinEventLoopInternal(node::Environment*) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+44: 0x104d7c7d8 node::NodeMainInstance::Run() [<home>/.nvm/versions/node/v24.19.0/bin/node]
+45: 0x104cce7e0 node::Start(int, char**) [<home>/.nvm/versions/node/v24.19.0/bin/node]
+46: 0x187ff1d54 start [/usr/lib/dyld]
