@@ -583,8 +583,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         try {
             return ((NodeCatalogs.Pnpm) edited).withoutUnused(projects(file, new HashMap<>()));
-        } catch (CannotKnow | JsError e) {
+        } catch (CannotKnow e) {
             return null;
+        } catch (JsError e) {
+            // the override value it trips on is one pnpm rejects before it cleans up (catalog-cleanup-override-number)
+            return edited;
         }
     }
 
@@ -611,7 +614,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
             return "cleanupUnusedCatalogs counts the dependencies of " + other + ", which the recipes do not read, " +
                    "so this edit was not made";
         } catch (JsError e) {
-            return "pnpm's cleanupUnusedCatalogs fails on " + file.path + " (" + e + "), so this edit was not made";
+            return null;
         }
     }
 

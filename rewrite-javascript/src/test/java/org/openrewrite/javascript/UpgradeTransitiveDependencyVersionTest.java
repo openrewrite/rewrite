@@ -341,6 +341,28 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         }
     }
 
+    @Test
+    void pnpmAfterAPlainEditOfTheRootInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-compose");
+        Recipe recipe = new CompositeRecipe(Arrays.asList(new ChangeValue("$.dependencies.is-odd", "\"3.0.1\""),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null)));
+        for (List<Source> order : orders(s.workspaceSources(PackageManager.Pnpm))) {
+            List<String> paths = order.stream().map(source -> source.path).collect(toList());
+            if (paths.indexOf("package.json") < paths.indexOf("pnpm-lock.yaml")) {
+                inOrder(s, recipe, order);
+                continue;
+            }
+            String visited = visited(order);
+            Outcome outcome = run(s, recipe, parse(order));
+            assertThat(print(outcome.file("package.json"))).as("visiting %s", visited).isEqualTo(s.file("pkg"));
+            assertThat(outcome.file("package.json").getMarkers().findFirst(Markup.Warn.class)).as("visiting %s",
+              visited).hasValueSatisfying(warn -> assertThat(warn.getMessage()).contains("wrote the lock from"));
+            assertThat(outcome.rows).as("visiting %s", visited).singleElement()
+              .extracting(NodeLockRegenerationFailures.Row::getReason)
+              .isEqualTo(LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name());
+        }
+    }
+
     // the same for UpgradeDependencyVersion, which shares the engine: a plain edit adds the override npm recorded
     @Test
     void upgradeDependencyVersionAfterAPlainEditOfTheRootInEveryVisitOrder() {

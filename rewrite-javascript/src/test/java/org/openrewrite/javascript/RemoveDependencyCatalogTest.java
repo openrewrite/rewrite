@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -94,6 +95,41 @@ class RemoveDependencyCatalogTest implements RewriteTest {
               - packages/*
             cleanupUnusedCatalogs: true
             catalog: {wrappy: 1.0.2}
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
+    // pnpm 11.2.2 rejects an override that is no string before it cleans up (catalog-cleanup-override-number: "The
+    // value of overrides.is-number should be a string, but got number"), so the workspace is left as it is
+    @Test
+    void noCleanupIsWrittenForAWorkspacePnpmRejects() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null))
+            .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyEditsDeclined.class)).isEmpty()),
+          packageJson("""
+            {
+              "name": "a",
+              "dependencies": {
+                "ms": "2.1.3",
+                "wrappy": "catalog:"
+              }
+            }
+            """, """
+            {
+              "name": "a",
+              "dependencies": {
+                "ms": "2.1.3"
+              }
+            }
+            """, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")),
+          yaml("""
+            packages:
+              - packages/*
+            cleanupUnusedCatalogs: true
+            overrides:
+              is-number: 7
+            catalog:
+              wrappy: 1.0.2
             """, s -> s.path("pnpm-workspace.yaml"))
         );
     }

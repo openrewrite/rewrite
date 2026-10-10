@@ -207,10 +207,11 @@ public final class PackageJsonOverrides {
             case YarnBerry:
                 return Place.RESOLUTIONS;
             case Pnpm:
-                // pnpm 10 reads package.json's overrides, when it holds any, instead of pnpm-workspace.yaml's
+                // pnpm 9 reads package.json's overrides only, 10 instead of pnpm-workspace.yaml's when it holds any
+                // (override-pnpm9-reads-pnpm-field, override-pnpm10-recipe-beside-resolutions)
                 if (release == 9 || release == 10 && (holdsOverrides(root) ||
                                                       !workspace.holdsOverrides() && hasPnpmField(root))) {
-                    // pnpm reads {...resolutions, ...pnpm?.overrides}, and a null pnpm field holds no object to edit
+                    // {...resolutions, ...pnpm?.overrides}; a null pnpm field: override-pnpm10-recipe-null-pnpm-*
                     return !hasPnpmField(root) && member(root, "pnpm") != null &&
                            holdsMembers(member(root, "resolutions")) ? Place.RESOLUTIONS : Place.PNPM_FIELD;
                 }
@@ -279,10 +280,10 @@ public final class PackageJsonOverrides {
         } else if (pm == PackageManager.YarnBerry && Resolution.rejects(berryKey(packageName, path)) != null) {
             return "Yarn drops the resolution " + berryKey(packageName, path) + " (YN0057): " +
                    Resolution.rejects(berryKey(packageName, path));
-        } else if (pm == PackageManager.YarnBerry && path != null && depth == 1 &&
+        } else if (pm == PackageManager.YarnBerry && path != null && depth == 1 && // override-key-ranged-parent
                    !exactVersion(path.get(0).getVersion())) {
             return "Yarn matches a resolution's parent by its exact version only, not " + segment(path.get(0));
-        } else if (pm == PackageManager.YarnClassic && path != null) {
+        } else if (pm == PackageManager.YarnClassic && path != null) { // override-key-versioned-parent
             for (DependencyPathSegment segment : path) {
                 if (segment.getVersion() != null) {
                     return "yarn matches a resolution's path by package names only, not " + segment.getName() +
@@ -313,7 +314,7 @@ public final class PackageJsonOverrides {
         switch (place) {
             case OVERRIDES:
                 if (path == null || path.isEmpty()) {
-                    // npm reads an object's "." as the package's own override and the other keys below it
+                    // npm reads an object's "." as its own override, the other keys below it (object-value-pinned)
                     Json overrides = member(doc, "overrides");
                     return overrides instanceof Json.JsonObject &&
                            member((Json.JsonObject) overrides, packageName) instanceof Json.JsonObject ?
@@ -382,6 +383,7 @@ public final class PackageJsonOverrides {
         return key.append(packageName).toString();
     }
 
+    // pnpm reads one parent, a>b (override-recipe-path); Yarn classic matches from the root (parent-not-root)
     private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {
         return path == null || path.isEmpty() ? packageName : segment(path.get(path.size() - 1)) + ">" + packageName;
     }
