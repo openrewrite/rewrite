@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock;
+package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
@@ -52,7 +53,10 @@ public final class HostRegistries {
           .withNpmrcConfigs(singletonList(new Npmrc(NpmrcScope.User, properties))), environment(home));
     }
 
-    private static Environment environment(Path home) {
+    /**
+     * The environment of a recording's scratch HOME: no variables, and no config there but what the recording wrote.
+     */
+    public static Environment environment(Path home) {
         return new Environment() {
             @Override
             public @Nullable String getenv(String name) {
