@@ -24,7 +24,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.berry.Resolution;
 import org.openrewrite.javascript.internal.lock.bun.OverrideMap;
+import org.openrewrite.javascript.internal.lock.pnpm.ParseOverrides;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
@@ -40,6 +42,7 @@ import org.openrewrite.semver.NodeSemver;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -264,13 +267,16 @@ public final class PackageJsonOverrides {
                 return "where pnpm " + (release < 0 ? "of the release the project names" : release + ".x") +
                        " reads overrides is not known";
             }
-            if (depth > 1) {
-                return "pnpm reads an override selector of one parent only (ERR_PNPM_INVALID_SELECTOR)";
+            String selector = pnpmSelector(packageName, path);
+            String rejected = ParseOverrides.rejects(selector);
+            if (rejected != null) {
+                return "pnpm rejects the override selector " + selector + ": " + rejected;
             }
         } else if (pm == PackageManager.Bun && depth > 0) {
             return "bun does not support nested overrides";
-        } else if (pm == PackageManager.YarnBerry && depth > 1) {
-            return "Yarn reads a resolution of one parent only (YN0057)";
+        } else if (pm == PackageManager.YarnBerry && Resolution.rejects(berryKey(packageName, path)) != null) {
+            return "Yarn drops the resolution " + berryKey(packageName, path) + " (YN0057): " +
+                   Resolution.rejects(berryKey(packageName, path));
         } else if (pm == PackageManager.YarnBerry && path != null && depth == 1 &&
                    !exactVersion(path.get(0).getVersion())) {
             return "Yarn matches a resolution's parent by its exact version only, not " + segment(path.get(0));
@@ -358,6 +364,24 @@ public final class PackageJsonOverrides {
 
     private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
         return PnpmOptions.releaseMajor(PackageJsonHelper.printed(root), workspace.settings());
+    }
+
+    // the selector of the whole path, which pnpm reads with one parent only
+    private static String pnpmSelector(String packageName, @Nullable List<DependencyPathSegment> path) {
+        StringBuilder selector = new StringBuilder();
+        for (DependencyPathSegment segment : path == null ? Collections.<DependencyPathSegment>emptyList() : path) {
+            selector.append(segment(segment)).append('>');
+        }
+        return selector.append(packageName).toString();
+    }
+
+    // the resolution key of the whole path, which Yarn reads with one parent only
+    private static String berryKey(String packageName, @Nullable List<DependencyPathSegment> path) {
+        StringBuilder key = new StringBuilder();
+        for (DependencyPathSegment segment : path == null ? Collections.<DependencyPathSegment>emptyList() : path) {
+            key.append(segment(segment)).append('/');
+        }
+        return key.append(packageName).toString();
     }
 
     private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {

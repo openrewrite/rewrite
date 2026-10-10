@@ -31,7 +31,19 @@ import java.util.regex.Pattern;
  * Port of @pnpm/config.parse-overrides src/index.ts and @pnpm/resolving.parse-wanted-dependency
  * (pnpm 11.2.2), with validate-npm-package-name 7.0.2's {@code validForOldPackages}.
  */
-final class ParseOverrides {
+public final class ParseOverrides {
+
+    /**
+     * pnpm's error for an override selector parsePkgAndParentSelector rejects, by its code; null for one it reads.
+     */
+    public static @Nullable String rejects(String selector) {
+        try {
+            parsePkgAndParentSelector(selector);
+            return null;
+        } catch (PnpmError e) {
+            return "[" + e.getCode() + "] " + e.getMessage();
+        }
+    }
 
     private static final Pattern DELIMITER_REGEX = Pattern.compile("[^ |@]>");
     private static final Pattern SCOPED_PACKAGE = Pattern.compile("^(?:@([^/]+?)[/])?([^/]+?)$");
