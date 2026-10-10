@@ -380,6 +380,23 @@ class PackageJsonOverridesTest {
         assertThat(PackageJsonOverrides.of(Npm, root, null, "is-number", "7.0.0", null).outranked()).isNull();
     }
 
+    // recorded with yarn 1.22.22: a resolution find tries before the one written wins where its glob matches
+    @Test
+    void aYarnClassicResolutionTriedBeforeTheGlobalOneOutranksIt() {
+        Json.Document before = manifest("{\"resolutions\":{\"is-odd/is-number\":\"6.0.0\",\"left-pad\":\"1.3.0\"," +
+                                        "\"**/is-number\":\"6.0.0\",\"a/is-number\":\"5.0.0\",\"b/is-number\":\"%\"}}");
+        assertThat(PackageJsonOverrides.of(YarnClassic, before, null, "is-number", "7.0.0", null).outranked())
+          .isEqualTo("yarn applies is-odd/is-number before a global override of is-number");
+        Json.Document appended = manifest("{\"resolutions\":{\"is-odd/is-number\":\"6.0.0\"," +
+                                          "\"a/is-number\":\"5.0.0\",\"b/is-number\":\"%\"}}");
+        assertThat(PackageJsonOverrides.of(YarnClassic, appended, null, "is-number", "7.0.0", null).outranked())
+          .isEqualTo("yarn applies is-odd/is-number, a/is-number before a global override of is-number");
+        Json.Document after = manifest("{\"resolutions\":{\"**/is-number\":\"6.0.0\"," +
+                                       "\"is-odd/is-number\":\"6.0.0\"}}");
+        assertThat(PackageJsonOverrides.of(YarnClassic, after, null, "is-number", "7.0.0", null).outranked())
+          .isNull();
+    }
+
     @Test
     void aPnpmFieldOrPnpmOverridesThatIsNoObjectIsDeclined() {
         String pnpm10 = "\"packageManager\":\"pnpm@10.34.6\"";

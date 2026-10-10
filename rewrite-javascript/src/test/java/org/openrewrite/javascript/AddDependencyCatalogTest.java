@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
@@ -27,6 +28,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
  * In a pnpm workspace with catalogs the dependency is added as {@code pnpm add} added it in {@code lock/catalogs/pnpm},
@@ -131,13 +133,45 @@ class AddDependencyCatalogTest implements RewriteTest {
         CatalogRecording recording = new CatalogRecording("pnpm", scenario);
         rewriteRun(
           spec -> spec.recipe(new AddDependency("wrappy", version, null)).executionContext(recording.ctx())
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> {
-                  assertThat(row.getDetail()).isEqualTo(detail);
-                  assertThat(row.getReason()).isEqualTo("RESOLUTION_REQUIRED");
-                  assertThat(row.getKind()).isEqualTo("rejects".equals(how) ? "PM_REJECTS" : "PM_FAILS");
-              })),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason)
+              .isEqualTo("wrappy@" + version + " was not added: " + detail))
+            .afterRecipe(run -> assertThat(run.getDataTableRows(NodeLockRegenerationFailures.class)).isEmpty()),
           recording.sources("packages/a/package.json", detail)
+        );
+    }
+
+    // PnpmOptions.releaseMajor leaves a range open between majors to the registry, which pnpm 9 and 10 answer apart
+    @Test
+    void aReleaseRangeOpenBetweenMajorsIsDeclined() {
+        String manifest = """
+          {
+            "name": "root",
+            "devEngines": {
+              "packageManager": {
+                "name": "pnpm",
+                "version": ">=9"
+              }
+            }
+          }
+          """;
+        String why = "is-number@6.0.0 was not added: what pnpm add of the release the project names writes is " +
+          "not known";
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo(why)),
+          packageJson(manifest, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.noTrim().after(actual -> actual)
+            .afterRecipe(doc -> {
+                assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                  .isEqualTo(manifest);
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(w ->
+                  assertThat(w.getMessage()).isEqualTo(why));
+            })),
+          yaml("""
+            catalog:
+              is-number: 6.0.0
+            """, s -> s.path("pnpm-workspace.yaml"))
         );
     }
 

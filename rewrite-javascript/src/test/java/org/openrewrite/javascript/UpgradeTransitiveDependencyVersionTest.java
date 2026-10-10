@@ -598,6 +598,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           "Yarn applies is-odd/is-number before a global override of is-number");
     }
 
+    // recorded with yarn 1.22.22, which applies the first resolution whose glob matches: is-odd's is-number stays 6.0.0
+    @Test
+    void yarnClassicNamesAResolutionScopedToAParentListedBeforeTheGlobalOne() {
+        golden("yarn-classic/override-recipe-parent-key-before-global", PackageManager.YarnClassic, "7.0.0", null,
+          "yarn applies is-odd/is-number before a global override of is-number");
+    }
+
     @Test
     void pnpmNamesAnOverrideScopedToAParentThatStillApplies() {
         golden("pnpm/override-recipe-parent-selector-present", PackageManager.Pnpm, "7.0.0", null,

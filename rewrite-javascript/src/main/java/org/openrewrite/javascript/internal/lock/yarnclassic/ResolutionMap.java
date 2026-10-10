@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 /**
  * Port of yarn src/resolution-map.js and util/parse-package-path.js (yarn 1.22.22).
  */
-final class ResolutionMap {
+public final class ResolutionMap {
 
     private static final String GLOBAL_NESTED_DEP_PATTERN = "**/";
     private static final Pattern PACKAGE_PATH = Pattern.compile("(@[^/]+/)?([^/]+)");
@@ -126,6 +126,41 @@ final class ResolutionMap {
             }
         }
         return null;
+    }
+
+    /**
+     * The glob yarn matches a resolution's key against, as parsePatternInfo makes it ({@code **}{@code /name} for a
+     * bare name); null for a key it ignores.
+     */
+    public static @Nullable String globPattern(String key) {
+        if (!isValidPackagePath(key)) {
+            return null;
+        }
+        List<String> directories = parsePackagePath(key);
+        return directories.size() == 1 && key.equals(directories.get(0)) ? GLOBAL_NESTED_DEP_PATTERN + key : key;
+    }
+
+    /**
+     * The keys of {@code resolutions} for the package {@code key} names that find tries before {@code key}, in the
+     * order init reads them: every one when {@code key} is not there.
+     */
+    public static List<String> triedBefore(Map<String, @Nullable Object> resolutions, String key) {
+        List<String> before = new ArrayList<>();
+        List<String> path = parsePackagePath(key);
+        String name = path.isEmpty() ? null : path.get(path.size() - 1);
+        for (String other : Js.keys(resolutions)) {
+            if (other.equals(key)) {
+                break;
+            }
+            List<String> otherPath = parsePackagePath(other);
+            Object range = resolutions.get(other);
+            if (isValidPackagePath(other) && !otherPath.isEmpty() &&
+                otherPath.get(otherPath.size() - 1).equals(name) && (ExoticResolvers.getExoticResolver(range) != null ||
+                range instanceof String && NodeSemver.validRange((String) range, YarnClassicOptions.SEMVER) != null)) {
+                before.add(other);
+            }
+        }
+        return before;
     }
 
     static List<String> parsePackagePath(String input) {

@@ -23,9 +23,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
+import org.openrewrite.javascript.internal.lock.yarnclassic.ResolutionMap;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -40,10 +42,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -53,7 +54,6 @@ import static java.util.Objects.requireNonNull;
 public final class PackageJsonOverrides {
 
     public static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
-    private static final Pattern YARN_PATH_SEGMENT = Pattern.compile("(@[^/]+/)?([^/]+)");
 
     private final PackageManager pm;
     private final String packageName;
@@ -374,24 +374,15 @@ public final class PackageJsonOverrides {
     // the first key yarn reads as the same glob, since it applies the first resolution whose glob matches
     private static String yarnClassicKeyOf(@Nullable Json resolutions, String key) {
         if (resolutions instanceof Json.JsonObject) {
+            String glob = ResolutionMap.globPattern(key);
             for (Json m : ((Json.JsonObject) resolutions).getMembers()) {
                 String existing = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
-                if (existing != null && yarnClassicGlob(existing).equals(yarnClassicGlob(key))) {
+                if (existing != null && glob != null && glob.equals(ResolutionMap.globPattern(existing))) {
                     return existing;
                 }
             }
         }
         return key;
-    }
-
-    // yarn 1.22.22's resolution-map.js parsePatternInfo: a bare name is **/name
-    private static String yarnClassicGlob(String key) {
-        Matcher segments = YARN_PATH_SEGMENT.matcher(key);
-        int count = 0;
-        while (segments.find()) {
-            count++;
-        }
-        return count == 1 ? "**/" + key : key;
     }
 
     /**
@@ -401,6 +392,12 @@ public final class PackageJsonOverrides {
     public @Nullable String outranked() {
         if (path != null && !path.isEmpty() || declined() != null) {
             return null;
+        }
+        if (pm == PackageManager.YarnClassic) {
+            List<String> before = ResolutionMap.triedBefore(parsedResolutions(),
+                    yarnClassicKeyOf(member(root, "resolutions"), packageName));
+            return before.isEmpty() ? null : "yarn applies " + String.join(", ", before) +
+                                             " before a global override of " + packageName;
         }
         if (pm != PackageManager.Pnpm && pm != PackageManager.YarnBerry) {
             return null;
@@ -416,6 +413,19 @@ public final class PackageJsonOverrides {
         }
         return keys.isEmpty() ? null : (pm == PackageManager.Pnpm ? "pnpm" : "Yarn") + " applies " +
                                       String.join(", ", keys) + " before a global override of " + packageName;
+    }
+
+    // the root's resolutions as JSON.parse reads them
+    @SuppressWarnings("unchecked")
+    private Map<String, @Nullable Object> parsedResolutions() {
+        Object parsed;
+        try {
+            parsed = EcmaScript.jsonParse(PackageJsonHelper.printed(root));
+        } catch (RuntimeException e) {
+            return emptyMap();
+        }
+        Object resolutions = parsed instanceof Map ? ((Map<String, ?>) parsed).get("resolutions") : null;
+        return resolutions instanceof Map ? (Map<String, @Nullable Object>) resolutions : emptyMap();
     }
 
     private List<String> overrideKeys() {

@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
@@ -113,7 +112,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             return;
         }
         boolean pnpm = catalogs instanceof NodeCatalogs.Pnpm;
-        String value = pnpm ? pnpmAdd(decision, ctx, (NodeCatalogs.Pnpm) catalogs) : version;
+        String value = pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) : version;
         if (value != null) {
             decision.editManifest(doc -> !matchesAdd(doc) ? doc : pnpm ?
                     PackageJsonHelper.sortMembers(PackageJsonHelper.addDependency(doc, packageName, value,
@@ -123,17 +122,25 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     }
 
     // what the pnpm release that runs writes, recorded: 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
-    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, ExecutionContext ctx,
-                                     NodeCatalogs.Pnpm catalogs) {
+    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, NodeCatalogs.Pnpm catalogs) {
         SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
-        if (root != null && PnpmOptions.releaseMajor(PackageJsonHelper.printed(root), catalogs.getSettings()) < 10) {
+        int release = root == null ? 0 : PnpmOptions.releaseMajor(PackageJsonHelper.printed(root),
+                catalogs.getSettings());
+        if (release < 0) {
+            declined(decision, packageName + "@" + version + " was not added: what pnpm add of the release the " +
+                               "project names writes is not known");
+            return null;
+        }
+        if (root != null && release < 10) {
             return version;
         }
         InstallSome.Saved saved;
         try {
             saved = InstallSome.add(packageName, version, catalogs.getSettings());
         } catch (Rejected e) {
-            return reject(decision, ctx, e);
+            declined(decision, packageName + "@" + version + " was not added: " +
+                               LockOnlyInstall.PNPM.failure(e).getDetail());
+            return null;
         }
         String catalog = saved.getCatalogName();
         if (catalog != null && !decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
@@ -142,14 +149,6 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             return null;
         }
         return saved.getBareSpecifier();
-    }
-
-    private @Nullable String reject(NodeDependencyEdits.Decision decision, ExecutionContext ctx, Rejected pnpm) {
-        LockFileRegeneration.Failure failure = LockOnlyInstall.PNPM.failure(pnpm);
-        decision.insertRow(lockRegenerationFailures, ctx, LockFileRegeneration.failureRow(decision.getPath(),
-                failure, packageName));
-        declined(decision, packageName + "@" + version + " was not added: " + failure.getDetail());
-        return null;
     }
 
     private static void declined(NodeDependencyEdits.Decision decision, String why) {
