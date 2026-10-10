@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/lockfile.preferred-versions src/index.ts and resolver-base's version selector
@@ -139,7 +140,7 @@ final class PreferredVersions {
                     continue;
                 }
                 if (!"version".equals(existingSelector.getSelectorType())) {
-                    throw new JsError("Encountered unexpected version selector '" + existingSelector.getSelectorType() +
+                    throw new JsError(JsError.ERROR, "Encountered unexpected version selector '" + existingSelector.getSelectorType() +
                                       "' for dependency '" + name + "@" + version + "'");
                 }
                 selectors.put(version, addWeightToVersionSelector(existingSelector, EXISTING_VERSION_SELECTOR_WEIGHT));

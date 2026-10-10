@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.LinkedHashMap;
@@ -102,14 +103,14 @@ final class LockfileUtils {
         String url;
         if (!Js.truthy(tarball)) {
             if (name == null || version == null) {
-                throw new JsError("Couldn't get tarball URL from dependency path " + depPath);
+                throw new JsError(JsError.ERROR, "Couldn't get tarball URL from dependency path " + depPath);
             }
             url = getNpmTarballUrl(name, version, registry);
         } else {
             WhatwgUrl parsedUrl = WhatwgUrl.tryParse(Js.string(tarball), registry.endsWith("/") ? registry :
                     registry + "/");
             if (parsedUrl == null) {
-                throw new JsError("TypeError: Invalid URL");
+                throw new JsError(JsError.TYPE_ERROR, "Invalid URL");
             }
             url = parsedUrl.toString();
         }

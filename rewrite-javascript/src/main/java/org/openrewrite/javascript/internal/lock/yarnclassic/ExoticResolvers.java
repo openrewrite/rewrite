@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/resolvers/index.js {@code getExoticResolver} and the exotic resolvers' {@code isVersion} and
@@ -139,7 +140,7 @@ final class ExoticResolvers {
             }
         }
         if (!(pattern instanceof String)) {
-            throw JsError.invalidArgType("The \"url\" argument must be of type string", pattern);
+            throw Js.invalidArgType("The \"url\" argument must be of type string", pattern);
         }
         LegacyUrl url = LegacyUrl.parse(text);
         if (url.hostname != null && url.path != null && GIT_HOSTS.contains(url.hostname)) {

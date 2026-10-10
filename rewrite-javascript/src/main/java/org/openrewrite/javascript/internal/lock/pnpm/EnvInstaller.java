@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -61,7 +62,7 @@ final class EnvInstaller {
                 if (!Js.truthy(lockfileConfigDeps.get(name))) {
                     String registry = PickRegistryForPackage.pickRegistryForPackage(registries, name, null);
                     if (value == null) {
-                        throw new JsError("Cannot read properties of null (reading 'integrity')");
+                        throw new JsError(JsError.ERROR, "Cannot read properties of null (reading 'integrity')");
                     }
                     Object spec = value instanceof Map ? ((Map<String, @Nullable Object>) value).get("integrity") :
                             null;
@@ -232,7 +233,7 @@ final class EnvInstaller {
      */
     static String[] parseIntegrity(String pkgName, @Nullable Object pkgSpec) {
         if (pkgSpec == null || pkgSpec == JsYaml.UNDEFINED) {
-            throw new JsError("Cannot read properties of " + Js.string(pkgSpec) + " (reading 'indexOf')");
+            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(pkgSpec) + " (reading 'indexOf')");
         }
         if (!(pkgSpec instanceof String)) {
             throw new CannotKnow("what pnpm makes of the integrity of config dependency " + pkgName + " (" +
@@ -355,7 +356,7 @@ final class EnvInstaller {
         for (String pkgName : Js.keys(configDeps)) {
             Object entry = configDeps.get(pkgName);
             if (entry == null || entry == JsYaml.UNDEFINED) {
-                throw new JsError("Cannot destructure property 'version' of '" + Js.string(entry) + "' as it is " +
+                throw new JsError(JsError.ERROR, "Cannot destructure property 'version' of '" + Js.string(entry) + "' as it is " +
                                   Js.string(entry) + ".");
             }
             Object version = entry instanceof Map ? ((Map<String, @Nullable Object>) entry).get("version") : null;
@@ -388,7 +389,7 @@ final class EnvInstaller {
         }
         Object resolution = pkgInfo instanceof Map ? ((Map<String, @Nullable Object>) pkgInfo).get("resolution") : null;
         if (resolution == null || resolution == JsYaml.UNDEFINED) {
-            throw new JsError("Cannot read properties of " + Js.string(resolution) + " (reading 'integrity')");
+            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(resolution) + " (reading 'integrity')");
         }
         Object integrity = resolution instanceof Map ?
                 ((Map<String, @Nullable Object>) resolution).get("integrity") : null;

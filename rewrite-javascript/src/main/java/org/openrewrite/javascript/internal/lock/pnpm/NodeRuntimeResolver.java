@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -155,7 +156,7 @@ final class NodeRuntimeResolver {
         String index = fetch.document(url);
         Object parsed = index == null ? null : Manifests.parseValue(index, url);
         if (!(parsed instanceof List)) {
-            throw new JsError("the Node.js release index " + url + " is not a JSON array");
+            throw new JsError(JsError.ERROR, "the Node.js release index " + url + " is not a JSON array");
         }
         List<String> all = new ArrayList<>();
         List<Object> lts = new ArrayList<>();

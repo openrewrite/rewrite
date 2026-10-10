@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
@@ -91,7 +92,7 @@ final class TarFs {
             write(name, archive, offset, size);
         } else if ("link".equals(header.type) || "symlink".equals(header.type)) {
             if (header.linkname == null) {
-                throw JsError.invalidArgType("The \"" + ("link".equals(header.type) ? "path" : "target") +
+                throw Js.invalidArgType("The \"" + ("link".equals(header.type) ? "path" : "target") +
                                              "\" argument must be of type string", null);
             }
             unlink(name);

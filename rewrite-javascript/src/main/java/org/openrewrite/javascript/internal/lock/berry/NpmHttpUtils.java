@@ -241,10 +241,6 @@ final class NpmHttpUtils {
     }
 
     private static boolean isMatch(String str, String pattern) {
-        try {
-            return Picomatch.matcher(pattern, MICROMATCH).test(str);
-        } catch (Picomatch.PatternError e) {
-            throw new JsError(e.getName(), e.getMessage());
-        }
+        return Picomatch.matcher(pattern, MICROMATCH).test(str);
     }
 }

@@ -25,12 +25,40 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Yarn's values as the port holds them, undefined as null: property reads, {@code Object.assign}, {@code JSON.parse},
  * string splits and template literals.
  */
 final class Js extends EcmaScript {
+
+    static final String INVARIANT_VIOLATION = "Invariant Violation";
+    static final String INVALID_ARG_TYPE = "TypeError [ERR_INVALID_ARG_TYPE]";
+
+    /**
+     * Node's {@code ERR_INVALID_ARG_TYPE} for a value yarn read from JSON, whose objects have no prototype.
+     */
+    static JsError invalidArgType(String expected, @Nullable Object received) {
+        return new JsError(INVALID_ARG_TYPE, expected + ". Received " + specificType(received));
+    }
+
+    private static String specificType(@Nullable Object value) {
+        if (value == null) {
+            return "undefined";
+        }
+        if (value instanceof Map) {
+            return ((Map<?, ?>) value).isEmpty() ? "[Object: null prototype] {}" : "[Object: null prototype]";
+        }
+        if (value instanceof List) {
+            return "an instance of Array";
+        }
+        if (value instanceof Number) {
+            double d = ((Number) value).doubleValue();
+            return "type number (" + (d == 0 && 1 / d < 0 ? "-0" : numberToString(d)) + ")";
+        }
+        return "type " + typeOf(value) + " (" + (value instanceof String ? "'" + value + "'" : value) + ")";
+    }
 
     /**
      * The characters JavaScript's {@code .} matches; Java's also leaves out {@code \u0085}.

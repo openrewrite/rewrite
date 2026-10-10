@@ -26,6 +26,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import static java.util.Arrays.asList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,7 +60,7 @@ class PackageResolverTest {
         registry.put("a", packument("a", "1.0.0", null, "\"version\": \"1.0.0\""));
         assertThatThrownBy(() -> resolve(HEADER, registry, "a@^1.0.0"))
                 .isInstanceOfSatisfying(JsError.class, e -> {
-                    assertThat(e.getName()).isEqualTo(JsError.INVARIANT_VIOLATION);
+                    assertThat(e.getName()).isEqualTo(Js.INVARIANT_VIOLATION);
                     assertThat(e.getMessage()).isEqualTo("Missing remote");
                 });
     }

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/core sources/VirtualResolver.ts (Yarn 4.10.3).

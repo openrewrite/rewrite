@@ -25,6 +25,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/fetchers/tarball-fetcher.js with base-fetcher.js {@code fetch} (yarn 1.22.22) for a version the
@@ -89,7 +90,7 @@ final class TarballFetcher {
             for (String binName : Js.keys(bin)) {
                 Object target = Js.get(bin, binName);
                 if (!(target instanceof String)) {
-                    throw JsError.invalidArgType("The \"paths[1]\" argument must be of type string", target);
+                    throw Js.invalidArgType("The \"paths[1]\" argument must be of type string", target);
                 }
             }
         }

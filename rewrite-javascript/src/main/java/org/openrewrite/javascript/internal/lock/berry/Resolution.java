@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/parsers sources/resolution.ts and sources/grammars/resolution.pegjs (Yarn 4.10.3).

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -48,26 +47,6 @@ public final class Picomatch {
         boolean posix;
     }
 
-    /**
-     * A TypeError or SyntaxError picomatch raises, by its JavaScript name.
-     */
-    @Getter
-    public static final class PatternError extends RuntimeException {
-        static final String TYPE_ERROR = "TypeError";
-        static final String SYNTAX_ERROR = "SyntaxError";
-
-        private final String name;
-
-        PatternError(String name, String message) {
-            super(message);
-            this.name = name;
-        }
-
-        @Override
-        public String toString() {
-            return name + ": " + getMessage();
-        }
-    }
 
     static final int MAX_LENGTH = 1024 * 64;
     static final int DEFAULT_MAX_EXTGLOB_RECURSION = 0;
@@ -119,7 +98,7 @@ public final class Picomatch {
 
     /**
      * {@code picomatch(globs, options)}: a matcher that is true when any of the globs matches.
-     * @throws PatternError picomatch's TypeError for an empty glob, and {@link #makeRe}'s
+     * @throws JsError picomatch's TypeError for an empty glob, and {@link #makeRe}'s
      */
     public static Predicate<String> matcher(List<String> globs, Options options) {
         List<Predicate<String>> fns = new ArrayList<>();
@@ -138,7 +117,7 @@ public final class Picomatch {
 
     public static Predicate<String> matcher(String glob, Options options) {
         if (glob.isEmpty()) {
-            throw new PatternError(PatternError.TYPE_ERROR, "Expected pattern to be a non-empty string");
+            throw new JsError(JsError.TYPE_ERROR, "Expected pattern to be a non-empty string");
         }
         Pattern regex = makeRe(glob, options);
         return input -> test(input, regex, glob);
@@ -154,7 +133,7 @@ public final class Picomatch {
 
     /**
      * {@code picomatch.makeRe(input, options)}.
-     * @throws PatternError for an empty input, one over 65536 characters, and 2.3.1's for an Object.prototype member
+     * @throws JsError for an empty input, one over 65536 characters, and 2.3.1's for an Object.prototype member
      */
     public static Pattern makeRe(String input, Options options) {
         return toRegex(source(input, options));
@@ -165,7 +144,7 @@ public final class Picomatch {
      */
     public static String source(String input, Options options) {
         if (input.isEmpty()) {
-            throw new PatternError(PatternError.TYPE_ERROR, "Expected a non-empty string");
+            throw new JsError(JsError.TYPE_ERROR, "Expected a non-empty string");
         }
         String output = null;
         boolean negated = false;

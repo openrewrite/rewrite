@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
@@ -161,7 +162,7 @@ final class Install {
             List<Manifest> infos = new ArrayList<>();
             for (Manifest manifest : resolver.getAllInfoForPackageName(name)) {
                 if (manifest.reference == null) {
-                    throw new JsError(JsError.INVARIANT_VIOLATION, "expected package reference");
+                    throw new JsError(Js.INVARIANT_VIOLATION, "expected package reference");
                 }
                 if (!manifest.reference.ignore) {
                     infos.add(manifest);

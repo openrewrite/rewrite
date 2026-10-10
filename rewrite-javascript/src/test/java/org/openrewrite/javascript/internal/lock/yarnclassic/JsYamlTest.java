@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.Map;
 import java.util.stream.Stream;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -19,6 +19,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
@@ -173,7 +174,7 @@ final class PackageRequester {
 
         if ("directory".equals(resolveResult.resolution.get("type")) && !id.startsWith("file:")) {
             if (manifest == null) {
-                throw new JsError("Couldn't read package.json of local dependency " +
+                throw new JsError(JsError.ERROR, "Couldn't read package.json of local dependency " +
                                   (Js.truthy(wantedDependency.getAlias()) ? wantedDependency.getAlias() + "@" : "") +
                                   wantedDependency.getBareSpecifier());
             }
@@ -351,7 +352,7 @@ final class PackageRequester {
         }
         WhatwgUrl url = WhatwgUrl.tryParse(bareSpecifier);
         if (url == null) {
-            throw new JsError("TypeError: Invalid URL");
+            throw new JsError(JsError.TYPE_ERROR, "Invalid URL");
         }
         NpmResolver.ResolveResult result = new NpmResolver.ResolveResult();
         result.id = url.toString();

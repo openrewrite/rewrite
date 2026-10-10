@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of object-path 0.11.4 {@code has} and {@code set} (yarn 1.22.22's bundle).

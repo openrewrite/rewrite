@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.ScenarioTest;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
@@ -226,8 +227,8 @@ class IdealTreeBuilderTest extends ScenarioTest {
                      (http.missing.isEmpty() || "E404".equals(words[1]));
                 break;
             case "pm-fails":
-                // one of JavaScript's errors, which the port raises as these two, without a code of npm's own
-                ok = code == null && (e instanceof IllegalArgumentException || e instanceof IllegalStateException) &&
+                // one of JavaScript's errors, without a code of npm's own
+                ok = code == null && (e instanceof JsError || e.getClass() == IllegalArgumentException.class) &&
                      http.missing.isEmpty();
                 break;
             case "cannot-know":

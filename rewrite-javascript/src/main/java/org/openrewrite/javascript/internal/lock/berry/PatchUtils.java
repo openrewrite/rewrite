@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.YarnpkgSemverUtils;
 

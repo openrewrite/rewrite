@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.time.Instant;

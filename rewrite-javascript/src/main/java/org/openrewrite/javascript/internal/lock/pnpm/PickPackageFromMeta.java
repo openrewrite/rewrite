@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
@@ -195,7 +196,7 @@ final class PickPackageFromMeta {
     private static String @Nullable [] parseNpmTarballUrl(String url) {
         WhatwgUrl parsed = WhatwgUrl.tryParse(url);
         if (parsed == null) {
-            throw new JsError("TypeError: Invalid URL");
+            throw new JsError(JsError.TYPE_ERROR, "Invalid URL");
         }
         String path = parsed.getPathname();
         if (path.isEmpty() || parsed.getHost().isEmpty()) {
@@ -209,7 +210,7 @@ final class PickPackageFromMeta {
         try {
             name = parts[0].isEmpty() ? "" : UriComponent.decodeURIComponent(parts[0].substring(1));
         } catch (IllegalArgumentException e) {
-            throw new JsError("URIError: URI malformed");
+            throw new JsError(JsError.URI_ERROR, "URI malformed");
         }
         if (name.isEmpty()) {
             return null;

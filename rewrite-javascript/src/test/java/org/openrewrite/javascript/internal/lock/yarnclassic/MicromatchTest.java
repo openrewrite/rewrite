@@ -34,6 +34,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;

@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of braces 3.0.2 for {@code braces(pattern, {expand: true, nodupes: true, keepEscaping: true})}.

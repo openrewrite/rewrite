@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-jsr sources/JsrResolver.ts and helpers.ts (Yarn 4.10.3).

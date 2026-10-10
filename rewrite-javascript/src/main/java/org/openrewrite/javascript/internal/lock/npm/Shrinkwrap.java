@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import lombok.Setter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Spec;
@@ -439,7 +440,7 @@ public final class Shrinkwrap {
 
     private Map<String, Object> loadedData() {
         if (data == null) {
-            throw new IllegalStateException("run load() before getting or setting data");
+            throw new JsError(JsError.ERROR, "run load() before getting or setting data");
         }
         return data;
     }

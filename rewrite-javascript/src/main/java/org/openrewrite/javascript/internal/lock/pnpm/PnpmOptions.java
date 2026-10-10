@@ -22,6 +22,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Ini;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
@@ -235,7 +236,7 @@ public final class PnpmOptions {
             explicitlySetKeys.add(pair.key);
             if ("registry".equals(pair.key)) {
                 if (!(pair.value instanceof String)) {
-                    throw new JsError("Unexpected type of registry, expecting a string but received " +
+                    throw new JsError(JsError.ERROR, "Unexpected type of registry, expecting a string but received " +
                                       Js.jsonStringify(pair.value));
                 }
                 registries.put("default", normalizeRegistryUrl(pair.value));
@@ -324,7 +325,7 @@ public final class PnpmOptions {
             Object nodeRuntime = null;
             for (Object runtime : runtimes) {
                 if (runtime == null || runtime == JsYaml.UNDEFINED) {
-                    throw new JsError("Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
+                    throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
                 }
                 if (runtime instanceof Map && "node".equals(((Map<String, @Nullable Object>) runtime).get("name"))) {
                     nodeRuntime = runtime;
@@ -336,13 +337,13 @@ public final class PnpmOptions {
                 continue;
             }
             if (!(version instanceof String)) {
-                throw new JsError("range.trim is not a function");
+                throw new JsError(JsError.ERROR, "range.trim is not a function");
             }
             String minVersion;
             try {
                 minVersion = NodeSemver.minVersion((String) version, NodeSemver.Options.DEFAULT);
             } catch (IllegalArgumentException e) {
-                throw new JsError(e.getMessage());
+                throw new JsError(JsError.ERROR, e.getMessage());
             }
             if (minVersion != null) {
                 return minVersion;
@@ -448,7 +449,7 @@ public final class PnpmOptions {
     @SuppressWarnings("unchecked")
     private static @Nullable Object property(@Nullable Object value, String key) {
         if (value == null || value == JsYaml.UNDEFINED) {
-            throw new JsError("Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
+            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
         }
         Object property = value instanceof Map ? ((Map<String, @Nullable Object>) value).get(key) : null;
         return property == JsYaml.UNDEFINED ? null : property;
@@ -715,7 +716,7 @@ public final class PnpmOptions {
      */
     static String normalizeRegistryUrl(@Nullable Object value) {
         if (!(value instanceof String)) {
-            throw new JsError("`registry` should be a string");
+            throw new JsError(JsError.ERROR, "`registry` should be a string");
         }
         String registry = (String) value;
         WhatwgUrl url = WhatwgUrl.tryParse(registry);
@@ -832,7 +833,7 @@ public final class PnpmOptions {
             case URL: {
                 WhatwgUrl url = WhatwgUrl.tryParse(envVar);
                 if (url == null) {
-                    throw new JsError("Invalid URL");
+                    throw new JsError(JsError.ERROR, "Invalid URL");
                 }
                 return url.toString();
             }
@@ -1000,7 +1001,7 @@ public final class PnpmOptions {
      */
     static String envReplace(String settingValue, @Nullable Map<String, String> env) {
         return replaceWith(settingValue, env, orig -> {
-            throw new JsError("Failed to replace env in config: " + orig);
+            throw new JsError(JsError.ERROR, "Failed to replace env in config: " + orig);
         });
     }
 

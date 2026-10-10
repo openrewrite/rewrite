@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/util/fs.js (yarn 1.22.22): {@code readJson} and {@code writeFilePreservingEol}.

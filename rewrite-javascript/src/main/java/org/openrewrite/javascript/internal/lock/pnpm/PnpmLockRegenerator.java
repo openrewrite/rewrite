@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
@@ -364,7 +365,7 @@ public final class PnpmLockRegenerator {
             String code = ((JsError) e).getCode();
             Reason reason = "ERR_INVALID_PACKAGE_CONFIG".equals(code) ? Reason.MALFORMED_MANIFEST :
                     Reason.RESOLUTION_REQUIRED;
-            return Rejected.crashes(reason, null, (code == null ? "" : "[" + code + "] ") + e.getMessage());
+            return Rejected.crashes(reason, null, (code == null ? "" : "[" + code + "] ") + Js.message(e));
         }
         // the lock and the env document catch their own; what reaches here is pnpm-workspace.yaml's
         if (e instanceof JsYaml.YamlException) {
@@ -712,7 +713,7 @@ public final class PnpmLockRegenerator {
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
         VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, resolutionVerifiers(options));
         if (missingManifest != null) {
-            throw new JsError("No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) +
+            throw new JsError(JsError.ERROR, "No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) +
                               "\"");
         }
         PnpmContext ctx = new PnpmContext(wantedLockfile, lockDir, projects, read.isHadConflicts());

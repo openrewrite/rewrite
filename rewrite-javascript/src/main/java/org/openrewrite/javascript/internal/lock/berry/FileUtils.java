@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-file sources/fileUtils.ts (Yarn 4.10.3), up to the files it reads.

@@ -33,6 +33,7 @@ import java.util.TreeMap;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/core sources/Configuration.ts {@code find} for the settings a lock reads (Yarn 4.10.3).

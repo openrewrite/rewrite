@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.function.Supplier;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and {@code fetchPackageFromCache} (Yarn 4.10.3).

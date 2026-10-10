@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/package-fetcher.js and config.js {@code generateUniquePackageSlug} (yarn 1.22.22).

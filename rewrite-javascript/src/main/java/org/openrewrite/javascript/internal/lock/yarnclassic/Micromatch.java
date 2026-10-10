@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) with is-glob 2.0.1,

@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
@@ -398,8 +399,8 @@ public final class NpmLockRegenerator {
         String code = e instanceof NpmError ? ((NpmError) e).getCode() :
                 e instanceof Spec.InvalidSpecException ? ((Spec.InvalidSpecException) e).getCode() : null;
         if (code == null) {
-            // the port raises JavaScript's errors as these two; any other is a fault of the port, not npm's
-            if (!(e instanceof IllegalArgumentException) && !(e instanceof IllegalStateException)) {
+            // JavaScript's errors, and its TypeError as the port and NodeSemver raise it; any other is the port's fault
+            if (!(e instanceof JsError) && e.getClass() != IllegalArgumentException.class) {
                 throw e;
             }
             return Rejected.crashes(Reason.RESOLUTION_REQUIRED, packageOf(e), message);

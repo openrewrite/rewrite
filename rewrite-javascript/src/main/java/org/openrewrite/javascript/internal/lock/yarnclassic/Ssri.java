@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of ssri 5.3.0 ({@code parse}, {@code stringify}, {@code fromHex} and the {@code Hash} and {@code Integrity}
@@ -198,7 +199,7 @@ final class Ssri {
                 bytes[i] = (byte) toNumber(items.get(i));
             }
         } else {
-            throw JsError.invalidArgType("The first argument must be of type string or an instance of Buffer, " +
+            throw Js.invalidArgType("The first argument must be of type string or an instance of Buffer, " +
                                          "ArrayBuffer, or Array or an Array-like Object", hexDigest);
         }
         return parse(algorithm + "-" + Base64.getEncoder().encodeToString(bytes));

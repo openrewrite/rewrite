@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /** Port of minimatch 10.2.5 on POSIX paths, without extglobs, which no workspace pattern uses. */
 final class Minimatch {
@@ -527,6 +528,6 @@ final class Minimatch {
         } else if (pi == pl) {
             return fi == fl - 1 && file.get(fi).isEmpty();
         }
-        throw new IllegalStateException("wtf?");
+        throw new JsError(JsError.ERROR, "wtf?");
     }
 }

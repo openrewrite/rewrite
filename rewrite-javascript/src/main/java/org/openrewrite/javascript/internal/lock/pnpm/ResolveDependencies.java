@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 

@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.time.Instant;
@@ -36,6 +37,14 @@ import java.util.Objects;
 final class Js extends EcmaScript {
 
     private Js() {
+    }
+
+    /**
+     * What pnpm prints of an error: an {@code Error}'s message, another kind's name before it.
+     */
+    static String message(RuntimeException e) {
+        return e instanceof JsError && !JsError.ERROR.equals(((JsError) e).getName()) ? e.toString() :
+                String.valueOf(e.getMessage());
     }
 
     /**

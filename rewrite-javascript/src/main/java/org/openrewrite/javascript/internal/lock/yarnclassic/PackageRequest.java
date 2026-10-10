@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -212,7 +213,7 @@ final class PackageRequest {
                 !pattern.startsWith(Js.templateString(resolver.focusedWorkspaceName) + "@")) {
                 WorkspaceLayout.Workspace localInfo = workspaceLayout.getManifestByPattern(pattern);
                 if (localInfo == null) {
-                    throw new JsError(JsError.INVARIANT_VIOLATION, "expected local info for " + pattern);
+                    throw new JsError(Js.INVARIANT_VIOLATION, "expected local info for " + pattern);
                 }
                 Manifest localManifest = localInfo.getManifest();
                 String requestPattern = Js.templateString(localManifest.getName()) + "@" +
@@ -231,11 +232,11 @@ final class PackageRequest {
                 Js.templateString(info.getVersion()) : normalized.getRange();
         Manifest resolved = resolver.getHighestRangeVersionMatch(normalized.getName(), solvedRange, info);
         if (resolved == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "should have a resolved reference");
+            throw new JsError(Js.INVARIANT_VIOLATION, "should have a resolved reference");
         }
         PackageReference ref = resolved.reference;
         if (ref == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "Resolved package info has no package reference");
+            throw new JsError(Js.INVARIANT_VIOLATION, "Resolved package info has no package reference");
         }
         ref.addRequest(this);
         ref.addPattern(pattern, resolved);
@@ -277,7 +278,7 @@ final class PackageRequest {
 
             PackageRemote remote = info.remote;
             if (remote == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "Missing remote");
+                throw new JsError(Js.INVARIANT_VIOLATION, "Missing remote");
             }
 
             PackageReference ref = new PackageReference(this, info, remote);

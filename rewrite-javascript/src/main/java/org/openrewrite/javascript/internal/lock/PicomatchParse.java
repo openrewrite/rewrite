@@ -120,7 +120,7 @@ final class PicomatchParse {
     }
 
     /**
-     * @throws PatternError the SyntaxError for an input over 65536 characters, and 2.3.1's TypeError for an input
+     * @throws JsError the SyntaxError for an input over 65536 characters, and 2.3.1's TypeError for an input
      *                     naming a member of {@code Object.prototype}
      */
     static State parse(String input, Options options, boolean fastpaths) {
@@ -129,7 +129,7 @@ final class PicomatchParse {
 
     static @Nullable String fastpaths(String input, Options options) {
         if (input.length() > MAX_LENGTH) {
-            throw new PatternError(PatternError.SYNTAX_ERROR, "Input length: " + input.length() +
+            throw new JsError(JsError.SYNTAX_ERROR, "Input length: " + input.length() +
                                                               ", exceeds maximum allowed length: " + MAX_LENGTH);
         }
         boolean dot = options.isDot();
@@ -475,7 +475,7 @@ final class PicomatchParse {
             String replaced = replacement(input, options.getRelease());
             if (replaced != null && options.getRelease() == Release.V2_3_1 &&
                 EcmaScript.objectPrototypeMember(input) != null) {
-                throw new PatternError(PatternError.TYPE_ERROR, "output.startsWith is not a function");
+                throw new JsError(JsError.TYPE_ERROR, "output.startsWith is not a function");
             }
             this.input = replaced != null ? replaced : input;
             this.len = this.input.length();
@@ -483,7 +483,7 @@ final class PicomatchParse {
 
         State parse() {
             if (len > MAX_LENGTH) {
-                throw new PatternError(PatternError.SYNTAX_ERROR, "Input length: " + len +
+                throw new JsError(JsError.SYNTAX_ERROR, "Input length: " + len +
                                                                   ", exceeds maximum allowed length: " + MAX_LENGTH);
             }
             tokens.add(bos);

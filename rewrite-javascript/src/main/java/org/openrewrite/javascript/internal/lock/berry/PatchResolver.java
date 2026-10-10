@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-patch sources/PatchResolver.ts (Yarn 4.10.3).

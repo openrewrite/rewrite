@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -160,7 +161,7 @@ final class PackageIsInstallable {
         try {
             return NodeSemver.satisfies(version, (String) range, NodeSemver.Options.INCLUDE_PRERELEASE);
         } catch (IllegalArgumentException e) {
-            throw new JsError(e.getMessage());
+            throw new JsError(JsError.ERROR, e.getMessage());
         }
     }
 
@@ -204,7 +205,7 @@ final class PackageIsInstallable {
             List<@Nullable Object> items = (List<@Nullable Object>) wanted;
             list = items;
         } else {
-            throw new JsError("list.filter is not a function");
+            throw new JsError(JsError.ERROR, "list.filter is not a function");
         }
         List<String> strings = new ArrayList<>();
         for (Object entry : list) {
@@ -245,7 +246,7 @@ final class PackageIsInstallable {
         if (supported instanceof List) {
             list = (List<?>) supported;
         } else if (supported != null) {
-            throw new JsError("supported.map is not a function");
+            throw new JsError(JsError.ERROR, "supported.map is not a function");
         }
         List<@Nullable Object> values = new ArrayList<>();
         for (Object value : list) {

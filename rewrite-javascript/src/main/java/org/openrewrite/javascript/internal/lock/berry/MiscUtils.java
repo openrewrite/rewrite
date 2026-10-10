@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of the parts of @yarnpkg/core sources/miscUtils.ts (Yarn 4.10.3) that reach the lock.

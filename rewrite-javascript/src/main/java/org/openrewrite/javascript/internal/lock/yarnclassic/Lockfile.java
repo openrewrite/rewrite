@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/lockfile/index.js (yarn 1.22.22).
@@ -276,10 +277,10 @@ final class Lockfile {
             PackageRemote remote = pkg.remote;
             PackageReference ref = pkg.reference;
             if (ref == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "Package is missing a reference");
+                throw new JsError(Js.INVARIANT_VIOLATION, "Package is missing a reference");
             }
             if (remote == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "Package is missing a remote");
+                throw new JsError(Js.INVARIANT_VIOLATION, "Package is missing a remote");
             }
 
             String remoteKey = keyForRemote(remote);

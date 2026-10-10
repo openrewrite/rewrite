@@ -20,6 +20,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -217,7 +218,7 @@ public final class YarnClassicOptions {
     // path.resolve(dirname(filePath), value) relative to the project's root
     private static String resolve(String dir, @Nullable Object value) {
         if (!(value instanceof String)) {
-            throw JsError.invalidArgType("The \"paths[1]\" argument must be of type string", value);
+            throw Js.invalidArgType("The \"paths[1]\" argument must be of type string", value);
         }
         String path = (String) value;
         String resolved = PosixPath.isAbsolute(path) ? PosixPath.normalize(path) : PosixPath.join(dir, path);

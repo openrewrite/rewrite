@@ -20,6 +20,7 @@ import lombok.NonNull;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -185,7 +186,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
             published = fetchPublishedAt(registry, name, version);
         } catch (PnpmError | JsError e) {
             return new Result(false, MINIMUM_RELEASE_AGE_VIOLATION_CODE,
-                    uncheckable("minimumReleaseAge", e.getMessage()));
+                    uncheckable("minimumReleaseAge", Js.message(e)));
         }
         if (!Js.truthy(published)) {
             if (opts.isIgnoreMissingTimeField()) {
@@ -281,7 +282,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (object instanceof List) {
             return Js.ownKeys(object).contains(key);
         }
-        throw new JsError("Cannot use 'in' operator to search for '" + key + "' in " + Js.string(object));
+        throw new JsError(JsError.ERROR, "Cannot use 'in' operator to search for '" + key + "' in " + Js.string(object));
     }
 
     private @Nullable Map<String, @Nullable Object> fetchAbbreviatedMeta(String registry, String name) {
@@ -302,7 +303,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         return fullMetaCache.computeIfAbsent(registry + "\0" + name, k -> Lookup.of(() -> {
             Map<String, @Nullable Object> meta = fetchMetadata(registry, name, true, TIME, Collections.emptySet());
             if (meta == null) {
-                throw new JsError("Cannot read properties of null (reading 'time')");
+                throw new JsError(JsError.ERROR, "Cannot read properties of null (reading 'time')");
             }
             return meta.get("time");
         })).get();

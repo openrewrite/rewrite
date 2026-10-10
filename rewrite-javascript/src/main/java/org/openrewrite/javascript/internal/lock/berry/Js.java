@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Yarn's plain objects as the port holds them: property reads, {@code Object.entries} and {@code JSON.parse}.

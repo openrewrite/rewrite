@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -151,7 +152,7 @@ final class NormalizeManifest {
             for (String name : Js.keys(dependencies)) {
                 Object raw = Js.get(dependencies, name);
                 if (!(raw instanceof String)) {
-                    throw JsError.invalidArgType("The \"path\" argument must be of type string", raw);
+                    throw Js.invalidArgType("The \"path\" argument must be of type string", raw);
                 }
                 String value = (String) raw;
                 if (value.startsWith("/")) {

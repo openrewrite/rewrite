@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/engine.runtime.deno-resolver src/index.ts (pnpm 11.2.2): a {@code deno} dependency of
@@ -76,7 +77,7 @@ final class DenoRuntimeResolver {
             throw new PnpmError("DENO_MISSING_ASSETS", "No assets found for Deno v" + version);
         }
         if (!(assetsData instanceof List)) {
-            throw new JsError("data.assets.map is not a function");
+            throw new JsError(JsError.ERROR, "data.assets.map is not a function");
         }
         List<Map<String, @Nullable Object>> assets = new ArrayList<>();
         for (Object asset : (List<?>) assetsData) {

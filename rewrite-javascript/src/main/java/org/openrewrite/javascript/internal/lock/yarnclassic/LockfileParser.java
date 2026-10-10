@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.ArrayDeque;
@@ -332,7 +333,7 @@ final class LockfileParser {
 
         private static void invariantKey(@Nullable String key) {
             if (key == null || key.isEmpty()) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "Expected a key");
+                throw new JsError(Js.INVARIANT_VIOLATION, "Expected a key");
             }
         }
     }

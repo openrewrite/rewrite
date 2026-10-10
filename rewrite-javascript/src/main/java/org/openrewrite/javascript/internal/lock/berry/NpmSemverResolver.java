@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.openrewrite.javascript.internal.lock.berry.NpmHttpUtils.PROTOCOL;
 

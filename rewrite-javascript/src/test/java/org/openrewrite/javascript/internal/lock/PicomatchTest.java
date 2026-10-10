@@ -20,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.Picomatch.Options;
-import org.openrewrite.javascript.internal.lock.Picomatch.PatternError;
 import org.openrewrite.javascript.internal.lock.Picomatch.Release;
 
 import java.io.BufferedReader;
@@ -58,7 +57,7 @@ class PicomatchTest {
             String actual;
             try {
                 actual = Picomatch.source(row[0], options);
-            } catch (PatternError e) {
+            } catch (JsError e) {
                 actual = "!" + e;
             }
             if (!actual.equals(row[2])) {
@@ -90,7 +89,7 @@ class PicomatchTest {
             String source;
             try {
                 source = Picomatch.source(pattern, options);
-            } catch (PatternError e) {
+            } catch (JsError e) {
                 source = "!" + e.getMessage();
             }
             if (expected.startsWith("!") ? !source.startsWith("!") || !expected.endsWith(source.substring(1)) :

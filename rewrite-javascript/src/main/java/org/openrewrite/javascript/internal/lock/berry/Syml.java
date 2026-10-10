@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.ArrayList;

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
@@ -70,8 +71,8 @@ public final class PackageJson {
     }
 
     /**
-     * {@code PackageJson.normalize(path)}: JsonParseException as {@code Invalid package.json}, IllegalStateException
-     * for a falsy value, IllegalArgumentException for a truthy one that is not an object or array.
+     * {@code PackageJson.normalize(path)}: JsonParseException as {@code Invalid package.json}, an Error for a falsy
+     * value, a TypeError for a truthy one that is not an object or array.
      */
     @SuppressWarnings("unchecked")
     public static PackageJson normalize(String text) {
@@ -83,7 +84,7 @@ public final class PackageJson {
         }
         Object value = parsed.getValue();
         if (!truthy(value)) {
-            throw new IllegalStateException("Can not normalize without content");
+            throw new JsError(JsError.ERROR, "Can not normalize without content");
         }
         if (!(value instanceof Map) && !(value instanceof List)) {
             throw new IllegalArgumentException(

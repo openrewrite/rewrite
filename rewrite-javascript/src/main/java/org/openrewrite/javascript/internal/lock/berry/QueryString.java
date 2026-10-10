@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 
 import java.io.ByteArrayOutputStream;

@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/resolvers/contextual/workspace-resolver.js (yarn 1.22.22): a pattern a workspace member
@@ -31,7 +32,7 @@ final class WorkspaceResolver {
     WorkspaceResolver(PackageRequest request, @Nullable WorkspaceLayout workspaceLayout) {
         this.request = request;
         if (workspaceLayout == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "expected workspaceLayout");
+            throw new JsError(Js.INVARIANT_VIOLATION, "expected workspaceLayout");
         }
         this.workspaceLayout = workspaceLayout;
     }
@@ -43,7 +44,7 @@ final class WorkspaceResolver {
     Manifest resolve(@Nullable Manifest downloadedManifest) {
         WorkspaceLayout.Workspace workspace = workspaceLayout.getManifestByPattern(request.pattern);
         if (workspace == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "expected workspace");
+            throw new JsError(Js.INVARIANT_VIOLATION, "expected workspace");
         }
         Manifest manifest = workspace.getManifest();
         if (manifest.remote != null && manifest.remote.registryRemote != null) {
@@ -51,14 +52,14 @@ final class WorkspaceResolver {
         }
         Object registry = manifest.get("_registry");
         if (!Js.truthy(registry)) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "expected reference");
+            throw new JsError(Js.INVARIANT_VIOLATION, "expected reference");
         }
         String hash = "";
         PackageRemote registryRemote = null;
         if (downloadedManifest != null && Js.strictEquals(manifest.getVersion(), downloadedManifest.getVersion())) {
             registryRemote = downloadedManifest.remote;
             if (registryRemote == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "missing remote info");
+                throw new JsError(Js.INVARIANT_VIOLATION, "missing remote info");
             }
             hash = registryRemote.hash;
             for (String key : new ArrayList<>(manifest.data.keySet())) {

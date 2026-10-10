@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
 import org.openrewrite.javascript.internal.lock.PosixPath;
@@ -314,11 +315,7 @@ final class FastGlob {
 
     // picomatch 2.3.1 under fast-glob's options; its errors are Yarn's
     private static Pattern makeRe(String pattern, boolean dot) {
-        try {
-            return Picomatch.makeRe(pattern, dot ? PICOMATCH_DOT : PICOMATCH);
-        } catch (Picomatch.PatternError e) {
-            throw new JsError(e.getName(), e.getMessage());
-        }
+        return Picomatch.makeRe(pattern, dot ? PICOMATCH_DOT : PICOMATCH);
     }
 
     private static boolean matchAny(String entry, List<Pattern> patternsRe) {

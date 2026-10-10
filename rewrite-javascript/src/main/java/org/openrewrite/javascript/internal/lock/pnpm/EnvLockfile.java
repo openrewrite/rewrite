@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/lockfile.types {@code EnvLockfile} and @pnpm/lockfile.fs src/envLockfile.ts (pnpm 11.2.2): the
@@ -119,7 +120,7 @@ final class EnvLockfile {
         try {
             parsed = JsYaml.load(rawContent);
         } catch (JsYaml.YamlException e) {
-            throw new JsError(e.toString());
+            throw new JsError(JsError.ERROR, e.toString());
         }
         if (!(parsed instanceof Map)) {
             return null;

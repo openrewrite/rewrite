@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-npm sources/NpmHttpFetcher.ts (Yarn 4.10.3).

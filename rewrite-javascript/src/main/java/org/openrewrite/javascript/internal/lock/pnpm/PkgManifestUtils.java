@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/pkg-manifest.utils src/convertEnginesRuntimeToDependencies.ts (pnpm 11.2.2).
@@ -87,7 +88,7 @@ final class PkgManifestUtils {
                     ((Map<String, @Nullable Object>) runtime).put("onFail", onFailOverride);
                 } else if (!(runtime instanceof List)) {
                     // pnpm's bundle is an ES module, where a property set on a primitive throws
-                    throw new JsError(runtime == null || runtime == JsYaml.UNDEFINED ?
+                    throw new JsError(JsError.ERROR, runtime == null || runtime == JsYaml.UNDEFINED ?
                             "Cannot set properties of " + Js.string(runtime) + " (setting 'onFail')" :
                             "Cannot create property 'onFail' on " + Js.typeOf(runtime) + " '" + Js.string(runtime) +
                             "'");
@@ -113,7 +114,7 @@ final class PkgManifestUtils {
     private static @Nullable Object find(List<@Nullable Object> runtimes, String runtimeName) {
         for (Object runtime : runtimes) {
             if (runtime == null || runtime == JsYaml.UNDEFINED) {
-                throw new JsError("Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
+                throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
             }
             if (runtimeName.equals(property(runtime, "name"))) {
                 return runtime;

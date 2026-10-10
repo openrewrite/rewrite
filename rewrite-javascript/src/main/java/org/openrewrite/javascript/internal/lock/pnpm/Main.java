@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -141,7 +142,7 @@ public final class Main {
             return Manifests.parse(text, "package.json");
         } catch (PnpmError e) {
             if ("ERR_PNPM_JSON_PARSE".equals(e.getCode())) {
-                throw new JsError("ERR_INVALID_PACKAGE_CONFIG", "Invalid package config package.json.");
+                throw new JsError(JsError.ERROR, "Invalid package config package.json.", "ERR_INVALID_PACKAGE_CONFIG");
             }
             throw e;
         }
@@ -312,7 +313,7 @@ public final class Main {
                     envInstaller.resolveAndInstallConfigDeps(configDeps, new EnvLockfile.OnDisk(null), options);
                 } catch (PnpmError | JsError e) {
                     throw new CannotKnow("whether pnpm resolves the config dependencies, which fail here (" +
-                                         e.getMessage() + ") unless the env document of " +
+                                         Js.message(e) + ") unless the env document of " +
                                          (rootDir.isEmpty() ? "the workspace's " : rootDir + "/") +
                                          LockfileReader.WANTED_LOCKFILE + " locks them");
                 }

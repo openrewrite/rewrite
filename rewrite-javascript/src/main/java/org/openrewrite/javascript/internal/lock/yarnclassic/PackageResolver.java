@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -153,7 +154,7 @@ final class PackageResolver {
             }
             PackageReference ref = pkg.reference;
             if (ref == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "expected reference");
+                throw new JsError(Js.INVARIANT_VIOLATION, "expected reference");
             }
             refs.add(ref);
             skip.add(pkg);
@@ -221,7 +222,7 @@ final class PackageResolver {
             }
         }
         if (collapseToReference == null || collapseToManifest == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "Couldn't find package manifest for " + name + "@" +
+            throw new JsError(Js.INVARIANT_VIOLATION, "Couldn't find package manifest for " + name + "@" +
                                                            version);
         }
         for (String pattern : patterns) {
@@ -230,7 +231,7 @@ final class PackageResolver {
             }
             PackageReference ref = getStrictResolvedPattern(pattern).reference;
             if (ref == null) {
-                throw new JsError(JsError.INVARIANT_VIOLATION, "expected package reference");
+                throw new JsError(Js.INVARIANT_VIOLATION, "expected package reference");
             }
             List<String> refPatterns = new ArrayList<>(ref.patterns);
             ref.prune();
@@ -274,7 +275,7 @@ final class PackageResolver {
     Manifest getStrictResolvedPattern(String pattern) {
         Manifest manifest = getResolvedPattern(pattern);
         if (manifest == null) {
-            throw new JsError(JsError.INVARIANT_VIOLATION, "expected manifest");
+            throw new JsError(Js.INVARIANT_VIOLATION, "expected manifest");
         }
         return manifest;
     }
@@ -494,7 +495,7 @@ final class PackageResolver {
             if (resolutionManifest != null) {
                 PackageReference reference = resolutionManifest.reference;
                 if (reference == null) {
-                    throw new JsError(JsError.INVARIANT_VIOLATION, "resolutions should have a resolved reference");
+                    throw new JsError(Js.INVARIANT_VIOLATION, "resolutions should have a resolved reference");
                 }
                 reference.patterns.add(pattern);
                 addPattern(pattern, resolutionManifest);

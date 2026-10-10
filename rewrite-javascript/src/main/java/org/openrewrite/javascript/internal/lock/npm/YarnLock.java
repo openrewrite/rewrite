@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
@@ -130,7 +131,7 @@ public final class YarnLock {
             }
             if (SUBKEY.matcher(line).matches()) {
                 if (current == null) {
-                    throw new IllegalStateException("Cannot set properties of null");
+                    throw new JsError(JsError.TYPE_ERROR, "Cannot set properties of null");
                 }
                 subkey = line.substring(2, line.length() - 1);
                 current.fields.put(subkey, new LinkedHashMap<String, Object>());
@@ -141,7 +142,8 @@ public final class YarnLock {
                 if (subval.size() == 2) {
                     Object object = current.get(subkey);
                     if (!(object instanceof Map)) {
-                        throw new IllegalStateException("Cannot create property '" + subval.get(0) + "' on " + object);
+                        throw new JsError(JsError.TYPE_ERROR, "Cannot create property '" + subval.get(0) + "' on " +
+                                object);
                     }
                     ((Map<String, Object>) object).put(subval.get(0), subval.get(1));
                     continue;
@@ -312,7 +314,8 @@ public final class YarnLock {
             return String.valueOf(val);
         }
         if (!(val instanceof String)) {
-            throw new IllegalStateException("not a yarn.lock scalar: " + val);
+            throw new JsError(JsError.TYPE_ERROR, val == null ? "Cannot read properties of undefined (reading " +
+                                                                "'startsWith')" : "val.startsWith is not a function");
         }
         String s = (String) val;
         char first = s.isEmpty() ? 0 : s.charAt(0);

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
@@ -347,13 +348,13 @@ final class NpmResolver {
         PickPackageFromMeta.RegistryPackageSpec spec = PickPackageFromMeta.parseBareSpecifier(bareSpecifier,
                 wantedDependency.getAlias(), defaultTag, registryUrl);
         if (spec == null) {
-            throw new JsError("Invalid workspace: spec (" + wantedDependency.getBareSpecifier() + ")");
+            throw new JsError(JsError.ERROR, "Invalid workspace: spec (" + wantedDependency.getBareSpecifier() + ")");
         }
         if (opts.workspacePackages == null) {
-            throw new JsError("Cannot resolve package from workspace because opts.workspacePackages is not defined");
+            throw new JsError(JsError.ERROR, "Cannot resolve package from workspace because opts.workspacePackages is not defined");
         }
         if (opts.projectDir == null) {
-            throw new JsError("Cannot resolve package from workspace because opts.projectDir is not defined");
+            throw new JsError(JsError.ERROR, "Cannot resolve package from workspace because opts.projectDir is not defined");
         }
         return tryResolveFromWorkspacePackages(opts.workspacePackages, spec, wantedDependency, opts,
                 opts.update != null);
@@ -595,7 +596,7 @@ final class NpmResolver {
     static String workspacePrefToNpm(String workspaceBareSpecifier) {
         Matcher m = WORKSPACE_SPEC.matcher(workspaceBareSpecifier);
         if (!m.matches()) {
-            throw new JsError("Invalid workspace spec: " + workspaceBareSpecifier);
+            throw new JsError(JsError.ERROR, "Invalid workspace spec: " + workspaceBareSpecifier);
         }
         String alias = m.group(1);
         String version = m.group(2);

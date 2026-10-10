@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
 
@@ -200,8 +201,8 @@ final class Tinyglobby {
     private static Predicate<String> matcher(List<String> globs) {
         try {
             return Picomatch.matcher(globs, PICOMATCH);
-        } catch (Picomatch.PatternError e) {
-            throw new JsError(e.getMessage());
+        } catch (JsError e) {
+            throw new JsError(JsError.ERROR, e.getMessage());
         }
     }
 

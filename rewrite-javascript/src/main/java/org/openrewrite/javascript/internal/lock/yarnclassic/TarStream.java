@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of tar-stream 1.6.1 lib/extract.js and lib/headers.js {@code decode}, as yarn 1.22.22 bundles them.
