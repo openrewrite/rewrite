@@ -380,6 +380,7 @@ public final class YarnClassicLockRegenerator {
             String message = String.valueOf(e.getMessage());
             return Rejected.rejects(reasonFor(message), message);
         }
+        // the registry's 404 is its verdict, as in every port; yarn's own plain Errors (a TTY question) have no code
         if (e instanceof NpmRegistry.NotFound) {
             return Rejected.rejects(SharedError.PACKAGE_NOT_FOUND, ((NpmRegistry.NotFound) e).getPackageName(),
                     e.toString());
