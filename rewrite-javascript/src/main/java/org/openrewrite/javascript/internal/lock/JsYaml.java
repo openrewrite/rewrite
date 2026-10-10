@@ -37,6 +37,8 @@ import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.EcmaScript.repeat;
+
 /**
  * Port of js-yaml's loader: {@code safeLoad} under {@code FAILSAFE_SCHEMA} of 3.13.1 (yarn 1.22.22) and 3.14.1
  * (@yarnpkg/parsers 3.0.3), {@code load} under {@code DEFAULT_SCHEMA} of @zkochan/js-yaml 0.0.11 (pnpm 11.2.2).
@@ -1858,14 +1860,6 @@ public final class JsYaml {
         }
         return new String(new char[]{(char) (((c - 0x010000) >> 10) + 0xD800),
                 (char) (((c - 0x010000) & 0x03FF) + 0xDC00)});
-    }
-
-    static String repeat(String s, int count) {
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < count; i++) {
-            out.append(s);
-        }
-        return out.toString();
     }
 
     private static boolean isNonPrintable(String s) {

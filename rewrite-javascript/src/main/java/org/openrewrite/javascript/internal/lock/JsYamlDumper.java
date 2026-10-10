@@ -223,7 +223,7 @@ public final class JsYamlDumper {
 
     // indents every line; empty lines (\n only) are not indented
     private static String indentString(String string, int spaces) {
-        String ind = JsYaml.repeat(" ", spaces);
+        String ind = EcmaScript.repeat(" ", spaces);
         int position = 0;
         StringBuilder result = new StringBuilder();
         while (position < string.length()) {
@@ -276,11 +276,11 @@ public final class JsYamlDumper {
             handle = "U";
             length = 8;
         }
-        return "\\" + handle + JsYaml.repeat("0", length - string.length()) + string;
+        return "\\" + handle + EcmaScript.repeat("0", length - string.length()) + string;
     }
 
     private static String generateNextLine(int level, boolean doubleLine) {
-        return "\n" + (doubleLine ? "\n" : "") + JsYaml.repeat(" ", INDENT * level);
+        return "\n" + (doubleLine ? "\n" : "") + EcmaScript.repeat(" ", INDENT * level);
     }
 
     @SuppressWarnings("unchecked")
