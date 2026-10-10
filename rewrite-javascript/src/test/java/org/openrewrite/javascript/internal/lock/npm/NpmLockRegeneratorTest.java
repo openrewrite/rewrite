@@ -15,8 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.time.Instant;
@@ -85,5 +87,23 @@ class NpmLockRegeneratorTest {
               "writes: it installs at the workspace root " + installsAt + ", whose workspaces list this project, " +
               "and writes that root's lock");
         }
+    }
+
+    // npm 11.17.0 writes an empty lock over this manifest (lock/npm/open-root-bin-dir-number-added): normalize's
+    // TypeError, which the failure names with the field normalize read
+    @Test
+    void aRootDirectoriesBinThatIsNoStringIsMalformedAtThatField() {
+        String manifest = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  \"directories\": {\n    \"bin\": 1\n" +
+                          "  }\n}\n";
+        Result result = new NpmLockRegenerator(NpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", manifest)
+          .now(Instant.EPOCH)
+          .build(), NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
+        assertThat(result.getErrorMessage()).isEqualTo("MALFORMED_MANIFEST: npm fails on this edit: it cannot apply " +
+          "the manifest: directories.bin: ref.replace is not a function");
     }
 }
