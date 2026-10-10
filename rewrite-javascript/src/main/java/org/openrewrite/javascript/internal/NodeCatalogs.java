@@ -1438,11 +1438,9 @@ public abstract class NodeCatalogs {
             return catalogFiles.get(path);
         }
 
-        /**
-         * The package manager of {@code packageJson}: its marker's, else the one a manifest at or above names in
-         * {@code packageManager} or {@code devEngines.packageManager}, else the one whose catalog files it lies under.
-         */
-        public @Nullable PackageManager packageManager(Path packageJson) {
+        // the marker's package manager, else the one a manifest at or above names in packageManager or
+        // devEngines.packageManager, else the one whose catalog files it lies under
+        private @Nullable PackageManager packageManager(Path packageJson) {
             NodeDependencyScan.ProjectState ps = scan.projects.get(packageJson);
             NodeResolutionResult marker = ps == null || ps.capturedPackageJson == null ? null :
                     ps.capturedPackageJson.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);

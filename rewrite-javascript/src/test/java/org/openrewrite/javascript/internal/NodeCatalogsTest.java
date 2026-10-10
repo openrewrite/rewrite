@@ -42,6 +42,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 /**
  * Each catalog read and edit against what pnpm 11.2.2, Yarn 4.10.3 and Bun 1.3.10 read or wrote in the recordings
@@ -277,6 +278,21 @@ class NodeCatalogsTest {
         }
         assertThat(edited(bun("catalog-rename").withEntry("", "is-number", "7.0.0")))
           .isEqualTo(file("bun/catalog-rename/pkg"));
+    }
+
+    @Test
+    void theAccumulatorGivesEachManifestTheCatalogsItsPackageManagerReads() {
+        NodeCatalogs.Accumulator acc = new NodeCatalogs.Accumulator();
+        acc.scan(yaml("packages:\n  - packages/*\ncatalog:\n  wrappy: 1.0.2\ncatalogs:\n  legacy:\n    ms: 2.1.3\n"));
+        SourceFile member = json("{\"name\":\"a\",\"dependencies\":{\"wrappy\":\"catalog:\"}}")
+          .withSourcePath(Paths.get("packages/a/package.json"));
+        acc.scan(member.withMarkers(member.getMarkers().add(nodeResolutionResult(PackageManager.Pnpm))));
+        NodeCatalogs catalogs = requireNonNull(acc.of(Paths.get("packages/a/package.json")));
+        assertThat(catalogs.resolve("wrappy", "catalog:")).isEqualTo("1.0.2");
+        assertThat(catalogs.resolve("ms", "catalog:legacy")).isEqualTo("2.1.3");
+        SourceFile yarn = json("{\"name\":\"b\"}").withSourcePath(Paths.get("tools/package.json"));
+        acc.scan(yarn.withMarkers(yarn.getMarkers().add(nodeResolutionResult(PackageManager.YarnBerry))));
+        assertThat(acc.of(Paths.get("tools/package.json"))).as("Yarn reads no .yarnrc.yml here").isNull();
     }
 
     @ParameterizedTest
