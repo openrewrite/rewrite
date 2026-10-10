@@ -258,16 +258,11 @@ final class TgzUtils {
     private static Map<String, Object> pax(String string, @Nullable Map<String, Object> previous) {
         Map<String, Object> kv = new LinkedHashMap<>();
         for (String line : string.replaceAll("\n\\z", "").split("\n", -1)) {
-            int n;
-            try {
-                n = Integer.parseInt(line.replaceAll("^\\s*(\\d+).*$", "$1"));
-            } catch (NumberFormatException e) {
-                continue;
-            }
+            double n = Js.parseInt(line, 10);
             if (n != line.getBytes(StandardCharsets.UTF_8).length + 1) {
                 continue;
             }
-            line = line.substring((n + " ").length());
+            line = Js.slice(line, (Js.numberToString(n) + " ").length());
             int eq = line.indexOf('=');
             String k = (eq == -1 ? line : line.substring(0, eq)).replaceAll("^SCHILY\\.(dev|ino|nlink)", "$1");
             if (k.isEmpty()) {
@@ -424,12 +419,8 @@ final class TgzUtils {
                 }
                 return value;
             }
-            String s = cutAtNul(new String(buf, off, size, StandardCharsets.UTF_8)).trim();
-            int end = 0;
-            while (end < s.length() && s.charAt(end) >= '0' && s.charAt(end) <= '7') {
-                end++;
-            }
-            return end == 0 ? null : Long.parseLong(s.substring(0, end), 8);
+            double value = Js.parseInt(Js.trim(cutAtNul(new String(buf, off, size, StandardCharsets.UTF_8))), 8);
+            return Double.isNaN(value) ? null : (long) value;
         }
     }
 }
