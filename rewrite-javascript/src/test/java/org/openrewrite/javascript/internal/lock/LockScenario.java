@@ -160,11 +160,11 @@ public abstract class LockScenario {
         Map<String, S> found = new TreeMap<>();
         Path httpCache = httpCache();
         for (Path root : classpathRoots(family)) {
-            collect(root, false, isScenario, httpCache, factory, found);
+            collect(root, 1, isScenario, httpCache, factory, found);
         }
         Path corpus = corpusRoot(family);
         if (corpus != null) {
-            collect(corpus, false, isScenario, httpCache, factory, found);
+            collect(corpus, 1, isScenario, httpCache, factory, found);
         }
         for (S scenario : found.values()) {
             String supersedes = scenario.file("supersedes");
@@ -221,15 +221,15 @@ public abstract class LockScenario {
     }
 
     /**
-     * The scenarios under {@code root}: its child directories that are scenarios, or with {@code nested} every
-     * directory below it that is one and lies in none.
+     * The scenarios under {@code root} down to {@code maxDepth}: each directory that is one and, deeper than its
+     * children, lies in none.
      */
-    public static <S extends LockScenario> void collect(Path root, boolean nested, Predicate<Path> isScenario,
+    public static <S extends LockScenario> void collect(Path root, int maxDepth, Predicate<Path> isScenario,
                                                         @Nullable Path httpCache, Factory<S> factory,
                                                         Map<String, S> found) {
-        try (Stream<Path> walk = nested ? Files.walk(root) : Files.walk(root, 1)) {
+        try (Stream<Path> walk = Files.walk(root, maxDepth)) {
             walk.filter(Files::isDirectory).forEach(dir -> {
-                if (dir.equals(root) || !isScenario.test(dir) || nested && inScenario(dir, root, isScenario)) {
+                if (dir.equals(root) || !isScenario.test(dir) || maxDepth > 1 && inScenario(dir, root, isScenario)) {
                     return;
                 }
                 String name = root.relativize(dir).toString().replace('\\', '/');

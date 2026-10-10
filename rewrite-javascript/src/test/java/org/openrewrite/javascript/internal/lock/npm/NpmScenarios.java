@@ -489,11 +489,11 @@ final class NpmScenarios {
                 new Scenario(name, label, dir, httpCache, roots);
         Path httpCache = LockScenario.httpCache();
         for (Path root : roots) {
-            LockScenario.collect(root, true, NpmScenarios::isScenario, httpCache, factory, found);
+            LockScenario.collect(root, Integer.MAX_VALUE, NpmScenarios::isScenario, httpCache, factory, found);
         }
         Path corpus = LockScenario.corpusDirectory();
         if (corpus != null) {
-            LockScenario.collect(corpus, true, NpmScenarios::isScenario, httpCache, factory, found);
+            LockScenario.collect(corpus, Integer.MAX_VALUE, NpmScenarios::isScenario, httpCache, factory, found);
         }
         return new ArrayList<>(found.values());
     }
