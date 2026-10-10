@@ -295,14 +295,16 @@ public final class Configuration {
                 up++;
             }
             int slash = rest.lastIndexOf('/');
-            if (rest.startsWith(HOME)) {
+            boolean home = rest.startsWith(HOME);
+            if (home) {
                 up = Integer.MAX_VALUE;
                 rest = rest.substring(HOME.length());
             } else if (slash >= 0 && up == 0) {
                 up = -rest.substring(0, slash).split("/").length;
                 rest = rest.substring(slash + 1);
             }
-            if (!rest.equals(rcFilename)) {
+            // findFolderRcFile reads the home directory's under Filename.rc, whatever YARN_RC_FILENAME names
+            if (!rest.equals(home ? DEFAULT_RC_FILENAME : rcFilename)) {
                 continue;
             }
             Object data;

@@ -264,6 +264,23 @@ class ConfigurationTest {
                 .getString("npmRegistryServer")).isEqualTo("https://registry.npmjs.org");
     }
 
+    /**
+     * Under YARN_RC_FILENAME, Yarn 4.10.3 still reads the home directory's .yarnrc.yml and not a home file of that
+     * name ({@code yarn config get npmRegistryServer} answers so).
+     */
+    @Test
+    void theHomeRcFileKeepsItsNameUnderYarnRcFilename() {
+        HostEnvironment env = HostEnvironment.of(Collections.singletonMap("YARN_RC_FILENAME", ".custom.yml"));
+        String mirror = "npmRegistryServer: \"https://registry.npmmirror.com\"\n";
+
+        assertThat(Configuration.load(Collections.singletonMap("~/.yarnrc.yml", mirror), env)
+                .getString("npmRegistryServer")).isEqualTo("https://registry.npmmirror.com");
+        assertThat(Configuration.load(Collections.singletonMap("~/.custom.yml", mirror), env)
+                .getString("npmRegistryServer")).isEqualTo("https://registry.yarnpkg.com");
+        assertThat(Configuration.load(Collections.singletonMap(".custom.yml", mirror), env)
+                .getString("npmRegistryServer")).isEqualTo("https://registry.npmmirror.com");
+    }
+
     private static Configuration load(String far, String mid, String near) {
         Map<String, String> files = new LinkedHashMap<>();
         files.put("../../.yarnrc.yml", far);
