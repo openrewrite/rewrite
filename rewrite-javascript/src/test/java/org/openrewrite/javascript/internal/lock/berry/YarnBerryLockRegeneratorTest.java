@@ -147,14 +147,15 @@ class YarnBerryLockRegeneratorTest {
     @CsvSource(delimiter = '|', value = {
             "unknownSetting: true\\ncompressionLevel: nope|Internal Error: Invalid value, expected one of mixed, 0, " +
             "1, 2, 3, 4, 5, 6, 7, 8, 9 in .yarnrc.yml",
-            "npmAlwaysAuth: nope\\ncompressionLevel: nope|Internal Error: Invalid value, expected one of mixed, 0, 1, " +
-            "2, 3, 4, 5, 6, 7, 8, 9 in .yarnrc.yml",
+            "npmAlwaysAuth: nope\\ncompressionLevel: nope|Internal Error: Invalid value, expected one of mixed, 0, " +
+            "1, 2, 3, 4, 5, 6, 7, 8, 9 in .yarnrc.yml",
             "unknownSetting: true\\nnpmScopes:\\n  foo:\\n    npmRegistryServr: https://x.example|Usage Error: " +
             "Unrecognized configuration settings found: npmScopes['foo'].npmRegistryServr",
-            "supportedArchitectures:\\n  osx: [darwin]\\nunknownSetting: true|Usage Error: Unrecognized configuration " +
-            "settings found: supportedArchitectures.osx",
-            "npmScopes:\\n  foo:\\n    npmRegistryServr: https://x.example\\nsupportedArchitectures:\\n  osx: [darwin]|" +
-            "Usage Error: Unrecognized configuration settings found: supportedArchitectures.osx"
+            "supportedArchitectures:\\n  osx: [darwin]\\nunknownSetting: true|Usage Error: Unrecognized " +
+            "configuration settings found: supportedArchitectures.osx",
+            "npmScopes:\\n  foo:\\n    npmRegistryServr: https://x.example\\n" +
+            "supportedArchitectures:\\n  osx: [darwin]|Usage Error: Unrecognized configuration settings found: " +
+            "supportedArchitectures.osx"
     })
     void reportsTheProblemConfigurationFindMeetsFirst(String yarnrc, String reported) {
         Failure failure = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
