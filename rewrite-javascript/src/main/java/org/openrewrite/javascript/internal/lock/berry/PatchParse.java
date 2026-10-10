@@ -324,7 +324,7 @@ final class PatchParse {
         return truthy(a) ? a : b;
     }
 
-    // parseInt(mode, 8) & 0o777, as ToInt32 reads parseInt's number
+    // parseInt(mode, 8) & 0o777: parseInt's Number rounds past 2^53, and ToInt32 finds no low bits from 2^63 up
     private static int parseFileMode(@Nullable String mode) {
         String s = Js.trim(String.valueOf(mode));
         int i = 0;
@@ -339,8 +339,10 @@ final class PatchParse {
         }
         int parsedMode = 0;
         if (i > start) {
-            BigInteger value = new BigInteger(s.substring(start, i), 8);
-            parsedMode = (negative ? value.negate() : value).intValue() & 0777;
+            double value = new BigInteger(s.substring(start, i), 8).doubleValue();
+            if (Math.abs(value) < 0x1p63) {
+                parsedMode = (int) (long) (negative ? -value : value) & 0777;
+            }
         }
         if (parsedMode != NON_EXECUTABLE_FILE_MODE && parsedMode != EXECUTABLE_FILE_MODE) {
             throw new JsError(JsError.ERROR, "Unexpected file mode string: " + mode);

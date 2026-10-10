@@ -15,7 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -95,6 +98,24 @@ class PatchParseTest {
                 "new " +
                 "file\\r\"],\"noNewlineAtEndOfFile\":false}]},\"path\":\"banana.ts\",\"mode\":420," +
                 "\"hash\":\"3e1267f\"}]");
+    }
+
+    /**
+     * parse.ts reads a mode as {@code parseInt(mode, 8) & 0o777}: node v24.19.0's answers, the Number rounding past
+     * 2^53.
+     */
+    @ParameterizedTest
+    @CsvSource({"100644, 420", "1000000000000000645, 420", "400000000000000645, 420", "1000000000000000646,",
+                "77777777777777777644,", "777777777777777777644,", "-100644,"})
+    void readsAFileModeAsParseIntDoes(String mode, @Nullable Integer parsed) {
+        String patch = "diff --git a/banana.ts b/banana.ts\nnew file mode " + mode + "\nindex 0000000..3e1267f\n" +
+                       "--- /dev/null\n+++ b/banana.ts\n@@ -0,0 +1 @@\n+this is a new file\n";
+        if (parsed == null) {
+            assertThatThrownBy(() -> PatchParse.parsePatchFile(patch))
+                    .hasMessage("Unexpected file mode string: " + mode);
+        } else {
+            assertThat(Js.jsonStringify(PatchParse.parsePatchFile(patch))).contains("\"mode\":" + parsed + ",");
+        }
     }
 
     @Test
