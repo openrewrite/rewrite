@@ -1,0 +1,1 @@
+Adding an optional dependency whose tarball answers 404 (the packument is fine): is it locked from the registry manifest, and does the install succeed?

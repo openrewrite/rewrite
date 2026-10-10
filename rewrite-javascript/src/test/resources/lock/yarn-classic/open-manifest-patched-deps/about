@@ -1,0 +1,1 @@
+A registry whose left-pad@1.3.0 manifest claims dependencies {ms: 2.1.2} while the tarball package.json has none: what yarn resolves and what it writes.

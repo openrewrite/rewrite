@@ -1,0 +1,1 @@
+The corrupt tarball as an optional dependency: yarn warns at the fetch step and the link step fails on its missing .yarn-metadata.json.

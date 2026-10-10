@@ -1,0 +1,7 @@
+yarn install v1.22.22
+warning package.json: No license field
+warning p@1.0.0: No license field
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+error http://127.0.0.1:4879/zz-openrewrite-tampered-sha1/-/zz-openrewrite-tampered-sha1-1.0.0.tgz: Integrity check failed for "zz-openrewrite-tampered-sha1" (computed integrity doesn't match our records, got "sha512-B3huStMCjSo4pRbGNCHXPs19DhmESNhLB4ri8ffbfDM9njhzRghvK4mWRh1qXzvJSAKld4VraW4vHZkjukr8Xw== sha1-B5Aavco+DtbRPE+fFiuZuIh7FCA=")
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

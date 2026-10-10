@@ -1,0 +1,1 @@
+A fresh pick whose packument gives only a shasum, which its registry tarball no longer matches: yarn fails on a cold cache and installs from a warm one (probes/warm-cache).

@@ -1,0 +1,1 @@
+A fresh pick whose registry tarball no longer matches the sha512 integrity (and shasum) its packument names: yarn fails on a cold cache, and installs from a warm one that holds the tarball the integrity names (probes/warm-cache).

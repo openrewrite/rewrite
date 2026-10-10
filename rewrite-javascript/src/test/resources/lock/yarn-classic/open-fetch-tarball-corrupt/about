@@ -1,0 +1,1 @@
+A fresh pick whose tarball matches its integrity but is gzipped text, not a tar archive: yarn rejects the extraction.

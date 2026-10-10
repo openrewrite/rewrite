@@ -150,20 +150,21 @@ final class TarballFetcher {
         }
     }
 
-    // ssri's integrityStream check: the strongest algorithm the expected integrity names, one of its digests
+    // isHashAlgorithmSupported over every algorithm named, then ssri's integrityStream check with the strongest
     private boolean matches(byte[] data, Ssri.Integrity expected) {
         if (expected.hashes.isEmpty()) {
             return false;
         }
         String algorithm = null;
         for (String candidate : Js.keys(expected.hashes)) {
-            String name = candidate.toLowerCase(Locale.ROOT);
-            if (!digestible(name)) {
-                throw new CannotKnow("whether the tarball of " + Js.string(name) + "@" + Js.string(version) +
-                                     " matches its " + candidate + " integrity");
+            String lower = candidate.toLowerCase(Locale.ROOT);
+            if (!digestible(lower)) {
+                throw new CannotKnow("whether the Node yarn runs under has the " + candidate + " digest the integrity " +
+                                     "of " + Js.string(name) + "@" + Js.string(version) + " names (its OpenSSL " +
+                                     "build decides, and yarn checks every algorithm named)");
             }
             if (algorithm == null ||
-                DEFAULT_PRIORITY.indexOf(algorithm.toLowerCase(Locale.ROOT)) < DEFAULT_PRIORITY.indexOf(name)) {
+                DEFAULT_PRIORITY.indexOf(algorithm.toLowerCase(Locale.ROOT)) < DEFAULT_PRIORITY.indexOf(lower)) {
                 algorithm = candidate;
             }
         }

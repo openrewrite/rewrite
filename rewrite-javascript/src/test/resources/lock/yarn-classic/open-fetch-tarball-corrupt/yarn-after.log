@@ -1,0 +1,7 @@
+yarn install v1.22.22
+warning package.json: No license field
+warning p@1.0.0: No license field
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+error http://127.0.0.1:4879/zz-openrewrite-corrupt/-/zz-openrewrite-corrupt-1.0.0.tgz: Extracting tar content of undefined failed, the file appears to be corrupt: "Invalid tar header. Maybe the tar is corrupted or it needs to be gunzipped?"
+info Visit https://yarnpkg.com/en/docs/cli/install for documentation about this command.

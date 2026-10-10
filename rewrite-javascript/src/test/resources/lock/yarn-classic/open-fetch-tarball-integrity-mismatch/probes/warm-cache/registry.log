@@ -1,0 +1,2 @@
+GET /zz-openrewrite-tampered 200
+GET /zz-openrewrite-base/-/zz-openrewrite-base-1.0.0.tgz 200

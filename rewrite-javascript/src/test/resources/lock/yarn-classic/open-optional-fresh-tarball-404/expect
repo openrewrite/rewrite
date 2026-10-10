@@ -1,0 +1,1 @@
+cannot-know whether yarn's cache holds left-pad@1.3.0, whose tarball http://127.0.0.1:4874/left-pad/-/left-pad-1.3.0.tgz answers 404 (yarn fails on a cold cache and writes the lock on a warm one, probes/warm-cache)

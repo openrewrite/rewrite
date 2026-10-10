@@ -1,0 +1,2 @@
+GET /left-pad abbreviated auth=none 200
+GET /ms/-/ms-2.1.3.tgz abbreviated auth=none 200

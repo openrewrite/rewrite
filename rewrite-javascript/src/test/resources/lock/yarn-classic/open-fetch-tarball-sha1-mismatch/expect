@@ -1,0 +1,1 @@
+cannot-know whether yarn's cache holds zz-openrewrite-tampered-sha1@1.0.0, whose tarball http://127.0.0.1:4879/zz-openrewrite-tampered-sha1/-/zz-openrewrite-tampered-sha1-1.0.0.tgz does not match the integrity the registry gives it (yarn fails on a cold cache and installs from a warm one, probes/warm-cache)

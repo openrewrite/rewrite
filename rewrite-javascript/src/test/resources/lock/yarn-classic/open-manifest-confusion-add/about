@@ -1,0 +1,1 @@
+darcyclarke-manifest-pkg@2.1.15: the registry manifest says version 2.1.15 with no dependencies; its tarball package.json says name express, version 3.0.0, dependencies sleepover *. What yarn writes for the entry and whether it locks sleepover.
