@@ -440,8 +440,8 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * Recorded run in a member with its own lock under a root that lists it and holds another's: none the host holds
-     * takes the edit, but npm rewrites a yarn.lock and bun migrates a pnpm-lock.yaml there, so the member's reports.
+     * Recorded in a member with its own lock under a root that lists it and holds another's: no held lock takes the
+     * edit, but where npm rewrites a yarn.lock or bun migrates a pnpm-lock.yaml there, the member's lock reports why.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
