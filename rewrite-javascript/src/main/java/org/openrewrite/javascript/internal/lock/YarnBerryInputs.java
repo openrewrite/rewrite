@@ -100,7 +100,7 @@ final class YarnBerryInputs {
         }
         StringBuilder entries = new StringBuilder();
         Set<String> keys = new LinkedHashSet<>();
-        if (hasCredentials(registry) || registry.isAlwaysAuth()) {
+        if (hasCredentials(registry)) {
             entry(entries, registry, keys);
         }
         List<NodeRegistry> others = new ArrayList<>(user.getByScope().values());
@@ -151,8 +151,9 @@ final class YarnBerryInputs {
         }
     }
 
+    // an npmrc's always-auth without credentials is no setting Yarn reads, and npmAlwaysAuth there would be YN0033
     private static void alwaysAuth(StringBuilder yarnrc, NodeRegistry registry) {
-        if (registry.isAlwaysAuth()) {
+        if (registry.isAlwaysAuth() && hasCredentials(registry)) {
             yarnrc.append("    npmAlwaysAuth: true\n");
         }
     }

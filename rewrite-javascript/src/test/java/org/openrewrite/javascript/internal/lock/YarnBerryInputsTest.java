@@ -159,6 +159,23 @@ class YarnBerryInputsTest {
     }
 
     /**
+     * Yarn 4.10.3 reads no .npmrc (recorded), so a user npmrc's always-auth without credentials names nothing; as an
+     * npmAlwaysAuth entry it would fail a project naming that registry with YN0033.
+     */
+    @Test
+    void alwaysAuthWithoutCredentialsIsNoSetting() {
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", null, null, null, null, true, null,
+          true, false));
+        NodeRegistry registry = new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, true, null,
+          true, false);
+
+        NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
+        assertThat(YarnBerryInputs.userYarnrc(user, user)).isEqualTo(
+          "npmScopes:\n  \"corp\":\n    npmRegistryServer: \"https://corp.example.com/\"\n");
+    }
+
+    /**
      * The host's token for the registry a project's .yarnrc.yml names goes with an unscoped package's request, as Yarn
      * 4.10.3 sends a home entry's whatever the project's top-level npmAlwaysAuth says (getAuthConfiguration).
      */
