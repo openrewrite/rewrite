@@ -704,8 +704,9 @@ final class Config {
     String getAuthorization(String packageIdent, String requestUrl) {
         String registry = getRegistry(packageIdent);
         Object alwaysAuth = getRegistryOrGlobalOption(registry, "always-auth");
-        boolean isToRegistry = isRequestToRegistry(requestUrl, registry) || requestNeedsAuth(requestUrl);
-        if (!isToRegistry || !Js.truthy(alwaysAuth) && getScope(packageIdent).isEmpty()) {
+        // urlParts is pure in yarn, so the url's parts are asked only where they decide
+        if (!Js.truthy(alwaysAuth) && getScope(packageIdent).isEmpty() ||
+            !isRequestToRegistry(requestUrl, registry) && !requestNeedsAuth(requestUrl)) {
             return null;
         }
         String auth = getAuth(packageIdent);

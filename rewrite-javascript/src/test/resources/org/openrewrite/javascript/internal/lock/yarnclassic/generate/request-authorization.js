@@ -53,6 +53,14 @@ const rows = [
   ['lodash', 'https://s.example/registry/lodash'],
   ['lodash', 'https://o.example/x/lodash'],
 ]
+// unscoped packages under configs without always-auth, at urls normalize-url rewrites in ways the port does not
+const unauthenticatedRows = [
+  ['lodash', 'https://registry.example.com/npm/lodash?b=2&a=1'],
+  ['lodash', 'https://registry.example.com/npm/lodash#fragment'],
+  ['lodash', 'https://registry.example.com/npm/./lodash'],
+  ['lodash', 'https://registry.example.com/npm/%E2%82%AC/lodash'],
+  ['lodash', 'https://régistry.example.com/npm/lodash'],
+]
 // the yarn registry's own config is its defaults, whose registry getRegistry falls back to
 const registries = {
   yarn: {getScopedOption: (scope, option) => scope === '' && option === 'registry' ? 'https://registry.yarnpkg.com' :
@@ -65,7 +73,8 @@ const registries = {
     const requestManager = {request: params => { seen.push(params); return Promise.resolve({}) }}
     const registry = new NpmRegistry('/tmp', registries, requestManager, {})
     registry.config = Object.assign({}, config)
-    for (const [name, url] of rows) {
+    const unauthenticated = !config['always-auth'] && !config['//registry.example.com/npm/:always-auth']
+    for (const [name, url] of unauthenticated ? rows.concat(unauthenticatedRows) : rows) {
       seen.length = 0
       await registry.request(url, {}, name)
       const headers = seen.length ? seen[0].headers || {} : {}
