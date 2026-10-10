@@ -121,6 +121,13 @@ public final class NativeLockEngine {
         }
     }
 
+    /**
+     * Whether the package manager reads a project's manifest from a file of this name, as it reads a package.json.
+     */
+    public static boolean readsAsManifest(PackageManager pm, String fileName) {
+        return pm == PackageManager.Pnpm && PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(fileName);
+    }
+
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {
         NodeExecutionContextView view = NodeExecutionContextView.view(ctx);
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);

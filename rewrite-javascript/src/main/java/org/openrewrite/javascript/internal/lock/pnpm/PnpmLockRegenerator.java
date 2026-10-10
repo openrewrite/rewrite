@@ -261,8 +261,11 @@ public final class PnpmLockRegenerator {
                 inputs.getFiles().get(".npmrc"), rootManifest, inputs.getEnv());
     }
 
-    // workspace.project-manifest-reader's other manifest names, which it reads where there is no package.json
-    private static final List<String> OTHER_MANIFEST_NAMES = Arrays.asList("package.json5", "package.yaml");
+    /**
+     * workspace.project-manifest-reader's other manifest names, which it reads where there is no package.json.
+     */
+    public static final List<String> OTHER_MANIFEST_NAMES = Collections.unmodifiableList(Arrays.asList("package.json5",
+            "package.yaml"));
 
     // the directories holding a manifest findPackages' patterns can match
     private static Set<String> manifestDirs(Inputs inputs) {
