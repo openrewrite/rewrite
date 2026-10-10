@@ -119,7 +119,8 @@ class AddDependencyLockRegenTest implements RewriteTest {
         rewriteRun(
                 spec -> spec.recipe(new AddDependency("kind-of", "^6.0.0", "dependencies")).executionContext(ctx),
                 packageJson(resource(scenario + "pkg-before"), null,
-                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.1")), s -> s.after(actual -> {
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.1")),
+                                s -> s.after(actual -> {
                             assertThat(actual).contains("kind-of").doesNotContain("lock regeneration failed");
                             return actual;
                         })),

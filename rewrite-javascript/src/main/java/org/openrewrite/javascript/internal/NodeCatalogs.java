@@ -231,9 +231,8 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * The file with the override {@code key: value} where pnpm's writer puts a new entry, an existing one's
-         * value replaced with its quotes kept; this one when it holds that value.
-         * @throws IllegalArgumentException naming why the file is not edited in place
+         * The file with the override {@code key: value} where pnpm's writer puts it, an existing value replaced in
+         * place; this one when it holds that value. An {@link IllegalArgumentException} names why not in place.
          */
         public NodeCatalogs withOverride(WorkspaceManifestWriter writer, String key, String value) {
             if (rejection != null || isRejected()) {
@@ -414,9 +413,8 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * The file without what pnpm's {@code cleanupUnusedCatalogs} removes, by the port's
-         * {@link WorkspaceManifestWriter#cleanupUnusedCatalogs}, over the {@code projects} by directory (null where the
-         * recipes do not read one); null when that is no edit in place.
+         * The file without what the port's {@link WorkspaceManifestWriter#cleanupUnusedCatalogs} removes over the
+         * {@code projects} by directory (null where the recipes do not read one); null when not in place.
          */
         @SuppressWarnings("unchecked")
         public @Nullable NodeCatalogs withoutUnused(Map<String, @Nullable Map<String, @Nullable Object>> projects) {
@@ -429,7 +427,8 @@ public abstract class NodeCatalogs {
             Map<String, @Nullable Object> cleaned = new LinkedHashMap<>(read);
             for (String key : Arrays.asList("catalog", "catalogs")) {
                 if (cleaned.get(key) instanceof Map) {
-                    Map<String, @Nullable Object> copy = new LinkedHashMap<>((Map<String, @Nullable Object>) cleaned.get(key));
+                    Map<String, @Nullable Object> copy =
+                            new LinkedHashMap<>((Map<String, @Nullable Object>) cleaned.get(key));
                     if ("catalogs".equals(key)) {
                         copy.replaceAll((name, group) -> group instanceof Map ?
                                 new LinkedHashMap<>((Map<String, @Nullable Object>) group) : group);
@@ -874,7 +873,7 @@ public abstract class NodeCatalogs {
         }.visitNonNull(docs, 0);
     }
 
-    // a scalar given a new value keeps its quotes, escaped as they need; a plain one is written as pnpm's yaml writes it
+    // a scalar given a new value keeps its quotes, escaped; a plain one is written as pnpm's yaml writes it
     private static Yaml.Scalar restyled(Yaml.Scalar scalar, String value) {
         switch (scalar.getStyle()) {
             case SINGLE_QUOTED:

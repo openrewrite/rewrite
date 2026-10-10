@@ -114,7 +114,8 @@ final class PkgManifestUtils {
     private static @Nullable Object find(List<@Nullable Object> runtimes, String runtimeName) {
         for (Object runtime : runtimes) {
             if (runtime == null || runtime == JsYaml.UNDEFINED) {
-                throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
+                throw new JsError(JsError.ERROR,
+                        "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
             }
             if (runtimeName.equals(property(runtime, "name"))) {
                 return runtime;

@@ -159,10 +159,12 @@ class NodeCatalogsTest {
     void pnpmCleanupKeepsWhatAnOverrideOrTheDefaultReferenceNames() {
         NodeCatalogs.Pnpm catalogs = pnpmOf("overrides:\n  foo>ms: 'catalog:'\ncatalog:\n  ms: 2.1.3\n" +
           "  wrappy: 1.0.2\ncatalogs:\n  legacy:\n    wrappy: 1.0.1\n");
-        NodeCatalogs cleaned = requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy", "catalog:")))));
+        NodeCatalogs cleaned = requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy",
+                "catalog:")))));
         assertThat(cleaned.specifier("default", "ms")).isEqualTo("2.1.3");
         assertThat(cleaned.specifier("legacy", "wrappy")).as("catalog: keeps every catalog's entry").isEqualTo("1.0.1");
-        assertThat(requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy", "catalog:default")))))
+        assertThat(requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy",
+                "catalog:default")))))
           .specifier("default", "wrappy")).as("pnpm counts only catalog:").isNull();
     }
 

@@ -140,7 +140,8 @@ final class PreferredVersions {
                     continue;
                 }
                 if (!"version".equals(existingSelector.getSelectorType())) {
-                    throw new JsError(JsError.ERROR, "Encountered unexpected version selector '" + existingSelector.getSelectorType() +
+                    throw new JsError(JsError.ERROR,
+                            "Encountered unexpected version selector '" + existingSelector.getSelectorType() +
                                       "' for dependency '" + name + "@" + version + "'");
                 }
                 selectors.put(version, addWeightToVersionSelector(existingSelector, EXISTING_VERSION_SELECTOR_WEIGHT));

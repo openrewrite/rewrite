@@ -713,7 +713,8 @@ public final class PnpmLockRegenerator {
         boolean existsNonEmptyWantedLockfile = existsWantedLockfile && !LockfileWriter.isEmptyLockfile(wantedLockfile);
         VerifyLockfileResolutions.verifyLockfileResolutions(wantedLockfile, resolutionVerifiers(options));
         if (missingManifest != null) {
-            throw new JsError(JsError.ERROR, "No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) +
+            throw new JsError(JsError.ERROR,
+                    "No package.json found in \"" + (missingManifest.isEmpty() ? "." : missingManifest) +
                               "\"");
         }
         PnpmContext ctx = new PnpmContext(wantedLockfile, lockDir, projects, read.isHadConflicts());

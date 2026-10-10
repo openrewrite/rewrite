@@ -282,7 +282,8 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
         if (object instanceof List) {
             return Js.ownKeys(object).contains(key);
         }
-        throw new JsError(JsError.ERROR, "Cannot use 'in' operator to search for '" + key + "' in " + Js.string(object));
+        throw new JsError(JsError.ERROR,
+                "Cannot use 'in' operator to search for '" + key + "' in " + Js.string(object));
     }
 
     private @Nullable Map<String, @Nullable Object> fetchAbbreviatedMeta(String registry, String name) {

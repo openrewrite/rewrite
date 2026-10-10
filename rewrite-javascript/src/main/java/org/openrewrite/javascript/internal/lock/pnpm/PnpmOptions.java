@@ -325,7 +325,8 @@ public final class PnpmOptions {
             Object nodeRuntime = null;
             for (Object runtime : runtimes) {
                 if (runtime == null || runtime == JsYaml.UNDEFINED) {
-                    throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
+                    throw new JsError(JsError.ERROR,
+                            "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
                 }
                 if (runtime instanceof Map && "node".equals(((Map<String, @Nullable Object>) runtime).get("name"))) {
                     nodeRuntime = runtime;
@@ -449,7 +450,8 @@ public final class PnpmOptions {
     @SuppressWarnings("unchecked")
     private static @Nullable Object property(@Nullable Object value, String key) {
         if (value == null || value == JsYaml.UNDEFINED) {
-            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
+            throw new JsError(JsError.ERROR,
+                    "Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
         }
         Object property = value instanceof Map ? ((Map<String, @Nullable Object>) value).get(key) : null;
         return property == JsYaml.UNDEFINED ? null : property;

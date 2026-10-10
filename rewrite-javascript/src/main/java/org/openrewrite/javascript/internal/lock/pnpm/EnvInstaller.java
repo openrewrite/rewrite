@@ -233,7 +233,8 @@ final class EnvInstaller {
      */
     static String[] parseIntegrity(String pkgName, @Nullable Object pkgSpec) {
         if (pkgSpec == null || pkgSpec == JsYaml.UNDEFINED) {
-            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(pkgSpec) + " (reading 'indexOf')");
+            throw new JsError(JsError.ERROR,
+                    "Cannot read properties of " + Js.string(pkgSpec) + " (reading 'indexOf')");
         }
         if (!(pkgSpec instanceof String)) {
             throw new CannotKnow("what pnpm makes of the integrity of config dependency " + pkgName + " (" +
@@ -356,7 +357,8 @@ final class EnvInstaller {
         for (String pkgName : Js.keys(configDeps)) {
             Object entry = configDeps.get(pkgName);
             if (entry == null || entry == JsYaml.UNDEFINED) {
-                throw new JsError(JsError.ERROR, "Cannot destructure property 'version' of '" + Js.string(entry) + "' as it is " +
+                throw new JsError(JsError.ERROR,
+                        "Cannot destructure property 'version' of '" + Js.string(entry) + "' as it is " +
                                   Js.string(entry) + ".");
             }
             Object version = entry instanceof Map ? ((Map<String, @Nullable Object>) entry).get("version") : null;
@@ -389,7 +391,8 @@ final class EnvInstaller {
         }
         Object resolution = pkgInfo instanceof Map ? ((Map<String, @Nullable Object>) pkgInfo).get("resolution") : null;
         if (resolution == null || resolution == JsYaml.UNDEFINED) {
-            throw new JsError(JsError.ERROR, "Cannot read properties of " + Js.string(resolution) + " (reading 'integrity')");
+            throw new JsError(JsError.ERROR,
+                    "Cannot read properties of " + Js.string(resolution) + " (reading 'integrity')");
         }
         Object integrity = resolution instanceof Map ?
                 ((Map<String, @Nullable Object>) resolution).get("integrity") : null;

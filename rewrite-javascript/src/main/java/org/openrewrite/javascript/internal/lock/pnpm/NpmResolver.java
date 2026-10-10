@@ -351,10 +351,12 @@ final class NpmResolver {
             throw new JsError(JsError.ERROR, "Invalid workspace: spec (" + wantedDependency.getBareSpecifier() + ")");
         }
         if (opts.workspacePackages == null) {
-            throw new JsError(JsError.ERROR, "Cannot resolve package from workspace because opts.workspacePackages is not defined");
+            throw new JsError(JsError.ERROR,
+                    "Cannot resolve package from workspace because opts.workspacePackages is not defined");
         }
         if (opts.projectDir == null) {
-            throw new JsError(JsError.ERROR, "Cannot resolve package from workspace because opts.projectDir is not defined");
+            throw new JsError(JsError.ERROR,
+                    "Cannot resolve package from workspace because opts.projectDir is not defined");
         }
         return tryResolveFromWorkspacePackages(opts.workspacePackages, spec, wantedDependency, opts,
                 opts.update != null);

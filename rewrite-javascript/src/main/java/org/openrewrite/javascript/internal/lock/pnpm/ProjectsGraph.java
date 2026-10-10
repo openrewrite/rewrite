@@ -179,7 +179,8 @@ final class ProjectsGraph {
             List<String> strings = new ArrayList<>();
             for (Object version : versions) {
                 if (!(version instanceof String)) {
-                    throw new JsError(JsError.ERROR, "Invalid version. Must be a string. Got type \"" + Js.typeOf(version) + "\".");
+                    throw new JsError(JsError.ERROR,
+                            "Invalid version. Must be a string. Got type \"" + Js.typeOf(version) + "\".");
                 }
                 strings.add((String) version);
             }

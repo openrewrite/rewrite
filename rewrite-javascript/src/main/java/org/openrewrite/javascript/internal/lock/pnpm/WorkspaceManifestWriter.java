@@ -118,9 +118,8 @@ public final class WorkspaceManifestWriter {
     }
 
     /**
-     * updateWorkspaceManifest's {@code cleanupUnusedCatalogs} over the {@code allProjects} installDeps passes: the
-     * projects among {@code projects} (manifests by directory, null where the host did not read one) that
-     * {@code manifest}'s packages match; true when that removed anything from {@code manifest}.
+     * updateWorkspaceManifest's {@code cleanupUnusedCatalogs} over installDeps' allProjects, those of {@code projects}
+     * (by directory, null unread) the manifest's packages match; true when it removed anything from {@code manifest}.
      */
     public static boolean cleanupUnusedCatalogs(Map<String, @Nullable Object> manifest,
                                                 Map<String, @Nullable Map<String, @Nullable Object>> projects) {
