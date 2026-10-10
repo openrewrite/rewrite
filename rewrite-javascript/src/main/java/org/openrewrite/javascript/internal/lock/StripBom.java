@@ -25,6 +25,6 @@ public final class StripBom {
     }
 
     public static String stripBom(String string) {
-        return !string.isEmpty() && string.charAt(0) == '﻿' ? string.substring(1) : string;
+        return !string.isEmpty() && string.charAt(0) == '\uFEFF' ? string.substring(1) : string;
     }
 }

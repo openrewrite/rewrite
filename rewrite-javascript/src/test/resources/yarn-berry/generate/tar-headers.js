@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes tgz-utils/node-tar-headers.tgz (a NUL before a line terminator, pax numbers past Number's safe integers) and
-// node-tar-oversize.tgz (an entry larger than the archive), each beside the .jsonl of what node-tar 6.1.11 emits.
-// Usage: NODE_PATH=<dir holding tar 6.1.11> node tar-headers.js <out-dir>
+// node-tar-headers.tgz (a NUL before a line end, long pax numbers), node-tar-oversize.tgz (an entry past the end)
+// and each one's entries in node-tar 6.1.11 as .jsonl. Usage: NODE_PATH=<tar 6.1.11> node tar-headers.js <out-dir>
 const fs = require('fs')
 const path = require('path')
 const zlib = require('zlib')

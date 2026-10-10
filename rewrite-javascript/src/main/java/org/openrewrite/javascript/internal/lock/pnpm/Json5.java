@@ -151,12 +151,12 @@ final class Json5 {
                     case "\u000B":
                     case "\f":
                     case " ":
-                    case " ":
-                    case "﻿":
+                    case "\u00A0":
+                    case "\uFEFF":
                     case "\n":
                     case "\r":
-                    case " ":
-                    case " ":
+                    case "\u2028":
+                    case "\u2029":
                         read();
                         return null;
                     case "/":
@@ -216,8 +216,8 @@ final class Json5 {
                 switch (c) {
                     case "\n":
                     case "\r":
-                    case " ":
-                    case " ":
+                    case "\u2028":
+                    case "\u2029":
                         read();
                         lexState = "default";
                         return null;
@@ -239,7 +239,7 @@ final class Json5 {
                 lexState = "identifierName";
                 return null;
             case "identifierName":
-                if ("$".equals(c) || "_".equals(c) || "‌".equals(c) || "‍".equals(c)) {
+                if ("$".equals(c) || "_".equals(c) || "\u200C".equals(c) || "\u200D".equals(c)) {
                     buffer.append(read());
                     return null;
                 }
@@ -259,7 +259,7 @@ final class Json5 {
                 }
                 read();
                 String u = unicodeEscape();
-                if (!"$".equals(u) && !"_".equals(u) && !"‌".equals(u) && !"‍".equals(u) &&
+                if (!"$".equals(u) && !"_".equals(u) && !"\u200C".equals(u) && !"\u200D".equals(u) &&
                     !isIdContinueChar(u)) {
                     throw invalidIdentifier();
                 }
@@ -621,8 +621,8 @@ final class Json5 {
                 read();
                 return unicodeEscape();
             case "\n":
-            case " ":
-            case " ":
+            case "\u2028":
+            case "\u2029":
                 read();
                 return "";
             case "\r":
@@ -814,9 +814,9 @@ final class Json5 {
                 return "\\v";
             case "\0":
                 return "\\0";
-            case " ":
+            case "\u2028":
                 return "\\u2028";
-            case " ":
+            case "\u2029":
                 return "\\u2029";
         }
         if (ch.charAt(0) < ' ') {

@@ -1,10 +1,9 @@
 Scope: all 2 workspace projects
 ? Verifying lockfile against supply-chain policies (1 entry)...
 ? Verifying lockfile at packages/b/pnpm-lock.yaml against supply-chain policies (1 entry)...
-✓ Lockfile passes supply-chain policies (1 entry in 2.7s)
-✓ Lockfile at packages/b/pnpm-lock.yaml passes supply-chain policies (1 entry in 2.7s)
+✓ Lockfile passes supply-chain policies (1 entry in 57ms)
+✓ Lockfile at packages/b/pnpm-lock.yaml passes supply-chain policies (1 entry in 58ms)
 Progress: resolved 1, reused 0, downloaded 0, added 0
-Progress: resolved 2, reused 0, downloaded 0, added 0
 Progress: resolved 2, reused 0, downloaded 0, added 0, done
 
-Done in 4.9s using pnpm v11.2.2
+Done in 297ms using pnpm v11.2.2

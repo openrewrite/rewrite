@@ -26,12 +26,12 @@ class StripBomTest {
 
     @Test
     void stripsBomFromString() {
-        assertThat(StripBom.stripBom("﻿Unicorn\n")).isEqualTo("Unicorn\n");
+        assertThat(StripBom.stripBom("\uFEFFUnicorn\n")).isEqualTo("Unicorn\n");
     }
 
     @Test
     void stripsBomFromTheBeginningOfAFile() {
-        String fixture = "Unicorn ﻿Unicorn\n";
+        String fixture = "Unicorn \uFEFFUnicorn\n";
         assertThat(StripBom.stripBom(fixture)).isEqualTo(fixture);
     }
 }

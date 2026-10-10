@@ -80,7 +80,7 @@ class Json5Test {
 
     @Test
     void readsAPackageJson5AsPnpmDoes() {
-        assertThat(Manifests.readJson5("﻿// c\n{name: 'c', dependencies: {once: '1.4.0',},}", "c/package.json5"))
+        assertThat(Manifests.readJson5("\uFEFF// c\n{name: 'c', dependencies: {once: '1.4.0',},}", "c/package.json5"))
           .containsEntry("name", "c");
         assertThatThrownBy(() -> Manifests.readJson5("{version: 1.4.0}", "c/package.json5"))
           .isInstanceOfSatisfying(PnpmError.class, e -> {

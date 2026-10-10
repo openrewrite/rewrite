@@ -13,11 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// json5 2.2.3, which pnpm 11.2.2 reads package.json5 with: `unicode <file>` writes the code point ranges of its
-// util.isSpaceSeparator, isIdStartChar and isIdContinueChar (json5-unicode.txt); `rows <test dir> <file>` runs the
-// inputs of json5's own test/parse.js and test/errors.js (git tag v2.2.3) through its parse, one JSON line per input.
-//
-// Usage: NODE_PATH=<dir holding json5@2.2.3> node json5.js unicode <file> | rows <dir with parse.js, errors.js> <file>
+// json5 2.2.3, pnpm's package.json5 reader: `unicode <file>` writes its util's code point ranges, `rows <dir> <file>`
+// its answers to v2.2.3's test/parse.js and errors.js inputs. Usage: NODE_PATH=<json5@2.2.3> node json5.js <mode>
 const fs = require('fs')
 const Module = require('module')
 const JSON5 = require('json5')
@@ -86,7 +83,8 @@ if (mode === 'unicode') {
   Module._load = load
   // what a manifest read as an object adds: key order, repeated and prototype keys, signed zero, lone surrogates
   for (const text of ['{b:1,"2":2,a:3,"1":4,"10":5,"01":6}', '{a:1,b:2,a:3}', '{__proto__:1,constructor:2}',
-    '[-0,+0,-0x0]', '{a:-Infinity,b:+NaN}', "'\\uD800'", "'\\uDC00\\uD83D'", '{"\\u0000":0}', "'\\x41\\u{41}'", '0x', '1e', '.e1',
+    '[-0,+0,-0x0]', '{a:-Infinity,b:+NaN}', "'\\uD800'", "'\\uDC00\\uD83D'", '{"\\u0000":0}',
+    "'\\x41\\u{41}'", '0x', '1e', '.e1',
     '{a:1,}', '[1,]', '{,}', '[,]', '{a b:1}', '{"a":1 "b":2}', '{a\\u0020:1}', '/**/0/**/', '0//']) {
     if (!inputs.includes(text)) inputs.push(text)
   }
