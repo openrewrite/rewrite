@@ -119,7 +119,13 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
                              " are written in flow style, which is not read");
             return;
         }
-        PackageManager pm = decision.getPackageManager();
+        PackageManager pm;
+        try {
+            pm = decision.getPackageManager();
+        } catch (Rejected e) {
+            declined(decision, packageName + "@" + version + " was not added: " + e.getMessage());
+            return;
+        }
         String value = catalogs instanceof NodeCatalogs.Pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) :
                 pm == PackageManager.Pnpm ? pnpmAdd(decision, PnpmRelease.of(PackageJsonHelper.printed(pkg), null)) :
                         version;

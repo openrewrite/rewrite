@@ -23,16 +23,17 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
+import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.SpecUtils;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.semver.NodeSemver;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
@@ -677,7 +678,12 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
 
     private @Nullable ManagedFile managedOf(Path packageJson) {
         if (!managedOf.containsKey(packageJson)) {
-            PackageManager pm = packageManager(packageJson);
+            PackageManager pm;
+            try {
+                pm = packageManager(packageJson);
+            } catch (Rejected e) {
+                pm = null;
+            }
             Path path = pm == null ? null : file(pm, packageJson);
             managedOf.put(packageJson, pm == null || path == null ? null : managedAt(path, pm));
         }
@@ -716,8 +722,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return file;
     }
 
-    // the marker's package manager, else the one a manifest at or above names in packageManager or
-    // devEngines.packageManager, else the one whose catalog files it lies under
+    // the marker's package manager, else the one corepack finds named from the manifest's directory up, else the
+    // one whose catalog files it lies under; throws Rejected for a spec corepack rejects
     private @Nullable PackageManager packageManager(Path packageJson) {
         NodeDependencyScan.ProjectState ps = scan.projects.get(packageJson);
         NodeResolutionResult marker = ps == null || ps.capturedPackageJson == null ? null :
@@ -725,15 +731,9 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (marker != null && marker.getPackageManager() != null) {
             return marker.getPackageManager();
         }
-        for (Path dir = packageJson.getParent(); ; dir = dir.getParent()) {
-            SourceFile manifest = captured(dir == null ? Paths.get("package.json") : dir.resolve("package.json"));
-            PackageManager named = manifest == null ? null : named(manifest);
-            if (named != null) {
-                return named;
-            }
-            if (dir == null) {
-                break;
-            }
+        PackageManager named = named(packageJson.getParent());
+        if (named != null) {
+            return named;
         }
         if (file(PackageManager.Pnpm, packageJson) != null) {
             return PackageManager.Pnpm;
@@ -774,24 +774,28 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return ps == null ? null : ps.capturedPackageJson;
     }
 
-    // the package manager a manifest names, as pnpm's getWantedPackageManager reads packageManager and
-    // devEngines.packageManager; a yarn release below 2 is Yarn classic
-    private static @Nullable PackageManager named(SourceFile manifest) {
-        PnpmOptions.WantedPackageManager wanted;
-        try {
-            wanted = PnpmOptions.wantedPackageManager(PackageJsonHelper.printed(manifest), null);
-        } catch (RuntimeException e) {
+    // corepack's loadSpec from dir up to the repository's root: the spec of the nearest packageManager, else of the
+    // topmost manifest's devEngines.packageManager; bun, which corepack does not run, by its name
+    private @Nullable PackageManager named(@Nullable Path dir) {
+        SpecUtils.Lookup lookup = SpecUtils.loadSpec("", dir == null ? 0 : dir.getNameCount(), up -> {
+            Path at = (dir == null ? Paths.get(up) : dir.resolve(up)).normalize();
+            SourceFile manifest = captured(at.toString().isEmpty() ? Paths.get("package.json") :
+                    at.resolve("package.json"));
+            return manifest == null ? null : print(manifest);
+        }, path -> false, HostEnvironment.UNKNOWN);
+        Object raw = lookup.getRawPmSpec();
+        if ("bun".equals(raw) || raw instanceof String && ((String) raw).startsWith("bun@")) {
+            return PackageManager.Bun;
+        }
+        SpecUtils.Descriptor spec = lookup.getSpec(true);
+        if (spec == null) {
             return null;
         }
-        Object name = wanted == null ? null : wanted.getName();
-        if ("yarn".equals(name)) {
-            Object version = wanted.getVersion();
-            String least = version instanceof String ? NodeSemver.minVersion((String) version,
-                    NodeSemver.Options.DEFAULT) : null;
-            return least != null && least.startsWith("1.") ? PackageManager.YarnClassic : PackageManager.YarnBerry;
+        if ("yarn".equals(spec.getName())) {
+            String version = SpecUtils.installVersion(spec);
+            return version != null && version.startsWith("1.") ? PackageManager.YarnClassic : PackageManager.YarnBerry;
         }
-        return "pnpm".equals(name) ? PackageManager.Pnpm : "bun".equals(name) ? PackageManager.Bun :
-                "npm".equals(name) ? PackageManager.Npm : null;
+        return "pnpm".equals(spec.getName()) ? PackageManager.Pnpm : PackageManager.Npm;
     }
 
     private static <T extends Tree> T warn(T tree, String message) {
@@ -873,8 +877,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
-         * The manifest's package manager: its marker's, else the one it or a manifest above names, else the one whose
-         * files it lies under.
+         * The manifest's package manager: its marker's, else the one corepack finds named, else the one whose files
+         * it lies under; throws Rejected, with corepack's message, for a spec corepack rejects.
          */
         public @Nullable PackageManager getPackageManager() {
             return acc.packageManager(path);

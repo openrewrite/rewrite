@@ -405,9 +405,20 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         otherPnpmRelease("pnpm/override-pnpm9-recipe-null-pnpm-resolutions", null, "9.15.9");
     }
 
+    /**
+     * pnpm 11.2.2 run directly installs itself beside devEngines naming 10.34.6 with onFail ignore, and corepack 0.35.0
+     * starts 10.34.6 there (both recorded): which release writes is the host's to say, so the override is declined.
+     */
     @Test
-    void pnpmWhoseNamedReleaseLetsThePortedOneInstall() {
-        golden("pnpm/override-on-fail-ignore", PackageManager.Pnpm, "7.0.0", null);
+    void pnpmWhoseNamedReleaseCorepackWouldStartIsDeclined() {
+        Scenario s = new Scenario("pnpm/override-on-fail-ignore");
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", null)
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).contains("corepack starts pnpm 10.34.6"))),
+          s.root(PackageManager.Pnpm, s.file("pkg-before")),
+          s.lock(PackageManager.Pnpm, null)
+        );
     }
 
     @Test

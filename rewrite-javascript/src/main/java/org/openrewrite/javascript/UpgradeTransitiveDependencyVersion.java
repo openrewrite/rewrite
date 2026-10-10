@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -108,7 +109,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
 
     // the override, at the workspace root only, where its package manager reads it
     private void decide(NodeDependencyEdits acc, NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
-        PackageManager pm = decision.getPackageManager();
+        PackageManager pm;
+        try {
+            pm = decision.getPackageManager();
+        } catch (Rejected e) {
+            decision.decline(String.valueOf(e.getMessage()));
+            return;
+        }
         if (pm == null) {
             return;
         }

@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.yaml.YamlParser;
@@ -77,18 +78,29 @@ class NodeDependencyEditsTest {
         assertThat(secondSees.specifier("legacy", "ms")).isEqualTo("2.1.2");
     }
 
-    // pnpm's getWantedPackageManager reads packageManager and devEngines.packageManager; yarn below 2 is classic
+    /**
+     * corepack 0.35.0's reading (recorded): packageManager over devEngines.packageManager, which must name an exact
+     * version, no array; a spec it rejects is its Rejected; bun, which corepack does not run, by its name.
+     */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {
-      "{\"packageManager\":\"yarn@1.22.22+sha512.abc\"}                                | YarnClassic",
-      "{\"packageManager\":\"yarn@4.10.3\"}                                            | YarnBerry",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"^1.22.0\"}}} | YarnClassic",
-      "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"10.x\"}]}} | Pnpm",
-      "{\"packageManager\":\"bun@1.3.10\"}                                             | Bun",
-      "{\"packageManager\":\"npm@11.17.0\"}                                            | Npm",
-      "{\"packageManager\":\"deno@2.0.0\"}                                             |"
+      "{\"packageManager\":\"yarn@1.22.22+sha512.abc\"}                                | YarnClassic |",
+      "{\"packageManager\":\"yarn@4.10.3\"}                                            | YarnBerry   |",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"1.22.22\"}}} | YarnClassic |",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"^1.22.0\"}}} |             |" +
+      " expected a semver version",
+      "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"10.x\"}]}} |             |",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"yarn@4.10.3\"} | |" +
+      " does not match the \"devEngines.packageManager\" field",
+      "{\"packageManager\":\"yarn@1\"}                                                 |             |" +
+      " expected a semver version",
+      "{\"packageManager\":\"bun@1.3.10\"}                                             | Bun         |",
+      "{\"packageManager\":\"npm@11.17.0\"}                                            | Npm         |",
+      "{\"packageManager\":\"deno@2.0.0\"}                                             |             |" +
+      " Unsupported package manager specification (deno@2.0.0)"
     })
-    void theManifestNamesThePackageManagerItsMarkerDoesNot(String manifest, @Nullable PackageManager named) {
+    void theManifestNamesThePackageManagerItsMarkerDoesNot(String manifest, @Nullable PackageManager named,
+                                                           @Nullable String declined) {
         NodeDependencyEdits acc = new NodeDependencyEdits(new NodeDependencyEdits.Rows() {
             @Override
             public void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
@@ -101,8 +113,22 @@ class NodeDependencyEditsTest {
         SourceFile root = json(manifest);
         acc.scan(root.withMarkers(root.getMarkers().add(nodeResolutionResult(null))));
         List<@Nullable PackageManager> seen = new ArrayList<>();
-        acc.decideAll(new InMemoryExecutionContext(), (decision, c) -> seen.add(decision.getPackageManager()));
+        List<String> reasons = new ArrayList<>();
+        acc.decideAll(new InMemoryExecutionContext(), (decision, c) -> {
+            try {
+                seen.add(decision.getPackageManager());
+            } catch (Rejected e) {
+                seen.add(null);
+                reasons.add(String.valueOf(e.getMessage()));
+            }
+        });
         assertThat(seen).containsExactly(named);
+        if (declined == null) {
+            assertThat(reasons).isEmpty();
+        } else {
+            assertThat(reasons).hasSize(1);
+            assertThat(reasons.get(0)).contains(declined).endsWith("(corepack)");
+        }
     }
 
     private static final Path MEMBER = Paths.get("packages/a/package.json");

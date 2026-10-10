@@ -125,11 +125,11 @@ class PackageJsonOverridesTest {
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=10.32.1 <=10.34.6\"}}} ; 10",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.0.6 - 11.2.2\"}}} ; 11",
       "{\"packageManager\":\"pnpm@10.0.0\"} ; 10",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"pnpm@10.34.6\"} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"pnpm@10.34.6\"} ; -1",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"npm\"},{\"name\":\"pnpm\",\"version\":\"9.15.9\"}]}} ; 9",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"9.15.9\"},{\"name\":\"npm\"}]}} ; 11",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}}} ; 11",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"warn\"}}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}}} ; -1",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"warn\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"error\"}}} ; 10",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":10}}} ; 11",
       "{\"devEngines\":{\"packageManager\":{\"name\":false}},\"packageManager\":\"pnpm@10.34.6\"} ; 10",
@@ -140,15 +140,19 @@ class PackageJsonOverridesTest {
         assertThat(release(manifest(root), null)).isEqualTo(release);
     }
 
+    /**
+     * pnpm run directly keeps 11.2.2 under pmOnFail ignore, while corepack 0.35.0 starts the packageManager release
+     * (recorded), so which release writes is the host's to say: declined.
+     */
     @Test
     void theWorkspacesPmOnFailDecidesWhetherTheNamedReleaseRuns() {
         Json.Document root = manifest("{\"packageManager\":\"pnpm@10.34.6\"}");
-        assertThat(release(root, "pmOnFail: ignore\n")).isEqualTo(11);
+        assertThat(release(root, "pmOnFail: ignore\n")).isEqualTo(-1);
         assertThat(release(root, "pmOnFail: download\n")).isEqualTo(10);
         assertThat(release(root, "pmOnFail: ''\n")).isEqualTo(10);
         assertThat(release(root, "pmOnFail: .nan\n")).isEqualTo(10);
-        assertThat(release(root, "pmOnFail: no\n")).isEqualTo(11);
-        assertThat(release(root, "pmOnFail: off\n")).isEqualTo(11);
+        assertThat(release(root, "pmOnFail: no\n")).isEqualTo(-1);
+        assertThat(release(root, "pmOnFail: off\n")).isEqualTo(-1);
     }
 
     @Test
@@ -159,7 +163,7 @@ class PackageJsonOverridesTest {
         PackageJsonOverrides scanned = PackageJsonOverrides.of(Pnpm, pnpm9, workspace, "is-number", "7.0.0", null);
         assertThat(scanned.from(pnpm9, workspace)).isSameAs(scanned);
         assertThat(scanned.getPlace()).isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
-        assertThat(scanned.from(pnpm9, "pmOnFail: ignore\n").getRelease()).isEqualTo(11);
+        assertThat(scanned.from(pnpm9, "pmOnFail: ignore\n").getRelease()).isEqualTo(-1);
 
         PackageJsonOverrides changed = scanned.from(pnpm11, workspace);
         assertThat(changed.getPlace()).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
