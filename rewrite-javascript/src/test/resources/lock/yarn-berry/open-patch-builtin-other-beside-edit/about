@@ -1,0 +1,1 @@
+A locked patch: resolution of ms to builtin<foo>, a builtin no plugin answers (plugin-compat answers only compat/ names), beside an is-number 6.0.0 to 7.0.0 bump: Yarn recomputes the patch hash with that source skipped and keeps the entry.

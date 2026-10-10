@@ -127,9 +127,9 @@ final class PatchUtils {
 
     /**
      * {@code loadPatchFiles} where no path is a builtin the release ships: each file's text with LF line endings, null
-     * for an unknown {@code compat/} builtin; throws CannotKnow for a file outside the project or a non-workspace's.
+     * for any other builtin (no hook answers it); throws CannotKnow for a file outside the project or a non-workspace's.
      */
-    static List<@Nullable Object> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
+    static List<@Nullable String> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
                                                  Project project) {
         Workspace parent = null;
         if (parentLocator != null) {
@@ -140,18 +140,16 @@ final class PatchUtils {
                                              "archive)");
             }
         }
-        List<@Nullable Object> sources = new ArrayList<>();
+        List<@Nullable String> sources = new ArrayList<>();
         for (String patchPath : patchPaths) {
             String name = builtinName(patchPath);
             String path = withoutFlags(patchPath);
-            Object source;
+            String source;
             if (name != null) {
-                if (!name.startsWith(COMPAT_TAG)) {
-                    source = Syml.UNDEFINED;
-                } else {
+                if (name.startsWith(COMPAT_TAG)) {
                     StructUtils.parseIdent(name.substring(COMPAT_TAG.length()));
-                    source = null;
                 }
+                source = null;
             } else if (path.startsWith("~/")) {
                 source = project.readFile(projectPath(".", path.substring(2), patchPath));
             } else if (path.startsWith("/")) {
@@ -162,7 +160,7 @@ final class PatchUtils {
                 }
                 source = project.readFile(projectPath(parent.getRelativeCwd(), path, patchPath));
             }
-            sources.add(source instanceof String ? CRLF.matcher((String) source).replaceAll("\n") : source);
+            sources.add(source == null ? null : CRLF.matcher(source).replaceAll("\n"));
         }
         return sources;
     }
@@ -178,17 +176,14 @@ final class PatchUtils {
     /**
      * {@code makePatchHash}: the parsed effects of each file the source version is not excluded from, hashed.
      */
-    static String makePatchHash(List<@Nullable Object> patchFiles, @Nullable String sourceVersion) {
+    static String makePatchHash(List<@Nullable String> patchFiles, @Nullable String sourceVersion) {
         List<String> parts = new ArrayList<>();
         parts.add(CACHE_VERSION);
-        for (Object source : patchFiles) {
+        for (String source : patchFiles) {
             if (source == null) {
                 continue;
             }
-            if (!(source instanceof String)) {
-                throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of undefined (reading 'split')");
-            }
-            for (Map<String, Object> effect : PatchParse.parsePatchFile((String) source)) {
+            for (Map<String, Object> effect : PatchParse.parsePatchFile(source)) {
                 Object semverExclusivity = effect.get("semverExclusivity");
                 if (semverExclusivity != null && sourceVersion != null &&
                     !YarnpkgSemverUtils.satisfiesWithPrereleases(sourceVersion, (String) semverExclusivity, false)) {

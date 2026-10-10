@@ -91,7 +91,7 @@ final class PatchResolver implements Resolver {
                                        ResolveOptions opts) {
         PatchUtils.Spec<Descriptor> parsed = PatchUtils.parseDescriptor(descriptor);
         if (!shipsBuiltin(parsed, opts)) {
-            List<@Nullable Object> patchFiles = PatchUtils.loadPatchFiles(parsed.getParentLocator(),
+            List<@Nullable String> patchFiles = PatchUtils.loadPatchFiles(parsed.getParentLocator(),
                     parsed.getPatchPaths(), opts.getProject());
             Package sourcePackage = dependencies.get(SOURCE_DESCRIPTOR);
             if (sourcePackage == null) {
