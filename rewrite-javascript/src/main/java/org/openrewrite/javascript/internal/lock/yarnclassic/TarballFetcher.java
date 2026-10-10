@@ -58,21 +58,23 @@ final class TarballFetcher {
      */
     @Nullable
     Object fetch() {
-        String dest = PackageFetcher.generateModuleCachePath(ref);
-        TarFs extracted = fetchTarball();
-        Object pkg = Config.readManifest(extracted, dest, Js.string(remote.registry), config.isLooseSemver(),
-                warnings);
+        return manifest(fetchTarball(), PackageFetcher.generateModuleCachePath(ref), Js.string(remote.registry),
+                ref.name, ref.version, config.isLooseSemver(), warnings);
+    }
+
+    /**
+     * The package base-fetcher.js reads from an extracted directory, its bins' targets checked as it links them.
+     */
+    static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
+                                     @Nullable Object version, boolean looseSemver, List<String> warnings) {
+        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver, warnings);
         if (pkg == Config.NO_MANIFEST) {
             Manifest defaultManifest = new Manifest();
-            defaultManifest.put("name", ref.name);
-            defaultManifest.put("version", ref.version);
-            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, config.isLooseSemver(),
-                    warnings);
+            defaultManifest.put("name", name);
+            defaultManifest.put("version", version);
+            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver, warnings);
         }
         Object data = pkg instanceof Manifest ? ((Manifest) pkg).data : pkg;
-        if (data == null) {
-            throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of null (reading 'bin')");
-        }
         Object bin = Js.get(data, "bin");
         if (Js.truthy(bin)) {
             for (String binName : Js.keys(bin)) {
@@ -112,19 +114,31 @@ final class TarballFetcher {
             throw new CannotKnow("whether yarn's cache holds " + pkg + ", whose tarball " + reference +
                                  " does not match the integrity the registry gives it");
         }
-        byte[] tar = GunzipMaybe.gunzip(tarball);
-        TarFs extracted;
-        try {
-            extracted = TarFs.extract(tar);
-        } catch (JsError e) {
-            throw new MessageError(Lang.format("Extracting tar content of $1 failed, the file appears to be " +
-                                               "corrupt: $0", e.getMessage(), null));
-        }
+        TarFs extracted = untar(reference, tarball);
         if (integrity != null && integrity.hashes.isEmpty()) {
-            throw new MessageError(Lang.format("Integrity checked failed for $0 (none of the specified algorithms " +
-                                               "are supported)", remote.packageName));
+            throw new MessageError(reference + ": " + Lang.format("Integrity checked failed for $0 (none of the " +
+                                                                  "specified algorithms are supported)",
+                    remote.packageName));
         }
         return extracted;
+    }
+
+    /**
+     * {@code createExtractor}'s gunzip and tar-fs extract, their errors as request-manager rejects them, the url first.
+     */
+    static TarFs untar(String url, byte[] tarball) {
+        byte[] tar;
+        try {
+            tar = GunzipMaybe.gunzip(tarball);
+        } catch (JsError e) {
+            throw new JsError(e.getName(), url + ": " + e.getMessage());
+        }
+        try {
+            return TarFs.extract(tar);
+        } catch (JsError e) {
+            throw new MessageError(url + ": " + Lang.format("Extracting tar content of $1 failed, the file appears " +
+                                                            "to be corrupt: $0", e.getMessage(), null));
+        }
     }
 
     // ssri's integrityStream check: the strongest algorithm the expected integrity names, one of its digests

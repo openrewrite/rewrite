@@ -28,30 +28,19 @@ import java.util.zip.InflaterInputStream;
  */
 final class GunzipMaybe {
 
-    private static final int MAX_RECURSION = 3;
-
     private GunzipMaybe() {
     }
 
     /**
-     * The bytes with every gzip or zlib layer taken off, at most four.
+     * The bytes with every gzip or zlib layer taken off: the recursion limit resets itself once it goes below 0.
      * @throws JsError zlib's error on a layer that does not inflate.
      */
     static byte[] gunzip(byte[] data) {
-        return gunzip(data, MAX_RECURSION);
-    }
-
-    private static byte[] gunzip(byte[] data, int maxRecursion) {
-        if (maxRecursion < 0) {
-            throw new JsError(JsError.ERROR, "Maximum recursion reached");
+        byte[] out = data;
+        while (isGzip(out) || isDeflate(out)) {
+            out = inflate(out, isGzip(out));
         }
-        if (isGzip(data)) {
-            return gunzip(inflate(data, true), maxRecursion - 1);
-        }
-        if (isDeflate(data)) {
-            return gunzip(inflate(data, false), maxRecursion - 1);
-        }
-        return data;
+        return out;
     }
 
     static boolean isGzip(byte[] buf) {

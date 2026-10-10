@@ -187,12 +187,13 @@ final class Config {
                                          List<String> warnings) {
         TarFs.Node metadata = dest.get(".yarn-metadata.json");
         if (metadata != null) {
-            Object json = Fs.readJson(dir + "/.yarn-metadata.json", text(metadata));
+            Object json = Fs.readJson(PosixPath.join(dir, ".yarn-metadata.json"), text(metadata));
             if (json == null) {
                 throw new JsError(JsError.TYPE_ERROR, "Cannot read properties of null (reading 'manifest')");
             }
             if (json instanceof Map && ((Map<?, ?>) json).containsKey("manifest")) {
-                return ((Map<?, ?>) json).get("manifest");
+                Object manifest = ((Map<?, ?>) json).get("manifest");
+                return Js.truthy(manifest) ? manifest : NO_MANIFEST;
             }
         }
         List<String> names = "yarn".equals(registry) ? Arrays.asList("yarn.json", "package.json") :
@@ -202,7 +203,7 @@ final class Config {
             if (file == null) {
                 continue;
             }
-            String loc = dir + "/" + filename;
+            String loc = PosixPath.join(dir, filename);
             Manifest manifest = manifest(Fs.readJson(loc, text(file)), "_registry");
             manifest.put("_registry", "yarn.json".equals(filename) ? "yarn" : NpmResolver.NPM_REGISTRY_ID);
             manifest.put("_loc", loc);
