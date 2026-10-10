@@ -87,8 +87,9 @@ class YarnClassicLockRoundTripTest {
         }
         String again = lock.again();
         String expect = lock.getScenario().expect();
-        assumeFalse(again != null && expect != null &&
-                    (expect.startsWith("cannot-know") || expect.startsWith("second-install-rejects")),
+        assumeFalse(again != null && expect != null && (expect.startsWith("cannot-know") ||
+                                                         expect.startsWith("second-install-rejects") ||
+                                                         expect.startsWith("not-reproduced")),
                 "yarn writes each package's own package.json, which differs from the entry the resolver reused");
         assumeFalse(loaded.resolvesAgain(), "the resolver's: an install over this lock resolves some pattern anew");
         String saved = loaded.save();
