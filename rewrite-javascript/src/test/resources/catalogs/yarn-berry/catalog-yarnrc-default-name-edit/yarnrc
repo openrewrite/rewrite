@@ -1,0 +1,5 @@
+catalog:
+  ms: 2.0.0
+catalogs:
+  default:
+    ms: 2.1.2

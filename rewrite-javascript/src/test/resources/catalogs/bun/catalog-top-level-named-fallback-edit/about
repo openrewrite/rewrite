@@ -1,0 +1,1 @@
+workspaces is an array, so Bun reads the top-level catalogs: legacy is-number ^6.0.0 -> ^7.0.0.

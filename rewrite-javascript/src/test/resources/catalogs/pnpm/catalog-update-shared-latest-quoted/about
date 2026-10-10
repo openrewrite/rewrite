@@ -1,0 +1,1 @@
+pnpm -r update --latest wrappy over a single-quoted default catalog entry '1.0.1'.

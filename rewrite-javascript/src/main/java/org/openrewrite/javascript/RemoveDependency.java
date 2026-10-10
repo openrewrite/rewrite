@@ -20,10 +20,10 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -31,16 +31,20 @@ import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 
-import static java.util.Collections.singleton;
+import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumulator> {
+public class RemoveDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
@@ -64,16 +68,18 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
 
     @Override public String getDescription() {
         return "Remove an npm dependency from `package.json` and regenerate the lock file natively, without " +
-                "executing the package manager. If the dependency does not exist in any scope, the recipe is a no-op.";
+                "executing the package manager. A pnpm workspace with `cleanupUnusedCatalogs` also loses the catalog " +
+                "entries no project references any more. If the dependency does not exist in any scope, the recipe " +
+                "is a no-op.";
     }
 
     @Override
-    public NodeDependencyScan.Accumulator getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyScan.Accumulator();
+    public NodeCatalogs.Accumulator getInitialValue(ExecutionContext ctx) {
+        return new NodeCatalogs.Accumulator();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyScan.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeCatalogs.Accumulator acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -82,17 +88,18 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
 
-                if (NodeDependencyScan.capturePackageManagerFile(acc, sf)) return tree;
+                acc.capture(sf);
+                if (NodeDependencyScan.capturePackageManagerFile(acc.scan, sf)) return tree;
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
-                        NodeDependencyScan.captureLock(acc, sf);
+                        NodeDependencyScan.captureLock(acc.scan, sf);
                     }
                     return tree;
                 }
                 if (sf instanceof Json.Document && "package.json".equals(basename)) {
                     NodeResolutionResult marker = sf.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
                     if (marker == null) return tree;
-                    NodeDependencyScan.ProjectState ps = acc.projects.computeIfAbsent(p, k ->
+                    NodeDependencyScan.ProjectState ps = acc.scan.projects.computeIfAbsent(p, k ->
                             new NodeDependencyScan.ProjectState());
                     ps.capturedPackageJson = sf;
                 }
@@ -101,26 +108,45 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
         };
     }
 
+    @Override
+    public Collection<? extends SourceFile> generate(NodeCatalogs.Accumulator acc, ExecutionContext ctx) {
+        Map<Path, SourceFile> removed = new LinkedHashMap<>();
+        Map<Path, Path> cleaned = new LinkedHashMap<>();
+        for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : new TreeMap<>(acc.scan.projects).entrySet()) {
+            SourceFile pkg = project.getValue().capturedPackageJson;
+            Set<String> scopes = pkg == null ? null : findContainingScopes(pkg);
+            if (!(pkg instanceof Json.Document) || scopes == null) {
+                continue;
+            }
+            Path path = project.getKey();
+            project.getValue().scopesContainingPackage = scopes;
+            acc.manifestEdits.put(path, doc -> PackageJsonHelper.removeDependency(doc, packageName, scopes));
+            removed.put(path, PackageJsonHelper.removeDependency((Json.Document) pkg, packageName, scopes));
+            NodeCatalogs catalogs = acc.of(path);
+            if (catalogs != null && catalogs.isCleanupUnusedCatalogs()) {
+                cleaned.putIfAbsent(catalogs.getPath(), path);
+            }
+        }
+        for (Map.Entry<Path, Path> workspace : cleaned.entrySet()) {
+            List<Map<String, String>> declarations = acc.declarations(ctx, workspace.getKey(), removed);
+            acc.edit(workspace.getValue(), c -> c.withoutUnused(declarations));
+        }
+        return emptyList();
+    }
+
     private @Nullable Set<String> findContainingScopes(SourceFile pkg) {
-        NodeResolutionResult marker = pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
-        if (marker == null) return null;
         Set<String> result = new LinkedHashSet<>();
-        addIfPresent(result, "dependencies", marker.getDependencies());
-        addIfPresent(result, "devDependencies", marker.getDevDependencies());
-        addIfPresent(result, "peerDependencies", marker.getPeerDependencies());
-        addIfPresent(result, "optionalDependencies", marker.getOptionalDependencies());
-        addIfPresent(result, "bundledDependencies", marker.getBundledDependencies());
-        if (scope != null) result.retainAll(singleton(scope));
+        for (Map.Entry<String, Map<String, String>> declared : PackageJsonHelper.declaredDependencies(pkg).entrySet()) {
+            if (declared.getValue().containsKey(packageName) && (scope == null || scope.equals(declared.getKey()))) {
+                result.add(declared.getKey());
+            }
+        }
         return result.isEmpty() ? null : result;
     }
 
-    private void addIfPresent(Set<String> out, String name, @Nullable List<Dependency> deps) {
-        if (deps != null) for (Dependency d : deps) if (packageName.equals(d.getName())) { out.add(name); return; }
-    }
-
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyScan.Accumulator acc) {
-        NodeDependencyScan.linkWorkspaceMembers(acc);
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeCatalogs.Accumulator acc) {
+        NodeDependencyScan.linkWorkspaceMembers(acc.scan);
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -128,9 +154,13 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 SourceFile sf = (SourceFile) tree;
                 Path p = sf.getSourcePath();
 
-                NodeDependencyScan.ProjectState ps = acc.projects.get(p);
+                SourceFile catalogFile = acc.editedFile(sf);
+                if (catalogFile != null) {
+                    return catalogFile;
+                }
+                NodeDependencyScan.ProjectState ps = acc.scan.projects.get(p);
                 if (ps != null && ps.capturedPackageJson != null) {
-                    if ((ps.scopesContainingPackage = findContainingScopes(sf)) != null) {
+                    if (acc.manifestEdits.containsKey(p) && findContainingScopes(sf) != null) {
                         ensureComputed(ps, sf, ctx);
                     }
                     if (ps.modifiedPackageJson != null) {
@@ -138,47 +168,48 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                         PackageJsonHelper.putLiveTree(ctx, p, out);
                         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
                             recordFailure(ctx, ps, p);
-                            return Markup.warn(out, new RuntimeException(
-                                    "lock regeneration failed: " + ps.regenResult.getErrorMessage()));
+                            return warn(out, ps.regenResult);
                         }
                         return out;
                     }
                 }
 
-                for (Path importer : NodeDependencyScan.lockImporters(acc, p)) {
-                    NodeDependencyScan.ProjectState ips = acc.projects.get(importer);
+                List<Path> importers = NodeDependencyScan.lockImporters(acc.scan, p);
+                for (Path importer : importers) {
+                    NodeDependencyScan.ProjectState ips = acc.scan.projects.get(importer);
                     if (ips == null) continue;
-                    if (ips.modifiedPackageJson == null) {
+                    if (!acc.results.containsKey(importer)) {
                         SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
                         if (pkg == null) pkg = ips.capturedPackageJson;
-                        if (pkg != null && (ips.scopesContainingPackage = findContainingScopes(pkg)) != null) {
+                        if (pkg != null && acc.manifestEdits.containsKey(importer) &&
+                            findContainingScopes(pkg) != null) {
                             ensureComputed(ips, pkg, ctx);
                             if (ips.modifiedPackageJson != null) {
                                 PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                             }
                         }
                     }
-                    if (ips.regenResult != null) {
-                        if (ips.regenResult.isSuccess()) {
-                            return PackageJsonHelper.reparseLock(sf, ips.regenResult.getLockFileContent());
-                        }
-                        recordFailure(ctx, ips, importer);
-                        return Markup.warn(sf, new RuntimeException(
-                                "lock regeneration failed: " + ips.regenResult.getErrorMessage()));
+                }
+                Path last = acc.lastRegenerated(importers);
+                NodeDependencyScan.ProjectState lps = last == null ? null : acc.scan.projects.get(last);
+                if (lps != null && lps.regenResult != null) {
+                    if (lps.regenResult.isSuccess()) {
+                        return PackageJsonHelper.reparseLock(sf, lps.regenResult.getLockFileContent());
                     }
+                    recordFailure(ctx, lps, last);
+                    return warn(sf, lps.regenResult);
                 }
                 return tree;
             }
 
             private void ensureComputed(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
-                if (ps.modifiedPackageJson != null) return;
-                if (ps.scopesContainingPackage == null) return;
-                Set<String> scopes = ps.scopesContainingPackage;
-                Function<Json.Document, Json.Document> edit = doc ->
-                        PackageJsonHelper.removeDependency(doc, packageName, scopes);
+                Path path = pkg.getSourcePath();
+                if (acc.results.containsKey(path)) return;
+                Function<Json.Document, Json.Document> edit = acc.manifestEdits.get(path);
                 PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(
-                        pkg, edit, ps.capturedLockContent,
-                        NodeDependencyScan.projectFiles(acc, ctx, pkg.getSourcePath()), ctx);
+                        pkg, edit, acc.editedFiles(ctx, path), ps.capturedLockContent,
+                        NodeDependencyScan.projectFiles(acc.scan, ctx, path), ctx);
+                acc.results.put(path, r);
                 if (r.isChanged()) {
                     ps.modifiedPackageJson = r.getModifiedPackageJson();
                     ps.regenResult = r.getRegenResult();
@@ -187,6 +218,11 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyScan.Accumula
                 }
             }
         };
+    }
+
+    private static <T extends Tree> T warn(T tree, LockFileRegeneration.Result result) {
+        return Markup.markup(tree, new Markup.Warn(Tree.randomId(), "lock regeneration failed: " +
+                                                                    result.getErrorMessage(), null));
     }
 
     private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath) {

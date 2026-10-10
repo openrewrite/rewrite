@@ -1,0 +1,15 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalogs": {
+      "legacy": {
+        "is-number": "^6.0.0"
+      }
+    }
+  }
+}

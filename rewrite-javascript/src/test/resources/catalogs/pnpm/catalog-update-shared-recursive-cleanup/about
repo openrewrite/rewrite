@@ -1,0 +1,1 @@
+pnpm -r update wrappy@1.0.2 at the root with cleanupUnusedCatalogs: the root and member a share the default catalog entry 1.0.1.

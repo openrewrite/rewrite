@@ -1,0 +1,5 @@
+packages:
+  - packages/*
+catalog:
+  is-number: ^6.0.0
+  wrappy: '1.0.1'

@@ -1,0 +1,7 @@
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
+- wrappy catalog:
+
+Done in 197ms using pnpm v11.2.2

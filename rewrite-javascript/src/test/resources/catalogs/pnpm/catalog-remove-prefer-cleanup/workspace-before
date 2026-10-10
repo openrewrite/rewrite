@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+catalogMode: prefer
+cleanupUnusedCatalogs: true
+catalog:
+  wrappy: 1.0.2
+catalogs:
+  legacy:
+    is-number: ^7.0.0

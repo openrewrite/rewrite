@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+catalog:
+  wrappy: 1.0.2
+catalogs:
+  legacy:
+    is-number: ^6.0.0

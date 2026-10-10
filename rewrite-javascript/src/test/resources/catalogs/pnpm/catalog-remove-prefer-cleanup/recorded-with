@@ -1,0 +1,3 @@
+pnpm 11.2.2, node v24.19.0, 2026-10-10T02:59:38Z
+before exit=0, after exit=0
+phase 2: pnpm remove wrappy --lockfile-only in packages/a

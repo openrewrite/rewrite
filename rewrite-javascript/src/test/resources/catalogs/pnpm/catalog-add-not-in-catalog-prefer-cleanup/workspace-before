@@ -1,0 +1,4 @@
+packages:
+  - packages/*
+catalogMode: prefer
+cleanupUnusedCatalogs: true

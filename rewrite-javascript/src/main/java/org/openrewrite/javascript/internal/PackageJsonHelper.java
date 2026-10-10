@@ -646,6 +646,84 @@ public class PackageJsonHelper {
     }
 
     /**
+     * Whether {@code doc}'s root holds {@code key} with a value that is not an object.
+     */
+    public static boolean isNonObjectMember(Json.Document doc, String key) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return false;
+        }
+        for (Json m : ((Json.JsonObject) doc.getValue()).getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                return !(((Json.Member) m).getValue() instanceof Json.JsonObject);
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The dependency maps a package.json declares, by scope then name, read from the document: the values as written.
+     */
+    public static Map<String, Map<String, String>> declaredDependencies(SourceFile packageJson) {
+        Map<String, Map<String, String>> declared = new LinkedHashMap<>();
+        if (!(packageJson instanceof Json.Document) || !(((Json.Document) packageJson).getValue() instanceof
+                Json.JsonObject)) {
+            return declared;
+        }
+        Json.JsonObject root = (Json.JsonObject) ((Json.Document) packageJson).getValue();
+        for (String scope : Arrays.asList("dependencies", "devDependencies", "peerDependencies",
+                "optionalDependencies")) {
+            Json.JsonObject members = findObjectMember(root, scope);
+            if (members == null) {
+                continue;
+            }
+            Map<String, String> values = new LinkedHashMap<>();
+            for (Json m : members.getMembers()) {
+                if (m instanceof Json.Member) {
+                    String name = literalString(((Json.Member) m).getKey());
+                    Object value = ((Json.Member) m).getValue() instanceof Json.Literal ?
+                            ((Json.Literal) ((Json.Member) m).getValue()).getValue() : null;
+                    if (name != null && value instanceof String) {
+                        values.put(name, (String) value);
+                    }
+                }
+            }
+            declared.put(scope, values);
+        }
+        return declared;
+    }
+
+    /**
+     * {@code doc} with the string member {@code key} of the object {@code path} leads to set to {@code value}, in place
+     * or appended; unchanged when the path leads to no object holding members.
+     */
+    public static Json.Document withStringMember(Json.Document doc, List<String> path, String key, String value) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject updated = withStringMember((Json.JsonObject) doc.getValue(), path, 0, key, value);
+        return updated == null ? doc : doc.withValue(updated);
+    }
+
+    private static Json.@Nullable JsonObject withStringMember(Json.JsonObject obj, List<String> path, int depth,
+                                                              String key, String value) {
+        if (depth < path.size()) {
+            Json.JsonObject child = findObjectMember(obj, path.get(depth));
+            Json.JsonObject updated = child == null ? null : withStringMember(child, path, depth + 1, key, value);
+            return updated == null ? null : replaceMember(obj, path.get(depth), updated);
+        }
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                JsonValue old = ((Json.Member) m).getValue();
+                return replaceMember(obj, key, makeStringLiteral(value).withPrefix(old.getPrefix()));
+            }
+        }
+        if (obj.getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+            return null;
+        }
+        return appendMember(obj, makeMember(key, makeStringLiteral(value), Space.EMPTY));
+    }
+
+    /**
      * Apply a transitive-dependency override to {@code doc} for the given package manager.
      * Delegates to {@link PackageJsonOverrides#applyOverride}.
      */

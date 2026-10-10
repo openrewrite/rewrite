@@ -1,0 +1,216 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript;
+
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.marker.Markup;
+import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.PlainText;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.function.Consumer;
+import java.util.stream.Stream;
+
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
+import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.pnpmLock;
+import static org.openrewrite.test.SourceSpecs.text;
+import static org.openrewrite.yaml.Assertions.yaml;
+
+/**
+ * A recording under {@code catalogs/<family>/<scenario>/} as a recipe run's sources: each file before the edit and
+ * as the package manager left it, and its registry responses served offline.
+ */
+final class CatalogRecording {
+
+    private static final String REGISTRY = "https://registry.npmjs.org/";
+    private static final String YARN_REGISTRY = "https://registry.yarnpkg.com/";
+
+    private final Path dir;
+    private final PackageManager pm;
+    final List<String> unserved = new ArrayList<>();
+
+    CatalogRecording(String family, String scenario) {
+        URL url = CatalogRecording.class.getResource("/catalogs/" + family + "/" + scenario);
+        if (url == null) {
+            throw new IllegalArgumentException(family + "/" + scenario);
+        }
+        try {
+            this.dir = Paths.get(url.toURI());
+        } catch (URISyntaxException e) {
+            throw new IllegalArgumentException(e);
+        }
+        this.pm = "pnpm".equals(family) ? PackageManager.Pnpm :
+                "bun".equals(family) ? PackageManager.Bun : PackageManager.YarnBerry;
+    }
+
+    ExecutionContext ctx() {
+        HttpSender http = request -> {
+            String url = request.getUrl().toString();
+            byte[] body = url.startsWith(REGISTRY) ? served(url.substring(REGISTRY.length())) :
+                    url.startsWith(YARN_REGISTRY) ? served(url.substring(YARN_REGISTRY.length())) : null;
+            if (body == null) {
+                unserved.add(url);
+            }
+            return new HttpSender.Response(body == null ? 404 : 200,
+                    new ByteArrayInputStream(body == null ? new byte[0] : body), () -> {
+            });
+        };
+        ExecutionContext ctx = new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        });
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(http);
+        NodeExecutionContextView.view(ctx).setRegistries(singletonList(
+                new NodeRegistry(null, REGISTRY, null, null, null, null, false, null, true, false)));
+        return ctx;
+    }
+
+    private byte @Nullable [] served(String route) {
+        String[] parts = route.split("/");
+        String file = parts.length == 1 ? parts[0] : parts.length == 2 ? parts[0] + "-" + parts[1] :
+                parts[parts.length - 1];
+        Path path = dir.resolve("http").resolve(file);
+        try {
+            return Files.isRegularFile(path) ? Files.readAllBytes(path) : null;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Every file the recording holds, before the edit and as the package manager left it ({@code null} for one it
+     * left unchanged); the lock must regenerate without a warning.
+     */
+    SourceSpecs[] sources() {
+        return sources(null, null);
+    }
+
+    /**
+     * {@link #sources()} where the recipe declines the edit of {@code member} with a warning naming {@code warning},
+     * leaving its text as it was.
+     */
+    SourceSpecs[] sources(@Nullable String member, @Nullable String warning) {
+        List<SourceSpecs> sources = new ArrayList<>();
+        Map<String, String> before = tree("tree-before");
+        Map<String, String> after = new TreeMap<>(before);
+        after.putAll(tree("tree"));
+        List<String> members = new ArrayList<>();
+        for (String path : before.keySet()) {
+            if (path.endsWith("package.json")) {
+                members.add(path);
+            }
+        }
+        boolean failed = !has("after");
+        sources.add(packageJson(read("pkg-before"), changed(read("pkg-before"), failed ? null : read("pkg")),
+                nodeResolutionResult(pm, members), s -> s.noTrim()));
+        for (String path : members) {
+            String text = before.get(path);
+            if (path.equals(member)) {
+                sources.add(packageJson(text, null, nodeResolutionResult(pm), s -> s.path(path).noTrim()
+                        .after(actual -> actual).afterRecipe(doc -> {
+                            assertThat(doc.printAll(new PrintOutputCapture<>(0,
+                                    PrintOutputCapture.MarkerPrinter.SANITIZED))).isEqualTo(text);
+                            assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                                    .hasValueSatisfying(w -> assertThat(w.getMessage()).contains(warning));
+                        })));
+                continue;
+            }
+            sources.add(packageJson(text, changed(text, failed ? null : after.get(path)), nodeResolutionResult(pm),
+                    s -> s.path(path).noTrim()));
+        }
+        if (has("workspace-before")) {
+            String edited = failed ? null : has("workspace") ? read("workspace") : read("workspace-before");
+            sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), edited),
+                    "pnpm-workspace.yaml"));
+        }
+        if (has("yarnrc")) {
+            String edited = failed ? null : has("yarnrc-after") ? read("yarnrc-after") : read("yarnrc");
+            sources.add(yamlFile(read("yarnrc"), changed(read("yarnrc"), edited), ".yarnrc.yml"));
+        }
+        String lock = failed ? null : changed(read("before"), read("after"));
+        if (pm == PackageManager.Pnpm) {
+            sources.add(pnpmLock(read("before"), lock, s -> s.noTrim().afterRecipe(doc -> assertThat(
+                    doc.getMarkers().findFirst(Markup.Warn.class)).as("unserved " + unserved).isEmpty())));
+        } else {
+            Consumer<SourceSpec<PlainText>> spec = s -> s.path(pm == PackageManager.Bun ? "bun.lock" : "yarn.lock")
+                    .noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
+                            .as("unserved " + unserved).isEmpty());
+            sources.add(lock == null ? text(read("before"), spec) : text(read("before"), lock, spec));
+        }
+        return sources.toArray(new SourceSpecs[0]);
+    }
+
+    // a yaml spec whose null after is no change, not a deletion
+    private static SourceSpecs yamlFile(String before, @Nullable String after, String path) {
+        return after == null ? yaml(before, s -> s.path(path).noTrim()) :
+                yaml(before, after, s -> s.path(path).noTrim());
+    }
+
+    private static @Nullable String changed(@Nullable String before, @Nullable String after) {
+        return after == null || after.equals(before) ? null : after;
+    }
+
+    private boolean has(String file) {
+        return Files.isRegularFile(dir.resolve(file));
+    }
+
+    String read(String file) {
+        try {
+            return new String(Files.readAllBytes(dir.resolve(file)), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private Map<String, String> tree(String name) {
+        Map<String, String> files = new TreeMap<>();
+        Path root = dir.resolve(name);
+        if (!Files.isDirectory(root)) {
+            return files;
+        }
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path file : walk.filter(Files::isRegularFile).collect(toList())) {
+                files.put(root.relativize(file).toString().replace('\\', '/'),
+                        new String(Files.readAllBytes(file), StandardCharsets.UTF_8));
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return files;
+    }
+}

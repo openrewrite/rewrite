@@ -1,0 +1,1 @@
+workspaces is an object without a catalog, so Bun reads the top-level catalog: ms 2.0.0 -> 2.1.3.

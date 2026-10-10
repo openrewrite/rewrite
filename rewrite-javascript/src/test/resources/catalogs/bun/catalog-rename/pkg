@@ -1,0 +1,14 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ],
+    "catalog": {
+      "ms": "2.0.0",
+      "is-number": "7.0.0"
+    }
+  }
+}

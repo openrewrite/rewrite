@@ -1,0 +1,1 @@
+Member a renames wrappy catalog: to is-number catalog: with cleanupUnusedCatalogs; the default catalog gains is-number 7.0.0 and drops the unused wrappy.
