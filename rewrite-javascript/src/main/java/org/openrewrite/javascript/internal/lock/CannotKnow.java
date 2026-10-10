@@ -16,7 +16,10 @@
 package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
+
+import java.util.Set;
 
 /**
  * Raised where the package manager reads something the engine is not given: a tarball's contents, a manifest that is
@@ -35,5 +38,23 @@ public final class CannotKnow extends RuntimeException {
         super("the engine cannot know " + subject);
         this.subject = subject;
         this.reason = reason;
+    }
+
+    /**
+     * A file the package manager reads that the host holds without having read its contents.
+     */
+    public static CannotKnow unread(String file) {
+        return new CannotKnow(file + " (its contents were not read)");
+    }
+
+    /**
+     * {@code contents}, the file at {@code path} as the host read it, null where it is not among {@code held} (null
+     * when the host has not said what it holds); {@link #unread} where the host holds it without its contents.
+     */
+    public static @Nullable String requireRead(@Nullable String contents, @Nullable Set<String> held, String path) {
+        if (contents == null && held != null && held.contains(path)) {
+            throw unread(path);
+        }
+        return contents;
     }
 }

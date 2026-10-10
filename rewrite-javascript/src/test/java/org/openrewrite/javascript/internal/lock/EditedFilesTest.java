@@ -71,7 +71,7 @@ class EditedFilesTest {
           .endsWith("catalog:\n  ms: 2.1.3\n");
         assertThat(YarnBerryInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getConfigFiles().get(".yarnrc.yml"))
           .isEqualTo("nodeLinker: node-modules\n");
-        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getConfigFiles().get(".yarnrc"))
+        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN).getConfigFiles().get(".yarnrc"))
           .isEqualTo("--install.frozen-lockfile false\n");
         assertThat(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getNpmrc())
           .isEqualTo("registry=https://edited.example/\n");

@@ -23,7 +23,6 @@ import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegen
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
 import java.nio.file.Paths;
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
 
@@ -56,7 +55,7 @@ class YarnClassicInputsTest {
           .packageManagerFile(Paths.get("repo/.npmrc"), "registry=https://registry.npmmirror.com/\n")
           .packageManagerFile(Paths.get("repo/packages/a/.yarnrc"), "registry \"https://example.com\"\n");
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(builder.build()), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(builder.build()), Host.UNKNOWN);
 
         assertThat(inputs.getLock()).isEqualTo("# yarn lockfile v1\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a", "local");
@@ -66,11 +65,10 @@ class YarnClassicInputsTest {
         assertThat(inputs.getConfigFiles().get(".npmrc")).isEqualTo("registry=https://registry.npmmirror.com/\n");
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();
-        assertThat(inputs.getNow()).isEqualTo(Instant.EPOCH);
         assertThat(inputs.getCwd()).isEqualTo("packages/a");
         Inputs fromRoot = YarnClassicInputs.from(
           LockDirectory.of(builder.packageJsonPath(Paths.get("repo/package.json"))
-          .packageJson("{\"private\":true,\"workspaces\":[\"packages/*\"]}").build()), Host.UNKNOWN, Instant.EPOCH);
+          .packageJson("{\"private\":true,\"workspaces\":[\"packages/*\"]}").build()), Host.UNKNOWN);
         assertThat(fromRoot.getCwd()).isEmpty();
         assertThat(fromRoot.getConfigFiles()).containsOnlyKeys(".yarnrc", ".npmrc");
     }
@@ -85,7 +83,7 @@ class YarnClassicInputsTest {
             Paths.get("other/.npmrc"))))
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc");
         assertThat(inputs.getConfigFiles()).isEmpty();
@@ -111,7 +109,7 @@ class YarnClassicInputsTest {
             Paths.get("README.md"), Paths.get("repo/other/.npmrc"), Paths.get("repo/web/src/index.js"))))
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN);
 
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../.yarnrc", "../../../.npmrc");
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "../.yarnrc", "../../.yarnrc.yml",
@@ -132,7 +130,7 @@ class YarnClassicInputsTest {
           .packageJsonPath(Paths.get("web/app/package.json"))
           .packageManagerFile(Paths.get("package.json"), "{\"private\":true,\"workspaces\":[\"web/*\"]}");
 
-        Inputs listed = YarnClassicInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN, Instant.EPOCH);
+        Inputs listed = YarnClassicInputs.from(LockDirectory.of(request.build()), Host.UNKNOWN);
 
         assertThat(listed.getDirectory()).isEqualTo("web/app");
         assertThat(new YarnClassicLockRegenerator(listed, NO_REGISTRY).regenerate().getErrorMessage())
@@ -141,8 +139,7 @@ class YarnClassicInputsTest {
                      "this project's");
 
         Inputs unlisted = YarnClassicInputs.from(
-          LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()),
-          Host.UNKNOWN, Instant.EPOCH);
+          LockDirectory.of(request.packageJsonPath(Paths.get("tools/app/package.json")).build()), Host.UNKNOWN);
 
         assertThat(unlisted.getDirectory()).isEqualTo("tools/app");
         assertThat(new YarnClassicLockRegenerator(unlisted, NO_REGISTRY).regenerate().isSuccess())
@@ -164,7 +161,7 @@ class YarnClassicInputsTest {
           .packageManagerFile(Paths.get("repo/other/package.json"), "{\"packageManager\":\"yarn@4.10.3\"}")
           .build();
 
-        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN);
 
         assertThat(inputs.getConfigFiles()).containsOnlyKeys("../package.json", "../../../package.json");
         assertThat(new YarnClassicLockRegenerator(inputs, NO_REGISTRY).regenerate().getErrorMessage())

@@ -92,8 +92,7 @@ public final class VirtualTreeLoader {
                 Map<String, Object> parsed = parsedManifests.get(location);
                 try {
                     if (text == null && parsed == null && unread.contains(location)) {
-                        throw new CannotKnow((location.isEmpty() ? "" : location + "/") + "package.json (its " +
-                                             "contents were not read)");
+                        throw CannotKnow.unread((location.isEmpty() ? "" : location + "/") + "package.json");
                     }
                     value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) :
                         NONE;

@@ -24,11 +24,21 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 import static org.openrewrite.javascript.internal.lock.bun.Package.INVALID_PACKAGE_ID;
 
 /** Port of bun's src/install/lockfile.zig (bun 1.3.10); package 0 is the root. */
-final class Lockfile {
+public final class Lockfile {
+
+    /**
+     * What bun loads where it holds no bun.lock and rewrites besides it: a bun.lockb, or a pnpm-lock.yaml it migrates
+     * (package-lock.json and yarn.lock first), rewriting package.json.
+     */
+    public static boolean rewritesAnotherFile(Predicate<String> holds) {
+        return holds.test("bun.lockb") || !holds.test("package-lock.json") && !holds.test("yarn.lock") &&
+                                          holds.test("pnpm-lock.yaml");
+    }
 
     static final int TEXT_LOCKFILE_VERSION_CURRENT = 1;
 

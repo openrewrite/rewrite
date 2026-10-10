@@ -160,9 +160,8 @@ public final class NativeLockEngine {
         NodeRegistries registries = RegistryDiscovery.discover(ctx, request.getMarker(), Environment.SYSTEM);
         YarnClassicRegistryPackuments packuments = new YarnClassicRegistryPackuments(registries,
                 view.getRegistryClient());
-        return new YarnClassicLockRegenerator(YarnClassicInputs.from(LockDirectory.of(request), host(view),
-                Instant.now()), packuments)
-                .regenerate();
+        return new YarnClassicLockRegenerator(YarnClassicInputs.from(LockDirectory.of(request), host(view)),
+                packuments).regenerate();
     }
 
     private static Result regenerateYarnBerry(Request request, ExecutionContext ctx) {

@@ -154,9 +154,7 @@ public final class Main {
             return;
         }
         for (String file : new String[]{"pnpm-workspace.yaml", ".npmrc"}) {
-            if (inputs.getPaths().contains(file) && !inputs.getFiles().containsKey(file)) {
-                throw new CannotKnow(file + " (its contents were not read)");
-            }
+            CannotKnow.requireRead(inputs.getFiles().get(file), inputs.getPaths(), file);
         }
     }
 
@@ -205,7 +203,7 @@ public final class Main {
         String path = others.get(0);
         String other = inputs.getFiles().get(path);
         if (other == null) {
-            throw new CannotKnow(path + " (its contents were not read)");
+            throw CannotKnow.unread(path);
         }
         if (!path.endsWith("/package.yaml") && !"package.yaml".equals(path)) {
             throw new CannotKnow("what pnpm reads from " + path + " (json5's parse is not ported)");

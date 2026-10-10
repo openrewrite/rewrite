@@ -622,4 +622,56 @@ public class NpmOptions {
     Set<String> omitSet() {
         return new LinkedHashSet<>(omit);
     }
+
+    /**
+     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm installs, at the
+     * nearest of {@code parentTrees} whose workspaces map it; 0 when it installs there.
+     */
+    static int loadLocalPrefix(@Nullable String manifest,
+                               Map<String, Map<String, @Nullable String>> parentTrees) {
+        if (manifest == null) {
+            return 0;
+        }
+        for (Map.Entry<String, Map<String, @Nullable String>> parent : parentTrees.entrySet()) {
+            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue());
+            Map<String, Object> pkg;
+            try {
+                PackageJson own = files.manifest("");
+                if (own == null) {
+                    continue;
+                }
+                pkg = own.getContent();
+            } catch (PackageJson.NeedsPackageFiles e) {
+                pkg = e.getContent();
+            } catch (CannotKnow e) {
+                throw e;
+            } catch (RuntimeException e) {
+                continue;
+            }
+            if (!truthy(pkg.get("workspaces"))) {
+                continue;
+            }
+            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
+                return parent.getKey().split("/").length;
+            }
+        }
+        return 0;
+    }
+
+    private static VirtualTreeLoader.ProjectFiles parentFiles(String runsIn, String manifest,
+                                                              Map<String, @Nullable String> tree) {
+        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .manifest(runsIn, manifest);
+        for (Map.Entry<String, @Nullable String> held : tree.entrySet()) {
+            if (held.getKey().equals(runsIn)) {
+                continue;
+            }
+            if (held.getValue() == null) {
+                files.unread(held.getKey());
+            } else {
+                files.manifest(held.getKey(), held.getValue());
+            }
+        }
+        return files.build();
+    }
 }

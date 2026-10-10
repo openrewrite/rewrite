@@ -929,8 +929,8 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         /**
          * Record that the decision depends on what the engine cannot know, as a failure of the manifest's lock.
          */
-        public void cannotKnow(String subject) {
-            acc.failure(ctx, path, LockOnlyInstall.cannotKnow(new CannotKnow(subject)));
+        public void cannotKnow(CannotKnow what) {
+            acc.failure(ctx, path, LockOnlyInstall.cannotKnow(what));
         }
 
         /**

@@ -61,6 +61,26 @@ public final class LockOnlyInstall {
     }
 
     /**
+     * A walk from {@code runsIn}, a directory below the lock's, that installs {@code installRoot} directories above it
+     * writes the lock there; elsewhere than at this {@code lock} is what the engine cannot know.
+     */
+    public void requireInstallsAt(int installRoot, String runsIn, String lock) {
+        int lockDir = runsIn.isEmpty() ? 0 : runsIn.split("/").length;
+        if (installRoot > lockDir) {
+            StringBuilder up = new StringBuilder("..");
+            for (int i = installRoot - lockDir; i > 1; i--) {
+                up.append("/..");
+            }
+            throw new CannotKnow("the lock " + command + " writes: it installs at the workspace root " + up +
+                                 ", whose workspaces list this project, and writes that root's " + lock);
+        }
+        if (installRoot < lockDir) {
+            throw new CannotKnow("the lock " + command + " writes: run in " + runsIn + " it installs " + installRoot +
+                                 " directories above it, not at this " + lock);
+        }
+    }
+
+    /**
      * @param outcome a {@link CannotKnow} or a {@link Rejected}; anything else is rethrown
      */
     public Failure failure(RuntimeException outcome) {

@@ -20,7 +20,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
-import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -44,10 +43,15 @@ final class YarnClassicInputs {
     }
 
     static InstallRoot installRoot(LockDirectory dir) {
-        return YarnClassicLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        return YarnClassicLockRegenerator.installRoot(project(dir).build());
     }
 
-    static Inputs from(LockDirectory dir, Host host, Instant now) {
+    static Inputs from(LockDirectory dir, Host host) {
+        return project(dir).host(host).build();
+    }
+
+    // what yarn reads of the project, which is all its walk reads
+    private static Inputs.InputsBuilder project(LockDirectory dir) {
         Map<String, String> configFiles = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
             String path = file.getKey();
@@ -66,10 +70,7 @@ final class YarnClassicInputs {
                 .configFiles(configFiles)
                 .paths(paths(dir))
                 .directory(dir.getPath())
-                .cwd(dir.getRunsIn())
-                .host(host)
-                .now(now)
-                .build();
+                .cwd(dir.getRunsIn());
     }
 
     // the paths under the lock's directory and those directly in a directory above it

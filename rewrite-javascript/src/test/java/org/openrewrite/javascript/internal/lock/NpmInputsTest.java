@@ -282,8 +282,8 @@ class NpmInputsTest {
 
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
-        assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know yarn.lock, which npm reads and " +
-                                                              "rewrites beside its lock (its contents were not read)");
+        assertThat(result.getFailure().getDetail())
+          .isEqualTo("the engine cannot know yarn.lock (its contents were not read)");
     }
 
     /**

@@ -106,7 +106,7 @@ final class Config {
             if (inputs.getPaths() != null && !inputs.getPaths().contains(cwd + "/package.json")) {
                 throw new MessageError("Couldn't find a package.json file in \"" + cwd + "\"", "ENOENT");
             }
-            throw new CannotKnow(cwd + "/package.json (its contents were not read)");
+            throw CannotKnow.unread(cwd + "/package.json");
         }
         return tryManifest(cwd, text, looseSemver, true, "", warnings);
     }
@@ -121,7 +121,7 @@ final class Config {
                     inputs.getConfigFiles().get(file);
             if (text == null) {
                 if (paths != null && paths.contains(file)) {
-                    throw new CannotKnow(file + " (its contents were not read)");
+                    throw CannotKnow.unread(file);
                 }
                 continue;
             }
@@ -164,7 +164,7 @@ final class Config {
         Set<String> paths = inputs.getPaths();
         for (String name : depth == 0 ? singletonList("yarn.json") : Arrays.asList("package.json", "yarn.json")) {
             if (paths != null && paths.contains(up + name)) {
-                throw new CannotKnow(up + name + " (its contents were not read)");
+                throw CannotKnow.unread(up + name);
             }
         }
         return null;

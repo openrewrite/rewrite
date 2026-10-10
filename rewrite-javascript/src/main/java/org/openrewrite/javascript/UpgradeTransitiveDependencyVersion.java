@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
@@ -126,7 +127,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             if (catalogs != null && catalogs.getPath().equals(workspaceManifest)) {
                 workspace = catalogs.print();
             } else if (acc.scan.paths.contains(workspaceManifest)) {
-                decision.cannotKnow(WORKSPACE_MANIFEST + " (its contents were not read)");
+                decision.cannotKnow(CannotKnow.unread(WORKSPACE_MANIFEST));
                 return;
             }
         }

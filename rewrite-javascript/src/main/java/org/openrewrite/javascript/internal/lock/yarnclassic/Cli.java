@@ -101,9 +101,7 @@ final class Cli {
         for (String dir = inputs.getCwd(); !dir.isEmpty(); dir = dir.substring(0, Math.max(dir.lastIndexOf('/'), 0))) {
             String text = inputs.getManifests().containsKey(dir) ? inputs.getManifests().get(dir) :
                     inputs.getConfigFiles().get(dir + "/package.json");
-            if (text == null && paths != null && paths.contains(dir + "/package.json")) {
-                throw new CannotKnow(dir + "/package.json (its contents were not read)");
-            }
+            CannotKnow.requireRead(text, paths, dir + "/package.json");
             String packageManager = text == null ? null : packageManager(text);
             if (packageManager != null) {
                 return packageManager;
@@ -115,7 +113,7 @@ final class Cli {
             String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(file);
             if (text == null) {
                 if (depth > 0 && paths != null && paths.contains(file)) {
-                    throw new CannotKnow(file + " (its contents were not read)");
+                    throw CannotKnow.unread(file);
                 }
                 continue;
             }

@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Builder;
-import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -105,9 +104,6 @@ public final class YarnClassicLockRegenerator {
 
         @Builder.Default
         Host host = Host.UNKNOWN;
-
-        @NonNull
-        Instant now;
 
         /**
          * The config files by their path from the directory yarn runs in.
@@ -232,7 +228,7 @@ public final class YarnClassicLockRegenerator {
         for (String path : paths) {
             String fromCwd = inputs.fromCwd(path);
             if (fromCwd != null && CONFIG_FILE.matcher(fromCwd).matches() && !configFiles.containsKey(fromCwd)) {
-                throw new CannotKnow(path + " (its contents were not read)");
+                throw CannotKnow.unread(path);
             }
         }
     }

@@ -19,10 +19,12 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
+import org.openrewrite.javascript.internal.lock.bun.Lockfile;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * The Bun regenerator's inputs: the lock's directory's own .npmrc and bunfig.toml, the patch and .env files under it,
@@ -69,21 +71,18 @@ final class BunInputs {
     }
 
     /**
-     * bun's walk from where it runs; it stops where bun, finding no bun.lock, rewrites a bun.lockb, or migrates a
-     * pnpm-lock.yaml (no package-lock.json or yarn.lock first) and rewrites package.json, which no regeneration writes.
+     * bun's walk from where it runs; where it finds no bun.lock it stops at a file no regeneration writes (Lockfile's
+     * rule).
      */
     static InstallRoot installRoot(LockDirectory dir) {
-        InstallRoot walked = BunLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        InstallRoot walked = BunLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(),
+                dir.manifestsAbove(dir.getRunsIn()));
         String root = dir.aboveRunsIn(walked.getDepth());
-        if (walked.isStopped() || root.isEmpty() && dir.getLock() != null || holds(dir, root, "bun.lock")) {
+        Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
+        if (walked.isStopped() || root.isEmpty() && dir.getLock() != null || holds.test("bun.lock")) {
             return walked;
         }
-        boolean rewritten = holds(dir, root, "bun.lockb") || !holds(dir, root, "package-lock.json") &&
-                            !holds(dir, root, "yarn.lock") && holds(dir, root, "pnpm-lock.yaml");
-        return rewritten ? InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE) : walked;
-    }
-
-    private static boolean holds(LockDirectory dir, String root, String file) {
-        return dir.holds(RootRelativePath.join(root, file));
+        return Lockfile.rewritesAnotherFile(holds) ?
+                InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE) : walked;
     }
 }

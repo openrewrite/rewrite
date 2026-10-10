@@ -521,7 +521,7 @@ final class Project {
             throw new CannotKnow(path + " (the host gave no view of the project's files)");
         }
         if (paths.contains(path)) {
-            throw new CannotKnow(path + " (its contents were not read)");
+            throw CannotKnow.unread(path);
         }
         throw new JsError(JsError.ERROR, "ENOENT: no such file or directory, open '" + path + "'");
     }

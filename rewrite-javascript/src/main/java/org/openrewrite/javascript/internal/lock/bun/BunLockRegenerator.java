@@ -202,20 +202,8 @@ public final class BunLockRegenerator {
     public Result regenerate() {
         String written;
         try {
-            int workspaceRoot = findWorkspaceRoot(inputs);
-            int lockDir = inputs.getRunsIn().isEmpty() ? 0 : inputs.getRunsIn().split("/").length;
-            if (workspaceRoot > lockDir) {
-                StringBuilder up = new StringBuilder("..");
-                for (int i = workspaceRoot - lockDir; i > 1; i--) {
-                    up.append("/..");
-                }
-                throw new CannotKnow("the lock bun writes: it installs at the workspace root " + up +
-                                     ", whose workspaces list this project, and writes that root's bun.lock");
-            }
-            if (workspaceRoot < lockDir) {
-                throw new CannotKnow("the lock bun writes: run in " + inputs.getRunsIn() + " it installs " +
-                                     workspaceRoot + " directories above it, not at this bun.lock");
-            }
+            INSTALL.requireInstallsAt(findWorkspaceRoot(inputs.getManifests().get(inputs.getRunsIn()),
+                    inputs.getParentManifests()), inputs.getRunsIn(), "bun.lock");
             written = install(inputs.getLock());
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
@@ -227,9 +215,10 @@ public final class BunLockRegenerator {
      * Where bun run in the project's directory installs and writes its bun.lock; a walk that fails, which
      * {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+                                          Map<String, String> parentManifests) {
         try {
-            return InstallRoot.at(findWorkspaceRoot(inputs));
+            return InstallRoot.at(findWorkspaceRoot(manifests.get(runsIn), parentManifests));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
@@ -239,12 +228,11 @@ public final class BunLockRegenerator {
      * PackageManager.init: how many directories above the one it runs in bun installs, at the first package.json
      * above with workspaces when they list it, writing that root's bun.lock; 0 when it installs there.
      */
-    private static int findWorkspaceRoot(Inputs inputs) {
-        String manifest = inputs.getManifests().get(inputs.getRunsIn());
+    private static int findWorkspaceRoot(@Nullable String manifest, Map<String, String> parentManifests) {
         if (manifest == null) {
             return 0;
         }
-        for (Map.Entry<String, String> parent : inputs.getParentManifests().entrySet()) {
+        for (Map.Entry<String, String> parent : parentManifests.entrySet()) {
             Json.Expr workspaces = Json.parse(parent.getValue()).get("workspaces");
             if (workspaces == null) {
                 continue;
@@ -317,16 +305,10 @@ public final class BunLockRegenerator {
             return;
         }
         for (String file : DotEnv.FILES) {
-            if (inputs.getPaths().contains(file) && !inputs.getFiles().containsKey(file)) {
-                throw new CannotKnow(file + " (its contents were not read)");
-            }
+            CannotKnow.requireRead(inputs.getFiles().get(file), inputs.getPaths(), file);
         }
-        if (inputs.getBunfig() == null && inputs.getPaths().contains("bunfig.toml")) {
-            throw new CannotKnow("bunfig.toml (its contents were not read)");
-        }
-        if (inputs.getNpmrc() == null && inputs.getPaths().contains(".npmrc")) {
-            throw new CannotKnow(".npmrc (its contents were not read)");
-        }
+        CannotKnow.requireRead(inputs.getBunfig(), inputs.getPaths(), "bunfig.toml");
+        CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
     }
 
     // calcHash: bun joins each patch path onto the root (joinZBuf), so ./ and .. spellings name the same file
@@ -346,7 +328,7 @@ public final class BunLockRegenerator {
             String contents = files.get(path);
             if (contents == null) {
                 if (paths == null || paths.contains(path) || RootRelativePath.climbsAboveRoot(path)) {
-                    throw new CannotKnow("patch file " + patch + " (its contents were not read)");
+                    throw CannotKnow.unread("patch file " + patch);
                 }
                 if (holdsBelow(path, paths, files.keySet())) {
                     throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,

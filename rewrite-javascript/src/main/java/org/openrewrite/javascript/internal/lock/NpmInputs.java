@@ -19,12 +19,14 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
 
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json
@@ -99,14 +101,13 @@ final class NpmInputs {
     }
 
     /**
-     * npm's walk from where it runs; where it installs it writes an npm-shrinkwrap.json in place of its lock and
-     * rewrites a yarn.lock (shrinkwrap.js), which no regeneration writes, so a walk to either the host holds stops.
+     * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules).
      */
     static InstallRoot installRoot(LockDirectory dir) {
-        InstallRoot walked = NpmLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
-        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "npm-shrinkwrap.json")) &&
-                                     !dir.holds(RootRelativePath.join(root, "yarn.lock")) ? walked :
-                InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
+        Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
+        return walked.isStopped() || !Shrinkwrap.readsShrinkwrap(holds) && !Shrinkwrap.writesBesideLock(holds) ?
+                walked : InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
     }
 }

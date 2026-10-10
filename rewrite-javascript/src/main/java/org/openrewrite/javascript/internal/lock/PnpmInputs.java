@@ -54,10 +54,15 @@ final class PnpmInputs {
     }
 
     static InstallRoot installRoot(LockDirectory dir) {
-        return PnpmLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        return PnpmLockRegenerator.installRoot(project(dir).build());
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
+        return project(dir).host(host).now(now).build();
+    }
+
+    // what pnpm reads of the project, which is all its walk reads
+    private static Inputs.InputsBuilder project(LockDirectory dir) {
         String workspaceDir = workspaceDir(dir);
         Map<String, String> manifests = new LinkedHashMap<>();
         Map<String, String> files = new LinkedHashMap<>();
@@ -80,10 +85,7 @@ final class PnpmInputs {
                 .dir(relative(dir.fromRoot(workspaceDir), dir.fromRoot(dir.getRunsIn())))
                 .manifests(manifests)
                 .files(files)
-                .paths(dir.pathsUnder(workspaceDir))
-                .now(now)
-                .host(host)
-                .build();
+                .paths(dir.pathsUnder(workspaceDir));
     }
 
     // the nearest directory from the lock's up holding a pnpm-workspace.yaml, read or not, else a misspelt one pnpm

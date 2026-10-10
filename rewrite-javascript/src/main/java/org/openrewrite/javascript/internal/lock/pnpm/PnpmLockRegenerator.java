@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Builder;
-import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -41,6 +40,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Port of pnpm 11.2.2's {@code pnpm install --lockfile-only} after {@link Main}: @pnpm/installing.commands
@@ -94,9 +95,9 @@ public final class PnpmLockRegenerator {
         Map<String, String> env;
 
         /**
-         * The clock {@code minimumReleaseAge} counts from.
+         * The clock {@code minimumReleaseAge} counts from; null for the walk, which reads none.
          */
-        @NonNull
+        @Nullable
         Instant now;
 
         @Builder.Default
@@ -193,6 +194,7 @@ public final class PnpmLockRegenerator {
     private final EnvLockfile.OnDisk lockFile;
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
+    private final Instant now;
 
     // a project pnpm lists without a package.json, which it reports once the lock is verified
     private @Nullable String missingManifest;
@@ -201,8 +203,9 @@ public final class PnpmLockRegenerator {
         this.inputs = inputs;
         this.registry = registry;
         this.lockFile = new EnvLockfile.OnDisk(inputs.getLock());
-        this.envInstaller = new EnvInstaller(registry, inputs.getNow(), inputs.getHost());
-        this.stores = new CreateNewStoreController(registry, inputs.getNow());
+        this.now = requireNonNull(inputs.getNow(), "now");
+        this.envInstaller = new EnvInstaller(registry, now, inputs.getHost());
+        this.stores = new CreateNewStoreController(registry, now);
     }
 
     /**
@@ -282,10 +285,7 @@ public final class PnpmLockRegenerator {
                 throw sharesCacheWith(dir);
             }
             String lockPath = RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE);
-            String lock = inputs.getFiles().get(lockPath);
-            if (lock == null && inputs.getPaths() != null && inputs.getPaths().contains(lockPath)) {
-                throw new CannotKnow(lockPath + " (its contents were not read)");
-            }
+            String lock = CannotKnow.requireRead(inputs.getFiles().get(lockPath), inputs.getPaths(), lockPath);
             if (lock == null) {
                 continue;
             }
@@ -482,7 +482,7 @@ public final class PnpmLockRegenerator {
         Double minimumReleaseAge = options.getNumber("minimumReleaseAge");
         List<String> minimumReleaseAgeExclude = options.getStrings("minimumReleaseAgeExclude");
         if (minimumReleaseAge != null && minimumReleaseAge != 0) {
-            ctx.setMaximumPublishedBy(inputs.getNow().minusMillis((long) (minimumReleaseAge * 60 * 1000)));
+            ctx.setMaximumPublishedBy(now.minusMillis((long) (minimumReleaseAge * 60 * 1000)));
         }
         if (minimumReleaseAgeExclude != null) {
             ctx.setPublishedByExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(minimumReleaseAgeExclude,
@@ -954,7 +954,7 @@ public final class PnpmLockRegenerator {
                         .registries(options.getRegistries())
                         .namedRegistries(options.getNamedRegistries())
                         .fetch(registry)
-                        .now(inputs.getNow())
+                        .now(now)
                         .build());
         return npmVerifier == null ? Collections.emptyList() : Collections.singletonList(npmVerifier);
     }

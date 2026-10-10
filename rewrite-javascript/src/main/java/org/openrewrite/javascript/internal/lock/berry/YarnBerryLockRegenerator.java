@@ -397,10 +397,7 @@ public final class YarnBerryLockRegenerator {
     private @Nullable String manifestText(String location) {
         String text = inputs.getManifests().get(location);
         String file = location.isEmpty() ? "package.json" : location + "/package.json";
-        if (text == null && inputs.getPaths() != null && inputs.getPaths().contains(file)) {
-            throw new CannotKnow(file + " (its contents were not read)");
-        }
-        return text;
+        return CannotKnow.requireRead(text, inputs.getPaths(), file);
     }
 
     private @Nullable Manifest manifest(String location) {

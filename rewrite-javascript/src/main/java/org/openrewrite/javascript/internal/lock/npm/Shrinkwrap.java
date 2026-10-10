@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
@@ -39,6 +40,20 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  * {@link #commit()} and written by {@link #toString()}.
  */
 public final class Shrinkwrap {
+
+    /**
+     * load's filename: an npm-shrinkwrap.json the project holds is read and written in place of package-lock.json.
+     */
+    public static boolean readsShrinkwrap(Predicate<String> holds) {
+        return holds.test("npm-shrinkwrap.json");
+    }
+
+    /**
+     * What save writes beside the lock it reads: the yarn.lock, which it rewrites from the tree.
+     */
+    public static boolean writesBesideLock(Predicate<String> holds) {
+        return holds.test("yarn.lock");
+    }
 
     public static final int DEFAULT_LOCKFILE_VERSION = 3;
 

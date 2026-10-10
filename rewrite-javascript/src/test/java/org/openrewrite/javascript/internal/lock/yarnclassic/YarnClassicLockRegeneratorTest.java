@@ -237,8 +237,7 @@ class YarnClassicLockRegeneratorTest {
     void aRangeNamingADirectoryTheProjectHoldsIsAFileDependency() {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"next\"}}")
-                .lock("# yarn lockfile v1\n\n\n")
-                .now(Instant.EPOCH);
+                .lock("# yarn lockfile v1\n\n\n");
         Result unread = new YarnClassicLockRegenerator(inputs.paths(new LinkedHashSet<>(Arrays.asList(
                 "package.json", "yarn.lock", "next/package.json"))).build(), YarnClassicScenarios.NO_REGISTRY)
                 .regenerate();
@@ -273,8 +272,7 @@ class YarnClassicLockRegeneratorTest {
     void rejectsAFileTargetThatDoesNotExist(String label, @Nullable String paths, String outcome) {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"x\":\"file:./missing\"}}")
-                .lock("# yarn lockfile v1\n\n\n")
-                .now(Instant.EPOCH);
+                .lock("# yarn lockfile v1\n\n\n");
         if (paths != null) {
             inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
         }
@@ -300,7 +298,6 @@ class YarnClassicLockRegeneratorTest {
                 .configFile(".yarnrc", "yarn-path \"" + release + "\"\n")
                 .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", ".yarnrc", "../README.md")))
                 .directory(directory)
-                .now(Instant.EPOCH)
                 .build();
         assertThat(untilTheFirstStep(inputs)).startsWith(outcome);
     }
@@ -314,8 +311,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", ROOT)
                 .lock("# yarn lockfile v1\n\n\n")
-                .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a*\"]}")
-                .now(Instant.EPOCH);
+                .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a*\"]}");
         assertThat(untilTheFirstStep(inputs.build())).isEqualTo(CANNOT_KNOW +
                 "whether the workspaces of ../package.json list this project, whose directory in the repository the " +
                 "host did not give");
@@ -347,8 +343,7 @@ class YarnClassicLockRegeneratorTest {
                 .manifest("", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../../package.json", "{\"private\":true,\"workspaces\":[\"" + pattern + "\"]}")
-                .directory("x/packages/a")
-                .now(Instant.EPOCH);
+                .directory("x/packages/a");
         if (configFile != null) {
             inputs.configFile(configFile, "registry \"https://registry.npmjs.org\"\n");
         }
@@ -365,8 +360,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a\"]}")
-                .directory("a")
-                .now(Instant.EPOCH);
+                .directory("a");
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("", "{\"name\":\"a\"}").build()))
                 .isEqualTo(InstallRoot.at(1));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("",
@@ -385,8 +379,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", WORKSPACE_ROOT)
                 .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"}")
-                .configFile(".yarnrc", "--focus true\n")
-                .now(Instant.EPOCH);
+                .configFile(".yarnrc", "--focus true\n");
         assertThat(untilTheFirstStep(inputs.build()))
                 .isEqualTo("error This command can only be run inside an individual workspace.");
         assertThat(untilTheFirstStep(inputs.cwd("packages/a").build())).startsWith("requests ");
@@ -403,8 +396,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", WORKSPACE_ROOT)
                 .manifest("tools/x", "{\"name\":\"x\",\"version\":\"1.0.0\"}")
-                .cwd("tools/x")
-                .now(Instant.EPOCH);
+                .cwd("tools/x");
         assertThat(untilTheFirstStep(inputs.build())).isEqualTo(CANNOT_KNOW + "the lock yarn writes: run in " +
                                                                 "tools/x, which no workspaces list, it makes that " +
                                                                 "directory its lockfileFolder and writes its " +
@@ -430,8 +422,7 @@ class YarnClassicLockRegeneratorTest {
                 .lock("# yarn lockfile v1\n\n\n")
                 .paths(new LinkedHashSet<>(Arrays.asList("package.json", "yarn.lock", "packages/a/package.json",
                         "lib/package.json")))
-                .cwd(cwd == null ? "" : cwd)
-                .now(Instant.EPOCH);
+                .cwd(cwd == null ? "" : cwd);
         if ("packageManager".equals(label)) {
             inputs.manifest("", "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]," +
                                 "\"packageManager\":\"pnpm@9.15.0\"}")
@@ -482,7 +473,6 @@ class YarnClassicLockRegeneratorTest {
                 .configFile("../../package.json", root)
                 .paths(paths)
                 .directory("mid/app")
-                .now(Instant.EPOCH)
                 .build();
         assertThat(untilTheFirstStep(inputs)).startsWith(outcome);
     }
@@ -515,7 +505,7 @@ class YarnClassicLockRegeneratorTest {
     void requestsTheAggregatorOfAnyWorkspaceRoot(String label, String manifest, String patterns) {
         List<String> warnings = new ArrayList<>();
         Run install = install(YarnClassicLockRegenerator.Inputs.builder().manifest("", manifest)
-                .now(Instant.EPOCH).build(), warnings);
+                .build(), warnings);
         Install.InstallCwdRequest request = install.install.fetchRequestFromCwd(install.install.lockfile(),
                 new ResolutionMap(install.options));
         List<String> requested = new ArrayList<>();
@@ -565,7 +555,7 @@ class YarnClassicLockRegeneratorTest {
         Run install = install(YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\": \"p\", \"version\": \"1.0.0\", \"dependencies\": " +
                               "{\"ms\": \"^2.1.0\"}, \"devDependencies\": {\"ms\": \"2.1.2\"}}")
-                .now(Instant.EPOCH).build(), warnings);
+                .build(), warnings);
         install.install.fetchRequestFromCwd(install.install.lockfile(), new ResolutionMap(install.options));
         String collision = ": \"dependencies\" has dependency \"ms\" with range \"^2.1.0\" that collides with a " +
                            "dependency in \"devDependencies\" of the same name with version \"2.1.2\"";
@@ -614,7 +604,6 @@ class YarnClassicLockRegeneratorTest {
                 .builder()
                 .lock("# yarn lockfile v1\n\n\n")
                 .manifest("", "{\"name\":\"x\",\"version\":\"1.0.0\",\"dependencies\":{\"root-dep\":\"^1.0.0\"}}")
-                .now(Instant.EPOCH)
                 .build(), registry);
         if (failure == null) {
             assertThatThrownBy(regenerator::regenerate)
@@ -640,8 +629,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .lock("# yarn lockfile v1\n\n\n")
                 .manifest("", "{\"name\":\"x\",\"version\":\"1.0.0\",\"dependencies\":{\"local\":\"link:./local\"}}")
-                .host(Host.builder().os("darwin").build())
-                .now(Instant.EPOCH);
+                .host(Host.builder().os("darwin").build());
         if (paths != null) {
             inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
         }
@@ -680,7 +668,6 @@ class YarnClassicLockRegeneratorTest {
                 .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}")
                 .paths(new LinkedHashSet<>(Arrays.asList("package.json", "packages/a/package.json", path)))
                 .host(Host.builder().os("darwin").build())
-                .now(Instant.EPOCH)
                 .build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
         if (cannotKnow == null) {
             assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
@@ -692,8 +679,7 @@ class YarnClassicLockRegeneratorTest {
     private static YarnClassicLockRegenerator.Inputs withMember(String root, @Nullable String yarnrc) {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", root)
-                .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}")
-                .now(Instant.EPOCH);
+                .manifest("packages/a", "{\"name\": \"a\", \"version\": \"1.0.0\"}");
         if (yarnrc != null) {
             inputs.configFile(".yarnrc", yarnrc);
         }
@@ -705,8 +691,7 @@ class YarnClassicLockRegeneratorTest {
         YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", manifest)
                 .lock(lock)
-                .env(env)
-                .now(Instant.EPOCH);
+                .env(env);
         if (yarnrc != null) {
             inputs.configFile(".yarnrc", yarnrc + "\n");
         }

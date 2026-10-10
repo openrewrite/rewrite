@@ -76,7 +76,7 @@ class LockDirectoryTest {
 
         assertThat(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getNpmrc()).isNull();
         assertThat(BunInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getNpmrc()).isNull();
-        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getConfigFiles())
+        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN).getConfigFiles())
           .containsOnlyKeys("../../.npmrc");
 
         LockDirectory held = LockDirectory.of(inMidApp(PackageManager.Npm)

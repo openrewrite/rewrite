@@ -29,7 +29,6 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,7 +55,6 @@ final class YarnClassicScenarios {
     private static final List<String> LOCKS = Arrays.asList("before", "after", "again");
     private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
-    private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S*) cpu=(\\S*)");
     private static final Pattern LAYOUT = Pattern.compile("(?m)^layout repo/(\\S+)");
     private static final String RECORDED_ON_OS = "darwin";
@@ -233,16 +231,6 @@ final class YarnClassicScenarios {
             return Host.builder().nodeVersion(nodeVersion()).os(os).cpu(cpu).build();
         }
 
-        Instant now() {
-            String recorded = file("recorded-with");
-            if (recorded != null) {
-                Matcher started = EDIT_STARTED.matcher(recorded);
-                if (started.find()) {
-                    return Instant.parse(started.group(1));
-                }
-            }
-            return Instant.now();
-        }
 
         /**
          * Every lock yarn wrote or was given, and what it wrote over each with no change or under {@code --force}.
@@ -314,7 +302,6 @@ final class YarnClassicScenarios {
                     .cwd(cwd == null ? "" : cwd.trim())
                     .env(new LinkedHashMap<>())
                     .host(host())
-                    .now(now())
                     .build();
         }
 

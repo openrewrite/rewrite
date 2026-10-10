@@ -135,31 +135,14 @@ public final class NpmLockRegenerator {
         String path;
         String written;
         try {
-            int localPrefix = loadLocalPrefix(inputs);
-            int lockDir = inputs.getRunsIn().isEmpty() ? 0 : inputs.getRunsIn().split("/").length;
-            if (localPrefix > lockDir) {
-                StringBuilder up = new StringBuilder("..");
-                for (int i = localPrefix - lockDir; i > 1; i--) {
-                    up.append("/..");
-                }
-                throw new CannotKnow("the lock npm writes: it installs at the workspace root " + up +
-                                     ", whose workspaces list this project, and writes that root's lock");
-            }
-            if (localPrefix < lockDir) {
-                throw new CannotKnow("the lock npm writes: run in " + inputs.getRunsIn() + " it installs " +
-                                     localPrefix + " directories above it, not at this lock");
-            }
-            if (inputs.getPaths() != null && inputs.getPaths().contains("npm-shrinkwrap.json")) {
+            INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
+                    inputs.getParentTrees()), inputs.getRunsIn(), "lock");
+            if (inputs.getPaths() != null && Shrinkwrap.readsShrinkwrap(inputs.getPaths()::contains)) {
                 throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
                                      "lock in its place");
             }
-            if (inputs.getNpmrc() == null && inputs.getPaths() != null && inputs.getPaths().contains(".npmrc")) {
-                throw new CannotKnow(".npmrc (its contents were not read)");
-            }
-            if (inputs.getYarnLock() == null && inputs.getPaths() != null && inputs.getPaths().contains("yarn.lock")) {
-                throw new CannotKnow("yarn.lock, which npm reads and rewrites beside its lock (its contents were " +
-                                     "not read)");
-            }
+            CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
+            CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
             options = NpmOptions.fromNpmrc(inputs.getNpmrc(), HostEnvironment.of(inputs.getEnv()));
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
@@ -186,67 +169,16 @@ public final class NpmLockRegenerator {
     }
 
     /**
-     * Where npm run in the project's directory installs and writes its lock; a walk that fails, which
-     * {@link #regenerate()} reports as it walks first, stops here.
+     * Where npm run in {@code runsIn} installs and writes its lock, by {@link Inputs#getParentTrees()}; a walk that
+     * fails, which {@link #regenerate()} reports as it walks first, stops here.
      */
-    public static InstallRoot installRoot(Inputs inputs) {
+    public static InstallRoot installRoot(String runsIn, Map<String, String> manifests,
+                                          Map<String, Map<String, @Nullable String>> parentTrees) {
         try {
-            return InstallRoot.at(loadLocalPrefix(inputs));
+            return InstallRoot.at(NpmOptions.loadLocalPrefix(manifests.get(runsIn), parentTrees));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }
-    }
-
-    /**
-     * @npmcli/config {@code loadLocalPrefix}: how many directories above the one it runs in npm installs, at the
-     * nearest whose workspaces map it, writing that directory's lock; 0 when it installs there.
-     */
-    private static int loadLocalPrefix(Inputs inputs) {
-        String manifest = inputs.getManifests().get(inputs.getRunsIn());
-        if (manifest == null) {
-            return 0;
-        }
-        for (Map.Entry<String, Map<String, @Nullable String>> parent : inputs.getParentTrees().entrySet()) {
-            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue());
-            Map<String, Object> pkg;
-            try {
-                PackageJson own = files.manifest("");
-                if (own == null) {
-                    continue;
-                }
-                pkg = own.getContent();
-            } catch (PackageJson.NeedsPackageFiles e) {
-                pkg = e.getContent();
-            } catch (CannotKnow e) {
-                throw e;
-            } catch (RuntimeException e) {
-                continue;
-            }
-            if (!truthy(pkg.get("workspaces"))) {
-                continue;
-            }
-            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
-                return parent.getKey().split("/").length;
-            }
-        }
-        return 0;
-    }
-
-    private static VirtualTreeLoader.ProjectFiles parentFiles(String runsIn, String manifest,
-                                                              Map<String, @Nullable String> tree) {
-        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
-                .manifest(runsIn, manifest);
-        for (Map.Entry<String, @Nullable String> held : tree.entrySet()) {
-            if (held.getKey().equals(runsIn)) {
-                continue;
-            }
-            if (held.getValue() == null) {
-                files.unread(held.getKey());
-            } else {
-                files.manifest(held.getKey(), held.getValue());
-            }
-        }
-        return files.build();
     }
 
     /**
