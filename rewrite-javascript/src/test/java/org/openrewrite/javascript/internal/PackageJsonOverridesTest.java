@@ -218,8 +218,8 @@ class PackageJsonOverridesTest {
 
     @Test
     void aPnpmOverrideItAlreadyReadsFromResolutionsIsLeftAlone() {
-        String pkg = "{\n  \"packageManager\": \"pnpm@10.34.6\",\n  \"resolutions\": {\n    \"is-number\": \"7.0.0\"\n" +
-                     "  }\n}\n";
+        String pkg = "{\n  \"packageManager\": \"pnpm@10.34.6\",\n  \"resolutions\": {\n" +
+                     "    \"is-number\": \"7.0.0\"\n  }\n}\n";
         assertThat(write(pkg, Pnpm, null)).isEqualTo(pkg);
     }
 

@@ -44,6 +44,7 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -132,6 +133,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void pnpmAtTheRootOfAWorkspaceWhoseProjectsKeepTheirOwnLocks() {
         golden("pnpm/override-recipe-unshared", PackageManager.Pnpm, "7.0.0", null);
+    }
+
+    @Test
+    void pnpmMemberLockVisitedBeforeTheRoot() {
+        golden("pnpm/override-recipe-unshared", PackageManager.Pnpm, "7.0.0", null, true);
     }
 
     @Test
@@ -310,6 +316,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path) {
+        golden(scenario, pm, version, path, false);
+    }
+
+    private void golden(String scenario, PackageManager pm, String version, @Nullable String path, boolean reversed) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
@@ -327,6 +337,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         } else {
             sources.add(s.lock(pm, "probes/before-root-lock", s.file("probes/after-root-lock"), "pnpm-lock.yaml"));
             sources.add(s.lock(pm, "before", s.file("after"), lockDir.trim() + "/pnpm-lock.yaml"));
+        }
+        if (reversed) {
+            Collections.reverse(sources);
         }
         rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
     }
