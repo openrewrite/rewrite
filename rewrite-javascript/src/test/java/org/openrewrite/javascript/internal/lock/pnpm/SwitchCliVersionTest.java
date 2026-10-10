@@ -169,7 +169,8 @@ class SwitchCliVersionTest {
         PnpmError missing = new PnpmError("PNPMFILE_NOT_FOUND", "pnpmfile at \"missing.cjs\" is not found");
         String resolved = "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies: {}\n" +
                           "    packageManagerDependencies:\n      '@pnpm/exe':\n        specifier: 11.2.2\n" +
-                          "        version: 11.2.2\n      pnpm:\n        specifier: 11.2.2\n        version: 11.2.2\n\n" +
+                          "        version: 11.2.2\n      pnpm:\n        specifier: 11.2.2\n" +
+                          "        version: 11.2.2\n\n" +
                           "packages: {}\n\nsnapshots: {}\n\n---\n" + MAIN_DOCUMENT;
         assertThat(member(BAD_NAMED_REGISTRY, resolved).beforeNextStoreController(missing)).isSameAs(missing);
     }
