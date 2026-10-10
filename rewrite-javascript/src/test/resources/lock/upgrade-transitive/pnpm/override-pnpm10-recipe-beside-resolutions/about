@@ -1,0 +1,1 @@
+pnpm 10.34.6 whose package.json holds resolutions and no pnpm field: the recipe writes pnpm.overrides is-number 7.0.0 there, which pnpm 10 reads in place of pnpm-workspace.yaml.

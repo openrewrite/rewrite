@@ -466,8 +466,25 @@ public class PackageJsonHelper {
         return doc.withValue(root.getPadding().withMembers(rootMembers));
     }
 
+    /** The indent unit of {@code doc}'s top-level members, or two spaces when none can be detected. */
+    public static String indentUnit(Json.Document doc) {
+        return doc.getValue() instanceof Json.JsonObject ? detectIndentUnit((Json.JsonObject) doc.getValue()) : "  ";
+    }
+
+    /** {@code doc} with the top-level member {@code key} holding {@code value}, appended when absent. */
+    public static Json.Document setMember(Json.Document doc, String key, JsonValue value) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        for (Json m : root.getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                return doc.withValue(replaceMember(root, key, value));
+            }
+        }
+        return doc.withValue(appendMember(root, makeMember(key, value, Space.EMPTY)));
+    }
+
     /** The indent unit from {@code obj}'s first member, or two spaces when none can be detected. */
-    static String detectIndentUnit(Json.JsonObject obj) {
+    private static String detectIndentUnit(Json.JsonObject obj) {
         List<JsonRightPadded<Json>> members = obj.getPadding().getMembers();
         if (!members.isEmpty()) {
             String ws = members.get(0).getElement().getPrefix().getWhitespace();
@@ -693,7 +710,7 @@ public class PackageJsonHelper {
     }
 
     /** A member with {@code prefix}; a bare literal value gets a leading space so it prints {@code "key": "value"}. */
-    static Json.Member makeMember(String key, JsonValue value, Space prefix) {
+    private static Json.Member makeMember(String key, JsonValue value, Space prefix) {
         Json.Literal keyLit = makeStringLiteral(key);
         JsonValue spacedValue = value;
         if (value instanceof Json.Literal && ((Json.Literal) value).getPrefix().getWhitespace().isEmpty()) {

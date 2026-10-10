@@ -114,6 +114,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void pnpmAtTheRootOfAWorkspaceWhoseProjectsKeepTheirOwnLocks() {
+        golden("pnpm/override-recipe-unshared", PackageManager.Pnpm, "7.0.0", null);
+    }
+
+    @Test
+    void pnpmWhoseNamedReleaseLetsThePortedOneInstall() {
+        golden("pnpm/override-on-fail-ignore", PackageManager.Pnpm, "7.0.0", null);
+    }
+
+    @Test
     void bunGlobal() {
         golden("bun/override-recipe-global", PackageManager.Bun, "7.0.0", null);
     }
@@ -191,6 +201,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void pnpm10BesideResolutionsWritesPnpmOverrides() {
+        otherPnpmRelease("pnpm/override-pnpm10-recipe-beside-resolutions", null, "10.34.6");
+    }
+
+    @Test
+    void pnpm10WithAPnpmFieldBesideWorkspaceOverridesWritesTheWorkspaceManifest() {
+        otherPnpmRelease("pnpm/override-pnpm10-recipe-pnpm-field-workspace-overrides", null, "10.34.6");
+    }
+
+    @Test
     void pnpm9WritesPnpmOverrides() {
         otherPnpmRelease("pnpm/override-pnpm9-reads-pnpm-field", null, "9.15.9");
     }
@@ -235,6 +255,33 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void yarnBerryCannotMatchARangedParent() {
+        Scenario s = new Scenario("yarn-berry/override-recipe-path");
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", "is-odd@^3.0.0")
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getDetail()).contains("exact version only, not is-odd@^3.0.0"))),
+          s.root(PackageManager.YarnBerry, s.file("pkg-before")),
+          s.lock(PackageManager.YarnBerry, null)
+        );
+    }
+
+    @Test
+    void npmRejectingTheOverrideKeepsTheEditAndWarns() {
+        Scenario s = new Scenario("npm/override-recipe-conflicts-direct");
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", null)
+            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getDetail()).contains("EOVERRIDE"))),
+          s.root(PackageManager.Npm, s.file("pkg"), true),
+          packageLock(s.file("before"), null, spec -> spec.noTrim().after(actual -> {
+              assertThat(actual).contains("EOVERRIDE").endsWith(requireNonNull(s.file("before")));
+              return actual;
+          }))
+        );
+    }
+
+    @Test
     void yarnClassicCannotMatchAVersionedParent() {
         Scenario s = new Scenario("yarn-classic/override-recipe-path");
         rewriteRun(
@@ -255,11 +302,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             sources.add(packageJson(member, null, nodeResolutionResult(pm, dependencies(member)),
               spec -> spec.path(MEMBER).noTrim()));
         }
-        String workspace = s.file("workspace");
-        if (workspace != null) {
-            sources.add(yaml(s.file("workspace-before"), workspace, spec -> spec.path("pnpm-workspace.yaml").noTrim()));
+        if (s.file("workspace") != null) {
+            sources.add(s.workspace());
         }
-        sources.add(s.lock(pm, s.file("after")));
+        String lockDir = s.file("lock-dir");
+        if (lockDir == null) {
+            sources.add(s.lock(pm, s.file("after")));
+        } else {
+            sources.add(s.lock(pm, "probes/before-root-lock", s.file("probes/after-root-lock"), "pnpm-lock.yaml"));
+            sources.add(s.lock(pm, "before", s.file("after"), lockDir.trim() + "/pnpm-lock.yaml"));
+        }
         rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
     }
 
@@ -270,8 +322,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(PackageManager.Pnpm, s.file("pkg"), true));
         if (s.file("workspace") != null) {
-            sources.add(yaml(s.file("workspace-before"), s.file("workspace"),
-              spec -> spec.path("pnpm-workspace.yaml").noTrim()));
+            sources.add(s.workspace());
         }
         sources.add(pnpmLock(s.file("before"), null, spec -> spec.noTrim().afterRecipe(lock ->
           assertThat(lock.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(warn ->
@@ -339,20 +390,32 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning));
         }
 
+        SourceSpecs workspace() {
+            String before = file("workspace-before");
+            String after = file("workspace");
+            return before != null && before.equals(after) ?
+              yaml(before, spec -> spec.path("pnpm-workspace.yaml").noTrim()) :
+              yaml(before, after, spec -> spec.path("pnpm-workspace.yaml").noTrim());
+        }
+
         SourceSpecs lock(PackageManager pm, @Nullable String after) {
-            String before = requireNonNull(file("before"));
+            return lock(pm, "before", after, pm == PackageManager.Npm ? "package-lock.json" :
+              pm == PackageManager.Pnpm ? "pnpm-lock.yaml" : pm == PackageManager.Bun ? "bun.lock" : "yarn.lock");
+        }
+
+        SourceSpecs lock(PackageManager pm, String beforeFile, @Nullable String after, String lockPath) {
+            String before = requireNonNull(file(beforeFile));
             String expected = before.equals(after) ? null : after;
             switch (pm) {
                 case Npm:
-                    return packageLock(before, expected, spec -> spec.noTrim()
+                    return packageLock(before, expected, spec -> spec.path(lockPath).noTrim()
                       .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning));
                 case Pnpm:
-                    return pnpmLock(before, expected, spec -> spec.noTrim()
+                    return pnpmLock(before, expected, spec -> spec.path(lockPath).noTrim()
                       .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning));
                 default:
-                    String name = pm == PackageManager.Bun ? "bun.lock" : "yarn.lock";
-                    return expected == null ? text(before, spec -> spec.path(name).noTrim()) :
-                            text(before, expected, spec -> spec.path(name).noTrim()
+                    return expected == null ? text(before, spec -> spec.path(lockPath).noTrim()) :
+                            text(before, expected, spec -> spec.path(lockPath).noTrim()
                               .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning));
             }
         }

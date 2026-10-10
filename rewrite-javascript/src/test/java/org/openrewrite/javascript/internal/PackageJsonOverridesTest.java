@@ -65,11 +65,16 @@ class PackageJsonOverridesTest {
     private static final String WRITES = "lock/upgrade-transitive/pnpm-writes/";
 
     /**
-     * Cases where pnpm rewrites what the edit leaves alone (indentation, pnpm 10's key order); the recipe keeps it.
+     * Cases where pnpm re-indents what the edit leaves alone; the recipe keeps it, and the keys come in pnpm's order.
      */
-    private static final List<String> RE_RENDERED = Arrays.asList("11.2.2/overrides-four-spaces",
+    private static final List<String> RE_INDENTED = Arrays.asList("11.2.2/overrides-four-spaces",
             "11.2.2/packages-sequence-unindented", "10.34.6/overrides-four-spaces",
-            "10.34.6/packages-sequence-unindented", "10.34.6/unordered", "10.34.6/overrides-unordered",
+            "10.34.6/packages-sequence-unindented");
+
+    /**
+     * Cases where pnpm 10 sorts the keys the edit leaves alone; the recipe keeps their order.
+     */
+    private static final List<String> RE_SORTED = Arrays.asList("10.34.6/unordered", "10.34.6/overrides-unordered",
             "10.34.6/overrides-empty", "10.34.6/blank-lines-first");
 
     static Stream<Arguments> writes() throws IOException, URISyntaxException {
@@ -103,7 +108,11 @@ class PackageJsonOverridesTest {
         String written = PackageJsonOverrides.applyWorkspaceOverride(before, root,
                 gt < 0 ? added.getKey() : added.getKey().substring(gt + 1), added.getValue(), path);
         String pnpm = read(dir.resolve("workspace"));
-        if (RE_RENDERED.contains(name)) {
+        if (RE_INDENTED.contains(name)) {
+            ObjectMapper json = new ObjectMapper();
+            assertThat(json.writeValueAsString(new Yaml().load(written)))
+              .isEqualTo(json.writeValueAsString(new Yaml().load(pnpm)));
+        } else if (RE_SORTED.contains(name)) {
             assertThat((Map<?, ?>) new Yaml().load(written)).isEqualTo(new Yaml().load(pnpm));
         } else {
             assertThat(written).isEqualTo(pnpm);
@@ -134,31 +143,55 @@ class PackageJsonOverridesTest {
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^12.0.0\"}}} ; 12",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"pnpm@10.34.6\"} ; 11",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"npm\"},{\"name\":\"pnpm\",\"version\":\"9.15.9\"}]}} ; 9",
+      "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"9.15.9\"},{\"name\":\"npm\"}]}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"warn\"}}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"error\"}}} ; 10",
     })
     void thePnpmReleaseIsTheOnePnpmRuns(String root, int release) {
-        assertThat(PackageJsonOverrides.pnpmRelease(manifest(root))).isEqualTo(release);
+        assertThat(PackageJsonOverrides.pnpmRelease(manifest(root), null)).isEqualTo(release);
+    }
+
+    @Test
+    void theWorkspacesPmOnFailDecidesWhetherTheNamedReleaseRuns() {
+        Json.Document root = manifest("{\"packageManager\":\"pnpm@10.34.6\"}");
+        assertThat(PackageJsonOverrides.pnpmRelease(root, "pmOnFail: ignore\n")).isEqualTo(11);
+        assertThat(PackageJsonOverrides.pnpmRelease(root, "pmOnFail: download\n")).isEqualTo(10);
+        assertThat(PackageJsonOverrides.pnpmRelease(root, "pmOnFail: ''\n")).isEqualTo(10);
     }
 
     @Test
     void eachPackageManagerReadsItsOwnPlace() {
         Json.Document plain = manifest("{\"name\":\"p\"}");
-        assertThat(PackageJsonOverrides.place(Npm, plain)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
-        assertThat(PackageJsonOverrides.place(Bun, plain)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
-        assertThat(PackageJsonOverrides.place(Bun, manifest("{\"resolutions\":{}}")))
+        assertThat(place(Npm, plain, null)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
+        assertThat(place(Bun, plain, null)).isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
+        assertThat(place(Bun, manifest("{\"resolutions\":{}}"), null))
           .isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
-        assertThat(PackageJsonOverrides.place(Bun, manifest("{\"overrides\":{},\"resolutions\":{}}")))
+        assertThat(place(Bun, manifest("{\"overrides\":{},\"resolutions\":{}}"), null))
           .isEqualTo(PackageJsonOverrides.Place.OVERRIDES);
-        assertThat(PackageJsonOverrides.place(YarnClassic, plain)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
-        assertThat(PackageJsonOverrides.place(YarnBerry, plain)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
-        assertThat(PackageJsonOverrides.place(Pnpm, plain)).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
-        assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@10.34.6\"}")))
-          .isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
-        assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@10.34.6\",\"pnpm\":{}}")))
+        assertThat(place(YarnClassic, plain, null)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
+        assertThat(place(YarnBerry, plain, null)).isEqualTo(PackageJsonOverrides.Place.RESOLUTIONS);
+        assertThat(place(Pnpm, plain, null)).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
+        assertThat(place(Pnpm, manifest("{\"packageManager\":\"pnpm@9.15.9\"}"), null))
           .isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
-        assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@10.34.6\",\"pnpm\":null}")))
-          .isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
-        assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@9.15.9\"}")))
-          .isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = ';', value = {
+      " ; ; WORKSPACE_MANIFEST",
+      "\"pnpm\":{} ; ; PNPM_FIELD",
+      "\"pnpm\":null ; ; WORKSPACE_MANIFEST",
+      "\"pnpm\":{} ; overrides: {left-pad: 1.3.0} ; WORKSPACE_MANIFEST",
+      "\"pnpm\":{} ; overrides: {} ; PNPM_FIELD",
+      "\"resolutions\":{\"left-pad\":\"1.3.0\"} ; ; PNPM_FIELD",
+      "\"resolutions\":{} ; ; WORKSPACE_MANIFEST",
+      "\"pnpm\":{\"overrides\":{\"left-pad\":\"1.3.0\"}} ; overrides: {wrappy: 1.0.2} ; PNPM_FIELD",
+    })
+    void pnpm10ReadsPackageJsonsOverridesInPlaceOfTheWorkspaces(@Nullable String fields, @Nullable String workspace,
+                                                                 PackageJsonOverrides.Place place) {
+        Json.Document root = manifest("{\"packageManager\":\"pnpm@10.34.6\"" + (fields == null ? "" : "," + fields) +
+                                      "}");
+        assertThat(place(Pnpm, root, workspace)).isEqualTo(place);
     }
 
     @Test
@@ -166,19 +199,35 @@ class PackageJsonOverridesTest {
         Json.Document plain = manifest("{\"name\":\"p\"}");
         List<DependencyPathSegment> oneParent = PackageJsonOverrides.parsePath("is-odd");
         List<DependencyPathSegment> twoParents = PackageJsonOverrides.parsePath("is-even>is-odd");
-        assertThat(PackageJsonOverrides.declined(Npm, plain, twoParents)).isNull();
-        assertThat(PackageJsonOverrides.declined(Bun, plain, oneParent)).contains("nested overrides");
-        assertThat(PackageJsonOverrides.declined(Pnpm, plain, oneParent)).isNull();
-        assertThat(PackageJsonOverrides.declined(Pnpm, plain, twoParents)).contains("ERR_PNPM_INVALID_SELECTOR");
-        assertThat(PackageJsonOverrides.declined(Pnpm, manifest("{\"packageManager\":\"pnpm@8.15.9\"}"), null))
-          .contains("pnpm 8.x");
-        assertThat(PackageJsonOverrides.declined(YarnBerry, plain, oneParent)).isNull();
-        assertThat(PackageJsonOverrides.declined(YarnBerry, plain, twoParents)).contains("YN0057");
-        assertThat(PackageJsonOverrides.declined(YarnClassic, plain, twoParents)).isNull();
-        assertThat(PackageJsonOverrides.declined(YarnClassic, plain, PackageJsonOverrides.parsePath("is-odd@3.0.1")))
+        assertThat(declined(Npm, plain, twoParents)).isNull();
+        assertThat(declined(Bun, plain, oneParent)).contains("nested overrides");
+        assertThat(declined(Pnpm, plain, oneParent)).isNull();
+        assertThat(declined(Pnpm, plain, twoParents)).contains("ERR_PNPM_INVALID_SELECTOR");
+        assertThat(declined(Pnpm, manifest("{\"packageManager\":\"pnpm@8.15.9\"}"), null)).contains("pnpm 8.x");
+        assertThat(declined(YarnBerry, plain, oneParent)).isNull();
+        assertThat(declined(YarnBerry, plain, twoParents)).contains("YN0057");
+        assertThat(declined(YarnBerry, plain, PackageJsonOverrides.parsePath("is-odd@3.0.1"))).isNull();
+        assertThat(declined(YarnBerry, plain, PackageJsonOverrides.parsePath("is-odd@npm:3.0.1"))).isNull();
+        assertThat(declined(YarnBerry, plain, PackageJsonOverrides.parsePath("is-odd@^3.0.0")))
+          .contains("exact version only, not is-odd@^3.0.0");
+        assertThat(declined(YarnClassic, plain, twoParents)).isNull();
+        assertThat(declined(YarnClassic, plain, PackageJsonOverrides.parsePath("is-odd@3.0.1")))
           .contains("is-odd@3.0.1");
-        assertThat(PackageJsonOverrides.declined(Npm, manifest("{\"overrides\":\"x\"}"), null))
-          .contains("not an object");
+        assertThat(declined(Npm, manifest("{\"overrides\":\"x\"}"), null)).contains("not an object");
+    }
+
+    @Test
+    void aPnpmOverrideItAlreadyReadsFromResolutionsIsLeftAlone() {
+        String pkg = "{\n  \"packageManager\": \"pnpm@10.34.6\",\n  \"resolutions\": {\n    \"is-number\": \"7.0.0\"\n" +
+                     "  }\n}\n";
+        assertThat(write(pkg, Pnpm, null)).isEqualTo(pkg);
+    }
+
+    @Test
+    void anOverrideThatWouldNeedAnEscapeIsNotWritten() {
+        Json.Document root = manifest("{\"name\":\"p\"}");
+        assertThatThrownBy(() -> PackageJsonOverrides.applyWorkspaceOverride(null, root, "is-number", "7.0.0\u0007",
+                null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -240,6 +289,16 @@ class PackageJsonOverridesTest {
     private static String write(String pkg, PackageManager pm, @Nullable String path) {
         return PackageJsonOverrides.applyOverride(manifest(pkg), pm, "is-number", "7.0.0",
                 path == null ? null : PackageJsonOverrides.parsePath(path)).printAll();
+    }
+
+    private static PackageJsonOverrides.Place place(PackageManager pm, Json.Document root,
+                                                    @Nullable String workspace) {
+        return PackageJsonOverrides.place(pm, root, workspace == null ? null : workspace + "\n");
+    }
+
+    private static @Nullable String declined(PackageManager pm, Json.Document root,
+                                             @Nullable List<DependencyPathSegment> path) {
+        return PackageJsonOverrides.declined(pm, root, place(pm, root, null), null, path);
     }
 
     private static Json.Document manifest(String json) {

@@ -33,8 +33,10 @@ import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
@@ -79,6 +81,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
         /** The package-manager files each workspace root's edit changes or creates, by the root's package.json. */
         final Map<Path, Map<Path, String>> editedFiles = new HashMap<>();
+        /** The edit of each pnpm-workspace.yaml, to apply again over a revision an earlier recipe made since. */
+        final Map<Path, UnaryOperator<String>> workspaceEdits = new HashMap<>();
         final Set<Path> computed = new HashSet<>();
     }
 
@@ -126,8 +130,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             NodeResolutionResult marker = pkg == null ? null :
                     pkg.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
             if (marker == null || marker.getPackageManager() != NodeResolutionResult.PackageManager.Pnpm ||
-                PackageJsonOverrides.place(marker.getPackageManager(), (Json.Document) pkg) !=
-                PackageJsonOverrides.Place.WORKSPACE_MANIFEST || acc.scan.paths.contains(workspaceManifest)) {
+                acc.scan.paths.contains(workspaceManifest) ||
+                !project.getKey().equals(workspaceRoot(acc.scan, project.getKey(), marker.getPackageManager())) ||
+                PackageJsonOverrides.place(marker.getPackageManager(), (Json.Document) pkg, null) !=
+                PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
                 continue;
             }
             ensureComputed(acc, project.getValue(), pkg, ctx);
@@ -212,9 +218,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 if (canApply(pkg)) {
                     ensureComputed(acc, ps, pkg, ctx);
                 }
-                String content = acc.editedFiles.getOrDefault(root, emptyMap()).get(sf.getSourcePath());
-                return content == null || content.equals(sf.printAll()) ? sf :
-                        PackageJsonHelper.reparseLock(sf, content);
+                Path path = sf.getSourcePath();
+                String content = acc.editedFiles.getOrDefault(root, emptyMap()).get(path);
+                UnaryOperator<String> edit = acc.workspaceEdits.get(path);
+                String visited = sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+                if (content != null && edit != null && !visited.equals(acc.scan.packageManagerFiles.get(path))) {
+                    try {
+                        content = edit.apply(visited);
+                    } catch (IllegalArgumentException e) {
+                        return Markup.warn(sf, e);
+                    }
+                }
+                return content == null || content.equals(visited) ? sf : PackageJsonHelper.reparseLock(sf, content);
             }
         };
     }
@@ -229,41 +244,47 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (marker == null || marker.getPackageManager() == null) {
             return;
         }
-        Path root = workspaceRoot(acc.scan, path);
+        NodeResolutionResult.PackageManager pm = marker.getPackageManager();
+        Path root = workspaceRoot(acc.scan, path, pm);
         if (!root.equals(path)) {
             NodeDependencyScan.ProjectState rootPs = acc.scan.projects.get(root);
             if (rootPs == null || rootPs.capturedPackageJson == null || !canApply(rootPs.capturedPackageJson)) {
                 decline(ctx, ps, path, "the override belongs in the workspace root's " + root +
                                        ", which is not a package.json the recipe edits");
+            } else {
+                SourceFile rootPkg = PackageJsonHelper.getLiveTree(ctx, root);
+                ensureComputed(acc, rootPs, rootPkg == null ? rootPs.capturedPackageJson : rootPkg, ctx);
             }
             return;
         }
-        NodeResolutionResult.PackageManager pm = marker.getPackageManager();
         Json.Document doc = (Json.Document) pkg;
+        Path workspaceManifest = path.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
+        String current = acc.scan.packageManagerFiles.get(workspaceManifest);
+        if (pm == NodeResolutionResult.PackageManager.Pnpm && current == null &&
+            acc.scan.paths.contains(workspaceManifest)) {
+            ps.failureRecorded = true;
+            lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(path.toString(),
+                    packageName, LockFileRegeneration.Reason.RESOLUTION_REQUIRED.toString(),
+                    "the engine cannot know " + PackageJsonOverrides.WORKSPACE_MANIFEST +
+                    " (its contents were not read)"));
+            return;
+        }
         List<DependencyPathSegment> parsedPath = dependencyPath == null ? null :
                 PackageJsonOverrides.parsePath(dependencyPath);
-        String declined = PackageJsonOverrides.declined(pm, doc, parsedPath);
+        PackageJsonOverrides.Place place = PackageJsonOverrides.place(pm, doc, current);
+        String declined = PackageJsonOverrides.declined(pm, doc, place, current, parsedPath);
         if (declined != null) {
             decline(ctx, ps, path, declined);
             return;
         }
 
         Map<Path, String> edited = emptyMap();
-        if (PackageJsonOverrides.place(pm, doc) == PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
-            Path workspaceManifest = path.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
-            String current = acc.scan.packageManagerFiles.get(workspaceManifest);
-            if (current == null && acc.scan.paths.contains(workspaceManifest)) {
-                ps.failureRecorded = true;
-                lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(path.toString(),
-                        packageName, LockFileRegeneration.Reason.RESOLUTION_REQUIRED.toString(),
-                        "the engine cannot know " + PackageJsonOverrides.WORKSPACE_MANIFEST +
-                        " (its contents were not read)"));
-                return;
-            }
+        if (place == PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
+            UnaryOperator<String> workspaceEdit = text ->
+                    PackageJsonOverrides.applyWorkspaceOverride(text, doc, packageName, newVersion, parsedPath);
             String written;
             try {
-                written = PackageJsonOverrides.applyWorkspaceOverride(current, doc, packageName, newVersion,
-                        parsedPath);
+                written = workspaceEdit.apply(current);
             } catch (RuntimeException e) {
                 decline(ctx, ps, path, String.valueOf(e.getMessage()));
                 return;
@@ -272,10 +293,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 return;
             }
             edited = singletonMap(workspaceManifest, written);
+            acc.workspaceEdits.put(workspaceManifest, workspaceEdit);
         }
 
         Function<Json.Document, Json.Document> edit = d ->
-                PackageJsonHelper.upgradeTransitive(d, pm, packageName, newVersion, parsedPath);
+                PackageJsonOverrides.applyOverride(d, place, pm, packageName, newVersion, parsedPath);
         PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(pkg, edit, edited,
                 ps.capturedLockContent, NodeDependencyScan.projectFiles(acc.scan, ctx, path), ctx);
         if (r.isChanged()) {
@@ -284,11 +306,44 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             ps.editedFrom = pkg;
             ps.edit = edit;
             acc.editedFiles.put(path, r.getEditedFiles());
+            regenerateMemberLocks(acc, path, pm, r.getEditedFiles(), ctx);
         }
     }
 
-    // the package.json whose lock an edit of packageJson lands in, else the nearest that lists it as a member
-    private static Path workspaceRoot(NodeDependencyScan.Accumulator acc, Path packageJson) {
+    // pnpm writes a lock per project when the workspace does not share one, and each reads the root's overrides
+    private static void regenerateMemberLocks(Accumulator acc, Path root, NodeResolutionResult.PackageManager pm,
+                                              Map<Path, String> edited, ExecutionContext ctx) {
+        for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : acc.scan.projects.entrySet()) {
+            Path member = project.getKey();
+            NodeDependencyScan.ProjectState ps = project.getValue();
+            Path lock = NodeDependencyScan.lockFor(acc.scan, member);
+            if (member.equals(root) || ps.capturedPackageJson == null || ps.capturedLockContent == null ||
+                ps.regenResult != null || !canApply(ps.capturedPackageJson) || lock == null ||
+                !member.equals(acc.scan.lockToPackage.get(lock)) || !root.equals(workspaceRoot(acc.scan, member, pm))) {
+                continue;
+            }
+            SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, member);
+            ps.regenResult = PackageJsonHelper.regenerateLockContent(pkg == null ? ps.capturedPackageJson : pkg,
+                    ps.capturedLockContent, NodeDependencyScan.projectFiles(acc.scan, ctx, member), edited, ctx);
+        }
+    }
+
+    // pnpm's workspace root holds the pnpm-workspace.yaml found above packageJson; for the others, the package.json
+    // whose lock an edit of packageJson lands in, else the nearest that lists it as a member
+    private static Path workspaceRoot(NodeDependencyScan.Accumulator acc, Path packageJson,
+                                      NodeResolutionResult.@Nullable PackageManager pm) {
+        if (pm == NodeResolutionResult.PackageManager.Pnpm) {
+            for (Path dir = packageJson.getParent(); ; dir = dir.getParent()) {
+                Path manifest = dir == null ? Paths.get(PackageJsonOverrides.WORKSPACE_MANIFEST) :
+                        dir.resolve(PackageJsonOverrides.WORKSPACE_MANIFEST);
+                if (acc.paths.contains(manifest)) {
+                    return manifest.resolveSibling("package.json");
+                }
+                if (dir == null) {
+                    break;
+                }
+            }
+        }
         Path lock = NodeDependencyScan.lockFor(acc, packageJson);
         Path root = lock == null ? null : acc.lockToPackage.get(lock);
         if (root != null) {

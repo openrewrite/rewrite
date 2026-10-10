@@ -1,0 +1,1 @@
+pnpm 11.2.2 in a project whose devEngines names pnpm 10.34.6 with onFail ignore writes overrides is-number 7.0.0 (config set) and installs itself.

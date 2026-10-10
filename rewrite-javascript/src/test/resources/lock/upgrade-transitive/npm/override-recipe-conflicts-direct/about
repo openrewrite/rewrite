@@ -1,0 +1,1 @@
+The recipe writes overrides is-number 7.0.0 at a root that depends on is-number ^6.0.0 directly: npm rejects it (EOVERRIDE) and writes no lock.

@@ -1,0 +1,16 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.34.6",
+  "dependencies": {
+    "is-odd": "3.0.1"
+  },
+  "resolutions": {
+    "left-pad": "1.3.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "is-number": "7.0.0"
+    }
+  }
+}

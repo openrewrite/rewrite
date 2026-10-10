@@ -1,0 +1,14 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "10.34.6",
+      "onFail": "ignore"
+    }
+  },
+  "dependencies": {
+    "is-odd": "3.0.1"
+  }
+}
