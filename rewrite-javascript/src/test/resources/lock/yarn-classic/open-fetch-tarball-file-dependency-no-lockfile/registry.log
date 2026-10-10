@@ -1,0 +1,8 @@
+GET /zz-openrewrite-base 200
+GET /zz-openrewrite-file-dep 200
+GET /zz-openrewrite-base/-/zz-openrewrite-base-1.0.0.tgz 200
+GET /zz-openrewrite-file-dep/-/zz-openrewrite-file-dep-1.0.0.tgz 200
+GET /zz-openrewrite-base 200
+GET /zz-openrewrite-file-dep 200
+GET /zz-openrewrite-base 200
+GET /zz-openrewrite-file-dep 200

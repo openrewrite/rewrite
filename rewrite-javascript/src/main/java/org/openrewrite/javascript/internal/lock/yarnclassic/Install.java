@@ -363,7 +363,7 @@ final class Install {
 
     /**
      * {@code saveLockfileAndIntegrity}: the lock text yarn writes for the install's top-level patterns, or null when
-     * yarn leaves the file as it is; the lockfile flags are the caller's.
+     * yarn leaves the file as it is.
      */
     static @Nullable String saveLockfileAndIntegrity(PackageResolver resolver, List<String> patterns,
                                                      @Nullable WorkspaceLayout workspaceLayout,
@@ -383,6 +383,11 @@ final class Install {
         }
 
         Map<String, @Nullable Object> lockfileBasedOnResolver = lockfile.getLockfile(resolvedPatterns);
+
+        YarnClassicOptions.Flags flags = config.getFlags();
+        if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
+            return null;
+        }
 
         boolean lockFileHasAllPatterns = true;
         for (String p : topLevel) {
@@ -420,7 +425,7 @@ final class Install {
             }
         }
 
-        if (!config.getFlags().isForce() &&
+        if (!flags.isForce() &&
             LockfileParser.SUCCESS.equals(lockfile.getParseResultType()) &&
             lockFileHasAllPatterns &&
             lockfilePatternsMatch &&

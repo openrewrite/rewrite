@@ -179,10 +179,6 @@ class YarnClassicLockRoundTripTest {
         String save() {
             Config config = new Config(inputs);
             YarnClassicOptions options = YarnClassicLockRegenerator.init(inputs, config, warnings);
-            YarnClassicOptions.Flags flags = options.getFlags();
-            if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
-                return null;
-            }
             Install.InstallCwdRequest request = new Install(inputs, config, options, YarnClassicScenarios.NO_REGISTRY,
                     warnings).fetchRequestFromCwd(lockfile, new ResolutionMap(options));
             return Install.saveLockfileAndIntegrity(resolver, request.getPatterns(),

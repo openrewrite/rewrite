@@ -1,0 +1,1 @@
+A lock yarn wrote under .yarnrc yarn-enable-lockfile-versions true (its # yarn and # node lines), then --pure-lockfile true, adding a dependency: yarn writes no lock, so no Node version is read.

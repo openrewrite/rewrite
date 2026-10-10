@@ -18,12 +18,14 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
@@ -32,6 +34,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Replays every recorded edit {@link YarnClassicScenarios} finds through {@link YarnClassicLockRegenerator} and asserts
@@ -100,6 +105,30 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER,
                 scenario.file("before")), http).regenerate();
         check(scenario.getLabel(), expect, scenario.file("after"), result, http);
+    }
+
+    /**
+     * yarn-enable-lockfile-versions writes the Node version into the lock's header, which the engine cannot know from
+     * a host that does not say, unless a lockfile flag keeps yarn from writing the lock at all.
+     */
+    @ParameterizedTest
+    @CsvSource({
+            "small-lockfile-versions-header, the Node version yarn-enable-lockfile-versions writes",
+            "open-opt-pure-lockfile-lockfile-versions,"
+    })
+    void readsTheNodeVersionOnlyWhereYarnWritesTheLock(String name, @Nullable String cannotKnow) {
+        YarnClassicScenarios.Scenario scenario = YarnClassicScenarios.discover().stream()
+                .filter(s -> s.getName().equals(name)).findFirst().orElseThrow(IllegalStateException::new);
+        Host withoutNode = scenario.host().toBuilder().nodeVersion(null).build();
+        YarnClassicLockRegenerator.Inputs inputs = scenario.inputs(YarnClassicScenarios.Phase.AFTER,
+                scenario.file("before")).toBuilder().host(withoutNode).build();
+        Result result = new YarnClassicLockRegenerator(inputs, new ScenarioRegistry(scenario)).regenerate();
+        if (cannotKnow == null) {
+            assertThat(result.getLockFileContent()).isEqualTo(scenario.file("after"));
+        } else {
+            assertThat(requireNonNull(result.getFailure()).getDetail()).isEqualTo("the engine cannot know " +
+                                                                                  cannotKnow);
+        }
     }
 
     @Override

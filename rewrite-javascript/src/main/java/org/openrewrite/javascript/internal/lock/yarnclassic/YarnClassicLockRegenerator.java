@@ -207,11 +207,6 @@ public final class YarnClassicLockRegenerator {
         Config config = new Config(these);
         YarnClassicOptions options = init(these, config, warnings);
         String saved = new Install(these, config, options, registry, warnings).run();
-        YarnClassicOptions.Flags flags = options.getFlags();
-        // saveLockfileAndIntegrity returns before writing: yarn exits 0 and the lock stays as it was
-        if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
-            return lock;
-        }
         return saved == null ? lock : saved;
     }
 

@@ -1,0 +1,1 @@
+The lock already holds the added zz-openrewrite-file-wrap but not its dependency zz-openrewrite-file-dep, whose tarball package.json has a file: dependency; under .yarnrc --frozen-lockfile true yarn resolves and fetches it and leaves the lock as it is.

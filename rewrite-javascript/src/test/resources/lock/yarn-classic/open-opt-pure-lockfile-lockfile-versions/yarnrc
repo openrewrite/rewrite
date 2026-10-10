@@ -1,0 +1,2 @@
+--pure-lockfile true
+yarn-enable-lockfile-versions true

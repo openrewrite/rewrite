@@ -1,0 +1,1 @@
+The fresh pick of open-fetch-tarball-file-dependency, whose tarball package.json has a file: dependency yarn writes relative to its cache, under .yarnrc --no-lockfile true: yarn fetches it and leaves the lock as it is.
