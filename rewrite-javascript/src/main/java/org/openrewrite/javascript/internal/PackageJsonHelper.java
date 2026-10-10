@@ -995,14 +995,6 @@ public class PackageJsonHelper {
             SourceFile packageJson,
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
-            ExecutionContext ctx) {
-        return regenerateLockContent(packageJson, capturedLockContent, projectFiles, Collections.emptyMap(), ctx);
-    }
-
-    public static LockFileRegeneration.@Nullable Result regenerateLockContent(
-            SourceFile packageJson,
-            @Nullable String capturedLockContent,
-            NodeDependencyScan.ProjectFiles projectFiles,
             Map<Path, String> editedFiles,
             ExecutionContext ctx) {
         NodeResolutionResult marker = packageJson.getMarkers()

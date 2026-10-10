@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -35,7 +35,7 @@ import static java.util.Collections.singletonList;
  * Port of yaml 2.9.0's parseDocument (its lexer's tokens read from an OpenRewrite YAML tree) and Document.toString,
  * with @pnpm/yaml.document-sync's patchDocument, as pnpm writes pnpm-workspace.yaml.
  */
-final class YamlDocument {
+public final class YamlDocument {
 
     private static final String INDENT_STEP = "  ";
     private static final Pattern NULL = Pattern.compile("^(?:~|[Nn]ull|NULL)?$");
@@ -58,7 +58,7 @@ final class YamlDocument {
     /**
      * The document yaml composes from {@code docs}; an {@link IllegalArgumentException} names what is not read here.
      */
-    static YamlDocument parse(Yaml.Documents docs) {
+    public static YamlDocument parse(Yaml.Documents docs) {
         Parser parser = new Parser();
         new Lexer(parser).lex(docs);
         return new Composer().compose(parser.document, parser.prelude);
@@ -67,22 +67,21 @@ final class YamlDocument {
     /**
      * {@code document.toJSON()}: maps in document order, strings, numbers as doubles, booleans and null.
      */
-    @Nullable
-    Object toJs() {
+    public @Nullable Object toJs() {
         return contents == null ? null : contents.toJs();
     }
 
     /**
      * patchDocument: the document changed in place to hold {@code target}, comments kept on the nodes it keeps.
      */
-    void patch(@Nullable Object target) {
+    public void patch(@Nullable Object target) {
         contents = patchNode(contents, target);
     }
 
     /**
      * The top-level keys in order; none when the document holds no mapping.
      */
-    List<String> keys() {
+    public List<String> keys() {
         List<String> keys = new ArrayList<>();
         for (Pair pair : contents instanceof YamlMap ? ((YamlMap) contents).items : new ArrayList<Pair>()) {
             keys.add((String) pair.key.value);
@@ -93,11 +92,14 @@ final class YamlDocument {
     /**
      * Whether the top-level key at {@code index} has a blank line before it ({@code spaceBefore}).
      */
-    boolean blankBefore(int index) {
+    public boolean blankBefore(int index) {
         return contents instanceof YamlMap && ((YamlMap) contents).items.get(index).key.spaceBefore;
     }
 
-    void blankLineBefore(int index) {
+    /**
+     * Gives the top-level key at {@code index} a blank line before it.
+     */
+    public void blankLineBefore(int index) {
         if (contents instanceof YamlMap) {
             ((YamlMap) contents).items.get(index).key.spaceBefore = true;
         }
@@ -1277,7 +1279,8 @@ final class YamlDocument {
         }
 
         void lex(Yaml.Documents docs) {
-            if (PackageJsonHelper.printed(docs).indexOf('\r') >= 0) {
+            String text = docs.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+            if (text.indexOf('\r') >= 0) {
                 throw unsupported("CR line ends");
             }
             if (docs.getDocuments().size() > 1) {

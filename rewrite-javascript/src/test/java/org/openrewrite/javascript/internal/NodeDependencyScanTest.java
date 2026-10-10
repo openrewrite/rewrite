@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -253,7 +254,7 @@ class NodeDependencyScanTest {
         if (reported != null) {
             ExecutionContext ctx = new InMemoryExecutionContext();
             LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(ps.capturedPackageJson,
-              ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, project), ctx);
+              ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, project), emptyMap(), ctx);
             assertThat(result).isNotNull();
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getErrorMessage()).contains(reported);
@@ -325,7 +326,7 @@ class NodeDependencyScanTest {
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
                   acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
-                  ctx);
+                  emptyMap(), ctx);
 
                 assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("pnpm-lock.yaml"));
                 assertThat(acc.projects.get(MEMBER).capturedLockContent).isEqualTo("root lock");
@@ -369,7 +370,7 @@ class NodeDependencyScanTest {
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
                   acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
-                  ctx);
+                  emptyMap(), ctx);
                 assertThat(result).isNotNull();
                 assertThat(result.getErrorMessage()).contains("pnpm fails on this edit");
             }
@@ -483,7 +484,8 @@ class NodeDependencyScanTest {
         }
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
+          emptyMap(), ctx);
         assertThat(result).isNotNull();
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
@@ -532,7 +534,8 @@ class NodeDependencyScanTest {
         }
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
+          emptyMap(), ctx);
         assertThat(result).isNotNull();
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
@@ -601,7 +604,8 @@ class NodeDependencyScanTest {
         if (pm == PackageManager.YarnBerry && !listed) {
             ExecutionContext ctx = new InMemoryExecutionContext();
             LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
+              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
+              emptyMap(), ctx);
             assertThat(result).isNotNull();
             assertThat(result.getFailure()).isNotNull();
             assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.PM_REJECTS);
@@ -637,7 +641,8 @@ class NodeDependencyScanTest {
         NodeDependencyScan.linkWorkspaceMembers(acc);
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
+          emptyMap(), ctx);
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get(lockName));
         assertThat(result).isNotNull();
@@ -667,7 +672,7 @@ class NodeDependencyScanTest {
         ExecutionContext ctx = new InMemoryExecutionContext();
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER);
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, files, ctx);
+          acc.projects.get(MEMBER).capturedLockContent, files, emptyMap(), ctx);
 
         assertThat(files.getPaths()).contains(unread);
         assertThat(result).isNotNull();

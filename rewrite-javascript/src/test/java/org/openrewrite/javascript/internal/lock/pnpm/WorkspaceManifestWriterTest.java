@@ -17,15 +17,18 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.javascript.internal.lock.YamlDocument;
+import org.openrewrite.yaml.YamlParser;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
@@ -83,17 +86,28 @@ class WorkspaceManifestWriterTest {
 
     @Test
     void aNewTopLevelPairFollowsTheDocumentsBlankLines() {
-        WorkspaceManifestWriter pnpm11 = new WorkspaceManifestWriter(11);
-        List<Boolean> separated = Arrays.asList(false, true, true);
-        List<Boolean> packed = Arrays.asList(false, false, true);
-        assertThat(pnpm11.blankLineStyle(separated)).isTrue();
-        assertThat(pnpm11.blankBefore(separated, 1)).isTrue();
-        assertThat(pnpm11.blankLineStyle(packed)).isFalse();
-        assertThat(pnpm11.blankBefore(packed, 1)).isFalse();
-        assertThat(pnpm11.blankBefore(packed, 2)).isTrue();
-        assertThat(pnpm11.blankBefore(packed, 3)).isTrue();
-        assertThat(pnpm11.blankBefore(separated, 0)).isFalse();
-        assertThat(new WorkspaceManifestWriter(10).blankBefore(separated, 1)).isFalse();
+        String separated = "packages:\n  - a\n\ncatalog:\n  x: 1.0.0\n\noverrides:\n  y: 1.0.0\n";
+        String packed = "packages:\n  - a\ncatalog:\n  x: 1.0.0\n\noverrides:\n  y: 1.0.0\n";
+        assertThat(blankBeforeNew(11, separated, "nodeLinker")).isTrue();
+        assertThat(blankBeforeNew(11, packed, "nodeLinker")).isTrue();
+        assertThat(blankBeforeNew(11, packed, "allowBuilds")).isFalse();
+        assertThat(blankBeforeNew(11, "packages:\n  - a\ncatalog:\n  x: 1.0.0\n", "nodeLinker")).isFalse();
+        assertThat(blankBeforeNew(10, separated, "nodeLinker")).isFalse();
+    }
+
+    // the blank line before key once the release's writer added it to the document yaml read
+    private static boolean blankBeforeNew(int release, String yaml, String key) {
+        YamlDocument document = YamlDocument.parse((Yaml.Documents) YamlParser.builder().build()
+          .parse(yaml).findFirst().orElseThrow(IllegalStateException::new));
+        @SuppressWarnings("unchecked")
+        Map<String, @Nullable Object> manifest = new LinkedHashMap<>((Map<String, @Nullable Object>) document.toJs());
+        Map<String, @Nullable Object> original = new LinkedHashMap<>();
+        for (String existing : manifest.keySet()) {
+            original.put(existing, null);
+        }
+        manifest.put(key, "hoisted");
+        new WorkspaceManifestWriter(release).write(document, original, manifest);
+        return document.blankBefore(document.keys().indexOf(key));
     }
 
     private static String read(String file) throws IOException {

@@ -17,12 +17,16 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.YamlDocument;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -72,31 +76,96 @@ public final class WorkspaceManifestWriter {
     }
 
     /**
-     * {@code propagateBlankLinesToNewPairs}: whether a new top-level pair inserted at {@code at} gets a blank line
-     * before it, given whether each existing pair has one.
+     * The rest of updateWorkspaceManifest over the {@code document} pnpm read, whose key order captureKeyOrder kept
+     * as {@code original}: pnpm 10's sortKeysByPriority or 11's reorderRecursive, patchDocument, then for 11
+     * propagateBlankLinesToNewPairs.
      */
-    public boolean blankBefore(List<Boolean> blankBefore, int at) {
-        if (release < 11 || at == 0) {
-            return false;
+    public void write(YamlDocument document, @Nullable Object original, Map<String, @Nullable Object> manifest) {
+        if (release < 11) {
+            document.patch(sorted(manifest));
+            return;
         }
-        return blankLineStyle(blankBefore) ||
-               (at < blankBefore.size() ? blankBefore.get(at) : blankBefore.get(at - 1));
+        document.patch(reordered(original, manifest));
+        propagateBlankLinesToNewPairs(document, original instanceof Map ? EcmaScript.keys(asMap(original)) :
+                Collections.emptyList());
+    }
+
+    private @Nullable Object sorted(@Nullable Object value) {
+        if (value instanceof List) {
+            List<@Nullable Object> items = new ArrayList<>();
+            for (Object item : (List<?>) value) {
+                items.add(sorted(item));
+            }
+            return items;
+        }
+        if (!(value instanceof Map)) {
+            return value;
+        }
+        List<String> keys = new ArrayList<>();
+        for (String key : EcmaScript.keys(asMap(value))) {
+            keys.add(insertionIndex(keys, key), key);
+        }
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        for (String key : keys) {
+            result.put(key, sorted(asMap(value).get(key)));
+        }
+        return result;
+    }
+
+    private @Nullable Object reordered(@Nullable Object original, @Nullable Object current) {
+        if (!(current instanceof Map)) {
+            return current;
+        }
+        Map<String, @Nullable Object> order = original instanceof Map ? asMap(original) : new LinkedHashMap<>();
+        List<String> keys = new ArrayList<>();
+        for (String key : EcmaScript.keys(order)) {
+            if (asMap(current).containsKey(key)) {
+                keys.add(key);
+            }
+        }
+        for (String key : EcmaScript.keys(asMap(current))) {
+            if (!order.containsKey(key)) {
+                keys.add(insertionIndex(keys, key), key);
+            }
+        }
+        Map<String, @Nullable Object> result = new LinkedHashMap<>();
+        for (String key : keys) {
+            result.put(key, reordered(order.get(key), asMap(current).get(key)));
+        }
+        return result;
     }
 
     /**
-     * Whether the document separates its top-level pairs by blank lines, read from every pair after the first, so
-     * that a pair a new one displaces from the front gets one too.
+     * {@code propagateBlankLinesToNewPairs}: a top-level pair the document did not hold before gets a blank line where
+     * the document separates its pairs by them, or where its neighbour has one.
      */
-    public boolean blankLineStyle(List<Boolean> blankBefore) {
-        if (release < 11 || blankBefore.size() < 2) {
-            return false;
-        }
-        for (int i = 1; i < blankBefore.size(); i++) {
-            if (!blankBefore.get(i)) {
-                return false;
+    void propagateBlankLinesToNewPairs(YamlDocument document, List<String> originalKeys) {
+        List<String> items = document.keys();
+        Set<String> original = new HashSet<>(originalKeys);
+        String originalFirst = originalKeys.isEmpty() ? null : originalKeys.get(0);
+        int nonFirst = 0;
+        int nonFirstWithBlank = 0;
+        for (int i = 0; i < items.size(); i++) {
+            if (original.contains(items.get(i)) && !items.get(i).equals(originalFirst)) {
+                nonFirst++;
+                nonFirstWithBlank += document.blankBefore(i) ? 1 : 0;
             }
         }
-        return true;
+        boolean blankLineStyle = nonFirst > 0 && nonFirstWithBlank == nonFirst;
+        for (int i = 1; i < items.size(); i++) {
+            if (document.blankBefore(i) || !blankLineStyle && original.contains(items.get(i))) {
+                continue;
+            }
+            boolean last = i + 1 == items.size();
+            if (blankLineStyle || !last && document.blankBefore(i + 1) || last && document.blankBefore(i - 1)) {
+                document.blankLineBefore(i);
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, @Nullable Object> asMap(Object value) {
+        return (Map<String, @Nullable Object>) value;
     }
 
     /**

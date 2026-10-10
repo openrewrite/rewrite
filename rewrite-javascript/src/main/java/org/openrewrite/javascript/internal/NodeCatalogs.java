@@ -22,6 +22,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.YamlDocument;
 import org.openrewrite.javascript.internal.lock.berry.Catalogs;
 import org.openrewrite.javascript.internal.lock.bun.CatalogMap;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
@@ -38,12 +39,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -470,7 +469,7 @@ public abstract class NodeCatalogs {
             if (manifest.isEmpty()) {
                 throw new IllegalArgumentException("pnpm would delete pnpm-workspace.yaml, which it leaves empty");
             }
-            new Writer(writer, getRelease().sortsEveryLevel()).write(document, original, manifest);
+            writer.write(document, original, manifest);
             return reread(PackageJsonHelper.reparseYaml((Yaml.Documents) getDocument(), document.toString()));
         }
 
@@ -496,102 +495,6 @@ public abstract class NodeCatalogs {
              * Whether it changed the manifest pnpm read.
              */
             boolean apply(Map<String, @Nullable Object> manifest);
-        }
-
-        /**
-         * The rest of updateWorkspaceManifest: pnpm 10 sorts every level (sortKeysByPriority), pnpm 11 keeps the order
-         * and places new keys (reorderRecursive), then patchDocument and, for 11, propagateBlankLinesToNewPairs.
-         */
-        private static final class Writer {
-            private final WorkspaceManifestWriter writer;
-            private final boolean sorts;
-
-            Writer(WorkspaceManifestWriter writer, boolean sorts) {
-                this.writer = writer;
-                this.sorts = sorts;
-            }
-
-            void write(YamlDocument document, @Nullable Object original, Map<String, @Nullable Object> manifest) {
-                if (sorts) {
-                    document.patch(sorted(manifest));
-                    return;
-                }
-                document.patch(reordered(original, manifest));
-                propagateBlankLinesToNewPairs(document, original instanceof Map ? EcmaScript.keys(asMap(original)) :
-                        emptyList());
-            }
-
-            private @Nullable Object sorted(@Nullable Object value) {
-                if (value instanceof List) {
-                    List<@Nullable Object> items = new ArrayList<>();
-                    for (Object item : (List<?>) value) {
-                        items.add(sorted(item));
-                    }
-                    return items;
-                }
-                if (!(value instanceof Map)) {
-                    return value;
-                }
-                List<String> keys = new ArrayList<>();
-                for (String key : EcmaScript.keys(asMap(value))) {
-                    keys.add(writer.insertionIndex(keys, key), key);
-                }
-                Map<String, @Nullable Object> result = new LinkedHashMap<>();
-                for (String key : keys) {
-                    result.put(key, sorted(asMap(value).get(key)));
-                }
-                return result;
-            }
-
-            // reorderRecursive
-            private @Nullable Object reordered(@Nullable Object original, @Nullable Object current) {
-                if (!(current instanceof Map)) {
-                    return current;
-                }
-                Map<String, @Nullable Object> order = original instanceof Map ? asMap(original) :
-                        new LinkedHashMap<>();
-                List<String> keys = new ArrayList<>();
-                for (String key : EcmaScript.keys(order)) {
-                    if (asMap(current).containsKey(key)) {
-                        keys.add(key);
-                    }
-                }
-                for (String key : EcmaScript.keys(asMap(current))) {
-                    if (!order.containsKey(key)) {
-                        keys.add(writer.insertionIndex(keys, key), key);
-                    }
-                }
-                Map<String, @Nullable Object> result = new LinkedHashMap<>();
-                for (String key : keys) {
-                    result.put(key, reordered(order.get(key), asMap(current).get(key)));
-                }
-                return result;
-            }
-
-            private void propagateBlankLinesToNewPairs(YamlDocument document, List<String> originalKeys) {
-                List<String> items = document.keys();
-                Set<String> original = new HashSet<>(originalKeys);
-                String originalFirst = originalKeys.isEmpty() ? null : originalKeys.get(0);
-                int nonFirst = 0;
-                int nonFirstWithBlank = 0;
-                for (int i = 0; i < items.size(); i++) {
-                    if (original.contains(items.get(i)) && !items.get(i).equals(originalFirst)) {
-                        nonFirst++;
-                        nonFirstWithBlank += document.blankBefore(i) ? 1 : 0;
-                    }
-                }
-                boolean blankLineStyle = nonFirst > 0 && nonFirstWithBlank == nonFirst;
-                for (int i = 1; i < items.size(); i++) {
-                    if (document.blankBefore(i) || !blankLineStyle && original.contains(items.get(i))) {
-                        continue;
-                    }
-                    boolean last = i + 1 == items.size();
-                    if (blankLineStyle || !last && document.blankBefore(i + 1) || last &&
-                                                                                document.blankBefore(i - 1)) {
-                        document.blankLineBefore(i);
-                    }
-                }
-            }
         }
 
         private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
