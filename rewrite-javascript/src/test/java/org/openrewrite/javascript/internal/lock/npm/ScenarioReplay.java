@@ -75,8 +75,12 @@ final class ScenarioReplay {
         throw new IllegalArgumentException(scenario);
     }
 
-    // "malformed override key <key>" or "malformed override reference <$ref> reached from <name>"
+    // "malformed override key <key>", "malformed override reference <$ref> reached from <name>", or
+    // "malformed manifest: <npm's message>"
     static String malformedKey(String expect) {
+        if (expect.startsWith("malformed manifest: ")) {
+            return expect.substring("malformed manifest: ".length());
+        }
         String[] words = expect.split("\\s+");
         return expect.startsWith("malformed override reference ") ? words[3] : words[words.length - 1];
     }
