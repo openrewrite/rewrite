@@ -35,12 +35,8 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
- * Resolves the npm registries (and their credentials) a project locks against: host-supplied
- * registries on the {@link NodeExecutionContextView} win outright; otherwise the marker's merged
- * {@code .npmrc} is parsed via {@link NpmConfig}, with credentials filled from the URL, then
- * host-supplied credentials, then {@code .netrc}. {@code .npmrc} credentials whose {@code ${VAR}}
- * placeholders cannot be resolved are sent as written, as npm does, and the placeholders are recorded
- * on the registry.
+ * The registries and credentials a project locks against: the {@link NodeExecutionContextView}'s, else the marker's
+ * merged {@code .npmrc} ({@link NpmConfig}), credentials from the URL, then the host's, then {@code .netrc}.
  */
 public final class RegistryDiscovery {
     private static final String DEFAULT_REGISTRY = "https://registry.npmjs.org/";
@@ -125,9 +121,8 @@ public final class RegistryDiscovery {
             // 2. npmrc auth keyed by nerf-dart.
             NpmConfig.Auth auth = config.authFor(url);
             if (auth != null) {
-                // Like npm, send the matched credentials as written even when a variable is unset where
-                // the recipe runs: a proxy may replace them, and otherwise the registry's rejection is
-                // reported with the placeholders that were not expanded.
+                // sent as written even with a variable unset, as npm does: a proxy may replace them, and a
+                // rejection names the placeholders
                 unresolvedCredentials = auth.unresolved;
                 authToken = auth.authToken;
                 username = auth.username;

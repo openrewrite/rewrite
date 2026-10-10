@@ -76,9 +76,8 @@ public final class WorkspaceManifestWriter {
     }
 
     /**
-     * The rest of updateWorkspaceManifest over the {@code document} pnpm read, whose key order captureKeyOrder kept
-     * as {@code original}: pnpm 10's sortKeysByPriority or 11's reorderRecursive, patchDocument, then for 11
-     * propagateBlankLinesToNewPairs.
+     * The rest of updateWorkspaceManifest ({@code original} is captureKeyOrder's): pnpm 10's sortKeysByPriority or 11's
+     * reorderRecursive, patchDocument, then for 11 propagateBlankLinesToNewPairs.
      */
     public void write(YamlDocument document, @Nullable Object original, Map<String, @Nullable Object> manifest) {
         if (release < 11) {

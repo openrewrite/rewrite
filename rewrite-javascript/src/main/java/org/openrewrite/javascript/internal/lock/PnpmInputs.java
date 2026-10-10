@@ -67,8 +67,8 @@ final class PnpmInputs {
     }
 
     /**
-     * The host's registries as pnpm's user .npmrc: the view's, else the marker's user npmrc; pnpm reads no global npmrc,
-     * and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc.
+     * The host's registries as pnpm's user .npmrc: the view's, else the marker's user npmrc; pnpm reads no global
+     * npmrc, and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc.
      */
     static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
         return RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.User));
