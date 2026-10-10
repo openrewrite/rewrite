@@ -63,6 +63,12 @@ final class Project {
     final Set<String> accessibleLocators = new LinkedHashSet<>();
     final Set<String> conditionalLocators = new LinkedHashSet<>();
     final Set<String> disabledLocators = new LinkedHashSet<>();
+
+    /**
+     * The conditional packages that are disabled on some of the machines the host could be and not on others.
+     */
+    final Set<String> hostDependentLocators = new LinkedHashSet<>();
+
     final Map<String, Package> originalPackages = new LinkedHashMap<>();
     final Set<String> optionalBuilds = new LinkedHashSet<>();
 
@@ -309,6 +315,55 @@ final class Project {
         return false;
     }
 
+    /**
+     * {@code isPackageCompatible} with the supported architectures of every machine the host could be; null when
+     * the machines disagree.
+     */
+    private @Nullable Boolean isPackageCompatible(Package pkg) {
+        Boolean compatible = null;
+        for (Host machine : machines(pkg)) {
+            boolean answer = StructUtils.isPackageCompatible(pkg, configuration.getSupportedArchitectures(machine));
+            if (compatible == null) {
+                compatible = answer;
+            } else if (compatible != answer) {
+                return null;
+            }
+        }
+        return compatible;
+    }
+
+    // the host with each member it does not say taken as every value the conditions name, and as one they do not;
+    // getLibc detects no libc off linux
+    private List<Host> machines(Package pkg) {
+        Map<String, Set<String>> named = new HashMap<>();
+        Matcher m = StructUtils.CONDITION_REGEX.matcher(Js.string(pkg.conditions));
+        while (m.find()) {
+            named.computeIfAbsent(m.group(1), k -> new LinkedHashSet<>()).add(m.group(2));
+        }
+        Set<String> oses = named.getOrDefault("os", Collections.emptySet());
+        List<Host> machines = new ArrayList<>();
+        for (String os : candidates(host.getOs(), oses)) {
+            for (String cpu : candidates(host.getCpu(), named.get("cpu"))) {
+                boolean linux = "linux".equals(os) || os.isEmpty() && !oses.contains("linux");
+                for (String libc : linux ? candidates(host.getLibc(), named.get("libc")) :
+                        Collections.<String>singletonList(null)) {
+                    machines.add(host.toBuilder().os(os).cpu(cpu).libc(libc).build());
+                }
+            }
+        }
+        return machines;
+    }
+
+    // "" matches no condition
+    private static List<String> candidates(@Nullable String known, @Nullable Set<String> named) {
+        if (known != null) {
+            return Collections.singletonList(known);
+        }
+        List<String> out = named == null ? new ArrayList<>() : new ArrayList<>(named);
+        out.add("");
+        return out;
+    }
+
     Workspace getTopLevelWorkspace() {
         return getWorkspaceByCwd(".");
     }
@@ -519,14 +574,17 @@ final class Project {
             pass.allResolutions.remove(descriptorHash);
         }
 
-        Map<String, @Nullable List<String>> supportedArchitectures = configuration.getSupportedArchitectures(host);
         Set<String> newConditionalLocators = new LinkedHashSet<>();
         Set<String> newDisabledLocators = new LinkedHashSet<>();
+        Set<String> newHostDependentLocators = new LinkedHashSet<>();
         for (Package pkg : pass.allPackages.values()) {
             if (pkg.conditions == null || !newOptionalBuilds.contains(pkg.locatorHash)) {
                 continue;
             }
-            if (!StructUtils.isPackageCompatible(pkg, supportedArchitectures)) {
+            Boolean compatible = isPackageCompatible(pkg);
+            if (compatible == null) {
+                newHostDependentLocators.add(pkg.locatorHash);
+            } else if (!compatible) {
                 newDisabledLocators.add(pkg.locatorHash);
             }
             newConditionalLocators.add(pkg.locatorHash);
@@ -541,6 +599,8 @@ final class Project {
         conditionalLocators.addAll(newConditionalLocators);
         disabledLocators.clear();
         disabledLocators.addAll(newDisabledLocators);
+        hostDependentLocators.clear();
+        hostDependentLocators.addAll(newHostDependentLocators);
         originalPackages.clear();
         originalPackages.putAll(pass.originalPackages);
         optionalBuilds.clear();

@@ -1,0 +1,12 @@
+{
+  "name": "lwc-darwin",
+  "version": "1.0.0",
+  "os": [
+    "darwin"
+  ],
+  "dist": {
+    "shasum": "54b9d94024d3c8ed6780648e837ba4ce76a191ab",
+    "integrity": "sha512-jV9ICOTQvx89rT8RYCLbDCV3WdHsz1ZSS3BoAGEeLGvWobsQKxme4CVzuBuAisXRSum1NJVYdWGILjVaY2jBmg==",
+    "tarball": "https://registry.npmjs.org/lwc-darwin/-/lwc-darwin-1.0.0.tgz"
+  }
+}

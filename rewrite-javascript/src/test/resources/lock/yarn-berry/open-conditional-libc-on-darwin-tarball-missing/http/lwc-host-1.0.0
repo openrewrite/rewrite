@@ -1,0 +1,12 @@
+{
+  "name": "lwc-host",
+  "version": "1.0.0",
+  "optionalDependencies": {
+    "lwc-musl": "1.0.0"
+  },
+  "dist": {
+    "shasum": "3062a68abd4e6ffbb572045fa70fce1ad07f54c5",
+    "integrity": "sha512-NsxO3LVSL3YPRj/NJSO+7PNDY90wUu3LKEWslg9m8LplqdUXsHvSKJLuD5YzRIJRysOUUvWFLfPcSLV6Uwq1ug==",
+    "tarball": "https://registry.npmjs.org/lwc-host/-/lwc-host-1.0.0.tgz"
+  }
+}

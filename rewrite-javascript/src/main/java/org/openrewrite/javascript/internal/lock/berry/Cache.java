@@ -53,11 +53,26 @@ final class Cache {
         }
         if (project.conditionalLocators.contains(locator.locatorHash)) {
             if (!project.lockfileHeld(locator)) {
-                loader.get();
+                loadConditional(locator, loader, project);
             }
             return null;
         }
         return loader.get().checksum();
+    }
+
+    // where the archive fails, another machine the host could be would mock the package instead
+    private static void loadConditional(Locator locator, Supplier<Archive> loader, Project project) {
+        try {
+            loader.get();
+        } catch (ReportError | JsError e) {
+            if (!project.hostDependentLocators.contains(locator.locatorHash)) {
+                throw e;
+            }
+            Package pkg = project.storedPackages.get(locator.locatorHash);
+            throw new CannotKnow("whether Yarn fetches " + StructUtils.stringifyLocator(locator) + " (conditions " +
+                                 (pkg == null ? "" : Js.string(pkg.conditions)) + ", on a platform the host does " +
+                                 "not give), whose archive fails: " + e.getMessage());
+        }
     }
 
     /**

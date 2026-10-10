@@ -1,0 +1,1 @@
+supportedArchitectures linux/x64/glibc, and the edit adds lwc-host with two optional platform packages: lwc-linux-gnu (linux, x64, glibc), which the registry serves, is fetched; lwc-darwin (the recording host's os, missing from the setting) names a tarball the registry does not have and is mocked.

@@ -19,7 +19,11 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.io.ByteArrayOutputStream;
@@ -156,6 +160,51 @@ class CacheTest {
                 options("compressionLevel: mixed\n")))
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("compressionLevel mixed");
+    }
+
+    /**
+     * The recorded conditional scenarios on other machines: what Yarn fetches and mocks follows the os, cpu and libc
+     * (none off linux, as getLibc answers), and Yarn's own failures stay its own.
+     */
+    @Test
+    void aConditionalPackageIsFetchedOnTheMachinesItSupports() {
+        Host linux = Host.builder().os("linux").cpu("x64").libc("glibc").build();
+        Host darwin = Host.builder().os("darwin").cpu("arm64").build();
+        assertThat(replay("open-conditional-incompatible-tarball-missing", darwin).getFailure()).isNull();
+        assertThat(replay("open-conditional-incompatible-tarball-missing", linux).getFailure())
+                .satisfies(failure -> assertThat(failure.getKind()).isEqualTo(Kind.PM_REJECTS))
+                .satisfies(failure -> assertThat(failure.getDetail()).contains("YN0035 lwc-linux@npm:1.0.0"));
+        assertThat(replay("open-conditional-libc-on-darwin-tarball-missing", darwin).getFailure()).isNull();
+        assertThat(replay("open-conditional-libc-on-darwin-tarball-missing", linux).getFailure()).isNull();
+        assertThat(replay("open-conditional-libc-on-darwin-tarball-missing", linux.toBuilder().libc("musl").build())
+                .getFailure()).satisfies(failure -> assertThat(failure.getKind()).isEqualTo(Kind.PM_REJECTS));
+    }
+
+    /**
+     * A host that does not give its platform: a conditional package some machine it could be fetches is fetched,
+     * and where its archive fails, whether Yarn fails is the platform's.
+     */
+    @Test
+    void aHostWithoutItsPlatformCannotKnowAFetchOnlySomeMachinesMake() {
+        BerryScenarios.Scenario fetched = scenario("small-conditional-compatible-fetched");
+        assertThat(replay(fetched.getName(), Host.UNKNOWN).getLockFileContent()).isEqualTo(fetched.file("after"));
+        for (String name : new String[]{"open-conditional-compatible-tarball-missing",
+                "open-conditional-incompatible-tarball-missing", "open-conditional-libc-on-darwin-tarball-missing"}) {
+            Failure failure = replay(name, Host.UNKNOWN).getFailure();
+            assertThat(failure).as(name).isNotNull();
+            assertThat(failure.getKind()).as(name).isEqualTo(Kind.CANNOT_KNOW);
+            assertThat(failure.getDetail()).as(name).contains("whether Yarn fetches lwc-")
+                    .contains("whose archive fails: Package not found");
+        }
+        assertThat(replay("open-conditional-libc-on-darwin-tarball-missing",
+                Host.builder().os("darwin").build()).getFailure()).isNull();
+    }
+
+    private static Result replay(String name, Host host) {
+        BerryScenarios.Scenario scenario = scenario(name);
+        YarnBerryLockRegenerator.Inputs inputs = scenario.inputs(BerryScenarios.Phase.AFTER, scenario.file("before"))
+                .toBuilder().host(host).build();
+        return new YarnBerryLockRegenerator(inputs, scenario.registry()).regenerate();
     }
 
     private static BerryOptions options(String yarnrc) {

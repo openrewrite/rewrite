@@ -31,7 +31,7 @@ import java.util.regex.Pattern;
 final class StructUtils {
 
     private static final String VIRTUAL_PROTOCOL = "virtual:";
-    private static final Pattern CONDITION_REGEX = Pattern.compile("(os|cpu|libc)=([a-z0-9_-]+)");
+    static final Pattern CONDITION_REGEX = Pattern.compile("(os|cpu|libc)=([a-z0-9_-]+)");
     // JavaScript's `.`, which unlike Java's also matches U+0085
     private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
     private static final Pattern IDENT_REGEXP = Pattern.compile("^(?:@([^/]+?)/)?([^@/]+)\\z");

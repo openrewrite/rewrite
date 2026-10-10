@@ -1,0 +1,20 @@
+{
+  "name": "lwc-host",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwc-host",
+      "version": "1.0.0",
+      "optionalDependencies": {
+        "lwc-darwin": "1.0.0"
+      },
+      "dist": {
+        "shasum": "c6f7a237552c77c1faa35d2768f97a75705e8478",
+        "integrity": "sha512-5YZwGEo0on2GhpiH7AEXFs+3MN6yITO/CH8lcyD+ccOrFe5erMJ/LcAhQeJq+VUXvNxesr3gLWZwKFy+MDPJSA==",
+        "tarball": "https://registry.npmjs.org/lwc-host/-/lwc-host-1.0.0.tgz"
+      }
+    }
+  }
+}

@@ -1,0 +1,1 @@
+The edit adds lwc-host, whose optional dependency lwc-musl (libc musl only) names a tarball the registry does not have: on darwin Yarn detects no libc, so the current architecture supports no libc value, the package is disabled and Yarn mocks it instead of fetching.

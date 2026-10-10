@@ -1,0 +1,12 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + lwc-host@npm:1.0.0, lwc-darwin@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwc-darwin%2F-%2Flwc-darwin-1.0.1.tgz, lwc-linux-gnu@npm:1.0.0
+➤ YN0077: │ lwc-darwin@npm:1.0.0::__archiveUrl=http%3A%2F%2F127.0.0.1%3A47391%2Flwc-darwin%2F-%2Flwc-darwin-1.0.1.tgz: Your current architecture (darwin-arm64) is supported by this package, but is missing from the supportedArchitectures setting
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0013: │ 2 packages were added to the project (+ 1.38 KiB).
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Link step
+➤ YN0073: │ Skipped due to mode=update-lockfile
+➤ YN0000: └ Completed
+➤ YN0000: · Done with warnings in 0s 60ms

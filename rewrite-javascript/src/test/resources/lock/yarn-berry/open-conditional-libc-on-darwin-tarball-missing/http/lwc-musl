@@ -1,0 +1,20 @@
+{
+  "name": "lwc-musl",
+  "dist-tags": {
+    "latest": "1.0.0"
+  },
+  "versions": {
+    "1.0.0": {
+      "name": "lwc-musl",
+      "version": "1.0.0",
+      "libc": [
+        "musl"
+      ],
+      "dist": {
+        "shasum": "2456bc3f2bda49eb9d462ed290fbb45b787ed24e",
+        "integrity": "sha512-5MIAye8QRJtE5c0Nmd6o/x1c3i06MMb+PmY+2n73b3n6fNz9QLZHBrKrksEz1K6GeBAa9CJOO5ZV+jcPUzDluw==",
+        "tarball": "https://registry.npmjs.org/lwc-musl/-/lwc-musl-1.0.1.tgz"
+      }
+    }
+  }
+}

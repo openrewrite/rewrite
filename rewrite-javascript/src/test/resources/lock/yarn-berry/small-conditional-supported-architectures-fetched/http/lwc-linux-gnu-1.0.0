@@ -1,0 +1,18 @@
+{
+  "name": "lwc-linux-gnu",
+  "version": "1.0.0",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "dist": {
+    "shasum": "e21fac47e7fc783550fc4c192d0ec6825cfa38cd",
+    "integrity": "sha512-SCko1MLZDp0icxWAg2T4jFrea/RQrC0Xs/6iRsnvK0w5LJYVeSrWyQmT/jxxIXskUvdvFiapHo5oIij2eKDDqw==",
+    "tarball": "https://registry.npmjs.org/lwc-linux-gnu/-/lwc-linux-gnu-1.0.0.tgz"
+  }
+}

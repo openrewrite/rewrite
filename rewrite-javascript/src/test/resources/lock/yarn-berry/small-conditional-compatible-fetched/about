@@ -1,0 +1,1 @@
+The edit adds lwc-host, whose optional dependency lwc-darwin (os darwin, the recording host's) the registry serves: the package is conditional and compatible, so Yarn fetches it in the fetch step and writes its entry without a checksum.

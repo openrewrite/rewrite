@@ -49,19 +49,19 @@ final class Configuration {
     }
 
     /**
-     * {@code getSupportedArchitectures}, {@code current} the host's; where the host does not say, the check counts
-     * as satisfied (null: every value).
+     * {@code getSupportedArchitectures} on a machine, {@code current} its os, cpu and libc, where a null libc (what
+     * getLibc detects on an os other than linux) names none.
      */
-    Map<String, @Nullable List<String>> getSupportedArchitectures(Host host) {
+    Map<String, @Nullable List<String>> getSupportedArchitectures(Host machine) {
         Map<String, @Nullable Object> supported = options.getMap("supportedArchitectures");
         Map<String, @Nullable List<String>> out = new LinkedHashMap<>();
-        out.put("os", current(supported.get("os"), host.getOs()));
-        out.put("cpu", current(supported.get("cpu"), host.getCpu()));
-        out.put("libc", current(supported.get("libc"), host.getLibc()));
+        out.put("os", current(supported.get("os"), machine.getOs()));
+        out.put("cpu", current(supported.get("cpu"), machine.getCpu()));
+        out.put("libc", current(supported.get("libc"), machine.getLibc()));
         return out;
     }
 
-    private static @Nullable List<String> current(@Nullable Object values, @Nullable String host) {
+    private static @Nullable List<String> current(@Nullable Object values, @Nullable String current) {
         if (!(values instanceof List)) {
             return null;
         }
@@ -69,10 +69,8 @@ final class Configuration {
         for (Object value : (List<?>) values) {
             if (!"current".equals(value)) {
                 out.add(Js.string(value));
-            } else if (host == null) {
-                return null;
-            } else {
-                out.add(host);
+            } else if (current != null) {
+                out.add(current);
             }
         }
         return out;
