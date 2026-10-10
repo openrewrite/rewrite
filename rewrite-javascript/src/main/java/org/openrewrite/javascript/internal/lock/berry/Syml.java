@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
@@ -71,7 +72,7 @@ final class Syml {
         if (SIMPLE_STRING.matcher(value).find()) {
             return value;
         }
-        return Js.quote(value);
+        return EcmaScript.quote(value);
     }
 
     private static boolean isRemovableField(@Nullable Object value) {
@@ -231,7 +232,7 @@ final class Syml {
             if (pos < input.length()) {
                 fail("end of input");
             }
-            String found = maxFailPos < input.length() ? Js.quote(String.valueOf(input.charAt(maxFailPos))) :
+            String found = maxFailPos < input.length() ? EcmaScript.quote(String.valueOf(input.charAt(maxFailPos))) :
                     "end of input";
             throw new SyntaxError("Expected " + describeExpected() + " but " + found + " found.");
         }
@@ -268,7 +269,7 @@ final class Syml {
                 pos += s.length();
                 return true;
             }
-            fail(Js.quote(s));
+            fail(EcmaScript.quote(s));
             return false;
         }
 
