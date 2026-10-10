@@ -29,7 +29,7 @@ module.exports = {
   tests: dir => fs.readdirSync(path.join(dir, 'test')).filter(f => f.endsWith('.js')).sort().map(f => 'test/' + f),
   shims: () => ({mocha: {}, 'bash-path': () => '/bin/bash'}),
   // a home directory in 1.8.5's own test, spelled under /srv as other upstream paths are; braces reads it as text
-  redact: line => line.split('/Users/tobiasreich/').join('/srv/tobiasreich/'),
+  redact: line => line.replace(/\/Users\/(?=tobiasreich\/)/g, '/srv/'),
   encode(v) {
     return v && typeof v === 'object' && typeof v.type === 'string' && Array.isArray(v.nodes) ? {$: 'ast'} : undefined
   },
