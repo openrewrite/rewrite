@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.util.Collection;
@@ -29,13 +29,13 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
-import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class RemoveDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
 
     @Option(displayName = "Package name",
             description = "The name of the npm package to remove (e.g., `lodash`, `@types/node`).",
@@ -64,7 +64,8 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits();
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
+                packageName));
     }
 
     @Override
@@ -82,8 +83,7 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
-        acc.decideAll(ctx, this::decide);
-        return emptyList();
+        return acc.decideAll(ctx, this::decide);
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
@@ -101,7 +101,6 @@ public class RemoveDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
-        return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
-                lockRegenerationFailures, path, result, packageName));
+        return acc.visitor(this::decide);
     }
 }

@@ -77,7 +77,15 @@ class NodeDependencyEditsTest {
     private static final Path MEMBER = Paths.get("packages/a/package.json");
 
     private static NodeDependencyEdits pnpmWorkspace() {
-        NodeDependencyEdits acc = new NodeDependencyEdits();
+        NodeDependencyEdits acc = new NodeDependencyEdits(new NodeDependencyEdits.Rows() {
+            @Override
+            public void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
+            }
+
+            @Override
+            public void declined(ExecutionContext ctx, Path path, String reason) {
+            }
+        });
         acc.scan(WORKSPACE);
         acc.scan(PNPM_MEMBER);
         return acc;

@@ -160,6 +160,13 @@ public abstract class NodeCatalogs {
 
     abstract NodeCatalogs reread(SourceFile edited);
 
+    /**
+     * The file as {@code text}, read again.
+     */
+    NodeCatalogs withText(String text) {
+        return reread(PackageJsonHelper.reparseLock(document, text));
+    }
+
     private static boolean isVersionSpec(String alias, String value) {
         Spec spec = classify(alias, value);
         return spec != null && spec.isVersionSpec();

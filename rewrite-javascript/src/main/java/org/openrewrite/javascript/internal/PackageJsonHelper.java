@@ -80,20 +80,6 @@ public class PackageJsonHelper {
         return members;
     }
 
-    private static final String LIVE_PACKAGE_JSON_TREES =
-            "org.openrewrite.javascript.livePackageJsonTrees";
-
-    @SuppressWarnings("unchecked")
-    public static @Nullable SourceFile getLiveTree(ExecutionContext ctx, Path packageJsonPath) {
-        Map<Path, SourceFile> map = (Map<Path, SourceFile>) ctx.getMessage(LIVE_PACKAGE_JSON_TREES);
-        return map == null ? null : map.get(packageJsonPath);
-    }
-
-    public static void putLiveTree(ExecutionContext ctx, Path packageJsonPath, SourceFile tree) {
-        Map<Path, SourceFile> map = ctx.computeMessageIfAbsent(LIVE_PACKAGE_JSON_TREES, k -> new HashMap<>());
-        map.put(packageJsonPath, tree);
-    }
-
     /**
      * A recipe's edits of the manifests and the package-manager files beside them, such as pnpm-workspace.yaml.
      */
@@ -891,11 +877,6 @@ public class PackageJsonHelper {
         public static EditAndRegenerateResult unchanged() {
             return new EditAndRegenerateResult(null, null, Collections.emptyMap());
         }
-
-        public static EditAndRegenerateResult changed(SourceFile modified,
-                                                      LockFileRegeneration.@Nullable Result regen) {
-            return new EditAndRegenerateResult(modified, regen, Collections.emptyMap());
-        }
     }
 
     /**
@@ -983,19 +964,6 @@ public class PackageJsonHelper {
             }
         }
         return changed;
-    }
-
-    /**
-     * Apply an edit already made, its lock already regenerated, to another revision of the package.json, such as one an
-     * earlier recipe in the run changed since; the declared dependencies are what the lock depends on.
-     */
-    public static SourceFile reapplyEdit(SourceFile packageJson,
-                                         Function<Json.Document, Json.Document> editFn,
-                                         LockFileRegeneration.@Nullable Result regen) {
-        if (!(packageJson instanceof Json.Document)) {
-            return packageJson;
-        }
-        return withResolvedDeps(refreshMarker(editFn.apply((Json.Document) packageJson)), regen);
     }
 
     private static SourceFile withResolvedDeps(SourceFile refreshed, LockFileRegeneration.@Nullable Result regen) {

@@ -19,12 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 
@@ -32,13 +32,13 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
     transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Old package name",
@@ -82,7 +82,8 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits();
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
+                oldPackageName));
     }
 
     @Override
@@ -100,8 +101,7 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
-        acc.decideAll(ctx, this::decide);
-        return emptyList();
+        return acc.decideAll(ctx, this::decide);
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
@@ -162,13 +162,12 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
         String path = decision.getPath().toString();
         decision.insertRow(protocolsSkipped, ctx, new NodeDependencyProtocolsSkipped.Row(path, path, oldPackageName,
                 declaredScope, protocol, value, newVersion == null ? "" : newVersion));
-        decision.decline(oldPackageName + " is declared as " + value + (protocol.isEmpty() ? "" : " (" + protocol +
+        decision.warn(oldPackageName + " is declared as " + value + (protocol.isEmpty() ? "" : " (" + protocol +
                 ")") + " and was left unchanged: " + remedy);
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
-        return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
-                lockRegenerationFailures, path, result, oldPackageName));
+        return acc.visitor(this::decide);
     }
 }

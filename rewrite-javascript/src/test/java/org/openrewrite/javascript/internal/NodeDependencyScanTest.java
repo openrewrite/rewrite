@@ -34,6 +34,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -42,6 +43,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NodeDependencyScanTest {
+
+    private static final Function<Path, @Nullable String> SCANNED = path -> null;
 
     @Test
     void everyVisitedPathIsHeldAndOnlyAReadPackageManagerFileHasContents() {
@@ -84,8 +87,7 @@ class NodeDependencyScanTest {
             NodeDependencyScan.capturePackageManagerFile(acc, PlainText.builder().sourcePath(path).text("x=y").build());
         }
 
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          manifest);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
 
         assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parentYarnrc, rootNpmrc, ownNpmrc);
         assertThat(files.getPaths()).containsExactlyInAnyOrder(parentYarnrc, rootNpmrc, ownNpmrc, readme);
@@ -111,8 +113,7 @@ class NodeDependencyScanTest {
             acc.projects.put(paths[i], ps);
         }
 
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          manifest);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
 
         assertThat(files.getManifests()).containsOnlyKeys(manifest);
         assertThat(files.getPackageManagerFiles()).containsOnlyKeys(parent, top);
@@ -135,8 +136,7 @@ class NodeDependencyScanTest {
         Path memberLock = Paths.get("packages/a/" + lockName);
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          MEMBER);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER);
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(rootLock);
         assertThat(files.getManifests()).containsOnlyKeys(ROOT, MEMBER);
@@ -253,7 +253,7 @@ class NodeDependencyScanTest {
         if (reported != null) {
             ExecutionContext ctx = new InMemoryExecutionContext();
             LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(ps.capturedPackageJson,
-              ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, project), ctx);
+              ps.capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, project), ctx);
             assertThat(result).isNotNull();
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getErrorMessage()).contains(reported);
@@ -324,7 +324,7 @@ class NodeDependencyScanTest {
                 NodeDependencyScan.linkWorkspaceMembers(acc);
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
+                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
                   ctx);
 
                 assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("pnpm-lock.yaml"));
@@ -368,7 +368,7 @@ class NodeDependencyScanTest {
             if (ownLock) {
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER),
+                  acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER),
                   ctx);
                 assertThat(result).isNotNull();
                 assertThat(result.getErrorMessage()).contains("pnpm fails on this edit");
@@ -428,8 +428,7 @@ class NodeDependencyScanTest {
         Path memberLock = Paths.get("packages/a/yarn.lock");
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          MEMBER);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER);
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(memberLock);
         assertThat(files.getManifests()).containsOnlyKeys(MEMBER);
@@ -484,7 +483,7 @@ class NodeDependencyScanTest {
         }
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
         assertThat(result).isNotNull();
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
@@ -533,7 +532,7 @@ class NodeDependencyScanTest {
         }
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
         assertThat(result).isNotNull();
         assertThat(result.getFailure()).isNotNull();
         assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
@@ -602,7 +601,7 @@ class NodeDependencyScanTest {
         if (pm == PackageManager.YarnBerry && !listed) {
             ExecutionContext ctx = new InMemoryExecutionContext();
             LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+              acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
             assertThat(result).isNotNull();
             assertThat(result.getFailure()).isNotNull();
             assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.PM_REJECTS);
@@ -638,7 +637,7 @@ class NodeDependencyScanTest {
         NodeDependencyScan.linkWorkspaceMembers(acc);
         ExecutionContext ctx = new InMemoryExecutionContext();
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
-          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER), ctx);
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get(lockName));
         assertThat(result).isNotNull();
@@ -666,7 +665,7 @@ class NodeDependencyScanTest {
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
         ExecutionContext ctx = new InMemoryExecutionContext();
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, ctx, MEMBER);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER);
         LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
           acc.projects.get(MEMBER).capturedLockContent, files, ctx);
 
@@ -691,8 +690,7 @@ class NodeDependencyScanTest {
         capture(acc, "patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          manifest);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
 
         assertThat(files.getPackageManagerFiles()).containsKey(Paths.get("patches/ms@2.1.3.patch"));
     }
@@ -715,8 +713,7 @@ class NodeDependencyScanTest {
         capture(acc, "pnpm-workspace.yaml", "packages:\n  - packages/*\nsharedWorkspaceLockfile: false\n");
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          MEMBER);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, MEMBER);
 
         assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(Paths.get("packages/a/" + lockName));
         if (read) {
@@ -801,8 +798,7 @@ class NodeDependencyScanTest {
               .text("{\"name\":\"app\"}").markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
 
             NodeDependencyScan.linkWorkspaceMembers(acc);
-            NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc,
-              new InMemoryExecutionContext(), manifest);
+            NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, manifest);
 
             List<String> kept = new ArrayList<>(readAnywhere);
             for (String name : read.split(" ")) {
@@ -852,8 +848,7 @@ class NodeDependencyScanTest {
           .markers(Markers.build(singletonList(nodeResolutionResult(pm)))).build();
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
-        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, new InMemoryExecutionContext(),
-          ROOT);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, SCANNED, ROOT);
 
         List<Path> manifests = Arrays.asList(Paths.get("packages/c/package.yaml"),
           Paths.get("packages/d/package.json5"));

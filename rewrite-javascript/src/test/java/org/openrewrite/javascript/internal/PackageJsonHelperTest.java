@@ -359,11 +359,7 @@ class PackageJsonHelperTest {
 
     @Test
     void editAndRegenerateSkipsOverlayForUnsupportedPm() {
-        // For yarn/pnpm, regen happens (or fails) but no overlay runs — marker resolvedDependencies
-        // stays as it was. We test the npm/Bun positive path via integTest in Task 9/10.
-        // This unit test pins the negative path: an edit of a YarnClassic package.json should
-        // leave the marker's resolvedDependencies untouched even when overlayResolvedDeps would
-        // throw on the lock content (we pass "no lock" so no overlay is even attempted).
+        // a Yarn classic edit keeps the marker's resolved dependencies: no lock, so no overlay
         String json = "{\n" +
                 "  \"name\": \"x\",\n" +
                 "  \"dependencies\": { \"lodash\": \"^4.17.21\" }\n" +

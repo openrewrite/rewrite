@@ -17,11 +17,9 @@ package org.openrewrite.javascript.internal;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.json.tree.Json;
 import org.openrewrite.quark.Quark;
 
 import java.nio.file.Path;
@@ -145,14 +143,6 @@ public final class NodeDependencyScan {
     public static final class ProjectState {
         public @Nullable SourceFile capturedPackageJson;
         public @Nullable String capturedLockContent;
-        public @Nullable SourceFile modifiedPackageJson;
-        /** The package.json revision {@link #edit} was applied to when computing {@link #modifiedPackageJson}. */
-        public @Nullable SourceFile editedFrom;
-        public @Nullable Function<Json.Document, Json.Document> edit;
-        public @Nullable Set<String> scopesContainingPackage;
-        public @Nullable List<MatchedDependency> matchedDeps;
-        public LockFileRegeneration.@Nullable Result regenResult;
-        public boolean failureRecorded;
     }
 
     /** Note a lock the scan visits; it belongs to the package.json beside it. */
@@ -216,8 +206,8 @@ public final class NodeDependencyScan {
                                                                 ProjectState ps, @Nullable Path lock,
                                                                 NodeResolutionResult marker,
                                                                 LockFileRegeneration regeneration) {
-        String manifest = print(null, packageJsonPath, ps);
-        ProjectFiles files = projectFiles(acc, null, packageJsonPath, singletonMap(packageJsonPath, manifest));
+        String manifest = print(p -> null, packageJsonPath, ps);
+        ProjectFiles files = projectFiles(acc, p -> null, packageJsonPath, singletonMap(packageJsonPath, manifest));
         return regeneration.installRoot(LockFileRegeneration.Request.builder()
                 .packageJson(manifest)
                 .lock(lock == null ? null : acc.locks.get(lock))
@@ -266,23 +256,9 @@ public final class NodeDependencyScan {
         return found;
     }
 
-    /**
-     * The modified package.json to return when visiting {@code visited}: the edit applied again over any change an
-     * earlier recipe in the run made since the scan.
-     */
-    public static SourceFile modifiedFor(ProjectState ps, SourceFile visited) {
-        SourceFile modified = requireNonNull(ps.modifiedPackageJson);
-        if (ps.edit == null || ps.editedFrom == visited) {
-            return modified;
-        }
-        return PackageJsonHelper.reapplyEdit(visited, ps.edit, ps.regenResult);
-    }
-
-    /**
-     * The manifests of the lock an edit of {@code packageJsonPath} regenerates, by path, as edited so far: the
-     * package.json beside the lock {@link #lockFor} names and every workspace member in the source set.
-     */
-    public static Map<Path, String> projectManifests(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
+    // the package.json beside the lock lockFor names and every workspace member in the source set
+    private static Map<Path, String> projectManifests(Accumulator acc, Function<Path, @Nullable String> before,
+                                                      Path packageJsonPath) {
         Path lock = lockFor(acc, packageJsonPath);
         Path root = lock == null ? null : acc.lockToPackage.get(lock);
         ProjectState rootPs = root == null ? null : acc.projects.get(root);
@@ -290,26 +266,27 @@ public final class NodeDependencyScan {
             return emptyMap();
         }
         Map<Path, String> manifests = new LinkedHashMap<>();
-        manifests.put(root, print(ctx, root, rootPs));
+        manifests.put(root, print(before, root, rootPs));
         for (Path member : PackageJsonHelper.workspaceMemberPaths(rootPs.capturedPackageJson)) {
             ProjectState memberPs = acc.projects.get(member);
             if (memberPs != null && memberPs.capturedPackageJson != null) {
-                manifests.put(member, print(ctx, member, memberPs));
+                manifests.put(member, print(before, member, memberPs));
             }
         }
         return manifests;
     }
 
     /**
-     * {@link #projectManifests}, the package-manager files beside or above them, the package.json of each directory
-     * above and of the members those list, the other locks a package manager reads, and the paths the walks read.
+     * What the regeneration for an edit of {@code packageJsonPath} reads besides it, each text as {@code before} gives
+     * it (null: as scanned): the lock's manifests, files beside or above them, the other locks, the paths walked.
      */
-    public static ProjectFiles projectFiles(Accumulator acc, ExecutionContext ctx, Path packageJsonPath) {
-        return projectFiles(acc, ctx, packageJsonPath, projectManifests(acc, ctx, packageJsonPath));
+    public static ProjectFiles projectFiles(Accumulator acc, Function<Path, @Nullable String> before,
+                                            Path packageJsonPath) {
+        return projectFiles(acc, before, packageJsonPath, projectManifests(acc, before, packageJsonPath));
     }
 
-    private static ProjectFiles projectFiles(Accumulator acc, @Nullable ExecutionContext ctx, Path packageJsonPath,
-                                             Map<Path, String> manifests) {
+    private static ProjectFiles projectFiles(Accumulator acc, Function<Path, @Nullable String> before,
+                                             Path packageJsonPath, Map<Path, String> manifests) {
         NodeResolutionResult marker = marker(acc.projects.get(packageJsonPath));
         LockFileRegeneration regeneration = LockFileRegeneration.forPackageManager(marker == null ? null :
                 marker.getPackageManager());
@@ -327,7 +304,8 @@ public final class NodeDependencyScan {
             // a patch file is wherever the manifest's patchedDependencies says, above the lock too
             if (directories.contains(dir) || above(dir, directories) || file.getKey().toString().endsWith(".patch") ||
                 readAsManifest(regeneration, file.getKey()) && under(dir, directories)) {
-                files.put(file.getKey(), file.getValue());
+                String text = before.apply(file.getKey());
+                files.put(file.getKey(), text == null ? file.getValue() : text);
             }
         }
         Path root = directory(manifests.isEmpty() ? packageJsonPath : manifests.keySet().iterator().next());
@@ -348,16 +326,16 @@ public final class NodeDependencyScan {
                 continue;
             }
             if (!dir.equals(root) && above(dir, Collections.singleton(root))) {
-                files.put(project.getKey(), print(ctx, project.getKey(), project.getValue()));
+                files.put(project.getKey(), print(before, project.getKey(), project.getValue()));
                 for (Path member : PackageJsonHelper.workspaceMemberPaths(captured)) {
                     ProjectState memberPs = acc.projects.get(member);
                     if (memberPs != null && memberPs.capturedPackageJson != null && !manifests.containsKey(member)) {
-                        files.put(member, print(ctx, member, memberPs));
+                        files.put(member, print(before, member, memberPs));
                     }
                 }
             } else if (!dir.equals(edited) && above(dir, Collections.singleton(edited)) &&
                        under(dir, Collections.singleton(root))) {
-                files.put(project.getKey(), print(ctx, project.getKey(), project.getValue()));
+                files.put(project.getKey(), print(before, project.getKey(), project.getValue()));
             }
         }
         Set<Path> ancestors = new LinkedHashSet<>();
@@ -405,12 +383,11 @@ public final class NodeDependencyScan {
         return false;
     }
 
-    private static String print(@Nullable ExecutionContext ctx, Path path, ProjectState ps) {
-        SourceFile current = ctx == null ? null : PackageJsonHelper.getLiveTree(ctx, path);
-        if (current == null) {
-            current = ps.modifiedPackageJson != null ? ps.modifiedPackageJson : requireNonNull(ps.capturedPackageJson);
-        }
-        return current.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+    // the manifest as the caller's recipe reads it, else as scanned
+    private static String print(Function<Path, @Nullable String> before, Path path, ProjectState ps) {
+        String text = before.apply(path);
+        return text != null ? text : requireNonNull(ps.capturedPackageJson)
+                .printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
     /**

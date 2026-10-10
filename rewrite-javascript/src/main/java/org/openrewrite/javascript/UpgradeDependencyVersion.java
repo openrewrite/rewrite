@@ -19,13 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.MatchedDependency;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
 import java.util.ArrayList;
@@ -35,13 +35,13 @@ import java.util.Map;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
     transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Package name",
@@ -85,7 +85,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits();
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
+                packageName));
     }
 
     @Override
@@ -103,8 +104,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
 
     @Override
     public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
-        acc.decideAll(ctx, this::decide);
-        return emptyList();
+        return acc.decideAll(ctx, this::decide);
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
@@ -151,7 +151,6 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
-        return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
-                lockRegenerationFailures, path, result, packageName));
+        return acc.visitor(this::decide);
     }
 }

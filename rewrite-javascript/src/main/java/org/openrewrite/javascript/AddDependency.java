@@ -26,6 +26,7 @@ import org.openrewrite.javascript.internal.NodeCatalogs.Pnpm.CatalogMode;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.semver.NodeSemver;
@@ -33,7 +34,6 @@ import org.openrewrite.semver.NodeSemver;
 import java.util.Collection;
 import java.util.Map;
 
-import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
@@ -43,6 +43,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     private static final String DEFAULT = "default";
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
 
     @Option(displayName = "Package name",
             description = "The name of the npm package to add (e.g., `lodash`, `@types/node`).",
@@ -77,7 +78,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
-        return new NodeDependencyEdits();
+        return new NodeDependencyEdits(NodeDependencyEdits.rows(lockRegenerationFailures, editsDeclined,
+                packageName));
     }
 
     @Override
@@ -95,8 +97,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
-        acc.decideAll(ctx, this::decide);
-        return emptyList();
+        return acc.decideAll(ctx, this::decide);
     }
 
     private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
@@ -105,12 +106,12 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
             return;
         }
         if (PackageJsonHelper.isNonObjectMember(pkg, targetScope())) {
-            decision.decline("`" + targetScope() + "` is not an object, so " + packageName + " was not added");
+            declined(decision, "`" + targetScope() + "` is not an object, so " + packageName + " was not added");
             return;
         }
         NodeCatalogs catalogs = decision.catalogs();
         if (catalogs instanceof NodeCatalogs.Pnpm && catalogs.isFlowStyle()) {
-            decision.decline(packageName + "@" + version + " was not added: the catalogs in " + catalogs.getPath() +
+            declined(decision, packageName + "@" + version + " was not added: the catalogs in " + catalogs.getPath() +
                              " are written in flow style, which is not read");
             return;
         }
@@ -157,7 +158,7 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         }
         String catalog = save;
         if (!decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
-            decision.decline(packageName + "@" + version + " was not added: its catalog in " + catalogs.getPath() +
+            declined(decision, packageName + "@" + version + " was not added: its catalog in " + catalogs.getPath() +
                              " cannot take the entry in place");
             return null;
         }
@@ -168,8 +169,13 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         LockFileRegeneration.Failure failure = LockOnlyInstall.PNPM.failure(pnpm);
         decision.insertRow(lockRegenerationFailures, ctx, LockFileRegeneration.failureRow(decision.getPath(),
                 failure, packageName));
-        decision.decline(packageName + "@" + version + " was not added: " + failure.getDetail());
+        declined(decision, packageName + "@" + version + " was not added: " + failure.getDetail());
         return null;
+    }
+
+    private static void declined(NodeDependencyEdits.Decision decision, String why) {
+        decision.warn(why);
+        decision.decline(why);
     }
 
     private boolean matchesAdd(Json.Document pkg) {
@@ -183,7 +189,6 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
-        return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
-                lockRegenerationFailures, path, result, packageName));
+        return acc.visitor(this::decide);
     }
 }

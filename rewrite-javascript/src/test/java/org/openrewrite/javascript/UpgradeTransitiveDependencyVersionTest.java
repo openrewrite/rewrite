@@ -18,17 +18,22 @@ package org.openrewrite.javascript;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.FindSourceFiles;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.Preconditions;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeRun;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.ipc.http.HttpSender;
@@ -38,6 +43,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
+import org.openrewrite.json.AddKeyValue;
 import org.openrewrite.json.ChangeValue;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markup;
@@ -318,6 +324,31 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             assertThat(outcome.rows).as("visiting %s", visited).singleElement()
               .extracting(NodeLockRegenerationFailures.Row::getReason)
               .isEqualTo(LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name());
+        }
+    }
+
+    // the same for UpgradeDependencyVersion, which shares the engine: a plain edit adds the override npm recorded
+    @Test
+    void upgradeDependencyVersionAfterAPlainEditOfTheRootInEveryVisitOrder() {
+        Scenario s = new Scenario("npm/override-recipe-compose");
+        Recipe recipe = new CompositeRecipe(Arrays.asList(new RootOnly(new AddKeyValue("$", "overrides",
+          "{\"is-number\": \"7.0.0\"}", null)), new UpgradeDependencyVersion("is-odd", null, "3.0.1")));
+        for (List<Source> order : orders(s.workspaceSources(PackageManager.Npm))) {
+            List<String> paths = order.stream().map(source -> source.path).collect(toList());
+            String visited = visited(order);
+            Outcome outcome = run(s, recipe, parse(order));
+            SourceFile root = outcome.file("package.json");
+            if (paths.indexOf("package.json") < paths.indexOf("package-lock.json")) {
+                assertThat(print(outcome.file("package-lock.json"))).as("visiting %s", visited)
+                  .isEqualTo(s.file("after"));
+                noWarning(root);
+                assertThat(outcome.rows).as("visiting %s", visited).isEmpty();
+                continue;
+            }
+            assertThat(root.getMarkers().findFirst(Markup.Warn.class)).as("visiting %s", visited)
+              .hasValueSatisfying(warn -> assertThat(warn.getMessage()).contains("wrote the lock from"));
+            assertThat(outcome.rows).as("visiting %s", visited).singleElement()
+              .extracting(NodeLockRegenerationFailures.Row::getKind).isEqualTo("CANNOT_KNOW");
         }
     }
 
@@ -743,6 +774,30 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             return out.toArray(new Dependency[0]);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /**
+     * Runs a recipe on the root package.json only.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false)
+    static class RootOnly extends Recipe {
+        Recipe recipe;
+
+        @Override
+        public String getDisplayName() {
+            return "Edit the root package.json only";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Runs a recipe on the root package.json only.";
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return Preconditions.check(new FindSourceFiles("package.json").getVisitor(), recipe.getVisitor());
         }
     }
 

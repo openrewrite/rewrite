@@ -211,7 +211,7 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                 NodeDependencyScan.ProjectState ps = acc.scan.projects.get(manifest);
                 acc.result = PackageJsonHelper.editAndRegenerate(ps.capturedPackageJson, Function.identity(),
                         Collections.singletonMap(Paths.get(path), content), ps.capturedLockContent,
-                        NodeDependencyScan.projectFiles(acc.scan, ctx, manifest), ctx);
+                        NodeDependencyScan.projectFiles(acc.scan, p -> null, manifest), ctx);
             }
             return acc.result;
         }

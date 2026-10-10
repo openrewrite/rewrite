@@ -65,8 +65,7 @@ public final class LockOnlyInstall {
      */
     public Failure failure(RuntimeException outcome) {
         if (outcome instanceof CannotKnow) {
-            CannotKnow e = (CannotKnow) outcome;
-            return new Failure(kindOf(e), e.getReason(), null, "the engine cannot know " + e.getSubject());
+            return cannotKnow((CannotKnow) outcome);
         }
         if (!(outcome instanceof Rejected)) {
             throw outcome;
@@ -78,6 +77,13 @@ public final class LockOnlyInstall {
                 e.getOutcome() == Rejected.Outcome.DELETES_LOCK ? command + " deletes the lock" : describe(kind);
         return new Failure(kind, e.getReason(), e.getPackageName(), what +
                 (e.getCode() == null ? "" : " (" + e.getCode() + ")") + ": " + e.getMessage());
+    }
+
+    /**
+     * What the engine cannot know, worded alike for every package manager.
+     */
+    public static Failure cannotKnow(CannotKnow e) {
+        return new Failure(Kind.CANNOT_KNOW, e.getReason(), null, "the engine cannot know " + e.getSubject());
     }
 
     /**
