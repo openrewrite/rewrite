@@ -1,0 +1,9 @@
+{
+  "name": "lws-a",
+  "version": "1.0.0",
+  "dist": {
+    "shasum": "1e73bcdce1212072e0298550aa60ec84c6668026",
+    "integrity": "sha512-HvUxAc27AlmeXxd6s3DxIG7wQ2Yfu+/tagieCHV/cnKnFXdh6xGscfbYcPTL4LgmWc0gzaXa1opjZYlCUVsKIg==",
+    "tarball": "https://registry.npmjs.org/lws-a/-/lws-a-1.0.0.tgz?\ud800"
+  }
+}

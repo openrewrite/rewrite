@@ -1,0 +1,1 @@
+The edit adds lws-a 1.0.0, whose registry document names a tarball URL ending in a lone surrogate (JSON "\ud800"): the URL is not conventional, so it becomes the locator's __archiveUrl binding, and querystring's escape of a surrogate that ends the string throws URIError [ERR_INVALID_URI].

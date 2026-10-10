@@ -1,0 +1,18 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ URIError [ERR_INVALID_URI]: lws-a@npm:1.0.0: URI malformed
+    at encodeStr (node:internal/querystring:97:13)
+    at qsEscape (node:querystring:171:10)
+    at encodeStringified (node:querystring:197:24)
+    at Object.stringify (node:querystring:263:19)
+    at Object.H$e (<corepack>/v1/yarn/4.10.3/yarn.js:140:102371)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:695:5865
+    at Array.map (<anonymous>)
+    at KD.getCandidates (<corepack>/v1/yarn/4.10.3/yarn.js:695:5701)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async rm.getCandidates (<corepack>/v1/yarn/4.10.3/yarn.js:141:1271)
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 21ms
+over=before
+exit=1
+no lock written

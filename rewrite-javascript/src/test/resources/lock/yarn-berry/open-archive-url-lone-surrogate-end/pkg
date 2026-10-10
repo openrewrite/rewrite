@@ -1,0 +1,9 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "lws-b": "1.0.0",
+    "lws-a": "1.0.0"
+  }
+}

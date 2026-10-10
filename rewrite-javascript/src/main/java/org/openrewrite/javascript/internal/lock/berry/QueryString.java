@@ -29,6 +29,12 @@ import java.util.Map;
  */
 final class QueryString {
 
+    // Node's ERR_INVALID_URI, printed with its code
+    static final String URI_ERROR = "URIError [ERR_INVALID_URI]";
+
+    private static final String UNRESERVED = "!'()*-.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz~";
+    private static final String HEX = "0123456789ABCDEF";
+
     private QueryString() {
     }
 
@@ -178,7 +184,7 @@ final class QueryString {
     static String stringify(Map<String, ?> obj) {
         StringBuilder out = new StringBuilder();
         for (String field : Js.keys(obj)) {
-            String key = UriComponent.encodeURIComponent(field) + "=";
+            String key = escape(field) + "=";
             Object value = obj.get(field);
             if (value instanceof List) {
                 for (Object item : (List<?>) value) {
@@ -197,14 +203,64 @@ final class QueryString {
         return out.toString();
     }
 
+    // encodeStringified
     private static String primitive(Object value) {
         if (value instanceof String) {
-            return UriComponent.encodeURIComponent((String) value);
+            return escape((String) value);
         }
-        if (value instanceof Number || value instanceof Boolean) {
+        if (value instanceof Number && !Double.isNaN(((Number) value).doubleValue()) &&
+            !Double.isInfinite(((Number) value).doubleValue())) {
+            String number = Js.numberToString((Number) value);
+            return Math.abs(((Number) value).doubleValue()) < 1e21 ? number : escape(number);
+        }
+        if (value instanceof Boolean) {
             return value.toString();
         }
         return "";
+    }
+
+    /**
+     * {@code qsEscape}, internal/querystring.js {@code encodeStr}: encodeURIComponent's unreserved set, but a surrogate
+     * takes the next code unit as its pair, whatever it is, and only one that ends the string is a URIError.
+     */
+    static String escape(String str) {
+        StringBuilder out = new StringBuilder();
+        byte[] utf8 = new byte[4];
+        for (int i = 0; i < str.length(); i++) {
+            int c = str.charAt(i);
+            int bytes;
+            if (c < 0x80) {
+                if (UNRESERVED.indexOf(c) >= 0) {
+                    out.append((char) c);
+                    continue;
+                }
+                utf8[0] = (byte) c;
+                bytes = 1;
+            } else if (c < 0x800) {
+                utf8[0] = (byte) (0xC0 | (c >> 6));
+                utf8[1] = (byte) (0x80 | (c & 0x3F));
+                bytes = 2;
+            } else if (c < 0xD800 || c >= 0xE000) {
+                utf8[0] = (byte) (0xE0 | (c >> 12));
+                utf8[1] = (byte) (0x80 | ((c >> 6) & 0x3F));
+                utf8[2] = (byte) (0x80 | (c & 0x3F));
+                bytes = 3;
+            } else {
+                if (++i >= str.length()) {
+                    throw new JsError(URI_ERROR, "URI malformed");
+                }
+                c = 0x10000 + (((c & 0x3FF) << 10) | (str.charAt(i) & 0x3FF));
+                utf8[0] = (byte) (0xF0 | (c >> 18));
+                utf8[1] = (byte) (0x80 | ((c >> 12) & 0x3F));
+                utf8[2] = (byte) (0x80 | ((c >> 6) & 0x3F));
+                utf8[3] = (byte) (0x80 | (c & 0x3F));
+                bytes = 4;
+            }
+            for (int b = 0; b < bytes; b++) {
+                out.append('%').append(HEX.charAt((utf8[b] >> 4) & 0xF)).append(HEX.charAt(utf8[b] & 0xF));
+            }
+        }
+        return out.toString();
     }
 
     // qsUnescape: decodeURIComponent, else the lenient unescapeBuffer
