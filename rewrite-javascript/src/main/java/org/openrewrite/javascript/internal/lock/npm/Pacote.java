@@ -109,7 +109,8 @@ final class Pacote {
                         .npmVersion(opts.getNpmVersion())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
-                withVersionDocument(picked, registry.manifest(options.registryFor(name), name, versionKey(packument, picked)));
+                withVersionDocument(picked, registry.manifest(options.registryFor(name), name,
+                        versionKey(packument, picked)));
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani);
 

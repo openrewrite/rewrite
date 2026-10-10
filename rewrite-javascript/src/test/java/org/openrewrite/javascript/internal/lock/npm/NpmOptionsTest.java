@@ -72,8 +72,6 @@ class NpmOptionsTest {
         assertThat(fromNpmrc("legacy-peer-deps").isLegacyPeerDeps()).isTrue();
     }
 
-    // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
-    // later global=false wins (npm 11.17.0: global=false then location=global is ESHRINKWRAPGLOBAL)
     // npm 11.17.0's npm-registry-fetch pickRegistry over the same options
     @Test
     void theRegistryIsTheOneTheConfigNamesForThePackage() {
@@ -87,6 +85,8 @@ class NpmOptionsTest {
         assertThat(fromNpmrc(null).registryFor("@corp/a")).isEqualTo("https://registry.npmjs.org/");
     }
 
+    // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
+    // later global=false wins (npm 11.17.0: global=false then location=global is ESHRINKWRAPGLOBAL)
     @Test
     void locationGlobalIsGlobal() {
         assertThat(fromNpmrc("location=global").isGlobal()).isTrue();
