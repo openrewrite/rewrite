@@ -214,7 +214,8 @@ public final class IdealTreeBuilder {
             throw err;
         } catch (RuntimeException err) {
             // arborist starts over from an empty manifest here and writes an empty lock
-            throw new MalformedManifest(err.getMessage(), err);
+            throw new MalformedManifest(err instanceof PackageJson.FieldError ?
+                    ((PackageJson.FieldError) err).getField() + ": " + err.getMessage() : err.getMessage(), err);
         }
         NpmLockRegenerator.setWorkspaces(root, files);
 

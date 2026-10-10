@@ -52,6 +52,19 @@ public final class PackageJson {
         }
     }
 
+    /**
+     * The TypeError a normalize step raises at a field's value, with JavaScript's message.
+     */
+    @Getter
+    static final class FieldError extends JsError {
+        private final String field;
+
+        FieldError(String field, String message) {
+            super(TYPE_ERROR, message);
+            this.field = field;
+        }
+    }
+
     private static final List<String> NORMALIZE_STEPS = Arrays.asList(
             "_id", "_attributes", "bundledDependencies", "bundleDependencies", "optionalDedupe", "scripts",
             "funding", "bin", "binDir");
@@ -96,7 +109,7 @@ public final class PackageJson {
         Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
         if (truthy(binDir) && !truthy(data.get("bin"))) {
             if (!(binDir instanceof String)) {
-                throw new IllegalArgumentException("ref.replace is not a function");
+                throw new FieldError("directories.bin", "ref.replace is not a function");
             }
             data.remove("bin");
             throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote((String) binDir) +
