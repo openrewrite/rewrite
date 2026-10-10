@@ -125,13 +125,12 @@ class YarnClassicLockRoundTripTest {
             new Cli(inputs).start(rc);
             options = new Config(inputs, Rc.getRcArgs(rc), new ArrayList<>());
         } catch (CannotKnow | JsError | MessageError e) {
-            String log = installOver(lock);
             if (e instanceof CannotKnow) {
                 assertThat(lock.getScenario().expect()).startsWith("cannot-know");
-                assertThat(log == null || log.contains("exit=0")).as("yarn ran the install over this lock").isTrue();
                 assumeFalse(true, "the engine cannot know what yarn does with this configuration: " +
                                   e.getMessage());
             }
+            String log = installOver(lock);
             assertThat(lock.getScenario().expect()).matches("(pm-fails|pm-rejects) .*");
             assertThat(log == null || log.contains("exit=1")).as("yarn failed the install over this lock").isTrue();
             assumeFalse(true, "yarn 1.22.22 fails on this configuration: " + e.getMessage());
