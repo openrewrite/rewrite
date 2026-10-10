@@ -292,8 +292,8 @@ class SpecTest {
             .isEqualTo(Spec.Type.VERSION);
     }
 
-    // npa's type for a dependency value (npm 11.17.0's npm-package-arg 13.0.2, npa.resolve(name, value)), or the
-    // pnpm, Yarn or Bun protocol it rejects with EUNSUPPORTEDPROTOCOL
+    // npa.resolve(name, value)'s type, or the pnpm, Yarn or Bun protocol it rejects with EUNSUPPORTEDPROTOCOL; this
+    // test's rows are printed by npm-arborist/generate/dependency-values.js
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
       catalog:                          | catalog          | catalog:
