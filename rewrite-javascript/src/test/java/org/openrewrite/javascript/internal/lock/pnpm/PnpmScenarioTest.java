@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmScenarios.Phase;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -63,18 +64,18 @@ class PnpmScenarioTest extends LockScenarioTest {
     }
 
     static PnpmLockRegenerator.Inputs inputs(PnpmScenarios.Scenario scenario, String lock) {
-        Map<String, String> files = new LinkedHashMap<>(scenario.tree(false));
-        String workspace = scenario.workspaceManifest(false);
+        Map<String, String> files = new LinkedHashMap<>(scenario.tree(Phase.AFTER));
+        String workspace = scenario.workspaceManifest(Phase.AFTER);
         if (workspace != null) {
             files.put("pnpm-workspace.yaml", workspace);
         }
-        String npmrc = scenario.npmrc(false);
+        String npmrc = scenario.npmrc(Phase.AFTER);
         if (npmrc != null) {
             files.put(".npmrc", npmrc);
         }
-        files.putAll(scenario.otherLocks());
+        files.putAll(scenario.otherLocks(Phase.BEFORE));
         PnpmScenarios.Scenario recording = recording(scenario);
-        Map<String, String> manifests = scenario.manifests(false, lock);
+        Map<String, String> manifests = scenario.manifests(Phase.AFTER, lock);
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock)
           .lockDir(scenario.lockDir())

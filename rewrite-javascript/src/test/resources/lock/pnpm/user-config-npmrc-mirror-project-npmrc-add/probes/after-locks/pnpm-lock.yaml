@@ -1,0 +1,30 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+
+  .:
+    dependencies:
+      abbrev:
+        specifier: 1.1.1
+        version: 1.1.1
+      ms:
+        specifier: 2.1.3
+        version: 2.1.3
+
+packages:
+
+  abbrev@1.1.1:
+    resolution: {integrity: sha512-nne9/IiQ/hzIhY6pdDnbBtz7DjPTKrY00P/zvPSm5pOFkl6xuGrGnXn/VtTNNfNtAfZ9/1RtehkszU9qcTii0Q==, tarball: https://registry.npmjs.org/abbrev/-/abbrev-1.1.1.tgz}
+
+  ms@2.1.3:
+    resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==, tarball: https://registry.npmjs.org/ms/-/ms-2.1.3.tgz}
+
+snapshots:
+
+  abbrev@1.1.1: {}
+
+  ms@2.1.3: {}

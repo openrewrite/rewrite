@@ -63,13 +63,12 @@ class SwitchCliVersionTest {
         switchCliVersion(pm, lock, null, "");
     }
 
-    private static CreateNewStoreController switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
-                                                             @Nullable String workspaceManifest, String lockDir) {
-        EnvLockfile.OnDisk lockFile = new EnvLockfile.OnDisk(lock);
-        CreateNewStoreController stores = new CreateNewStoreController(NO_REGISTRY, NOW);
-        new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN), stores, lockFile, lockDir)
-          .switchCliVersion(pm, options(workspaceManifest), "");
-        return stores;
+    // a member's lock (lockDir other than the root) reads the root's lock, which the inputs do not hold here
+    private static @Nullable PnpmError switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
+                                                        @Nullable String workspaceManifest, String lockDir) {
+        return new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
+          new CreateNewStoreController(NO_REGISTRY, NOW))
+          .switchCliVersion(pm, options(workspaceManifest), lockDir.isEmpty() ? new EnvLockfile.OnDisk(lock) : null);
     }
 
     private static PnpmOptions options(@Nullable String workspaceManifest) {
@@ -135,12 +134,13 @@ class SwitchCliVersionTest {
     @ParameterizedTest
     @ValueSource(strings = {"11.2.2", "^11.0.0"})
     void aMembersStoreControllerFailsAtTheNextOne(String version) {
-        CreateNewStoreController stores = switchCliVersion(pm(version, true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY,
-          "packages/a");
-        assertThatThrownBy(() -> stores.createStoreController(options(BAD_NAMED_REGISTRY)))
+        PnpmError unlessLocked = switchCliVersion(pm(version, true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "packages/a");
+        assertThat(unlessLocked).isNotNull();
+        assertThatThrownBy(() -> new CreateNewStoreController(NO_REGISTRY, NOW)
+          .createStoreController(options(BAD_NAMED_REGISTRY)))
           .isInstanceOfSatisfying(PnpmError.class, next -> {
-              assertThat(next.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL");
-              assertThat(stores.beforeNextStoreController(next)).isSameAs(next);
+              assertThat(next.getCode()).isEqualTo(unlessLocked.getCode());
+              assertThat(member(BAD_NAMED_REGISTRY, null).beforeNextStoreController(next)).isSameAs(next);
           });
     }
 
@@ -151,12 +151,48 @@ class SwitchCliVersionTest {
     @Test
     void aFailureBeforeTheNextStoreControllerIsEitherOne() {
         PnpmError missing = new PnpmError("PNPMFILE_NOT_FOUND", "pnpmfile at \"missing.cjs\" is not found");
-        assertThat(switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "packages/a")
-          .beforeNextStoreController(missing))
+        assertThat(member(BAD_NAMED_REGISTRY, null).beforeNextStoreController(missing))
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject())
             .contains("ERR_PNPM_INVALID_NAMED_REGISTRY_URL", "ftp://example.com/", "ERR_PNPM_PNPMFILE_NOT_FOUND"));
-        assertThat(switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, null, "packages/a")
-          .beforeNextStoreController(missing)).isSameAs(missing);
+        assertThat(member(null, null).beforeNextStoreController(missing)).isSameAs(missing);
+    }
+
+    /**
+     * The root's lock the inputs hold decides: locked and resolved, no store controller; unlocked, the store
+     * controller pnpm creates, whose failure is pnpm's (the -locked- and -unlocked- missing-pnpmfile recordings).
+     */
+    @Test
+    void aMembersSwitchReadsTheRootsLockTheInputsHold() {
+        assertThatThrownBy(() -> member(BAD_NAMED_REGISTRY, MAIN_DOCUMENT))
+          .isInstanceOfSatisfying(PnpmError.class,
+            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL"));
+        PnpmError missing = new PnpmError("PNPMFILE_NOT_FOUND", "pnpmfile at \"missing.cjs\" is not found");
+        String resolved = "---\nlockfileVersion: '9.0'\n\nimporters:\n\n  .:\n    configDependencies: {}\n" +
+                          "    packageManagerDependencies:\n      '@pnpm/exe':\n        specifier: 11.2.2\n" +
+                          "        version: 11.2.2\n      pnpm:\n        specifier: 11.2.2\n        version: 11.2.2\n\n" +
+                          "packages: {}\n\nsnapshots: {}\n\n---\n" + MAIN_DOCUMENT;
+        assertThat(member(BAD_NAMED_REGISTRY, resolved).beforeNextStoreController(missing)).isSameAs(missing);
+    }
+
+    // packages/a's lock under a root pinning pnpm 11.2.2 in devEngines, after the package manager check
+    private static Main member(@Nullable String workspaceSettings, @Nullable String rootLock) {
+        PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
+          .lock(MAIN_DOCUMENT)
+          .lockDir("packages/a")
+          .manifest("", "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.2.2\"}}}")
+          .manifest("packages/a", "{\"name\":\"a\"}")
+          .file("pnpm-workspace.yaml", "packages:\n  - packages/*\nsharedWorkspaceLockfile: false\n" +
+                                       (workspaceSettings == null ? "" : workspaceSettings))
+          .now(NOW);
+        if (rootLock != null) {
+            inputs.file("pnpm-lock.yaml", rootLock);
+        }
+        PnpmLockRegenerator.Inputs built = inputs.build();
+        EnvLockfile.OnDisk lockFile = new EnvLockfile.OnDisk(MAIN_DOCUMENT);
+        Main main = new Main(built, Collections.emptyMap(), new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
+          new CreateNewStoreController(NO_REGISTRY, NOW), lockFile);
+        main.checkWantedPackageManager(main.config());
+        return main;
     }
 
     /**

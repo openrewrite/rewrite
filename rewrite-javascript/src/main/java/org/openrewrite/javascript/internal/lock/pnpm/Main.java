@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
@@ -23,7 +24,10 @@ import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -48,6 +52,20 @@ public final class Main {
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
     private final EnvLockfile.OnDisk lockFile;
+    private final Map<String, EnvLockfile.OnDisk> otherLockFiles = new HashMap<>();
+
+    // the package manager check's store controller failure, which pnpm ends with unless a lock it reads locks the
+    // release; the inputs do not say whether it does
+    private @Nullable PnpmError unlessLocked;
+
+    /**
+     * filterProjectsFromDir's result for a workspace install: every project, and the graph of their dependencies.
+     */
+    @Value
+    static class FilterResults {
+        List<Verification.Project> allProjects;
+        ProjectsGraph.Result allProjectsGraph;
+    }
 
     Main(PnpmLockRegenerator.Inputs inputs, Map<String, String> userConfig, EnvInstaller envInstaller,
          CreateNewStoreController stores, EnvLockfile.OnDisk lockFile) {
@@ -107,7 +125,7 @@ public final class Main {
     }
 
     /**
-     * main.ts' findWorkspaceDir from where pnpm runs, then getConfig.
+     * main.ts' findWorkspaceDir from where pnpm runs, then getConfig, whose install options the port reads.
      */
     PnpmOptions config() {
         String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir(), inputs.getEnv());
@@ -117,7 +135,60 @@ public final class Main {
                                  "NPM_CONFIG_WORKSPACE_DIR names (the inputs are those of the workspace found from " +
                                  "the lock up)");
         }
-        return getConfig(inputs, userConfig, workspaceDir);
+        PnpmOptions options = getConfig(inputs, userConfig, workspaceDir);
+        requireSettings(options);
+        return options;
+    }
+
+    // getConfig copies every camelCase key of pnpm-workspace.yaml into the config the install reads as its options;
+    // these change the lock or the install's outcome and are not settings the port reads
+    private static void requireSettings(PnpmOptions options) {
+        Map<String, Boolean> asIfUnset = new LinkedHashMap<>(AS_IF_UNSET);
+        if (options.getWorkspacePackagePatterns() != null) {
+            // recursive.ts: true when every project of the workspace is installed
+            asIfUnset.put("pruneLockfileImporters", true);
+        }
+        for (String option : UNPORTED_OPTIONS) {
+            if (options.isExplicitlySet(option) && !(asIfUnset.containsKey(option) &&
+                                                     asIfUnset.get(option).equals(options.get(option)))) {
+                throw new CannotKnow("what pnpm does with " + option + " (" +
+                                     Js.jsonStringify(options.get(option)) + "), an option of the install");
+            }
+        }
+        Object only = options.get("only");
+        boolean production = "prod".equals(only) || "production".equals(only) ||
+                             !Js.truthy(only) && options.isTrue("production");
+        boolean dev = !production && ("dev".equals(only) || "development".equals(only) || options.isTrue("dev"));
+        if (production || dev || Boolean.FALSE.equals(options.get("optional"))) {
+            throw new CannotKnow("the lock pnpm writes without its " + (production ? "devDependencies" :
+                    dev ? "dependencies" : "optionalDependencies") + " (only, production, dev or optional)");
+        }
+        for (String networkOnly : new String[]{"offline", "preferOffline"}) {
+            if (options.isTrue(networkOnly)) {
+                throw new CannotKnow("the metadata pnpm's cache holds (" + networkOnly + ")");
+            }
+        }
+    }
+
+    private static final List<String> UNPORTED_OPTIONS = Arrays.asList("dedupe", "dir", "explicitlySetKeys",
+            "finders", "fixLockfile", "forceFullResolution", "frozenLockfile", "frozenLockfileIfExists", "hooks",
+            "ignoredPackages", "ignorePackageManifest", "latest", "lockfileCheck", "packageManager",
+            "packageVulnerabilityAudit", "pruneDirectDependencies", "pruneLockfileImporters", "resolutionOnly",
+            "rootProjectManifest", "rootProjectManifestDir", "saveLockfile", "update", "updateMatching",
+            "updatePackageManifest", "updateToLatest", "wantedPackageManager", "workspace", "workspaceDir",
+            "workspacePackagePatterns");
+
+    // the value of an option above that a lock-only install treats as the option unset (extendInstallOptions'
+    // defaults, install.ts' frozenLockfileIfExists under lockfileOnly, the commands' truthiness checks)
+    private static final Map<String, Boolean> AS_IF_UNSET = new LinkedHashMap<>();
+
+    static {
+        for (String option : Arrays.asList("dedupe", "fixLockfile", "forceFullResolution", "frozenLockfile",
+                "frozenLockfileIfExists", "ignorePackageManifest", "latest", "pruneDirectDependencies",
+                "resolutionOnly", "update", "updatePackageManifest", "updateToLatest", "workspace")) {
+            AS_IF_UNSET.put(option, false);
+        }
+        AS_IF_UNSET.put("saveLockfile", true);
     }
 
     // config.dir: where pnpm runs, the edited manifest's directory, else the lock's
@@ -164,9 +235,9 @@ public final class Main {
 
     /**
      * main.ts' recursive branch: filterProjectsFromDir's projects of the workspace, each with its manifest as read and
-     * installable under engineStrict and nodeVersion; filters that select some of them are cannot-know.
+     * installable under engineStrict and nodeVersion, and their graph; filters that select some are cannot-know.
      */
-    List<Verification.Project> filterProjectsFromDir(PnpmOptions options) {
+    FilterResults filterProjectsFromDir(PnpmOptions options) {
         if (options.isExplicitlySet("recursiveInstall") && !options.isTrue("recursiveInstall") ||
             options.isTrue("workspaceRoot") || options.isExplicitlySet("filter") ||
             options.isExplicitlySet("filterProd")) {
@@ -182,7 +253,8 @@ public final class Main {
             PackageIsInstallable.projectIsInstallable(project.getId(), project.getManifest(),
                     options.isTrue("engineStrict"), options.getNodeVersion(), null, inputs.getHost());
         }
-        return projects;
+        return new FilterResults(projects, ProjectsGraph.createProjectsGraph(projects, false,
+                Js.truthy(options.get("linkWorkspacePackages"))));
     }
 
     // project-manifest-reader over the one manifest findPackages lists in dir
@@ -240,23 +312,60 @@ public final class Main {
             return;
         }
         boolean underCorepack = inputs.getEnv() != null && inputs.getEnv().containsKey("COREPACK_ROOT");
+        EnvLockfile.OnDisk rootLockFile = lockFileOf(WORKSPACE_DIR);
         if ("pnpm".equals(pm.getName()) && "download".equals(pm.getOnFail()) && !underCorepack) {
-            new SwitchCliVersion(envInstaller, stores, lockFile, inputs.getLockDir()).switchCliVersion(pm, options,
-                    WORKSPACE_DIR);
+            unlessLocked = new SwitchCliVersion(envInstaller, stores).switchCliVersion(pm, options, rootLockFile);
             return;
         }
         checkPackageManager(pm, underCorepack);
-        if (!inputs.getLockDir().equals(WORKSPACE_DIR)) {
+        if (rootLockFile == null) {
             if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null) != null) {
-                stores.createStoreControllerUnlessLocked(options);
+                unlessLocked = stores.storeControllerFailure(options);
             }
             return;
         }
-        String version = SyncEnvLockfile.syncEnvLockfile(pm, lockFile::readEnvLockfile);
+        String version = SyncEnvLockfile.syncEnvLockfile(pm, rootLockFile::readEnvLockfile);
         if (version != null) {
-            envInstaller.resolvePackageManagerIntegrities(version, lockFile.readEnvLockfile(), true, lockFile,
+            envInstaller.resolvePackageManagerIntegrities(version, rootLockFile.readEnvLockfile(), true, rootLockFile,
                     stores.createStoreController(options), options);
         }
+    }
+
+    /**
+     * What pnpm ends with when {@code e} comes before installDeps' store controller: e, or the failure of a store
+     * controller the package manager check created unless a lock the inputs do not hold records the release.
+     */
+    RuntimeException beforeNextStoreController(RuntimeException e) {
+        PnpmError failed = unlessLocked;
+        if (failed == null || e instanceof PnpmError && failed.getCode().equals(((PnpmError) e).getCode()) &&
+                              String.valueOf(failed.getMessage()).equals(e.getMessage())) {
+            return e;
+        }
+        String other = e instanceof CannotKnow ? ((CannotKnow) e).getSubject() : "with " +
+                (e instanceof PnpmError ? "[" + ((PnpmError) e).getCode() + "] " : "") + e.getMessage();
+        return new CannotKnow("whether pnpm fails with [" + failed.getCode() + "] " + failed.getMessage() +
+                              " (unless the env document of the workspace's " + LockfileReader.WANTED_LOCKFILE +
+                              " records the release) or else " + other);
+    }
+
+    // the lock file in dir as the run finds it: this lock, another the inputs hold, or none where the host lists the
+    // project's files; null when they do not say what it holds
+    private EnvLockfile.@Nullable OnDisk lockFileOf(String dir) {
+        if (dir.equals(inputs.getLockDir())) {
+            return lockFile;
+        }
+        EnvLockfile.OnDisk other = otherLockFiles.get(dir);
+        if (other != null) {
+            return other;
+        }
+        String path = RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE);
+        String text = inputs.getFiles().get(path);
+        if (text == null && (inputs.getPaths() == null || inputs.getPaths().contains(path))) {
+            return null;
+        }
+        other = new EnvLockfile.OnDisk(text);
+        otherLockFiles.put(dir, other);
+        return other;
     }
 
     private static void checkPackageManager(PnpmOptions.WantedPackageManager pm, boolean underCorepack) {
@@ -296,7 +405,6 @@ public final class Main {
      * lockfileDir, else rootProjectManifestDir; the pnpmfiles, its plugins' among them, from lockfileDir or config.dir.
      */
     void installConfigDepsAndLoadHooks(PnpmOptions options, @Nullable String lockfileDir) {
-        String lockDir = inputs.getLockDir();
         Object configDependencies = options.get("configDependencies");
         if (Js.truthy(configDependencies)) {
             stores.createStoreController(options);
@@ -307,8 +415,9 @@ public final class Main {
             @SuppressWarnings("unchecked")
             Map<String, @Nullable Object> configDeps = (Map<String, @Nullable Object>) configDependencies;
             String rootDir = lockfileDir == null ? WORKSPACE_DIR : lockfileDir;
-            if (lockDir.equals(rootDir)) {
-                envInstaller.resolveAndInstallConfigDeps(configDeps, lockFile, options);
+            EnvLockfile.OnDisk rootLockFile = lockFileOf(rootDir);
+            if (rootLockFile != null) {
+                envInstaller.resolveAndInstallConfigDeps(configDeps, rootLockFile, options);
             } else {
                 // into the env document of rootDir's lock, which the inputs do not hold: what it does not lock resolves
                 try {

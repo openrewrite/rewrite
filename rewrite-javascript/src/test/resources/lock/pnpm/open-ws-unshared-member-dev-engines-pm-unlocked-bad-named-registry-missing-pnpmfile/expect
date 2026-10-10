@@ -1,1 +1,1 @@
-cannot-know whether pnpm fails with ftp://example.com/ (unless the env document of the workspace's pnpm-lock.yaml records the release) or else with the missing pnpmfile
+pm-rejects ERR_PNPM_INVALID_NAMED_REGISTRY_URL

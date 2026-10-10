@@ -66,7 +66,7 @@ class MainTest {
         return "\"devEngines\":{\"packageManager\":" + packageManager + "}";
     }
 
-    private static PnpmLockRegenerator.Install install(String manifest, @Nullable String workspace, String... env) {
+    private static Install.Result install(String manifest, @Nullable String workspace, String... env) {
         Map<String, String> environment = new LinkedHashMap<>();
         environment.put("pnpm_config_minimum_release_age", "0");
         for (int i = 0; i < env.length; i += 2) {

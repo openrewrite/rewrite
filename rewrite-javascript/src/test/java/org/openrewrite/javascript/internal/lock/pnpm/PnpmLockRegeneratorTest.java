@@ -22,6 +22,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmScenarios.Phase;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -30,7 +32,6 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -66,7 +67,7 @@ class PnpmLockRegeneratorTest {
         }
     };
 
-    private static PnpmLockRegenerator.Install install(@Nullable String workspace, @Nullable String npmrc,
+    private static Install.Result install(@Nullable String workspace, @Nullable String npmrc,
                                                        String... env) {
         Map<String, String> files = new LinkedHashMap<>();
         if (npmrc != null) {
@@ -75,7 +76,7 @@ class PnpmLockRegeneratorTest {
         return install(LOCK, MANIFEST, workspace, files, env);
     }
 
-    private static PnpmLockRegenerator.Install install(String lock, String manifest, @Nullable String workspace,
+    private static Install.Result install(String lock, String manifest, @Nullable String workspace,
                                                        Map<String, String> projectFiles, String... env) {
         Map<String, String> files = new LinkedHashMap<>(projectFiles);
         if (workspace != null) {
@@ -95,22 +96,22 @@ class PnpmLockRegeneratorTest {
           .build(), NO_REGISTRY).install();
     }
 
-    private static PnpmLockRegenerator.Install withManifest(String manifest, String... env) {
+    private static Install.Result withManifest(String manifest, String... env) {
         return install(LOCK, manifest, null, Collections.emptyMap(), env);
     }
 
     // the edit a recorded scenario makes: its after phase's inputs over its before lock
-    private static PnpmLockRegenerator.Install edit(String name) {
+    private static Install.Result edit(String name) {
         PnpmScenarios.Scenario scenario = scenario(name);
-        Map<String, String> files = new LinkedHashMap<>(scenario.tree(false));
-        String workspace = scenario.workspaceManifest(false);
+        Map<String, String> files = new LinkedHashMap<>(scenario.tree(Phase.AFTER));
+        String workspace = scenario.workspaceManifest(Phase.AFTER);
         if (workspace != null) {
             files.put("pnpm-workspace.yaml", workspace);
         }
         String before = scenario.file("before");
         return new PnpmLockRegenerator(PnpmLockRegenerator.Inputs.builder()
           .lock(before)
-          .manifests(scenario.manifests(false, before))
+          .manifests(scenario.manifests(Phase.AFTER, before))
           .files(files)
           .now(scenario.phaseTime("after"))
           .build(), new ScenarioRegistry(scenario, "after")).install();
@@ -146,7 +147,7 @@ class PnpmLockRegeneratorTest {
 
     @Test
     void anAddedDevEnginesRuntimeIsAnEditPnpmResolves() {
-        PnpmLockRegenerator.Install install = edit("small-dev-engines-runtime-add");
+        Install.Result install = edit("small-dev-engines-runtime-add");
         assertThat(install.getResolution()).isEqualTo("projects not up to date with the lock");
     }
 
@@ -273,7 +274,7 @@ class PnpmLockRegeneratorTest {
         assertThat(installHolding(null, "package.yaml").getWritten()).isEqualTo(LOCK);
     }
 
-    private static PnpmLockRegenerator.Install installHolding(@Nullable String workspace, String... paths) {
+    private static Install.Result installHolding(@Nullable String workspace, String... paths) {
         Map<String, String> files = new LinkedHashMap<>();
         Set<String> held = new LinkedHashSet<>(Arrays.asList("package.json", "pnpm-lock.yaml"));
         held.addAll(Arrays.asList(paths));
@@ -410,7 +411,7 @@ class PnpmLockRegeneratorTest {
 
     @Test
     void minimumReleaseAgeZeroVerifiesNothing() {
-        PnpmLockRegenerator.Install install = install(null, null);
+        Install.Result install = install(null, null);
         assertThat(install.getResolution()).isNull();
         assertThat(install.getWritten()).isEqualTo(LOCK);
     }

@@ -57,6 +57,13 @@ final class PnpmScenarios {
     }
 
     /**
+     * The project's files as an install found them: before the edit, or after it.
+     */
+    enum Phase {
+        BEFORE, AFTER
+    }
+
+    /**
      * One lock of a scenario with what pnpm had when it read or wrote it.
      */
     @Getter
@@ -64,17 +71,18 @@ final class PnpmScenarios {
         private final Scenario scenario;
         private final String fileName;
         private final String text;
-        private final boolean before;
+        private final Phase phase;
 
         Lock(Scenario scenario, String fileName, String text) {
             this.scenario = scenario;
             this.fileName = fileName;
             this.text = text;
-            this.before = fileName.startsWith("before") || fileName.startsWith("seed-lock");
+            this.phase = fileName.startsWith("before") || fileName.startsWith("seed-lock") ? Phase.BEFORE :
+                    Phase.AFTER;
         }
 
         Map<String, String> manifests() {
-            return scenario.manifests(before, text);
+            return scenario.manifests(phase, text);
         }
 
         /**
@@ -82,24 +90,29 @@ final class PnpmScenarios {
          */
         @Nullable
         String workspaceManifest() {
-            String rewritten = before ? null : scenario.file("probes/after-changed/pnpm-workspace.yaml");
-            return rewritten != null ? rewritten : scenario.workspaceManifest(before);
+            String rewritten = phase == Phase.BEFORE ? null :
+                    scenario.file("probes/after-changed/pnpm-workspace.yaml");
+            return rewritten != null ? rewritten : scenario.workspaceManifest(phase);
         }
 
         @Nullable
         String npmrc() {
-            return scenario.npmrc(before);
+            return scenario.npmrc(phase);
         }
 
         Map<String, String> tree() {
-            return scenario.tree(before);
+            return scenario.tree(phase);
+        }
+
+        Map<String, String> otherLocks() {
+            return scenario.otherLocks(phase);
         }
 
         /**
          * The recorded phase that ran the install that changes nothing over this lock, or wrote it.
          */
-        String phase() {
-            if (before) {
+        String recordedPhase() {
+            if (phase == Phase.BEFORE) {
                 return "before".equals(fileName) && scenario.editChangesNothing() &&
                        scenario.file("pnpm-before-again.log") == null ? "after" : "before";
             }
@@ -107,7 +120,7 @@ final class PnpmScenarios {
         }
 
         Instant now() {
-            return scenario.phaseTime(phase());
+            return scenario.phaseTime(recordedPhase());
         }
 
         /**
@@ -223,9 +236,10 @@ final class PnpmScenarios {
         boolean editChangesNothing() {
             return has("before") && has("pkg") && args() == null && !has("full-before") &&
                    String.valueOf(file("pkg")).equals(file("pkg-before")) &&
-                   tree(true).equals(tree(false)) &&
-                   String.valueOf(workspaceManifest(true)).equals(String.valueOf(workspaceManifest(false))) &&
-                   String.valueOf(npmrc(true)).equals(String.valueOf(npmrc(false)));
+                   tree(Phase.BEFORE).equals(tree(Phase.AFTER)) &&
+                   String.valueOf(workspaceManifest(Phase.BEFORE))
+                           .equals(String.valueOf(workspaceManifest(Phase.AFTER))) &&
+                   String.valueOf(npmrc(Phase.BEFORE)).equals(String.valueOf(npmrc(Phase.AFTER)));
         }
 
         /**
@@ -264,7 +278,7 @@ final class PnpmScenarios {
                 boolean seen = false;
                 for (Lock other : locks) {
                     // the recorder copies seed-lock to before; a rewrite can come back to a lock already held
-                    seen |= other.getText().equals(candidate.getText()) && other.isBefore() == candidate.isBefore();
+                    seen |= other.getText().equals(candidate.getText()) && other.getPhase() == candidate.getPhase();
                 }
                 if (!seen) {
                     locks.add(candidate);
@@ -276,34 +290,35 @@ final class PnpmScenarios {
         /**
          * The files of the project directory in a phase: {@code tree-before/}, then {@code tree/} over it after.
          */
-        Map<String, String> tree(boolean before) {
+        Map<String, String> tree(Phase phase) {
             Map<String, String> out = new TreeMap<>(tree("tree-before"));
-            if (!before) {
+            if (phase == Phase.AFTER) {
                 out.putAll(tree("tree"));
             }
             return out;
         }
 
         /**
-         * The locks of the other projects as the edit's install found them, where the recording kept every project's
-         * ({@code probes/before-locks/}), else the root's ({@code probes/before-root-lock}).
+         * The other projects' locks beside the {@code before} or the {@code after} lock, where the recording kept every
+         * project's ({@code probes/before-locks/}), else the root's ({@code probes/before-root-lock}).
          */
-        Map<String, String> otherLocks() {
-            Map<String, String> out = new TreeMap<>(tree("probes/before-locks"));
-            if (out.isEmpty() && has("probes/before-root-lock")) {
-                out.put(LockfileReader.WANTED_LOCKFILE, requireNonNull(file("probes/before-root-lock")));
+        Map<String, String> otherLocks(Phase phase) {
+            String probes = phase == Phase.BEFORE ? "probes/before" : "probes/after";
+            Map<String, String> out = new TreeMap<>(tree(probes + "-locks"));
+            if (out.isEmpty() && has(probes + "-root-lock")) {
+                out.put(LockfileReader.WANTED_LOCKFILE, requireNonNull(file(probes + "-root-lock")));
             }
             out.remove(RootRelativePath.join(lockDir(), LockfileReader.WANTED_LOCKFILE));
             return out;
         }
 
         @Nullable
-        String workspaceManifest(boolean before) {
-            String fromTree = tree(before).get("pnpm-workspace.yaml");
+        String workspaceManifest(Phase phase) {
+            String fromTree = tree(phase).get("pnpm-workspace.yaml");
             if (fromTree != null) {
                 return fromTree;
             }
-            if (before) {
+            if (phase == Phase.BEFORE) {
                 return has("workspace-before") ? file("workspace-before") :
                         has("workspace") ? file("workspace") : file("workspace-yaml");
             }
@@ -312,12 +327,12 @@ final class PnpmScenarios {
         }
 
         @Nullable
-        String npmrc(boolean before) {
-            String fromTree = tree(before).get(".npmrc");
+        String npmrc(Phase phase) {
+            String fromTree = tree(phase).get(".npmrc");
             if (fromTree != null) {
                 return fromTree;
             }
-            if (before && has("npmrc-before")) {
+            if (phase == Phase.BEFORE && has("npmrc-before")) {
                 return file("npmrc-before");
             }
             return file("npmrc");
@@ -326,14 +341,14 @@ final class PnpmScenarios {
         /**
          * The project's manifests in a phase by location: {@code ""} the root, a member's path otherwise.
          */
-        Map<String, String> manifests(boolean before, String lock) {
+        Map<String, String> manifests(Phase phase, String lock) {
             Map<String, String> manifests = new LinkedHashMap<>();
-            String root = before ? (has("pkg-before") ? file("pkg-before") : file("pkg-root")) :
+            String root = phase == Phase.BEFORE ? (has("pkg-before") ? file("pkg-before") : file("pkg-root")) :
                     has("pkg") ? file("pkg") : has("pkg-after") ? file("pkg-after") : file("pkg-root");
             if (root != null) {
                 manifests.put("", root);
             }
-            for (Map.Entry<String, String> entry : tree(before).entrySet()) {
+            for (Map.Entry<String, String> entry : tree(phase).entrySet()) {
                 String path = entry.getKey();
                 if (path.endsWith("/package.json")) {
                     manifests.put(path.substring(0, path.length() - "/package.json".length()), entry.getValue());
@@ -347,11 +362,11 @@ final class PnpmScenarios {
                 if (!m.matches() || Arrays.asList("before", "after", "root").contains(m.group(1))) {
                     continue;
                 }
-                String phase = m.group(2);
-                if (phase != null && !phase.equals(before ? "before" : "after")) {
+                String filePhase = m.group(2);
+                if (filePhase != null && !filePhase.equals(phase == Phase.BEFORE ? "before" : "after")) {
                     continue;
                 }
-                if (phase == null && memberFiles.containsKey(m.group(1))) {
+                if (filePhase == null && memberFiles.containsKey(m.group(1))) {
                     continue;
                 }
                 memberFiles.put(m.group(1), file);

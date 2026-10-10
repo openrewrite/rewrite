@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.semver.NodeSemver;
 
@@ -26,39 +27,38 @@ final class SwitchCliVersion {
 
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
-    private final EnvLockfile.OnDisk lockFile;
-    private final String lockDir;
 
-    SwitchCliVersion(EnvInstaller envInstaller, CreateNewStoreController stores, EnvLockfile.OnDisk lockFile,
-                     String lockDir) {
+    SwitchCliVersion(EnvInstaller envInstaller, CreateNewStoreController stores) {
         this.envInstaller = envInstaller;
         this.stores = stores;
-        this.lockFile = lockFile;
-        this.lockDir = lockDir;
     }
 
-    void switchCliVersion(PnpmOptions.WantedPackageManager pm, PnpmOptions options, String rootProjectManifestDir) {
+    /**
+     * The switch over the lock file of rootProjectManifestDir, null when the inputs do not say what it holds: then the
+     * failure of a store controller pnpm creates unless that lock records the release, which pnpm ends with either way.
+     */
+    @Nullable
+    PnpmError switchCliVersion(PnpmOptions.WantedPackageManager pm, PnpmOptions options,
+                               EnvLockfile.@Nullable OnDisk lockFile) {
         if (!"pnpm".equals(pm.getName()) || pm.getVersion() == null) {
-            return;
+            return null;
         }
         String version = Js.string(pm.getVersion());
         boolean persistLockfile = shouldPersistLockfile(pm);
         if (!persistLockfile && Main.PNPM_VERSION.equals(version)) {
-            return;
+            return null;
         }
-        // readEnvLockfile(rootProjectManifestDir): another lock's env document, which the inputs do not hold; only when
-        // it records the running release resolved does pnpm go on without a store controller
-        boolean ownEnvDocument = lockDir.equals(rootProjectManifestDir);
-        if (!ownEnvDocument && persistLockfile &&
+        if (lockFile == null && persistLockfile &&
             NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
-            if (stores.createStoreControllerUnlessLocked(options) && !Main.PNPM_VERSION.equals(version)) {
+            PnpmError failure = stores.storeControllerFailure(options);
+            if (failure == null && !Main.PNPM_VERSION.equals(version)) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
             }
-            return;
+            return failure;
         }
-        boolean save = persistLockfile && ownEnvDocument;
-        EnvLockfile envLockfile = save ? lockFile.readEnvLockfile() : null;
+        EnvLockfile.OnDisk rootLockFile = lockFile == null ? new EnvLockfile.OnDisk(null) : lockFile;
+        EnvLockfile envLockfile = persistLockfile ? rootLockFile.readEnvLockfile() : null;
         Object pmVersion = EnvInstaller.lockedVersion(
                 envLockfile == null ? null : envLockfile.packageManagerDependencies(), "pnpm");
         NpmResolver storeToUse = null;
@@ -69,23 +69,23 @@ final class SwitchCliVersion {
             if (!NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
                 throw switchesTo(version);
             }
-            EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile, save,
-                    lockFile, storeToUse, options);
+            EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile,
+                    persistLockfile, rootLockFile, storeToUse, options);
             pmVersion = EnvInstaller.lockedVersion(resolved.packageManagerDependencies(), "pnpm");
             if (!Js.truthy(pmVersion)) {
                 // pnpm warns that it cannot resolve the release and goes on
-                return;
+                return null;
             }
         } else if (!EnvInstaller.isPackageManagerResolved(envLockfile, Js.string(pmVersion))) {
             storeToUse = stores.createStoreController(options);
             if (!Main.PNPM_VERSION.equals(Js.string(pmVersion))) {
                 throw switchesTo(Js.string(pmVersion));
             }
-            envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile, save, lockFile,
-                    storeToUse, options);
+            envInstaller.resolvePackageManagerIntegrities(Js.string(pmVersion), envLockfile, persistLockfile,
+                    rootLockFile, storeToUse, options);
         }
         if (Main.PNPM_VERSION.equals(Js.string(pmVersion))) {
-            return;
+            return null;
         }
         if (storeToUse == null) {
             stores.createStoreController(options);

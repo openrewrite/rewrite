@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmScenarios.Phase;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,6 +58,7 @@ class PnpmLockRoundTripTest {
         if (lock.npmrc() != null) {
             files.put(".npmrc", lock.npmrc());
         }
+        files.putAll(lock.otherLocks());
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(lock.getText())
           .lockDir(lock.getScenario().lockDir())
@@ -85,12 +87,13 @@ class PnpmLockRoundTripTest {
             assertModelRoundTrip(lock);
             return;
         }
-        PnpmLockRegenerator.Install install;
+        Install.Result install;
         try {
-            install = new PnpmLockRegenerator(inputs(lock), new ScenarioRegistry(lock.getScenario(), lock.phase()))
+            install = new PnpmLockRegenerator(inputs(lock), new ScenarioRegistry(lock.getScenario(), lock.recordedPhase()))
               .install();
         } catch (LockfileReader.IgnoredLockfile e) {
-            String readingLog = lock.isBefore() ? lock.getScenario().file("pnpm-after.log") : log;
+            String readingLog = lock.getPhase() == Phase.BEFORE ? lock.getScenario().file("pnpm-after.log") :
+              log;
             if (readingLog == null) {
                 // a downloaded fixture without logs: lock-v54-no-edit and lock-v6-* record pnpm ignoring such a lock
                 assertThat(e.getMessage()).isEqualTo("Lockfile pnpm-lock.yaml not compatible with current pnpm");
@@ -185,7 +188,7 @@ class PnpmLockRoundTripTest {
     private static final Pattern IGNORED = Pattern.compile("Ignoring broken lockfile at (\\S+): (.*)$");
 
     // nothing for pnpm to resolve: no package in the lock and no dependency in any project
-    private static boolean nothingToResolve(PnpmLockRegenerator.Install install) {
+    private static boolean nothingToResolve(Install.Result install) {
         Map<String, PackageSnapshot> packages = install.getCtx().getWantedLockfile().getPackages();
         if (packages != null && !packages.isEmpty()) {
             return false;
