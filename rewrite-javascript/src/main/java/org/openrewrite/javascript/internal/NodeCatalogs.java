@@ -415,68 +415,75 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * pnpm's {@code removePackagesFromWorkspaceCatalog}: without the entries no project's dependencies nor a
-         * {@code catalog:} override reference, and without a catalog left empty; null when that is no edit in place.
+         * The file without what pnpm's {@code cleanupUnusedCatalogs} removes, by the port's
+         * {@link WorkspaceManifestWriter#cleanupUnusedCatalogs}, over the {@code projects} by directory (null where the
+         * recipes do not read one); null when that is no edit in place.
          */
-        public @Nullable NodeCatalogs withoutUnused(Collection<Map<String, Map<String, String>>> projects) {
+        @SuppressWarnings("unchecked")
+        public @Nullable NodeCatalogs withoutUnused(Map<String, @Nullable Map<String, @Nullable Object>> projects) {
+            Map<String, @Nullable Object> read = getSettings();
             Yaml.Documents docs = (Yaml.Documents) getDocument();
             Yaml.Mapping root = yamlRoot(docs);
-            if (projects.isEmpty() || root == null) {
+            if (read == null || root == null) {
+                return this;
+            }
+            Map<String, @Nullable Object> cleaned = new LinkedHashMap<>(read);
+            for (String key : Arrays.asList("catalog", "catalogs")) {
+                if (cleaned.get(key) instanceof Map) {
+                    Map<String, @Nullable Object> copy = new LinkedHashMap<>((Map<String, @Nullable Object>) cleaned.get(key));
+                    if ("catalogs".equals(key)) {
+                        copy.replaceAll((name, group) -> group instanceof Map ?
+                                new LinkedHashMap<>((Map<String, @Nullable Object>) group) : group);
+                    }
+                    cleaned.put(key, copy);
+                }
+            }
+            if (!WorkspaceManifestWriter.cleanupUnusedCatalogs(cleaned, projects)) {
                 return this;
             }
             if (isFlowStyle()) {
                 return null;
             }
-            if (mapping(root, "catalog") == null && mapping(root, "catalogs") == null) {
-                return this;
-            }
-            Map<String, Set<String>> references = new HashMap<>();
-            for (Map<String, Map<String, String>> project : projects) {
-                for (Map<String, String> scope : project.values()) {
-                    for (Map.Entry<String, String> dependency : scope.entrySet()) {
-                        references.computeIfAbsent(dependency.getKey(), k -> new HashSet<>())
-                                .add(dependency.getValue());
-                    }
-                }
-            }
-            Yaml.Mapping overrides = mapping(root, "overrides");
-            if (overrides != null) {
-                for (Map.Entry<String, String> override : scalars(overrides).entrySet()) {
-                    if (override.getValue().startsWith(PROTOCOL)) {
-                        references.computeIfAbsent(overrideTarget(override.getKey()), k -> new HashSet<>())
-                                .add(override.getValue());
-                    }
-                }
-            }
-            Yaml.Mapping cleaned = root;
+            Yaml.Mapping edited = root;
             Yaml.Mapping catalog = mapping(root, "catalog");
             if (catalog != null) {
-                Yaml.Mapping kept = retain(catalog, references, null);
-                cleaned = kept.getEntries().isEmpty() ? without(cleaned, "catalog") : with(cleaned, "catalog", kept);
+                Object kept = cleaned.get("catalog");
+                edited = kept instanceof Map ? with(edited, "catalog", retain(catalog, ((Map<?, ?>) kept).keySet())) :
+                        without(edited, "catalog");
             }
-            Yaml.Mapping named = mapping(cleaned, "catalogs");
+            Yaml.Mapping named = mapping(edited, "catalogs");
             if (named != null) {
-                List<Yaml.Mapping.Entry> groups = new ArrayList<>();
-                boolean changed = false;
-                for (Yaml.Mapping.Entry group : named.getEntries()) {
-                    Yaml.Mapping entries = asMapping(group.getValue());
-                    if (entries == null) {
-                        groups.add(group);
-                        continue;
+                Object kept = cleaned.get("catalogs");
+                if (!(kept instanceof Map)) {
+                    edited = without(edited, "catalogs");
+                } else {
+                    List<Yaml.Mapping.Entry> groups = new ArrayList<>();
+                    for (Yaml.Mapping.Entry group : named.getEntries()) {
+                        Yaml.Mapping entries = asMapping(group.getValue());
+                        Object keptGroup = ((Map<?, ?>) kept).get(group.getKey().getValue());
+                        if (entries == null) {
+                            groups.add(group);
+                        } else if (keptGroup instanceof Map) {
+                            Yaml.Mapping retained = retain(entries, ((Map<?, ?>) keptGroup).keySet());
+                            groups.add(retained == entries ? group : group.withValue(retained));
+                        }
                     }
-                    Yaml.Mapping kept = retain(entries, references, group.getKey().getValue());
-                    changed |= kept != entries || kept.getEntries().isEmpty();
-                    if (!kept.getEntries().isEmpty()) {
-                        groups.add(kept == entries ? group : group.withValue(kept));
-                    }
-                }
-                if (groups.isEmpty()) {
-                    cleaned = without(cleaned, "catalogs");
-                } else if (changed) {
-                    cleaned = with(cleaned, "catalogs", named.withEntries(firstPrefix(named.getEntries(), groups)));
+                    edited = with(edited, "catalogs", named.withEntries(firstPrefix(named.getEntries(), groups)));
                 }
             }
-            return cleaned == root ? this : reread(withRoot(docs, cleaned));
+            return edited == root ? this : reread(withRoot(docs, edited));
+        }
+
+        // the entries of a catalog's mapping whose keys pnpm keeps
+        private static Yaml.Mapping retain(Yaml.Mapping catalog, Set<?> keep) {
+            List<Yaml.Mapping.Entry> kept = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
+                if (keep.contains(entry.getKey().getValue())) {
+                    kept.add(entry);
+                }
+            }
+            return kept.size() == catalog.getEntries().size() ? catalog :
+                    catalog.withEntries(firstPrefix(catalog.getEntries(), kept));
         }
 
         @Override
@@ -500,26 +507,7 @@ public abstract class NodeCatalogs {
             return singletonList("catalog");
         }
 
-        // the entries of `catalog` (name null) or `catalogs.<name>` a reference keeps
-        private static Yaml.Mapping retain(Yaml.Mapping catalog, Map<String, Set<String>> references,
-                                           @Nullable String name) {
-            List<Yaml.Mapping.Entry> kept = new ArrayList<>();
-            for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
-                Set<String> referenced = references.getOrDefault(entry.getKey().getValue(), Collections.emptySet());
-                if (referenced.contains(PROTOCOL) || name != null && referenced.contains(PROTOCOL + name)) {
-                    kept.add(entry);
-                }
-            }
-            return kept.size() == catalog.getEntries().size() ? catalog :
-                    catalog.withEntries(firstPrefix(catalog.getEntries(), kept));
-        }
 
-        // parsePkgAndParentSelector's target package of an override key: `a>b@1` -> b
-        private static String overrideTarget(String selector) {
-            String target = selector.substring(selector.lastIndexOf('>') + 1);
-            int at = target.indexOf('@', target.startsWith("@") ? 1 : 0);
-            return at < 0 ? target : target.substring(0, at);
-        }
     }
 
     /**

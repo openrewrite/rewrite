@@ -32,6 +32,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -137,31 +138,31 @@ class NodeCatalogsTest {
 
     @Test
     void pnpmCleanupDropsUnusedEntriesAndEmptiedCatalogs() {
-        assertThat(edited(pnpm("catalog-remove-manual-cleanup").withoutUnused(Arrays.asList(emptyMap(),
-          declares("is-number", "catalog:legacy"))))).isEqualTo(file("pnpm/catalog-remove-manual-cleanup/workspace"));
-        assertThat(edited(pnpm("catalog-remove-named-cleanup").withoutUnused(singletonList(
-          declares("wrappy", "catalog:"))))).isEqualTo(file("pnpm/catalog-remove-named-cleanup/workspace"));
-        assertThat(edited(pnpm("catalog-update-shared-recursive-cleanup").withoutUnused(Arrays.asList(
-          declares("wrappy", "1.0.2"), declares("wrappy", "1.0.2")))))
+        assertThat(edited(pnpm("catalog-remove-manual-cleanup").withoutUnused(projects(Arrays.asList(emptyMap(),
+          declares("is-number", "catalog:legacy")))))).isEqualTo(file("pnpm/catalog-remove-manual-cleanup/workspace"));
+        assertThat(edited(pnpm("catalog-remove-named-cleanup").withoutUnused(projects(singletonList(
+          declares("wrappy", "catalog:")))))).isEqualTo(file("pnpm/catalog-remove-named-cleanup/workspace"));
+        assertThat(edited(pnpm("catalog-update-shared-recursive-cleanup").withoutUnused(projects(Arrays.asList(
+          declares("wrappy", "1.0.2"), declares("wrappy", "1.0.2"))))))
           .isEqualTo(file("pnpm/catalog-update-shared-recursive-cleanup/workspace"));
     }
 
     @Test
     void pnpmCleanupWithProjectsDeclaringNothing() {
-        assertThat(edited(pnpm("catalog-remove-last-cleanup").withoutUnused(Arrays.asList(emptyMap(),
-          singletonMap("dependencies", emptyMap()))))).isEqualTo(file("pnpm/catalog-remove-last-cleanup/workspace"));
+        assertThat(edited(pnpm("catalog-remove-last-cleanup").withoutUnused(projects(Arrays.asList(emptyMap(),
+          singletonMap("dependencies", emptyMap())))))).isEqualTo(file("pnpm/catalog-remove-last-cleanup/workspace"));
         NodeCatalogs.Pnpm catalogs = pnpm("catalog-remove-last-cleanup");
-        assertThat(catalogs.withoutUnused(emptyList())).as("no projects").isSameAs(catalogs);
+        assertThat(catalogs.withoutUnused(projects(emptyList()))).as("no projects").isSameAs(catalogs);
     }
 
     @Test
     void pnpmCleanupKeepsWhatAnOverrideOrTheDefaultReferenceNames() {
         NodeCatalogs.Pnpm catalogs = pnpmOf("overrides:\n  foo>ms: 'catalog:'\ncatalog:\n  ms: 2.1.3\n" +
           "  wrappy: 1.0.2\ncatalogs:\n  legacy:\n    wrappy: 1.0.1\n");
-        NodeCatalogs cleaned = requireNonNull(catalogs.withoutUnused(singletonList(declares("wrappy", "catalog:"))));
+        NodeCatalogs cleaned = requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy", "catalog:")))));
         assertThat(cleaned.specifier("default", "ms")).isEqualTo("2.1.3");
         assertThat(cleaned.specifier("legacy", "wrappy")).as("catalog: keeps every catalog's entry").isEqualTo("1.0.1");
-        assertThat(requireNonNull(catalogs.withoutUnused(singletonList(declares("wrappy", "catalog:default"))))
+        assertThat(requireNonNull(catalogs.withoutUnused(projects(singletonList(declares("wrappy", "catalog:default")))))
           .specifier("default", "wrappy")).as("pnpm counts only catalog:").isNull();
     }
 
@@ -169,7 +170,7 @@ class NodeCatalogsTest {
     void pnpmCleanupDropsAnAlreadyEmptyNamedCatalog() {
         NodeCatalogs.Pnpm catalogs = pnpmOf("catalog:\n  wrappy: 1.0.2\ncatalogs:\n  legacy: {}\n  tools:\n" +
           "    ms: 2.1.3\n");
-        assertThat(edited(catalogs.withoutUnused(singletonList(declares("ms", "catalog:tools")))))
+        assertThat(edited(catalogs.withoutUnused(projects(singletonList(declares("ms", "catalog:tools"))))))
           .isEqualTo("catalogs:\n  tools:\n    ms: 2.1.3\n");
     }
 
@@ -182,7 +183,7 @@ class NodeCatalogsTest {
         assertThat(catalogs.withSpecifier("default", "wrappy", "1.0.2")).isNull();
         assertThat(catalogs.withSpecifier("legacy", "wrappy", "1.0.2")).isNull();
         assertThat(catalogs.withEntry("default", "is-number", "7.0.0")).isNull();
-        assertThat(catalogs.withoutUnused(singletonList(declares("ms", "catalog:")))).isNull();
+        assertThat(catalogs.withoutUnused(projects(singletonList(declares("ms", "catalog:"))))).isNull();
         assertThat(pnpmOf("catalog:\n  wrappy: 1.0.1\n").isFlowStyle()).isFalse();
     }
 
@@ -274,6 +275,16 @@ class NodeCatalogsTest {
         }
         assertThat(edited(bun("catalog-rename").withEntry("", "is-number", "7.0.0")))
           .isEqualTo(file("bun/catalog-rename/pkg"));
+    }
+
+    // the root first, then one member under packages/ each, as pnpm-workspace.yaml's packages list them
+    private static Map<String, @Nullable Map<String, @Nullable Object>> projects(
+      List<? extends Map<String, ? extends Map<String, String>>> manifests) {
+        Map<String, @Nullable Map<String, @Nullable Object>> projects = new LinkedHashMap<>();
+        for (int i = 0; i < manifests.size(); i++) {
+            projects.put(i == 0 ? "" : "packages/p" + i, new LinkedHashMap<>(manifests.get(i)));
+        }
+        return projects;
     }
 
     private static Map<String, Map<String, String>> declares(String name, String value) {

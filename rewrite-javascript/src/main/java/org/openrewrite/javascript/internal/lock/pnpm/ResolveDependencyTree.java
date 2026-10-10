@@ -36,6 +36,18 @@ import java.util.Set;
  */
 final class ResolveDependencyTree {
 
+    /**
+     * The catalog lookup resolveDependencyTree attaches to a direct dependency saved to {@code saveCatalogName}: its
+     * {@code userSpecifiedBareSpecifier}, or null where the default catalog already holds the alias or there is none.
+     */
+    static @Nullable String catalogLookup(String alias, @Nullable String saveCatalogName,
+                                          @Nullable Map<String, @Nullable Object> defaultCatalog) {
+        if (saveCatalogName == null || defaultCatalog != null && defaultCatalog.get(alias) != null) {
+            return null;
+        }
+        return "catalog:" + ("default".equals(saveCatalogName) ? "" : saveCatalogName);
+    }
+
     private ResolveDependencyTree() {
     }
 

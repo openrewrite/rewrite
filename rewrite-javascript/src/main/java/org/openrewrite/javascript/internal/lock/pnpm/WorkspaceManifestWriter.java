@@ -15,7 +15,17 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -30,6 +40,9 @@ public final class WorkspaceManifestWriter {
             "^(?:~|[Nn]ull|NULL)?$|^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$|^0o[0-7]+$|^[-+]?[0-9]+$|^0x[0-9a-fA-F]+$|" +
             "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.nan|\\.NaN|\\.NAN)$|" +
             "^[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)[eE][-+]?[0-9]+$|^[-+]?(?:\\.[0-9]+|[0-9]+\\.[0-9]*)$");
+
+    private static final List<String> DEPENDENCY_TYPES = Arrays.asList("dependencies", "devDependencies",
+            "optionalDependencies", "peerDependencies");
 
     private final int release;
 
@@ -102,6 +115,113 @@ public final class WorkspaceManifestWriter {
                     "'" + value.replace("'", "''") + "'";
         }
         return value;
+    }
+
+    /**
+     * updateWorkspaceManifest's {@code cleanupUnusedCatalogs} over the {@code allProjects} installDeps passes: the
+     * projects among {@code projects} (manifests by directory, null where the host did not read one) that
+     * {@code manifest}'s packages match; true when that removed anything from {@code manifest}.
+     */
+    public static boolean cleanupUnusedCatalogs(Map<String, @Nullable Object> manifest,
+                                                Map<String, @Nullable Map<String, @Nullable Object>> projects) {
+        List<Map<String, @Nullable Object>> allProjects = new ArrayList<>();
+        for (String dir : FindPackages.workspaceProjects(manifest, projects.keySet())) {
+            Map<String, @Nullable Object> project = projects.get(dir);
+            if (project == null) {
+                throw CannotKnow.unread(dir.isEmpty() ? "the root project's manifest" : dir + "'s manifest");
+            }
+            allProjects.add(project);
+        }
+        return removePackagesFromWorkspaceCatalog(manifest, allProjects);
+    }
+
+    @SuppressWarnings("unchecked")
+    static boolean removePackagesFromWorkspaceCatalog(Map<String, @Nullable Object> manifest,
+                                                      List<Map<String, @Nullable Object>> packagesJson) {
+        boolean shouldBeUpdated = false;
+        if (packagesJson.isEmpty() || manifest.get("catalog") == null && manifest.get("catalogs") == null) {
+            return shouldBeUpdated;
+        }
+        Map<String, Set<Object>> packageReferences = new HashMap<>();
+        for (Map<String, @Nullable Object> pkg : packagesJson) {
+            for (String type : DEPENDENCY_TYPES) {
+                Object deps = pkg.get(type);
+                if (!Js.truthy(deps) || !(deps instanceof Map)) {
+                    continue;
+                }
+                for (String pkgName : Js.keys(deps)) {
+                    addPackageReference(packageReferences, pkgName, ((Map<String, ?>) deps).get(pkgName));
+                }
+            }
+        }
+        Object overrides = manifest.get("overrides");
+        if (overrides instanceof Map) {
+            for (String selector : Js.keys(overrides)) {
+                Object version = ((Map<String, ?>) overrides).get(selector);
+                if (!(version instanceof String)) {
+                    throw new JsError(JsError.TYPE_ERROR, "version.startsWith is not a function");
+                }
+                if (!((String) version).startsWith("catalog:")) {
+                    continue;
+                }
+                String pkgName;
+                try {
+                    pkgName = ParseOverrides.parsePkgAndParentSelector(selector)[1].getName();
+                } catch (PnpmError e) {
+                    continue;
+                }
+                addPackageReference(packageReferences, pkgName, version);
+            }
+        }
+        Object catalog = manifest.get("catalog");
+        if (Js.truthy(catalog) && catalog instanceof Map) {
+            for (String pkg : Js.keys(catalog)) {
+                Set<Object> references = packageReferences.get(pkg);
+                if (references == null || !references.contains("catalog:")) {
+                    ((Map<String, ?>) catalog).remove(pkg);
+                    shouldBeUpdated = true;
+                }
+            }
+            if (((Map<?, ?>) catalog).isEmpty()) {
+                manifest.remove("catalog");
+                shouldBeUpdated = true;
+            }
+        }
+        Object catalogs = manifest.get("catalogs");
+        if (Js.truthy(catalogs) && catalogs instanceof Map) {
+            List<String> catalogsToRemove = new ArrayList<>();
+            for (String catalogName : Js.keys(catalogs)) {
+                Object named = ((Map<String, ?>) catalogs).get(catalogName);
+                if (!Js.truthy(named) || !(named instanceof Map)) {
+                    continue;
+                }
+                for (String pkg : Js.keys(named)) {
+                    Set<Object> references = packageReferences.get(pkg);
+                    if (references == null || !references.contains("catalog:" + catalogName) &&
+                                              !references.contains("catalog:")) {
+                        ((Map<String, ?>) named).remove(pkg);
+                        shouldBeUpdated = true;
+                    }
+                }
+                if (((Map<?, ?>) named).isEmpty()) {
+                    catalogsToRemove.add(catalogName);
+                    shouldBeUpdated = true;
+                }
+            }
+            for (String catalogName : catalogsToRemove) {
+                ((Map<String, ?>) catalogs).remove(catalogName);
+            }
+            if (((Map<?, ?>) catalogs).isEmpty()) {
+                manifest.remove("catalogs");
+                shouldBeUpdated = true;
+            }
+        }
+        return shouldBeUpdated;
+    }
+
+    private static void addPackageReference(Map<String, Set<Object>> packageReferences, String pkgName,
+                                            @Nullable Object version) {
+        packageReferences.computeIfAbsent(pkgName, k -> new HashSet<>()).add(version == null ? "undefined" : version);
     }
 
     public static String doubleQuoted(String value) {

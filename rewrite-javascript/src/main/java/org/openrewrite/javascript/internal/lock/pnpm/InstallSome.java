@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Port of what {@code pnpm add <alias>@<specifier>} saves for a new dependency (pnpm 11.2.2): parseWantedDependencies'
- * default-catalog match, installSome's catalogMode check and resolveDependencyTree's saveCatalogName entry.
+ * Port of @pnpm/installing.deps-installer src/install/index.ts installSome's catalogMode check (pnpm 11.2.2) for
+ * {@code pnpm add <alias>@<specifier>}, between {@link ParseWantedDependencies} and {@link ResolveDependencyTree}.
  */
 public final class InstallSome {
 
@@ -60,8 +60,7 @@ public final class InstallSome {
             throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, alias, "[" + e.getCode() + "] " + e.getMessage());
         }
         Map<String, @Nullable Object> defaultCatalog = catalogs.get(DEFAULT);
-        Object inDefault = defaultCatalog == null ? null : defaultCatalog.get(alias);
-        String wanted = inDefault != null && inDefault.equals(bareSpecifier) ? CATALOG_PROTOCOL : bareSpecifier;
+        String wanted = ParseWantedDependencies.bareSpecifier(alias, bareSpecifier, defaultCatalog);
         String saveCatalogName = saveCatalogName(workspace);
         if (!"manual".equals(catalogMode(workspace))) {
             String perDepCatalogName = saveCatalogName == null ? DEFAULT : saveCatalogName;
@@ -78,11 +77,9 @@ public final class InstallSome {
                                                                           "range defined in catalog");
             }
         }
-        if (CATALOG_PROTOCOL.equals(wanted) || saveCatalogName == null || inDefault != null) {
-            return new Saved(wanted, null);
-        }
-        return new Saved(CATALOG_PROTOCOL + (DEFAULT.equals(saveCatalogName) ? "" : saveCatalogName),
-                saveCatalogName);
+        String lookup = CATALOG_PROTOCOL.equals(wanted) ? null :
+                ResolveDependencyTree.catalogLookup(alias, saveCatalogName, defaultCatalog);
+        return lookup == null ? new Saved(wanted, null) : new Saved(lookup, saveCatalogName);
     }
 
     // semver.validRange of both, then semver.eq, which takes versions only
