@@ -33,6 +33,7 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
@@ -73,10 +74,16 @@ public final class NpmLockRegenerator {
         Map<String, String> manifests;
 
         /**
-         * The project's own .npmrc; the host's user and global npmrc are not an input.
+         * The project's own .npmrc.
          */
         @Nullable
         String npmrc;
+
+        /**
+         * The host's registries, which npm reads as the user's own config, under the project's .npmrc; null for none.
+         */
+        @Nullable
+        NodeRegistries userConfig;
 
         /**
          * The files the project holds relative to the lock's directory, when the host says; an .npmrc among them the
@@ -84,12 +91,6 @@ public final class NpmLockRegenerator {
          */
         @Nullable
         Set<String> paths;
-
-        /**
-         * The environment npm runs in; null when the host does not know it.
-         */
-        @Nullable
-        Map<String, String> env;
 
         @Builder.Default
         Host host = Host.UNKNOWN;
@@ -145,7 +146,7 @@ public final class NpmLockRegenerator {
             }
             CannotKnow.requireRead(inputs.getNpmrc(), inputs.getPaths(), ".npmrc");
             CannotKnow.requireRead(inputs.getYarnLock(), inputs.getPaths(), "yarn.lock");
-            options = NpmOptions.fromNpmrc(inputs.getNpmrc(), HostEnvironment.of(inputs.getEnv()));
+            options = NpmOptions.fromNpmrc(inputs.getUserConfig(), inputs.getNpmrc(), HostEnvironment.UNKNOWN);
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);
             }

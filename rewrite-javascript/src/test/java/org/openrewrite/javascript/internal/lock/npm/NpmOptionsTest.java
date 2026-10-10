@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -36,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NpmOptionsTest {
 
     private static NpmOptions fromNpmrc(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
+        return NpmOptions.fromNpmrc(null, npmrc, HostEnvironment.UNKNOWN);
     }
 
     @Test
@@ -83,6 +84,26 @@ class NpmOptionsTest {
         assertThat(scoped.registryFor("lodash")).isEqualTo("https://corp.example/");
         assertThat(scoped.registryFor("@corp/a")).isEqualTo("https://corp.example/");
         assertThat(fromNpmrc(null).registryFor("@corp/a")).isEqualTo("https://registry.npmjs.org/");
+    }
+
+    // the host's registries are the user's config, the project's .npmrc sets each key over it: recorded with npm
+    // 11.17.0 and a --userconfig naming a mirror (lock/npm/open-user-registry-*)
+    @Test
+    void theHostsRegistriesAreTheUserConfigUnderTheProjectsNpmrc() {
+        Map<String, String> types = new HashMap<>();
+        types.put("@types", "https://registry.npmmirror.com/");
+        NodeRegistries user = ScenarioReplay.registries("https://registry.npmmirror.com/", types);
+
+        NpmOptions userOnly = NpmOptions.fromNpmrc(user, null, HostEnvironment.UNKNOWN);
+        assertThat(userOnly.registryFor("ms")).isEqualTo("https://registry.npmmirror.com/");
+        assertThat(userOnly.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
+
+        NpmOptions project = NpmOptions.fromNpmrc(user, "registry=https://registry.yarnpkg.com/\n",
+          HostEnvironment.UNKNOWN);
+        assertThat(project.registryFor("ms")).isEqualTo("https://registry.yarnpkg.com/");
+        assertThat(project.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
+        assertThat(fromNpmrc("registry=https://registry.yarnpkg.com/\n").registryFor("@types/ms"))
+          .isEqualTo("https://registry.yarnpkg.com/");
     }
 
     // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
@@ -267,10 +288,10 @@ class NpmOptionsTest {
         env.put("LFV", "2");
         env.put("K", "legacy");
         HostEnvironment known = HostEnvironment.of(env);
-        assertThat(NpmOptions.fromNpmrc("lockfile-version=${LFV}\n", known).getLockfileVersion()).isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc("${K}-peer-deps=true\n", known).isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc("legacy-peer-deps=${LPD?}\n", known).isLegacyPeerDeps()).isFalse();
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc("lockfile-version=${UNSET}\n", known))
+        assertThat(NpmOptions.fromNpmrc(null, "lockfile-version=${LFV}\n", known).getLockfileVersion()).isEqualTo(2);
+        assertThat(NpmOptions.fromNpmrc(null, "${K}-peer-deps=true\n", known).isLegacyPeerDeps()).isTrue();
+        assertThat(NpmOptions.fromNpmrc(null, "legacy-peer-deps=${LPD?}\n", known).isLegacyPeerDeps()).isFalse();
+        assertThatThrownBy(() -> NpmOptions.fromNpmrc(null, "lockfile-version=${UNSET}\n", known))
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 

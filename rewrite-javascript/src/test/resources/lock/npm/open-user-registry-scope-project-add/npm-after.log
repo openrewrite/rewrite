@@ -1,0 +1,4 @@
+npm http fetch GET 200 https://registry.npmmirror.com/@types%2fms 759ms (cache miss)
+npm http fetch GET 200 https://registry.yarnpkg.com/ms 63ms (cache miss)
+
+up to date in 927ms

@@ -86,7 +86,8 @@ final class ScenarioReplay {
     }
 
     /**
-     * A registry answering from the scenario's recorded responses, reporting every route it lacks.
+     * A registry answering from the scenario's recorded responses, {@code http-<label>/} for another registry that
+     * recorded its own, reporting every route it lacks.
      */
     static final class ScenarioRegistry extends RecordedRegistry<NpmScenarios.Scenario> implements HttpSender {
         final List<String> requests = new ArrayList<>();
@@ -95,12 +96,19 @@ final class ScenarioReplay {
             super(scenario);
         }
 
+        NpmScenarios.Scenario recording() {
+            return scenario;
+        }
+
         @Override
         public Response send(Request request) {
             String url = request.getUrl().toString();
-            String file = file(url, "application/json".equals(header(request, "Accept")));
+            boolean full = "application/json".equals(header(request, "Accept"));
+            String mirror = url.startsWith(REG) ? null : mirror(url, "npmjs");
+            String file = mirror == null ? file(url, full) : mirror + "/" + file(url.replaceFirst(
+              "^[a-z]+://[^/]+/", ""), full);
             requests.add(file);
-            String body = scenario.http(file);
+            String body = mirror == null ? scenario.http(file) : scenario.file(file);
             if (body == null) {
                 notRecorded(file);
             }
@@ -136,9 +144,22 @@ final class ScenarioReplay {
     }
 
     static PackumentSource registry(ScenarioRegistry http) {
-        NodeRegistry registry = new NodeRegistry(null, REG, null, null, null, null, false, null, true, false);
-        return new NpmRegistryPackuments(new NodeRegistries(registry, Collections.emptyMap(), null, null, null),
+        NodeRegistries user = http.recording().userConfig();
+        return new NpmRegistryPackuments(user != null ? user : registries(REG, Collections.emptyMap()),
           new NpmRegistryClient(http));
+    }
+
+    /**
+     * The registries a default and scoped registry URLs name, without credentials, as the host hands them over.
+     */
+    static NodeRegistries registries(String defaultRegistry, Map<String, String> scoped) {
+        Map<String, NodeRegistry> byScope = new LinkedHashMap<>();
+        scoped.forEach((scope, url) -> byScope.put(scope, registry(scope, url)));
+        return new NodeRegistries(registry(null, defaultRegistry), byScope, null, null, null);
+    }
+
+    private static NodeRegistry registry(@Nullable String scope, String url) {
+        return new NodeRegistry(scope, url, null, null, null, null, false, null, true, false);
     }
 
     /**
@@ -156,11 +177,11 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return options(npmrc + scenario.argsAfter());
+        return NpmOptions.fromNpmrc(scenario.userConfig(), npmrc + scenario.argsAfter(), HostEnvironment.UNKNOWN);
     }
 
     static NpmOptions options(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
+        return NpmOptions.fromNpmrc(null, npmrc, HostEnvironment.UNKNOWN);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {
@@ -171,6 +192,7 @@ final class ScenarioReplay {
           .yarnLock(edit.getInputs().getYarnLock())
           .manifests(edit.manifests())
           .npmrc(npmrc + scenario.argsAfter())
+          .userConfig(scenario.userConfig())
           .host(host(scenario))
           .now(now(scenario))
           .build();

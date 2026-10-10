@@ -15,9 +15,11 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
-import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -27,7 +29,7 @@ import java.util.Map;
 
 /**
  * Port of bun's src/install/PackageManager/PackageManagerOptions.zig {@code load} (bun 1.3.10) over bunfig.toml, the
- * project's .npmrc and the environment, in that order: the options that change what a lock-only install writes.
+ * user's .npmrc, the project's and the environment, in that order: the options that change what an install writes.
  */
 @Getter
 public final class BunOptions {
@@ -60,9 +62,11 @@ public final class BunOptions {
     }
 
     /**
-     * The options from the project's bunfig.toml, .npmrc and environment, any of which may be absent.
+     * The options from the project's bunfig.toml, the user's .npmrc (the host's registries), the project's .npmrc and
+     * the environment, any of which may be absent.
      */
-    public static BunOptions load(@Nullable String bunfigToml, @Nullable String npmrc, HostEnvironment env) {
+    public static BunOptions load(@Nullable String bunfigToml, @Nullable NodeRegistries user, @Nullable String npmrc,
+                                  HostEnvironment env) {
         Install install = new Install();
         if (bunfigToml != null) {
             Json.Expr bunfig = Toml.parse(bunfigToml);
@@ -70,6 +74,9 @@ public final class BunOptions {
             if (installObj != null) {
                 install.readBunfig(installObj);
             }
+        }
+        if (user != null) {
+            install.readUserNpmrc(user);
         }
         if (npmrc != null) {
             install.readNpmrc(npmrc, env);
@@ -214,6 +221,18 @@ public final class BunOptions {
             Json.Expr value = obj.get(key);
             Boolean b = value == null ? null : value.asBool();
             return b != null ? b : current;
+        }
+
+        // loadNpmrc over the user's .npmrc: registry and @scope:registry; a host default of npm's own registry is read
+        // as none named, since the host's registries cannot tell the two apart
+        void readUserNpmrc(NodeRegistries user) {
+            String registry = user.getDefaultRegistry().getUrl();
+            if (!Strings.withoutTrailingSlash(registry).equals(Strings.withoutTrailingSlash(DEFAULT_REGISTRY))) {
+                defaultRegistry = registry;
+            }
+            for (Map.Entry<String, NodeRegistry> scope : user.getByScope().entrySet()) {
+                scoped.put(scope.getKey().substring(1), scope.getValue().getUrl());
+            }
         }
 
         // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes

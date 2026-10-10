@@ -88,7 +88,7 @@ class PackageManifestTest {
         assertThat(manifest).isNotNull();
         PackageManifest.FindResult found = version.tag == DependencyVersion.Tag.NPM ?
           manifest.findBestVersion(version.npm().version) : manifest.findByDistTag(version.distTag().tag);
-        Lockfile lockfile = TextLockfileReader.load(fresh, BunOptions.load(null, null, HostEnvironment.UNKNOWN));
+        Lockfile lockfile = TextLockfileReader.load(fresh, BunOptions.load(null, null, null, HostEnvironment.UNKNOWN));
         Package locked = topLevel(lockfile, alias);
         if (found == null) {
             assertThat(locked).as("bun installed nothing for " + alias).isNull();

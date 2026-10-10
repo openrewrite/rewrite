@@ -18,7 +18,9 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,6 +55,7 @@ final class NpmScenarios {
     private static final Pattern NODE_VERSION = Pattern.compile("node (v[0-9.]+)");
     private static final Pattern RECORDED_AT = Pattern.compile("after exit=-?\\d+ at ([^,\\s]+)");
     private static final Pattern PLATFORM = Pattern.compile("platform os=(\\S+) cpu=(\\S+) libc=(\\S*)");
+    private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
     private NpmScenarios() {
     }
@@ -400,6 +403,29 @@ final class NpmScenarios {
         @Nullable
         String npmrc() {
             return file("npmrc");
+        }
+
+        /**
+         * The user config the edit ran under ({@code user-npmrc}, npm's {@code --userconfig}) as the host hands it
+         * over: its registries.
+         */
+        @Nullable
+        NodeRegistries userConfig() {
+            String npmrc = file("user-npmrc");
+            if (npmrc == null) {
+                return null;
+            }
+            String defaultRegistry = ScenarioReplay.REG;
+            Map<String, String> scoped = new LinkedHashMap<>();
+            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
+                Matcher scope = SCOPED_REGISTRY.matcher(entry.getKey());
+                if ("registry".equals(entry.getKey())) {
+                    defaultRegistry = String.valueOf(entry.getValue());
+                } else if (scope.matches()) {
+                    scoped.put(scope.group(1), String.valueOf(entry.getValue()));
+                }
+            }
+            return ScenarioReplay.registries(defaultRegistry, scoped);
         }
 
         /**

@@ -1,0 +1,18 @@
+{
+  "lockfileVersion": 1,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "user-registry",
+      "dependencies": {
+        "@types/ms": "^0.7.34",
+        "is-number": "^7.0.0",
+      },
+    },
+  },
+  "packages": {
+    "@types/ms": ["@types/ms@0.7.34", "https://registry.npmmirror.com/@types/ms/-/ms-0.7.34.tgz", {}, "sha512-nG96G3Wp6acyAgJqGasjODb+acrI7KltPiRxzHPXnP3NgI28bpQDRv53olbqGXbfcgF5aiiHmO3xpwEpS5Ld9g=="],
+
+    "is-number": ["is-number@7.0.0", "", {}, "sha512-41Cifkg6e8TylSpdtTpeLVMqvSBEVzTttHvERD741+pnZ8ANv0004MRL43QKPDlK9cGvNp6NZWZUBlbGXYxxng=="],
+  }
+}

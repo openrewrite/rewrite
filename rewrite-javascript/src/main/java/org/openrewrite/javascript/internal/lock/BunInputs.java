@@ -15,11 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.internal.lock.bun.Lockfile;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -27,8 +29,8 @@ import java.util.Map;
 import java.util.function.Predicate;
 
 /**
- * The Bun regenerator's inputs: the lock's directory's own .npmrc and bunfig.toml, the patch and .env files under it,
- * and the package.json of each directory above the one bun runs in.
+ * The Bun regenerator's inputs: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and
+ * bunfig.toml, the patch and .env files under it, and the package.json of each directory above the one bun runs in.
  */
 final class BunInputs {
 
@@ -44,6 +46,13 @@ final class BunInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
+        return from(dir, null, host, now);
+    }
+
+    /**
+     * @param registries the host's registries, bun's user .npmrc; null when the host gives none
+     */
+    static Inputs from(LockDirectory dir, @Nullable NodeRegistries registries, Host host, Instant now) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
             if (DotEnv.FILES.contains(file.getKey())) {
@@ -61,6 +70,7 @@ final class BunInputs {
                 .manifests(dir.getManifests())
                 .npmrc(dir.file(".npmrc"))
                 .bunfig(dir.file("bunfig.toml"))
+                .userConfig(registries)
                 .files(files)
                 .paths(dir.pathsUnder(""))
                 .runsIn(dir.getRunsIn())

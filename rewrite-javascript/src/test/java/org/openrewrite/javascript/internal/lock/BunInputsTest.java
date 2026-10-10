@@ -16,8 +16,10 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -25,6 +27,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 
 import static java.util.Collections.singletonMap;
@@ -46,7 +49,7 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("repo/packages/a/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
@@ -68,7 +71,7 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("other/patches/x.patch"), "")
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", ".env", "../other/patches/x.patch");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
@@ -85,9 +88,20 @@ class BunInputsTest {
             Paths.get("repo/patches/./ms@2.1.3.patch"), Paths.get("other/patches/x.patch"))))
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "bun.lock", "patches/ms@2.1.3.patch");
+    }
+
+    @Test
+    void theHostsRegistriesAreBunsUserNpmrc() {
+        NodeRegistries registries = new NodeRegistries(new NodeRegistry(null, "https://registry.npmmirror.com/", null,
+          null, null, null, false, null, true, false), Collections.emptyMap(), null, null, null);
+        Request request = Request.builder().packageJson("{}").lock("{}").build();
+
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), registries, Host.UNKNOWN, Instant.EPOCH);
+
+        assertThat(inputs.getUserConfig()).isSameAs(registries);
     }
 
     @Test
@@ -100,7 +114,7 @@ class BunInputsTest {
             new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://project.example/")))))
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getNpmrc()).contains("registry=https://project.example/");
         assertThat(inputs.getBunfig()).isNull();

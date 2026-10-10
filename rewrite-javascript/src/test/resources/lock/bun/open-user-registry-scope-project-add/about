@@ -1,0 +1,1 @@
+the user config names a mirror for the default and @types, the project .npmrc another default; the edit adds @types/ms and ms

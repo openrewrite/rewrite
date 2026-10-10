@@ -18,10 +18,12 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.V8Date;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -258,13 +260,20 @@ public class NpmOptions {
     }
 
     /**
-     * The options a project's {@code .npmrc} sets over npm's defaults, read as npm's config loads it; a
-     * {@code ${VAR}} in a key read, or in a key that could expand to one, follows the host's environment.
+     * The options of the user's config (the host's registries; null for none) and a project's {@code .npmrc} over it,
+     * as npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, follows the environment.
      */
-    public static NpmOptions fromNpmrc(@Nullable String npmrc, HostEnvironment env) {
+    public static NpmOptions fromNpmrc(@Nullable NodeRegistries user, @Nullable String npmrc, HostEnvironment env) {
         NpmOptionsBuilder options = builder();
+        Map<String, String> scopedRegistries = new LinkedHashMap<>();
+        if (user != null) {
+            options.registry(user.getDefaultRegistry().getUrl());
+            for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
+                scopedRegistries.put(scoped.getKey(), scoped.getValue().getUrl());
+            }
+        }
         if (npmrc == null) {
-            return options.build();
+            return options.scopedRegistries(scopedRegistries).build();
         }
         Object omit = null;
         Object include = null;
@@ -276,7 +285,6 @@ public class NpmOptions {
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
-        Map<String, String> scopedRegistries = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
             String key;
             try {

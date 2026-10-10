@@ -155,7 +155,7 @@ class PackageManagerTest {
     }
 
     private static PackageManager manager(Lockfile lockfile) {
-        return new PackageManager(lockfile, BunOptions.load(null, null, HostEnvironment.UNKNOWN), new Log(),
+        return new PackageManager(lockfile, BunOptions.load(null, null, null, HostEnvironment.UNKNOWN), new Log(),
           Collections.emptyMap(),
           (registry, name, extended) -> {
               throw new AssertionError("no packument is needed: " + name);

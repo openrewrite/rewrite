@@ -32,6 +32,7 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.SharedError;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -73,13 +74,20 @@ public final class BunLockRegenerator {
         Map<String, String> manifests;
 
         /**
-         * The project's own .npmrc and bunfig.toml; the host's user and global ones are not an input.
+         * The project's own .npmrc and bunfig.toml.
          */
         @Nullable
         String npmrc;
 
         @Nullable
         String bunfig;
+
+        /**
+         * The host's registries, which bun reads as the user's own .npmrc, after bunfig.toml and before the project's
+         * .npmrc; null for none.
+         */
+        @Nullable
+        NodeRegistries userConfig;
 
         /**
          * The project's package-manager files under the root, by path relative to it, with their contents: the
@@ -94,13 +102,6 @@ public final class BunLockRegenerator {
          */
         @Nullable
         Set<String> paths;
-
-        /**
-         * The process environment, which the project's .env files never override; null when the host does not know
-         * it.
-         */
-        @Nullable
-        Map<String, String> env;
 
         @Builder.Default
         Host host = Host.UNKNOWN;
@@ -398,8 +399,8 @@ public final class BunLockRegenerator {
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
     private static PendingInstall installWithManager(Inputs inputs, ManifestSource registry, Log log) {
-        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
-                DotEnv.load(HostEnvironment.of(inputs.getEnv()), inputs.getFiles()));
+        BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getUserConfig(), inputs.getNpmrc(),
+                DotEnv.load(HostEnvironment.UNKNOWN, inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();

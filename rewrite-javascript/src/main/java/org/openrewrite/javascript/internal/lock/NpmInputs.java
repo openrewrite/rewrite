@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -29,8 +30,8 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json
- * files under each directory above the one npm runs in.
+ * The npm regenerator's inputs: the host's registries as the user's config, the lock's directory's own .npmrc and the
+ * paths held there, and the package.json files under each directory above the one npm runs in.
  */
 final class NpmInputs {
 
@@ -50,10 +51,18 @@ final class NpmInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
+        return from(dir, null, host, now);
+    }
+
+    /**
+     * @param registries the host's registries, npm's user config; null when the host gives none
+     */
+    static Inputs from(LockDirectory dir, @Nullable NodeRegistries registries, Host host, Instant now) {
         return Inputs.builder()
                 .lock(dir.getLock())
                 .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
+                .userConfig(registries)
                 .paths(dir.pathsUnder(""))
                 .host(host)
                 .now(now)

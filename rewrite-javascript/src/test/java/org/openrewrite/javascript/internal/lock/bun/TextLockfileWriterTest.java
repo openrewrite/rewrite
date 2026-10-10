@@ -45,7 +45,7 @@ class TextLockfileWriterTest {
     })
     void writesBunsSnapshotBack(String snapshot) {
         String lock = BunTestData.resource("snapshots/" + snapshot + ".lock");
-        Lockfile lockfile = TextLockfileReader.load(lock, BunOptions.load(null, null, HostEnvironment.UNKNOWN));
+        Lockfile lockfile = TextLockfileReader.load(lock, BunOptions.load(null, null, null, HostEnvironment.UNKNOWN));
         int configVersion = lockfile.savedConfigVersion != null ? lockfile.savedConfigVersion : 0;
         assertThat(TextLockfileWriter.saveFromBinary(Cleaner.clean(lockfile), configVersion)).isEqualTo(lock);
     }
