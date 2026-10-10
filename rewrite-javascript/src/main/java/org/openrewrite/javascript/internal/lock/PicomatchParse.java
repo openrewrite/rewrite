@@ -32,19 +32,19 @@ import static org.openrewrite.javascript.internal.lock.Picomatch.*;
  */
 final class PicomatchParse {
 
-    private static final Pattern REGEX_NON_SPECIAL_CHARS = regExp("^[^@![\\].,$*+?^{}()|\\\\/]+");
-    private static final Pattern NO_FAST_PATH = regExp("(^[*!]|[/()[\\]{}\"])");
-    private static final Pattern BACKSLASHES = regExp("^\\\\+");
-    private static final Pattern ALL_BACKSLASHES = regExp("\\\\+");
-    private static final Pattern CLOSING_PARENS = regExp("^\\)+$");
-    private static final Pattern EXTENSION = regExp("^\\.[^\\\\/.]+$");
-    private static final Pattern GROUP_START = regExp("^\\([^?]");
-    private static final Pattern LOOKAROUND = regExp("[!=<:]");
-    private static final Pattern LOOKBEHIND = regExp("<([!=]|\\w+>)");
-    private static final Pattern EXTENSION_SUFFIX = regExp("^(.*?)\\.(\\w+)$");
-    private static final Pattern SIMPLE_AT_EXTGLOB = regExp("^@\\([^\\\\()[\\]{}|]+\\)$");
-    private static final Pattern ESCAPED_CHAR = regExp("\\\\(.)");
-    private static final Pattern STARS_AND_QMARKS = regExp("^[*?]+$");
+    private static final Pattern REGEX_NON_SPECIAL_CHARS = V8RegExp.of("^[^@![\\].,$*+?^{}()|\\\\/]+");
+    private static final Pattern NO_FAST_PATH = V8RegExp.of("(^[*!]|[/()[\\]{}\"])");
+    private static final Pattern BACKSLASHES = V8RegExp.of("^\\\\+");
+    private static final Pattern ALL_BACKSLASHES = V8RegExp.of("\\\\+");
+    private static final Pattern CLOSING_PARENS = V8RegExp.of("^\\)+$");
+    private static final Pattern EXTENSION = V8RegExp.of("^\\.[^\\\\/.]+$");
+    private static final Pattern GROUP_START = V8RegExp.of("^\\([^?]");
+    private static final Pattern LOOKAROUND = V8RegExp.of("[!=<:]");
+    private static final Pattern LOOKBEHIND = V8RegExp.of("<([!=]|\\w+>)");
+    private static final Pattern EXTENSION_SUFFIX = V8RegExp.of("^(.*?)\\.(\\w+)$");
+    private static final Pattern SIMPLE_AT_EXTGLOB = V8RegExp.of("^@\\([^\\\\()[\\]{}|]+\\)$");
+    private static final Pattern ESCAPED_CHAR = V8RegExp.of("\\\\(.)");
+    private static final Pattern STARS_AND_QMARKS = V8RegExp.of("^[*?]+$");
 
     private PicomatchParse() {
     }

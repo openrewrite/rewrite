@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.text.Normalizer;
 import java.util.ArrayDeque;
@@ -51,13 +52,13 @@ final class FastGlob {
 
     private static final List<String> IGNORE = Arrays.asList("**/node_modules", "**/.git", "**/.yarn");
 
-    private static final Pattern COMMON_GLOB_SYMBOLS_RE = JsRegExp.of("[*?]|^!");
-    private static final Pattern REGEX_CHARACTER_CLASS_SYMBOLS_RE = JsRegExp.of("\\[[^[]*]");
-    private static final Pattern REGEX_GROUP_SYMBOLS_RE = JsRegExp.of("(?:^|[^!*+?@])\\([^(]*\\|[^|]*\\)");
-    private static final Pattern GLOB_EXTENSION_SYMBOLS_RE = JsRegExp.of("[!*+?@]\\([^(]*\\)");
-    private static final Pattern BRACE_EXPANSION_SEPARATORS_RE = JsRegExp.of(",|\\.\\.");
-    private static final Pattern DOUBLE_SLASH_RE = JsRegExp.of("(?!^)\\/{2,}");
-    private static final Pattern BRACES = JsRegExp.of("\\{.*\\}");
+    private static final Pattern COMMON_GLOB_SYMBOLS_RE = V8RegExp.of("[*?]|^!");
+    private static final Pattern REGEX_CHARACTER_CLASS_SYMBOLS_RE = V8RegExp.of("\\[[^[]*]");
+    private static final Pattern REGEX_GROUP_SYMBOLS_RE = V8RegExp.of("(?:^|[^!*+?@])\\([^(]*\\|[^|]*\\)");
+    private static final Pattern GLOB_EXTENSION_SYMBOLS_RE = V8RegExp.of("[!*+?@]\\([^(]*\\)");
+    private static final Pattern BRACE_EXPANSION_SEPARATORS_RE = V8RegExp.of(",|\\.\\.");
+    private static final Pattern DOUBLE_SLASH_RE = V8RegExp.of("(?!^)\\/{2,}");
+    private static final Pattern BRACES = V8RegExp.of("\\{.*\\}");
 
     private enum Kind {
         DIRECTORY, FILE, ABSENT

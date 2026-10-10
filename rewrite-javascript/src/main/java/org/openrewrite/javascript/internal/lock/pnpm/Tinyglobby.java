@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -36,9 +37,9 @@ final class Tinyglobby {
 
     private static final Picomatch.Options PICOMATCH = new Picomatch.Options(Picomatch.Release.V4_0_4, false, true);
 
-    private static final Pattern ONLY_PARENT_DIRECTORIES = Picomatch.regExp("^(\\/?\\.\\.)+$");
-    private static final Pattern PARENT_DIRECTORY = Picomatch.regExp("^(\\/?\\.\\.)+");
-    private static final Pattern ESCAPING_BACKSLASHES = Picomatch.regExp("\\\\(?=[()[\\]{}!*+?@|])");
+    private static final Pattern ONLY_PARENT_DIRECTORIES = V8RegExp.of("^(\\/?\\.\\.)+$");
+    private static final Pattern PARENT_DIRECTORY = V8RegExp.of("^(\\/?\\.\\.)+");
+    private static final Pattern ESCAPING_BACKSLASHES = V8RegExp.of("\\\\(?=[()[\\]{}!*+?@|])");
 
     private @Nullable List<String> commonPath;
     private String root = "";

@@ -70,7 +70,7 @@ public final class Picomatch {
     private static final Map<String, String> REPLACEMENTS = new HashMap<>();
 
     private static final String REGEX_SPECIAL_CHARS = "-*+?.^${}(|)[]";
-    private static final Pattern NEVER = regExp("$^");
+    private static final Pattern NEVER = V8RegExp.of("$^");
 
     static {
         POSIX_REGEX_SOURCE.put("alnum", "a-zA-Z0-9");
@@ -171,17 +171,6 @@ public final class Picomatch {
         } catch (PatternSyntaxException e) {
             throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
         }
-    }
-
-    /**
-     * A regular expression literal of the ported module's source.
-     */
-    public static Pattern regExp(String source) {
-        String java = V8RegExp.toJava(source);
-        if (java == null) {
-            throw new IllegalArgumentException("V8 rejects /" + source + "/");
-        }
-        return Pattern.compile(java);
     }
 
     /**

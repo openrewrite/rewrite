@@ -24,12 +24,14 @@ import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
  * A JavaScript regular expression source as V8 reads it without the {@code u} flag (the syntax of ECMAScript Annex
- * B), translated to a {@link Pattern} source over the same strings.
+ * B), translated to a {@link Pattern} source over the same strings, and {@code String.prototype.replace} over it.
  */
 public final class V8RegExp {
 
@@ -59,6 +61,103 @@ public final class V8RegExp {
         } catch (PatternSyntaxException e) {
             throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
         }
+    }
+
+    /**
+     * A regular expression literal of a ported module's source.
+     */
+    public static Pattern of(String source) {
+        Pattern pattern = compile(source);
+        if (pattern == null) {
+            throw new IllegalArgumentException("V8 rejects /" + source + "/");
+        }
+        return pattern;
+    }
+
+    /**
+     * {@code String.prototype.replace} with a regular expression and a replacement string, its {@code $} patterns
+     * included.
+     */
+    public static String replace(String s, Pattern re, boolean global, String replacement) {
+        return replace(s, re, global, m -> substitution(s, m, replacement));
+    }
+
+    /**
+     * {@code String.prototype.replace} with a regular expression and a replacement function of the match.
+     */
+    public static String replace(String s, Pattern re, boolean global, Function<Matcher, String> replacer) {
+        Matcher m = re.matcher(s);
+        StringBuilder out = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            out.append(s, last, m.start()).append(replacer.apply(m));
+            last = m.end();
+            if (!global) {
+                break;
+            }
+        }
+        return out.append(s.substring(last)).toString();
+    }
+
+    /**
+     * {@code String.prototype.replace} of the first occurrence of a string.
+     */
+    public static String replace(String s, String search, String replacement) {
+        int at = s.indexOf(search);
+        if (at < 0) {
+            return s;
+        }
+        Matcher m = Pattern.compile(Pattern.quote(search)).matcher(s);
+        m.find(at);
+        return s.substring(0, at) + substitution(s, m, replacement) + s.substring(at + search.length());
+    }
+
+    // GetSubstitution
+    private static String substitution(String s, Matcher m, String replacement) {
+        StringBuilder out = new StringBuilder();
+        int groups = m.groupCount();
+        for (int i = 0; i < replacement.length(); i++) {
+            char c = replacement.charAt(i);
+            if (c != '$' || i + 1 == replacement.length()) {
+                out.append(c);
+                continue;
+            }
+            char next = replacement.charAt(i + 1);
+            if (next == '$') {
+                out.append('$');
+                i++;
+            } else if (next == '&') {
+                out.append(m.group());
+                i++;
+            } else if (next == '`') {
+                out.append(s, 0, m.start());
+                i++;
+            } else if (next == '\'') {
+                out.append(s.substring(m.end()));
+                i++;
+            } else if (next >= '0' && next <= '9') {
+                int one = next - '0';
+                int two = i + 2 < replacement.length() && Character.isDigit(replacement.charAt(i + 2)) ?
+                        one * 10 + replacement.charAt(i + 2) - '0' : -1;
+                if (two >= 1 && two <= groups) {
+                    out.append(group(m, two));
+                    i += 2;
+                } else if (one >= 1 && one <= groups) {
+                    out.append(group(m, one));
+                    i++;
+                } else {
+                    out.append(c);
+                }
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString();
+    }
+
+    private static String group(Matcher m, int n) {
+        String g = m.group(n);
+        return g == null ? "" : g;
     }
 
     /**

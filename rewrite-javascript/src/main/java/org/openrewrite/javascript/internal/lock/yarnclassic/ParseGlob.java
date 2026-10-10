@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -169,7 +170,7 @@ final class ParseGlob {
     }
 
     private static String escape(String str) {
-        return JsRegExp.replace(str, ENCLOSED, true, m -> {
+        return V8RegExp.replace(str, ENCLOSED, true, m -> {
             String inner = m.group(1) != null ? m.group(1) : m.group(2) != null ? m.group(2) : m.group(3);
             if (inner == null || inner.isEmpty()) {
                 return m.group();

@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -111,7 +112,7 @@ final class Braces {
                     return concat(arr, str);
                 }
                 es6 = true;
-                str = JsRegExp.replace(str, ES6_RE, false, match -> {
+                str = V8RegExp.replace(str, ES6_RE, false, match -> {
                     String id = String.format("%05d", preserved.size());
                     preserved.put(id, match.group());
                     return "__ID" + id + "__";
@@ -152,7 +153,7 @@ final class Braces {
         } else {
             segs = new ArrayList<>(Arrays.asList(Js.splitString(inner, ",")));
             if (opts.makeRe) {
-                return braces(JsRegExp.replace(str, outter, "(" + String.join("|", segs) + ")"), null, opts);
+                return braces(V8RegExp.replace(str, outter, "(" + String.join("|", segs) + ")"), null, opts);
             }
             segsLength = segs.size();
         }
@@ -188,7 +189,7 @@ final class Braces {
     }
 
     private String after(String str) {
-        return JsRegExp.replace(str, PRESERVED, true, m -> {
+        return V8RegExp.replace(str, PRESERVED, true, m -> {
             String token = preserved.get(m.group(1));
             return token == null ? "undefined" : token;
         });

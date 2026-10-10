@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.V8RegExp;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,10 +25,10 @@ import java.util.regex.Pattern;
  */
 final class GlobParent {
 
-    private static final Pattern ENCLOSURE = JsRegExp.of("[\\{\\[].*[\\}\\]]$");
-    private static final Pattern GLOBBY = JsRegExp.of("(^|[^\\\\])([\\{\\[]|\\([^\\)]+$)");
-    private static final Pattern ESCAPED = JsRegExp.of("\\\\([\\!\\*\\?\\|\\[\\]\\(\\)\\{\\}])");
-    private static final Pattern EXTGLOB = JsRegExp.of("(\\\\).|([@?!+*]\\(.*\\))");
+    private static final Pattern ENCLOSURE = V8RegExp.of("[\\{\\[].*[\\}\\]]$");
+    private static final Pattern GLOBBY = V8RegExp.of("(^|[^\\\\])([\\{\\[]|\\([^\\)]+$)");
+    private static final Pattern ESCAPED = V8RegExp.of("\\\\([\\!\\*\\?\\|\\[\\]\\(\\)\\{\\}])");
+    private static final Pattern EXTGLOB = V8RegExp.of("(\\\\).|([@?!+*]\\(.*\\))");
 
     private GlobParent() {
     }

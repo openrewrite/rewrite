@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.V8RegExp;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,8 +38,8 @@ final class Extglob {
     }
 
     static String extglob(String str) {
-        str = JsRegExp.replace(str, REVERSED_NEGATION, true, m -> m.group(1) + "!(");
-        str = JsRegExp.replace(str, EXTENSION_NEGATION, true, m -> "/".equals(m.group(1)) ?
+        str = V8RegExp.replace(str, REVERSED_NEGATION, true, m -> m.group(1) + "!(");
+        str = V8RegExp.replace(str, EXTENSION_NEGATION, true, m -> "/".equals(m.group(1)) ?
                 escape("\\/[^.]+") : escape("[^.]+"));
 
         Map<String, String> o = new LinkedHashMap<>();

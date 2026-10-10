@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -40,9 +41,9 @@ final class PatchParse {
     static final String INSERTION = "insertion";
     static final String DELETION = "deletion";
 
-    private static final Pattern HEADER_REGEXP = JsRegExp.of("^@@ -(\\d+)(,(\\d+))? \\+(\\d+)(,(\\d+))? @@.*");
-    private static final Pattern DIFF_LINE = JsRegExp.of("^diff --git a\\/(.*?) b\\/(.*?)\\s*$");
-    private static final Pattern INDEX_HASHES = JsRegExp.of("(\\w+)\\.\\.(\\w+)");
+    private static final Pattern HEADER_REGEXP = V8RegExp.of("^@@ -(\\d+)(,(\\d+))? \\+(\\d+)(,(\\d+))? @@.*");
+    private static final Pattern DIFF_LINE = V8RegExp.of("^diff --git a\\/(.*?) b\\/(.*?)\\s*$");
+    private static final Pattern INDEX_HASHES = V8RegExp.of("(\\w+)\\.\\.(\\w+)");
 
     private PatchParse() {
     }

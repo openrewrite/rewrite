@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -88,7 +89,7 @@ final class Micromatch {
         }
     }
 
-    private static final Pattern MATCH_NOTHING = Objects.requireNonNull(JsRegExp.compile("$^"));
+    private static final Pattern MATCH_NOTHING = Objects.requireNonNull(V8RegExp.compile("$^"));
 
     private final ParseGlob parseGlob = new ParseGlob();
     private final Braces braces = new Braces();
@@ -143,7 +144,7 @@ final class Micromatch {
             return glob::equals;
         }
         String source = makeRe(glob);
-        Pattern re = JsRegExp.compile(source);
+        Pattern re = V8RegExp.compile(source);
         List<String> ids = braces.preservedIds(source);
         return fp -> {
             boolean matches = find(re, fp);
@@ -178,7 +179,7 @@ final class Micromatch {
                 m.appendReplacement(drawn, Matcher.quoteReplacement("__ID" + draws.get(i).get(draw[i]) + "__"));
             }
             m.appendTail(drawn);
-            if (find(JsRegExp.compile(drawn.toString()), fp) != matches) {
+            if (find(V8RegExp.compile(drawn.toString()), fp) != matches) {
                 return false;
             }
         } while (next(draw, draws));
@@ -360,15 +361,15 @@ final class Micromatch {
         }
 
         void replace(Pattern a, boolean global, String b, boolean escape) {
-            pattern = JsRegExp.replace(pattern, a, global, escape ? esc(b) : b);
+            pattern = V8RegExp.replace(pattern, a, global, escape ? esc(b) : b);
         }
 
         void replace(Pattern a, boolean global, Function<Matcher, String> b) {
-            pattern = JsRegExp.replace(pattern, a, global, b);
+            pattern = V8RegExp.replace(pattern, a, global, b);
         }
 
         void escape(String str) {
-            pattern = JsRegExp.replace(str, ESCAPED, true, m -> {
+            pattern = V8RegExp.replace(str, ESCAPED, true, m -> {
                 String ch = ESC.get(m.group(1));
                 if (ch != null) {
                     return ch;
@@ -381,7 +382,7 @@ final class Micromatch {
         }
 
         void unescape(String str) {
-            pattern = JsRegExp.replace(str, UNESCAPE, true, m -> {
+            pattern = V8RegExp.replace(str, UNESCAPE, true, m -> {
                 Map<String, String> chars = "ESC".equals(m.group(1)) ? ESC : "UNESC".equals(m.group(1)) ? UNESC :
                         "TEMP".equals(m.group(1)) ? TEMP : null;
                 if (chars == null) {
@@ -409,11 +410,11 @@ final class Micromatch {
         opts.makeRe = true;
 
         if (!isGlob(pattern)) {
-            glob.pattern = JsRegExp.replace(glob.pattern, PATH_CHARS, true, m -> "\\" + m.group(1));
+            glob.pattern = V8RegExp.replace(glob.pattern, PATH_CHARS, true, m -> "\\" + m.group(1));
             return glob;
         }
 
-        glob.pattern = JsRegExp.replace(glob.pattern, PLUS, true, m -> "\\" + m.group(1));
+        glob.pattern = V8RegExp.replace(glob.pattern, PLUS, true, m -> "\\" + m.group(1));
         glob.pattern = Js.splitJoin(glob.pattern, "$", "\\$");
 
         if (".*".equals(glob.pattern)) {
@@ -569,7 +570,7 @@ final class Micromatch {
     }
 
     private static String negateSlash(String str) {
-        return JsRegExp.replace(str, NEGATED_CLASS, true, m -> {
+        return V8RegExp.replace(str, NEGATED_CLASS, true, m -> {
             String inner = m.group(1);
             if (!inner.contains("/")) {
                 inner = "\\/" + inner;
