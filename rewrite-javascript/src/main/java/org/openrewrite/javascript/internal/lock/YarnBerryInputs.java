@@ -24,9 +24,7 @@ import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -38,7 +36,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
 
 /**
@@ -66,9 +63,16 @@ final class YarnBerryInputs {
      * npmrc; not its project npmrc (the repository root's), as Yarn reads no .npmrc.
      */
     static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
-        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
-                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
-                        .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
+        return YarnClassicInputs.userConfig(ctx, marker, env);
+    }
+
+    /**
+     * The host's credentials for every registry the marker's npmrc names, its project npmrc's too, without that
+     * file's own credentials, which Yarn never reads.
+     */
+    static NodeRegistries hostCredentials(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
+                                          Environment env) {
+        return YarnClassicInputs.hostCredentials(ctx, marker, env);
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
@@ -77,7 +81,7 @@ final class YarnBerryInputs {
 
     /**
      * With the home directory's .yarnrc.yml, which Yarn reads under the project's rc files: {@code user}, the host's
-     * registries as the user's own config (null for none), holding the credentials {@code credentials} has as well.
+     * registries as the user's own config (null for none), with the host's {@code credentials} for others too.
      */
     static Inputs from(LockDirectory dir, Host host, Instant now, @Nullable NodeRegistries user,
                        @Nullable NodeRegistries credentials) {

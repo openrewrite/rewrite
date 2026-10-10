@@ -28,7 +28,6 @@ import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
-import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -148,12 +147,12 @@ class YarnBerryInputsTest {
     }
 
     /**
-     * The host's token for the registry a project's .yarnrc.yml names goes with an unscoped package's request, with or
-     * without the project's top-level npmAlwaysAuth, which a home entry lacking its own would shadow.
+     * The host's token for the registry a project's .yarnrc.yml names goes with an unscoped package's request, as Yarn
+     * 4.10.3 sends a home entry's whatever the project's top-level npmAlwaysAuth says (getAuthConfiguration).
      */
     @Test
     void theHostsCredentialsGoWithEveryRequestToTheirRegistry(@TempDir Path home) {
-        for (String alwaysAuth : new String[]{"", "npmAlwaysAuth: true\n"}) {
+        for (String alwaysAuth : new String[]{"", "npmAlwaysAuth: true\n", "npmAlwaysAuth: false\n"}) {
             Request request = Request.builder()
               .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"packageManager\":\"yarn@4.10.3\"," +
                            "\"dependencies\":{\"a\":\"^1.0.0\"}}")
@@ -172,12 +171,50 @@ class YarnBerryInputsTest {
 
             Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
               YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)),
-              RegistryDiscovery.discover(ctx, request.getMarker(), scratch(home)));
+              YarnBerryInputs.hostCredentials(ctx, request.getMarker(), scratch(home)));
 
             assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
               "npmRegistries:\n  \"//corp.example\":\n    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\n");
             assertThat(asked(inputs)).as(alwaysAuth)
               .containsExactly(entry("https://corp.example a", "Bearer corp-token"));
+        }
+    }
+
+    /**
+     * Yarn 4.10.3 never reads the project's .npmrc, so its token stays out of the home file and no request carries it;
+     * the host's own credentials for that registry still go.
+     */
+    @Test
+    void theProjectsNpmrcCredentialsNeverReachTheHomeYarnrc(@TempDir Path home) {
+        Map<String, String> npmrc = new LinkedHashMap<>();
+        npmrc.put("registry", "https://corp.example/");
+        npmrc.put("//corp.example/:_authToken", "project-token");
+        npmrc.put("always-auth", "true");
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"packageManager\":\"yarn@4.10.3\"," +
+                       "\"dependencies\":{\"a\":\"^1.0.0\"}}")
+          .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n" +
+                "  resolution: \"p@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
+          .packageJsonPath(Paths.get("package.json"))
+          .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
+          .marker(nodeResolutionResult(PackageManager.YarnBerry).withNpmrcConfigs(singletonList(
+            new Npmrc(NpmrcScope.Project, npmrc))))
+          .build();
+        for (String hostToken : new String[]{null, "corp-token"}) {
+            InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+            if (hostToken != null) {
+                NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
+                  new NodeRegistryCredentials("corp.example", hostToken, null, null)));
+            }
+
+            Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
+              YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)),
+              YarnBerryInputs.hostCredentials(ctx, request.getMarker(), scratch(home)));
+
+            assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(hostToken == null ? "" :
+              "npmRegistries:\n  \"//corp.example\":\n    npmAuthToken: \"corp-token\"\n    npmAlwaysAuth: true\n");
+            assertThat(asked(inputs)).containsExactly(entry("https://corp.example a",
+              hostToken == null ? null : "Bearer corp-token"));
         }
     }
 
@@ -257,7 +294,7 @@ class YarnBerryInputsTest {
           .build();
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         return YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
-          YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)), RegistryDiscovery.discover(ctx,
+          YarnBerryInputs.userConfig(ctx, request.getMarker(), scratch(home)), YarnBerryInputs.hostCredentials(ctx,
             request.getMarker(), scratch(home))).getHomeFiles().get(".yarnrc.yml");
     }
 

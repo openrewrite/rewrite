@@ -25,6 +25,7 @@ import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.nio.charset.StandardCharsets;
@@ -35,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
 
@@ -46,6 +48,7 @@ final class YarnClassicInputs {
 
     private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
     private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+    private static final Pattern USERINFO = Pattern.compile("^([A-Za-z][A-Za-z0-9+.-]*://)[^/?#@]*@");
 
     private YarnClassicInputs() {
     }
@@ -68,13 +71,35 @@ final class YarnClassicInputs {
                         .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
     }
 
+    /**
+     * The host's credentials for every registry the marker's npmrc names, its project npmrc's too; that file's own
+     * credentials and always-auth stay the project's, read where yarn reads them.
+     */
+    static NodeRegistries hostCredentials(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
+                                          Environment env) {
+        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .map(npmrc -> npmrc.getScope() == NpmrcScope.Project ? registriesOnly(npmrc) : npmrc)
+                        .collect(toList())), env);
+    }
+
+    private static Npmrc registriesOnly(Npmrc npmrc) {
+        Map<String, String> registries = new LinkedHashMap<>();
+        for (Map.Entry<String, String> property : npmrc.getProperties().entrySet()) {
+            if ("registry".equals(property.getKey()) || property.getKey().endsWith(":registry")) {
+                registries.put(property.getKey(), USERINFO.matcher(property.getValue()).replaceFirst("$1"));
+            }
+        }
+        return npmrc.withProperties(registries);
+    }
+
     static Inputs from(LockDirectory dir, Host host) {
         return from(dir, host, null, null);
     }
 
     /**
      * With the home directory's .npmrc, which yarn reads under the project's: {@code user}, the host's registries as
-     * the user's own config (null for none), holding the credentials {@code credentials} has as well.
+     * the user's own config (null for none), with the host's {@code credentials} for those the project names too.
      */
     static Inputs from(LockDirectory dir, Host host, @Nullable NodeRegistries user,
                        @Nullable NodeRegistries credentials) {
