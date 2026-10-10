@@ -20,6 +20,17 @@ const path = require('path')
 
 const v10 = release => release.startsWith('10.')
 const FUNCTIONS = ['match', 'makeRe', 'filter', 'braceExpand', 'escape', 'unescape']
+const e = String.fromCharCode(0xe9)
+// 10.2.5's parse() checks *, *.<ext>, ?..., *.* and .* without the expression, a POSIX class makes it a u-flag one V8
+// may reject, and its $ ends the path: no upstream test of either release asks these
+const DIFFERENCES = [['packages/ab-x', 'packages/[[:alpha:]]*-x'], ['aba.2ba', '*\\|'], ['|', '*\\|'], ['ax', '*\\x'],
+  ['ab', '*\\b'], ['a\\b', '*\\b'], ['ab\n', 'a[bc]'], ['ab\n', '*b'], ['.a', '*', {dot: true}],
+  ['..', '*', {dot: true}], ['.', '.*'], ['..', '.*'], ['.a', '.*'], ['a.b', '*.*'], ['.a.b', '*.*'],
+  ['.a.b', '*.*', {dot: true}], ['abc.js', '???.js'], ['.bc.js', '???.js'], ['.bc.js', '???.js', {dot: true}],
+  ['ab.js', '???.js'], ['ab', '??'], ['.b', '??'], ['..', '??', {dot: true}], ['x', '[[:alpha:]]'], [e, '[[:alpha:]]'],
+  ['1', '[[:alpha:]]'], ['a,b', '[[:alpha:]],*'], ['a b', '[[:alpha:]] *'], ['a#', '[[:alpha:]]#'],
+  ['a!', '[[:alpha:]]\\!'], ['ab', '[[:alpha:]]?'], ['a-b', '[[:ascii:]]-b'], ['a.b', '[[:alpha:]].b'],
+  ['ab', '+([[:alpha:]])'], ['a-', '@([[:alpha:]]-)']]
 
 module.exports = {
   library: 'minimatch',
@@ -29,6 +40,7 @@ module.exports = {
   tests: (dir, release) => fs.readdirSync(path.join(dir, 'test'))
     .filter(f => /\.(js|ts)$/.test(f) && f !== 'patterns.js' && !(v10(release) && f === 'bash-results.js')).sort()
     .map(f => 'test/' + f),
+  differences: DIFFERENCES.map(([f, p, o]) => mm => (typeof mm === 'function' ? mm : mm.minimatch)(f, p, o)),
   receiver(self) {
     return self && self.__upstreamArgs ? {pattern: self.__upstreamArgs[0], options: self.__upstreamArgs[1]} :
       undefined

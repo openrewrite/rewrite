@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -582,7 +583,7 @@ public final class Minimatch {
     // 10.2.5
 
     private static final int MAX_GLOBSTAR_RECURSION = 200;
-    private static final Pattern RE_SPECIALS_10 = Pattern.compile("[-\\[\\]{}()*+?.,\\\\^$|#\\s]");
+    private static final Pattern RE_SPECIALS_10 = V8RegExp.of("[-[\\]{}()*+?.,\\\\^$|#\\s]");
     private static final String STAR_10 = "[^/]*?";
     private static final String STAR_NO_EMPTY = "[^/]+?";
     private static final String QMARK_10 = "[^/]";
@@ -610,6 +611,12 @@ public final class Minimatch {
         return new ArrayList<>(Arrays.asList(SLASHES.split(p, -1)));
     }
 
+    private static final Pattern STAR_DOT_EXT_RE = V8RegExp.of("^\\*+([^+@!?*[(]*)$");
+    private static final Pattern STAR_DOT_STAR_RE = V8RegExp.of("^\\*+\\.\\*+$");
+    private static final Pattern DOT_STAR_RE = V8RegExp.of("^\\.\\*+$");
+    private static final Pattern STAR_RE = V8RegExp.of("^\\*+$");
+    private static final Pattern QMARKS_RE = V8RegExp.of("^\\?+([^+@!?*[(]*)?$");
+
     private Object parse10(String part) {
         assertValidPattern(part);
         if ("**".equals(part)) {
@@ -618,7 +625,35 @@ public final class Minimatch {
         if (part.isEmpty()) {
             return "";
         }
-        return Ast.fromGlob(part, options).toMMPattern();
+        return Ast.fromGlob(part, options).toMMPattern(fastTest(part, options.isDot()));
+    }
+
+    // the checks parse puts in place of the regular expression's test for *, *.<ext>, ?..., *.* and .*
+    private static @Nullable Predicate<String> fastTest(String pattern, boolean dot) {
+        Matcher m;
+        if (STAR_RE.matcher(pattern).find()) {
+            return dot ? f -> !f.isEmpty() && !".".equals(f) && !"..".equals(f) :
+                    f -> !f.isEmpty() && !f.startsWith(".");
+        }
+        if ((m = STAR_DOT_EXT_RE.matcher(pattern)).find()) {
+            String ext = m.group(1);
+            return dot ? f -> f.endsWith(ext) : f -> !f.startsWith(".") && f.endsWith(ext);
+        }
+        if ((m = QMARKS_RE.matcher(pattern)).find()) {
+            int len = m.group().length();
+            String ext = m.group(1) == null ? "" : m.group(1);
+            Predicate<String> noext = dot ? f -> f.length() == len && !".".equals(f) && !"..".equals(f) :
+                    f -> f.length() == len && !f.startsWith(".");
+            return ext.isEmpty() ? noext : f -> noext.test(f) && f.endsWith(ext);
+        }
+        if (STAR_DOT_STAR_RE.matcher(pattern).find()) {
+            return dot ? f -> !".".equals(f) && !"..".equals(f) && f.contains(".") :
+                    f -> !f.startsWith(".") && f.contains(".");
+        }
+        if (DOT_STAR_RE.matcher(pattern).find()) {
+            return f -> !".".equals(f) && !"..".equals(f) && f.startsWith(".");
+        }
+        return null;
     }
 
     private static boolean isPatternStart(String src, int at) {
@@ -632,7 +667,7 @@ public final class Minimatch {
     // usurpMap: for each parent type, pairs of an only child's type and the type the parent takes from it
     private static final Map<Character, String> USURP = types("!!@", "?**+*", "@!!??@@**++", "+?***");
     private static final String RE_SPECIALS_AST = "().*{}+?[]^$\\!";
-    private static final Pattern ALL_STARS = Pattern.compile("[*]+");
+    private static final Pattern ALL_STARS = V8RegExp.of("^[*]+$");
 
     private static Map<Character, String> types(String... entries) {
         Map<Character, String> out = new HashMap<>();
@@ -654,11 +689,30 @@ public final class Minimatch {
         final String re;
         final String body;
         final boolean hasMagic;
+        final boolean uflag;
 
-        Source(String re, String body, boolean hasMagic) {
+        Source(String re, String body, boolean hasMagic, boolean uflag) {
             this.re = re;
             this.body = body;
             this.hasMagic = hasMagic;
+            this.uflag = uflag;
+        }
+    }
+
+    /**
+     * A portion's regular expression, its {@code test} the fast check {@code parse} gives the commonest patterns.
+     */
+    private static final class MMRegExp {
+        final Pattern re;
+        final @Nullable Predicate<String> fastTest;
+
+        MMRegExp(Pattern re, @Nullable Predicate<String> fastTest) {
+            this.re = re;
+            this.fastTest = fastTest;
+        }
+
+        boolean test(String f) {
+            return fastTest != null ? fastTest.test(f) : re.matcher(f).find();
         }
     }
 
@@ -677,6 +731,7 @@ public final class Minimatch {
         private final Options options;
         private @Nullable String asString;
         private boolean emptyExt;
+        private boolean uflag;
 
         Ast(@Nullable Character type, @Nullable Ast parent, Options options) {
             this.type = type;
@@ -974,12 +1029,17 @@ public final class Minimatch {
         }
 
         // the regular expression if there is magic, else the unescaped string
-        Object toMMPattern() {
+        Object toMMPattern(@Nullable Predicate<String> fastTest) {
             Source source = toRegExpSource(null);
             if (!source.hasMagic && !Boolean.TRUE.equals(hasMagic)) {
                 return source.body;
             }
-            return Pattern.compile("^" + source.re + "$");
+            String re = "^" + source.re + "$";
+            Pattern compiled = source.uflag ? V8RegExp.compileUnicode(re) : V8RegExp.compile(re);
+            if (compiled == null) {
+                throw new CannotKnow("how V8 words its SyntaxError for /" + re + "/");
+            }
+            return new MMRegExp(compiled, fastTest);
         }
 
         private Source toRegExpSource(@Nullable Boolean allowDot) {
@@ -999,6 +1059,7 @@ public final class Minimatch {
                     Source s = p instanceof String ? parseGlob((String) p, magic, noEmpty) :
                             ((Ast) p).toRegExpSource(allowDot);
                     hasMagic = magic || s.hasMagic;
+                    uflag |= s.uflag;
                     src.append(s.re);
                 }
                 String start = "";
@@ -1016,7 +1077,7 @@ public final class Minimatch {
                 }
                 String end = isEnd() && root.filledNegs && parent != null && parent.is('!') ? "(?:$|\\/)" : "";
                 hasMagic = Boolean.TRUE.equals(hasMagic);
-                return new Source(start + src + end, unescape(src.toString()), hasMagic);
+                return new Source(start + src + end, unescape(src.toString()), hasMagic, uflag);
             }
 
             boolean repeated = is('*') || is('+');
@@ -1028,7 +1089,7 @@ public final class Minimatch {
                 parts = new ArrayList<>(Collections.singletonList(s));
                 type = null;
                 hasMagic = null;
-                return new Source(s, unescape(toString()), false);
+                return new Source(s, unescape(toString()), false, false);
             }
             String bodyDotAllowed = !repeated || Boolean.TRUE.equals(allowDot) || dot ? "" : partsToRegExp(true);
             if (bodyDotAllowed.equals(body)) {
@@ -1051,7 +1112,7 @@ public final class Minimatch {
                 fin = start + body + close;
             }
             hasMagic = Boolean.TRUE.equals(hasMagic);
-            return new Source(fin, unescape(body), hasMagic);
+            return new Source(fin, unescape(body), hasMagic, uflag);
         }
 
         private void flatten() {
@@ -1090,7 +1151,9 @@ public final class Minimatch {
         private String partsToRegExp(boolean dot) {
             List<String> sources = new ArrayList<>();
             for (Object p : parts) {
-                sources.add(((Ast) p).toRegExpSource(dot).re);
+                Source s = ((Ast) p).toRegExpSource(dot);
+                uflag |= s.uflag;
+                sources.add(s.re);
             }
             boolean whole = isStart() && isEnd();
             List<String> kept = new ArrayList<>();
@@ -1105,6 +1168,7 @@ public final class Minimatch {
         private static Source parseGlob(String glob, boolean hasMagic, boolean noEmpty) {
             boolean escaping = false;
             boolean inStar = false;
+            boolean uflag = false;
             StringBuilder re = new StringBuilder();
             for (int i = 0; i < glob.length(); i++) {
                 char c = glob.charAt(i);
@@ -1118,7 +1182,7 @@ public final class Minimatch {
                         continue;
                     }
                     inStar = true;
-                    re.append(noEmpty && ALL_STARS.matcher(glob).matches() ? STAR_NO_EMPTY : STAR_10);
+                    re.append(noEmpty && ALL_STARS.matcher(glob).find() ? STAR_NO_EMPTY : STAR_10);
                     hasMagic = true;
                     continue;
                 }
@@ -1135,6 +1199,7 @@ public final class Minimatch {
                     ParsedClass cls = parseClass(glob, i);
                     if (cls.consumed > 0) {
                         re.append(cls.src);
+                        uflag |= cls.uflag;
                         i += cls.consumed - 1;
                         hasMagic |= cls.magic;
                         continue;
@@ -1147,49 +1212,58 @@ public final class Minimatch {
                 }
                 re.append(regExpEscape(String.valueOf(c)));
             }
-            return new Source(re.toString(), unescape(glob), hasMagic);
+            return new Source(re.toString(), unescape(glob), hasMagic, uflag);
         }
     }
 
     private static String regExpEscape(String s) {
-        return RE_SPECIALS_10.matcher(s).replaceAll("\\\\$0");
+        return V8RegExp.replace(s, RE_SPECIALS_10, true, "\\$&");
     }
 
+    private static final Pattern BRACKETED = V8RegExp.of("((?!\\\\).|^)\\[([^/\\\\])\\]");
+    private static final Pattern ESCAPED = V8RegExp.of("\\\\([^/])");
+
     private static String unescape(String s) {
-        return s.replaceAll("((?!\\\\).|^)\\[([^/\\\\])]", "$1$2").replaceAll("\\\\([^/])", "$1");
+        return V8RegExp.replace(V8RegExp.replace(s, BRACKETED, true, "$1$2"), ESCAPED, true, "$1");
     }
 
     private static final class ParsedClass {
         final String src;
+        final boolean uflag;
         final int consumed;
         final boolean magic;
 
-        ParsedClass(String src, int consumed, boolean magic) {
+        ParsedClass(String src, boolean uflag, int consumed, boolean magic) {
             this.src = src;
+            this.uflag = uflag;
             this.consumed = consumed;
             this.magic = magic;
         }
     }
 
+    // each class: its source, whether it needs the u flag, whether it is a negation
     private static final String[][] POSIX_CLASSES = {
-            {"[:alnum:]", "\\p{L}\\p{Nl}\\p{Nd}", "+"},
-            {"[:alpha:]", "\\p{L}\\p{Nl}", "+"},
-            {"[:ascii:]", "\\x00-\\x7f", "+"},
-            {"[:blank:]", "\\p{Zs}\\t", "+"},
-            {"[:cntrl:]", "\\p{Cc}", "+"},
-            {"[:digit:]", "\\p{Nd}", "+"},
-            {"[:graph:]", "\\p{Z}\\p{C}", "-"},
-            {"[:lower:]", "\\p{Ll}", "+"},
-            {"[:print:]", "\\p{C}", "+"},
-            {"[:punct:]", "\\p{P}", "+"},
-            {"[:space:]", "\\p{Z}\\t\\r\\n\\x0B\\f", "+"},
-            {"[:upper:]", "\\p{Lu}", "+"},
-            {"[:word:]", "\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}", "+"},
-            {"[:xdigit:]", "A-Fa-f0-9", "+"},
+            {"[:alnum:]", "\\p{L}\\p{Nl}\\p{Nd}", "u", "+"},
+            {"[:alpha:]", "\\p{L}\\p{Nl}", "u", "+"},
+            {"[:ascii:]", "\\x00-\\x7f", "", "+"},
+            {"[:blank:]", "\\p{Zs}\\t", "u", "+"},
+            {"[:cntrl:]", "\\p{Cc}", "u", "+"},
+            {"[:digit:]", "\\p{Nd}", "u", "+"},
+            {"[:graph:]", "\\p{Z}\\p{C}", "u", "-"},
+            {"[:lower:]", "\\p{Ll}", "u", "+"},
+            {"[:print:]", "\\p{C}", "u", "+"},
+            {"[:punct:]", "\\p{P}", "u", "+"},
+            {"[:space:]", "\\p{Z}\\t\\r\\n\\v\\f", "u", "+"},
+            {"[:upper:]", "\\p{Lu}", "u", "+"},
+            {"[:word:]", "\\p{L}\\p{Nl}\\p{Nd}\\p{Pc}", "u", "+"},
+            {"[:xdigit:]", "A-Fa-f0-9", "", "+"},
     };
 
+    private static final Pattern BRACE_SPECIALS = V8RegExp.of("[[\\]\\\\-]");
+    private static final Pattern ONE_CHARACTER = V8RegExp.of("^\\\\?.$");
+
     private static String braceEscape(String s) {
-        return s.replaceAll("[\\[\\]\\\\-]", "\\\\$0");
+        return V8RegExp.replace(s, BRACE_SPECIALS, true, "\\$&");
     }
 
     private static ParsedClass parseClass(String glob, int pos) {
@@ -1199,6 +1273,7 @@ public final class Minimatch {
         boolean sawStart = false;
         boolean escaping = false;
         boolean negate = false;
+        boolean uflag = false;
         int endPos = pos;
         String rangeStart = "";
         outer:
@@ -1223,14 +1298,15 @@ public final class Minimatch {
                 for (String[] cls : POSIX_CLASSES) {
                     if (glob.startsWith(cls[0], i)) {
                         if (!rangeStart.isEmpty()) {
-                            return new ParsedClass("$.", glob.length() - pos, true);
+                            return new ParsedClass("$.", false, glob.length() - pos, true);
                         }
                         i += cls[0].length();
-                        if ("-".equals(cls[2])) {
+                        if ("-".equals(cls[3])) {
                             negs.add(cls[1]);
                         } else {
                             ranges.add(cls[1]);
                         }
+                        uflag |= !cls[2].isEmpty();
                         continue outer;
                     }
                 }
@@ -1261,20 +1337,20 @@ public final class Minimatch {
             i++;
         }
         if (endPos < i) {
-            return new ParsedClass("", 0, false);
+            return new ParsedClass("", false, 0, false);
         }
         if (ranges.isEmpty() && negs.isEmpty()) {
-            return new ParsedClass("$.", glob.length() - pos, true);
+            return new ParsedClass("$.", false, glob.length() - pos, true);
         }
-        if (negs.isEmpty() && ranges.size() == 1 && ranges.get(0).matches("\\\\?.") && !negate) {
+        if (negs.isEmpty() && ranges.size() == 1 && ONE_CHARACTER.matcher(ranges.get(0)).find() && !negate) {
             String r = ranges.get(0).length() == 2 ? ranges.get(0).substring(1) : ranges.get(0);
-            return new ParsedClass(regExpEscape(r), endPos - pos, false);
+            return new ParsedClass(regExpEscape(r), false, endPos - pos, false);
         }
         String sranges = "[" + (negate ? "^" : "") + String.join("", ranges) + "]";
         String snegs = "[" + (negate ? "" : "^") + String.join("", negs) + "]";
         String comb = !ranges.isEmpty() && !negs.isEmpty() ? "(" + sranges + "|" + snegs + ")" :
                 !ranges.isEmpty() ? sranges : snegs;
-        return new ParsedClass(comb, endPos - pos, true);
+        return new ParsedClass(comb, uflag, endPos - pos, true);
     }
 
     private boolean match10(String f, boolean partial) {
@@ -1425,7 +1501,7 @@ public final class Minimatch {
             if (p == GLOBSTAR) {
                 return false;
             }
-            boolean hit = p instanceof String ? f.equals(p) : ((Pattern) p).matcher(f).find();
+            boolean hit = p instanceof String ? f.equals(p) : ((MMRegExp) p).test(f);
             if (!hit) {
                 return false;
             }
