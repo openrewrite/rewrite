@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.npm.NpmError;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -66,7 +65,7 @@ public final class Spec {
      * An error npm-package-arg throws; {@code code} is its {@code err.code} when it sets one.
      */
     @Getter
-    public static final class InvalidSpecException extends IllegalArgumentException implements NpmError {
+    public static final class InvalidSpecException extends IllegalArgumentException {
         private final @Nullable String code;
 
         InvalidSpecException(String message, @Nullable String code) {

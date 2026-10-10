@@ -31,6 +31,7 @@ import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
+import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
@@ -385,7 +386,8 @@ public final class NpmLockRegenerator {
         if (e instanceof JsonParseEvenBetterErrors.JsonParseException) {
             return Rejected.coded(Reason.MALFORMED_MANIFEST, null, "EJSONPARSE", message);
         }
-        String code = e instanceof NpmError ? ((NpmError) e).getCode() : null;
+        String code = e instanceof NpmError ? ((NpmError) e).getCode() :
+                e instanceof Spec.InvalidSpecException ? ((Spec.InvalidSpecException) e).getCode() : null;
         if (code == null) {
             return Rejected.crashes(Reason.RESOLUTION_REQUIRED, packageOf(e), message);
         }

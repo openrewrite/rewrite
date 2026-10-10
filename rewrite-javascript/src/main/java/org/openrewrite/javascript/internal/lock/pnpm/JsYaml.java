@@ -182,9 +182,9 @@ final class JsYaml {
         SIMPLE_ESCAPES['/'] = "/";
         SIMPLE_ESCAPES['\\'] = "\\";
         SIMPLE_ESCAPES['N'] = "\u0085";
-        SIMPLE_ESCAPES['_'] = " ";
-        SIMPLE_ESCAPES['L'] = " ";
-        SIMPLE_ESCAPES['P'] = " ";
+        SIMPLE_ESCAPES['_'] = "\u00a0";
+        SIMPLE_ESCAPES['L'] = "\u2028";
+        SIMPLE_ESCAPES['P'] = "\u2029";
     }
 
     /**

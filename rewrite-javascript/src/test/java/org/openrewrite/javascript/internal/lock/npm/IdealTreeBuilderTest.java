@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Expect;
 import org.openrewrite.javascript.internal.lock.ScenarioTest;
+import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
 
 import java.util.Map;
@@ -128,7 +129,8 @@ class IdealTreeBuilderTest extends ScenarioTest {
     }
 
     private static @Nullable String codeOf(Throwable t) {
-        return t instanceof NpmError ? ((NpmError) t).getCode() : null;
+        return t instanceof NpmError ? ((NpmError) t).getCode() :
+                t instanceof Spec.InvalidSpecException ? ((Spec.InvalidSpecException) t).getCode() : null;
     }
 
     // pacote renders --before with toISOString() in every fetcher's constructor, so the date is read at the
