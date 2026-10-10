@@ -88,8 +88,7 @@ public final class WorkspaceManifestWriter {
 
     /**
      * How the yaml library writes {@code value} as a new scalar: plain where it reads back as that string, else
-     * single quoted, double quoted when it holds a single quote only; an {@link IllegalArgumentException} where it
-     * would need an escape.
+     * single quoted, double quoted when it holds only a single quote; refused where it would need an escape.
      */
     public static String scalar(String value) {
         for (int i = 0; i < value.length(); i++) {

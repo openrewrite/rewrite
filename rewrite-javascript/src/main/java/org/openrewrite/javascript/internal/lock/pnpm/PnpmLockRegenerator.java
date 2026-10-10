@@ -281,7 +281,8 @@ public final class PnpmLockRegenerator {
                 throw sharesCacheWith(dir);
             }
             String lockPath = RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE);
-            String lock = inputs.getFiles().get(lockPath);            if (lock == null && inputs.getPaths() != null && inputs.getPaths().contains(lockPath)) {
+            String lock = inputs.getFiles().get(lockPath);
+            if (lock == null && inputs.getPaths() != null && inputs.getPaths().contains(lockPath)) {
                 throw new CannotKnow(lockPath + " (its contents were not read)");
             }
             if (lock == null) {

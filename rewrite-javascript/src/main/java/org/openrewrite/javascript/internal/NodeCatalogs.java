@@ -186,7 +186,8 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * pnpm-workspace.yaml as pnpm's workspace-manifest-reader reads it, once; null when empty or {@link #isRejected}.
+         * pnpm-workspace.yaml as pnpm's workspace-manifest-reader reads it, once; null when empty or
+         * {@link #isRejected}.
          */
         public @Nullable Map<String, @Nullable Object> getSettings() {
             if (!settingsRead) {
@@ -595,7 +596,8 @@ public abstract class NodeCatalogs {
             try {
                 Yaml.Scalar written = scalar("", specifier);
                 rewritten = scalar.getStyle() == Yaml.Scalar.Style.PLAIN ?
-                        scalar.withStyle(written.getStyle()).withValue(written.getValue()) : scalar.withValue(specifier);
+                        scalar.withStyle(written.getStyle()).withValue(written.getValue()) :
+                        scalar.withValue(specifier);
             } catch (IllegalArgumentException e) {
                 return null;
             }

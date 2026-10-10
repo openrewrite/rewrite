@@ -659,7 +659,8 @@ class NodeDependencyScanTest {
         project(acc, ROOT, "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"libs/*\"]}",
           nodeResolutionResult(PackageManager.Npm, emptyList()));
         Path unread = Paths.get("libs/x/package.json");
-        NodeDependencyScan.capturePackageManagerFile(acc, new Quark(Tree.randomId(), unread, Markers.EMPTY, null, null));
+        NodeDependencyScan.capturePackageManagerFile(acc,
+          new Quark(Tree.randomId(), unread, Markers.EMPTY, null, null));
         SourceFile member = project(acc, MEMBER, "{\"name\":\"a\",\"version\":\"1.0.0\"}",
           nodeResolutionResult(PackageManager.Npm));
 
