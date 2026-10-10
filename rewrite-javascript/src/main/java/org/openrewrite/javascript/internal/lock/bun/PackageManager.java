@@ -123,6 +123,12 @@ final class PackageManager {
     private @Nullable Set<Long> namesBeforePeers;
     private final Map<Integer, DependencyVersion> peersOfNewNames = new LinkedHashMap<>();
 
+    /**
+     * The peers queued before any manifest arrived, whose place at the head of the peer queue no timing changes.
+     */
+    final Set<Integer> peersQueuedFirst = new HashSet<>();
+    private boolean manifestArrived;
+
     PackageManager(Lockfile lockfile, BunOptions options, Log log, Map<String, String> projectManifests,
                    ManifestSource registry, double nowMs) {
         this.lockfile = lockfile;
@@ -244,7 +250,7 @@ final class PackageManager {
                             networkTasks.add(new NetworkTask(name, options.getMinimumReleaseAgeMs() != null));
                         }
                     } else {
-                        peerDependencies.add(id);
+                        queuePeer(id);
                         return;
                     }
                     taskQueue.computeIfAbsent(name, k -> new ArrayList<>()).add(id);
@@ -269,7 +275,7 @@ final class PackageManager {
                     return;
                 }
                 if (dependency.behavior.isPeer() && !installPeer) {
-                    peerDependencies.add(id);
+                    queuePeer(id);
                     return;
                 }
                 throw new CannotKnow((version.tag == DependencyVersion.Tag.TARBALL ? "tarball contents of " :
@@ -609,6 +615,7 @@ final class PackageManager {
     void runTasks(boolean installPeer) {
         NetworkTask task = networkTasks.poll();
         if (task != null) {
+            manifestArrived = true;
             String scope = options.scopeForPackageName(task.name);
             String text = registry.packument(scope, task.name, task.extended);
             if (text == null) {
@@ -731,9 +738,16 @@ final class PackageManager {
         return out;
     }
 
+    private void queuePeer(int id) {
+        if (!manifestArrived) {
+            peersQueuedFirst.add(id);
+        }
+        peerDependencies.add(id);
+    }
+
     /**
-     * One line per name whose required peers nothing satisfied when the peers began and whose picks differ: the order
-     * the requirers' manifests arrived in decides which pick the later peers take.
+     * One line per name whose required peers nothing satisfied when the peers began and whose picks differ, unless the
+     * first was queued before any manifest arrived: the order the requirers' manifests arrived in decides the pick.
      */
     List<String> peerArrivalOrder(List<Resolved> peers) {
         Map<String, List<Resolved>> byName = new LinkedHashMap<>();
@@ -743,7 +757,7 @@ final class PackageManager {
         List<String> out = new ArrayList<>();
         for (Map.Entry<String, List<Resolved>> entry : byName.entrySet()) {
             List<Resolved> edges = entry.getValue();
-            for (int i = 1; i < edges.size(); i++) {
+            for (int i = 1; i < edges.size() && !peersQueuedFirst.contains(edges.get(0).dependencyId); i++) {
                 if (!edges.get(i).resolution.eql(edges.get(0).resolution)) {
                     Resolved a = edges.get(0);
                     Resolved b = edges.get(i);

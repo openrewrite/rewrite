@@ -1,0 +1,1 @@
+A new folder dependency and a new registry package each carry a required peer on zz-vb-peer-p (^1.0.0 and ^2.0.0) that nothing provides; the registry answers at once: does the folder's peer, queued before any manifest arrives, always win?

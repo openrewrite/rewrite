@@ -122,6 +122,18 @@ class PackageManagerTest {
           "installed in one install");
     }
 
+    // open-stub-peer-arrival-local-first-fast and -slow: a folder dependency's peer, queued before any manifest arrives
+    @Test
+    void peersOfANewNameWhoseFirstWasQueuedBeforeAnyManifestArrived() {
+        Lockfile lockfile = new Lockfile();
+        int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
+        lockfile.dependencies.get(debugMs).behavior = Behavior.of(Behavior.PEER);
+        lockfile.dependencies.get(debugMs + 1).behavior = Behavior.of(Behavior.PEER);
+        PackageManager manager = manager(lockfile);
+        manager.peersQueuedFirst.add(debugMs);
+        assertThat(manager.peerArrivalOrder(resolved(lockfile, debugMs, debugMs + 1))).isEmpty();
+    }
+
     @Test
     void peersOfANewNameWithOnePick() {
         Lockfile lockfile = new Lockfile();
