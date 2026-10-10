@@ -175,7 +175,11 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(npmrc + scenario.argsAfter(), HostEnvironment.UNKNOWN);
+        return options(npmrc + scenario.argsAfter());
+    }
+
+    static NpmOptions options(@Nullable String npmrc) {
+        return NpmOptions.fromNpmrc(npmrc, HostEnvironment.UNKNOWN);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {

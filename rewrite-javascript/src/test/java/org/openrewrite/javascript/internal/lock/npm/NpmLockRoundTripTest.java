@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.npm;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +52,7 @@ class NpmLockRoundTripTest {
     @MethodSource("locks")
     void writesBackWhatNpmWrites(String name, NpmScenarios.Lock lock) {
         String expect = lock.getScenario().expect();
-        NpmOptions options = NpmOptions.fromNpmrc(lock.getNpmrc(), HostEnvironment.UNKNOWN);
+        NpmOptions options = ScenarioReplay.options(lock.getNpmrc());
         if (expect != null && expect.startsWith("malformed override key ") && !lock.isBefore()) {
             String key = expect.substring("malformed override key ".length());
             assertThatThrownBy(() -> roundTrip(lock, options)).as(expect)
