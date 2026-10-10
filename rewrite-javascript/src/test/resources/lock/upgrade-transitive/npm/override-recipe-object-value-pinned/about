@@ -1,0 +1,1 @@
+UpgradeTransitiveDependencyVersion is-odd 0.1.2 (no path) where the root already overrides is-odd with {".": "0.1.2", "is-number": "4.0.0"}: the pin is already there, so npm installs nothing new.

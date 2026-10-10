@@ -63,11 +63,11 @@ class BunLockRoundTripTest {
           new BunScenarioTest.ScenarioRegistry(scenario) : NO_REQUEST).regenerate();
         if (loadError != null) {
             assertThat(result.getFailure()).as("bun ignores the lock: " + loadError).isNotNull();
-            assertThat(result.getFailure().getKind()).isEqualTo(Kind.DISCARDS_LOCK);
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
             assertThat(result.getFailure().getDetail()).endsWith(": " + loadError);
         } else if (lock.deletedAgain()) {
             assertThat(result.getFailure()).as("bun deletes the lock").isNotNull();
-            assertThat(result.getFailure().getKind()).isEqualTo(Kind.DELETES_LOCK);
+            assertThat(result.getFailure().getDetail()).startsWith("bun deletes the lock");
         } else {
             String rewritten = lock.rewritten();
             assertThat(result.getErrorMessage()).isNull();

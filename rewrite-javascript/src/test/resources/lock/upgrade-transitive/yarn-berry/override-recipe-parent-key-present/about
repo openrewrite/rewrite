@@ -1,0 +1,1 @@
+The root already resolves "is-odd/is-number" to 6.0.0; a plain "is-number": "7.0.0" is added after it.

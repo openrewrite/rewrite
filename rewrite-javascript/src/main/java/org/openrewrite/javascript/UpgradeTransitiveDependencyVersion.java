@@ -25,8 +25,11 @@ import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
@@ -49,6 +52,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
     transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
+    transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
 
     @Option(displayName = "Package name",
             description = "The name of the transitive npm dependency to upgrade.",
@@ -88,6 +92,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         /** Each root's override as the recipes before this one leave its files, for the recipes after it. */
         final Map<Path, PackageJsonOverrides> edits = new HashMap<>();
         final Set<NodeDependencyProtocolsSkipped.Row> protocolRows = new HashSet<>();
+        final Set<NodeDependencyEditsDeclined.Row> declineRows = new HashSet<>();
         /** Each workspace root's override, decided from the revisions before this recipe it was last asked for. */
         final Map<Path, PackageJsonOverrides> overrides = new HashMap<>();
         /** The override each root's files visited so far were left by; a later one must leave them alike. */
@@ -187,7 +192,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 SourceFile out = edited(acc, ctx, (SourceFile) tree);
                 String overturned = acc.overturnedAt;
                 acc.overturnedAt = null;
-                return overturned == null ? out : Markup.warn(out, new RuntimeException(overturned));
+                return overturned == null ? out : warn(out, overturned);
             }
         };
     }
@@ -219,7 +224,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                     return PackageJsonHelper.reparseLock(sf, result.getLockFileContent());
                 }
                 recordFailure(ctx, ips, importer, result);
-                return Markup.warn(sf, new RuntimeException("lock regeneration failed: " + result.getErrorMessage()));
+                return warn(sf, "lock regeneration failed: " + result.getErrorMessage());
             }
         }
         return sf;
@@ -279,8 +284,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         left(acc, p, p, sf, print(out));
         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
             recordFailure(ctx, ps, p, ps.regenResult);
-            return Markup.warn(out, new RuntimeException("lock regeneration failed: " +
-                                                         ps.regenResult.getErrorMessage()));
+            return warn(out, "lock regeneration failed: " + ps.regenResult.getErrorMessage());
         }
         return out;
     }
@@ -374,7 +378,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             String why = "a recipe before this one changed " + root + " or a file its lock reads after this recipe " +
                          "wrote the lock from their earlier revisions";
             acc.overturnedAt = why;
-            failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, why);
+            failure(ctx, ps, root, why);
         }
         Map<Path, String> read = new LinkedHashMap<>(edited);
         if (!(base instanceof Json.Document) || override.apply((Json.Document) base) != base || !edited.isEmpty()) {
@@ -478,13 +482,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                              PackageJsonOverrides.WORKSPACE_MANIFEST + " after files visited earlier were left by " +
                              "the override's place then, " + followed + "; it is now " + override;
                 acc.overturnedAt = why;
-                failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, why);
+                failure(ctx, ps, root, why);
             }
             return null;
         }
         String declined = override.declined();
         if (declined != null) {
-            failure(ctx, ps, root, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, declined);
+            decline(acc, ctx, root, declined);
             return null;
         }
         if (writes(acc, ctx, root, ps, override)) {
@@ -497,6 +501,10 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
             if (!references.isEmpty()) {
                 return null;
+            }
+            String outranked = override.outranked();
+            if (outranked != null) {
+                decline(acc, ctx, root, outranked);
             }
         }
         return override;
@@ -604,8 +612,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         Path root = workspaceRoot(acc.scan, packageJson, pm);
         NodeDependencyScan.ProjectState rootPs = acc.scan.projects.get(root);
         if (rootPs == null || packageManager(rootPs.capturedPackageJson) == null) {
-            failure(ctx, ps, packageJson, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, "the override " +
-                    "belongs in the workspace root's " + root + ", which is not a package.json the recipe edits");
+            decline(acc, ctx, packageJson, "the override belongs in the workspace root's " + root +
+                                           ", which is not a package.json the recipe edits");
             return null;
         }
         return root;
@@ -625,8 +633,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
             if (acc.scan.paths.contains(workspaceManifest) &&
                 !acc.scan.packageManagerFiles.containsKey(workspaceManifest)) {
-                failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, "the engine cannot know " +
-                        PackageJsonOverrides.WORKSPACE_MANIFEST + " (its contents were not read)");
+                failure(ctx, ps, root, LockOnlyInstall.PNPM.failure(new CannotKnow(
+                        PackageJsonOverrides.WORKSPACE_MANIFEST + " (its contents were not read)")));
                 return null;
             }
             workspace = workspaceBase(acc, ctx, workspaceManifest);
@@ -680,13 +688,25 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
+    private void failure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path path, String why) {
+        failure(ctx, ps, path, new LockFileRegeneration.Failure(LockFileRegeneration.Kind.CANNOT_KNOW,
+                LockFileRegeneration.Reason.RESOLUTION_REQUIRED, null, why));
+    }
+
     private void failure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path path,
-                         LockFileRegeneration.Reason reason, String why) {
-        if (!ps.failureRecorded) {
-            ps.failureRecorded = true;
-            lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(path.toString(),
-                    packageName, reason.toString(), why));
+                         LockFileRegeneration.Failure failure) {
+        recordFailure(ctx, ps, path, LockFileRegeneration.Result.failure(failure));
+    }
+
+    private void decline(Accumulator acc, ExecutionContext ctx, Path path, String why) {
+        NodeDependencyEditsDeclined.Row row = new NodeDependencyEditsDeclined.Row(path.toString(), packageName, why);
+        if (acc.declineRows.add(row)) {
+            editsDeclined.insertRow(ctx, row);
         }
+    }
+
+    private static <T extends Tree> T warn(T tree, String message) {
+        return Markup.markup(tree, new Markup.Warn(Tree.randomId(), message, null));
     }
 
     private void recordFailure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path packageJsonPath,

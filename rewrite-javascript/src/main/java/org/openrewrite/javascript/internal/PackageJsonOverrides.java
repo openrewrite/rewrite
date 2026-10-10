@@ -42,6 +42,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -53,6 +55,7 @@ import static java.util.Objects.requireNonNull;
 public final class PackageJsonOverrides {
 
     public static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
+    private static final Pattern YARN_PATH_SEGMENT = Pattern.compile("(@[^/]+/)?([^/]+)");
 
     private final PackageManager pm;
     private final String packageName;
@@ -297,15 +300,6 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * The package.json with the override where the root's package manager reads it there; unchanged when it reads
-     * pnpm-workspace.yaml or the entry already holds {@code newVersion}.
-     */
-    public static Json.Document applyOverride(Json.Document doc, PackageManager pm, String packageName,
-                                              String newVersion, @Nullable List<DependencyPathSegment> path) {
-        return of(pm, doc, null, packageName, newVersion, path).apply(doc);
-    }
-
-    /**
      * {@code doc}, a revision of the root's package.json, with the override at {@link #getPlace()}; unchanged when
      * that is pnpm-workspace.yaml or the package manager already reads {@code newVersion} there.
      */
@@ -313,15 +307,24 @@ public final class PackageJsonOverrides {
         switch (place) {
             case OVERRIDES:
                 if (path == null || path.isEmpty()) {
-                    return setFlatEntry(doc, "overrides", packageName, newVersion);
+                    // npm reads an object's "." as the package's own override and the other keys below it
+                    Json overrides = member(doc, "overrides");
+                    return overrides instanceof Json.JsonObject &&
+                           member((Json.JsonObject) overrides, packageName) instanceof Json.JsonObject ?
+                            PackageJsonHelper.setNestedEntry(doc, "overrides", packageName, ".", newVersion) :
+                            setFlatEntry(doc, "overrides", packageName, newVersion);
                 }
                 if (newVersion.equals(nestedOverrideValue(doc, path, packageName))) {
                     return doc;
                 }
                 return setNestedOverride(doc, path, packageName, newVersion);
             case RESOLUTIONS:
-                return setFlatEntry(doc, "resolutions", pm == PackageManager.Pnpm ? pnpmKey(packageName, path) :
-                        resolutionKey(pm, packageName, path), newVersion);
+                String resolution = pm == PackageManager.Pnpm ? pnpmKey(packageName, path) :
+                        resolutionKey(pm, packageName, path);
+                if (pm == PackageManager.YarnClassic) {
+                    resolution = yarnClassicKeyOf(member(doc, "resolutions"), resolution);
+                }
+                return setFlatEntry(doc, "resolutions", resolution, newVersion);
             case PNPM_FIELD:
                 String key = pnpmKey(packageName, path);
                 Json pnpm = member(doc, "pnpm");
@@ -398,6 +401,90 @@ public final class PackageJsonOverrides {
             key.append(segment.getName()).append('/');
         }
         return key.append(packageName).toString();
+    }
+
+    // the first key yarn reads as the same glob, since it applies the first resolution whose glob matches
+    private static String yarnClassicKeyOf(@Nullable Json resolutions, String key) {
+        if (resolutions instanceof Json.JsonObject) {
+            for (Json m : ((Json.JsonObject) resolutions).getMembers()) {
+                String existing = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
+                if (existing != null && yarnClassicGlob(existing).equals(yarnClassicGlob(key))) {
+                    return existing;
+                }
+            }
+        }
+        return key;
+    }
+
+    // yarn 1.22.22's resolution-map.js parsePatternInfo: a bare name is **/name
+    private static String yarnClassicGlob(String key) {
+        Matcher segments = YARN_PATH_SEGMENT.matcher(key);
+        int count = 0;
+        while (segments.find()) {
+            count++;
+        }
+        return count == 1 ? "**/" + key : key;
+    }
+
+    /**
+     * The overrides already in place that the package manager applies before a global one where both match, as it
+     * reads them; null when there are none or the override is scoped.
+     */
+    public @Nullable String outranked() {
+        if (path != null && !path.isEmpty() || declined() != null) {
+            return null;
+        }
+        if (pm != PackageManager.Pnpm && pm != PackageManager.YarnBerry) {
+            return null;
+        }
+        List<String> keys = new ArrayList<>();
+        for (String key : overrideKeys()) {
+            int at = key.lastIndexOf('>');
+            if (pm == PackageManager.Pnpm ? at > 0 && packageName.equals(nameOf(key.substring(at + 1))) :
+                    key.endsWith("/" + packageName) && isParent(key.substring(0, key.length() -
+                                                                              packageName.length() - 1))) {
+                keys.add(key);
+            }
+        }
+        return keys.isEmpty() ? null : (pm == PackageManager.Pnpm ? "pnpm" : "Yarn") + " applies " +
+                                      String.join(", ", keys) + " before a global override of " + packageName;
+    }
+
+    private List<String> overrideKeys() {
+        List<String> keys = new ArrayList<>();
+        if (place == Place.WORKSPACE_MANIFEST) {
+            Object overrides = workspace.setting("overrides");
+            if (overrides instanceof Map) {
+                for (Object key : ((Map<?, ?>) overrides).keySet()) {
+                    keys.add(String.valueOf(key));
+                }
+            }
+            return keys;
+        }
+        Json pnpm = member(root, "pnpm");
+        for (Json map : Arrays.asList(member(root, "resolutions"), place == Place.PNPM_FIELD &&
+                pnpm instanceof Json.JsonObject ? member((Json.JsonObject) pnpm, "overrides") : null)) {
+            if (map instanceof Json.JsonObject) {
+                for (Json m : ((Json.JsonObject) map).getMembers()) {
+                    String key = m instanceof Json.Member ? literalString(((Json.Member) m).getKey()) : null;
+                    if (key != null) {
+                        keys.add(key);
+                    }
+                }
+            }
+        }
+        return keys;
+    }
+
+    // a Berry resolution's parent descriptor, not the scope of the package it resolves
+    private static boolean isParent(String prefix) {
+        return !prefix.isEmpty() && !(prefix.startsWith("@") && prefix.indexOf('/') < 0);
+    }
+
+    // a selector's package name, without the range after its name's @
+    private static String nameOf(String selector) {
+        int at = selector.indexOf('@', selector.startsWith("@") ? 1 : 0);
+        return at < 0 ? selector : selector.substring(0, at);
     }
 
     private static String segment(DependencyPathSegment segment) {

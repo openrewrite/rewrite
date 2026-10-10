@@ -107,7 +107,7 @@ class BunScenarioTest extends LockScenarioTest {
         String rest = expect.getRest();
         switch (expect.getKind()) {
             case "exact":
-                return failure.getKind() == Kind.DELETES_LOCK;
+                return failure.getKind() == Kind.PM_REJECTS && failure.getDetail().startsWith("bun deletes the lock");
             case "cannot-know":
                 return failure.getKind() == Kind.CANNOT_KNOW && failure.getDetail().contains(rest);
             case "malformed":

@@ -90,8 +90,8 @@ class NpmScenarioTest extends LockScenarioTest {
             case "cannot-know":
                 return failure.getKind() == Kind.CANNOT_KNOW;
             case "malformed":
-                return failure.getReason() == Reason.MALFORMED_LOCK ||
-                       failure.getReason() == Reason.MALFORMED_MANIFEST &&
+                return failure.getReason() == Reason.MALFORMED_LOCK && failure.getKind() == Kind.PM_REJECTS ||
+                       failure.getReason() == Reason.MALFORMED_MANIFEST && failure.getKind() == Kind.PM_FAILS &&
                        failure.getDetail().contains(ScenarioReplay.malformedKey(String.valueOf(expect.getLine())));
             case "unstable":
                 return failure.getKind() == Kind.SECOND_INSTALL;

@@ -36,6 +36,7 @@ import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.ChangeValue;
 import org.openrewrite.json.JsonParser;
@@ -272,10 +273,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             String visited = visited(order);
             List<String> paths = order.stream().map(source -> source.path).collect(toList());
             boolean lockFirst = paths.indexOf("pnpm-lock.yaml") < paths.indexOf("pnpm-workspace.yaml");
-            assertThat(outcome.rows).as("visiting %s", visited).singleElement()
-              .extracting(NodeLockRegenerationFailures.Row::getReason).isEqualTo(lockFirst ?
-                LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name() :
-                LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE.name());
+            if (lockFirst) {
+                assertThat(outcome.rows).as("visiting %s", visited).singleElement()
+                  .extracting(NodeLockRegenerationFailures.Row::getReason)
+                  .isEqualTo(LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name());
+            } else {
+                assertThat(outcome.rows).as("visiting %s", visited).isEmpty();
+                assertThat(outcome.declines).as("visiting %s", visited).singleElement()
+                  .extracting(NodeDependencyEditsDeclined.Row::getReason).asString()
+                  .contains("has a value it does not edit");
+            }
             assertThat(print(outcome.file("pnpm-workspace.yaml"))).as("visiting %s", visited)
               .isEqualTo("packages: [apps/*]\n");
             assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
@@ -346,8 +353,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         Scenario s = new Scenario("bun/override-recipe-path-nested");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-odd")
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).isEqualTo("bun does not support nested overrides"))),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).isEqualTo("bun does not support nested overrides"))),
           s.root(PackageManager.Bun, s.file("pkg-before")),
           s.lock(PackageManager.Bun, null)
         );
@@ -433,8 +440,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         Scenario s = new Scenario("pnpm/override-recipe-path");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-even>is-odd")
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).contains("ERR_PNPM_INVALID_SELECTOR"))),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).contains("ERR_PNPM_INVALID_SELECTOR"))),
           s.root(PackageManager.Pnpm, s.file("pkg-before")),
           yaml(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml").noTrim()),
           s.lock(PackageManager.Pnpm, null)
@@ -460,8 +467,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         Scenario s = new Scenario("yarn-berry/override-recipe-path");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-even>is-odd")
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).contains("YN0057"))),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).contains("YN0057"))),
           s.root(PackageManager.YarnBerry, s.file("pkg-before")),
           s.lock(PackageManager.YarnBerry, null)
         );
@@ -472,8 +479,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         Scenario s = new Scenario("yarn-berry/override-recipe-path");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-odd@^3.0.0")
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).contains("exact version only, not is-odd@^3.0.0"))),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).contains("exact version only, not is-odd@^3.0.0"))),
           s.root(PackageManager.YarnBerry, s.file("pkg-before")),
           s.lock(PackageManager.YarnBerry, null)
         );
@@ -499,14 +506,56 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         Scenario s = new Scenario("yarn-classic/override-recipe-path");
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-odd@3.0.1")
-            .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getDetail()).contains("is-odd@3.0.1"))),
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .satisfies(row -> assertThat(row.getReason()).contains("is-odd@3.0.1"))),
           s.root(PackageManager.YarnClassic, s.file("pkg-before")),
           s.lock(PackageManager.YarnClassic, null)
         );
     }
 
+    // recorded with npm 11.17.0: the version is already the object's ".", so npm installs nothing new
+    @Test
+    void npmOverrideOfAnObjectAlreadyPinnedUnderDotIsLeftAlone() {
+        Scenario s = new Scenario("npm/override-recipe-object-value-pinned");
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-odd", "0.1.2", null))
+            .executionContext(s.ctx()),
+          s.root(PackageManager.Npm, s.file("pkg")),
+          s.lock(PackageManager.Npm, s.file("after"))
+        );
+    }
+
+    // recorded with yarn 1.22.22, which applies the first resolution whose glob matches: the one in place is edited
+    @Test
+    void yarnClassicEditsTheResolutionOfTheSameGlobInPlace() {
+        golden("yarn-classic/override-recipe-glob-key-present", PackageManager.YarnClassic, "7.0.0", null);
+    }
+
+    // recorded with Bun 1.3.10, which applies the resolution written after "**/is-number"
+    @Test
+    void bunAppliesAResolutionWrittenBesideAGlobKey() {
+        golden("bun/override-recipe-glob-key-present", PackageManager.Bun, "7.0.0", null);
+    }
+
+    // recorded with Yarn 4.10.3 and pnpm 11.2.2: the override scoped to is-odd still applies there, and is named
+    @Test
+    void yarnBerryNamesAResolutionScopedToAParentThatStillApplies() {
+        golden("yarn-berry/override-recipe-parent-key-present", PackageManager.YarnBerry, "7.0.0", null,
+          "Yarn applies is-odd/is-number before a global override of is-number");
+    }
+
+    @Test
+    void pnpmNamesAnOverrideScopedToAParentThatStillApplies() {
+        golden("pnpm/override-recipe-parent-selector-present", PackageManager.Pnpm, "7.0.0", null,
+          "pnpm applies is-odd>is-number before a global override of is-number");
+    }
+
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path) {
+        golden(scenario, pm, version, path, null);
+    }
+
+    private void golden(String scenario, PackageManager pm, String version, @Nullable String path,
+                        @Nullable String declined) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
@@ -525,7 +574,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             sources.add(s.lock(pm, "probes/before-root-lock", s.file("probes/after-root-lock"), "pnpm-lock.yaml"));
             sources.add(s.lock(pm, "before", s.file("after"), lockDir.trim() + "/pnpm-lock.yaml"));
         }
-        rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
+        rewriteRun(spec -> {
+            if (declined == null) {
+                s.spec(spec, version, path).afterRecipe(run ->
+                  assertThat(run.getDataTableRows(NodeDependencyEditsDeclined.class)).isEmpty());
+            } else {
+                s.spec(spec, version, path).dataTable(NodeDependencyEditsDeclined.Row.class, rows ->
+                  assertThat(rows).singleElement().extracting(NodeDependencyEditsDeclined.Row::getReason)
+                    .isEqualTo(declined));
+            }
+        }, sources.toArray(new SourceSpecs[0]));
     }
 
     private static void memberCompose(Scenario s, PackageManager pm) {
@@ -557,6 +615,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           order.stream().filter(source -> source.before == null).map(source -> Paths.get(source.path))
             .collect(toList()));
         assertThat(first.rows).as("visiting %s", visited).isEmpty();
+        assertThat(first.declines).as("visiting %s", visited).isEmpty();
         Outcome second = run(s, recipe, new ArrayList<>(first.files.values()));
         for (Map.Entry<Path, SourceFile> file : second.files.entrySet()) {
             assertThat(file.getValue().printAll()).as("a second run over %s, visiting %s", file.getKey(), visited)
@@ -594,6 +653,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             outcome.files.put(after.getSourcePath(), after);
         }
         outcome.rows = run.getDataTableRows(NodeLockRegenerationFailures.class);
+        outcome.declines = run.getDataTableRows(NodeDependencyEditsDeclined.class);
         return outcome;
     }
 
@@ -623,6 +683,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         final Map<Path, SourceFile> files = new LinkedHashMap<>();
         final List<Path> generated = new ArrayList<>();
         List<NodeLockRegenerationFailures.Row> rows = new ArrayList<>();
+        List<NodeDependencyEditsDeclined.Row> declines = new ArrayList<>();
 
         SourceFile file(String path) {
             return requireNonNull(files.get(Paths.get(path)), path);

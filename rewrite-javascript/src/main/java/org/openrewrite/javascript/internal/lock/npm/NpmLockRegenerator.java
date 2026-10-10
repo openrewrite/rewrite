@@ -389,6 +389,10 @@ public final class NpmLockRegenerator {
         String code = e instanceof NpmError ? ((NpmError) e).getCode() :
                 e instanceof Spec.InvalidSpecException ? ((Spec.InvalidSpecException) e).getCode() : null;
         if (code == null) {
+            // the port raises JavaScript's errors as these two; any other is a fault of the port, not npm's
+            if (!(e instanceof IllegalArgumentException) && !(e instanceof IllegalStateException)) {
+                throw e;
+            }
             return Rejected.crashes(Reason.RESOLUTION_REQUIRED, packageOf(e), message);
         }
         return Rejected.coded(reasonFor(code), packageOf(e), code, message);

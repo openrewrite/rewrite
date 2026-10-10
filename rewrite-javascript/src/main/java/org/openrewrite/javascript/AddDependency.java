@@ -24,6 +24,8 @@ import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.NodeCatalogs.Pnpm.CatalogMode;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.semver.NodeSemver;
@@ -138,14 +140,16 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
                 try {
                     same = NodeSemver.compare(wanted, entry, NodeSemver.Options.DEFAULT) == 0;
                 } catch (IllegalArgumentException e) {
-                    return reject(decision, ctx, "pnpm fails on this edit: TypeError: " + e.getMessage());
+                    return reject(decision, ctx, Rejected.crashes(LockFileRegeneration.Reason.RESOLUTION_REQUIRED,
+                            packageName, "TypeError: " + e.getMessage()));
                 }
             }
             if (same) {
                 save = perDep;
             } else if (mode == CatalogMode.STRICT) {
-                return reject(decision, ctx, "pnpm rejects this edit: [ERR_PNPM_CATALOG_VERSION_MISMATCH] Wanted " +
-                                             "dependency outside the version range defined in catalog");
+                return reject(decision, ctx, Rejected.rejects(LockFileRegeneration.Reason.RESOLUTION_REQUIRED,
+                        packageName, "[ERR_PNPM_CATALOG_VERSION_MISMATCH] Wanted dependency outside the version " +
+                                     "range defined in catalog"));
             }
         }
         if (CATALOG.equals(wanted) || save == null || inDefault != null) {
@@ -160,11 +164,11 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         return CATALOG + (DEFAULT.equals(save) ? "" : save);
     }
 
-    private @Nullable String reject(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String detail) {
-        decision.insertRow(lockRegenerationFailures, ctx, new NodeLockRegenerationFailures.Row(
-                decision.getPath().toString(), packageName, LockFileRegeneration.Reason.RESOLUTION_REQUIRED.toString(),
-                detail));
-        decision.decline(packageName + "@" + version + " was not added: " + detail);
+    private @Nullable String reject(NodeDependencyEdits.Decision decision, ExecutionContext ctx, Rejected pnpm) {
+        LockFileRegeneration.Failure failure = LockOnlyInstall.PNPM.failure(pnpm);
+        decision.insertRow(lockRegenerationFailures, ctx, LockFileRegeneration.failureRow(decision.getPath(),
+                failure, packageName));
+        decision.decline(packageName + "@" + version + " was not added: " + failure.getDetail());
         return null;
     }
 

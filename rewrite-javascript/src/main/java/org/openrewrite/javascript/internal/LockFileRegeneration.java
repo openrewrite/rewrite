@@ -96,7 +96,8 @@ public final class LockFileRegeneration {
         CANNOT_KNOW,
 
         /**
-         * The package manager rejects the edit with an error of its own.
+         * The package manager's own verdict on the edit or the lock: an error of its own, or a lock it would discard
+         * and resolve from scratch, or delete.
          */
         PM_REJECTS,
 
@@ -104,16 +105,6 @@ public final class LockFileRegeneration {
          * The package manager fails on the edit with an error it does not raise on purpose.
          */
         PM_FAILS,
-
-        /**
-         * The package manager would discard the lock and resolve everything from scratch.
-         */
-        DISCARDS_LOCK,
-
-        /**
-         * The package manager deletes the lock.
-         */
-        DELETES_LOCK,
 
         /**
          * A second install over the lock written for the edit would reject or rewrite it.
@@ -238,12 +229,14 @@ public final class LockFileRegeneration {
      */
     public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
                                         Path packageJsonPath, Result result, @Nullable String defaultPackageName) {
-        Failure failure = requireNonNull(result.getFailure());
-        table.insertRow(ctx, new NodeLockRegenerationFailures.Row(
-                packageJsonPath.toString(),
+        table.insertRow(ctx, failureRow(packageJsonPath, requireNonNull(result.getFailure()), defaultPackageName));
+    }
+
+    public static NodeLockRegenerationFailures.Row failureRow(Path packageJsonPath, Failure failure,
+                                                              @Nullable String defaultPackageName) {
+        return new NodeLockRegenerationFailures.Row(packageJsonPath.toString(),
                 failure.getPackageName() != null ? failure.getPackageName() : defaultPackageName,
-                failure.getReason().toString(),
-                failure.getDetail()));
+                failure.getKind().toString(), failure.getReason().toString(), failure.getDetail());
     }
 
     private final PackageManager pm;

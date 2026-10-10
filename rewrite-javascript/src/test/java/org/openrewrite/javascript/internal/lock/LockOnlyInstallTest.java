@@ -38,8 +38,8 @@ class LockOnlyInstallTest {
           .isEqualTo(Kind.PM_REJECTS);
         assertThat(LockOnlyInstall.kindOf(Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "TypeError: x")))
           .isEqualTo(Kind.PM_FAILS);
-        assertThat(LockOnlyInstall.kindOf(Rejected.discardsLock("x"))).isEqualTo(Kind.DISCARDS_LOCK);
-        assertThat(LockOnlyInstall.kindOf(Rejected.deletesLock("x"))).isEqualTo(Kind.DELETES_LOCK);
+        assertThat(LockOnlyInstall.kindOf(Rejected.discardsLock("x"))).isEqualTo(Kind.PM_REJECTS);
+        assertThat(LockOnlyInstall.kindOf(Rejected.deletesLock("x"))).isEqualTo(Kind.PM_REJECTS);
         assertThat(LockOnlyInstall.kindOf(new NodeRegistryException(NodeRegistryException.Reason.PACKAGE_NOT_FOUND,
           "a", "404"))).isEqualTo(Kind.PM_REJECTS);
         assertThat(LockOnlyInstall.kindOf(new NodeRegistryException(NodeRegistryException.Reason.UNREACHABLE,

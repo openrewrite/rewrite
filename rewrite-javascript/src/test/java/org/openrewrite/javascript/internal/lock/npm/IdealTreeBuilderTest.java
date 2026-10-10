@@ -226,8 +226,9 @@ class IdealTreeBuilderTest extends ScenarioTest {
                      (http.missing.isEmpty() || "E404".equals(words[1]));
                 break;
             case "pm-fails":
-                // an error without a code of npm's own
-                ok = code == null && !(e instanceof CannotKnow) && http.missing.isEmpty();
+                // one of JavaScript's errors, which the port raises as these two, without a code of npm's own
+                ok = code == null && (e instanceof IllegalArgumentException || e instanceof IllegalStateException) &&
+                     http.missing.isEmpty();
                 break;
             case "cannot-know":
                 ok = e instanceof CannotKnow ||

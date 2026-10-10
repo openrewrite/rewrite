@@ -291,8 +291,8 @@ class PackageJsonOverridesTest {
     @Test
     void aNestedOverrideIsWrittenPastAnEarlierWarning() {
         Json.Document doc = Markup.warn(manifest("{\n  \"name\": \"p\"\n}\n"), new RuntimeException("earlier"));
-        Json.Document written = PackageJsonOverrides.applyOverride(doc, Npm, "is-number", "7.0.0",
-                PackageJsonOverrides.parsePath("is-odd"));
+        Json.Document written = PackageJsonOverrides.of(Npm, doc, null, "is-number", "7.0.0",
+                PackageJsonOverrides.parsePath("is-odd")).apply(doc);
         assertThat(written.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
           .isEqualTo("{\n  \"name\": \"p\",\n  \"overrides\": {\n    \"is-odd\": {\n      \"is-number\": \"7.0.0\"\n" +
                      "    }\n  }\n}\n");
@@ -326,9 +326,80 @@ class PackageJsonOverridesTest {
           .isEqualTo("{\n  \"overrides\": {\n    \"is-number\": \"7.0.0\"\n  }\n}\n");
     }
 
+    @Test
+    void aNestedOverrideOnALeafPinnedOtherwiseUnderDotMovesTheDot() {
+        String pkg = "{\n  \"overrides\": {\n    \"is-odd\": {\n      \"is-number\": {\n" +
+                     "        \".\": \"6.0.0\",\n        \"kind-of\": \"1\"\n      }\n    }\n  }\n}\n";
+        assertThat(write(pkg, Npm, "is-odd")).isEqualTo(pkg.replace("6.0.0", "7.0.0"));
+    }
+
+    // an object's "." is the package's own override and the keys beside it stay (npm 11.17.0 keeps an equal pin)
+    @Test
+    void aGlobalOverrideOfAPackageOverriddenByAnObjectSetsItsDot() {
+        String pinned = "{\n  \"overrides\": {\n    \"is-number\": {\n      \".\": \"7.0.0\",\n" +
+                        "      \"kind-of\": \"4.0.0\"\n    }\n  }\n}\n";
+        assertThat(write(pinned, Npm, null)).isEqualTo(pinned);
+        assertThat(write(pinned.replace("7.0.0", "6.0.0"), Npm, null)).isEqualTo(pinned);
+        assertThat(write("{\n  \"overrides\": {\n    \"is-number\": {\n      \"kind-of\": \"4.0.0\"\n" +
+                         "    }\n  }\n}\n", Npm, null)).isEqualTo("{\n  \"overrides\": {\n" +
+                "    \"is-number\": {\n      \"kind-of\": \"4.0.0\",\n      \".\": \"7.0.0\"\n    }\n  }\n}\n");
+    }
+
+    // recorded with yarn 1.22.22: a bare name is **/name, and the first resolution whose glob matches applies
+    @Test
+    void yarnClassicEditsTheResolutionItReadsAsTheSameGlob() {
+        String pkg = "{\n  \"resolutions\": {\n    \"**/is-number\": \"6.0.0\"\n  }\n}\n";
+        assertThat(write(pkg, YarnClassic, null)).isEqualTo(pkg.replace("6.0.0", "7.0.0"));
+        String bare = "{\n  \"resolutions\": {\n    \"is-number\": \"6.0.0\"\n  }\n}\n";
+        assertThat(write(bare, YarnClassic, null)).isEqualTo(bare.replace("6.0.0", "7.0.0"));
+        String scoped = "{\n  \"resolutions\": {\n    \"**/@s/p\": \"6.0.0\"\n  }\n}\n";
+        assertThat(write(scoped, YarnClassic, "@s/p", null)).isEqualTo(scoped.replace("6.0.0", "7.0.0"));
+        String path = "{\n  \"resolutions\": {\n    \"is-odd/is-number\": \"6.0.0\"\n  }\n}\n";
+        assertThat(write(path, YarnClassic, null)).contains("\"is-odd/is-number\": \"6.0.0\"",
+          "\"is-number\": \"7.0.0\"");
+    }
+
+    // recorded with Yarn 4.10.3 and pnpm 11.2.2: an override scoped to a parent wins over a global one there
+    @Test
+    void anOverrideScopedToAParentOutranksAGlobalOne() {
+        Json.Document berry = manifest("{\"resolutions\":{\"is-odd/is-number\":\"6.0.0\",\"@s/is-number\":\"1\"," +
+                                       "\"@s/a@1.0.0/is-number\":\"2\"}}");
+        assertThat(PackageJsonOverrides.of(YarnBerry, berry, null, "is-number", "7.0.0", null).outranked())
+          .isEqualTo("Yarn applies is-odd/is-number, @s/a@1.0.0/is-number before a global override of is-number");
+        assertThat(PackageJsonOverrides.of(YarnBerry, berry, null, "is-number", "7.0.0",
+          PackageJsonOverrides.parsePath("is-odd")).outranked()).isNull();
+        Json.Document root = manifest("{\"name\":\"p\"}");
+        assertThat(PackageJsonOverrides.of(Pnpm, root, "overrides:\n  is-odd>is-number: 6.0.0\n  left-pad: 1.3.0\n",
+          "is-number", "7.0.0", null).outranked())
+          .isEqualTo("pnpm applies is-odd>is-number before a global override of is-number");
+        Json.Document pnpm9 = manifest("{\"packageManager\":\"pnpm@9.15.9\",\"pnpm\":{\"overrides\":" +
+                                       "{\"is-odd@3>is-number@<7\":\"6.0.0\"}}}");
+        assertThat(PackageJsonOverrides.of(Pnpm, pnpm9, null, "is-number", "7.0.0", null).outranked())
+          .contains("is-odd@3>is-number@<7");
+        assertThat(PackageJsonOverrides.of(Npm, root, null, "is-number", "7.0.0", null).outranked()).isNull();
+    }
+
+    @Test
+    void aPnpmFieldOrPnpmOverridesThatIsNoObjectIsDeclined() {
+        String pnpm10 = "\"packageManager\":\"pnpm@10.34.6\"";
+        assertThat(declined(Pnpm, manifest("{" + pnpm10 + ",\"pnpm\":\"hoist\"}"), null))
+          .isEqualTo("the root's pnpm is not an object");
+        assertThat(declined(Pnpm, manifest("{" + pnpm10 + ",\"pnpm\":{\"overrides\":\"none\"}}"), null))
+          .isEqualTo("the root's pnpm.overrides is not an object");
+        assertThat(declined(Npm, manifest("{\"overrides\":[]}"), null))
+          .isEqualTo("the root's overrides is not an object");
+        assertThat(declined(YarnClassic, manifest("{\"resolutions\":1}"), null))
+          .isEqualTo("the root's resolutions is not an object");
+    }
+
     private static String write(String pkg, PackageManager pm, @Nullable String path) {
-        return PackageJsonOverrides.applyOverride(manifest(pkg), pm, "is-number", "7.0.0",
-                path == null ? null : PackageJsonOverrides.parsePath(path)).printAll();
+        return write(pkg, pm, "is-number", path);
+    }
+
+    private static String write(String pkg, PackageManager pm, String packageName, @Nullable String path) {
+        Json.Document root = manifest(pkg);
+        return PackageJsonOverrides.of(pm, root, null, packageName, "7.0.0",
+                path == null ? null : PackageJsonOverrides.parsePath(path)).apply(root).printAll();
     }
 
     private static PackageJsonOverrides.Place place(PackageManager pm, Json.Document root,

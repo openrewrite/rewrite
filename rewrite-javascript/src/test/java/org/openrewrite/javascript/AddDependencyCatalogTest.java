@@ -105,6 +105,7 @@ class AddDependencyCatalogTest implements RewriteTest {
               .satisfies(row -> {
                   assertThat(row.getDetail()).isEqualTo(detail);
                   assertThat(row.getReason()).isEqualTo("RESOLUTION_REQUIRED");
+                  assertThat(row.getKind()).isEqualTo("rejects".equals(how) ? "PM_REJECTS" : "PM_FAILS");
               })),
           recording.sources("packages/a/package.json", detail)
         );

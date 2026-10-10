@@ -1,0 +1,1 @@
+pnpm-workspace.yaml already overrides is-odd>is-number to 6.0.0; pnpm config set adds is-number 7.0.0.

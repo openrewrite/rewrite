@@ -211,9 +211,8 @@ class PackageJsonHelperTest {
                 "{\n" +
                 "  \"dependencies\": { \"lodash\": \"^4.17.20\" }\n" +
                 "}\n");
-        Json.Document modified = PackageJsonHelper.upgradeTransitive(
-                doc, NodeResolutionResult.PackageManager.Npm, "lodash", "^4.17.21",
-                java.util.Collections.<DependencyPathSegment>emptyList());
+        Json.Document modified = PackageJsonOverrides.of(NodeResolutionResult.PackageManager.Npm, doc, null,
+                "lodash", "^4.17.21", java.util.Collections.<DependencyPathSegment>emptyList()).apply(doc);
         assertThat(modified.printAll()).contains("\"overrides\"");
         assertThat(modified.printAll()).contains("\"lodash\": \"^4.17.21\"");
     }

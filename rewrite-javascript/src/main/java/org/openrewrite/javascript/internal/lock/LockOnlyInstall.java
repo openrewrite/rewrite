@@ -55,16 +55,7 @@ public final class LockOnlyInstall {
                    reason == NodeRegistryException.Reason.VERSION_NOT_FOUND ? Kind.PM_REJECTS : Kind.CANNOT_KNOW;
         }
         if (outcome instanceof Rejected) {
-            switch (((Rejected) outcome).getOutcome()) {
-                case VERDICT:
-                    return Kind.PM_REJECTS;
-                case CRASH:
-                    return Kind.PM_FAILS;
-                case DISCARDS_LOCK:
-                    return Kind.DISCARDS_LOCK;
-                case DELETES_LOCK:
-                    return Kind.DELETES_LOCK;
-            }
+            return ((Rejected) outcome).getOutcome() == Rejected.Outcome.CRASH ? Kind.PM_FAILS : Kind.PM_REJECTS;
         }
         throw outcome;
     }
@@ -82,7 +73,10 @@ public final class LockOnlyInstall {
         }
         Rejected e = (Rejected) outcome;
         Kind kind = kindOf(e);
-        return new Failure(kind, e.getReason(), e.getPackageName(), describe(kind) +
+        String what = e.getOutcome() == Rejected.Outcome.DISCARDS_LOCK ?
+                command + " would discard the lock and resolve everything from scratch" :
+                e.getOutcome() == Rejected.Outcome.DELETES_LOCK ? command + " deletes the lock" : describe(kind);
+        return new Failure(kind, e.getReason(), e.getPackageName(), what +
                 (e.getCode() == null ? "" : " (" + e.getCode() + ")") + ": " + e.getMessage());
     }
 
@@ -144,10 +138,6 @@ public final class LockOnlyInstall {
                 return command + " rejects this edit";
             case PM_FAILS:
                 return command + " fails on this edit";
-            case DISCARDS_LOCK:
-                return command + " would discard the lock and resolve everything from scratch";
-            case DELETES_LOCK:
-                return command + " deletes the lock";
             case SECOND_INSTALL:
             default:
                 return "a second " + command + " install over the lock written for this edit";

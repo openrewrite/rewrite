@@ -795,17 +795,6 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Apply a transitive-dependency override to {@code doc} for the given package manager.
-     * Delegates to {@link PackageJsonOverrides#applyOverride}.
-     */
-    public static Json.Document upgradeTransitive(Json.Document doc,
-                                                   NodeResolutionResult.PackageManager pm,
-                                                   String name, String newVersion,
-                                                   @Nullable List<DependencyPathSegment> path) {
-        return PackageJsonOverrides.applyOverride(doc, pm, name, newVersion, path);
-    }
-
-    /**
      * Compile a glob pattern (using {@code *} and {@code ?} wildcards) into a {@link Pattern}.
      * Special regex characters in the glob are escaped before compiling.
      */
