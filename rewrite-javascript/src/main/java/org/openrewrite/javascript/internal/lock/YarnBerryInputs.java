@@ -87,8 +87,8 @@ final class YarnBerryInputs {
     }
 
     /**
-     * {@code user}'s registries as .yarnrc.yml settings, the default's and {@code credentials}' other credentials as
-     * {@code npmRegistries} entries; npm's own default, the host's answer when nothing names one, stays unnamed.
+     * {@code user}'s registries as .yarnrc.yml settings, each registry's credentials, {@code credentials}' others too,
+     * as its {@code npmRegistries} entry; npm's own default, the host's answer when nothing names one, stays unnamed.
      */
     static String userYarnrc(NodeRegistries user, NodeRegistries credentials) {
         StringBuilder yarnrc = new StringBuilder();
@@ -100,14 +100,8 @@ final class YarnBerryInputs {
         Set<String> keys = new LinkedHashSet<>();
         if (hasCredentials(registry) || registry.isAlwaysAuth()) {
             entry(entries, registry, keys);
-            alwaysAuth(entries, registry);
         }
-        for (NodeRegistry scoped : user.getByScope().values()) {
-            if (hasCredentials(scoped)) {
-                keys.add(key(scoped));
-            }
-        }
-        List<NodeRegistry> others = new ArrayList<>();
+        List<NodeRegistry> others = new ArrayList<>(user.getByScope().values());
         others.add(credentials.getDefaultRegistry());
         others.addAll(credentials.getByScope().values());
         for (NodeRegistry other : others) {
@@ -131,10 +125,12 @@ final class YarnBerryInputs {
         return yarnrc.toString();
     }
 
+    // npmAlwaysAuth: the entry stands whole for its registry, and the host's credentials go with every request to it
     private static void entry(StringBuilder entries, NodeRegistry registry, Set<String> keys) {
         keys.add(key(registry));
         entries.append("  ").append(EcmaScript.quote(key(registry))).append(":\n");
         credentials(entries, registry);
+        entries.append("    npmAlwaysAuth: true\n");
     }
 
     // npmRegistries' key, as getRegistryConfiguration's lookup without the protocol finds it

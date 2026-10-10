@@ -97,11 +97,9 @@ final class YarnClassicInputs {
             npmrc.append("registry=").append(registry.getUrl()).append('\n');
         }
         credentials(npmrc, registry, keys);
-        alwaysAuth(npmrc, registry);
         for (Map.Entry<String, NodeRegistry> scoped : user.getByScope().entrySet()) {
             npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
             credentials(npmrc, scoped.getValue(), keys);
-            alwaysAuth(npmrc, scoped.getValue());
         }
         credentials(npmrc, credentials.getDefaultRegistry(), keys);
         for (NodeRegistry scoped : credentials.getByScope().values()) {
@@ -110,26 +108,29 @@ final class YarnClassicInputs {
         return npmrc.toString();
     }
 
-    // keyed by the registry's url without its protocol, as yarn's getRegistryOption looks them up, once per key
+    /**
+     * Keyed by the registry's url without its protocol, as getRegistryOption reads them, once per key; always-auth
+     * with them, since the host's credentials for a registry go with every request to it, as npm sends them.
+     */
     private static void credentials(StringBuilder npmrc, NodeRegistry registry, Set<String> keys) {
         String key = key(registry);
-        if (!hasCredentials(registry) || !keys.add(key)) {
-            return;
+        boolean sent = registry.isAlwaysAuth();
+        if (hasCredentials(registry) && keys.add(key)) {
+            sent = true;
+            if (registry.getAuthToken() != null) {
+                npmrc.append(key).append(":_authToken=").append(EcmaScript.quote(registry.getAuthToken()))
+                        .append('\n');
+            } else if (registry.getAuthBase64() != null) {
+                npmrc.append(key).append(":_auth=").append(EcmaScript.quote(registry.getAuthBase64())).append('\n');
+            } else if (registry.getUsername() != null && registry.getPassword() != null) {
+                npmrc.append(key).append(":username=").append(EcmaScript.quote(registry.getUsername())).append('\n')
+                        .append(key).append(":_password=").append(EcmaScript.quote(Base64.getEncoder()
+                                .encodeToString(registry.getPassword().getBytes(StandardCharsets.UTF_8))))
+                        .append('\n');
+            }
         }
-        if (registry.getAuthToken() != null) {
-            npmrc.append(key).append(":_authToken=").append(EcmaScript.quote(registry.getAuthToken())).append('\n');
-        } else if (registry.getAuthBase64() != null) {
-            npmrc.append(key).append(":_auth=").append(EcmaScript.quote(registry.getAuthBase64())).append('\n');
-        } else if (registry.getUsername() != null && registry.getPassword() != null) {
-            npmrc.append(key).append(":username=").append(EcmaScript.quote(registry.getUsername())).append('\n')
-                    .append(key).append(":_password=").append(EcmaScript.quote(Base64.getEncoder().encodeToString(
-                            registry.getPassword().getBytes(StandardCharsets.UTF_8)))).append('\n');
-        }
-    }
-
-    private static void alwaysAuth(StringBuilder npmrc, NodeRegistry registry) {
-        if (registry.isAlwaysAuth()) {
-            npmrc.append(key(registry)).append(":always-auth=true\n");
+        if (sent && keys.add(key + ":always-auth")) {
+            npmrc.append(key).append(":always-auth=true\n");
         }
     }
 

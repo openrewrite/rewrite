@@ -19,7 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
@@ -39,6 +41,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
@@ -209,22 +212,70 @@ class YarnClassicInputsTest {
     }
 
     /**
-     * The host's credentials are the home .npmrc's, keyed by registry as yarn's getRegistryOption reads them, so the
-     * port sends them where yarn would (ConfigTest.sendsTheCredentialsYarnSends).
+     * The host's credentials are the home .npmrc's, keyed by registry as yarn's getRegistryOption reads them, with
+     * always-auth, so yarn sends them with every request to their registry (ConfigTest.sendsTheCredentialsYarnSends).
      */
     @Test
     void theHostsCredentialsAreTheHomeDirectorysNpmrc() {
         Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
         scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null,
           false, null, true, false));
-        NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm", null, "u", "p", null, true, null, true,
-          false);
+        scopes.put("@open", new NodeRegistry("@open", "https://open.example.com/", null, null, null, null, true, null,
+          true, false));
+        NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm", null, "u", "p", null, false, null,
+          true, false);
 
         NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
         assertThat(YarnClassicInputs.userNpmrc(user, user)).isEqualTo(
           "registry=https://r.example/npm\n//r.example/npm/:username=\"u\"\n//r.example/npm/:_password=\"cA==\"\n" +
           "//r.example/npm/:always-auth=true\n@corp:registry=https://corp.example.com/\n" +
-          "//corp.example.com/:_authToken=\"corp-token\"\n");
+          "//corp.example.com/:_authToken=\"corp-token\"\n//corp.example.com/:always-auth=true\n" +
+          "@open:registry=https://open.example.com/\n//open.example.com/:always-auth=true\n");
+    }
+
+    /**
+     * The host's token for the private registry a project's .npmrc names goes with an unscoped package's request too,
+     * which yarn makes with credentials only under always-auth ({@code request-authorization.jsonl}).
+     */
+    @Test
+    void theHostsCredentialsGoWithEveryRequestToTheirRegistry(@TempDir Path home) {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("package.json"))
+          .packageManagerFile(Paths.get(".npmrc"), "registry=https://corp.example/\n")
+          .marker(nodeResolutionResult(PackageManager.YarnClassic).withNpmrcConfigs(singletonList(
+            new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://corp.example/")))))
+          .build();
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
+          new NodeRegistryCredentials("corp.example", "corp-token", null, null)));
+
+        Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN,
+          YarnClassicInputs.userConfig(ctx, request.getMarker(), scratch(home)),
+          RegistryDiscovery.discover(ctx, request.getMarker(), scratch(home)));
+
+        assertThat(inputs.getHomeFiles().get(".npmrc"))
+          .isEqualTo("//corp.example/:_authToken=\"corp-token\"\n//corp.example/:always-auth=true\n");
+        assertThat(asked(inputs)).containsExactly(entry("https://corp.example/a", "Bearer corp-token"));
+    }
+
+    private static Map<String, @Nullable String> asked(Inputs inputs) {
+        Map<String, @Nullable String> asked = new LinkedHashMap<>();
+        new YarnClassicLockRegenerator(inputs, new RegistrySource() {
+            @Override
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+                asked.put(registry + name, authorization);
+                return null;
+            }
+
+            @Override
+            public byte @Nullable [] tarball(String url, String name, String version,
+                                             @Nullable String authorization) {
+                return null;
+            }
+        }).regenerate();
+        return asked;
     }
 
     /**
@@ -248,23 +299,10 @@ class YarnClassicInputsTest {
           null);
 
         Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, user, credentials);
-        Map<String, @Nullable String> asked = new LinkedHashMap<>();
-        new YarnClassicLockRegenerator(inputs, new RegistrySource() {
-            @Override
-            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
-                asked.put(registry + name, authorization);
-                return null;
-            }
 
-            @Override
-            public byte @Nullable [] tarball(String url, String name, String version,
-                                             @Nullable String authorization) {
-                return null;
-            }
-        }).regenerate();
-
-        assertThat(inputs.getHomeFiles().get(".npmrc")).isEqualTo("//corp.example.com/:_authToken=\"corp-token\"\n");
-        assertThat(asked).containsExactly(entry("https://corp.example.com/@corp/a", "Bearer corp-token"));
+        assertThat(inputs.getHomeFiles().get(".npmrc"))
+          .isEqualTo("//corp.example.com/:_authToken=\"corp-token\"\n//corp.example.com/:always-auth=true\n");
+        assertThat(asked(inputs)).containsExactly(entry("https://corp.example.com/@corp/a", "Bearer corp-token"));
     }
 
     /**
@@ -288,24 +326,10 @@ class YarnClassicInputsTest {
         NodeRegistries all = RegistryDiscovery.discover(ctx, request.getMarker(), scratch(home));
 
         Inputs inputs = YarnClassicInputs.from(LockDirectory.of(request), Host.UNKNOWN, user, all);
-        Map<String, @Nullable String> asked = new LinkedHashMap<>();
-        new YarnClassicLockRegenerator(inputs, new RegistrySource() {
-            @Override
-            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
-                asked.put(registry + name, authorization);
-                return null;
-            }
-
-            @Override
-            public byte @Nullable [] tarball(String url, String name, String version,
-                                             @Nullable String authorization) {
-                return null;
-            }
-        }).regenerate();
 
         assertThat(inputs.getHomeFiles()).containsEntry(".npmrc", "registry=https://registry.npmmirror.com/\n");
         assertThat(inputs.getConfigFiles()).containsEntry(".npmrc", "registry=https://registry.npmjs.org/\n");
-        assertThat(asked).containsOnlyKeys("https://registry.npmmirror.com/ms");
+        assertThat(asked(inputs)).containsOnlyKeys("https://registry.npmmirror.com/ms");
     }
 
     // a scratch HOME without a .netrc, and no variables
