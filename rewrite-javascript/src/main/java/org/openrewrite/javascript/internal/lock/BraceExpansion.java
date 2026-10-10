@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -100,12 +101,9 @@ public final class BraceExpansion {
     }
 
     // 1.1.11's parseInt(str, 10) == str and 5.0.6's !isNaN(str) agree on the parts a sequence's pattern lets through
-    private static long numeric(String str) {
-        try {
-            return Long.parseLong(str);
-        } catch (NumberFormatException e) {
-            return str.charAt(0);
-        }
+    private static double numeric(String str) {
+        double parsed = EcmaScript.parseInt(str, 10);
+        return Double.isNaN(parsed) ? str.charAt(0) : parsed;
     }
 
     private static String escapeBraces(String str) {
@@ -203,10 +201,10 @@ public final class BraceExpansion {
         }
         List<String> big = new ArrayList<>();
         if (isSequence) {
-            long x = numeric(n.get(0));
-            long y = numeric(n.get(1));
+            double x = numeric(n.get(0));
+            double y = numeric(n.get(1));
             int width = Math.max(n.get(0).length(), n.get(1).length());
-            long incr = n.size() == 3 ? Math.abs(numeric(n.get(2))) : 1;
+            double incr = n.size() == 3 ? Math.abs(numeric(n.get(2))) : 1;
             if (v5) {
                 incr = Math.max(incr, 1);
             }
@@ -218,31 +216,29 @@ public final class BraceExpansion {
             for (String el : n) {
                 pad |= PADDED.matcher(el).find();
             }
-            for (long i = x; (reverse ? i >= y : i <= y) && big.size() < max; i += incr) {
+            for (double i = x; (reverse ? i >= y : i <= y) && big.size() < max; i += incr) {
+                if (!v5 && i + incr == i) {
+                    throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "FATAL ERROR: Reached heap limit " +
+                            "Allocation failed - JavaScript heap out of memory: the range {" + m.getBody() +
+                            "} never ends");
+                }
                 String c;
                 if (isAlphaSequence) {
-                    c = String.valueOf((char) i);
+                    c = String.valueOf((char) EcmaScript.toInt32(i));
                     if ("\\".equals(c)) {
                         c = "";
                     }
                 } else {
-                    c = String.valueOf(i);
+                    c = EcmaScript.numberToString(i);
                     if (pad) {
                         int need = width - c.length();
                         if (need > 0) {
-                            StringBuilder z = new StringBuilder();
-                            for (int j = 0; j < need; j++) {
-                                z.append('0');
-                            }
+                            String z = EcmaScript.repeat("0", need);
                             c = i < 0 ? "-" + z + c.substring(1) : z + c;
                         }
                     }
                 }
                 big.add(c);
-                // 1.1.11 loops forever on a zero step
-                if (incr == 0) {
-                    break;
-                }
             }
         } else {
             for (String part : n) {

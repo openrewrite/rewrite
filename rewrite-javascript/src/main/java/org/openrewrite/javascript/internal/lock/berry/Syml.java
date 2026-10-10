@@ -74,7 +74,7 @@ final class Syml {
         if (SIMPLE_STRING.matcher(value).find()) {
             return value;
         }
-        return jsonStringify(value);
+        return Js.quote(value);
     }
 
     private static boolean isRemovableField(@Nullable Object value) {
@@ -113,7 +113,7 @@ final class Syml {
             if (list.isEmpty()) {
                 return "[]\n";
             }
-            String indent = repeat("  ", indentLevel);
+            String indent = Js.repeat("  ", indentLevel);
             StringBuilder serialized = new StringBuilder();
             for (Object sub : list) {
                 serialized.append(indent).append("- ").append(stringifyValue(sub, indentLevel + 1, false));
@@ -123,7 +123,7 @@ final class Syml {
         if (value instanceof Map || value instanceof PreserveOrdering) {
             boolean sort = !(value instanceof PreserveOrdering);
             Map<String, ?> data = sort ? asMap(value) : ((PreserveOrdering) value).data;
-            String indent = repeat("  ", indentLevel);
+            String indent = Js.repeat("  ", indentLevel);
             List<String> keys = new ArrayList<>(data.keySet());
             if (sort) {
                 keys.sort((a, b) -> {
@@ -234,7 +234,7 @@ final class Syml {
             if (pos < input.length()) {
                 fail("end of input");
             }
-            String found = maxFailPos < input.length() ? jsonStringify(String.valueOf(input.charAt(maxFailPos))) :
+            String found = maxFailPos < input.length() ? Js.quote(String.valueOf(input.charAt(maxFailPos))) :
                     "end of input";
             throw new SyntaxError("Expected " + describeExpected() + " but " + found + " found.");
         }
@@ -271,7 +271,7 @@ final class Syml {
                 pos += s.length();
                 return true;
             }
-            fail(jsonStringify(s));
+            fail(Js.quote(s));
             return false;
         }
 
@@ -685,59 +685,5 @@ final class Syml {
             }
             return text.substring(from, to);
         }
-    }
-
-    static String jsonStringify(String value) {
-        StringBuilder out = new StringBuilder("\"");
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            switch (c) {
-                case '"':
-                    out.append("\\\"");
-                    break;
-                case '\\':
-                    out.append("\\\\");
-                    break;
-                case '\b':
-                    out.append("\\b");
-                    break;
-                case '\f':
-                    out.append("\\f");
-                    break;
-                case '\n':
-                    out.append("\\n");
-                    break;
-                case '\r':
-                    out.append("\\r");
-                    break;
-                case '\t':
-                    out.append("\\t");
-                    break;
-                default:
-                    if (c < 0x20 || (Character.isSurrogate(c) && !wellFormedPair(value, i))) {
-                        out.append(String.format("\\u%04x", (int) c));
-                    } else {
-                        out.append(c);
-                    }
-            }
-        }
-        return out.append('"').toString();
-    }
-
-    // JSON.stringify escapes a lone surrogate
-    private static boolean wellFormedPair(String s, int i) {
-        char c = s.charAt(i);
-        if (Character.isHighSurrogate(c)) {
-            return i + 1 < s.length() && Character.isLowSurrogate(s.charAt(i + 1));
-        }
-        return i > 0 && Character.isHighSurrogate(s.charAt(i - 1));
-    }
-
-    private static String repeat(String s, int count) {
-        StringBuilder out = new StringBuilder();
-        for (int i = 0; i < count; i++) {
-            out.append(s);
-        }
-        return out.toString();
     }
 }

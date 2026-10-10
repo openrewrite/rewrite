@@ -502,7 +502,7 @@ public final class GitHost {
 
     // String.prototype.split with a limit keeps only the first `limit` pieces.
     private static String[] split(String s, int limit) {
-        String[] all = s.split("/", -1);
+        String[] all = EcmaScript.splitString(s, "/");
         return Arrays.copyOf(all, Math.min(all.length, limit));
     }
 

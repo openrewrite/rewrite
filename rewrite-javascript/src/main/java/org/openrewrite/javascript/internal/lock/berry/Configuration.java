@@ -22,7 +22,6 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -575,7 +574,7 @@ public final class Configuration {
             String replaced = MiscUtils.replaceEnvVariables((String) value, env);
             switch (definition.type) {
                 case NUMBER:
-                    interpreted = parseInt(replaced);
+                    interpreted = number(Js.parseInt(replaced, 0));
                     break;
                 case BOOLEAN:
                     interpreted = MiscUtils.parseBoolean(replaced);
@@ -650,32 +649,9 @@ public final class Configuration {
         }
     }
 
-    // parseInt: the leading integer of the string, hexadecimal after 0x, NaN when there is none
-    static Object parseInt(String s) {
-        int i = 0;
-        while (i < s.length() && Js.isWhiteSpace(s.charAt(i))) {
-            i++;
-        }
-        boolean negative = false;
-        if (i < s.length() && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
-            negative = s.charAt(i) == '-';
-            i++;
-        }
-        int radix = 10;
-        if (i + 1 < s.length() && s.charAt(i) == '0' && (s.charAt(i + 1) == 'x' || s.charAt(i + 1) == 'X')) {
-            radix = 16;
-            i += 2;
-        }
-        int start = i;
-        while (i < s.length() && s.charAt(i) < 128 && Character.digit(s.charAt(i), radix) >= 0) {
-            i++;
-        }
-        if (i == start) {
-            return Double.NaN;
-        }
-        BigInteger magnitude = new BigInteger(s.substring(start, i), radix);
-        BigInteger value = negative ? magnitude.negate() : magnitude;
-        return value.bitLength() < 32 ? (Object) value.intValue() : (Object) value.doubleValue();
+    // a number as the settings hold one, an int when it is one
+    private static Object number(double d) {
+        return d == (int) d ? (Object) (int) d : (Object) d;
     }
 
     /**

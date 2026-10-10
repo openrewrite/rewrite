@@ -15,14 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock.npm;
 
-import com.fasterxml.jackson.core.StreamReadFeature;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -38,7 +34,7 @@ public final class JsonParseEvenBetterErrors {
      * Thrown as {@code JSONParseError} is, with its {@code EJSONPARSE} code.
      */
     public static final class JsonParseException extends IllegalArgumentException implements NpmError {
-        JsonParseException(String message, Throwable cause) {
+        JsonParseException(String message, @Nullable Throwable cause) {
             super(message, cause);
         }
 
@@ -70,10 +66,7 @@ public final class JsonParseEvenBetterErrors {
                                                           Js.WHITESPACE_CLASS + "\\t]*)");
     private static final Pattern EMPTY = Pattern.compile("^(?:\\{}|\\[])((?:\\r?\\n)+)?$");
 
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
-            .build();
+    private static final Pattern JSON_WHITESPACE = Pattern.compile("[ \\t\\n\\r]*");
 
     private JsonParseEvenBetterErrors() {
     }
@@ -83,23 +76,23 @@ public final class JsonParseEvenBetterErrors {
      */
     public static @Nullable Object jsonParse(String text) {
         try {
-            return MAPPER.readValue(text, Object.class);
-        } catch (IOException e) {
-            throw new JsonParseException(e.getMessage(), e);
+            return Js.jsonParse(text);
+        } catch (JsonSyntaxError e) {
+            throw new JsonParseException(e.getCause().getMessage(), e.getCause());
         }
     }
 
     static Parsed parse(String raw) {
         String txt = raw.startsWith("\uFEFF") ? raw.substring(1) : raw;
         Object result;
+        String parsing = txt.isEmpty() ? "empty string" : Js.quote(txt.length() > 40 ? txt.substring(0, 40) : txt);
+        if (JSON_WHITESPACE.matcher(txt).matches()) {
+            throw new JsonParseException("Unexpected end of JSON input while parsing " + parsing, null);
+        }
         try {
-            if (txt.trim().isEmpty()) {
-                throw new IOException("Unexpected end of JSON input");
-            }
-            result = MAPPER.readValue(txt, Object.class);
-        } catch (IOException e) {
-            String parsing = txt.isEmpty() ? "empty string" : Js.quote(txt.length() > 40 ? txt.substring(0, 40) : txt);
-            throw new JsonParseException(e.getMessage() + " while parsing " + parsing, e);
+            result = Js.jsonParse(txt);
+        } catch (JsonSyntaxError e) {
+            throw new JsonParseException(e.getCause().getMessage() + " while parsing " + parsing, e.getCause());
         }
         if (result instanceof Map || result instanceof List) {
             Matcher empty = EMPTY.matcher(txt);

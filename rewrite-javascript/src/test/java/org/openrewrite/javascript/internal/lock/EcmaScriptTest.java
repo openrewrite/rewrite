@@ -15,21 +15,28 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.entry;
 import static org.openrewrite.javascript.internal.lock.EcmaScript.HOLE;
 import static org.openrewrite.javascript.internal.lock.EcmaScript.UNDEFINED;
 
 /**
- * What Node v24.19.0 answers for the same expressions.
+ * What Node v24.19.0 answers for the same expressions, the built-ins' rows from {@code generate/node-builtins.js}.
  */
 class EcmaScriptTest {
 
@@ -92,6 +99,82 @@ class EcmaScriptTest {
         assertThat(EcmaScript.strictEquals("a", "a")).isTrue();
         assertThat(EcmaScript.strictEquals(null, UNDEFINED)).isFalse();
         assertThat(EcmaScript.strictEquals(new ArrayList<>(), new ArrayList<>())).isFalse();
+    }
+
+    static Stream<Call> builtins() {
+        return UpstreamCalls.read(BUILTINS).stream().filter(EcmaScriptTest::knows);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("builtins")
+    void answersAsNodeDoes(Call call) {
+        assertThat(answer(call)).isEqualTo(call.getOut());
+    }
+
+    @Test
+    void everyBuiltinRowIsReplayedSomewhere() {
+        Map<String, Integer> cannotKnow = new LinkedHashMap<>();
+        List<String> elsewhere = Arrays.asList("encodeURIComponent", "decodeURIComponent", "replace", "match");
+        for (Call call : UpstreamCalls.read(BUILTINS)) {
+            if (elsewhere.contains(call.getFn())) {
+                continue;
+            }
+            assertThat(call.getFn()).isIn("parseInt", "slice", "repeat", "split", "toInt32", "isInteger", "toNumber",
+              "numberToString", "trim", "trimStart");
+            if (!knows(call)) {
+                cannotKnow.merge(call.getFn(), 1, Integer::sum);
+            }
+        }
+        // a radix of 36 over more than 53 bits, which an x64 build of V8 rounds otherwise than this arm64 one did
+        assertThat(cannotKnow).containsExactly(entry("parseInt", 4));
+    }
+
+    private static boolean knows(Call call) {
+        try {
+            return answer(call) != NOT_HERE;
+        } catch (CannotKnow e) {
+            return false;
+        }
+    }
+
+    static final String BUILTINS = "node-24.19.0-builtins.jsonl";
+
+    private static final Object NOT_HERE = new Object();
+
+    private static @Nullable Object answer(Call call) {
+        switch (call.getFn()) {
+            case "parseInt":
+                return EcmaScript.parseInt(text(call, 0), call.has(1) ? (int) number(call, 1) : 0);
+            case "slice":
+                return call.has(2) ? EcmaScript.slice(text(call, 0), (int) number(call, 1), (int) number(call, 2)) :
+                  EcmaScript.slice(text(call, 0), (int) number(call, 1));
+            case "repeat":
+                return EcmaScript.repeat(text(call, 0), (int) number(call, 1));
+            case "split":
+                return Arrays.asList(EcmaScript.splitString(text(call, 0), text(call, 1)));
+            case "toInt32":
+                return (double) EcmaScript.toInt32(number(call, 0));
+            case "isInteger":
+                return EcmaScript.isInteger(number(call, 0));
+            case "toNumber":
+                return EcmaScript.toNumber(text(call, 0));
+            case "numberToString":
+                return EcmaScript.numberToString(number(call, 0));
+            case "trim":
+                return EcmaScript.trim(text(call, 0));
+            case "trimStart":
+                return EcmaScript.trimStart(text(call, 0));
+            default:
+                return NOT_HERE;
+        }
+    }
+
+    private static String text(Call call, int i) {
+        return (String) Objects.requireNonNull(call.arg(i));
+    }
+
+    private static double number(Call call, int i) {
+        return (Double) Objects.requireNonNull(call.arg(i));
     }
 
     @Test

@@ -22,7 +22,6 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -48,7 +47,6 @@ public class NpmOptions {
     public static final NpmOptions DEFAULT = NpmOptions.builder().build();
 
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}?]+)(\\?)?\\}");
-    private static final Pattern LEADING_INTEGER = Pattern.compile("^[" + Js.WHITESPACE_CLASS + "]*([+-]?\\d+)");
     private static final Pattern DIGIT = Pattern.compile("[0-9]");
     private static final Pattern NUMBER = Pattern.compile("^[+-]?(\\d+\\.?\\d*(e[+-]?\\d+)?|\\.\\d+(e[+-]" +
                                                           "?\\d+)?|Infinity)$",
@@ -601,7 +599,7 @@ public class NpmOptions {
         if (value instanceof Ini.Section) {
             throw new IllegalArgumentException("Cannot convert object to primitive value");
         }
-        Object lfv = truthy(value) ? parseInt(Js.string(value)) : value;
+        Object lfv = truthy(value) ? (Object) Js.parseInt(Js.string(value), 10) : value;
         if (lfv == null || lfv == Js.UNDEFINED) {
             return null;
         }
@@ -612,11 +610,6 @@ public class NpmOptions {
             }
         }
         throw new IllegalArgumentException("Invalid lockfileVersion config: " + Js.string(lfv));
-    }
-
-    private static Double parseInt(String value) {
-        Matcher digits = LEADING_INTEGER.matcher(value);
-        return digits.find() ? new BigDecimal(digits.group(1)).doubleValue() : Double.NaN;
     }
 
     Set<String> omitSet() {

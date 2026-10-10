@@ -1,0 +1,124 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+// The JavaScript built-ins EcmaScript, UriComponent and V8RegExp port, asked of the Node that runs this, as rows.
+// Usage: node node-builtins.js > ../upstream/node-24.19.0-builtins.jsonl
+const rows = []
+
+function encode(v) {
+  if (v === undefined) {
+    return {$: 'undefined'}
+  }
+  if (typeof v === 'number' && (!Number.isFinite(v) || Object.is(v, -0))) {
+    return {$: 'number', value: Object.is(v, -0) ? '-0' : String(v)}
+  }
+  if (Array.isArray(v)) {
+    return v.map(encode)
+  }
+  return v
+}
+
+function ask(test, fn, args, call) {
+  const row = {test, fn, args: args.map(encode)}
+  try {
+    row.out = encode(call(...args))
+  } catch (e) {
+    row.threw = {$: 'error', name: e.name, message: e.message}
+  }
+  rows.push(JSON.stringify(row))
+}
+
+const integers = ['', ' 12', '　 -12', '﻿42', '0x1F', '-0x1F', '+0x10', '0X1a', '0x', '0xg', '-0',
+  '  -0  ', '1e3', '12abc', '077', '0b101', '0o17', '1_000', '99999999999999999999999', '9007199254740993',
+  '123456789012345678901234567890', '١٢', '４２', 'z', 'Z9', '-', '+', '+-1', 'Infinity', 'NaN',
+  '.5', '-.5', '00012', 'ffffffffffffffffffffffff', '0'.repeat(320) + '7', '1' + '0'.repeat(320), '9'.repeat(400),
+  '1'.repeat(30), 'zzzzzzzzzzzzzzzzzzzzzzzzz']
+for (const radix of [undefined, 2, 8, 10, 16, 36, 1, 37]) {
+  for (const s of integers) {
+    ask('parseInt', 'parseInt', [s, radix], (x, r) => parseInt(x, r))
+  }
+}
+
+for (const [s, start, end] of [['abcdef', 2, -1], ['abcdef', -3, undefined], ['abcdef', -10, 2], ['abcdef', 4, 2],
+  ['abcdef', 0, -0], ['', 0, 1], ['abc', 1, 100], ['abc', 3, undefined], ['abc', 0, -3]]) {
+  ask('String.prototype.slice', 'slice', end === undefined ? [s, start] : [s, start, end],
+    (x, a, b) => x.slice(a, b))
+}
+
+for (const [s, count] of [['ab', 0], ['ab', 3], ['', 5], ['0', 1]]) {
+  ask('String.prototype.repeat', 'repeat', [s, count], (x, n) => x.repeat(n))
+}
+
+for (const [s, separator] of [['a/b//c', '/'], ['abc', ''], ['', '/'], ['', ''], ['a..b..', '..'], ['/a/', '/']]) {
+  ask('String.prototype.split', 'split', [s, separator], (x, sep) => x.split(sep))
+}
+
+const doubles = [0, -0, 1.5, -1.5, 2147483647, 2147483648, -2147483649, 4294967296.5, 1e21, -1e21, 2 ** 53 + 2,
+  2 ** 63 + 2048, 1e300, NaN, Infinity, -Infinity, 9007199254740991]
+for (const d of doubles) {
+  ask('ToInt32', 'toInt32', [d], x => x >> 0)
+  ask('Number.isInteger', 'isInteger', [d], x => Number.isInteger(x))
+}
+
+for (const s of ['0x10', ' 12 ', '1e3', '', '0b2', '0b11', '0o8', 'Infinity', '-Infinity', '+0x10', '1_0',
+  '٣', '.5e1', '5.', '  7 ﻿', '0X1F', '-0', 'infinity']) {
+  ask('Number', 'toNumber', [s], x => Number(x))
+}
+
+for (const d of [1e21, 1e-7, 123e-20, -0, 0.1 + 0.2, 2 ** 53 + 2, 100, 1.5e300, 5e-324, 123456789012345680000]) {
+  ask('Number.prototype.toString', 'numberToString', [d], x => String(x))
+}
+
+for (const s of ['abc', '\t a b \n', '　 x ﻿', '᠎x᠎', '\u0085x​']) {
+  ask('String.prototype.trim', 'trim', [s], x => x.trim())
+  ask('String.prototype.trimStart', 'trimStart', [s], x => x.trimStart())
+}
+
+for (const s of ['a b', "-_.!~*'()", 'é', '😀', '\ud83d', '\ude00x', '#?&=/:@+$,;', '%']) {
+  ask('encodeURIComponent', 'encodeURIComponent', [s], x => encodeURIComponent(x))
+}
+for (const s of ['%20', '%E9', '%C3%A9', '%', '%zz', '%C3', '%F0%9F%98%80', '%ED%A0%80', 'a%2fb', '%3', '%c3%a9']) {
+  ask('decodeURIComponent', 'decodeURIComponent', [s], x => decodeURIComponent(x))
+}
+
+// String.prototype.replace with a pattern and a replacement string (GetSubstitution)
+const replacements = [['abcabc', 'b', false, '[$&]'], ['abcabc', 'b', true, '[$&]'], ['abc', '(b)', false, '$1$1'],
+  ['abc', '(b)', false, '$$'], ['abc', '(b)', false, '$`'], ['abc', '(b)', false, "$'"], ['abc', '(b)', false, '$0'],
+  ['abc', '(b)', false, '$2'], ['abc', '(b)', false, '$01'], ['abc', '(b)', false, '$10'], ['abc', '(b)', false, '$'],
+  ['abc', '(b)(c)?', false, '<$2>'], ['abcdefghijk', '(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)', false, '$11-$10-$1'],
+  ['abc', '(?<n>b)', false, '$<n>'], ['abc', 'b', false, '$<n>'], ['aaa', 'a*?', true, '-'], ['abc', '', true, '-'],
+  ['abc', '(b)', false, '$1٣']]
+for (const [s, source, global, replacement] of replacements) {
+  ask('String.prototype.replace', 'replace', [s, source, global, replacement],
+    (x, src, g, r) => x.replace(new RegExp(src, g ? 'g' : ''), r))
+}
+
+// new RegExp(source) without flags: the match of each subject, or V8's SyntaxError
+const patterns = [['a(', 'a'], ['[', ''], ['(?<n>a)\\k<n>', 'aa'], ['\\k<n>', 'k<n>'], ['a{2,1}', 'aa'], ['a{,2}', 'a{,2}'],
+  ['\\p{L}', 'p{L}'], ['(?=a)*b', 'b'], ['[\\d-z]', '-'], ['.', ' '], ['.', '\u0085'], ['\\s', '﻿'],
+  ['\\s', '᠎'], ['\\bx', 'éx'], ['\\w', 'é'], ['[^]', '\n'], ['[]', 'a'], ['\\cJ', '\n'], ['\\c1', '\\c1'],
+  ['\\8', '8'], ['(a)\\1', 'aa'], ['\\1(a)', 'a'], ['\\0', '\0'], ['\\u{41}', 'u'.repeat(41)], ['\\x4', 'x4'],
+  ['$^', ''], ['a|', 'b'], ['(?:)', 'x'], ['\\/', '/'], ['[\\b]', '\b'], ['^\\S+$', 'a b'], ['a{1}?', 'a'],
+  ['(?!a)?', 'a'], ['\\D\\W', '-.'], ['x*', 'xxx'], ['[a-\\d]', '-'], ['\\-', '-'], ['(?<a>.)(?<b>.)', 'xy'],
+  ['(?<a>x)|(?<a>y)', 'y']]
+for (const [source, subject] of patterns) {
+  ask('RegExp', 'match', [source, subject], (src, x) => {
+    const m = x.match(new RegExp(src))
+    return m === null ? null : Array.from(m)
+  })
+}
+
+process.stdout.write([JSON.stringify({header: 'Node ' + process.versions.node + ' (V8 ' + process.versions.v8 +
+  '): the built-ins the lock package ports, asked; generate/node-builtins.js'}), ...rows].join('\n') + '\n')

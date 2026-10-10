@@ -443,8 +443,8 @@ class ConfigurationTest {
         assertThat(Configuration.load(Collections.emptyMap(),
                 HostEnvironment.of(Collections.singletonMap("YARN_COMPRESSION_LEVEL", "0x5")))
                 .get("compressionLevel")).isEqualTo(5);
-        assertThat(Configuration.parseInt("\u3000\u2028-12")).isEqualTo(-12);
-        assertThat(Configuration.parseInt("99999999999")).isEqualTo(99999999999d);
+        assertThat(options("npmMinimalAgeGate: \"\\u3000\\u2028-12\"\n").get("npmMinimalAgeGate")).isEqualTo(-12);
+        assertThat(options("npmMinimalAgeGate: \"99999999999\"\n").get("npmMinimalAgeGate")).isEqualTo(99999999999d);
     }
 
     /**

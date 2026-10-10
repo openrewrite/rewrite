@@ -184,11 +184,6 @@ final class PicomatchParse {
         return "(?:(?:(?!" + START_ANCHOR + (dot ? DOTS_SLASH : DOT_LITERAL) + ").)*?)";
     }
 
-    // JavaScript's input.slice(0, -n), where -0 is 0
-    private static String sliceEnd(String s, int n) {
-        return n == 0 ? "" : s.substring(0, Math.max(0, s.length() - n));
-    }
-
     private static boolean test(Pattern pattern, @Nullable String s) {
         return pattern.matcher(s == null ? "undefined" : s).find();
     }
@@ -627,7 +622,7 @@ final class PicomatchParse {
                         continue;
                     }
                     String escaped = escapeRegex(prev.value);
-                    state.output = sliceEnd(state.output, prev.value.length());
+                    state.output = EcmaScript.slice(state.output, 0, -prev.value.length());
                     prev.value = "(?:" + escaped + "|" + prev.value + ")";
                     state.output += prev.value;
                     continue;
@@ -856,7 +851,7 @@ final class PicomatchParse {
                     }
 
                     if ("slash".equals(prior.type) && !"bos".equals(prior.prev.type) && !afterStar && eos()) {
-                        state.output = sliceEnd(state.output, (prior.output + prev.output).length());
+                        state.output = EcmaScript.slice(state.output, 0, -(prior.output + prev.output).length());
                         prior.output = "(?:" + prior.output;
                         prev.type = "globstar";
                         prev.output = globstar(dot) + "|$)";
@@ -867,7 +862,7 @@ final class PicomatchParse {
 
                     if ("slash".equals(prior.type) && !"bos".equals(prior.prev.type) && rest.startsWith("/")) {
                         String end = rest.length() > 1 ? "|$" : "";
-                        state.output = sliceEnd(state.output, (prior.output + prev.output).length());
+                        state.output = EcmaScript.slice(state.output, 0, -(prior.output + prev.output).length());
                         prior.output = "(?:" + prior.output;
                         prev.type = "globstar";
                         prev.output = globstar(dot) + SLASH_LITERAL + "|" + SLASH_LITERAL + end + ")";
@@ -888,7 +883,7 @@ final class PicomatchParse {
                         continue;
                     }
 
-                    state.output = sliceEnd(state.output, prev.output.length());
+                    state.output = EcmaScript.slice(state.output, 0, -prev.output.length());
                     prev.type = "globstar";
                     prev.output = globstar(dot);
                     prev.value += value;
@@ -971,14 +966,14 @@ final class PicomatchParse {
                     output.append(m);
                 } else if (first == '?') {
                     if (!esc.isEmpty()) {
-                        output.append(esc).append(first).append(repeat(QMARK, rest.length()));
+                        output.append(esc).append(first).append(EcmaScript.repeat(QMARK, rest.length()));
                     } else if (i == 0) {
-                        output.append(qmarkNoDot).append(repeat(QMARK, rest.length()));
+                        output.append(qmarkNoDot).append(EcmaScript.repeat(QMARK, rest.length()));
                     } else {
-                        output.append(repeat(QMARK, chars));
+                        output.append(EcmaScript.repeat(QMARK, chars));
                     }
                 } else if (first == '.') {
-                    output.append(repeat(DOT_LITERAL, chars));
+                    output.append(EcmaScript.repeat(DOT_LITERAL, chars));
                 } else if (first == '*') {
                     if (!esc.isEmpty()) {
                         output.append(esc).append(first).append(rest.isEmpty() ? "" : STAR);
@@ -1074,7 +1069,7 @@ final class PicomatchParse {
                 boolean isExtglob = tok.extglob || (!extglobs.isEmpty() && ("pipe".equals(tok.type) ||
                                                                             "paren".equals(tok.type)));
                 if (!"slash".equals(tok.type) && !"paren".equals(tok.type) && !isBrace && !isExtglob) {
-                    state.output = sliceEnd(state.output, prev.output.length());
+                    state.output = EcmaScript.slice(state.output, 0, -prev.output.length());
                     prev.type = "star";
                     prev.value = "*";
                     prev.output = STAR;
@@ -1184,14 +1179,6 @@ final class PicomatchParse {
 
         private static boolean isWordChar(char c) {
             return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_';
-        }
-
-        private static String repeat(String s, int n) {
-            StringBuilder out = new StringBuilder();
-            for (int i = 0; i < n; i++) {
-                out.append(s);
-            }
-            return out.toString();
         }
     }
 }

@@ -17,17 +17,14 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Ssri;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/fetchers/tarball-fetcher.js with base-fetcher.js {@code fetch} (yarn 1.22.22) for a version the
@@ -37,9 +34,6 @@ final class TarballFetcher {
 
     private static final Pattern DRIVE = Pattern.compile("^[a-z]:\\z", Pattern.CASE_INSENSITIVE);
     private static final Pattern RELATIVE_PATH = Pattern.compile("^(?:\\.{1,2})?[\\\\/]");
-    private static final List<String> DEFAULT_PRIORITY = Arrays.asList("md5", "whirlpool", "sha1", "sha224",
-            "sha256", "sha384", "sha512", "sha3", "sha3-256", "sha3-384", "sha3-512", "sha3_256", "sha3_384",
-            "sha3_512");
 
     final PackageRemote remote;
     private final @Nullable Object name;
@@ -183,45 +177,22 @@ final class TarballFetcher {
         }
     }
 
-    // isHashAlgorithmSupported over every algorithm named, then ssri's integrityStream check with the strongest
+    // isHashAlgorithmSupported over every algorithm named, then ssri's integrityStream check
     private boolean matches(byte[] data, Ssri.Integrity expected) {
         if (expected.getHashes().isEmpty()) {
             return false;
         }
-        String algorithm = null;
         for (String candidate : Js.keys(expected.getHashes())) {
-            String lower = candidate.toLowerCase(Locale.ROOT);
-            if (!digestible(lower)) {
+            if (!digestible(candidate.toLowerCase(Locale.ROOT))) {
                 throw new CannotKnow("whether the Node yarn runs under has the " + candidate + " digest the " +
                                      "integrity of " + Js.string(name) + "@" + Js.string(version) + " names (its " +
                                      "OpenSSL build decides, and yarn checks every algorithm named)");
             }
-            if (algorithm == null ||
-                DEFAULT_PRIORITY.indexOf(algorithm.toLowerCase(Locale.ROOT)) < DEFAULT_PRIORITY.indexOf(lower)) {
-                algorithm = candidate;
-            }
         }
-        String digest = digest(data, algorithm);
-        for (Ssri.Hash hash : expected.getHashes().get(algorithm)) {
-            if (digest.equals(hash.getDigest())) {
-                return true;
-            }
-        }
-        return false;
+        return Ssri.checkData(data, expected, Ssri.Release.V5_3_0) != null;
     }
 
     private static boolean digestible(String algorithm) {
         return Arrays.asList("md5", "sha1", "sha224", "sha256", "sha384", "sha512").contains(algorithm);
-    }
-
-    private static String digest(byte[] data, String algorithm) {
-        String name = algorithm.toLowerCase(Locale.ROOT);
-        try {
-            MessageDigest md = MessageDigest.getInstance("md5".equals(name) ? "MD5" :
-                    "SHA-" + name.substring("sha".length()));
-            return Base64.getEncoder().encodeToString(md.digest(data));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException(e);
-        }
     }
 }

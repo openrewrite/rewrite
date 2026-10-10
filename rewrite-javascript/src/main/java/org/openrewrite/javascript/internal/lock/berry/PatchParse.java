@@ -20,7 +20,6 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -79,19 +78,15 @@ final class PatchParse {
             throw new JsError(JsError.ERROR, "Bad header line: '" + headerLine + "'");
         }
         Map<String, Object> original = new LinkedHashMap<>();
-        original.put("start", Math.max(number(match.group(1)), 1));
-        original.put("length", match.group(3) == null ? 1.0 : number(match.group(3)));
+        original.put("start", Math.max(Js.toNumber(match.group(1)), 1));
+        original.put("length", match.group(3) == null ? 1.0 : Js.toNumber(match.group(3)));
         Map<String, Object> patched = new LinkedHashMap<>();
-        patched.put("start", Math.max(number(match.group(4)), 1));
-        patched.put("length", match.group(6) == null ? 1.0 : number(match.group(6)));
+        patched.put("start", Math.max(Js.toNumber(match.group(4)), 1));
+        patched.put("length", match.group(6) == null ? 1.0 : Js.toNumber(match.group(6)));
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("original", original);
         header.put("patched", patched);
         return header;
-    }
-
-    private static double number(String digits) {
-        return new BigInteger(digits).doubleValue();
     }
 
     private static Map<String, Object> emptyHunk(String headerLine) {
@@ -169,17 +164,17 @@ final class PatchParse {
                         currentFilePatch.diffLineFromPath = match.group(1);
                         currentFilePatch.diffLineToPath = match.group(2);
                     } else if (line.startsWith("old mode ")) {
-                        currentFilePatch.oldMode = Js.trim(slice(line, "old mode ".length()));
+                        currentFilePatch.oldMode = Js.trim(Js.slice(line, "old mode ".length()));
                     } else if (line.startsWith("new mode ")) {
-                        currentFilePatch.newMode = Js.trim(slice(line, "new mode ".length()));
+                        currentFilePatch.newMode = Js.trim(Js.slice(line, "new mode ".length()));
                     } else if (line.startsWith("deleted file mode ")) {
-                        currentFilePatch.deletedFileMode = Js.trim(slice(line, "deleted file mode ".length()));
+                        currentFilePatch.deletedFileMode = Js.trim(Js.slice(line, "deleted file mode ".length()));
                     } else if (line.startsWith("new file mode ")) {
-                        currentFilePatch.newFileMode = Js.trim(slice(line, "new file mode ".length()));
+                        currentFilePatch.newFileMode = Js.trim(Js.slice(line, "new file mode ".length()));
                     } else if (line.startsWith("rename from ")) {
-                        currentFilePatch.renameFrom = Js.trim(slice(line, "rename from ".length()));
+                        currentFilePatch.renameFrom = Js.trim(Js.slice(line, "rename from ".length()));
                     } else if (line.startsWith("rename to ")) {
-                        currentFilePatch.renameTo = Js.trim(slice(line, "rename to ".length()));
+                        currentFilePatch.renameTo = Js.trim(Js.slice(line, "rename to ".length()));
                     } else if (line.startsWith("index ")) {
                         Matcher match = INDEX_HASHES.matcher(line);
                         if (!match.find()) {
@@ -188,11 +183,11 @@ final class PatchParse {
                         currentFilePatch.beforeHash = match.group(1);
                         currentFilePatch.afterHash = match.group(2);
                     } else if (line.startsWith("semver exclusivity ")) {
-                        currentFilePatch.semverExclusivity = Js.trim(slice(line, "semver exclusivity ".length()));
+                        currentFilePatch.semverExclusivity = Js.trim(Js.slice(line, "semver exclusivity ".length()));
                     } else if (line.startsWith("--- ")) {
-                        currentFilePatch.fromPath = Js.trim(slice(line, "--- a/".length()));
+                        currentFilePatch.fromPath = Js.trim(Js.slice(line, "--- a/".length()));
                     } else if (line.startsWith("+++ ")) {
-                        currentFilePatch.toPath = Js.trim(slice(line, "+++ b/".length()));
+                        currentFilePatch.toPath = Js.trim(Js.slice(line, "+++ b/".length()));
                     }
                     continue;
                 }
@@ -227,7 +222,7 @@ final class PatchParse {
                         currentHunkMutationPart.put("lines", new ArrayList<String>());
                         currentHunkMutationPart.put("noNewlineAtEndOfFile", false);
                     }
-                    ((List<String>) currentHunkMutationPart.get("lines")).add(slice(line, 1));
+                    ((List<String>) currentHunkMutationPart.get("lines")).add(Js.slice(line, 1));
                 }
             }
             commitFilePatch();
@@ -240,11 +235,6 @@ final class PatchParse {
             }
             return result;
         }
-    }
-
-    // JavaScript's s.slice(start) for start >= 0
-    private static String slice(String s, int start) {
-        return start >= s.length() ? "" : s.substring(start);
     }
 
     static List<Map<String, Object>> interpretParsedPatchFile(List<FileDeets> files) {
@@ -326,26 +316,8 @@ final class PatchParse {
         return truthy(a) ? a : b;
     }
 
-    // parseInt(mode, 8) & 0o777: parseInt's Number rounds past 2^53, and ToInt32 finds no low bits from 2^63 up
     private static int parseFileMode(@Nullable String mode) {
-        String s = Js.trim(String.valueOf(mode));
-        int i = 0;
-        boolean negative = false;
-        if (i < s.length() && (s.charAt(i) == '+' || s.charAt(i) == '-')) {
-            negative = s.charAt(i) == '-';
-            i++;
-        }
-        int start = i;
-        while (i < s.length() && s.charAt(i) >= '0' && s.charAt(i) <= '7') {
-            i++;
-        }
-        int parsedMode = 0;
-        if (i > start) {
-            double value = new BigInteger(s.substring(start, i), 8).doubleValue();
-            if (Math.abs(value) < 0x1p63) {
-                parsedMode = (int) (long) (negative ? -value : value) & 0777;
-            }
-        }
+        int parsedMode = Js.toInt32(Js.parseInt(String.valueOf(mode), 8)) & 0777;
         if (parsedMode != NON_EXECUTABLE_FILE_MODE && parsedMode != EXECUTABLE_FILE_MODE) {
             throw new JsError(JsError.ERROR, "Unexpected file mode string: " + mode);
         }

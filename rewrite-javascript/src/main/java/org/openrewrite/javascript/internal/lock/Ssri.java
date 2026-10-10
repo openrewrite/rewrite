@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
@@ -26,15 +28,17 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of ssri ({@code parse}, {@code stringify}, {@code fromHex}, {@code Hash} and {@code Integrity} without the
- * strict options): 5.3.0, which yarn 1.22.22 bundles, and 13.0.1, which npm 11.17.0 and pnpm 11.2.2 bundle.
+ * Port of ssri ({@code parse}, {@code stringify}, {@code fromHex}, {@code checkData}, {@code Hash}, {@code Integrity},
+ * without options): 5.3.0, which yarn 1.22.22 bundles, and 13.0.1, which npm 11.17.0 and pnpm 11.2.2 bundle.
  */
 public final class Ssri {
 
@@ -57,6 +61,9 @@ public final class Ssri {
             "sha384", "sha512", "sha3", "sha3-256", "sha3-384", "sha3-512", "sha3_256", "sha3_384", "sha3_512");
     private static final List<String> PRIORITY_13_0_1 = Arrays.asList("md5", "sha1", "sha224", "sha256", "sha384",
             "sha512", "sha3-256", "sha3-384", "sha3-512");
+
+    private static final Set<String> JAVA_DIGESTS = new HashSet<>(Arrays.asList("md5", "sha1", "sha224", "sha256",
+            "sha384", "sha512"));
 
     private Ssri() {
     }
@@ -190,8 +197,7 @@ public final class Ssri {
          * {@code pickAlgorithm(opts, among)}: the algorithm of highest priority, over those {@code among} names when
          * it names any (13.0.1 only); 5.3.0's Error for an integrity with no algorithm.
          */
-        @Nullable
-        String pickAlgorithm(Collection<String> among) {
+        public @Nullable String pickAlgorithm(Collection<String> among) {
             if (release == Release.V5_3_0 && hashes.isEmpty()) {
                 throw new JsError(JsError.ERROR, "No algorithms available for " + EcmaScript.quote(toString()));
             }
@@ -344,6 +350,36 @@ public final class Ssri {
             return ((List<?>) value).get((int) index);
         }
         return null;
+    }
+
+    /**
+     * {@code ssri.checkData(data, sri)}: the hash of {@code sri} the data's digest matches, null for {@code false}.
+     * @throws CannotKnow for an algorithm whose digest Java 8 lacks
+     */
+    public static @Nullable Hash checkData(byte[] data, @Nullable Object sri, Release release) {
+        Integrity parsed = parse(sri, release, EcmaScript::string);
+        if (parsed == null || parsed.isEmpty()) {
+            return null;
+        }
+        String algorithm = String.valueOf(parsed.pickAlgorithm(Collections.emptyList()));
+        Map<String, @Nullable Object> newSri = new LinkedHashMap<>();
+        newSri.put("algorithm", algorithm);
+        newSri.put("digest", digest(data, algorithm));
+        return Objects.requireNonNull(parse(newSri, release, EcmaScript::string)).match(parsed);
+    }
+
+    private static String digest(byte[] data, String algorithm) {
+        String name = algorithm.toLowerCase(Locale.ROOT);
+        if (!JAVA_DIGESTS.contains(name)) {
+            throw new CannotKnow("the " + algorithm + " digest of the data (Java 8 has none)");
+        }
+        try {
+            MessageDigest md = MessageDigest.getInstance("md5".equals(name) ? "MD5" :
+                    "SHA-" + name.substring("sha".length()));
+            return Base64.getEncoder().encodeToString(md.digest(data));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     /**

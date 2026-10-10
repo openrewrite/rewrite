@@ -151,7 +151,7 @@ final class TarStream {
             header.linkname = pax.get("linkpath");
         }
         if (Js.truthy(pax.get("size"))) {
-            header.size = parseInt(pax.get("size"), 10);
+            header.size = Js.parseInt(pax.get("size"), 10);
         }
     }
 
@@ -163,7 +163,7 @@ final class TarStream {
             while (i < buf.length && buf[i] != 32) {
                 i++;
             }
-            double len = parseInt(new String(buf, start, i - start, StandardCharsets.UTF_8), 10);
+            double len = Js.parseInt(new String(buf, start, i - start, StandardCharsets.UTF_8), 10);
             if (Double.isNaN(len) || len == 0) {
                 return result;
             }
@@ -260,7 +260,7 @@ final class TarStream {
         if (end == offset) {
             return 0;
         }
-        return parseInt(new String(val, offset, end - offset, StandardCharsets.UTF_8), 8);
+        return Js.parseInt(new String(val, offset, end - offset, StandardCharsets.UTF_8), 8);
     }
 
     private static double parse256(byte[] buf) {
@@ -300,26 +300,5 @@ final class TarStream {
             end++;
         }
         return new String(val, offset, end - offset, StandardCharsets.UTF_8);
-    }
-
-    // parseInt(string, radix): leading white space, a sign, then the longest run of digits; NaN without one
-    static double parseInt(String s, int radix) {
-        String t = Js.trim(s);
-        int i = 0;
-        boolean negative = false;
-        if (i < t.length() && (t.charAt(i) == '+' || t.charAt(i) == '-')) {
-            negative = t.charAt(i) == '-';
-            i++;
-        }
-        int start = i;
-        double value = 0;
-        while (i < t.length() && Character.digit(t.charAt(i), radix) >= 0 && t.charAt(i) < 128) {
-            value = value * radix + Character.digit(t.charAt(i), radix);
-            i++;
-        }
-        if (i == start) {
-            return Double.NaN;
-        }
-        return negative ? -value : value;
     }
 }

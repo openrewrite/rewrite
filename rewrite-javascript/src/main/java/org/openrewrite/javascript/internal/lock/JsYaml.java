@@ -20,7 +20,6 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.math.BigInteger;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -1541,25 +1540,16 @@ public final class JsYaml {
         }
         if (ch == '0') {
             if (value.charAt(1) == 'b') {
-                return sign * parseInt(value.substring(2), 2);
+                return sign * EcmaScript.parseInt(value.substring(2), 2);
             }
             if (value.charAt(1) == 'x') {
-                return sign * parseInt(value.substring(2), 16);
+                return sign * EcmaScript.parseInt(value.substring(2), 16);
             }
             if (value.charAt(1) == 'o') {
-                return sign * parseInt(value.substring(2), 8);
+                return sign * EcmaScript.parseInt(value.substring(2), 8);
             }
         }
-        return sign * parseInt(value, 10);
-    }
-
-    // parseInt over digits the resolver already checked, as JavaScript sums them in doubles
-    private static double parseInt(String digits, int radix) {
-        if (radix == 10) {
-            return Double.parseDouble(digits);
-        }
-        BigInteger value = new BigInteger(digits, radix);
-        return value.doubleValue();
+        return sign * EcmaScript.parseInt(value, 10);
     }
 
     private static double constructFloat(String data) {
@@ -1765,15 +1755,8 @@ public final class JsYaml {
             tail = " ...";
             lineEnd = position + maxHalfLength - tail.length();
         }
-        String str = head + slice(buffer, lineStart, lineEnd).replace('\t', '→') + tail;
+        String str = head + EcmaScript.slice(buffer, lineStart, lineEnd).replace('\t', '→') + tail;
         return new String[]{str, String.valueOf(position - lineStart + head.length())};
-    }
-
-    // String.prototype.slice over clamped bounds
-    private static String slice(String s, int start, int end) {
-        int from = Math.max(0, Math.min(start, s.length()));
-        int to = Math.max(0, Math.min(end, s.length()));
-        return from < to ? s.substring(from, to) : "";
     }
 
     private static String padStart(String s, int max) {

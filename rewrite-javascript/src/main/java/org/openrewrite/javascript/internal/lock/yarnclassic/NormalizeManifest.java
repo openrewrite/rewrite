@@ -18,10 +18,9 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.semver.NodeSemver;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -261,10 +260,9 @@ final class NormalizeManifest {
 
     private static String encodeURIComponent(String s) {
         try {
-            return URLEncoder.encode(s, "UTF-8").replace("+", "%20").replace("%21", "!").replace("%27", "'")
-                    .replace("%28", "(").replace("%29", ")").replace("%7E", "~");
-        } catch (UnsupportedEncodingException e) {
-            throw new IllegalStateException(e);
+            return UriComponent.encodeURIComponent(s);
+        } catch (IllegalArgumentException e) {
+            throw new JsError(JsError.URI_ERROR, "URI malformed");
         }
     }
 

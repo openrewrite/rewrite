@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -400,9 +401,11 @@ public final class FillRange {
         if (pattern.contains("*")) {
             mask.append(LOWER).append(UPPER).append(NUMBER).append(SPECIAL);
         }
-        if (n < 0 || n != Math.floor(n)) {
-            throw new CannotKnow("what micromatch 2.3.11 makes of the range step ? with a length of " + length +
-                                 ", which never ends");
+        // while (length--) ends only on zero
+        if (n < 0 || n != Math.floor(n) || Double.isInfinite(n)) {
+            throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, (mask.length() == 0 ? "" :
+                    "FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory: ") +
+                    "the range {" + pattern + ".." + length + "..?} never ends");
         }
         if (mask.length() == 0) {
             return "";

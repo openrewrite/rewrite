@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -166,6 +167,9 @@ class SsriTest {
             case "Integrity#pickAlgorithm":
                 return call.arg(0) instanceof Map && ((Map<?, ?>) call.arg(0)).containsKey("pickAlgorithm") ?
                         "a pickAlgorithm function: no package manager passes one" : null;
+            case "checkData":
+                return options(call.arg(2)) ? "checkData's options (error, size): no package manager passes them" :
+                        null;
             default:
                 return call.getFn() + ": not on a package manager's lock path";
         }
@@ -214,6 +218,9 @@ class SsriTest {
                     }
                 }
                 return ((Ssri.Integrity) Objects.requireNonNull(self)).pickAlgorithm(among);
+            case "checkData":
+                Ssri.Hash matched = Ssri.checkData(data(call.arg(0)), value(release, call.arg(1)), release);
+                return matched == null ? false : matched;
             default:
                 return String.valueOf(self);
         }
@@ -230,6 +237,19 @@ class SsriTest {
             return new Ssri.Hash((String) Objects.requireNonNull(((Map<?, ?>) value).get("source")), release);
         }
         return value;
+    }
+
+    // a Buffer a row writes as its hex, or a string as Node hashes it (UTF-8)
+    private static byte[] data(@Nullable Object value) {
+        if (value instanceof String) {
+            return ((String) value).getBytes(StandardCharsets.UTF_8);
+        }
+        String hex = (String) Objects.requireNonNull(((Map<?, ?>) Objects.requireNonNull(value)).get("hex"));
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) Integer.parseInt(hex.substring(2 * i, 2 * i + 2), 16);
+        }
+        return bytes;
     }
 
     // what a row writes of a value: an Integrity as its string and algorithms, a Hash as its string
@@ -272,7 +292,7 @@ class SsriTest {
             expected.put(release + " Integrity#concat" + path, 7);
             expected.put(release + " Integrity#hexDigest" + path, 1);
             expected.put(release + " a pickAlgorithm function: no package manager passes one", 1);
-            expected.put(release + " checkData" + path, v13 ? 16 : 15);
+            expected.put(release + " checkData's options (error, size): no package manager passes them", v13 ? 6 : 5);
             expected.put(release + " checkStream" + path, v13 ? 13 : 12);
             expected.put(release + " create" + path, v13 ? 3 : 2);
             expected.put(release + " fromData" + path, v13 ? 13 : 9);

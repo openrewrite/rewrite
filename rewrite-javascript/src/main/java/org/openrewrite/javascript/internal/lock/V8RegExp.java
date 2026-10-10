@@ -20,9 +20,12 @@ import org.jspecify.annotations.Nullable;
 import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -79,7 +82,8 @@ public final class V8RegExp {
      * included.
      */
     public static String replace(String s, Pattern re, boolean global, String replacement) {
-        return replace(s, re, global, m -> substitution(s, m, replacement));
+        Map<String, Integer> names = namedGroups(re.pattern());
+        return replace(s, re, global, m -> substitution(s, m, replacement, names));
     }
 
     /**
@@ -109,11 +113,35 @@ public final class V8RegExp {
         }
         Matcher m = Pattern.compile(Pattern.quote(search)).matcher(s);
         m.find(at);
-        return s.substring(0, at) + substitution(s, m, replacement) + s.substring(at + search.length());
+        return s.substring(0, at) + substitution(s, m, replacement, Collections.emptyMap()) +
+               s.substring(at + search.length());
+    }
+
+    // the capture number of each named group of a translated source
+    private static Map<String, Integer> namedGroups(String java) {
+        Map<String, Integer> names = new HashMap<>();
+        int captures = 0;
+        boolean inClass = false;
+        for (int i = 0; i < java.length(); i++) {
+            char c = java.charAt(i);
+            if (c == '\\') {
+                i++;
+            } else if (inClass) {
+                inClass = c != ']';
+            } else if (c == '[') {
+                inClass = true;
+            } else if (c == '(' && !java.startsWith("?", i + 1)) {
+                captures++;
+            } else if (c == '(' && java.startsWith("?<", i + 1) && !java.startsWith("?<=", i + 1) &&
+                       !java.startsWith("?<!", i + 1)) {
+                names.put(java.substring(i + 3, java.indexOf('>', i)), ++captures);
+            }
+        }
+        return names;
     }
 
     // GetSubstitution
-    private static String substitution(String s, Matcher m, String replacement) {
+    private static String substitution(String s, Matcher m, String replacement, Map<String, Integer> names) {
         StringBuilder out = new StringBuilder();
         int groups = m.groupCount();
         for (int i = 0; i < replacement.length(); i++) {
@@ -135,10 +163,15 @@ public final class V8RegExp {
             } else if (next == '\'') {
                 out.append(s.substring(m.end()));
                 i++;
+            } else if (next == '<' && !names.isEmpty() && replacement.indexOf('>', i + 2) >= 0) {
+                int close = replacement.indexOf('>', i + 2);
+                Integer group = names.get(replacement.substring(i + 2, close));
+                out.append(group == null ? "" : group(m, group));
+                i = close;
             } else if (next >= '0' && next <= '9') {
                 int one = next - '0';
-                int two = i + 2 < replacement.length() && Character.isDigit(replacement.charAt(i + 2)) ?
-                        one * 10 + replacement.charAt(i + 2) - '0' : -1;
+                char after = i + 2 < replacement.length() ? replacement.charAt(i + 2) : ' ';
+                int two = after >= '0' && after <= '9' ? one * 10 + after - '0' : -1;
                 if (two >= 1 && two <= groups) {
                     out.append(group(m, two));
                     i += 2;

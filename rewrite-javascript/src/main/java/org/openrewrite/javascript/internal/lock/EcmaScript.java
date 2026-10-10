@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -40,6 +41,7 @@ public class EcmaScript {
 
     private static final ObjectMapper MAPPER = JsonMapper.builder()
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .enable(StreamReadFeature.INCLUDE_SOURCE_IN_LOCATION)
             .build();
 
     /**
@@ -103,7 +105,7 @@ public class EcmaScript {
         try {
             return jsonValue(MAPPER.readValue(text, Object.class));
         } catch (JsonProcessingException e) {
-            throw new JsonSyntaxError(e.getOriginalMessage());
+            throw new JsonSyntaxError(e);
         }
     }
 
@@ -134,11 +136,11 @@ public class EcmaScript {
     }
 
     /**
-     * {@code JSON.parse}'s SyntaxError, with Jackson's message.
+     * {@code JSON.parse}'s SyntaxError, with Jackson's message; its cause's message adds the location.
      */
     public static final class JsonSyntaxError extends IllegalArgumentException {
-        JsonSyntaxError(String message) {
-            super(message);
+        JsonSyntaxError(JsonProcessingException cause) {
+            super(cause.getOriginalMessage(), cause);
         }
     }
 
@@ -450,6 +452,92 @@ public class EcmaScript {
             return toNumber(string(value));
         }
         return Double.NaN;
+    }
+
+    /**
+     * {@code parseInt(s, radix)} as V8 computes it, a radix of 0 standing for none ({@code 0x} then reads as
+     * hexadecimal).
+     */
+    public static double parseInt(String s, int radix) {
+        String t = trimStart(s);
+        int i = 0;
+        double sign = 1;
+        if (!t.isEmpty() && (t.charAt(0) == '+' || t.charAt(0) == '-')) {
+            sign = t.charAt(0) == '-' ? -1 : 1;
+            i++;
+        }
+        int r = radix;
+        boolean stripPrefix = r == 0 || r == 16;
+        if (r == 0) {
+            r = 10;
+        } else if (r < 2 || r > 36) {
+            return Double.NaN;
+        }
+        if (stripPrefix && (t.startsWith("0x", i) || t.startsWith("0X", i))) {
+            i += 2;
+            r = 16;
+        }
+        int start = i;
+        while (i < t.length() && t.charAt(i) < 128 && Character.digit(t.charAt(i), r) >= 0) {
+            i++;
+        }
+        if (i == start) {
+            return Double.NaN;
+        }
+        while (start + 1 < i && t.charAt(start) == '0') {
+            start++;
+        }
+        String digits = t.substring(start, i);
+        if (r == 10) {
+            // strtod over the first 310 digits
+            return sign * new BigInteger(digits.substring(0, Math.min(digits.length(), 310))).doubleValue();
+        }
+        if (Integer.bitCount(r) == 1) {
+            return sign * new BigInteger(digits, r).doubleValue();
+        }
+        // V8's generic radix: parts of up to 32 bits, each folded in by a multiply-add an arm64 build fuses
+        double result = 0;
+        int at = 0;
+        while (at < digits.length() && !Double.isInfinite(result)) {
+            long part = 0;
+            long multiplier = 1;
+            while (at < digits.length() && multiplier * r <= 0xFFFFFFFFL / 36) {
+                part = part * r + Character.digit(digits.charAt(at++), r);
+                multiplier *= r;
+            }
+            double fused = new BigDecimal(result).multiply(BigDecimal.valueOf(multiplier))
+                    .add(BigDecimal.valueOf(part)).doubleValue();
+            if (fused != result * multiplier + part) {
+                throw new CannotKnow("parseInt(\"" + s + "\", " + radix + "), whose rounding depends on whether " +
+                                     "the Node build fuses a multiply-add (an arm64 one does)");
+            }
+            result = fused;
+        }
+        return sign * result;
+    }
+
+    /**
+     * {@code String.prototype.slice}: a negative index counts back from the end.
+     */
+    public static String slice(String s, int start, int end) {
+        int from = start < 0 ? Math.max(s.length() + start, 0) : Math.min(start, s.length());
+        int to = end < 0 ? Math.max(s.length() + end, 0) : Math.min(end, s.length());
+        return from < to ? s.substring(from, to) : "";
+    }
+
+    public static String slice(String s, int start) {
+        return slice(s, start, s.length());
+    }
+
+    /**
+     * {@code String.prototype.repeat} for a count that is not negative.
+     */
+    public static String repeat(String s, int count) {
+        StringBuilder out = new StringBuilder(Math.max(0, s.length() * count));
+        for (int i = 0; i < count; i++) {
+            out.append(s);
+        }
+        return out.toString();
     }
 
     /**
