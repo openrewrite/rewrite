@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Braces;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.GlobParent;
 import org.openrewrite.javascript.internal.lock.Host;
@@ -218,7 +219,9 @@ final class FastGlob {
      * micromatch 4.0.5's {@code braces(pattern, {expand: true, nodupes: true, keepEscaping: true})}.
      */
     static List<String> braces(String pattern) {
-        return BRACES.matcher(pattern).find() ? Braces.braces(pattern) : Collections.singletonList(pattern);
+        return BRACES.matcher(pattern).find() ? new Braces().braces(pattern,
+                Braces.Options.builder(Braces.Release.V3_0_2).nodupes(true).keepEscaping(true).build()) :
+                Collections.singletonList(pattern);
     }
 
     private static List<Task> convertPatternsToTasks(List<String> positive, List<String> negative, boolean dynamic) {

@@ -69,14 +69,14 @@
  * </pre>
  * {@code DeepEqual} ports deep-equal 1.0.1, {@code internal.lock.JsYaml} the loader of js-yaml 3.13.1,
  * {@code ObjectPath} object-path 0.11.4, {@code internal.lock.BraceExpansion} brace-expansion 1.1.11 with
- * balanced-match 1.0.0, {@code Micromatch} micromatch 2.3.11 with arr-diff 2.0.0, {@code internal.lock.IsGlob}
- * is-glob 2.0.1, {@code internal.lock.IsExtglob} is-extglob 1.0.0, {@code Braces} braces 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
- * randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob
- * 0.3.2, {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, {@code GunzipMaybe} gunzip-maybe
- * 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1, {@code TarFs} tar-fs 1.16.3 and
- * {@code internal.lock.StripBom} strip-bom 3.0.0, as
- * yarn 1.22.22 bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed
- * under the MIT License:
+ * balanced-match 1.0.0, {@code Micromatch} micromatch 2.3.11 with arr-diff 2.0.0, {@code internal.lock.IsGlob} is-glob
+ * 2.0.1, {@code internal.lock.IsExtglob} is-extglob 1.0.0, {@code internal.lock.Braces} braces 1.8.5 with expand-range
+ * 1.8.2, preserve 0.2.0 and repeat-element 1.1.2, {@code internal.lock.FillRange} fill-range 2.2.4 with repeat-string
+ * 1.6.1 and randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob}
+ * extglob 0.3.2, {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, {@code GunzipMaybe}
+ * gunzip-maybe 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1, {@code TarFs} tar-fs
+ * 1.16.3 and {@code internal.lock.StripBom} strip-bom 3.0.0, as yarn 1.22.22 bundles them, and
+ * {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed under the MIT License:
  * <ul>
  *     <li>deep-equal: James Halliday</li>
  *     <li>brace-expansion, balanced-match: Copyright (c) 2013 Julian Gruber</li>

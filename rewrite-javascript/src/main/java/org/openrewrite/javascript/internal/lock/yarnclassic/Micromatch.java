@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Braces;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.IsExtglob;
 import org.openrewrite.javascript.internal.lock.IsGlob;
@@ -448,8 +449,7 @@ final class Micromatch {
             if (opening > 0 && closing > 0 && opening != closing) {
                 opts.makeRe = false;
             }
-            Braces.Options braceOptions = new Braces.Options();
-            braceOptions.makeRe = opts.makeRe;
+            Braces.Options braceOptions = Braces.Options.builder(Braces.Release.V1_8_5).makeRe(opts.makeRe).build();
             glob.pattern = String.join("|", braces.braces(glob.pattern, braceOptions));
         }
 

@@ -366,6 +366,37 @@ public class EcmaScript {
         return trimEnd(trimStart(s));
     }
 
+    /**
+     * {@code String.prototype.split} by a string.
+     */
+    public static String[] splitString(String s, String separator) {
+        if (separator.isEmpty()) {
+            String[] chars = new String[s.length()];
+            for (int i = 0; i < s.length(); i++) {
+                chars[i] = String.valueOf(s.charAt(i));
+            }
+            return chars;
+        }
+        return s.split(Pattern.quote(separator), -1);
+    }
+
+    /**
+     * {@code Number.isInteger}.
+     */
+    public static boolean isInteger(double d) {
+        return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
+    }
+
+    /**
+     * ToInt32, as {@code x >> 0} applies it.
+     */
+    public static int toInt32(double d) {
+        if (Double.isNaN(d) || Double.isInfinite(d)) {
+            return 0;
+        }
+        return (int) (new BigDecimal(d).toBigInteger().longValue() & 0xFFFFFFFFL);
+    }
+
     public static String trimStart(String s) {
         int start = 0;
         while (start < s.length() && isWhiteSpace(s.charAt(start))) {

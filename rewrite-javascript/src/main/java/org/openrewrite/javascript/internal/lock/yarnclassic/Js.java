@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -154,20 +153,6 @@ final class Js extends EcmaScript {
     }
 
     /**
-     * {@code String.prototype.split} by a string.
-     */
-    static String[] splitString(String s, String separator) {
-        if (separator.isEmpty()) {
-            String[] chars = new String[s.length()];
-            for (int i = 0; i < s.length(); i++) {
-                chars[i] = String.valueOf(s.charAt(i));
-            }
-            return chars;
-        }
-        return s.split(Pattern.quote(separator), -1);
-    }
-
-    /**
      * {@code s.split(separator).join(with)}.
      */
     static String splitJoin(String s, String separator, String with) {
@@ -178,15 +163,6 @@ final class Js extends EcmaScript {
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(Infinity|([0-9]+\\.?[0-9]*|\\.[0-9]+)" +
                                                            "([eE][+-]?[0-9]+)?)");
 
-    /**
-     * ToInt32, as {@code x >> 0} applies it.
-     */
-    static int toInt32(double d) {
-        if (Double.isNaN(d) || Double.isInfinite(d)) {
-            return 0;
-        }
-        return (int) (new BigDecimal(d).toBigInteger().longValue() & 0xFFFFFFFFL);
-    }
 
     public static String string(@Nullable Object value) {
         if (value instanceof UnknownPath) {

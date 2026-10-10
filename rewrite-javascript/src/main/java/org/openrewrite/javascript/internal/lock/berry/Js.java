@@ -98,9 +98,4 @@ final class Js extends EcmaScript {
             throw new SyntaxError(e.getMessage());
         }
     }
-
-    static boolean isInteger(double d) {
-        return !Double.isInfinite(d) && !Double.isNaN(d) && d == Math.floor(d);
-    }
-
 }
