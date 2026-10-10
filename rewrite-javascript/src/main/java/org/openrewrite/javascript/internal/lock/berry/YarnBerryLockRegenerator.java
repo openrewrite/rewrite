@@ -247,7 +247,7 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * {@code yarnPath}'s release unless {@code ignorePath}, else the packageManager corepack finds from where Yarn runs;
+     * {@code yarnPath}'s release unless {@code ignorePath}, else the packageManager corepack finds where Yarn runs;
      * CannotKnow when neither names a version, the data lacks it, or it is later than the release ported.
      */
     YarnRelease release() {
