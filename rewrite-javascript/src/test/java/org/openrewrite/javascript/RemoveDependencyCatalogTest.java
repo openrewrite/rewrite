@@ -103,7 +103,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    // the cleanup is pnpm's write of the whole file, which is not made where it holds what the port of yaml does not read
+    // the cleanup is pnpm's write of the whole file, not made where it holds what the yaml port does not read
     @Test
     void declinedWhenTheCleanupWouldRewriteALayoutNotWrittenAsPnpmWritesIt() {
         String member = """
