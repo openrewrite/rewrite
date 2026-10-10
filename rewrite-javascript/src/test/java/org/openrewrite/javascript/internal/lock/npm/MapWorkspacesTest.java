@@ -76,7 +76,7 @@ class MapWorkspacesTest {
         Map<String, Object> pkg = obj("workspaces", json(c.get("workspaces")));
         if (c.has("error")) {
             String message = c.get("error").get("message").asText().replace("{CWD}", CWD);
-            if ("EJSONPARSE".equals(c.get("error").get("code").asText())) {
+            if ("EJSONPARSE".equals(c.get("error").path("code").asText())) {
                 assertThatThrownBy(() -> MapWorkspaces.mapWorkspaces(CWD, pkg, manifests(declared)))
                   .isInstanceOf(JsonParseEvenBetterErrors.JsonParseException.class)
                   .hasMessageStartingWith("Invalid package.json: ");

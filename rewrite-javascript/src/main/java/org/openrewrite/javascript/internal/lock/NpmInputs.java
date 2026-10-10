@@ -15,15 +15,19 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json of
- * each directory above the one npm runs in.
+ * The npm regenerator's inputs: the lock's directory's own .npmrc and the paths held there, and the package.json
+ * files under each directory above the one npm runs in.
  */
 final class NpmInputs {
 
@@ -44,8 +48,41 @@ final class NpmInputs {
                 .directoryName(dir.name())
                 .manifests(dir.getManifests())
                 .runsIn(dir.getRunsIn())
-                .parentManifests(dir.manifestsAbove(dir.getRunsIn()))
+                .parentTrees(parentTrees(dir))
                 .build();
+    }
+
+    private static Map<String, Map<String, @Nullable String>> parentTrees(LockDirectory dir) {
+        Map<String, Map<String, @Nullable String>> trees = new LinkedHashMap<>();
+        for (String seenFrom : dir.manifestsAbove(dir.getRunsIn()).keySet()) {
+            String parent = dir.aboveRunsIn(seenFrom.split("/").length);
+            Map<String, @Nullable String> tree = new LinkedHashMap<>();
+            Set<String> held = dir.pathsUnder(parent);
+            if (held != null) {
+                for (String path : held) {
+                    String location = manifestLocation(path);
+                    if (location != null) {
+                        tree.put(location, null);
+                    }
+                }
+            }
+            for (Map.Entry<String, String> file : dir.filesUnder(parent).entrySet()) {
+                String location = manifestLocation(file.getKey());
+                if (location != null) {
+                    tree.put(location, file.getValue());
+                }
+            }
+            tree.putAll(dir.manifestsUnder(parent));
+            trees.put(seenFrom, tree);
+        }
+        return trees;
+    }
+
+    private static @Nullable String manifestLocation(String path) {
+        if ("package.json".equals(path)) {
+            return "";
+        }
+        return path.endsWith("/package.json") ? path.substring(0, path.length() - "/package.json".length()) : null;
     }
 
     /**

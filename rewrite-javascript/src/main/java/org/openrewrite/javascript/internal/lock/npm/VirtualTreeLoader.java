@@ -19,6 +19,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Singular;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
@@ -62,15 +63,22 @@ public final class VirtualTreeLoader {
          */
         private final Map<String, Map<String, Object>> parsedManifests;
 
+        /**
+         * Locations whose package.json the host holds without its contents.
+         */
+        private final Set<String> unread;
+
         private final Map<String, Object> read = new HashMap<>();
 
         @Builder
         ProjectFiles(@Nullable LockFile lock, @Nullable String yarnLock, @Singular Map<String, String> manifests,
-                     @Singular Map<String, Map<String, Object>> parsedManifests) {
+                     @Singular Map<String, Map<String, Object>> parsedManifests,
+                     @Singular("unread") Set<String> unread) {
             this.lock = lock;
             this.yarnLock = yarnLock;
             this.manifests = manifests;
             this.parsedManifests = parsedManifests;
+            this.unread = unread;
         }
 
         /**
@@ -83,6 +91,10 @@ public final class VirtualTreeLoader {
                 String text = manifests.get(location);
                 Map<String, Object> parsed = parsedManifests.get(location);
                 try {
+                    if (text == null && parsed == null && unread.contains(location)) {
+                        throw new CannotKnow((location.isEmpty() ? "" : location + "/") + "package.json (its " +
+                                             "contents were not read)");
+                    }
                     value = text != null ? PackageJson.normalize(text) : parsed != null ? PackageJson.parsed(parsed) :
                         NONE;
                 } catch (RuntimeException e) {
@@ -102,6 +114,7 @@ public final class VirtualTreeLoader {
         public Set<String> manifestLocations() {
             Set<String> locations = new LinkedHashSet<>(manifests.keySet());
             locations.addAll(parsedManifests.keySet());
+            locations.addAll(unread);
             return locations;
         }
     }

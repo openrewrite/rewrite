@@ -157,12 +157,19 @@ final class MapWorkspaces {
         Map<Object, Set<String>> seen = new LinkedHashMap<>();
         for (String match : orderedMatches) {
             String location = ".".equals(match) ? "" : match;
-            PackageJson manifest = files.manifest(location);
-            if (manifest == null) {
-                continue;
+            Map<String, Object> content;
+            try {
+                PackageJson manifest = files.manifest(location);
+                if (manifest == null) {
+                    continue;
+                }
+                content = manifest.getContent();
+            } catch (PackageJson.NeedsPackageFiles e) {
+                // the bin npm reads from the files does not name the workspace
+                content = e.getContent();
             }
             String path = PosixPath.join(cwd, match);
-            Object name = getPackageName(manifest.getContent(), path);
+            Object name = getPackageName(content, path);
             seen.computeIfAbsent(name, k -> new LinkedHashSet<>()).add(path);
         }
 

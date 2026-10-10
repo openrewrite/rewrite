@@ -1,0 +1,10 @@
+{
+  "name": "open-root-bin-dir-number-added",
+  "version": "1.0.0",
+  "directories": {
+    "bin": 1
+  },
+  "dependencies": {
+    "ms": "2.1.3"
+  }
+}

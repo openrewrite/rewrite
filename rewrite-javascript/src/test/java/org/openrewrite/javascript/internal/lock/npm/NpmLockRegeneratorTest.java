@@ -20,8 +20,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class NpmLockRegeneratorTest {
@@ -65,10 +67,14 @@ class NpmLockRegeneratorTest {
           .lock(LOCK)
           .manifest("", MANIFEST)
           .now(Instant.EPOCH);
+        Map<String, String> rootTree = new LinkedHashMap<>();
+        rootTree.put("", root);
         if (mid != null) {
-            inputs.parentManifest("a", mid);
+            inputs.parentTree("a", singletonMap("", mid));
+            rootTree.put("packages", mid);
         }
-        inputs.parentManifest("packages/a", root);
+        rootTree.put("packages/a", MANIFEST);
+        inputs.parentTree("packages/a", rootTree);
 
         Result result = new NpmLockRegenerator(inputs.build(), NO_REGISTRY).regenerate();
 

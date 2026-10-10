@@ -215,7 +215,14 @@ final class ScenarioReplay {
     static Node load(NpmScenarios.Lock lock, NpmOptions options, String path) {
         VirtualTreeLoader.ProjectFiles files = NpmLockRegenerator.projectFiles(new LockFile(lock.getText()),
           lock.getYarnLock(), lock.manifests());
-        PackageJson manifest = files.manifest("");
+        PackageJson manifest;
+        try {
+            manifest = files.manifest("");
+        } catch (JsonParseEvenBetterErrors.JsonParseException | PackageJson.NeedsPackageFiles e) {
+            throw e;
+        } catch (RuntimeException e) {
+            manifest = null;
+        }
         Node root = new Node(Node.options()
           .path(path).realpath(path)
           .pkg(manifest != null ? manifest.getContent() : new LinkedHashMap<>())

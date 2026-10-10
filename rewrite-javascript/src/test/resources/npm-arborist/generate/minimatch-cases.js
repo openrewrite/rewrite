@@ -108,6 +108,16 @@ const layouts = [
     dirs: { 'a': 'not json', 'b': { name: 'b' } },
     workspaces: [['b'], ['*']],
   },
+  {
+    name: 'member-bin-dir',
+    dirs: { 'a': { name: 'a', directories: { bin: 'bin' } }, 'b': { name: 'b', directories: { bin: 1 } }, 'c': {} },
+    workspaces: [['a'], ['a', 'c'], ['b'], ['*']],
+  },
+  {
+    name: 'member-without-content',
+    dirs: { 'a': 'null', 'b': { name: 'b' } },
+    workspaces: [['b'], ['*']],
+  },
 ]
 
 const run = async () => {

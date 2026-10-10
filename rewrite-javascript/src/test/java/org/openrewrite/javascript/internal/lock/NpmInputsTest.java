@@ -15,7 +15,11 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -33,6 +37,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
 
 class NpmInputsTest {
+
+    private static final String MEMBER = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\"\n}\n";
+    private static final String MEMBER_LOCK = "{\n  \"name\": \"a\",\n  \"version\": \"1.0.0\",\n  " +
+                                              "\"lockfileVersion\": 3,\n  \"requires\": true,\n  \"packages\": {\n" +
+                                              "    \"\": {\n      \"name\": \"a\",\n      \"version\": \"1.0.0\"\n" +
+                                              "    }\n  }\n}\n";
 
     private static final PackumentSource NO_REGISTRY = new PackumentSource() {
         @Override
@@ -61,8 +71,12 @@ class NpmInputsTest {
 
         Inputs inputs = NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getParentManifests()).containsExactly(
-          entry("packages/a", "{\"name\":\"repo\"}"), entry("repo/packages/a", "{\"name\":\"top\"}"));
+        assertThat(inputs.getParentTrees().keySet()).containsExactly("packages/a", "repo/packages/a");
+        assertThat(inputs.getParentTrees().get("packages/a")).containsOnly(entry("", "{\"name\":\"repo\"}"),
+          entry("other", "{\"name\":\"other\"}"), entry("packages/a", "{\"name\":\"a\"}"));
+        assertThat(inputs.getParentTrees().get("repo/packages/a")).containsOnly(entry("", "{\"name\":\"top\"}"),
+          entry("repo", "{\"name\":\"repo\"}"), entry("repo/other", "{\"name\":\"other\"}"),
+          entry("repo/packages/a", "{\"name\":\"a\"}"));
     }
 
     /**
@@ -84,9 +98,117 @@ class NpmInputsTest {
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
-        assertThat(inputs.getParentManifests()).containsExactly(
-          entry("packages/a", "{\"private\":true,\"workspaces\":[\"packages/*\"]}"),
-          entry("repo/packages/a", "{\"workspaces\":[\"repo\"]}"));
+        assertThat(inputs.getParentTrees().keySet()).containsExactly("packages/a", "repo/packages/a");
+        assertThat(inputs.getParentTrees().get("packages/a")).containsOnly(
+          entry("", "{\"private\":true,\"workspaces\":[\"packages/*\"]}"), entry("packages/a", "{\"name\":\"a\"}"));
+        assertThat(inputs.getParentTrees().get("repo/packages/a")).containsOnly(
+          entry("", "{\"workspaces\":[\"repo\"]}"), entry("repo", "{\"private\":true,\"workspaces\":[\"packages/*\"]}"),
+          entry("repo/packages/a", "{\"name\":\"a\"}"));
+    }
+
+    /**
+     * npm 11.17.0 run in packages/a, which holds its own lock, under these files: {@code npm prefix} and its
+     * {@code install --package-lock-only} there install at the member, at the root, or fail.
+     */
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', value = {
+      "bin-dir-no-workspaces|{\"name\":\"root\",\"directories\":{\"bin\":\"bin\"}}||installs here",
+      "bin-dir-lists|{\"name\":\"root\",\"directories\":{\"bin\":\"bin\"},\"workspaces\":[\"packages/*\"]}||" +
+      "installs at ../..",
+      "bin-dir-not-listing|{\"name\":\"root\",\"directories\":{\"bin\":\"bin\"},\"workspaces\":[\"libs/*\"]}||" +
+      "installs here",
+      "bin-dir-with-files-lists|{\"name\":\"root\",\"directories\":{\"bin\":\"bin\"}," +
+      "\"workspaces\":[\"packages/*\"]}|bin/tool.js=#!/usr/bin/env node|installs at ../..",
+      "bin-dir-number-lists|{\"name\":\"root\",\"directories\":{\"bin\":1},\"workspaces\":[\"packages/*\"]}||" +
+      "installs here",
+      "bin-dir-array-lists|{\"name\":\"root\",\"directories\":{\"bin\":[\"bin\"]},\"workspaces\":[\"packages/*\"]}|" +
+      "|installs here",
+      "mid-bin-dir-root-lists|{\"name\":\"root\",\"workspaces\":[\"packages/*\"]}|" +
+      "packages/package.json={\"name\":\"mid\",\"directories\":{\"bin\":\"bin\"}}|installs at ../..",
+      "unlisted-duplicate-names|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|" +
+      "libs/x/package.json={\"name\":\"dup\"};libs/y/package.json={\"name\":\"dup\"}|rejects EDUPLICATEWORKSPACE",
+      "listed-duplicate-of-project|{\"name\":\"root\",\"workspaces\":[\"packages/*\"]}|" +
+      "packages/b/package.json={\"name\":\"a\"}|rejects EDUPLICATEWORKSPACE",
+      "unlisted-folder-names-collide|{\"name\":\"root\",\"workspaces\":[\"libs/*\",\"other/*\"]}|" +
+      "libs/x/package.json={};other/x/package.json={}|rejects EDUPLICATEWORKSPACE",
+      "unlisted-member-unparsable|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|libs/x/package.json={|" +
+      "rejects EJSONPARSE",
+      "unlisted-member-null|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|libs/x/package.json=null|" +
+      "fails Can not normalize without content",
+      "unlisted-member-bin-dir-number|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|" +
+      "libs/x/package.json={\"name\":\"x\",\"directories\":{\"bin\":1}}|fails ref.replace is not a function",
+      "unlisted-member-bin-dir|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|" +
+      "libs/x/package.json={\"name\":\"x\",\"directories\":{\"bin\":\"bin\"}}|installs here",
+      "listed-member-unparsable|{\"name\":\"root\",\"workspaces\":[\"packages/*\"]}|packages/b/package.json={|" +
+      "rejects EJSONPARSE",
+      "workspaces-not-an-array|{\"name\":\"root\",\"workspaces\":\"packages/*\"}||rejects EWORKSPACESCONFIG",
+      "unlisted-duplicate-under-node-modules|{\"name\":\"root\",\"workspaces\":[\"libs/**\"]}|" +
+      "libs/x/package.json={\"name\":\"dup\"};libs/x/node_modules/y/package.json={\"name\":\"dup\"}|installs here"
+    })
+    void npmMapsTheWorkspacesOfEachPackageJsonAboveOverWhatIsUnderIt(String name, String root,
+                                                                     @Nullable String files, String outcome) {
+        Request.RequestBuilder request = member().packageManagerFile(Paths.get("package.json"), root);
+        if (files != null) {
+            for (String file : files.split(";")) {
+                request.packageManagerFile(Paths.get(file.substring(0, file.indexOf('='))),
+                  file.substring(file.indexOf('=') + 1));
+            }
+        }
+        LockDirectory dir = LockDirectory.of(request.build());
+
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+          .regenerate();
+        InstallRoot installRoot = NpmInputs.installRoot(dir);
+
+        if ("installs here".equals(outcome)) {
+            assertThat(result.getLockFileContent()).isEqualTo(MEMBER_LOCK);
+            assertThat(installRoot.getDepth()).isEqualTo(0);
+            assertThat(installRoot.isStopped()).isFalse();
+            return;
+        }
+        assertThat(result.getFailure()).isNotNull();
+        if ("installs at ../..".equals(outcome)) {
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+            assertThat(result.getFailure().getDetail()).contains("it installs at the workspace root ../..");
+            assertThat(installRoot.getDepth()).isEqualTo(2);
+        } else if (outcome.startsWith("rejects ")) {
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_REJECTS);
+            assertThat(result.getFailure().getDetail()).contains("(" + outcome.substring("rejects ".length()) + ")");
+            assertThat(installRoot.isStopped()).isTrue();
+        } else {
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.PM_FAILS);
+            assertThat(result.getFailure().getDetail()).endsWith(outcome.substring("fails ".length()));
+            assertThat(installRoot.isStopped()).isTrue();
+        }
+    }
+
+    /**
+     * A package.json npm would map at a directory above that the host holds without its contents is unknown.
+     */
+    @Test
+    void aPackageJsonAboveTheHostDidNotReadIsCannotKnow() {
+        LockDirectory dir = LockDirectory.of(member()
+          .packageManagerFile(Paths.get("package.json"), "{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}")
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("package.json"), Paths.get("libs/x/package.json"),
+            Paths.get("packages/a/package.json"))))
+          .build());
+
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+          .regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know libs/x/package.json (its " +
+                                                              "contents were not read)");
+        assertThat(NpmInputs.installRoot(dir).isStopped()).isTrue();
+    }
+
+    private static Request.RequestBuilder member() {
+        return Request.builder()
+          .packageJson(MEMBER)
+          .lock(MEMBER_LOCK)
+          .packageJsonPath(Paths.get("packages/a/package.json"))
+          .manifest(Paths.get("packages/a/package.json"), MEMBER);
     }
 
     /**

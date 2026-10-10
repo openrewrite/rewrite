@@ -39,8 +39,15 @@ public final class PackageJson {
      * Thrown where npm would read the package's files: {@code directories.bin} without {@code bin}.
      */
     public static final class NeedsPackageFiles extends IllegalStateException {
-        NeedsPackageFiles(String message) {
+        /**
+         * The manifest normalized but for the {@code bin} npm fills from those files.
+         */
+        @Getter
+        private final transient Map<String, Object> content;
+
+        NeedsPackageFiles(String message, Map<String, Object> content) {
             super(message);
+            this.content = content;
         }
     }
 
@@ -87,8 +94,13 @@ public final class PackageJson {
         Object directories = data.get("directories");
         Object binDir = directories instanceof Map ? ((Map<?, ?>) directories).get("bin") : null;
         if (truthy(binDir) && !truthy(data.get("bin"))) {
-            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote(String.valueOf(binDir)) +
-                                        "} names the package's files, which are not known");
+            if (!(binDir instanceof String)) {
+                throw new IllegalArgumentException("ref.replace is not a function");
+            }
+            data.remove("bin");
+            throw new NeedsPackageFiles("\"directories\": {\"bin\": " + Js.quote((String) binDir) +
+                                        "} names the package's files, which are not known",
+                    syncSteps(data, NORMALIZE_STEPS));
         }
         normalizeBin(data);
         syncSteps(data, NORMALIZE_STEPS);

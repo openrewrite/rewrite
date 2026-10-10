@@ -110,11 +110,11 @@ public final class NpmLockRegenerator {
         String runsIn = "";
 
         /**
-         * The package.json of each directory above the one npm runs in, which it walks through, nearest first,
-         * keyed by that directory's location from there ({@code packages/a}).
+         * The package.json files under each directory above the one npm runs in that holds one, nearest first, keyed
+         * by where npm runs as seen from there ({@code packages/a}); each by location, its own at "", null unread.
          */
         @Singular
-        Map<String, String> parentManifests;
+        Map<String, Map<String, @Nullable String>> parentTrees;
     }
 
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.NPM;
@@ -203,11 +203,18 @@ public final class NpmLockRegenerator {
         if (manifest == null) {
             return 0;
         }
-        for (Map.Entry<String, String> parent : inputs.getParentManifests().entrySet()) {
+        for (Map.Entry<String, Map<String, @Nullable String>> parent : inputs.getParentTrees().entrySet()) {
+            VirtualTreeLoader.ProjectFiles files = parentFiles(parent.getKey(), manifest, parent.getValue());
             Map<String, Object> pkg;
             try {
-                pkg = PackageJson.normalize(parent.getValue()).getContent();
+                PackageJson own = files.manifest("");
+                if (own == null) {
+                    continue;
+                }
+                pkg = own.getContent();
             } catch (PackageJson.NeedsPackageFiles e) {
+                pkg = e.getContent();
+            } catch (CannotKnow e) {
                 throw e;
             } catch (RuntimeException e) {
                 continue;
@@ -215,14 +222,28 @@ public final class NpmLockRegenerator {
             if (!truthy(pkg.get("workspaces"))) {
                 continue;
             }
-            VirtualTreeLoader.ProjectFiles project = VirtualTreeLoader.ProjectFiles.builder()
-                    .manifest(parent.getKey(), manifest)
-                    .build();
-            if (MapWorkspaces.mapWorkspaces("/", pkg, project).containsValue("/" + parent.getKey())) {
+            if (MapWorkspaces.mapWorkspaces("/", pkg, files).containsValue("/" + parent.getKey())) {
                 return parent.getKey().split("/").length;
             }
         }
         return 0;
+    }
+
+    private static VirtualTreeLoader.ProjectFiles parentFiles(String runsIn, String manifest,
+                                                              Map<String, @Nullable String> tree) {
+        VirtualTreeLoader.ProjectFiles.ProjectFilesBuilder files = VirtualTreeLoader.ProjectFiles.builder()
+                .manifest(runsIn, manifest);
+        for (Map.Entry<String, @Nullable String> held : tree.entrySet()) {
+            if (held.getKey().equals(runsIn)) {
+                continue;
+            }
+            if (held.getValue() == null) {
+                files.unread(held.getKey());
+            } else {
+                files.manifest(held.getKey(), held.getValue());
+            }
+        }
+        return files.build();
     }
 
     /**

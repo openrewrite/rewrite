@@ -2085,6 +2085,135 @@
      ]
     }
    ]
+  },
+  {
+   "name": "member-bin-dir",
+   "manifests": {
+    "a": "{\"name\":\"a\",\"directories\":{\"bin\":\"bin\"}}",
+    "b": "{\"name\":\"b\",\"directories\":{\"bin\":1}}",
+    "c": "{}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "a"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "a",
+      "c"
+     ],
+     "members": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ],
+     "virtual": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "b"
+     ],
+     "error": {
+      "message": "ref.replace is not a function"
+     },
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "message": "ref.replace is not a function"
+     },
+     "virtual": [
+      [
+       "a",
+       "a"
+      ],
+      [
+       "b",
+       "b"
+      ],
+      [
+       "c",
+       "c"
+      ]
+     ]
+    }
+   ]
+  },
+  {
+   "name": "member-without-content",
+   "manifests": {
+    "a": "null",
+    "b": "{\"name\":\"b\"}"
+   },
+   "cases": [
+    {
+     "workspaces": [
+      "b"
+     ],
+     "members": [
+      [
+       "b",
+       "b"
+      ]
+     ],
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    },
+    {
+     "workspaces": [
+      "*"
+     ],
+     "error": {
+      "message": "Can not normalize without content"
+     },
+     "virtual": [
+      [
+       "b",
+       "b"
+      ]
+     ]
+    }
+   ]
   }
  ]
 }
