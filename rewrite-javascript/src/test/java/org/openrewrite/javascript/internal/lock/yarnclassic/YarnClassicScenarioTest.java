@@ -56,9 +56,8 @@ class YarnClassicScenarioTest extends LockScenarioTest {
     }
 
     /**
-     * The registry as the scenario recorded it, {@code http/<name>} and {@code http/<name>-<version>.tgz} whatever the
-     * registry's url, a 404 where its {@code registry-config} said; a downloaded fixture's empty versions are filled
-     * from its {@code http/<name>-<version>} documents, its tarballs from the re-recording that names it.
+     * The registry as the scenario recorded it ({@code http/<name>}, {@code http/<name>-<version>.tgz}, a 404 where its
+     * {@code registry-config} said); a downloaded fixture's empty versions come from its {@code <name>-<version>}.
      */
     static final class ScenarioRegistry extends RecordedRegistry<YarnClassicScenarios.Scenario>
             implements RegistrySource {
@@ -98,8 +97,8 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         Expect expect = Expect.of(scenario.expect());
         skipUnlessReplayed(scenario.getLabel(), scenario, expect);
         ScenarioRegistry http = new ScenarioRegistry(scenario);
-        Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER, scenario.file("before")), http)
-                .regenerate();
+        Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER,
+                scenario.file("before")), http).regenerate();
         check(scenario.getLabel(), expect, scenario.file("after"), result, http);
     }
 

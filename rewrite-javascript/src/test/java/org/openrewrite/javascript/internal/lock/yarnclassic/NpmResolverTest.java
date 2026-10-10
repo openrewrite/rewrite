@@ -176,7 +176,8 @@ class NpmResolverTest {
                       (variant == null ? "" : "  prebuiltVariants:\n    " + variant + "\n");
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
                 new ResolutionMap(options), YarnClassicScenarios.NO_REGISTRY,
-                new ProjectFiles(Collections.emptyMap(), null), Host.builder().os("darwin").cpu("arm64").build(), new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.builder().os("darwin").cpu("arm64").build(),
+                new ArrayList<>());
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("left-pad@1.3.0")
                 .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
         String answer;

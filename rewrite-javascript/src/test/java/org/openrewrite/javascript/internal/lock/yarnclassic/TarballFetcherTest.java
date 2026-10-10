@@ -37,9 +37,8 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * yarn's TarballFetcher cases (__tests__/fetchers.js: an ungzipped tarball, truncated tar data and header) and archives
- * made for each branch of gunzip-maybe, tar-stream, tar-fs and the manifest read ({@code tarball-rows.tsv}, from
- * {@code generate/tarball-rows.js}), each as yarn 1.22.22's fetcher read it over http.
+ * yarn's __tests__/fetchers.js tarball cases and archives for each branch of gunzip-maybe, tar-stream, tar-fs and the
+ * manifest read ({@code generate/tarball-rows.js}), as yarn 1.22.22's TarballFetcher read each over http.
  */
 class TarballFetcherTest {
 
