@@ -22,8 +22,8 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * What semver-range-intersect 0.3.1's {@code intersect} answered under node for each row, through pnpm's
- * {@code safeIntersect}.
+ * What semver-range-intersect 0.3.1's {@code intersect} answers for each row (pnpm/generate/semver-range-intersect.js
+ * prints them), through pnpm's {@code safeIntersect}.
  */
 class SemverRangeIntersectTest {
 
