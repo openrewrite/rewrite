@@ -146,6 +146,34 @@ class ChangeDependencyCatalogTest implements RewriteTest {
     }
 
     @Test
+    void aRenameInAMemberAndAnUpgradeAtTheRootInOneRun() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-rename-member-upgrade-root");
+        rewriteRun(
+          spec -> spec.recipes(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
+              new UpgradeDependencyVersion("ms", null, "2.1.3"))
+            .executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
+          new UpgradeDependencyVersion("ms", null, "2.1.3"));
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion("ms", null, "2.1.3"),
+          new ChangeDependency("wrappy", "is-number", "7.0.0", null));
+    }
+
+    @Test
+    void anUpgradeOfTheEntryAnEarlierRenameAdded() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-rename-then-upgrade");
+        rewriteRun(
+          spec -> spec.recipes(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
+              new UpgradeDependencyVersion("is-number", null, "6.0.0"))
+            .executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new ChangeDependency("wrappy", "is-number", "7.0.0", null),
+          new UpgradeDependencyVersion("is-number", null, "6.0.0"));
+    }
+
+    @Test
     void aDependencyAnEarlierRecipeAddedInTheSameCycle() {
         rewriteRun(
           spec -> spec.recipes(new AddDependency("left-pad", "^1.3.0", null),

@@ -18,7 +18,6 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
@@ -62,37 +61,60 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest(name = "{0}/{1} reversed={6}")
+    @ParameterizedTest(name = "{0}/{1}")
     @CsvSource(delimiter = '|', textBlock = """
-      pnpm       | catalog-entry-quoted                        | is-number | >=7.0.0 | wrappy | 1.0.2 | false
-      pnpm       | catalog-entry-quoted                        | is-number | >=7.0.0 | wrappy | 1.0.2 | true
-      yarn-berry | catalog-yarnrc-quoted-edit                  | is-number | >=7.0.0 | ms     | 2.1.3 | false
-      yarn-berry | catalog-yarnrc-quoted-edit                  | is-number | >=7.0.0 | ms     | 2.1.3 | true
-      bun        | catalog-workspaces-catalog-two-entries-edit | is-number | ^7.0.0  | ms     | 2.1.3 | false
-      bun        | catalog-workspaces-catalog-two-entries-edit | is-number | ^7.0.0  | ms     | 2.1.3 | true
+      pnpm       | catalog-entry-quoted                        | is-number | >=7.0.0 | wrappy | 1.0.2
+      yarn-berry | catalog-yarnrc-quoted-edit                  | is-number | >=7.0.0 | ms     | 2.1.3
+      bun        | catalog-workspaces-catalog-two-entries-edit | is-number | ^7.0.0  | ms     | 2.1.3
       """)
     void twoUpgradesInOneRunEachReadTheCatalogAsTheOtherLeftIt(String family, String scenario, String first,
                                                                String firstVersion, String second,
-                                                               String secondVersion, boolean reversed) {
+                                                               String secondVersion) {
         CatalogRecording recording = new CatalogRecording(family, scenario);
         rewriteRun(
           spec -> spec.recipes(new UpgradeDependencyVersion(first, null, firstVersion),
               new UpgradeDependencyVersion(second, null, secondVersion))
             .executionContext(recording.ctx()),
-          recording.sources(reversed)
+          recording.sources()
         );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion(first, null, firstVersion),
+          new UpgradeDependencyVersion(second, null, secondVersion));
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void anEntryAnEarlierRecipeAddedInTheSameRun(boolean reversed) {
+    @ParameterizedTest(name = "{0}/{1}: {2}, then {4}")
+    @CsvSource(delimiter = '|', textBlock = """
+      bun        | catalog-compose-entry-then-member     | ms        | 2.1.3  | is-number | ^7.0.0
+      bun        | catalog-compose-entry-then-member     | is-number | ^7.0.0 | ms        | 2.1.3
+      yarn-berry | catalog-compose-entry-then-member     | ms        | 2.1.3  | is-number | ^7.0.0
+      yarn-berry | catalog-compose-entry-then-member     | is-number | ^7.0.0 | ms        | 2.1.3
+      pnpm       | catalog-compose-plain-member-and-root | is-number | ^7.0.0 | wrappy    | 1.0.2
+      pnpm       | catalog-compose-plain-member-and-root | wrappy    | 1.0.2  | is-number | ^7.0.0
+      """)
+    void twoUpgradesInOneRunEachRegenerateWithTheOthersManifest(String family, String scenario, String first,
+                                                                String firstVersion, String second,
+                                                                String secondVersion) {
+        CatalogRecording recording = new CatalogRecording(family, scenario);
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeDependencyVersion(first, null, firstVersion),
+              new UpgradeDependencyVersion(second, null, secondVersion))
+            .executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion(first, null, firstVersion),
+          new UpgradeDependencyVersion(second, null, secondVersion));
+    }
+
+    @Test
+    void anEntryAnEarlierRecipeAddedInTheSameRun() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-add-then-update");
         rewriteRun(
           spec -> spec.recipes(new AddDependency("is-number", "6.0.0", null),
               new UpgradeDependencyVersion("is-number", null, "7.0.0"))
             .executionContext(recording.ctx()),
-          recording.sources(reversed)
+          recording.sources()
         );
+        recording.assertEveryVisitOrder(new AddDependency("is-number", "6.0.0", null),
+          new UpgradeDependencyVersion("is-number", null, "7.0.0"));
     }
 
     @Test

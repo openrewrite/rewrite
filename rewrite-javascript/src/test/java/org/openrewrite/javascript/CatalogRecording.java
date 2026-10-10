@@ -19,14 +19,24 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Recipe;
+import org.openrewrite.RecipeRun;
+import org.openrewrite.Result;
+import org.openrewrite.SourceFile;
+import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextParser;
+import org.openrewrite.yaml.YamlParser;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.ByteArrayInputStream;
@@ -40,7 +50,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -125,15 +136,108 @@ final class CatalogRecording {
     }
 
     /**
-     * {@link #sources()}, in reverse when {@code reversed}: the lock before the catalog file, the members before the
-     * root.
+     * Run {@code recipes} over the recording's files in every order a host can visit them: each order leaves every
+     * file as the package manager did, without a warning, and a second run over that changes nothing.
      */
-    SourceSpecs[] sources(boolean reversed) {
-        SourceSpecs[] sources = sources();
-        if (reversed) {
-            Collections.reverse(Arrays.asList(sources));
+    void assertEveryVisitOrder(Recipe... recipes) {
+        Map<String, String> before = new LinkedHashMap<>();
+        Map<String, String> after = new LinkedHashMap<>();
+        before.put("package.json", read("pkg-before"));
+        after.put("package.json", read("pkg"));
+        Map<String, String> members = new TreeMap<>(tree("tree-before"));
+        members.keySet().removeIf(path -> !path.endsWith("package.json"));
+        Map<String, String> membersAfter = new TreeMap<>(members);
+        membersAfter.putAll(tree("tree"));
+        for (String member : members.keySet()) {
+            before.put(member, members.get(member));
+            after.put(member, membersAfter.get(member));
         }
-        return sources;
+        if (has("workspace-before") || has("workspace")) {
+            String workspace = read(has("workspace-before") ? "workspace-before" : "workspace");
+            before.put("pnpm-workspace.yaml", workspace);
+            after.put("pnpm-workspace.yaml", has("workspace") ? read("workspace") : workspace);
+        }
+        if (has("yarnrc")) {
+            before.put(".yarnrc.yml", read("yarnrc"));
+            after.put(".yarnrc.yml", read(has("yarnrc-after") ? "yarnrc-after" : "yarnrc"));
+        }
+        String lock = pm == PackageManager.Pnpm ? "pnpm-lock.yaml" : pm == PackageManager.Bun ? "bun.lock" :
+                "yarn.lock";
+        before.put(lock, read("before"));
+        after.put(lock, read("after"));
+        List<String> failures = new ArrayList<>();
+        for (List<String> order : orders(new ArrayList<>(before.keySet()))) {
+            List<SourceFile> sources = new ArrayList<>();
+            for (String path : order) {
+                sources.add(parse(path, before.get(path), new ArrayList<>(members.keySet())));
+            }
+            List<SourceFile> edited = run(sources, recipes);
+            for (SourceFile sf : edited) {
+                String path = sf.getSourcePath().toString();
+                if (!after.get(path).equals(printed(sf))) {
+                    failures.add(order + ": " + path + " is\n" + printed(sf));
+                }
+                sf.getMarkers().findFirst(Markup.class).ifPresent(m -> failures.add(order + ": " + path + " is marked " +
+                        m.getMessage()));
+            }
+            List<SourceFile> again = run(edited, recipes);
+            for (int i = 0; i < again.size(); i++) {
+                if (again.get(i) != edited.get(i)) {
+                    failures.add(order + ": a second run changes " + again.get(i).getSourcePath() + " to\n" +
+                            printed(again.get(i)));
+                }
+            }
+        }
+        assertThat(failures).as("unserved " + unserved).isEmpty();
+    }
+
+    private List<SourceFile> run(List<SourceFile> sources, Recipe... recipes) {
+        RecipeRun run = new CompositeRecipe(Arrays.asList(recipes)).run(new InMemoryLargeSourceSet(sources), ctx(), 1);
+        Map<Path, SourceFile> edited = new HashMap<>();
+        for (Result result : run.getChangeset().getAllResults()) {
+            if (result.getBefore() != null && result.getAfter() != null) {
+                edited.put(result.getBefore().getSourcePath(), result.getAfter());
+            }
+        }
+        List<SourceFile> out = new ArrayList<>();
+        for (SourceFile sf : sources) {
+            out.add(edited.getOrDefault(sf.getSourcePath(), sf));
+        }
+        return out;
+    }
+
+    private SourceFile parse(String path, String text, List<String> members) {
+        Parser parser = path.endsWith(".json") ? JsonParser.builder().build() :
+                path.endsWith(".yaml") || path.endsWith(".yml") ? YamlParser.builder().build() :
+                        PlainTextParser.builder().build();
+        SourceFile sf = parser.parse(ctx(), text).findFirst().orElseThrow(IllegalStateException::new)
+                .withSourcePath(Paths.get(path));
+        if (path.endsWith("package.json")) {
+            sf = sf.withMarkers(sf.getMarkers().add("package.json".equals(path) ?
+                    nodeResolutionResult(pm, members) : nodeResolutionResult(pm)));
+        }
+        return sf;
+    }
+
+    private static List<List<String>> orders(List<String> paths) {
+        List<List<String>> orders = new ArrayList<>();
+        if (paths.size() <= 1) {
+            orders.add(new ArrayList<>(paths));
+            return orders;
+        }
+        for (int i = 0; i < paths.size(); i++) {
+            List<String> rest = new ArrayList<>(paths);
+            String first = rest.remove(i);
+            for (List<String> order : orders(rest)) {
+                order.add(0, first);
+                orders.add(order);
+            }
+        }
+        return orders;
+    }
+
+    private static String printed(SourceFile sf) {
+        return sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
     /**
@@ -190,6 +294,8 @@ final class CatalogRecording {
             String edited = failed ? null : has("workspace") ? read("workspace") : read("workspace-before");
             sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), edited),
                     "pnpm-workspace.yaml"));
+        } else if (has("workspace")) {
+            sources.add(yamlFile(read("workspace"), null, "pnpm-workspace.yaml"));
         }
         if (has("yarnrc")) {
             String edited = failed ? null : has("yarnrc-after") ? read("yarnrc-after") : read("yarnrc");

@@ -57,7 +57,6 @@ import java.util.regex.Pattern;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonList;
-import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
@@ -1249,7 +1248,7 @@ public abstract class NodeCatalogs {
                         }
                     }
                     List<Path> importers = NodeDependencyScan.lockImporters(scan, p);
-                    Path last = regenerateLock(ctx, importers, decider);
+                    Path last = regenerateLock(ctx, importers);
                     NodeDependencyScan.ProjectState lps = last == null ? null : scan.projects.get(last);
                     if (lps != null && lps.regenResult != null) {
                         if (lps.regenResult.isSuccess()) {
@@ -1333,17 +1332,15 @@ public abstract class NodeCatalogs {
         }
 
         // the lock's importers regenerated as this cycle edits them; the one regenerated last holds every edit
-        private @Nullable Path regenerateLock(ExecutionContext ctx, List<Path> importers, Decider decider) {
+        private @Nullable Path regenerateLock(ExecutionContext ctx, List<Path> importers) {
             for (Path importer : importers) {
                 NodeDependencyScan.ProjectState ips = scan.projects.get(importer);
                 if (ips == null || ips.capturedPackageJson == null || results.containsKey(importer)) {
                     continue;
                 }
-                SourceFile pkg = current(ctx, importer, ips);
-                decide(importer, pkg, ctx, decider);
                 Decision decision = decisions.get(importer);
                 if (decision != null && decision.manifestEdit != null) {
-                    regenerate(ips, pkg, ctx);
+                    regenerate(ips, decision.from, ctx);
                     if (ips.modifiedPackageJson != null) {
                         PackageJsonHelper.putLiveTree(ctx, importer, ips.modifiedPackageJson);
                     }
@@ -1354,7 +1351,7 @@ public abstract class NodeCatalogs {
                     NodeDependencyScan.ProjectState ips = scan.projects.get(importers.get(i));
                     CatalogFile file = catalogFile(importers.get(i));
                     if (ips != null && ips.capturedPackageJson != null && file != null && !file.edits.isEmpty()) {
-                        regenerate(ips, current(ctx, importers.get(i), ips), ctx);
+                        regenerate(ips, from(ctx, importers.get(i)), ctx);
                         break;
                     }
                 }
@@ -1373,9 +1370,11 @@ public abstract class NodeCatalogs {
             return last;
         }
 
-        private static SourceFile current(ExecutionContext ctx, Path packageJson, NodeDependencyScan.ProjectState ps) {
-            SourceFile live = PackageJsonHelper.getLiveTree(ctx, packageJson);
-            return live == null ? requireNonNull(ps.capturedPackageJson) : live;
+        // a manifest as the recipes before this one leave it, as this recipe last decided from it
+        private SourceFile from(ExecutionContext ctx, Path packageJson) {
+            Decision decision = decisions.get(packageJson);
+            return decision != null ? decision.from :
+                    PackageJsonHelper.editedBefore(ctx, this, requireNonNull(captured(packageJson)));
         }
 
         private void regenerate(NodeDependencyScan.ProjectState ps, SourceFile pkg, ExecutionContext ctx) {
@@ -1387,9 +1386,9 @@ public abstract class NodeCatalogs {
             Function<Json.Document, Json.Document> manifestEdit = decision == null || decision.manifestEdit == null ?
                     Function.identity() : decision.manifestEdit;
             Function<Json.Document, Json.Document> edit = doc -> withCatalogEdits(manifestEdit.apply(doc));
+            NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(scan, ctx, path);
             PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(pkg, edit,
-                    editedFiles(ctx, path), ps.capturedLockContent, NodeDependencyScan.projectFiles(scan, ctx, path),
-                    ctx);
+                    editedFiles(ctx, path, files), ps.capturedLockContent, files, ctx);
             results.put(path, r);
             if (r.isChanged()) {
                 ps.modifiedPackageJson = r.getModifiedPackageJson();
@@ -1407,27 +1406,28 @@ public abstract class NodeCatalogs {
             }
         }
 
-        // the catalog files other than a manifest that a regeneration for packageJson reads, as the recipes so far and
-        // this cycle's edits leave them; Bun's root manifest, as edited so far, when packageJson is another
-        private Map<Path, String> editedFiles(ExecutionContext ctx, Path packageJson) {
-            CatalogFile file = catalogFile(packageJson);
-            if (file == null || file.path.equals(packageJson)) {
-                return emptyMap();
-            }
-            NodeCatalogs output;
-            if (file.scanned instanceof Bun) {
-                if (file.edits.isEmpty()) {
-                    return emptyMap();
+        // the project's other manifests and its catalog file that a regeneration for packageJson reads, as the recipes
+        // before this one and this cycle's decisions leave them, in any visit order
+        private Map<Path, String> editedFiles(ExecutionContext ctx, Path packageJson,
+                                              NodeDependencyScan.ProjectFiles files) {
+            Map<Path, String> edited = new LinkedHashMap<>();
+            Set<Path> manifests = new LinkedHashSet<>(files.getManifests().keySet());
+            manifests.addAll(files.getPackageManagerFiles().keySet());
+            for (Path manifest : manifests) {
+                if (!manifest.equals(packageJson) && captured(manifest) != null) {
+                    edited.put(manifest, printed(edit(ctx, from(ctx, manifest))));
+                    written.add(manifest);
                 }
-                SourceFile live = PackageJsonHelper.getLiveTree(ctx, file.path);
-                output = live instanceof Json.Document ? file.replay(file.scanned.reread(live)) : file.scanned.reread(
-                        edit(ctx, PackageJsonHelper.editedBefore(ctx, this, file.scanned.getDocument())));
-            } else {
-                output = output(file, rebased(ctx, file).current());
             }
-            written.add(file.path);
-            return output == null || output.getDocument() == file.scanned.getDocument() ? emptyMap() :
-                    singletonMap(file.path, output.print());
+            CatalogFile file = catalogFile(packageJson);
+            if (file != null && !(file.scanned instanceof Bun)) {
+                NodeCatalogs output = output(file, rebased(ctx, file).current());
+                written.add(file.path);
+                if (output != null && output.getDocument() != file.scanned.getDocument()) {
+                    edited.put(file.path, output.print());
+                }
+            }
+            return edited;
         }
 
         // a catalog file as visited, with this cycle's edits, when they change it

@@ -18,7 +18,6 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -120,16 +119,17 @@ class AddDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void anAdditionAfterAnUpgradeOfTheCatalogInTheSameRun(boolean reversed) {
+    @Test
+    void anAdditionAfterAnUpgradeOfTheCatalogInTheSameRun() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-update-then-add");
         rewriteRun(
           spec -> spec.recipes(new UpgradeDependencyVersion("wrappy", null, "1.0.2"),
               new AddDependency("wrappy", "1.0.2", null))
             .executionContext(recording.ctx()),
-          recording.sources(reversed)
+          recording.sources()
         );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion("wrappy", null, "1.0.2"),
+          new AddDependency("wrappy", "1.0.2", null));
     }
 
     @Test

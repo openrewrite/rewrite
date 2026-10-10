@@ -18,7 +18,6 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.marker.Markup;
@@ -86,16 +85,17 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void aRemovalAfterAnUpgradeOfTheCatalogInTheSameRun(boolean reversed) {
+    @Test
+    void aRemovalAfterAnUpgradeOfTheCatalogInTheSameRun() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-update-then-remove");
         rewriteRun(
           spec -> spec.recipes(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
               new RemoveDependency("wrappy", null))
             .executionContext(recording.ctx()),
-          recording.sources(reversed)
+          recording.sources()
         );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
+          new RemoveDependency("wrappy", null));
     }
 
     @Test
