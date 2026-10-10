@@ -22,14 +22,14 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
-import org.openrewrite.javascript.internal.NodeCatalogs.Pnpm.CatalogMode;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
+import org.openrewrite.javascript.internal.lock.pnpm.InstallSome;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
-import org.openrewrite.semver.NodeSemver;
 
 import java.util.Collection;
 import java.util.Map;
@@ -38,9 +38,6 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
-
-    private static final String CATALOG = "catalog:";
-    private static final String DEFAULT = "default";
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
     transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
@@ -115,54 +112,36 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
                              " are written in flow style, which is not read");
             return;
         }
-        String value = catalogs instanceof NodeCatalogs.Pnpm ?
-                pnpmAdd(decision, ctx, (NodeCatalogs.Pnpm) catalogs) : version;
+        boolean pnpm = catalogs instanceof NodeCatalogs.Pnpm;
+        String value = pnpm ? pnpmAdd(decision, ctx, (NodeCatalogs.Pnpm) catalogs) : version;
         if (value != null) {
-            decision.editManifest(doc -> matchesAdd(doc) ?
-                    PackageJsonHelper.addDependency(doc, packageName, value, targetScope()) : doc);
+            decision.editManifest(doc -> !matchesAdd(doc) ? doc : pnpm ?
+                    PackageJsonHelper.sortMembers(PackageJsonHelper.addDependency(doc, packageName, value,
+                            targetScope()), targetScope()) :
+                    PackageJsonHelper.addDependency(doc, packageName, value, targetScope()));
         }
     }
 
-    // what pnpm add writes: parseWantedDependencies' default-catalog match, installSome's catalogMode check and
-    // resolveDependencyTree's saveCatalogName entry
+    // what the pnpm release that runs writes, recorded: 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
     private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, ExecutionContext ctx,
                                      NodeCatalogs.Pnpm catalogs) {
-        String inDefault = catalogs.resolve(packageName, CATALOG);
-        String wanted = version.equals(inDefault) ? CATALOG : version;
-        String save = catalogs.getSaveCatalogName();
-        CatalogMode mode = catalogs.getCatalogMode();
-        if (mode != CatalogMode.MANUAL) {
-            String perDep = save == null ? DEFAULT : save;
-            String reference = CATALOG + (DEFAULT.equals(perDep) ? "" : perDep);
-            String entry = catalogs.resolve(packageName, reference);
-            boolean same = entry == null || wanted.equals(reference);
-            if (!same && NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) != null &&
-                NodeSemver.validRange(entry, NodeSemver.Options.DEFAULT) != null) {
-                try {
-                    same = NodeSemver.compare(wanted, entry, NodeSemver.Options.DEFAULT) == 0;
-                } catch (IllegalArgumentException e) {
-                    return reject(decision, ctx, Rejected.crashes(LockFileRegeneration.Reason.RESOLUTION_REQUIRED,
-                            packageName, "TypeError: " + e.getMessage()));
-                }
-            }
-            if (same) {
-                save = perDep;
-            } else if (mode == CatalogMode.STRICT) {
-                return reject(decision, ctx, Rejected.rejects(LockFileRegeneration.Reason.RESOLUTION_REQUIRED,
-                        packageName, "[ERR_PNPM_CATALOG_VERSION_MISMATCH] Wanted dependency outside the version " +
-                                     "range defined in catalog"));
-            }
+        SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
+        if (root != null && PnpmOptions.releaseMajor(PackageJsonHelper.printed(root), catalogs.getSettings()) < 10) {
+            return version;
         }
-        if (CATALOG.equals(wanted) || save == null || inDefault != null) {
-            return wanted;
+        InstallSome.Saved saved;
+        try {
+            saved = InstallSome.add(packageName, version, catalogs.getSettings());
+        } catch (Rejected e) {
+            return reject(decision, ctx, e);
         }
-        String catalog = save;
-        if (!decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
+        String catalog = saved.getCatalogName();
+        if (catalog != null && !decision.editCatalogs(c -> c.withEntry(catalog, packageName, version))) {
             declined(decision, packageName + "@" + version + " was not added: its catalog in " + catalogs.getPath() +
-                             " cannot take the entry in place");
+                               " cannot take the entry in place");
             return null;
         }
-        return CATALOG + (DEFAULT.equals(save) ? "" : save);
+        return saved.getBareSpecifier();
     }
 
     private @Nullable String reject(NodeDependencyEdits.Decision decision, ExecutionContext ctx, Rejected pnpm) {

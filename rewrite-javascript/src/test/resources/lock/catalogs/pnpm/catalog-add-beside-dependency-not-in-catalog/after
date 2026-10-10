@@ -1,0 +1,46 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+catalogs:
+  default:
+    left-pad:
+      specifier: 1.3.0
+      version: 1.3.0
+    wrappy:
+      specifier: 1.0.2
+      version: 1.0.2
+
+importers:
+
+  .:
+    dependencies:
+      left-pad:
+        specifier: 1.3.0
+        version: 1.3.0
+
+  packages/a:
+    dependencies:
+      left-pad:
+        specifier: 'catalog:'
+        version: 1.3.0
+      wrappy:
+        specifier: 'catalog:'
+        version: 1.0.2
+
+packages:
+
+  left-pad@1.3.0:
+    resolution: {integrity: sha512-XI5MPzVNApjAyhQzphX8BkmKsKUxD4LdyK24iZeQGinBN9yTQT3bFlCBy/aVx2HrNcqQGsdot8ghrjyrvMCoEA==}
+    deprecated: use String.prototype.padStart()
+
+  wrappy@1.0.2:
+    resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
+
+snapshots:
+
+  left-pad@1.3.0: {}
+
+  wrappy@1.0.2: {}

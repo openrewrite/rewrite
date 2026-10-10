@@ -135,6 +135,13 @@ public class PackageJsonHelper {
         return editors.editors;
     }
 
+    /**
+     * The file's text without its markers, which an earlier recipe's warning would otherwise print into.
+     */
+    public static String printed(SourceFile file) {
+        return file.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+    }
+
     public static Json.Document reparseJson(Json.Document original, String newContent) {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);
@@ -388,6 +395,32 @@ public class PackageJsonHelper {
             updatedScope = appendMember(existingScope, newDep);
         }
         return doc.withValue(replaceMember(root, scope, updatedScope));
+    }
+
+    /**
+     * {@code doc} with the members of its object {@code scope} in the lexical order of their keys, as pnpm writes a
+     * dependency field; each takes the layout of the member that stood in its place.
+     */
+    public static Json.Document sortMembers(Json.Document doc, String scope) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        Json.JsonObject object = findObjectMember(root, scope);
+        if (object == null) return doc;
+        List<JsonRightPadded<Json>> members = object.getPadding().getMembers();
+        List<Json.Member> sorted = new ArrayList<>();
+        for (JsonRightPadded<Json> member : members) {
+            if (!(member.getElement() instanceof Json.Member)) return doc;
+            sorted.add((Json.Member) member.getElement());
+        }
+        sorted.sort(Comparator.comparing(member -> String.valueOf(literalString(member.getKey()))));
+        List<JsonRightPadded<Json>> out = new ArrayList<>();
+        boolean changed = false;
+        for (int i = 0; i < members.size(); i++) {
+            Json.Member at = (Json.Member) members.get(i).getElement();
+            changed |= sorted.get(i) != at;
+            out.add(members.get(i).withElement(sorted.get(i).withPrefix(at.getPrefix())));
+        }
+        return changed ? doc.withValue(replaceMember(root, scope, object.getPadding().withMembers(out))) : doc;
     }
 
     /**
@@ -1010,10 +1043,7 @@ public class PackageJsonHelper {
         if (regen == null) {
             return null;
         }
-        // Print without markers: a Markup.warn from an earlier failed run must not corrupt the manifest
-        // handed to regeneration.
-        String content = packageJson.printAll(
-                new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        String content = printed(packageJson);
         return regen.regenerate(LockFileRegeneration.Request.builder()
                 .packageJson(content)
                 .lock(capturedLockContent)

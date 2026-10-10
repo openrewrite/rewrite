@@ -19,7 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.DataTable;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -784,11 +783,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     }
 
     private String print(SourceFile document) {
-        return prints.computeIfAbsent(document, NodeDependencyEdits::printed);
-    }
-
-    static String printed(SourceFile document) {
-        return document.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        return prints.computeIfAbsent(document, PackageJsonHelper::printed);
     }
 
     /**
@@ -848,6 +843,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         public @Nullable NodeCatalogs catalogs() {
             ManagedFile file = acc.managedOf(path);
             return file == null ? null : file.current();
+        }
+
+        /**
+         * Another manifest as the recipes before this one leave it; null when the scan holds none there.
+         */
+        public @Nullable SourceFile manifestOf(Path packageJson) {
+            return acc.editedBefore(ctx, packageJson);
         }
 
         /**
@@ -999,7 +1001,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
                 return base;
             }
             return scanned.reread(revision.getClass() == scanned.getDocument().getClass() ? revision :
-                    PackageJsonHelper.reparseLock(scanned.getDocument(), printed(revision)).withSourcePath(path));
+                    PackageJsonHelper.reparseLock(scanned.getDocument(), PackageJsonHelper.printed(revision)).withSourcePath(path));
         }
 
         NodeCatalogs current() {

@@ -21,7 +21,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.SourceFile;
-import org.openrewrite.javascript.internal.NodeCatalogs.Pnpm.CatalogMode;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.yaml.YamlParser;
@@ -185,19 +184,17 @@ class NodeCatalogsTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      catalog-add-root-declares-in-catalog-strict-cleanup, STRICT,  true
-      catalog-entry-one-importer,                          MANUAL,  false
-      catalog-add-mode-capitalized-mismatch,               PREFER,  false
-      catalog-add-mode-null-mismatch,                      PREFER,  false
-      catalog-add-save-name-prefer,                        PREFER,  false
-      catalog-remove-cleanup-capitalized-true,             MANUAL,  true
-      catalog-remove-cleanup-quoted-false,                 MANUAL,  true
-      catalog-remove-cleanup-no,                           MANUAL,  true
+      catalog-add-root-declares-in-catalog-strict-cleanup, true
+      catalog-entry-one-importer,                          false
+      catalog-add-mode-capitalized-mismatch,               false
+      catalog-add-mode-null-mismatch,                      false
+      catalog-add-save-name-prefer,                        false
+      catalog-remove-cleanup-capitalized-true,             true
+      catalog-remove-cleanup-quoted-false,                 true
+      catalog-remove-cleanup-no,                           true
       """)
-    void pnpmSettingsAsPnpmReadsThem(String scenario, CatalogMode mode, boolean cleanup) {
-        NodeCatalogs.Pnpm catalogs = pnpm(scenario);
-        assertThat(catalogs.getCatalogMode()).isEqualTo(mode);
-        assertThat(catalogs.isCleanupUnusedCatalogs()).isEqualTo(cleanup);
+    void pnpmSettingsAsPnpmReadsThem(String scenario, boolean cleanup) {
+        assertThat(pnpm(scenario).isCleanupUnusedCatalogs()).isEqualTo(cleanup);
     }
 
     @ParameterizedTest
@@ -216,18 +213,6 @@ class NodeCatalogsTest {
       """)
     void cleanupIsWhatJavaScriptHoldsTrue(String setting, boolean cleanup) {
         assertThat(pnpmOf(setting + "\n").isCleanupUnusedCatalogs()).isEqualTo(cleanup);
-    }
-
-    @ParameterizedTest
-    @CsvSource(nullValues = "null", textBlock = """
-      catalog-add-save-name-manual,  tools
-      catalog-add-save-name-default, default
-      catalog-add-save-name-empty,   ''
-      catalog-add-save-name-null,    null
-      catalog-entry-one-importer,    null
-      """)
-    void saveCatalogNameAsPnpmReadsIt(String scenario, @Nullable String name) {
-        assertThat(pnpm(scenario).getSaveCatalogName()).isEqualTo(name);
     }
 
     @Test

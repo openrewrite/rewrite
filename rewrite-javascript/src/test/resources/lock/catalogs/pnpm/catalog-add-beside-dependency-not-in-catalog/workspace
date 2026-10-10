@@ -1,0 +1,6 @@
+packages:
+  - packages/*
+catalogMode: prefer
+catalog:
+  left-pad: 1.3.0
+  wrappy: 1.0.2

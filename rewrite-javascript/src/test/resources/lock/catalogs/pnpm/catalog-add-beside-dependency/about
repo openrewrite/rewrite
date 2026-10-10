@@ -1,0 +1,1 @@
+pnpm 11.2.2 add is-number@6.0.0 in member a, which already depends on wrappy (catalog:); the default catalog holds is-number 6.0.0.

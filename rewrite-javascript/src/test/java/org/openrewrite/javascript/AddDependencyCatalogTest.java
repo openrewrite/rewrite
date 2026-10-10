@@ -62,6 +62,36 @@ class AddDependencyCatalogTest implements RewriteTest {
         recording.assertEveryVisitOrder(new AddDependency(name, version, null));
     }
 
+    // recorded with pnpm 11.2.2, which writes the member's dependencies sorted, whatever order they were in
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      catalog-add-beside-dependency                | is-number | 6.0.0
+      catalog-add-beside-dependency-not-in-catalog | left-pad  | 1.3.0
+      catalog-add-unsorted                         | is-number | 6.0.0
+      """)
+    void addedBesideOtherDependenciesInTheOrderPnpmWritesThem(String scenario, String name, String version) {
+        CatalogRecording recording = new CatalogRecording("pnpm", scenario);
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency(name, version, null)).executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new AddDependency(name, version, null));
+    }
+
+    // recorded with pnpm 9.15.9, whose add writes the version, and 10.34.6, which follows the default catalog as 11
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      catalog-add-pnpm9  | 9.15.9
+      catalog-add-pnpm10 | 10.34.6
+      """)
+    void addedAsTheReleaseTheProjectNamesAddsIt(String scenario, String release) {
+        CatalogRecording recording = new CatalogRecording("pnpm", scenario);
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null)).executionContext(recording.ctx()),
+          recording.sourcesWhoseInstallFails("the lock pnpm " + release + " writes")
+        );
+    }
+
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
       catalog-add-save-name-manual               | wrappy    | 1.0.2

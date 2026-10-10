@@ -1,0 +1,1 @@
+pnpm 11.2.2 add is-number@6.0.0 in packages/a, whose dependencies are not sorted (wrappy, is-odd): where pnpm writes the new key.

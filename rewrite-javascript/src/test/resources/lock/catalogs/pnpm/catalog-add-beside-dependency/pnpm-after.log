@@ -1,0 +1,7 @@
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 2, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ is-number catalog:
+
+Done in 167ms using pnpm v11.2.2

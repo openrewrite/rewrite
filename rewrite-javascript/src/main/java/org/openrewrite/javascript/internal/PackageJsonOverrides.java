@@ -22,9 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
-import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
@@ -350,38 +348,8 @@ public final class PackageJsonOverrides {
         return workspace.manifest(release).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
-    // the major of the pnpm release that installs the root: the one getConfig wants, unless its onFail lets the
-    // ported release run; -1 when a range leaves it open or pnpm cannot read what the root names
     private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
-        PnpmOptions.WantedPackageManager wanted;
-        try {
-            wanted = PnpmOptions.wantedPackageManager(root.printAll(), workspace.settings());
-        } catch (RuntimeException e) {
-            return -1;
-        }
-        if (wanted == null || !"pnpm".equals(wanted.getName()) || !(wanted.getVersion() instanceof String) ||
-            !"download".equals(wanted.getOnFail()) && !"error".equals(wanted.getOnFail())) {
-            return 11;
-        }
-        String version = (String) wanted.getVersion();
-        return version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT)) ?
-                Integer.parseInt(version.substring(0, version.indexOf('.'))) : releaseOf(version);
-    }
-
-    private static int releaseOf(String range) {
-        if (NodeSemver.satisfies(Main.PNPM_VERSION, range, NodeSemver.Options.INCLUDE_PRERELEASE)) {
-            return 11;
-        }
-        int found = -1;
-        for (int major = 9; major <= 12; major++) {
-            if (NodeSemver.intersects(range, "^" + major + ".0.0", NodeSemver.Options.DEFAULT)) {
-                if (found != -1) {
-                    return -1;
-                }
-                found = major;
-            }
-        }
-        return found;
+        return PnpmOptions.releaseMajor(PackageJsonHelper.printed(root), workspace.settings());
     }
 
     private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {
@@ -505,9 +473,7 @@ public final class PackageJsonOverrides {
         String indent = PackageJsonHelper.indentUnit(doc);
         try {
             ObjectMapper mapper = new ObjectMapper();
-            // an earlier recipe's warning would otherwise print into the JSON
-            JsonNode rootNode = mapper.readTree(doc.printAll(
-                    new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
+            JsonNode rootNode = mapper.readTree(PackageJsonHelper.printed(doc));
             ObjectNode overrides = rootNode.path("overrides").isObject() ?
                     (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
             ObjectNode at = overrides;

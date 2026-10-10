@@ -1,0 +1,8 @@
+[WARN] deprecated left-pad@1.3.0: use String.prototype.padStart()
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 2, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ left-pad catalog:
+
+Done in 179ms using pnpm v11.2.2

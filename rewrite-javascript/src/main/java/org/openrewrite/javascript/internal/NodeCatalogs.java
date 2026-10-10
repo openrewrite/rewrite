@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
@@ -148,7 +147,7 @@ public abstract class NodeCatalogs {
     public abstract @Nullable NodeCatalogs withEntry(String catalog, String alias, String specifier);
 
     public String print() {
-        return printed(document);
+        return PackageJsonHelper.printed(document);
     }
 
     /**
@@ -177,10 +176,6 @@ public abstract class NodeCatalogs {
      * {@code catalogs.default}), with the settings {@code pnpm add} and {@code pnpm remove} read beside them.
      */
     public static final class Pnpm extends YamlCatalogs {
-
-        public enum CatalogMode {
-            MANUAL, PREFER, STRICT
-        }
 
         private static final String DEFAULT = "default";
 
@@ -244,32 +239,11 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * {@code catalogMode}: manual when unset or {@code manual}, strict when {@code strict}; any other value lets
-         * pnpm add a version outside the catalog, as prefer does.
-         */
-        public CatalogMode getCatalogMode() {
-            Map<String, @Nullable Object> read = getSettings();
-            if (read == null || !read.containsKey("catalogMode") || "manual".equals(read.get("catalogMode"))) {
-                return CatalogMode.MANUAL;
-            }
-            return "strict".equals(read.get("catalogMode")) ? CatalogMode.STRICT : CatalogMode.PREFER;
-        }
-
-        /**
          * Whether {@code cleanupUnusedCatalogs} is a value JavaScript holds true.
          */
         public boolean isCleanupUnusedCatalogs() {
             Map<String, @Nullable Object> read = getSettings();
             return read != null && EcmaScript.truthy(read.get("cleanupUnusedCatalogs"));
-        }
-
-        /**
-         * {@code saveCatalogName} as pnpm reads it into a string; null when unset or null.
-         */
-        public @Nullable String getSaveCatalogName() {
-            Map<String, @Nullable Object> read = getSettings();
-            Object value = read == null ? null : read.get("saveCatalogName");
-            return value == null || value instanceof Map || value instanceof List ? null : EcmaScript.string(value);
         }
 
         /**
@@ -853,7 +827,4 @@ public abstract class NodeCatalogs {
         return null;
     }
 
-    private static String printed(SourceFile document) {
-        return document.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
-    }
 }
