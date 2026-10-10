@@ -1,0 +1,1 @@
+pnpm 11.2.2 installs after pnpm-workspace.yaml goes from autoInstallPeers true to false, as an earlier recipe edits it, and gains overrides is-number 7.0.0, as the recipe writes it: the lock records both.

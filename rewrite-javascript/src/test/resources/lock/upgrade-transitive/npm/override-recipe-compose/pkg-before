@@ -1,0 +1,11 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/a"
+  ],
+  "dependencies": {
+    "is-odd": "3.0.0"
+  }
+}

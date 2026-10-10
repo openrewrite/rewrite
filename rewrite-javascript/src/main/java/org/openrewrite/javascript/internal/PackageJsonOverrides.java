@@ -46,7 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Writes an override of a transitive dependency where the workspace root's package manager reads it, in its own key
+ * An override of a transitive dependency written where the workspace root's package manager reads it, in its own key
  * syntax: npm's and Bun's {@code overrides}, Yarn's {@code resolutions}, pnpm's by the release the project names.
  */
 public final class PackageJsonOverrides {
@@ -55,7 +55,47 @@ public final class PackageJsonOverrides {
 
     private static final String PNPM_RELEASE = "11.2.2";
 
-    private PackageJsonOverrides() {
+    private final PackageManager pm;
+    private final String packageName;
+    private final String newVersion;
+    private final @Nullable List<DependencyPathSegment> path;
+    private final Json.Document root;
+    private final WorkspaceSettings workspace;
+    private final int release;
+    private final Place place;
+    private @Nullable WorkspaceManifest scanned;
+
+    private PackageJsonOverrides(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
+                                 String packageName, String newVersion, @Nullable List<DependencyPathSegment> path) {
+        this.pm = pm;
+        this.root = root;
+        this.packageName = packageName;
+        this.newVersion = newVersion;
+        this.path = path;
+        this.workspace = new WorkspaceSettings(workspaceManifest);
+        this.release = pm == PackageManager.Pnpm ? pnpmRelease(root, workspace) : -1;
+        this.place = place(pm, root, workspace, release);
+    }
+
+    /**
+     * The override of {@code packageName} along {@code path} for the workspace root {@code root}, given the
+     * workspace's pnpm-workspace.yaml (null when it has none), which is read once.
+     */
+    public static PackageJsonOverrides of(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
+                                          String packageName, String newVersion,
+                                          @Nullable List<DependencyPathSegment> path) {
+        return new PackageJsonOverrides(pm, root, workspaceManifest, packageName, newVersion, path);
+    }
+
+    /**
+     * Where the root's package manager reads the override.
+     */
+    public Place getPlace() {
+        return place;
+    }
+
+    int getRelease() {
+        return release;
     }
 
     /**
@@ -120,11 +160,7 @@ public final class PackageJsonOverrides {
         return new DependencyPathSegment(part, null);
     }
 
-    /**
-     * Where the package manager of the workspace root {@code root} reads an override, given the workspace's
-     * pnpm-workspace.yaml (null when it has none).
-     */
-    public static Place place(PackageManager pm, Json.Document root, @Nullable String workspaceManifest) {
+    private static Place place(PackageManager pm, Json.Document root, WorkspaceSettings workspace, int release) {
         switch (pm) {
             case Bun:
                 return member(root, "overrides") == null && member(root, "resolutions") != null ?
@@ -133,12 +169,12 @@ public final class PackageJsonOverrides {
             case YarnBerry:
                 return Place.RESOLUTIONS;
             case Pnpm:
-                int release = pnpmRelease(root, workspaceManifest);
                 // pnpm 10 reads package.json's overrides, when it holds any, instead of pnpm-workspace.yaml's
                 if (release == 9 || release == 10 && (holdsOverrides(root) ||
-                                                      !WorkspaceManifest.holdsOverrides(workspaceManifest) &&
-                                                      hasPnpmField(root))) {
-                    return Place.PNPM_FIELD;
+                                                      !workspace.holdsOverrides() && hasPnpmField(root))) {
+                    // pnpm reads {...resolutions, ...pnpm?.overrides}, and a null pnpm field holds no object to edit
+                    return !hasPnpmField(root) && member(root, "pnpm") != null &&
+                           holdsMembers(member(root, "resolutions")) ? Place.RESOLUTIONS : Place.PNPM_FIELD;
                 }
                 return Place.WORKSPACE_MANIFEST;
             case Npm:
@@ -170,15 +206,11 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Why the root's package manager would not read the override along {@code path} at {@code place}, or null when
-     * it would.
+     * Why the root's package manager would not read the override where it is written, or null when it would.
      */
-    public static @Nullable String declined(PackageManager pm, Json.Document root, Place place,
-                                            @Nullable String workspaceManifest,
-                                            @Nullable List<DependencyPathSegment> path) {
+    public @Nullable String declined() {
         int depth = path == null ? 0 : path.size();
         if (pm == PackageManager.Pnpm) {
-            int release = pnpmRelease(root, workspaceManifest);
             if (release < 9 || release > 11) {
                 return "where pnpm " + (release < 0 ? "of the release the project names" : release + ".x") +
                        " reads overrides is not known";
@@ -222,15 +254,14 @@ public final class PackageJsonOverrides {
      */
     public static Json.Document applyOverride(Json.Document doc, PackageManager pm, String packageName,
                                               String newVersion, @Nullable List<DependencyPathSegment> path) {
-        return applyOverride(doc, place(pm, doc, null), pm, packageName, newVersion, path);
+        return of(pm, doc, null, packageName, newVersion, path).apply(doc);
     }
 
     /**
-     * The package.json with the override at {@code place}, unchanged when that is pnpm-workspace.yaml or the
-     * package manager already reads {@code newVersion} there.
+     * {@code doc}, a revision of the root's package.json, with the override at {@link #getPlace()}; unchanged when
+     * that is pnpm-workspace.yaml or the package manager already reads {@code newVersion} there.
      */
-    public static Json.Document applyOverride(Json.Document doc, Place place, PackageManager pm, String packageName,
-                                              String newVersion, @Nullable List<DependencyPathSegment> path) {
+    public Json.Document apply(Json.Document doc) {
         switch (place) {
             case OVERRIDES:
                 if (path == null || path.isEmpty()) {
@@ -241,7 +272,8 @@ public final class PackageJsonOverrides {
                 }
                 return setNestedOverride(doc, path, packageName, newVersion);
             case RESOLUTIONS:
-                return setFlatEntry(doc, "resolutions", resolutionKey(pm, packageName, path), newVersion);
+                return setFlatEntry(doc, "resolutions", pm == PackageManager.Pnpm ? pnpmKey(packageName, path) :
+                        resolutionKey(pm, packageName, path), newVersion);
             case PNPM_FIELD:
                 String key = pnpmKey(packageName, path);
                 Json pnpm = member(doc, "pnpm");
@@ -260,21 +292,25 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * pnpm-workspace.yaml with the override placed as the root's pnpm release writes a new key or entry, created when
-     * null; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors, documents).
+     * A revision of pnpm-workspace.yaml (null for none) with the override where pnpm writes a new key or entry; an
+     * {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors, documents).
      */
-    public static String applyWorkspaceOverride(@Nullable String workspaceManifest, Json.Document root,
-                                                String packageName, String newVersion,
-                                                @Nullable List<DependencyPathSegment> path) {
-        return new WorkspaceManifest(workspaceManifest, pnpmRelease(root, workspaceManifest))
-                .withOverride(pnpmKey(packageName, path), newVersion);
+    public String applyToWorkspaceManifest(@Nullable String workspaceManifest) {
+        WorkspaceManifest manifest;
+        if (workspace.isText(workspaceManifest)) {
+            if (scanned == null) {
+                scanned = new WorkspaceManifest(workspace, release);
+            }
+            manifest = scanned;
+        } else {
+            manifest = new WorkspaceManifest(new WorkspaceSettings(workspaceManifest), release);
+        }
+        return manifest.withOverride(pnpmKey(packageName, path), newVersion);
     }
 
-    /**
-     * The major of the pnpm release that installs the root: the one it names, unless {@code onFail} or the workspace's
-     * {@code pmOnFail} lets the ported release run; 11 when it names none; -1 when a range leaves it open.
-     */
-    static int pnpmRelease(Json.Document root, @Nullable String workspaceManifest) {
+    // the major of the pnpm release that installs the root: the one it names, unless onFail or the workspace's
+    // pmOnFail lets the ported release run; 11 when it names none; -1 when a range leaves it open
+    private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
         Json devEngines = member(root, "devEngines");
         Json engine = devEngines instanceof Json.JsonObject ?
                 member((Json.JsonObject) devEngines, "packageManager") : null;
@@ -291,27 +327,28 @@ public final class PackageJsonOverrides {
             String own = literal(pnpm < 0 ? engines.get(engines.size() - 1) : engine, "onFail");
             onFail = own != null ? own : pnpm < 0 || pnpm == engines.size() - 1 ? "error" : "ignore";
         }
-        String name = engine == null ? null : literal(engine, "name");
+        Json name = engine instanceof Json.JsonObject ? member((Json.JsonObject) engine, "name") : null;
         String wanted = null;
         boolean exact = false;
-        if (name != null && !name.isEmpty()) {
-            wanted = "pnpm".equals(name) ? literal(engine, "version") : null;
+        if (truthy(name)) {
+            Json version = member((Json.JsonObject) requireNonNull(engine), "version");
+            wanted = "pnpm".equals(string(name)) ? string(version) : null;
             if (wanted != null && NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null) {
                 wanted = null;
             }
         } else {
             onFail = null;
-            Json packageManager = member(root, "packageManager");
-            String named = packageManager instanceof Json.Literal ? literalString(packageManager) : null;
+            String named = string(member(root, "packageManager"));
             if (named != null && named.startsWith("pnpm@") && !named.contains(":")) {
                 String version = named.substring("pnpm@".length()).split("\\+", -1)[0];
                 exact = version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT));
                 wanted = exact ? version : null;
             }
         }
-        Object pmOnFail = WorkspaceManifest.setting(workspaceManifest, "pmOnFail");
+        Object pmOnFail = workspace.setting("pmOnFail");
         if (pmOnFail != null && !Boolean.FALSE.equals(pmOnFail) && !"".equals(pmOnFail) &&
-            !(pmOnFail instanceof Number && ((Number) pmOnFail).doubleValue() == 0)) {
+            !(pmOnFail instanceof Number && (((Number) pmOnFail).doubleValue() == 0 ||
+                                             Double.isNaN(((Number) pmOnFail).doubleValue())))) {
             onFail = String.valueOf(pmOnFail);
         }
         if (wanted == null || onFail != null && !"download".equals(onFail) && !"error".equals(onFail)) {
@@ -495,6 +532,22 @@ public final class PackageJsonOverrides {
         return obj instanceof Json.JsonObject ? literalString(member((Json.JsonObject) obj, name)) : null;
     }
 
+    // a JSON string's value; null for any other value, which pnpm does not read as a string
+    private static @Nullable String string(@Nullable Json value) {
+        Object literal = value instanceof Json.Literal ? ((Json.Literal) value).getValue() : null;
+        return literal instanceof String ? (String) literal : null;
+    }
+
+    private static boolean truthy(@Nullable Json value) {
+        if (!(value instanceof Json.Literal)) {
+            return value != null;
+        }
+        Object literal = ((Json.Literal) value).getValue();
+        return literal != null && !Boolean.FALSE.equals(literal) && !"".equals(literal) &&
+               !(literal instanceof Number && (((Number) literal).doubleValue() == 0 ||
+                                               Double.isNaN(((Number) literal).doubleValue())));
+    }
+
     private static @Nullable String literalString(@Nullable Object node) {
         if (node instanceof Json.Literal) {
             Object val = ((Json.Literal) node).getValue();
@@ -528,6 +581,44 @@ public final class PackageJsonOverrides {
     }
 
     /**
+     * A revision of pnpm-workspace.yaml as a YAML document, loaded once; no settings when absent or unreadable.
+     */
+    private static final class WorkspaceSettings {
+        private final @Nullable String text;
+        private final @Nullable Object loaded;
+        private final @Nullable RuntimeException unreadable;
+
+        WorkspaceSettings(@Nullable String text) {
+            this.text = text;
+            Object document = null;
+            RuntimeException error = null;
+            if (text != null) {
+                try {
+                    document = new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
+                } catch (RuntimeException e) {
+                    error = e;
+                }
+            }
+            this.loaded = document;
+            this.unreadable = error;
+        }
+
+        boolean isText(@Nullable String other) {
+            return text == null ? other == null : text.equals(other);
+        }
+
+        @Nullable
+        Object setting(String key) {
+            return loaded instanceof Map ? ((Map<?, ?>) loaded).get(key) : null;
+        }
+
+        boolean holdsOverrides() {
+            Object overrides = setting("overrides");
+            return overrides instanceof Map && !((Map<?, ?>) overrides).isEmpty();
+        }
+    }
+
+    /**
      * pnpm-workspace.yaml as lines, with its top-level entries and those of its {@code overrides}, edited in place
      * where pnpm's workspace manifest writer puts a new key or entry.
      */
@@ -544,12 +635,16 @@ public final class PackageJsonOverrides {
         private final List<String> lines = new ArrayList<>();
         private final List<Entry> entries;
 
-        WorkspaceManifest(@Nullable String text, int release) {
-            this.text = text;
+        WorkspaceManifest(WorkspaceSettings settings, int release) {
+            this.text = settings.text;
             this.release = release;
             if (text == null) {
                 entries = emptyList();
                 return;
+            }
+            if (settings.unreadable != null) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not YAML pnpm reads: " +
+                                                   settings.unreadable.getMessage(), settings.unreadable);
             }
             if (text.indexOf('\r') >= 0) {
                 throw new IllegalArgumentException("pnpm-workspace.yaml has CR line ends");
@@ -559,32 +654,14 @@ public final class PackageJsonOverrides {
                 lines.remove(lines.size() - 1);
             }
             entries = scan(0, lines.size(), true);
-            Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
-            if (!keys(entries).equals(keysOf(loaded))) {
+            if (!keys(entries).equals(keysOf(settings.loaded))) {
                 throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping of plain keys");
             }
             Entry overrides = entry(entries, "overrides");
-            Object loadedOverrides = overrides == null ? null : ((Map<?, ?>) loaded).get("overrides");
+            Object loadedOverrides = overrides == null ? null : settings.setting("overrides");
             if (overrides != null && (overrides.inline != null ||
                                       !keys(children(overrides)).equals(keysOf(loadedOverrides)))) {
                 throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
-            }
-        }
-
-        static boolean holdsOverrides(@Nullable String text) {
-            Object overrides = setting(text, "overrides");
-            return overrides instanceof Map && !((Map<?, ?>) overrides).isEmpty();
-        }
-
-        static @Nullable Object setting(@Nullable String text, String key) {
-            if (text == null) {
-                return null;
-            }
-            try {
-                Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
-                return loaded instanceof Map ? ((Map<?, ?>) loaded).get(key) : null;
-            } catch (RuntimeException e) {
-                return null;
             }
         }
 
@@ -777,7 +854,7 @@ public final class PackageJsonOverrides {
         static String scalar(String value) {
             for (int i = 0; i < value.length(); i++) {
                 char c = value.charAt(i);
-                if (c < 0x20 || c >= 0x7f && c <= 0x9f || c == ' ' || c == ' ') {
+                if (c < 0x20 || c >= 0x7f && c <= 0x9f || c == 0x2028 || c == 0x2029) {
                     throw new IllegalArgumentException("pnpm-workspace.yaml would need an escape for " + value);
                 }
             }

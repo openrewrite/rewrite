@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes overrides is-number 7.0.0 and left-pad 1.3.0 into an existing pnpm-workspace.yaml (config set), as the recipe run twice in one composite writes them.

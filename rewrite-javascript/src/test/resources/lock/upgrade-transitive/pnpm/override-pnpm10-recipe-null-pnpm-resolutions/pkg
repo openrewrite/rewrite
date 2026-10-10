@@ -1,0 +1,13 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "pnpm@10.34.6",
+  "dependencies": {
+    "is-odd": "3.0.1"
+  },
+  "pnpm": null,
+  "resolutions": {
+    "left-pad": "1.3.0",
+    "is-number": "7.0.0"
+  }
+}

@@ -23,17 +23,24 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.Recipe;
+import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
+import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.yaml.ChangePropertyValue;
+import org.openrewrite.yaml.YamlParser;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -42,9 +49,11 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +61,7 @@ import java.util.Map;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -69,6 +79,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     private static final String RESOURCES = "lock/upgrade-transitive/";
     private static final String MEMBER = "packages/a/package.json";
+    private static final String APPS_MEMBER = "apps/a/package.json";
 
     @Test
     void npmGlobal() {
@@ -131,13 +142,63 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void pnpmLockReadsAnEarlierRecipesEditOfTheWorkspaceManifestVisitedBeforeIt() {
+        Scenario s = new Scenario("pnpm/override-recipe-after-workspace-edit");
+        inOrder(s, new CompositeRecipe(Arrays.asList(
+          new ChangePropertyValue("autoInstallPeers", "false", null, null, null, null),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), Arrays.asList(
+          s.source("pnpm-workspace.yaml", "workspace-before", "workspace"),
+          s.manifest("package.json", PackageManager.Pnpm, null, "pkg-before", "pkg"),
+          s.source("pnpm-lock.yaml", "before", "after")));
+    }
+
+    @Test
     void pnpmAtTheRootOfAWorkspaceWhoseProjectsKeepTheirOwnLocks() {
         golden("pnpm/override-recipe-unshared", PackageManager.Pnpm, "7.0.0", null);
     }
 
     @Test
-    void pnpmMemberLockVisitedBeforeTheRoot() {
-        golden("pnpm/override-recipe-unshared", PackageManager.Pnpm, "7.0.0", null, true);
+    void pnpmWorkspaceWhoseProjectsKeepTheirOwnLocksInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-unshared");
+        String member = requireNonNull(s.file("tree-before/" + MEMBER));
+        inEveryOrder(s, new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null), Arrays.asList(
+          s.manifest("package.json", PackageManager.Pnpm, singletonList(MEMBER), "pkg-before", "pkg"),
+          new Source(MEMBER, member, member, nodeResolutionResult(PackageManager.Pnpm, dependencies(member))),
+          s.source("pnpm-workspace.yaml", "workspace-before", "workspace"),
+          s.source("pnpm-lock.yaml", "probes/before-root-lock", "probes/after-root-lock"),
+          s.source("packages/a/pnpm-lock.yaml", "before", "after")));
+    }
+
+    @Test
+    void pnpmAfterAnEarlierRecipeChangedTheRootInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-compose");
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(new UpgradeDependencyVersion("is-odd", null, "3.0.1"),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), s.workspaceSources(PackageManager.Pnpm));
+    }
+
+    @Test
+    void pnpmTwoOverridesInOneRunInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-two-pins");
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null),
+          new UpgradeTransitiveDependencyVersion("left-pad", "1.3.0", null))), s.workspaceSources(PackageManager.Pnpm));
+    }
+
+    @Test
+    void npmAfterAnEarlierRecipeChangedTheRootInEveryVisitOrder() {
+        Scenario s = new Scenario("npm/override-recipe-compose");
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(new UpgradeDependencyVersion("is-odd", null, "3.0.1"),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), s.workspaceSources(PackageManager.Npm));
+    }
+
+    @Test
+    void pnpm10NullPnpmFieldBesideResolutionsWritesResolutions() {
+        otherPnpmRelease("pnpm/override-pnpm10-recipe-null-pnpm-resolutions", null, "10.34.6");
+    }
+
+    @Test
+    void pnpm9NullPnpmFieldBesideResolutionsWritesResolutions() {
+        otherPnpmRelease("pnpm/override-pnpm9-recipe-null-pnpm-resolutions", null, "9.15.9");
     }
 
     @Test
@@ -316,10 +377,6 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     private void golden(String scenario, PackageManager pm, String version, @Nullable String path) {
-        golden(scenario, pm, version, path, false);
-    }
-
-    private void golden(String scenario, PackageManager pm, String version, @Nullable String path, boolean reversed) {
         Scenario s = new Scenario(scenario);
         List<SourceSpecs> sources = new ArrayList<>();
         sources.add(s.root(pm, s.file("pkg")));
@@ -338,10 +395,53 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             sources.add(s.lock(pm, "probes/before-root-lock", s.file("probes/after-root-lock"), "pnpm-lock.yaml"));
             sources.add(s.lock(pm, "before", s.file("after"), lockDir.trim() + "/pnpm-lock.yaml"));
         }
-        if (reversed) {
-            Collections.reverse(sources);
-        }
         rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
+    }
+
+    private static void inEveryOrder(Scenario s, Recipe recipe, List<Source> sources) {
+        for (List<Source> order : orders(sources)) {
+            inOrder(s, recipe, order);
+        }
+    }
+
+    // RewriteTest visits the sources grouped by parser, so this run fixes the order itself, over two cycles
+    private static void inOrder(Scenario s, Recipe recipe, List<Source> order) {
+        List<SourceFile> before = new ArrayList<>();
+        for (Source source : order) {
+            before.add(source.parse());
+        }
+        Map<Path, SourceFile> after = new HashMap<>();
+        for (Result result : recipe.run(new InMemoryLargeSourceSet(before), s.ctx(), 2, 2).getChangeset()
+          .getAllResults()) {
+            if (result.getAfter() != null) {
+                after.put(result.getAfter().getSourcePath(), result.getAfter());
+            }
+        }
+        String visited = order.stream().map(source -> source.path).collect(joining(", "));
+        for (Source source : order) {
+            SourceFile out = after.get(Paths.get(source.path));
+            if (out != null) {
+                noWarning(out);
+            }
+            assertThat(out == null ? source.before : out.printAll()).as("%s, visiting %s", source.path, visited)
+              .isEqualTo(source.after);
+        }
+    }
+
+    private static <T> List<List<T>> orders(List<T> items) {
+        List<List<T>> orders = new ArrayList<>();
+        if (items.isEmpty()) {
+            orders.add(new ArrayList<>());
+        }
+        for (int i = 0; i < items.size(); i++) {
+            List<T> rest = new ArrayList<>(items);
+            T first = rest.remove(i);
+            for (List<T> order : orders(rest)) {
+                order.add(0, first);
+                orders.add(order);
+            }
+        }
+        return orders;
     }
 
     // the edit is kept and the lock warned: pnpm 11.2.2 hands the install to the release the project names
@@ -385,6 +485,31 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     /**
+     * A file of a run in a fixed visit order: its text before and the text the recording ends with.
+     */
+    private static final class Source {
+        final String path;
+        final String before;
+        final String after;
+        final @Nullable NodeResolutionResult marker;
+
+        Source(String path, String before, String after, @Nullable NodeResolutionResult marker) {
+            this.path = path;
+            this.before = before;
+            this.after = after;
+            this.marker = marker;
+        }
+
+        SourceFile parse() {
+            Parser parser = path.endsWith(".json") ? JsonParser.builder().build() : YamlParser.builder().build();
+            SourceFile parsed = parser.parse(new InMemoryExecutionContext(t -> {
+                throw new RuntimeException(t);
+            }), before).findFirst().orElseThrow(IllegalStateException::new).withSourcePath(Paths.get(path));
+            return marker == null ? parsed : parsed.withMarkers(parsed.getMarkers().add(marker));
+        }
+    }
+
+    /**
      * A recording: its files, and a registry serving its {@code http/} by path whatever the registry's host.
      */
     private static final class Scenario {
@@ -417,6 +542,29 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             }
             return packageJson(before, before.equals(after) ? null : after, marker, spec -> spec.noTrim()
               .afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning));
+        }
+
+        Source source(String path, String before, String after) {
+            return new Source(path, requireNonNull(file(before)), requireNonNull(file(after)), null);
+        }
+
+        Source manifest(String path, PackageManager pm, @Nullable List<String> members, String before, String after) {
+            String text = requireNonNull(file(before));
+            return new Source(path, text, requireNonNull(file(after)), nodeResolutionResult(pm, members,
+              dependencies(text)));
+        }
+
+        // the root, its member apps/a (sorting before the root), pnpm-workspace.yaml when recorded, the root's lock
+        List<Source> workspaceSources(PackageManager pm) {
+            String member = requireNonNull(file("tree-before/" + APPS_MEMBER));
+            List<Source> sources = new ArrayList<>();
+            sources.add(manifest("package.json", pm, singletonList(APPS_MEMBER), "pkg-before", "pkg"));
+            sources.add(new Source(APPS_MEMBER, member, member, nodeResolutionResult(pm, dependencies(member))));
+            if (file("workspace-before") != null) {
+                sources.add(source("pnpm-workspace.yaml", "workspace-before", "workspace"));
+            }
+            sources.add(source(pm == PackageManager.Npm ? "package-lock.json" : "pnpm-lock.yaml", "before", "after"));
+            return sources;
         }
 
         SourceSpecs workspace() {

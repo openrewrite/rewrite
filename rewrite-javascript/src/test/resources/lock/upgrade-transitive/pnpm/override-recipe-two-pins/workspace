@@ -1,0 +1,5 @@
+packages:
+  - apps/*
+overrides:
+  is-number: 7.0.0
+  left-pad: 1.3.0
