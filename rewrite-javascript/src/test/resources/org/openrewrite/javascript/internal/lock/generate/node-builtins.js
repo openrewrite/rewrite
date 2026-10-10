@@ -40,9 +40,9 @@ function ask(test, fn, args, call) {
   rows.push(JSON.stringify(row))
 }
 
-const integers = ['', ' 12', '　 -12', '﻿42', '0x1F', '-0x1F', '+0x10', '0X1a', '0x', '0xg', '-0',
+const integers = ['', ' 12', '\u3000\u2028-12', '\ufeff42', '0x1F', '-0x1F', '+0x10', '0X1a', '0x', '0xg', '-0',
   '  -0  ', '1e3', '12abc', '077', '0b101', '0o17', '1_000', '99999999999999999999999', '9007199254740993',
-  '123456789012345678901234567890', '١٢', '４２', 'z', 'Z9', '-', '+', '+-1', 'Infinity', 'NaN',
+  '123456789012345678901234567890', '\u0661\u0662', '\uff14\uff12', 'z', 'Z9', '-', '+', '+-1', 'Infinity', 'NaN',
   '.5', '-.5', '00012', 'ffffffffffffffffffffffff', '0'.repeat(320) + '7', '1' + '0'.repeat(320), '9'.repeat(400),
   '1'.repeat(30), 'zzzzzzzzzzzzzzzzzzzzzzzzz']
 for (const radix of [undefined, 2, 8, 10, 16, 36, 1, 37]) {
@@ -73,7 +73,7 @@ for (const d of doubles) {
 }
 
 for (const s of ['0x10', ' 12 ', '1e3', '', '0b2', '0b11', '0o8', 'Infinity', '-Infinity', '+0x10', '1_0',
-  '٣', '.5e1', '5.', '  7 ﻿', '0X1F', '-0', 'infinity']) {
+  '\u0663', '.5e1', '5.', '\u00a0 7 \ufeff', '0X1F', '-0', 'infinity']) {
   ask('Number', 'toNumber', [s], x => Number(x))
 }
 
@@ -81,12 +81,12 @@ for (const d of [1e21, 1e-7, 123e-20, -0, 0.1 + 0.2, 2 ** 53 + 2, 100, 1.5e300, 
   ask('Number.prototype.toString', 'numberToString', [d], x => String(x))
 }
 
-for (const s of ['abc', '\t a b \n', '　 x ﻿', '᠎x᠎', '\u0085x​']) {
+for (const s of ['abc', '\t a b \n', '\u3000\u2028x\u2029\ufeff', '\u180ex\u180e', '\u0085x\u200b']) {
   ask('String.prototype.trim', 'trim', [s], x => x.trim())
   ask('String.prototype.trimStart', 'trimStart', [s], x => x.trimStart())
 }
 
-for (const s of ['a b', "-_.!~*'()", 'é', '😀', '\ud83d', '\ude00x', '#?&=/:@+$,;', '%']) {
+for (const s of ['a b', "-_.!~*'()", '\u00e9', '\ud83d\ude00', '\ud83d', '\ude00x', '#?&=/:@+$,;', '%']) {
   ask('encodeURIComponent', 'encodeURIComponent', [s], x => encodeURIComponent(x))
 }
 for (const s of ['%20', '%E9', '%C3%A9', '%', '%zz', '%C3', '%F0%9F%98%80', '%ED%A0%80', 'a%2fb', '%3', '%c3%a9']) {
@@ -99,20 +99,20 @@ const replacements = [['abcabc', 'b', false, '[$&]'], ['abcabc', 'b', true, '[$&
   ['abc', '(b)', false, '$2'], ['abc', '(b)', false, '$01'], ['abc', '(b)', false, '$10'], ['abc', '(b)', false, '$'],
   ['abc', '(b)(c)?', false, '<$2>'], ['abcdefghijk', '(a)(b)(c)(d)(e)(f)(g)(h)(i)(j)(k)', false, '$11-$10-$1'],
   ['abc', '(?<n>b)', false, '$<n>'], ['abc', 'b', false, '$<n>'], ['aaa', 'a*?', true, '-'], ['abc', '', true, '-'],
-  ['abc', '(b)', false, '$1٣']]
+  ['abc', '(b)', false, '$1\u0663']]
 for (const [s, source, global, replacement] of replacements) {
   ask('String.prototype.replace', 'replace', [s, source, global, replacement],
     (x, src, g, r) => x.replace(new RegExp(src, g ? 'g' : ''), r))
 }
 
 // new RegExp(source) without flags: the match of each subject, or V8's SyntaxError
-const patterns = [['a(', 'a'], ['[', ''], ['(?<n>a)\\k<n>', 'aa'], ['\\k<n>', 'k<n>'], ['a{2,1}', 'aa'], ['a{,2}', 'a{,2}'],
-  ['\\p{L}', 'p{L}'], ['(?=a)*b', 'b'], ['[\\d-z]', '-'], ['.', ' '], ['.', '\u0085'], ['\\s', '﻿'],
-  ['\\s', '᠎'], ['\\bx', 'éx'], ['\\w', 'é'], ['[^]', '\n'], ['[]', 'a'], ['\\cJ', '\n'], ['\\c1', '\\c1'],
-  ['\\8', '8'], ['(a)\\1', 'aa'], ['\\1(a)', 'a'], ['\\0', '\0'], ['\\u{41}', 'u'.repeat(41)], ['\\x4', 'x4'],
-  ['$^', ''], ['a|', 'b'], ['(?:)', 'x'], ['\\/', '/'], ['[\\b]', '\b'], ['^\\S+$', 'a b'], ['a{1}?', 'a'],
-  ['(?!a)?', 'a'], ['\\D\\W', '-.'], ['x*', 'xxx'], ['[a-\\d]', '-'], ['\\-', '-'], ['(?<a>.)(?<b>.)', 'xy'],
-  ['(?<a>x)|(?<a>y)', 'y']]
+const patterns = [['a(', 'a'], ['[', ''], ['(?<n>a)\\k<n>', 'aa'], ['\\k<n>', 'k<n>'], ['a{2,1}', 'aa'],
+  ['a{,2}', 'a{,2}'], ['\\p{L}', 'p{L}'], ['(?=a)*b', 'b'], ['[\\d-z]', '-'], ['.', '\u2028'], ['.', '\u0085'],
+  ['\\s', '\ufeff'], ['\\s', '\u180e'], ['\\bx', '\u00e9x'], ['\\w', '\u00e9'], ['[^]', '\n'], ['[]', 'a'],
+  ['\\cJ', '\n'], ['\\c1', '\\c1'], ['\\8', '8'], ['(a)\\1', 'aa'], ['\\1(a)', 'a'], ['\\0', '\0'],
+  ['\\u{41}', 'u'.repeat(41)], ['\\x4', 'x4'], ['$^', ''], ['a|', 'b'], ['(?:)', 'x'], ['\\/', '/'], ['[\\b]', '\b'],
+  ['^\\S+$', 'a\u00a0b'], ['a{1}?', 'a'], ['(?!a)?', 'a'], ['\\D\\W', '-.'], ['x*', 'xxx'], ['[a-\\d]', '-'],
+  ['\\-', '-'], ['(?<a>.)(?<b>.)', 'xy'], ['(?<a>x)|(?<a>y)', 'y']]
 for (const [source, subject] of patterns) {
   ask('RegExp', 'match', [source, subject], (src, x) => {
     const m = x.match(new RegExp(src))

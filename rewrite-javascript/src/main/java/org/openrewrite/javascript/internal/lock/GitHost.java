@@ -33,10 +33,15 @@ import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURIComponent;
 
 /**
- * Port of hosted-git-info 9.0.3 ({@code lib/index.js}, {@code hosts.js}, {@code from-url.js},
- * {@code parse-url.js}): the git hosts npm recognizes and the URL forms it writes for them.
+ * Port of hosted-git-info ({@code fromUrl} and the URL forms npm-package-arg writes): 9.0.3, which npm 11.17.0
+ * bundles, and 4.1.0, which pnpm 11.2.2's npm-package-arg fork calls.
  */
 public final class GitHost {
+
+    public enum Release {
+        V4_1_0,
+        V9_0_3
+    }
 
     /**
      * The options hosted-git-info's templates read; an unset option defers to the host's own.
@@ -90,6 +95,10 @@ public final class GitHost {
     private static final Map<String, @Nullable String> PROTOCOL_NAMES = new LinkedHashMap<>();
     private static final List<String> AUTH_PROTOCOLS =
             Arrays.asList("git+https:", "git:", "http:", "https:", "git+http:");
+    private static final List<String> KNOWN_PROTOCOLS_4_1_0 =
+            Arrays.asList("http:", "https:", "git:", "git+ssh:", "git+https:", "ssh:");
+    private static final Function<Fill, String> SOURCEHUT_HTTPS_4_1_0 = t ->
+            "https://" + t.domain + "/" + t.user + "/" + t.project + ".git" + maybeJoin("#", t.committish);
 
     static {
         PROTOCOL_NAMES.put("git+ssh:", "sshurl");
@@ -243,9 +252,10 @@ public final class GitHost {
     private final @Nullable String defaultRepresentation;
     private final Opts opts;
     private final HostInfo info;
+    private final Release release;
 
     private GitHost(String type, @Nullable String user, @Nullable String auth, String project,
-                    @Nullable String committish, @Nullable String defaultRepresentation, Opts opts) {
+                    @Nullable String committish, @Nullable String defaultRepresentation, Opts opts, Release release) {
         this.type = type;
         this.user = user;
         this.auth = auth;
@@ -254,6 +264,7 @@ public final class GitHost {
         this.defaultRepresentation = defaultRepresentation;
         this.opts = opts;
         this.info = HOSTS.get(type);
+        this.release = release;
     }
 
     public String getDomain() {
@@ -265,11 +276,24 @@ public final class GitHost {
     }
 
     public static @Nullable GitHost fromUrl(@Nullable String giturl, Opts opts) {
+        return fromUrl(giturl, opts, Release.V9_0_3);
+    }
+
+    public static @Nullable GitHost fromUrl(@Nullable String giturl, Opts opts, Release release) {
         if (giturl == null || giturl.isEmpty()) {
             return null;
         }
-        String correctedUrl = isGitHubShorthand(giturl) ? "github:" + giturl : giturl;
-        WhatwgUrl parsed = parseUrl(correctedUrl, true);
+        WhatwgUrl parsed;
+        if (release == Release.V4_1_0) {
+            String url = isGitHubShorthand(giturl) ? "github:" + giturl : correctProtocol410(giturl);
+            parsed = WhatwgUrl.tryParse(url);
+            if (parsed == null) {
+                String corrected = correctUrl410(url);
+                parsed = corrected == null ? null : WhatwgUrl.tryParse(corrected);
+            }
+        } else {
+            parsed = parseUrl(isGitHubShorthand(giturl) ? "github:" + giturl : giturl, true);
+        }
         if (parsed == null) {
             return null;
         }
@@ -335,7 +359,7 @@ public final class GitHost {
         } catch (IllegalArgumentException uriError) {
             return null;
         }
-        return new GitHost(gitHostName, user, auth, project, committish, defaultRepresentation, opts);
+        return new GitHost(gitHostName, user, auth, project, committish, defaultRepresentation, opts, release);
     }
 
     private static @Nullable String fill(@Nullable Function<Fill, String> template, @Nullable GitHost host, Opts over) {
@@ -366,7 +390,8 @@ public final class GitHost {
     }
 
     public @Nullable String https(Opts over) {
-        return fill("https", over);
+        return release == Release.V4_1_0 && "sourcehut".equals(type) ? fill(SOURCEHUT_HTTPS_4_1_0, this, over) :
+                fill("https", over);
     }
 
     public @Nullable String git(Opts over) {
@@ -476,6 +501,40 @@ public final class GitHost {
             giturl = "git+ssh://" + giturl;
         }
         return giturl;
+    }
+
+    // 4.1.0's correctProtocol, which knows fewer protocols and looks for // only after an @
+    private static String correctProtocol410(String arg) {
+        int firstColon = arg.indexOf(':');
+        String proto = arg.substring(0, firstColon + 1);
+        if (KNOWN_PROTOCOLS_4_1_0.contains(proto) || BY_SHORTCUT.containsKey(proto)) {
+            return arg;
+        }
+        int firstAt = arg.indexOf('@');
+        if (firstAt > -1) {
+            return firstAt > firstColon ? "git+ssh://" + arg : arg;
+        }
+        if (arg.indexOf("//") == firstColon + 1) {
+            return arg;
+        }
+        return arg.substring(0, firstColon + 1) + "//" + arg.substring(firstColon + 1);
+    }
+
+    // 4.1.0's correctUrl: the first @ and the last : before the last #; null where it leaves the URL undefined
+    private static @Nullable String correctUrl410(String giturl) {
+        int firstAt = giturl.indexOf('@');
+        int lastHash = giturl.lastIndexOf('#');
+        int firstColon = giturl.indexOf(':');
+        int lastColon = giturl.lastIndexOf(':', lastHash > -1 ? lastHash : giturl.length());
+        String corrected = null;
+        if (lastColon > firstAt) {
+            corrected = giturl.substring(0, lastColon) + "/" + giturl.substring(lastColon + 1);
+            firstColon = corrected.indexOf(':');
+        }
+        if (firstColon == -1 && !giturl.contains("//")) {
+            corrected = "git+ssh://" + (corrected == null ? "undefined" : corrected);
+        }
+        return corrected;
     }
 
     private static int lastIndexOfBefore(String str, char c, char beforeChar) {

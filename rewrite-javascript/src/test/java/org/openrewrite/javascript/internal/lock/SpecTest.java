@@ -24,6 +24,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -123,6 +125,10 @@ class SpecTest {
                 return spec.getGitRange();
             case "gitSubdir":
                 return spec.getGitSubdir();
+            case "where":
+                return spec.getWhere();
+            case "alias":
+                return spec.getAlias();
             default:
                 throw new IllegalArgumentException("unexpected key " + key);
         }
@@ -391,6 +397,118 @@ class SpecTest {
 
     @Test
     void catalogName() {
+    }
+
+    static Stream<Arguments> calls() {
+        List<Arguments> out = new ArrayList<>();
+        for (Spec.Release release : Spec.Release.values()) {
+            for (Call call : UpstreamCalls.read(resource(release))) {
+                if (!"toPurl".equals(call.getFn()) && !madeByTheTest(call)) {
+                    out.add(Arguments.of(release, call));
+                }
+            }
+        }
+        return out.stream();
+    }
+
+    private static String resource(Spec.Release release) {
+        return "npm-package-arg-" + (release == Spec.Release.PNPM_2_0_0 ? "pnpm-2.0.0" : "13.0.2") + ".jsonl.gz";
+    }
+
+    private static final String[] FIELDS = {"type", "registry", "where", "raw", "name", "escapedName", "scope",
+      "rawSpec", "saveSpec", "fetchSpec", "gitRange", "gitCommittish", "gitSubdir", "alias"};
+
+    // each release's own tests: the module loads once, before windows.js asks for Windows paths, so its rows hold
+    // the POSIX answers; process.cwd() (the test directory) is the port's root
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("calls")
+    void answersAsTheReleaseDoes(Spec.Release release, Call call) {
+        Map<String, @Nullable Object> threw = call.getThrew();
+        if (threw != null) {
+            assertThatThrownBy(() -> answer(release, call)).isInstanceOf(IllegalArgumentException.class)
+              .hasMessage((String) threw.get("message"));
+            return;
+        }
+        Object answer = answer(release, call);
+        if ("Result#toString".equals(call.getFn())) {
+            assertThat(answer).isEqualTo(call.getOut());
+            return;
+        }
+        Map<?, ?> out = (Map<?, ?>) Objects.requireNonNull(call.getOut());
+        Spec spec = (Spec) answer;
+        for (String key : FIELDS) {
+            Object want = out.containsKey(key) ? out.get(key) : EcmaScript.UNDEFINED;
+            Object got = field(spec, key);
+            assertThat(got == null ? null : got.toString()).as(key).isEqualTo(cwd(want));
+        }
+        Object hosted = out.get("hosted");
+        if (hosted instanceof Map) {
+            GitHost host = Objects.requireNonNull(spec.getHosted());
+            assertThat(host.getType()).isEqualTo(((Map<?, ?>) hosted).get("type"));
+            assertThat(host.getUser()).isEqualTo(((Map<?, ?>) hosted).get("user"));
+            assertThat(host.getProject()).isEqualTo(((Map<?, ?>) hosted).get("project"));
+            assertThat(host.getCommittish()).isEqualTo(cwd(((Map<?, ?>) hosted).get("committish")));
+            assertThat(host.getDefaultRepresentation()).isEqualTo(((Map<?, ?>) hosted).get("default"));
+        } else {
+            assertThat(spec.getHosted()).isNull();
+        }
+    }
+
+    private static Object answer(Spec.Release release, Call call) {
+        switch (call.getFn()) {
+            case "npa":
+                return Spec.npa(call.arg(0), where(call, 1), release);
+            case "resolve":
+                return Spec.resolve(text(call.arg(0)), text(call.arg(1)), where(call, 2), release);
+            default:
+                return Spec.npa(call.getSelf(), null, release).toString();
+        }
+    }
+
+    // the where a call passes, else the process.cwd() its test had, which a file spec's result names
+    private static @Nullable String where(Call call, int i) {
+        if (call.arg(i) instanceof String || !(call.getOut() instanceof Map)) {
+            return where(call.arg(i));
+        }
+        return where(((Map<?, ?>) call.getOut()).get("where"));
+    }
+
+    // a Result the test makes with new Result(...), which no npa call returns
+    private static boolean madeByTheTest(Call call) {
+        return "Result#toString".equals(call.getFn()) &&
+               ((Map<?, ?>) Objects.requireNonNull(call.getSelf())).get("type") == EcmaScript.UNDEFINED;
+    }
+
+    @Test
+    void namesEveryUpstreamCallItDoesNotReplay() {
+        assertThat(UpstreamCalls.read(resource(Spec.Release.V13_0_2)).stream()
+          .filter(call -> "toPurl".equals(call.getFn()))).as("toPurl: npm never calls it on a lock").hasSize(7);
+        assertThat(UpstreamCalls.read(resource(Spec.Release.V13_0_2)).stream().filter(SpecTest::madeByTheTest))
+          .as("toString of a Result the test constructs").hasSize(3);
+        assertThat(UpstreamCalls.read(resource(Spec.Release.PNPM_2_0_0)).stream()
+          .filter(call -> "toPurl".equals(call.getFn()) || madeByTheTest(call))).isEmpty();
+    }
+
+    private static @Nullable String text(@Nullable Object value) {
+        return value instanceof String ? (String) value : null;
+    }
+
+    private static @Nullable String where(@Nullable Object value) {
+        return value instanceof String ? cwd(value) : null;
+    }
+
+    // a value under the test directory or the home directory as the port, whose cwd and home are its root, has it
+    private static @Nullable String cwd(@Nullable Object value) {
+        if (value == null || value == EcmaScript.UNDEFINED) {
+            return null;
+        }
+        String s = value.toString();
+        for (String dir : new String[]{"<checkout>/test", "<home>"}) {
+            if (s.equals(dir) || s.startsWith(dir + "/")) {
+                return "/" + s.substring(Math.min(s.length(), dir.length() + 1));
+            }
+        }
+        return s;
     }
 
     @Test

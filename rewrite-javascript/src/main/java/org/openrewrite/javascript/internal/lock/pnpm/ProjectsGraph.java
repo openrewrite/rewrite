@@ -19,28 +19,22 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
-import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
-import org.openrewrite.semver.NodeSemver;
+import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
- * Port of @pnpm/workspace.projects-graph src/index.ts (pnpm 11.2.2), with the parts of @pnpm/npm-package-arg 2.0.0
- * and hosted-git-info 4.1.0 that type a dependency.
+ * Port of @pnpm/workspace.projects-graph src/index.ts (pnpm 11.2.2).
  */
 final class ProjectsGraph {
 
-    private static final Pattern IS_URL = Pattern.compile("^(?:git[+])?[a-z]+:", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IS_FILENAME = Pattern.compile("[.](?:tgz|tar.gz|tar)$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern IS_FILESPEC = Pattern.compile("^(?:[.]|~[/]|[/]|[a-zA-Z]:)");
-    private static final Pattern IS_FILE_PROTOCOL = Pattern.compile("^file:", Pattern.CASE_INSENSITIVE);
-    // what encodeURIComponent escapes
-    private static final Pattern URI_ENCODED = Pattern.compile("[^A-Za-z0-9\\-_.!~*'()]");
+    // two places for the workspace, whose own location the engine does not know
+    private static final String[] PLACEMENTS = {"/", "/workspace"};
 
     private final Map<String, Verification.Project> projectMap = new LinkedHashMap<>();
     private final List<Unmatched> unmatched = new ArrayList<>();
@@ -69,21 +63,6 @@ final class ProjectsGraph {
          * of its projects.
          */
         List<String> unknown;
-    }
-
-    // npa's result as far as createNode reads it
-    @Value
-    private static class Spec {
-        String type;
-
-        @Nullable
-        String fetchSpec;
-    }
-
-    private static final class NpaError extends RuntimeException {
-        NpaError(String message) {
-            super(message);
-        }
     }
 
     static Result createProjectsGraph(List<Verification.Project> projects, boolean ignoreDevDeps,
@@ -132,7 +111,8 @@ final class ProjectsGraph {
         }
         String rawSpec = (String) raw;
         boolean isWorkspaceSpec = rawSpec.startsWith("workspace:");
-        Spec spec;
+        String dir;
+        Spec.Type type;
         try {
             if (isWorkspaceSpec) {
                 PickPackageFromMeta.RegistryPackageSpec parsed = PickPackageFromMeta.parseBareSpecifier(
@@ -143,15 +123,17 @@ final class ProjectsGraph {
                 rawSpec = parsed.getFetchSpec();
                 depName = parsed.getName();
             }
-            spec = resolve(depName, rawSpec, project.getRootDir());
-        } catch (NpaError | JsError | PnpmError e) {
+            type = Spec.resolve(depName, rawSpec, PosixPath.join(PLACEMENTS[0], project.getRootDir()),
+                    Spec.Release.PNPM_2_0_0).getType();
+            dir = type == Spec.Type.DIRECTORY ? directory(depName, rawSpec, project.getRootDir()) : null;
+        } catch (IllegalArgumentException | JsError | PnpmError e) {
             return null;
         }
-        if ("directory".equals(spec.getType())) {
-            Verification.Project found = spec.getFetchSpec() == null ? null : projectMap.get(spec.getFetchSpec());
+        if (type == Spec.Type.DIRECTORY) {
+            Verification.Project found = dir == null ? null : projectMap.get(dir);
             return found == null ? null : found.getRootDir();
         }
-        if (!"version".equals(spec.getType()) && !"range".equals(spec.getType())) {
+        if (type != Spec.Type.VERSION && type != Spec.Type.RANGE) {
             return null;
         }
         List<Verification.Project> candidates = new ArrayList<>();
@@ -200,118 +182,20 @@ final class ProjectsGraph {
         return null;
     }
 
-    // npa.js: the argument split into a name and a spec
-    private Spec npa(String arg, String where) {
-        int nameEndsAt = arg.startsWith("@") ? arg.substring(1).indexOf('@') + 1 : arg.indexOf('@');
-        String namePart = nameEndsAt > 0 ? arg.substring(0, nameEndsAt) : arg;
-        String name = null;
-        String spec = null;
-        if (IS_URL.matcher(arg).find()) {
-            spec = arg;
-        } else if (!namePart.startsWith("@") && (namePart.contains("/") || IS_FILENAME.matcher(namePart).find())) {
-            spec = arg;
-        } else if (nameEndsAt > 0) {
-            name = namePart;
-            spec = arg.substring(nameEndsAt + 1);
-        } else if (ValidateNpmPackageName.validForOldPackages(arg, ValidateNpmPackageName.Release.V4_0_0)) {
-            name = arg;
-        } else {
-            spec = arg;
-        }
-        return resolve(name, spec, where);
-    }
-
-    // npa.js resolve
-    private Spec resolve(@Nullable String name, @Nullable String spec, String where) {
-        if (name != null && !name.isEmpty() &&
-            !ValidateNpmPackageName.validForOldPackages(name, ValidateNpmPackageName.Release.V4_0_0)) {
-            throw new NpaError("Invalid package name \"" + name + "\"");
-        }
-        if (spec == null || spec.isEmpty()) {
-            return fromRegistry("");
-        }
-        if (IS_FILESPEC.matcher(spec).find() || IS_FILE_PROTOCOL.matcher(spec).find()) {
-            return fromFile(spec, where);
-        }
-        if (spec.startsWith("npm:")) {
-            return npa(spec.substring(4), where);
-        }
-        if (isHostedGit(spec, where)) {
-            return new Spec("git", null);
-        }
-        if (IS_URL.matcher(spec).find()) {
-            return new Spec("url", null);
-        }
-        if (spec.contains("/") || IS_FILENAME.matcher(spec).find()) {
-            return fromFile(spec, where);
-        }
-        return fromRegistry(spec);
-    }
-
-    private Spec fromFile(String rawSpec, String where) {
-        String type = IS_FILENAME.matcher(rawSpec).find() ? "file" : "directory";
-        String spec = rawSpec.replace('\\', '/')
-                .replaceFirst("(?i)^file:[/]*([A-Za-z]:)", "$1")
-                .replaceFirst("^file:(?:[/]*([~./]))?", "$1");
-        String fetchSpec = spec.startsWith("~/") || spec.startsWith("/") || spec.matches("^[A-Za-z]:.*") ? null :
-                RootRelativePath.join(where, spec);
-        if ("directory".equals(type) && (fetchSpec == null || RootRelativePath.climbsAboveRoot(fetchSpec))) {
-            unknown.add(rawSpec);
-            return new Spec(type, null);
-        }
-        return new Spec(type, fetchSpec);
-    }
-
-    private static Spec fromRegistry(String rawSpec) {
-        String spec = rawSpec.isEmpty() ? "latest" : rawSpec;
-        if (NodeSemver.valid(spec, NodeSemver.Options.LOOSE) != null) {
-            return new Spec("version", spec);
-        }
-        if (NodeSemver.validRange(spec, NodeSemver.Options.LOOSE) != null) {
-            return new Spec("range", spec);
-        }
-        if (URI_ENCODED.matcher(spec).find()) {
-            throw new NpaError("Invalid tag name \"" + spec + "\"");
-        }
-        return new Spec("tag", spec);
-    }
-
-    // hosted-git-info 4.1.0 fromUrl(spec) != null, for the specs resolve reaches it with; a spec that names a user
-    // before its host is a repository only on a host hosted-git-info knows
-    private boolean isHostedGit(String spec, String where) {
-        if (isGitHubShorthand(spec)) {
-            return true;
-        }
-        if (spec.indexOf(':') < 0 && spec.indexOf('@') > -1 && spec.contains("/") &&
-            projectMap.containsKey(RootRelativePath.join(where, spec))) {
-            unknown.add(spec);
-            return true;
-        }
-        return false;
-    }
-
-    private static boolean isGitHubShorthand(String arg) {
-        int firstHash = arg.indexOf('#');
-        int firstSlash = arg.indexOf('/');
-        int secondSlash = arg.indexOf('/', firstSlash + 1);
-        int firstColon = arg.indexOf(':');
-        int firstSpace = -1;
-        for (int i = 0; i < arg.length(); i++) {
-            if (Js.trim(String.valueOf(arg.charAt(i))).isEmpty()) {
-                firstSpace = i;
-                break;
+    // path.resolve(project.rootDir, spec.fetchSpec) relative to the workspace, the same wherever the workspace lies, or
+    // null for a path that leaves it (unknown)
+    private @Nullable String directory(String depName, String rawSpec, String rootDir) {
+        String dir = null;
+        for (String root : PLACEMENTS) {
+            String where = PosixPath.join(root, rootDir);
+            String fetchSpec = Spec.resolve(depName, rawSpec, where, Spec.Release.PNPM_2_0_0).getFetchSpec();
+            String relative = PosixPath.relative(root, PosixPath.resolve(where, String.valueOf(fetchSpec)));
+            if (RootRelativePath.climbsAboveRoot(relative) || dir != null && !dir.equals(relative)) {
+                unknown.add(rawSpec);
+                return null;
             }
+            dir = relative;
         }
-        int firstAt = arg.indexOf('@');
-        boolean spaceOnlyAfterHash = firstSpace == -1 || firstHash > -1 && firstSpace > firstHash;
-        boolean atOnlyAfterHash = firstAt == -1 || firstHash > -1 && firstAt > firstHash;
-        boolean colonOnlyAfterHash = firstColon == -1 || firstHash > -1 && firstColon > firstHash;
-        boolean secondSlashOnlyAfterHash = secondSlash == -1 || firstHash > -1 && secondSlash > firstHash;
-        boolean hasSlash = firstSlash > 0;
-        boolean doesNotEndWithSlash = firstHash > -1 ? firstHash == 0 || arg.charAt(firstHash - 1) != '/' :
-                !arg.endsWith("/");
-        boolean doesNotStartWithDot = !arg.startsWith(".");
-        return spaceOnlyAfterHash && hasSlash && doesNotEndWithSlash && doesNotStartWithDot && atOnlyAfterHash &&
-               colonOnlyAfterHash && secondSlashOnlyAfterHash;
+        return dir;
     }
 }

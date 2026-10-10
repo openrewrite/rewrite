@@ -34,11 +34,16 @@ import static org.openrewrite.javascript.internal.lock.UriComponent.decodeURICom
 import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURIComponent;
 
 /**
- * Port of npm-package-arg 13.0.2 ({@code lib/npa.js}, its {@code Result}) on POSIX paths: what a
- * dependency spec asks for. {@link #ofDependency} also names the pnpm, Yarn and Bun protocols npa rejects.
+ * Port of npm-package-arg ({@code npa.js}, its {@code Result}) on POSIX paths: 13.0.2, which npm 11.17.0 bundles, and
+ * pnpm 11.2.2's fork of npa 8, {@code @pnpm/npm-package-arg} 2.0.0. {@link #ofDependency} also names other protocols.
  */
 @Getter
 public final class Spec {
+
+    public enum Release {
+        PNPM_2_0_0,
+        V13_0_2
+    }
 
     public enum Type {
         VERSION, RANGE, TAG, ALIAS, GIT, FILE, DIRECTORY, REMOTE,
@@ -82,7 +87,11 @@ public final class Spec {
     private static final Pattern IS_URL = Pattern.compile("^(?:git[+])?[a-z]+:", Pattern.CASE_INSENSITIVE);
     private static final Pattern IS_GIT = Pattern.compile("^[^@]+@[^:.]+\\.[^:]+:.+$", Pattern.CASE_INSENSITIVE);
     private static final Pattern IS_FILE_TYPE = Pattern.compile("[.](?:tgz|tar\\.gz|tar)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IS_FILENAME_PNPM = Pattern.compile("[.](?:tgz|tar.gz|tar)$", Pattern.CASE_INSENSITIVE);
     private static final Pattern IS_PORT_NUMBER = Pattern.compile(":[0-9]+(/|$)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern IS_PORT_NUMBER_PNPM = V8RegExp.of(":[0-9]+\\/?.*$");
+    private static final Pattern FILE_PROTOCOL = Pattern.compile("^file:", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ABSOLUTE_PATH = Pattern.compile("^[/]|^[A-Za-z]:");
     private static final Pattern IS_POSIX_FILE = Pattern.compile("^(?:[.]|~[/]|[/]|[a-zA-Z]:)");
     private static final Pattern GIT_SSH = Pattern.compile("^git\\+ssh://([^:#]+:[^#]+(?:\\.git)?)(?:#(.*))?$",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -93,11 +102,11 @@ public final class Spec {
     private @Nullable Type type;
     private @Nullable Boolean registry;
     private @Nullable String where;
-    private final String raw;
+    private String raw;
     private @Nullable String name;
     private @Nullable String escapedName;
     private @Nullable String scope;
-    private final String rawSpec;
+    private String rawSpec;
     private @Nullable String saveSpec;
     private @Nullable String fetchSpec;
     private @Nullable String gitRange;
@@ -106,13 +115,18 @@ public final class Spec {
     private @Nullable GitHost hosted;
     private @Nullable Spec subSpec;
 
-    private Spec(@Nullable String raw, @Nullable String name, @Nullable String rawSpec) {
+    /**
+     * The fork's {@code alias}: the name an {@code npm:} spec was given, on the result of the spec it names.
+     */
+    private @Nullable String alias;
+
+    private Spec(@Nullable String raw, @Nullable String name, @Nullable String rawSpec, Release release) {
         this.raw = raw != null ? raw :
                 name != null && !name.isEmpty() ? name + "@" + (rawSpec == null ? "undefined" : rawSpec) :
                         rawSpec == null ? "" : rawSpec;
         this.rawSpec = rawSpec == null ? "" : rawSpec;
         if (name != null && !name.isEmpty()) {
-            setName(name);
+            setName(name, release);
         }
     }
 
@@ -132,6 +146,7 @@ public final class Spec {
         this.gitSubdir = copy.gitSubdir;
         this.hosted = copy.hosted;
         this.subSpec = copy.subSpec;
+        this.alias = copy.alias;
     }
 
     public boolean isRegistry() {
@@ -143,13 +158,17 @@ public final class Spec {
     }
 
     public static Spec npa(Spec arg, @Nullable String where) {
+        return npa(arg, where, Release.V13_0_2);
+    }
+
+    private static Spec npa(Spec arg, @Nullable String where, Release release) {
         if (where == null || where.isEmpty() || where.equals(arg.where)) {
             return arg;
         }
         if (arg.name != null && !arg.name.isEmpty() && !arg.rawSpec.isEmpty()) {
-            return resolve(arg.name, arg.rawSpec, where);
+            return resolve(arg.name, arg.rawSpec, where, release);
         }
-        return npa(arg.raw, where);
+        return npa(arg.raw, where, release);
     }
 
     /**
@@ -157,11 +176,15 @@ public final class Spec {
      * @throws IllegalArgumentException npa's TypeError for a value of another type
      */
     public static Spec npa(@Nullable Object arg, @Nullable String where) {
+        return npa(arg, where, Release.V13_0_2);
+    }
+
+    public static Spec npa(@Nullable Object arg, @Nullable String where, Release release) {
         if (arg instanceof Spec) {
-            return npa((Spec) arg, where);
+            return npa((Spec) arg, where, release);
         }
         if (arg instanceof String) {
-            return npa((String) arg, where);
+            return npa((String) arg, where, release);
         }
         if (arg == null) {
             throw new IllegalArgumentException("Cannot read properties of null (reading 'name')");
@@ -179,15 +202,18 @@ public final class Spec {
         if (truthy(name) && truthy(rawSpec)) {
             if (!(name instanceof String)) {
                 String pkgid = string(name) + "@" + string(rawSpec);
-                throw new InvalidSpecException("Invalid package name \"" + string(name) + "\" of package \"" +
-                                               pkgid + "\": name must be a string.", "EINVALIDPACKAGENAME");
+                throw new InvalidSpecException(release == Release.PNPM_2_0_0 ?
+                        "Invalid package name \"" + string(name) + "\": name must be a string" :
+                        "Invalid package name \"" + string(name) + "\" of package \"" + pkgid +
+                        "\": name must be a string.", "EINVALIDPACKAGENAME");
             }
             if (!(rawSpec instanceof String)) {
-                throw new IllegalArgumentException("spec.toLowerCase is not a function");
+                throw new IllegalArgumentException(release == Release.PNPM_2_0_0 ?
+                        "spec.startsWith is not a function" : "spec.toLowerCase is not a function");
             }
-            return resolve((String) name, (String) rawSpec, resolvedWhere);
+            return resolve((String) name, (String) rawSpec, resolvedWhere, release);
         }
-        return npa(get(arg, "raw"), resolvedWhere);
+        return npa(get(arg, "raw"), resolvedWhere, release);
     }
 
     // arg[key] of the object or array npa was given, for a key no prototype has
@@ -196,35 +222,55 @@ public final class Spec {
     }
 
     public static Spec npa(String arg, @Nullable String where) {
+        return npa(arg, where, Release.V13_0_2);
+    }
+
+    public static Spec npa(String arg, @Nullable String where, Release release) {
+        boolean pnpm = release == Release.PNPM_2_0_0;
         String name = null;
         String spec;
         int nameEndsAt = arg.indexOf('@', 1);
         String namePart = nameEndsAt > 0 ? arg.substring(0, nameEndsAt) : arg;
         if (IS_URL.matcher(arg).find()) {
             spec = arg;
-        } else if (IS_GIT.matcher(arg).find()) {
+        } else if (!pnpm && IS_GIT.matcher(arg).find()) {
             spec = "git+ssh://" + arg;
-        } else if (!namePart.startsWith("@") && (namePart.contains("/") || IS_FILE_TYPE.matcher(namePart).find())) {
+        } else if (!namePart.startsWith("@") && (namePart.contains("/") || isFileType(namePart, release))) {
             spec = arg;
         } else if (nameEndsAt > 0) {
             name = namePart;
             spec = arg.substring(nameEndsAt + 1);
-            if (spec.isEmpty()) {
+            if (spec.isEmpty() && !pnpm) {
                 spec = "*";
             }
         } else {
-            if (ValidateNpmPackageName.validForOldPackages(arg, ValidateNpmPackageName.Release.V7_0_2)) {
+            if (ValidateNpmPackageName.validForOldPackages(arg, validateRelease(release))) {
                 name = arg;
-                spec = "*";
+                spec = pnpm ? null : "*";
             } else {
                 spec = arg;
             }
         }
-        return resolve(name, spec, where, arg);
+        return resolve(name, spec, where, arg, release);
     }
 
     public static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where) {
-        return resolve(name, spec, where, null);
+        return resolve(name, spec, where, null, Release.V13_0_2);
+    }
+
+    public static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,
+                               Release release) {
+        return resolve(name, spec, where, null, release);
+    }
+
+    private static boolean isFileType(String spec, Release release) {
+        return (release == Release.PNPM_2_0_0 ? IS_FILENAME_PNPM : IS_FILE_TYPE).matcher(spec).find();
+    }
+
+    // the validate-npm-package-name the release bundles
+    private static ValidateNpmPackageName.Release validateRelease(Release release) {
+        return release == Release.PNPM_2_0_0 ? ValidateNpmPackageName.Release.V4_0_0 :
+                ValidateNpmPackageName.Release.V7_0_2;
     }
 
     /**
@@ -245,7 +291,7 @@ public final class Spec {
     public static Spec ofDependency(String name, String value) {
         for (Type type : Type.values()) {
             if (type.prefix != null && value.startsWith(type.prefix)) {
-                Spec res = new Spec(null, name, value);
+                Spec res = new Spec(null, name, value, Release.V13_0_2);
                 res.type = type;
                 return res;
             }
@@ -256,7 +302,7 @@ public final class Spec {
             if (!"EUNSUPPORTEDPROTOCOL".equals(e.getCode())) {
                 throw e;
             }
-            Spec res = new Spec(null, name, value);
+            Spec res = new Spec(null, name, value, Release.V13_0_2);
             res.type = Type.UNKNOWN_PROTOCOL;
             return res;
         }
@@ -305,26 +351,36 @@ public final class Spec {
     }
 
     private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,
-                                @Nullable String arg) {
-        Spec res = new Spec(arg, name, spec);
+                                @Nullable String arg, Release release) {
+        boolean pnpm = release == Release.PNPM_2_0_0;
+        Spec res = new Spec(arg, name, spec, release);
         if (where == null || where.isEmpty()) {
             where = PosixPath.CWD;
         }
-        if (isFileSpec(spec)) {
+        if (pnpm && spec != null && (IS_POSIX_FILE.matcher(spec).find() || FILE_PROTOCOL.matcher(spec).find())) {
+            return fromFilePnpm(res, where);
+        } else if (pnpm && spec != null && spec.startsWith("npm:")) {
+            Spec aliased = npa(spec.substring(4), where, release);
+            aliased.alias = name;
+            aliased.raw = res.raw;
+            aliased.rawSpec = res.rawSpec;
+            return aliased;
+        } else if (!pnpm && isFileSpec(spec)) {
             return fromFile(res, where);
-        } else if (isAliasSpec(spec)) {
+        } else if (!pnpm && isAliasSpec(spec)) {
             return fromAlias(res, where);
         }
 
-        GitHost hosted = spec == null ? null : GitHost.fromUrl(spec, GitHost.Opts.of(true, true));
+        GitHost hosted = spec == null ? null : GitHost.fromUrl(spec, GitHost.Opts.of(true, true),
+                pnpm ? GitHost.Release.V4_1_0 : GitHost.Release.V9_0_3);
         if (hosted != null) {
             return fromHostedGit(res, hosted);
         } else if (spec != null && !spec.isEmpty() && IS_URL.matcher(spec).find()) {
-            return fromURL(res);
-        } else if (spec != null && !spec.isEmpty() && (spec.contains("/") || IS_FILE_TYPE.matcher(spec).find())) {
-            return fromFile(res, where);
+            return fromURL(res, release);
+        } else if (spec != null && !spec.isEmpty() && (spec.contains("/") || isFileType(spec, release))) {
+            return pnpm ? fromFilePnpm(res, where) : fromFile(res, where);
         }
-        return fromRegistry(res);
+        return fromRegistry(res, release);
     }
 
     private static boolean isFileSpec(@Nullable String spec) {
@@ -344,11 +400,13 @@ public final class Spec {
         return spec.toLowerCase(Locale.ROOT).startsWith("npm:");
     }
 
-    private void setName(String name) {
-        List<String> errors = ValidateNpmPackageName.errors(name, ValidateNpmPackageName.Release.V7_0_2);
+    private void setName(String name, Release release) {
+        List<String> errors = ValidateNpmPackageName.errors(name, validateRelease(release));
         if (!errors.isEmpty()) {
-            throw new InvalidSpecException("Invalid package name \"" + name + "\" of package \"" + raw + "\": " +
-                                           String.join("; ", errors) + ".", "EINVALIDPACKAGENAME");
+            throw new InvalidSpecException(release == Release.PNPM_2_0_0 ?
+                    "Invalid package name \"" + name + "\": " + String.join("; ", errors) :
+                    "Invalid package name \"" + name + "\" of package \"" + raw + "\": " + String.join("; ", errors) +
+                    ".", "EINVALIDPACKAGENAME");
         }
         this.name = name;
         this.scope = name.charAt(0) == '@' ? name.substring(0, name.indexOf('/')) : null;
@@ -481,6 +539,28 @@ public final class Spec {
         return res;
     }
 
+    // the fork's fromFile, npa 8's: the path as given, resolved against where
+    private static Spec fromFilePnpm(Spec res, String where) {
+        res.type = IS_FILENAME_PNPM.matcher(res.rawSpec).find() ? Type.FILE : Type.DIRECTORY;
+        res.where = where;
+        String spec = res.rawSpec.replace('\\', '/')
+                .replaceFirst("^file:[/]*([A-Za-z]:)", "$1")
+                .replaceFirst("^file:(?:[/]*([~./]))?", "$1");
+        if (spec.startsWith("~/")) {
+            res.fetchSpec = resolvePath(HOME, spec.substring(2));
+            res.saveSpec = "file:" + spec;
+        } else {
+            res.fetchSpec = resolvePath(where, spec);
+            res.saveSpec = "file:" + (ABSOLUTE_PATH.matcher(spec).find() ? spec :
+                    PosixPath.relative(where, res.fetchSpec));
+        }
+        return res;
+    }
+
+    private static String resolvePath(String where, String spec) {
+        return ABSOLUTE_PATH.matcher(spec).find() ? spec : PosixPath.resolve(where, spec);
+    }
+
     private static Spec fromHostedGit(Spec res, GitHost hosted) {
         res.type = Type.GIT;
         res.hosted = hosted;
@@ -491,12 +571,13 @@ public final class Spec {
         return res;
     }
 
-    private static Spec fromURL(Spec res) {
+    private static Spec fromURL(Spec res, Release release) {
         String rawSpec = res.rawSpec;
         res.saveSpec = rawSpec;
         if (rawSpec.startsWith("git+ssh:")) {
             Matcher matched = GIT_SSH.matcher(rawSpec);
-            if (matched.matches() && !IS_PORT_NUMBER.matcher(matched.group(1)).find()) {
+            Pattern port = release == Release.PNPM_2_0_0 ? IS_PORT_NUMBER_PNPM : IS_PORT_NUMBER;
+            if (matched.matches() && !port.matcher(matched.group(1)).find()) {
                 res.type = Type.GIT;
                 setGitAttrs(res, matched.group(2));
                 res.fetchSpec = matched.group(1);
@@ -564,9 +645,10 @@ public final class Spec {
         return res;
     }
 
-    private static Spec fromRegistry(Spec res) {
+    private static Spec fromRegistry(Spec res, Release release) {
+        boolean pnpm = release == Release.PNPM_2_0_0;
         res.registry = true;
-        String spec = trim(res.rawSpec);
+        String spec = !pnpm ? trim(res.rawSpec) : res.rawSpec.isEmpty() ? "latest" : res.rawSpec;
         res.saveSpec = null;
         res.fetchSpec = spec;
         String version = NodeSemver.valid(spec, NodeSemver.Options.LOOSE);
@@ -577,13 +659,13 @@ public final class Spec {
             res.type = Type.RANGE;
         } else {
             if (!encodeURIComponent(spec).equals(spec)) {
-                throw new InvalidSpecException("Invalid tag name \"" + spec + "\" of package \"" + res.raw +
-                                               "\": Tags may not have any characters that encodeURIComponent encodes.",
+                throw new InvalidSpecException("Invalid tag name \"" + spec + "\"" +
+                                               (pnpm ? "" : " of package \"" + res.raw + "\"") +
+                                               ": Tags may not have any characters that encodeURIComponent encodes.",
                         "EINVALIDTAGNAME");
             }
             res.type = Type.TAG;
         }
         return res;
     }
-
 }
