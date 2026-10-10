@@ -52,7 +52,7 @@ class YarnBerryInputsTest {
           .packageManagerFile(Paths.get("repo/app/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null);
 
         assertThat(inputs.getLock()).isEqualTo("__metadata:\n  version: 8\n");
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
@@ -76,7 +76,7 @@ class YarnBerryInputsTest {
             Paths.get("repo/packages/a/package.json"), Paths.get("other/.yarnrc.yml"))))
           .build();
 
-        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH, null);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc.yml",
           "packages/a/package.json");

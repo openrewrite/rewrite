@@ -103,7 +103,8 @@ final class YarnClassicInputs {
     }
 
     private static boolean hasCredentials(NodeRegistry registry) {
-        return registry.getAuthToken() != null || registry.getAuthBase64() != null || registry.getUsername() != null;
+        return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
+               registry.getUsername() != null && registry.getPassword() != null;
     }
 
     // what yarn reads of the project, which is all its walk reads

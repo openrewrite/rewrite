@@ -130,7 +130,8 @@ class ConfigTest {
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("registries")
     void requestsMetadataFromTheRegistryYarnDoes(Map<String, String> env, String packageIdent, String registry) {
-        assertThat(YarnClassicScenarios.config(Collections.emptyMap(), env).getRegistry(packageIdent)).isEqualTo(registry);
+        assertThat(YarnClassicScenarios.config(Collections.emptyMap(), env).getRegistry(packageIdent))
+          .isEqualTo(registry);
     }
 
     /**

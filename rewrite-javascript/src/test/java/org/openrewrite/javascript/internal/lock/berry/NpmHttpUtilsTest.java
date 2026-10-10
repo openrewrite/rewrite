@@ -32,7 +32,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class NpmHttpUtilsTest {
 
-    private final Configuration configuration = BerryScenarios.restricted(Configuration.defaults(), YarnRelease.of("4.10.3"));
+    private final Configuration configuration = BerryScenarios.restricted(Configuration.defaults(),
+      YarnRelease.of("4.10.3"));
     private final String registry = configuration.getString("npmRegistryServer");
 
     @Test
@@ -124,8 +125,8 @@ class NpmHttpUtilsTest {
             "Bearer entry-token|Bearer entry-token",
             "npmRegistries:\\n  '//127.0.0.1:4893':\\n    npmAuthIdent: 'u:p'\\n    npmAlwaysAuth: true|Basic dTpw|" +
             "Basic dTpw",
-            "npmScopes:\\n  types:\\n    npmRegistryServer: 'http://127.0.0.1:4893'\\n    npmAuthToken: scope-token|-|" +
-            "Bearer scope-token"
+            "npmScopes:\\n  types:\\n    npmRegistryServer: 'http://127.0.0.1:4893'\\n" +
+            "    npmAuthToken: scope-token|-|Bearer scope-token"
     })
     void sendsTheCredentialsYarnSends(String settings, @Nullable String unscoped, @Nullable String scoped) {
         Configuration configuration = BerryScenarios.restricted(Configuration.load(Collections.singletonMap(
