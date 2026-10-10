@@ -66,6 +66,13 @@ final class YarnClassicScenarios {
     }
 
     /**
+     * The install a lock belongs to: the one from {@code pkg-before}, or the edit's and the installs over its lock.
+     */
+    enum Phase {
+        BEFORE, AFTER
+    }
+
+    /**
      * One lock of a scenario with what yarn had when it wrote or read it: the manifests and the config of the
      * phase.
      */
@@ -74,17 +81,17 @@ final class YarnClassicScenarios {
         private final Scenario scenario;
         private final String fileName;
         private final String text;
-        private final boolean before;
+        private final Phase phase;
 
         Lock(Scenario scenario, String fileName, String text) {
             this.scenario = scenario;
             this.fileName = fileName;
             this.text = text;
-            this.before = fileName.startsWith("before");
+            this.phase = fileName.startsWith("before") ? Phase.BEFORE : Phase.AFTER;
         }
 
         Map<String, String> manifests() {
-            return scenario.manifests(before);
+            return scenario.manifests(phase);
         }
 
         /**
@@ -113,7 +120,7 @@ final class YarnClassicScenarios {
         }
 
         YarnClassicLockRegenerator.Inputs inputs() {
-            return scenario.inputs(before, text);
+            return scenario.inputs(phase, text);
         }
 
         @Override
@@ -267,12 +274,12 @@ final class YarnClassicScenarios {
          * What yarn had in a phase: the lock it started from, the phase's manifests and tree, the recorder's config
          * files ({@code parent/}, {@code grandparent/}), its paths, and the directory the {@code cwd} file names.
          */
-        YarnClassicLockRegenerator.Inputs inputs(boolean before, @Nullable String lock) {
+        YarnClassicLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
             putIfPresent(configFiles, ".yarnrc", file("yarnrc"));
             putIfPresent(configFiles, ".npmrc", file("npmrc"));
             Map<String, Map<String, String>> trees = new LinkedHashMap<>();
-            trees.put("", tree(before));
+            trees.put("", tree(phase));
             trees.put("../", tree("parent"));
             trees.put("../../", tree("grandparent"));
             Set<String> paths = new LinkedHashSet<>(configFiles.keySet());
@@ -300,7 +307,7 @@ final class YarnClassicScenarios {
             }
             return YarnClassicLockRegenerator.Inputs.builder()
                     .lock(lock)
-                    .manifests(manifests(before))
+                    .manifests(manifests(phase))
                     .configFiles(configFiles)
                     .paths(has("recorded-with") ? paths : null)
                     .directory(directory())
@@ -334,13 +341,14 @@ final class YarnClassicScenarios {
         /**
          * The project's manifests in a phase by location: {@code ""} the root, a directory's path otherwise.
          */
-        Map<String, String> manifests(boolean before) {
+        Map<String, String> manifests(Phase phase) {
             Map<String, String> manifests = new LinkedHashMap<>();
-            String root = before ? file("pkg-before") : has("pkg") ? file("pkg") : file("pkg-after");
+            String root = phase == Phase.BEFORE ? file("pkg-before") : has("pkg") ? file("pkg") :
+                    file("pkg-after");
             if (root != null) {
                 manifests.put("", root);
             }
-            for (Map.Entry<String, String> entry : tree(before).entrySet()) {
+            for (Map.Entry<String, String> entry : tree(phase).entrySet()) {
                 String path = entry.getKey();
                 if (path.endsWith("/package.json")) {
                     manifests.put(path.substring(0, path.length() - "/package.json".length()), entry.getValue());
@@ -352,9 +360,9 @@ final class YarnClassicScenarios {
         /**
          * The files of the project directory in a phase: {@code tree-before/}, then {@code tree/} over it after.
          */
-        Map<String, String> tree(boolean before) {
+        Map<String, String> tree(Phase phase) {
             Map<String, String> out = new TreeMap<>(tree("tree-before"));
-            if (!before) {
+            if (phase == Phase.AFTER) {
                 out.putAll(tree("tree"));
             }
             return out;

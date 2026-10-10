@@ -98,7 +98,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         Expect expect = Expect.of(scenario.expect());
         skipUnlessReplayed(scenario.getLabel(), scenario, expect);
         ScenarioRegistry http = new ScenarioRegistry(scenario);
-        Result result = new YarnClassicLockRegenerator(scenario.inputs(false, scenario.file("before")), http)
+        Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER, scenario.file("before")), http)
                 .regenerate();
         check(scenario.getLabel(), expect, scenario.file("after"), result, http);
     }

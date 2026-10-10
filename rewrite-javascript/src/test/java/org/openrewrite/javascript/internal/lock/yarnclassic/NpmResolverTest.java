@@ -131,7 +131,8 @@ class NpmResolverTest {
     }
 
     /**
-     * The registry left-pad 1.3.0's {@code resolved} names when yarn 1.22.22 ran live with each variable set.
+     * The registry left-pad 1.3.0's {@code resolved} names when yarn 1.22.22 ran live with each variable set
+     * ({@code generate/registry-env-rows.js}).
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource({
