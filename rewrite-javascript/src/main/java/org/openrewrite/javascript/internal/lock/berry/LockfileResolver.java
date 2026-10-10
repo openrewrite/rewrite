@@ -15,11 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.JsError;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/core sources/LockfileResolver.ts (Yarn 4.10.3).

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -23,7 +24,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of tar-stream 1.6.1 lib/extract.js and lib/headers.js {@code decode}, as yarn 1.22.22 bundles them.

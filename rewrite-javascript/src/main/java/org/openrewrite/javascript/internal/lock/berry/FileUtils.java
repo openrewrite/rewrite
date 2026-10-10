@@ -17,10 +17,10 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-file sources/fileUtils.ts (Yarn 4.10.3), up to the files it reads.

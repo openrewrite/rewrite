@@ -17,9 +17,9 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.function.Supplier;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/core sources/Cache.ts {@code getCacheKey} and {@code fetchPackageFromCache} (Yarn 4.10.3).

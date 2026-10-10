@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -27,7 +28,6 @@ import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 

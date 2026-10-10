@@ -17,13 +17,13 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/lockfile.preferred-versions src/index.ts and resolver-base's version selector

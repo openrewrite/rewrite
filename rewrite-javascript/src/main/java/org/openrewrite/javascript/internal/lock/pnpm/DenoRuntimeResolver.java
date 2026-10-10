@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.ArrayList;
 import java.util.Base64;
@@ -24,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @pnpm/engine.runtime.deno-resolver src/index.ts (pnpm 11.2.2): a {@code deno} dependency of

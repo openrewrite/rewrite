@@ -23,12 +23,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.Host;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;

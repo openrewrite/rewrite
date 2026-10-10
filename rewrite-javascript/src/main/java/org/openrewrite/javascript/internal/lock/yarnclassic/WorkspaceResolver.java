@@ -16,9 +16,9 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.ArrayList;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of yarn src/resolvers/contextual/workspace-resolver.js (yarn 1.22.22): a pattern a workspace member

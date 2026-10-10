@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.lock.Braces;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.IsExtglob;
 import org.openrewrite.javascript.internal.lock.IsGlob;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
@@ -33,7 +34,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 

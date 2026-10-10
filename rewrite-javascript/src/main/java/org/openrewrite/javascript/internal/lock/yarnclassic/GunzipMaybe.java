@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.JsError;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.EOFException;
@@ -22,7 +24,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.InflaterInputStream;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of gunzip-maybe 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, as yarn 1.22.22 bundles them.

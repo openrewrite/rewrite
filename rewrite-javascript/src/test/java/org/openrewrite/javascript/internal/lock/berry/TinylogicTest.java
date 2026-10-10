@@ -17,9 +17,9 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;

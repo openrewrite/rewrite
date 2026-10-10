@@ -15,12 +15,13 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import org.openrewrite.javascript.internal.lock.JsError;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of tinylogic 2.0.0 (index.js, grammar.pegjs and the pegjs 0.10 parser it generates), which structUtils'

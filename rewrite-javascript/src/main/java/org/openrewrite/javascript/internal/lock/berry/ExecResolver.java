@@ -16,11 +16,11 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
  * Port of @yarnpkg/plugin-exec sources/ExecResolver.ts (Yarn 4.10.3).
