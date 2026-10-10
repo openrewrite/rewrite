@@ -133,10 +133,10 @@ public final class PackageJsonOverrides {
                 return Place.RESOLUTIONS;
             case Pnpm:
                 int release = pnpmRelease(root);
-                if (release == 9 || release == 10 && member(root, "pnpm") != null) {
-                    return Place.PNPM_FIELD;
-                }
-                return Place.WORKSPACE_MANIFEST;
+                Json pnpm = member(root, "pnpm");
+                boolean hasPnpmField = pnpm != null &&
+                                       !(pnpm instanceof Json.Literal && ((Json.Literal) pnpm).getValue() == null);
+                return release == 9 || release == 10 && hasPnpmField ? Place.PNPM_FIELD : Place.WORKSPACE_MANIFEST;
             case Npm:
             default:
                 return Place.OVERRIDES;

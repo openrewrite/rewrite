@@ -155,6 +155,8 @@ class PackageJsonOverridesTest {
           .isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
         assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@10.34.6\",\"pnpm\":{}}")))
           .isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
+        assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@10.34.6\",\"pnpm\":null}")))
+          .isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
         assertThat(PackageJsonOverrides.place(Pnpm, manifest("{\"packageManager\":\"pnpm@9.15.9\"}")))
           .isEqualTo(PackageJsonOverrides.Place.PNPM_FIELD);
     }
