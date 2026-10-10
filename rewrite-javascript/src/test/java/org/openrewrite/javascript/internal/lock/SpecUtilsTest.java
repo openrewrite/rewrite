@@ -186,6 +186,21 @@ class SpecUtilsTest {
     }
 
     /**
+     * The package manager a root names is the spec its lookup finds, packageManager over devEngines; none without one.
+     */
+    @Test
+    void theSpecALookupFindsNamesThePackageManager() {
+        String both = "{\"packageManager\":\"yarn@1.22.22\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"}}}";
+        assertThat(SpecUtils.loadSpec("", 0, dir -> both).getSpec(true))
+                .isEqualTo(new SpecUtils.Descriptor("yarn", "1.22.22"));
+        assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}").getSpec(true)).isNull();
+        assertThat(SpecUtils.loadSpec("", 0, dir -> null).getSpec(true)).isNull();
+        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}").getSpec(true))
+                .isInstanceOf(Rejected.class)
+                .hasMessageContaining("expected a semver version");
+    }
+
+    /**
      * Under COREPACK_ENABLE_PROJECT_SPEC=0 corepack runs its own default whatever the project names.
      */
     @Test

@@ -65,6 +65,16 @@ public final class SpecUtils {
          */
         @Nullable
         String source;
+
+        /**
+         * {@code getSpec} of a lookup that found a spec, null for none; throws Rejected where parseSpec refuses it.
+         */
+        public @Nullable Descriptor getSpec(boolean enforceExactVersion) {
+            if (target == null || rawPmSpec == EcmaScript.UNDEFINED) {
+                return null;
+            }
+            return parseSpec(rawPmSpec, String.valueOf(source), enforceExactVersion);
+        }
     }
 
     /**
@@ -235,11 +245,8 @@ public final class SpecUtils {
             return null;
         }
         Lookup lookup = loadSpec(initialCwd, levels, manifest);
-        if (lookup.getTarget() == null || lookup.getRawPmSpec() == EcmaScript.UNDEFINED) {
-            return null;
-        }
-        Descriptor spec = parseSpec(lookup.getRawPmSpec(), String.valueOf(lookup.getSource()), true);
-        if (spec.getName().equals(name)) {
+        Descriptor spec = lookup.getSpec(true);
+        if (spec == null || spec.getName().equals(name)) {
             return spec;
         }
         if ("0".equals(env.setting("COREPACK_ENABLE_STRICT"))) {
