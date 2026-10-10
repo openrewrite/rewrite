@@ -49,8 +49,8 @@ public final class PnpmRelease {
     }
 
     /**
-     * The release pnpm runs for {@code rootManifest} under {@code workspace} (null without one): the one it switches to,
-     * else the ported one; declined where corepack would start another, as the host does not say which runs pnpm.
+     * The release pnpm runs for {@code rootManifest} under {@code workspace} (null without one): the one it switches
+     * to, else the ported one; declined where corepack would start another, as the host does not say which runs pnpm.
      */
     public static PnpmRelease of(String rootManifest, @Nullable Map<String, @Nullable Object> workspace) {
         PnpmOptions.WantedPackageManager wanted;
