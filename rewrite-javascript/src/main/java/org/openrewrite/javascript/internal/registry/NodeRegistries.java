@@ -19,6 +19,8 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -54,20 +56,32 @@ public class NodeRegistries {
     }
 
     /**
-     * The registry a request for {@code packageName} to {@code url} goes through: the host's for that name when
-     * {@code url} is its URL or under it, since the host's credentials go nowhere else; otherwise {@code url} without.
+     * The registry a request for {@code packageName} to {@code url} goes through: of the host's registries, the one
+     * whose URL is {@code url} or the longest under which it lies, as npm picks credentials by the request's URL;
+     * otherwise {@code url} without credentials, since the host's go nowhere else.
      */
     public NodeRegistry registryFor(String packageName, String url) {
-        NodeRegistry configured = registryFor(packageName);
-        String base = trimSlash(configured.getUrl());
         String target = trimSlash(url);
-        if (target.equals(base)) {
-            return configured;
+        NodeRegistry match = null;
+        for (NodeRegistry candidate : candidates()) {
+            String base = trimSlash(candidate.getUrl());
+            if ((target.equals(base) || target.startsWith(base + "/")) &&
+                (match == null || base.length() > trimSlash(match.getUrl()).length())) {
+                match = candidate;
+            }
         }
-        if (target.startsWith(base + "/")) {
-            return configured.withUrl(url);
+        if (match != null) {
+            return target.equals(trimSlash(match.getUrl())) ? match : match.withUrl(url);
         }
-        return new NodeRegistry(null, url, null, null, null, null, false, null, configured.isStrictSsl(), false);
+        return new NodeRegistry(null, url, null, null, null, null, false, null,
+                registryFor(packageName).isStrictSsl(), false);
+    }
+
+    private List<NodeRegistry> candidates() {
+        List<NodeRegistry> candidates = new ArrayList<>();
+        candidates.add(defaultRegistry);
+        candidates.addAll(byScope.values());
+        return candidates;
     }
 
     private static String trimSlash(String url) {

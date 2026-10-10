@@ -43,13 +43,15 @@ class NodeRegistriesTest {
             "lodash|https://registry.example.com/||https://registry.example.com/",
             "lodash|https://registry.yarnpkg.com||https://registry.yarnpkg.com",
             "@corp/a|https://corp.example.com/|corp-token|https://corp.example.com",
-            "@corp/a|https://registry.example.com/npm/||https://registry.example.com/npm/",
+            "@corp/a|https://registry.example.com/npm/|default-token|https://registry.example.com/npm/",
     })
     void sendsTheHostsCredentialsOnlyToItsRegistryAndTheUrlsUnderIt(String name, String url, @Nullable String token,
                                                                     String requestedFrom) {
         NodeRegistry registry = REGISTRIES.registryFor(name, url);
         assertThat(registry.getAuthToken()).isEqualTo(token);
         assertThat(registry.getUrl()).isEqualTo(requestedFrom);
-        assertThat(registry.isStrictSsl()).isEqualTo(REGISTRIES.registryFor(name).isStrictSsl());
+        NodeRegistry answering = "corp-token".equals(token) ? REGISTRIES.getByScope().get("@corp") :
+                "default-token".equals(token) ? REGISTRIES.getDefaultRegistry() : REGISTRIES.registryFor(name);
+        assertThat(registry.isStrictSsl()).isEqualTo(answering.isStrictSsl());
     }
 }
