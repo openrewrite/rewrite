@@ -24,6 +24,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -500,7 +501,7 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> result = new LinkedHashMap<>();
         Map<String, @Nullable Object> raw;
         try {
-            raw = Ini.decode(LockfileReader.stripBom(text));
+            raw = Ini.decode(StripBom.stripBom(text), Ini.Release.V6_0_0);
         } catch (IllegalArgumentException e) {
             // pnpm warns of the file and reads nothing from it
             return result;

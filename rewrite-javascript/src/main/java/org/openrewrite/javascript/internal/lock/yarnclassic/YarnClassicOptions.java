@@ -20,6 +20,7 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
+import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.semver.NodeSemver;
@@ -277,7 +278,8 @@ public final class YarnClassicOptions {
                 continue;
             }
             Map<String, @Nullable Object> config = new LinkedHashMap<>();
-            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(file.replace("\r\n", "\n")).entrySet()) {
+            String text = file.replace("\r\n", "\n");
+            for (Map.Entry<String, @Nullable Object> entry : Ini.decode(text, Ini.Release.V1_3_5).entrySet()) {
                 config.put(entry.getKey(), envReplace(normalizeConfigOption(entry.getValue()), env));
             }
             config.putAll(npmConfig);

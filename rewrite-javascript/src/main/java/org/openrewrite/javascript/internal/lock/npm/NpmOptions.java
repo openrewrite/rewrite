@@ -280,7 +280,7 @@ public class NpmOptions {
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
-        for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
+        for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
             String key;
             try {
                 key = envReplace(entry.getKey(), env);

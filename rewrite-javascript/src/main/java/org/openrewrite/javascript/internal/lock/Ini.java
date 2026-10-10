@@ -15,10 +15,6 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -31,42 +27,31 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.EcmaScript.truthy;
 
 /**
- * Port of ini 6.0.0 {@code decode}, which npm reads an npmrc with.
+ * Port of ini {@code decode}: 1.3.5, which yarn 1.22.22 reads an .npmrc with, and 6.0.0, which npm 11.17.0 and pnpm
+ * 11.2.2 (read-ini-file 5.0.0) read one with; {@code encode} of a flat map as 6.0.0 writes it.
  */
 public final class Ini {
 
+    public enum Release {
+        V1_3_5,
+        V6_0_0
+    }
+
     /**
-     * A section: {@code Object.create(null)}, an object with no prototype and so no string form.
+     * A 6.0.0 section: {@code Object.create(null)}, an object with no prototype and so no string form.
      */
     public static final class Section extends LinkedHashMap<String, @Nullable Object> {
     }
 
     private static final Pattern LINES = Pattern.compile("[\\r\\n]+");
-    private static final Pattern BLANK_OR_COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS +
-            "]*(?:[;#]|\\z)");
-    private static final Pattern LINE = Pattern.compile(
-            "^\\[([^\\]]*)\\][" + EcmaScript.WHITESPACE_CLASS + "]*\\z|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z");
-
-    private static final ObjectMapper JSON = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
+    private static final Pattern COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*[;#]");
+    private static final Pattern BLANK = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*\\z");
+    private static final String KEY_VALUE = "|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z";
+    private static final Pattern LINE_1_3_5 = Pattern.compile("^\\[([^\\]]*)\\]\\z" + KEY_VALUE);
+    private static final Pattern LINE_6_0_0 = Pattern.compile("^\\[([^\\]]*)\\][" + EcmaScript.WHITESPACE_CLASS +
+                                                              "]*\\z" + KEY_VALUE);
 
     private Ini() {
-    }
-
-    // what a JSON.parse value becomes as an object's key
-    private static String propertyKey(@Nullable Object value) {
-        if (value instanceof Number) {
-            return EcmaScript.numberToString((Number) value);
-        }
-        if (value instanceof List) {
-            List<String> items = new ArrayList<>();
-            for (Object item : (List<?>) value) {
-                items.add(item == null ? "" : propertyKey(item));
-            }
-            return String.join(",", items);
-        }
-        return value instanceof Map ? "[object Object]" : String.valueOf(value);
     }
 
     /**
@@ -74,26 +59,27 @@ public final class Ini {
      * {@code false} and {@code null} the JSON values, a quoted value what {@code JSON.parse} makes of it.
      */
     @SuppressWarnings("unchecked")
-    public static Map<String, @Nullable Object> decode(String str) {
-        Map<String, @Nullable Object> out = new LinkedHashMap<>();
+    public static Map<String, @Nullable Object> decode(String str, Release release) {
+        boolean v6 = release == Release.V6_0_0;
+        Map<String, @Nullable Object> out = v6 ? new Section() : new LinkedHashMap<>();
         Object p = out;
         for (String line : LINES.split(str, -1)) {
-            if (line.isEmpty() || BLANK_OR_COMMENT.matcher(line).find()) {
+            if (line.isEmpty() || COMMENT.matcher(line).find() || v6 && BLANK.matcher(line).find()) {
                 continue;
             }
-            Matcher match = LINE.matcher(line);
+            Matcher match = (v6 ? LINE_6_0_0 : LINE_1_3_5).matcher(line);
             if (!match.find()) {
                 continue;
             }
             if (match.group(1) != null) {
                 Object section = unsafe(match.group(1));
-                if ("__proto__".equals(section)) {
+                if (v6 && "__proto__".equals(section)) {
                     p = new Section();
                     continue;
                 }
-                String name = propertyKey(section);
+                String name = EcmaScript.string(section);
                 Object existing = out.get(name);
-                p = truthy(existing) ? existing : new Section();
+                p = truthy(existing) ? existing : v6 ? new Section() : new LinkedHashMap<String, @Nullable Object>();
                 out.put(name, p);
                 continue;
             }
@@ -101,10 +87,10 @@ public final class Ini {
             if (keyRaw == null) {
                 throw new IllegalArgumentException("Cannot read properties of null (reading 'length')");
             }
-            String keyText = propertyKey(keyRaw);
+            String keyText = EcmaScript.string(keyRaw);
             boolean isArray = keyRaw instanceof String && keyText.length() > 2 && keyText.endsWith("[]");
             String key = isArray ? keyText.substring(0, keyText.length() - 2) : keyText;
-            if ("__proto__".equals(key)) {
+            if (v6 && "__proto__".equals(key)) {
                 continue;
             }
             Object valueRaw = match.group(3) != null ? unsafe(match.group(4)) : Boolean.TRUE;
@@ -115,18 +101,19 @@ public final class Ini {
             if (!(p instanceof Map)) {
                 continue;
             }
-            Map<String, Object> target = (Map<String, Object>) p;
+            Map<String, @Nullable Object> target = (Map<String, @Nullable Object>) p;
             if (isArray) {
-                if (!target.containsKey(key)) {
+                if (v6 ? !target.containsKey(key) : !truthy(target.get(key))) {
                     target.put(key, new ArrayList<>());
                 } else if (!(target.get(key) instanceof List)) {
-                    List<Object> wrapped = new ArrayList<>();
+                    List<@Nullable Object> wrapped = new ArrayList<>();
                     wrapped.add(target.get(key));
                     target.put(key, wrapped);
                 }
             }
-            if (target.get(key) instanceof List) {
-                ((List<Object>) target.get(key)).add(value);
+            Object current = target.get(key);
+            if (current instanceof List) {
+                ((List<@Nullable Object>) current).add(value);
             } else {
                 target.put(key, value);
             }
@@ -135,15 +122,16 @@ public final class Ini {
         List<String> remove = new ArrayList<>();
         for (String k : EcmaScript.keys(out)) {
             Object section = out.get(k);
-            if (!(section == null || section instanceof Map)) {
+            // typeof null is 'object': 6.0.0 nests a null value, 1.3.5's falsy check skips it
+            if (!(section instanceof Map || v6 && section == null)) {
                 continue;
             }
-            List<String> parts = splitSections(k, ".");
+            List<String> parts = splitSections(k);
             p = out;
             String l = parts.remove(parts.size() - 1);
             String nl = l.replace("\\.", ".");
             for (String part : parts) {
-                if ("__proto__".equals(part)) {
+                if (v6 && "__proto__".equals(part)) {
                     continue;
                 }
                 if (p == null) {
@@ -151,15 +139,16 @@ public final class Ini {
                 }
                 Object child;
                 if (p instanceof Map) {
-                    Map<String, Object> parent = (Map<String, Object>) p;
+                    Map<String, @Nullable Object> parent = (Map<String, @Nullable Object>) p;
                     child = parent.get(part);
-                    boolean object = child == null || child instanceof Map || child instanceof List;
-                    if (!parent.containsKey(part) || !object) {
-                        child = new Section();
+                    boolean object = child instanceof Map || child instanceof List ||
+                                     v6 && child == null && parent.containsKey(part);
+                    if (!object) {
+                        child = v6 ? new Section() : new LinkedHashMap<String, @Nullable Object>();
                         parent.put(part, child);
                     }
                 } else {
-                    child = new Section();
+                    child = v6 ? new Section() : new LinkedHashMap<String, @Nullable Object>();
                 }
                 p = child;
             }
@@ -170,7 +159,7 @@ public final class Ini {
                 throw new IllegalArgumentException("Cannot set properties of null (setting '" + nl + "')");
             }
             if (p instanceof Map) {
-                ((Map<String, Object>) p).put(nl, section);
+                ((Map<String, @Nullable Object>) p).put(nl, section);
             }
             remove.add(k);
         }
@@ -180,20 +169,21 @@ public final class Ini {
         return out;
     }
 
-    private static List<String> splitSections(String str, String separator) {
+    // 6.0.0's splitSections; 1.3.5's dotSplit splits at the same dots
+    private static List<String> splitSections(String str) {
         int lastMatchIndex = 0;
         int lastSeparatorIndex = 0;
         int nextIndex;
         List<String> sections = new ArrayList<>();
         do {
-            nextIndex = str.indexOf(separator, lastMatchIndex);
+            nextIndex = str.indexOf('.', lastMatchIndex);
             if (nextIndex != -1) {
-                lastMatchIndex = nextIndex + separator.length();
+                lastMatchIndex = nextIndex + 1;
                 if (nextIndex > 0 && str.charAt(nextIndex - 1) == '\\') {
                     continue;
                 }
                 sections.add(str.substring(lastSeparatorIndex, nextIndex));
-                lastSeparatorIndex = nextIndex + separator.length();
+                lastSeparatorIndex = nextIndex + 1;
             }
         } while (nextIndex != -1);
         sections.add(str.substring(lastSeparatorIndex));
@@ -225,7 +215,7 @@ public final class Ini {
      */
     static String safe(String val) {
         if (val.matches("(?s).*[=\\r\\n].*") || val.startsWith("[") || (val.length() > 1 && isQuoted(val)) ||
-            !val.equals(val.trim())) {
+            !val.equals(EcmaScript.trim(val))) {
             return EcmaScript.quote(val);
         }
         return val.replace(";", "\\;").replace("#", "\\#");
@@ -238,8 +228,8 @@ public final class Ini {
                 val = val.substring(1, Math.max(1, val.length() - 1));
             }
             try {
-                return JSON.readValue(val, Object.class);
-            } catch (JsonProcessingException ignored) {
+                return EcmaScript.jsonParse(val);
+            } catch (EcmaScript.JsonSyntaxError ignored) {
                 return val;
             }
         }

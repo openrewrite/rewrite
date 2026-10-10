@@ -53,7 +53,8 @@
  * </pre>
  * The same license covers what pnpm 11.2.2 bundles and this package ports: {@code JsYaml} and
  * {@code JsYamlDumper}, @zkochan/js-yaml 0.0.11 (Copyright (C) 2011-2015 by Vitaly Puzrin); {@code KeySorting},
- * sort-keys 6.0.0 and is-plain-obj 4.1.0 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
+ * sort-keys 6.0.0 and is-plain-obj 4.1.0, and {@code internal.lock.StripBom}, strip-bom 5.0.0 (Copyright (c) Sindre
+ * Sorhus &lt;sindresorhus@gmail.com&gt;
  * (https://sindresorhus.com)) with @pnpm/util.lex-comparator 3.0.2 and comver-to-semver 2.0.0 (Copyright (c)
  * 2022-2026 Zoltan Kochan); {@code ObjectHasher}, object-hash 3.0.0 (Copyright (c) 2014 object-hash contributors);
  * version-selector-type 3.0.0 (Copyright (c) 2017-2020 Zoltan Kochan &lt;z@kochan.io&gt;); parse-npm-tarball-url

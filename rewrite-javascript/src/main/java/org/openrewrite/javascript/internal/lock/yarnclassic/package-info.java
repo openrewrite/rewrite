@@ -44,8 +44,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code Ssri} ports ssri 5.3.0, {@code Ini} ports ini 1.3.5, {@code Minimatch} ports minimatch 3.0.4 and
- * {@code ParseGlob} glob-parent 2.0.0, as yarn 1.22.22 bundles them, all distributed under the ISC License:
+ * {@code Ssri} ports ssri 5.3.0, {@code internal.lock.Ini} ports ini 1.3.5, {@code Minimatch} ports minimatch 3.0.4
+ * and {@code ParseGlob} glob-parent 2.0.0, as yarn 1.22.22 bundles them, all distributed under the ISC License:
  * <ul>
  *     <li>ssri: Copyright (c) npm, Inc.</li>
  *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>
@@ -71,7 +71,8 @@
  * 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
  * randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob
  * 0.3.2, {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, {@code GunzipMaybe} gunzip-maybe
- * 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1 and {@code TarFs} tar-fs 1.16.3, as
+ * 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1, {@code TarFs} tar-fs 1.16.3 and
+ * {@code internal.lock.StripBom} strip-bom 3.0.0, as
  * yarn 1.22.22 bundles them, and {@code ExoticResolvers.LegacyUrl} ports Node.js {@code lib/url.js}, all distributed
  * under the MIT License:
  * <ul>
@@ -88,6 +89,7 @@
  *     <li>is-dotfile: Copyright (c) 2015-2017, Jon Schlinkert</li>
  *     <li>repeat-element: Copyright (c) 2015 Jon Schlinkert</li>
  *     <li>randomatic: Copyright (c) 2013-2017, Jon Schlinkert</li>
+ *     <li>strip-bom: Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt; (sindresorhus.com)</li>
  *     <li>gunzip-maybe: Copyright (c) 2016 Mathias Buus</li>
  *     <li>tar-stream, tar-fs: Copyright (c) 2014 Mathias Buus</li>
  *     <li>is-gzip: Kevin Mårtensson</li>
