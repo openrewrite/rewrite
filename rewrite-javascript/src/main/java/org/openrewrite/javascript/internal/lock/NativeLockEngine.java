@@ -73,9 +73,9 @@ public final class NativeLockEngine {
         LockDirectory dir = LockDirectory.of(request);
         switch (pm) {
             case Npm:
-                return NpmLockRegenerator.installRoot(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
+                return NpmInputs.installRoot(dir);
             case Bun:
-                return BunLockRegenerator.installRoot(BunInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
+                return BunInputs.installRoot(dir);
             case YarnClassic:
                 return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
             case YarnBerry:

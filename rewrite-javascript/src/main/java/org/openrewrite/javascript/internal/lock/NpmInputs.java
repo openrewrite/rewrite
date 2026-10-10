@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 
 import java.time.Instant;
@@ -44,5 +46,16 @@ final class NpmInputs {
                 .runsIn(dir.getRunsIn())
                 .parentManifests(dir.manifestsAbove(dir.getRunsIn()))
                 .build();
+    }
+
+    /**
+     * npm's walk from where it runs; where it installs it reads and rewrites a yarn.lock (shrinkwrap.js save), which
+     * no regeneration writes, so a walk to one the host holds stops.
+     */
+    static InstallRoot installRoot(LockDirectory dir) {
+        InstallRoot walked = NpmLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        String root = dir.aboveRunsIn(walked.getDepth());
+        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "yarn.lock")) ? walked :
+                new InstallRoot(walked.getDepth(), true);
     }
 }

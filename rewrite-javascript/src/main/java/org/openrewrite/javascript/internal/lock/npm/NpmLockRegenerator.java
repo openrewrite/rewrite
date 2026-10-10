@@ -149,6 +149,10 @@ public final class NpmLockRegenerator {
             if (inputs.getNpmrc() == null && inputs.getPaths() != null && inputs.getPaths().contains(".npmrc")) {
                 throw new CannotKnow(".npmrc (its contents were not read)");
             }
+            if (inputs.getYarnLock() == null && inputs.getPaths() != null && inputs.getPaths().contains("yarn.lock")) {
+                throw new CannotKnow("yarn.lock, which npm reads and rewrites beside its lock (its contents were " +
+                                     "not read)");
+            }
             options = NpmOptions.fromNpmrc(inputs.getNpmrc(), HostEnvironment.of(inputs.getEnv()));
             if (options.isGlobal()) {
                 throw new NpmRejection("ESHRINKWRAPGLOBAL", "cannot generate lockfile for global packages", null);

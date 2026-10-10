@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -439,21 +440,55 @@ class NodeDependencyScanTest {
     }
 
     /**
-     * npm 11.17.0 run in a member whose root lists it writes the root's lock, creating it beside a yarn.lock, and
-     * leaves the member's own: no lock the host holds takes the edit.
+     * Recorded run in a member with its own lock under a root that lists it and holds another's: none the host holds
+     * takes the edit, but npm rewrites a yarn.lock and bun migrates a pnpm-lock.yaml there, so the member's reports.
      */
-    @Test
-    void aMemberWhoseRootHoldsNoneOfItsPackageManagersLockWritesNoneTheHostHolds() {
-        NodeDependencyScan.Accumulator acc = workspaceWithMemberLock(PackageManager.YarnClassic, PackageManager.Npm,
-          "yarn.lock", "package-lock.json");
-        Path memberLock = Paths.get("packages/a/package-lock.json");
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "Npm         | YarnClassic | the lock npm writes: it installs at the workspace root ../..",
+      "Npm         | Pnpm        |",
+      "Npm         | Bun         |",
+      "YarnClassic | Npm         |",
+      "YarnClassic | Pnpm        |",
+      "YarnClassic | Bun         |",
+      "Pnpm        | Npm         |",
+      "Pnpm        | YarnClassic |",
+      "Pnpm        | Bun         |",
+      "Bun         | Npm         |",
+      "Bun         | YarnClassic |",
+      "Bun         | Pnpm        | the lock bun writes: it installs at the workspace root ../.."
+    })
+    void aMemberWhoseRootHoldsOnlyAnotherPackageManagersLock(PackageManager pm, PackageManager rootPm,
+                                                             @Nullable String reported) {
+        String rootLock = LockFileRegeneration.forPackageManager(rootPm).getLockFile();
+        Path memberLock = Paths.get("packages/a/" + LockFileRegeneration.forPackageManager(pm).getLockFile());
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        captureFile(acc, rootLock, "root lock");
+        captureFile(acc, memberLock.toString(), "member lock");
+        project(acc, ROOT, "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]}",
+          nodeResolutionResult(rootPm, singletonList("packages/a/package.json")));
+        SourceFile member = project(acc, MEMBER,
+          "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}",
+          nodeResolutionResult(pm));
+        if (pm == PackageManager.Pnpm || rootPm == PackageManager.Pnpm) {
+            capture(acc, "pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+        }
 
         NodeDependencyScan.linkWorkspaceMembers(acc);
 
-        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isNull();
-        assertThat(acc.projects.get(MEMBER).capturedLockContent).isNull();
-        assertThat(NodeDependencyScan.lockImporters(acc, Paths.get("yarn.lock"))).containsExactly(ROOT);
-        assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(reported == null ? null : memberLock);
+        assertThat(NodeDependencyScan.lockImporters(acc, Paths.get(rootLock))).containsExactly(ROOT);
+        if (reported == null) {
+            assertThat(NodeDependencyScan.lockImporters(acc, memberLock)).isEmpty();
+            return;
+        }
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+        assertThat(result).isNotNull();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know " + reported);
     }
 
     /**

@@ -116,4 +116,28 @@ class NpmInputsTest {
           "legacy-peer-deps=true\n").build()), Host.UNKNOWN, Instant.EPOCH);
         assertThat(new NpmLockRegenerator(read, NO_REGISTRY).regenerate().isSuccess()).isTrue();
     }
+
+    /**
+     * npm reads a yarn.lock beside its lock and rewrites it (open-yarn-lock-incremental's after-yarn): the host holds
+     * it without its contents.
+     */
+    @Test
+    void aYarnLockBesideTheLockIsCannotKnow() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"a\",\"version\":\"1.0.0\"}")
+          .lock("{\"name\":\"a\",\"version\":\"1.0.0\",\"lockfileVersion\":3,\"requires\":true,\"packages\":" +
+                "{\"\":{\"name\":\"a\",\"version\":\"1.0.0\"}}}\n")
+          .packageJsonPath(Paths.get("app/package.json"))
+          .manifest(Paths.get("app/package.json"), "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"), Paths.get("app/yarn.lock"))))
+          .build();
+
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH),
+          NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know yarn.lock, which npm reads and " +
+                                                              "rewrites beside its lock (its contents were not read)");
+    }
 }

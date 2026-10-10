@@ -58,6 +58,12 @@ class LockDirectoryTest {
         assertThat(dir.getPaths()).containsExactly("packages/a/index.js");
         assertThat(dir.getRunsIn()).isEqualTo("packages/a");
         assertThat(dir.filesUnder("..")).containsOnlyKeys("repo/.npmrc", ".yarnrc");
+        assertThat(dir.holds("packages/a/index.js")).isTrue();
+        assertThat(dir.holds("../.yarnrc")).isTrue();
+        assertThat(dir.holds("packages/a/yarn.lock")).isFalse();
+        assertThat(dir.aboveRunsIn(0)).isEqualTo("packages/a");
+        assertThat(dir.aboveRunsIn(2)).isEqualTo("");
+        assertThat(dir.aboveRunsIn(3)).isEqualTo("..");
     }
 
     /**

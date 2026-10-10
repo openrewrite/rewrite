@@ -67,8 +67,7 @@ final class YarnBerryInputs {
      * manifest.
      */
     static Predicate<String> holds(LockDirectory dir) {
-        return path -> dir.getFiles().containsKey(path) || dir.getPaths() != null && dir.getPaths().contains(path) ||
-                       "yarn.lock".equals(path) && dir.getLock() != null ||
+        return path -> dir.holds(path) || "yarn.lock".equals(path) && dir.getLock() != null ||
                        "package.json".equals(path) && dir.getManifests().containsKey("");
     }
 

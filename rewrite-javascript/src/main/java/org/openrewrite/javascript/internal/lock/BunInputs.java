@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 
@@ -58,5 +60,16 @@ final class BunInputs {
                 .host(host)
                 .now(now)
                 .build();
+    }
+
+    /**
+     * bun's walk from where it runs; without a bun.lock where it installs it migrates a pnpm-lock.yaml there and
+     * rewrites that package.json (pnpm.zig), which no regeneration writes, so a walk to one the host holds stops.
+     */
+    static InstallRoot installRoot(LockDirectory dir) {
+        InstallRoot walked = BunLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+        String root = dir.aboveRunsIn(walked.getDepth());
+        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "pnpm-lock.yaml")) ? walked :
+                new InstallRoot(walked.getDepth(), true);
     }
 }

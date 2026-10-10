@@ -152,6 +152,24 @@ public final class LockDirectory {
     }
 
     /**
+     * Whether the host holds the file at {@code path}, from the lock's directory ({@code ../yarn.lock}), read or not.
+     */
+    public boolean holds(String path) {
+        return files.containsKey(path) || paths != null && paths.contains(path);
+    }
+
+    /**
+     * The directory {@code depth} above the one the package manager runs in, relative to the lock's.
+     */
+    public String aboveRunsIn(int depth) {
+        StringBuilder dir = new StringBuilder(runsIn);
+        for (int up = 0; up < depth; up++) {
+            dir.append("/..");
+        }
+        return RootRelativePath.normalize(dir.toString());
+    }
+
+    /**
      * The manifests under {@code dir}, a directory relative to the lock's, by directory relative to it.
      */
     public Map<String, String> manifestsUnder(String dir) {
