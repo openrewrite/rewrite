@@ -38,7 +38,10 @@ import java.util.regex.PatternSyntaxException;
  */
 public final class V8RegExp {
 
-    private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
+    /**
+     * JavaScript's {@code .} as a Java character class: Java's also leaves out {@code \u0085}.
+     */
+    public static final String DOT = "[^\\n\\r\\u2028\\u2029]";
     private static final String WORD = "[A-Za-z0-9_]";
     private static final String WORD_BOUNDARY = "(?:(?<=" + WORD + ")(?!" + WORD + ")|(?<!" + WORD + ")(?=" + WORD +
                                                 "))";

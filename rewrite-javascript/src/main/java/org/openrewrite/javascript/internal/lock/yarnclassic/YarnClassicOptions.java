@@ -37,6 +37,8 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
+
 /**
  * Port of yarn src/config.js, rc.js, registries/ and install.js {@code normalizeFlags} (yarn 1.22.22): the config.
  */
@@ -51,7 +53,7 @@ public final class YarnClassicOptions {
 
     private static final Map<String, Object> DEFAULTS = new LinkedHashMap<>();
     private static final Map<String, String> NPM_MAP = new HashMap<>();
-    private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(" + Js.DOT + "*)\\z");
+    private static final Pattern RC_ARG = Pattern.compile("^--(?:([^.]+)\\.)?(" + DOT + "*)\\z");
     private static final Pattern ENV_EXPR = Pattern.compile("(\\\\*)\\$\\{([^}]+)}");
     private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
     private static final Pattern REGISTRY_PREFIX = Pattern.compile("^(https?:)?//", Pattern.CASE_INSENSITIVE);

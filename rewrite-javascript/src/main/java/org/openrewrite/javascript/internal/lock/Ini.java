@@ -46,7 +46,7 @@ public final class Ini {
     private static final Pattern LINES = Pattern.compile("[\\r\\n]+");
     private static final Pattern COMMENT = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*[;#]");
     private static final Pattern BLANK = Pattern.compile("^[" + EcmaScript.WHITESPACE_CLASS + "]*\\z");
-    private static final String KEY_VALUE = "|^([^=]+)(=([^\\n\\r\\u2028\\u2029]*))?\\z";
+    private static final String KEY_VALUE = "|^([^=]+)(=(" + V8RegExp.DOT + "*))?\\z";
     private static final Pattern LINE_1_3_5 = Pattern.compile("^\\[([^\\]]*)\\]\\z" + KEY_VALUE);
     private static final Pattern LINE_6_0_0 = Pattern.compile("^\\[([^\\]]*)\\][" + EcmaScript.WHITESPACE_CLASS +
                                                               "]*\\z" + KEY_VALUE);

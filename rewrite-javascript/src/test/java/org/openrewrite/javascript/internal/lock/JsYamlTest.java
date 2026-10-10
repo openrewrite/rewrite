@@ -121,7 +121,8 @@ class JsYamlTest {
     void answersAsTheReleaseDoes(JsYaml.Release release, Call call) {
         Map<String, @Nullable Object> threw = call.getThrew();
         if (threw == null) {
-            assertThat(UpstreamCalls.shape(written(answer(release, call)))).isEqualTo(UpstreamCalls.shape(call.getOut()));
+            assertThat(UpstreamCalls.shape(written(answer(release, call))))
+              .isEqualTo(UpstreamCalls.shape(call.getOut()));
         } else {
             assertThatThrownBy(() -> answer(release, call)).hasMessage((String) threw.get("message"));
         }

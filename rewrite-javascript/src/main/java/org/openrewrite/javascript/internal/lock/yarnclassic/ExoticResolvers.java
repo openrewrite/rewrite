@@ -27,6 +27,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
+
 /**
  * Port of yarn src/resolvers/index.js {@code getExoticResolver} and the exotic resolvers' {@code isVersion} and
  * registry-resolver.js fragment (yarn 1.22.22).
@@ -43,15 +45,15 @@ final class ExoticResolvers {
     private static final List<String> GIT_HOSTS = Arrays.asList("github.com", "gitlab.com", "bitbucket.com",
             "bitbucket.org");
     private static final List<Pattern> GIT_PATTERN_MATCHERS = Arrays.asList(
-            Pattern.compile("^git:"), Pattern.compile("^git\\+" + Js.DOT + "+:"), Pattern.compile("^ssh:"),
-            Pattern.compile("^https?:" + Js.DOT + "+\\.git\\z"),
-            Pattern.compile("^https?:" + Js.DOT + "+\\.git#" + Js.DOT + "+"));
+            Pattern.compile("^git:"), Pattern.compile("^git\\+" + DOT + "+:"), Pattern.compile("^ssh:"),
+            Pattern.compile("^https?:" + DOT + "+\\.git\\z"),
+            Pattern.compile("^https?:" + DOT + "+\\.git#" + DOT + "+"));
     private static final Pattern GITHUB_SHORTHAND = Pattern.compile(
             "^[^:@%/" + Js.WHITESPACE_CLASS + ".-][^:@%/" + Js.WHITESPACE_CLASS + "]*[/][^:@" + Js.WHITESPACE_CLASS +
-            "/%]+(?:#" + Js.DOT + "*)?\\z");
+            "/%]+(?:#" + DOT + "*)?\\z");
     private static final Pattern FILE_PREFIX = Pattern.compile("^\\.{1,2}/");
     private static final Pattern REGISTRY_FRAGMENT = Pattern.compile("^([^" + Js.WHITESPACE_CLASS + "]+):(@?" +
-                                                                     Js.DOT + "*?)(@(" + Js.DOT + "*?)|)\\z");
+                                                                     DOT + "*?)(@(" + DOT + "*?)|)\\z");
 
     private ExoticResolvers() {
     }

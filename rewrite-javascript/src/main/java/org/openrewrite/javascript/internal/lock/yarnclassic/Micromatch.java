@@ -35,6 +35,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
+
 /**
  * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) with arr-diff 2.0.0
  * on POSIX paths, as yarn 1.22.22 bundles them, for calls with no options.
@@ -56,7 +58,7 @@ final class Micromatch {
     private static final Pattern STARS = Pattern.compile("\\*{2,}");
     private static final Pattern WORD_STAR = Pattern.compile("(\\w+)\\*(?!/)");
     private static final Pattern GLOBSTAR_STAR_WORD = Pattern.compile("\\*\\*/\\*(\\w)");
-    private static final Pattern GLOBSTAR_ANY = Pattern.compile("\\*\\*/(" + Js.DOT + ")");
+    private static final Pattern GLOBSTAR_ANY = Pattern.compile("\\*\\*/(" + V8RegExp.DOT + ")");
     private static final Pattern GLOBSTAR_COMMA = Pattern.compile(",\\*\\*|\\*\\*,");
     private static final Pattern TRAILING_SLASH_STAR = Pattern.compile("/\\*\\z");
     private static final Pattern TRAILING_STAR = Pattern.compile("(?!/)\\*\\z");

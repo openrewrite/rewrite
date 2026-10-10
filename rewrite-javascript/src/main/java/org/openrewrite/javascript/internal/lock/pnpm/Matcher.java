@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import org.openrewrite.javascript.internal.lock.V8RegExp;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -118,22 +120,9 @@ final class Matcher {
         if (escapedPattern.equals(pattern)) {
             return pattern::equals;
         }
-        StringBuilder regex = new StringBuilder();
-        String[] parts = pattern.split("\\*", -1);
-        for (int i = 0; i < parts.length; i++) {
-            if (i > 0) {
-                regex.append(ANY);
-            }
-            if (!parts[i].isEmpty()) {
-                regex.append(Pattern.quote(parts[i]));
-            }
-        }
-        Pattern regexp = Pattern.compile(regex.toString());
-        return input -> regexp.matcher(input).matches();
+        Pattern regexp = V8RegExp.of("^" + escapedPattern + "$");
+        return input -> regexp.matcher(input).find();
     }
-
-    // JavaScript's `.`: any code unit but a line terminator
-    private static final String ANY = "[^\\n\\r\\u2028\\u2029]*";
 
     // escape-string-regexp 5: | \ { } ( ) [ ] ^ $ + * ? . escaped, - as \x2d
     private static String escapeStringRegexp(String string) {

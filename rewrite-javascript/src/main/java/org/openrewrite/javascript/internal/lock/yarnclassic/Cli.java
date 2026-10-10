@@ -28,6 +28,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.singletonList;
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 
 /**
  * Port of yarn src/cli/index.js (yarn 1.22.22): {@code start}'s yarn-path hand-off and {@code main}'s packageManager
@@ -38,7 +39,7 @@ final class Cli {
     private static final Pattern RELEASE = Pattern.compile("yarn-1\\.22\\.22\\.[cm]?js");
     private static final Pattern IN_A_DIRECTORY_ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
     private static final Pattern YARN_0_OR_1 = Pattern.compile("^yarn@[01]\\.");
-    private static final Pattern BUILD_METADATA = Pattern.compile("\\+" + Js.DOT + "*");
+    private static final Pattern BUILD_METADATA = Pattern.compile("\\+" + DOT + "*");
 
     private final Inputs inputs;
 

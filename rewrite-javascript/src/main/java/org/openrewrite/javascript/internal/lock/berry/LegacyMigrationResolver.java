@@ -29,12 +29,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
+
 /**
  * Port of @yarnpkg/core sources/LegacyMigrationResolver.ts (Yarn 4.10.3).
  */
 final class LegacyMigrationResolver implements Resolver {
 
-    private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
 
     /**
      * {@code IMPORTED_PATTERNS}: each pattern with the reference it makes from the entry's version and the match.

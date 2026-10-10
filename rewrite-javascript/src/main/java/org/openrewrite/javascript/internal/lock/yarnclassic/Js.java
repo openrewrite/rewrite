@@ -59,11 +59,6 @@ final class Js extends EcmaScript {
         return "type " + typeOf(value) + " (" + (value instanceof String ? "'" + value + "'" : value) + ")";
     }
 
-    /**
-     * The characters JavaScript's {@code .} matches; Java's also leaves out {@code \u0085}.
-     */
-    static final String DOT = "[^\\n\\r\\u2028\\u2029]";
-
     private Js() {
     }
 

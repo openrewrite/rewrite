@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -46,7 +47,6 @@ final class YarnRelease {
     static final String PORTED = "4.10.3";
 
     private static final String RESOURCE = "yarn-releases.json.gz";
-    private static final String WORD = "[A-Za-z0-9_]";
 
     private static volatile @Nullable Map<String, @Nullable Object> data;
 
@@ -124,7 +124,7 @@ final class YarnRelease {
         Set<String> settings = new LinkedHashSet<>((List<String>) tables.get((String) Js.get(release, "settings")));
         return new YarnRelease(version, Collections.unmodifiableList(extensions),
                 Collections.unmodifiableList((List<String>) Js.get(release, "patches")),
-                Pattern.compile(jsRegExp((String) nodeGyp.get("pattern"))), (String) nodeGyp.get("range"),
+                V8RegExp.of((String) nodeGyp.get("pattern")), (String) nodeGyp.get("range"),
                 Collections.unmodifiableList((List<String>) tables.get((String) Js.get(release, "plugins"))),
                 Boolean.TRUE.equals(Js.get(release, "jsrScope")),
                 Boolean.TRUE.equals(Js.get(release, "checksumWithoutCacheKey")), Collections.unmodifiableSet(settings),
@@ -144,11 +144,6 @@ final class YarnRelease {
             }
         }
         return 0;
-    }
-
-    // JavaScript's `\b` is between an ASCII word character and anything else
-    private static String jsRegExp(String source) {
-        return source.replace("\\b", "(?:(?<=" + WORD + ")(?!" + WORD + ")|(?<!" + WORD + ")(?=" + WORD + "))");
     }
 
     @SuppressWarnings("unchecked")

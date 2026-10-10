@@ -18,12 +18,14 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
@@ -34,17 +36,12 @@ final class Syml {
 
     private static final JsYaml.Options OPTIONS = new JsYaml.Options(JsYaml.Release.V3_14_1, true, LinkedHashMap::new);
 
-    // JavaScript's `.`, which unlike Java's also matches U+0085
-    private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
-    private static final Pattern SIMPLE_STRING = Pattern.compile("^(?![-?:,\\]\\[{}#&*!|>'\"%@` \\t\\r\\n])" + DOT +
-                                                                 "([ \\t]*(?![,\\]\\[{}:# \\t\\r\\n])" + DOT + ")*\\z");
+    private static final Pattern SIMPLE_STRING =
+            V8RegExp.of("^(?![-?:,\\][{}#&*!|>'\"%@` \\t\\r\\n]).([ \\t]*(?![,\\][{}:# \\t\\r\\n]).)*$");
     private static final List<String> SPECIAL_OBJECT_KEYS = Arrays.asList("__metadata", "version", "resolution",
             "dependencies", "peerDependencies", "dependenciesMeta", "peerDependenciesMeta", "binaries");
-    // JavaScript's `\\s`
-    private static final String SPACE = "[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029" +
-                                        "\\u202F\\u205F\\u3000\\uFEFF]";
-    private static final Pattern LEGACY = Pattern.compile("^(#" + DOT + "*(\\r?\\n))*?#" + SPACE + "+yarn" + SPACE +
-                                                          "+lockfile" + SPACE + "+v1\\r?\\n", Pattern.CASE_INSENSITIVE);
+    private static final Pattern LEGACY = Pattern.compile(Objects.requireNonNull(
+            V8RegExp.toJava("^(#.*(\\r?\\n))*?#\\s+yarn\\s+lockfile\\s+v1\\r?\\n")), Pattern.CASE_INSENSITIVE);
 
     /**
      * A mapping written in its own key order ({@code stringifySyml.PreserveOrdering}).

@@ -36,6 +36,7 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
 
 /**
@@ -43,7 +44,6 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  */
 public final class YarnLock {
 
-    private static final String DOT = "[^\\n\\r\\u2028\\u2029]";
     private static final String NOT_SPACE = "[^" + Js.WHITESPACE_CLASS + "]";
 
     private static final Pattern LINE = Pattern.compile("([^\\r\\n]*)\\r?\\n");

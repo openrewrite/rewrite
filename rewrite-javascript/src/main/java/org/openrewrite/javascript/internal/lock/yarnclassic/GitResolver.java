@@ -21,15 +21,17 @@ import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 
 import java.util.regex.Pattern;
 
+import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
+
 /**
  * Port of yarn src/resolvers/exotics/git-resolver.js, hosted-git-resolver.js (with github, gitlab and bitbucket) and
  * gist-resolver.js (yarn 1.22.22): a locked git pattern is reused, any other needs the repository.
  */
 final class GitResolver {
 
-    private static final Pattern STRIP_HASH = Pattern.compile("(" + Js.DOT + "*?)#" + Js.DOT + "*");
-    private static final Pattern STRIP_PROTOCOL = Pattern.compile(Js.DOT + "*:(" + Js.DOT + "*)");
-    private static final Pattern GIT_SUFFIX = Pattern.compile(Js.DOT + "git\\z");
+    private static final Pattern STRIP_HASH = Pattern.compile("(" + DOT + "*?)#" + DOT + "*");
+    private static final Pattern STRIP_PROTOCOL = Pattern.compile(DOT + "*:(" + DOT + "*)");
+    private static final Pattern GIT_SUFFIX = Pattern.compile(DOT + "git\\z");
 
     private final PackageRequest request;
     private final String fragment;
