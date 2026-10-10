@@ -23,6 +23,7 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.javascript.internal.lock.pnpm.FindPackages;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -409,15 +410,26 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return touched ? ((NodeCatalogs.Pnpm) edited).withoutUnused(projects) : edited;
     }
 
-    // pnpm's allProjects: the workspace root and the members its packages list; null without the root's manifest
+    // pnpm's allProjects: the scanned projects pnpm-workspace.yaml's packages match; null when pnpm rejects the file
     private @Nullable Set<Path> workspaceProjects(CatalogFile file) {
-        Path root = file.path.resolveSibling("package.json");
-        SourceFile manifest = captured(root);
-        if (manifest == null) {
+        Path dir = file.path.getParent();
+        Map<String, Path> manifestDirs = new HashMap<>();
+        for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
+            Path projectDir = project.getKey().getParent();
+            boolean under = dir == null || projectDir != null && projectDir.startsWith(dir);
+            if (project.getValue().capturedPackageJson != null && under) {
+                Path relative = dir == null ? projectDir : dir.relativize(projectDir);
+                manifestDirs.put(relative == null ? "" : relative.toString().replace('\\', '/'), project.getKey());
+            }
+        }
+        List<String> found = FindPackages.workspaceProjects(file.base.print(), manifestDirs.keySet());
+        if (found == null) {
             return null;
         }
-        Set<Path> projects = new HashSet<>(PackageJsonHelper.workspaceMemberPaths(manifest));
-        projects.add(root);
+        Set<Path> projects = new HashSet<>();
+        for (String project : found) {
+            projects.add(manifestDirs.get(project));
+        }
         return projects;
     }
 

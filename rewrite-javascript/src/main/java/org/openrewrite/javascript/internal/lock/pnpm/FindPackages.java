@@ -24,12 +24,13 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Port of @pnpm/workspace.projects-reader src/index.ts {@code findWorkspaceProjectsNoCheck} and src/findPackages.ts
  * (pnpm 11.2.2), with @pnpm/lockfile.fs {@code getLockfileImporterId}, over the directories holding a package.json.
  */
-final class FindPackages {
+public final class FindPackages {
 
     private static final List<String> DEFAULT_IGNORE = Arrays.asList("**/node_modules/**", "**/bower_components/**",
             "**/test/**", "**/tests/**");
@@ -46,6 +47,20 @@ final class FindPackages {
         List<String> projects = findPackages(manifestDirs, patterns, IGNORE, true);
         projects.sort(KeySorting::lexCompare);
         return projects;
+    }
+
+    /**
+     * The projects of the workspace whose pnpm-workspace.yaml holds {@code workspaceManifest}, among the directories
+     * holding a package.json, as getConfig reads its packages; null for a manifest pnpm rejects.
+     */
+    public static @Nullable List<String> workspaceProjects(String workspaceManifest, Collection<String> manifestDirs) {
+        Map<String, @Nullable Object> manifest;
+        try {
+            manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest);
+        } catch (PnpmError | JsYaml.YamlException e) {
+            return null;
+        }
+        return findWorkspaceProjects(manifestDirs, PnpmOptions.workspacePackagePatterns(manifest));
     }
 
     /**

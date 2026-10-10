@@ -174,9 +174,7 @@ final class PnpmOptions {
         List<String> patterns = null;
         if (workspaceManifest != null) {
             Map<String, @Nullable Object> manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest);
-            Object packages = manifest == null ? null : manifest.get("packages");
-            patterns = packages instanceof List ? new ArrayList<>((List<String>) packages) :
-                    Collections.singletonList(".");
+            patterns = workspacePackagePatterns(manifest);
             if (manifest != null) {
                 Map<String, @Nullable Object> newSettings = getOptionsFromPnpmSettings(manifest, rootManifest, env);
                 for (String option : CLI_OPTIONS) {
@@ -305,6 +303,15 @@ final class PnpmOptions {
             }
         }
         return null;
+    }
+
+    /**
+     * The workspace's package patterns as getConfig takes them from a pnpm-workspace.yaml it read.
+     */
+    @SuppressWarnings("unchecked")
+    static List<String> workspacePackagePatterns(@Nullable Map<String, @Nullable Object> manifest) {
+        Object packages = manifest == null ? null : manifest.get("packages");
+        return packages instanceof List ? new ArrayList<>((List<String>) packages) : Collections.singletonList(".");
     }
 
     static @Nullable WantedPackageManager getWantedPackageManager(Map<String, @Nullable Object> manifest) {

@@ -242,4 +242,45 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             """, s -> s.path("pnpm-workspace.yaml"))
         );
     }
+
+    // recorded with pnpm 11.2.2: without a lock it still counts every project its packages match, so the cleanup
+    // keeps the entry only a member references
+    @Test
+    void withoutALockTheCleanupCountsTheProjectsTheWorkspaceLists() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("ms", null, "2.1.3")),
+          packageJson("""
+            {
+              "name": "root",
+              "packageManager": "pnpm@11.2.2",
+              "dependencies": {
+                "ms": "^2.0.0"
+              }
+            }
+            """, """
+            {
+              "name": "root",
+              "packageManager": "pnpm@11.2.2",
+              "dependencies": {
+                "ms": "2.1.3"
+              }
+            }
+            """, nodeResolutionResult((PackageManager) null)),
+          packageJson("""
+            {
+              "name": "a",
+              "dependencies": {
+                "wrappy": "catalog:"
+              }
+            }
+            """, null, nodeResolutionResult((PackageManager) null), s -> s.path("packages/a/package.json")),
+          yaml("""
+            packages:
+              - packages/*
+            cleanupUnusedCatalogs: true
+            catalog:
+              wrappy: ^1.0.0
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
 }
