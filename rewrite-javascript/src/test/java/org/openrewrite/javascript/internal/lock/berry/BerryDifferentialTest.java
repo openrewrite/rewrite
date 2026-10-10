@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.GlobParent;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
@@ -213,7 +214,7 @@ class BerryDifferentialTest {
     void globParentAndScanAnswerAsYarnsBundleDoes() {
         List<String> differences = new ArrayList<>();
         for (String[] row : rows("glob-parent.tsv.gz")) {
-            String base = GlobParent.globParent(row[0]);
+            String base = GlobParent.globParent(row[0], GlobParent.Release.V5_1_2);
             JsonNode parts = NODES.arrayNode().addAll(PicomatchScan.scan(row[0], true).getParts().stream()
                     .map(NODES::textNode).collect(Collectors.toList()));
             boolean dynamic = FastGlob.isDynamicPattern(row[0]);

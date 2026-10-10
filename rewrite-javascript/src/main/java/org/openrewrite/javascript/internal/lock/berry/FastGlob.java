@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.GlobParent;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
@@ -241,7 +242,7 @@ final class FastGlob {
     private static Map<String, List<String>> groupPatternsByBaseDirectory(List<String> patterns) {
         Map<String, List<String>> group = new LinkedHashMap<>();
         for (String pattern : patterns) {
-            String base = GlobParent.globParent(pattern);
+            String base = GlobParent.globParent(pattern, GlobParent.Release.V5_1_2);
             if (Js.objectPrototypeMember(base) != null) {
                 throw new JsError(JsError.TYPE_ERROR, "collection[base].push is not a function");
             }
@@ -287,7 +288,7 @@ final class FastGlob {
     }
 
     private static boolean isAffectDepthOfReadingPattern(String pattern) {
-        return pattern.endsWith("/**") || !isDynamicPattern(GlobParent.basename(pattern));
+        return pattern.endsWith("/**") || !isDynamicPattern(PosixPath.basename(pattern));
     }
 
     private static List<String> getPatternParts(String pattern) {

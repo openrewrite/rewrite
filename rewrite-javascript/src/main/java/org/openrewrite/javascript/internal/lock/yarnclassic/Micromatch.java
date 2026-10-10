@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.IsExtglob;
+import org.openrewrite.javascript.internal.lock.IsGlob;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
@@ -33,8 +35,8 @@ import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
 
 /**
- * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) with is-glob 2.0.1,
- * is-extglob 1.0.0 and arr-diff 2.0.0 on POSIX paths, as yarn 1.22.22 bundles them, for calls with no options.
+ * Port of micromatch 2.3.11 (index.js, lib/expand.js, lib/glob.js, lib/utils.js, lib/chars.js) with arr-diff 2.0.0
+ * on POSIX paths, as yarn 1.22.22 bundles them, for calls with no options.
  */
 final class Micromatch {
 
@@ -45,8 +47,6 @@ final class Micromatch {
     private static final String DOTFILES = "(?!" + DOTFILE_GLOB + ")(?=.)";
     private static final String TWO_STAR_DOT = "(?:(?!" + DOTFILE_GLOB + ").)*?";
 
-    private static final Pattern GLOB_CHARS = Pattern.compile("[*!?{}(|)\\[\\]]");
-    private static final Pattern EXTGLOB_CHARS = Pattern.compile("[@?!+*]\\(");
     private static final Pattern PATH_CHARS = Pattern.compile("([/.])");
     private static final Pattern PLUS = Pattern.compile("(\\+)(?!\\()");
     private static final Pattern BRACE_DOT = Pattern.compile("[{,]\\.");
@@ -140,7 +140,7 @@ final class Micromatch {
                                                   "function.");
         }
         String glob = (String) pattern;
-        if (!isGlob(glob)) {
+        if (!IsGlob.isGlob(glob, IsGlob.Release.V2_0_1)) {
             return glob::equals;
         }
         String source = makeRe(glob);
@@ -326,14 +326,6 @@ final class Micromatch {
         return "^" + glob;
     }
 
-    static boolean isExtglob(String str) {
-        return EXTGLOB_CHARS.matcher(str).find();
-    }
-
-    static boolean isGlob(String str) {
-        return GLOB_CHARS.matcher(str).find() || isExtglob(str);
-    }
-
     // the options expand reads and sets on the object toRegex makes for each glob
     private static final class Options {
         boolean dot;
@@ -409,7 +401,7 @@ final class Micromatch {
         Glob glob = new Glob(pattern);
         opts.makeRe = true;
 
-        if (!isGlob(pattern)) {
+        if (!IsGlob.isGlob(pattern, IsGlob.Release.V2_0_1)) {
             glob.pattern = V8RegExp.replace(glob.pattern, PATH_CHARS, true, m -> "\\" + m.group(1));
             return glob;
         }
@@ -461,7 +453,7 @@ final class Micromatch {
             glob.pattern = String.join("|", braces.braces(glob.pattern, braceOptions));
         }
 
-        if (tok.extglob && isExtglob(glob.pattern)) {
+        if (tok.extglob && IsExtglob.isExtglob(glob.pattern, IsExtglob.Release.V1_0_0)) {
             glob.pattern = Extglob.extglob(glob.pattern);
         }
 

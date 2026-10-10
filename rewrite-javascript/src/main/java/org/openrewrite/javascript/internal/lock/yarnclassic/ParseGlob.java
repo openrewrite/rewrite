@@ -15,6 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import org.openrewrite.javascript.internal.lock.GlobParent;
+import org.openrewrite.javascript.internal.lock.IsExtglob;
+import org.openrewrite.javascript.internal.lock.IsGlob;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
@@ -25,8 +28,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of parse-glob 3.0.4 with glob-base 0.3.0, glob-parent 2.0.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles
- * them for micromatch 2.3.11.
+ * Port of parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, as yarn 1.22.22 bundles them for micromatch
+ * 2.3.11.
  */
 final class ParseGlob {
 
@@ -66,7 +69,7 @@ final class ParseGlob {
         glob = escape(glob);
 
         String[] parsed = globBase(glob);
-        tok.isGlob = Micromatch.isGlob(glob);
+        tok.isGlob = IsGlob.isGlob(glob, IsGlob.Release.V2_0_1);
         tok.glob = parsed[1];
         tok.base = parsed[0];
         Matcher segs = BASENAME.matcher(glob);
@@ -79,7 +82,7 @@ final class ParseGlob {
         tok.extname = String.join(".", Arrays.copyOfRange(basename, 1, basename.length));
         tok.ext = "";
 
-        if (Micromatch.isGlob(tok.dirname) && tok.basename.isEmpty()) {
+        if (IsGlob.isGlob(tok.dirname, IsGlob.Release.V2_0_1) && tok.basename.isEmpty()) {
             if (!tok.glob.endsWith("/")) {
                 tok.basename = tok.glob;
             }
@@ -110,7 +113,7 @@ final class ParseGlob {
 
         boolean is = !glob.isEmpty() && tok.isGlob;
         tok.negated = !glob.isEmpty() && glob.charAt(0) == '!';
-        tok.extglob = !glob.isEmpty() && Micromatch.isExtglob(glob);
+        tok.extglob = !glob.isEmpty() && IsExtglob.isExtglob(glob, IsExtglob.Release.V1_0_0);
         tok.braces = is && glob.contains("{");
         tok.brackets = is && glob.contains("[:");
         tok.globstar = is && glob.contains("**");
@@ -129,8 +132,8 @@ final class ParseGlob {
 
     // glob-base: the directory part that holds no glob and the rest
     private static String[] globBase(String pattern) {
-        String base = globParent(pattern);
-        boolean isGlob = Micromatch.isGlob(pattern);
+        String base = GlobParent.globParent(pattern, GlobParent.Release.V2_0_0);
+        boolean isGlob = IsGlob.isGlob(pattern, IsGlob.Release.V2_0_1);
         String glob;
         if (!".".equals(base)) {
             glob = pattern.substring(Math.min(base.length(), pattern.length()));
@@ -151,14 +154,6 @@ final class ParseGlob {
             glob = glob.substring(1);
         }
         return new String[]{base, glob};
-    }
-
-    private static String globParent(String str) {
-        str += "a";
-        do {
-            str = PosixPath.dirname(str);
-        } while (Micromatch.isGlob(str));
-        return str;
     }
 
     static boolean isDotfile(String str) {

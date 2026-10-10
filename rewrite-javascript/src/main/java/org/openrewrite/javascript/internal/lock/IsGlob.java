@@ -13,66 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.berry;
+package org.openrewrite.javascript.internal.lock;
 
-import org.openrewrite.javascript.internal.lock.V8RegExp;
-
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of glob-parent 5.1.2 with is-glob 4.0.3 and is-extglob 2.1.1, as fast-glob 3.3.2 calls it.
+ * Port of is-glob over its is-extglob: 2.0.1 with 1.0.0, which yarn 1.22.22 bundles for micromatch 2.3.11, and 4.0.3
+ * with 2.1.1 under its default strict check, which glob-parent 5.1.2 calls in Yarn 4.10.3's fast-glob.
  */
-final class GlobParent {
+public final class IsGlob {
 
-    private static final Pattern ENCLOSURE = V8RegExp.of("[\\{\\[].*[\\}\\]]$");
-    private static final Pattern GLOBBY = V8RegExp.of("(^|[^\\\\])([\\{\\[]|\\([^\\)]+$)");
-    private static final Pattern ESCAPED = V8RegExp.of("\\\\([\\!\\*\\?\\|\\[\\]\\(\\)\\{\\}])");
-    private static final Pattern EXTGLOB = V8RegExp.of("(\\\\).|([@?!+*]\\(.*\\))");
-
-    private GlobParent() {
+    public enum Release {
+        V2_0_1,
+        V4_0_3
     }
 
-    static String globParent(String str) {
-        if (ENCLOSURE.matcher(str).find()) {
-            str += "/";
-        }
-        str += "a";
-        do {
-            str = dirname(str);
-        } while (isGlob(str) || GLOBBY.matcher(str).find());
+    private static final Pattern GLOB_CHARS_2_0_1 = V8RegExp.of("[*!?{}(|)[\\]]");
 
-        Matcher m = ESCAPED.matcher(str);
-        StringBuilder out = new StringBuilder();
-        int last = 0;
-        while (m.find()) {
-            out.append(str, last, m.start()).append(m.group(1));
-            last = m.end();
-        }
-        return out.append(str.substring(last)).toString();
+    private IsGlob() {
     }
 
-    static boolean isGlob(String str) {
+    public static boolean isGlob(String str, Release release) {
+        if (release == Release.V2_0_1) {
+            return GLOB_CHARS_2_0_1.matcher(str).find() || IsExtglob.isExtglob(str, IsExtglob.Release.V1_0_0);
+        }
         if (str.isEmpty()) {
             return false;
         }
-        if (isExtglob(str)) {
+        if (IsExtglob.isExtglob(str, IsExtglob.Release.V2_1_1)) {
             return true;
         }
         return strictCheck(str);
-    }
-
-    private static boolean isExtglob(String str) {
-        while (true) {
-            Matcher match = EXTGLOB.matcher(str);
-            if (!match.find()) {
-                return false;
-            }
-            if (match.group(2) != null) {
-                return true;
-            }
-            str = str.substring(match.end());
-        }
     }
 
     private static boolean strictCheck(String str) {
@@ -168,55 +139,5 @@ final class GlobParent {
 
     private static int at(String str, int index) {
         return index < str.length() ? str.charAt(index) : -1;
-    }
-
-    /**
-     * Node's {@code path.posix.dirname}.
-     */
-    static String dirname(String path) {
-        if (path.isEmpty()) {
-            return ".";
-        }
-        boolean hasRoot = path.charAt(0) == '/';
-        int end = -1;
-        boolean matchedSlash = true;
-        for (int i = path.length() - 1; i >= 1; --i) {
-            if (path.charAt(i) == '/') {
-                if (!matchedSlash) {
-                    end = i;
-                    break;
-                }
-            } else {
-                matchedSlash = false;
-            }
-        }
-        if (end == -1) {
-            return hasRoot ? "/" : ".";
-        }
-        if (hasRoot && end == 1) {
-            return "//";
-        }
-        return path.substring(0, end);
-    }
-
-    /**
-     * Node's {@code path.posix.basename}.
-     */
-    static String basename(String path) {
-        int start = 0;
-        int end = -1;
-        boolean matchedSlash = true;
-        for (int i = path.length() - 1; i >= 0; --i) {
-            if (path.charAt(i) == '/') {
-                if (!matchedSlash) {
-                    start = i + 1;
-                    break;
-                }
-            } else if (end == -1) {
-                matchedSlash = false;
-                end = i + 1;
-            }
-        }
-        return end == -1 ? "" : path.substring(start, end);
     }
 }

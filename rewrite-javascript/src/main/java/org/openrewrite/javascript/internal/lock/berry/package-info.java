@@ -49,14 +49,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
  * {@code internal.lock.JsYaml} ports the loader of js-yaml 3.14.1 (Copyright (C) 2011-2015 by Vitaly Puzrin);
- * {@code QueryString} and {@code GlobParent} Node.js {@code lib/querystring.js}, {@code lib/internal/querystring.js}
- * and {@code lib/path.js} (Copyright Joyent, Inc. and other Node contributors); {@code FastGlob} fast-glob 3.3.2
+ * {@code QueryString} Node.js {@code lib/querystring.js} and {@code lib/internal/querystring.js} (Copyright Joyent,
+ * Inc. and other Node contributors); {@code FastGlob} fast-glob 3.3.2
  * (Copyright (c) Denis Malinochkin);
  * {@code internal.lock.Picomatch}, {@code internal.lock.PicomatchParse} and {@code internal.lock.PicomatchScan}
  * picomatch 2.3.1 (Copyright (c) 2017-present, Jon Schlinkert), as micromatch 4.0.5 calls it (Copyright (c)
  * 2014-present, Jon Schlinkert); {@code Braces} braces 3.0.2 (Copyright (c) 2014-2018, Jon Schlinkert);
- * {@code FillRange} fill-range 7.0.1 (Copyright (c) 2014-present, Jon Schlinkert); {@code GlobParent} is-glob 4.0.3
- * (Copyright (c) 2014-2017, Jon Schlinkert) and is-extglob 2.1.1 (Copyright (c) 2014-2016, Jon Schlinkert);
+ * {@code FillRange} fill-range 7.0.1 (Copyright (c) 2014-present, Jon Schlinkert); {@code internal.lock.IsGlob}
+ * is-glob 4.0.3 (Copyright (c) 2014-2017, Jon Schlinkert) and {@code internal.lock.IsExtglob} is-extglob 2.1.1
+ * (Copyright (c) 2014-2016, Jon Schlinkert);
  * {@code Configuration} camelcase 5.3.1 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
  * (sindresorhus.com)); {@code SpecUtils} corepack 0.35.0's {@code loadSpec} and {@code parseSpec} (Copyright (c)
  * Corepack contributors); and {@code Tinylogic} tinylogic 2.0.0 (Copyright (c) 2020 Mael Nison) with the parser
@@ -80,7 +81,8 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * </pre>
  * {@code TgzUtils} reads tarballs as node-tar 6.1.11 parses them (Copyright (c) Isaac Z. Schlueter and
- * Contributors), and {@code GlobParent} ports glob-parent 5.1.2 (Copyright (c) 2015, 2019 Elan Shanker), both
+ * Contributors), and {@code internal.lock.GlobParent} ports glob-parent 5.1.2 (Copyright (c) 2015, 2019 Elan
+ * Shanker), both
  * distributed under the ISC License:
  * <pre>
  * Permission to use, copy, modify, and/or distribute this software for any
