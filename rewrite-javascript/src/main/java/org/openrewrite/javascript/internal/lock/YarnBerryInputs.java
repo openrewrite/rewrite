@@ -39,13 +39,14 @@ import java.util.regex.Pattern;
 import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
 
 /**
- * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
- * {@code .yarnrc.yml} of each directory from where Yarn runs up, and the package.json of those above it.
+ * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, the
+ * {@code .yarnrc.yml} of each directory from where Yarn runs up, and the package.json and paths of those above it.
  */
 final class YarnBerryInputs {
 
     private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
     private static final Pattern MANIFEST_ABOVE = Pattern.compile("(\\.\\./)+package\\.json");
+    private static final Pattern ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
 
     private YarnBerryInputs() {
     }
@@ -186,7 +187,7 @@ final class YarnBerryInputs {
         Set<String> paths = dir.pathsUnder("");
         if (paths != null) {
             for (String held : dir.getPaths()) {
-                if (MANIFEST_ABOVE.matcher(held).matches()) {
+                if (ABOVE.matcher(held).matches()) {
                     paths.add(held);
                 }
             }

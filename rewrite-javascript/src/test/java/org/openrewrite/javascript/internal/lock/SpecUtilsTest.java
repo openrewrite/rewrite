@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -252,6 +253,34 @@ class SpecUtilsTest {
                     dir -> dir.isEmpty() ? "{\"packageManager\":\"" + raw + "\"}" : null, held == null ? NOTHING :
                             held::equals, "yarn", env);
             actual = String.valueOf(SpecUtils.installVersion(requireNonNull(found)));
+        } catch (Rejected e) {
+            actual = e.getMessage().startsWith("Illegal use of URL for known package manager.") ? "refused" :
+                    e.getMessage();
+        } catch (CannotKnow e) {
+            actual = e.getMessage();
+        }
+        assertThat(actual).isEqualTo(answer);
+    }
+
+    /**
+     * Run below a package.json naming none, corepack 0.35.0 settles on the parent's and reads only the env file beside
+     * that one.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "../.corepack.env|the engine cannot know ../.corepack.env (its contents were not read)",
+            "-|refused",
+            ".corepack.env|refused",
+            ".corepack.env,../.corepack.env|the engine cannot know ../.corepack.env (its contents were not read)"
+    })
+    void readsTheEnvFileBesideTheParentPackageJsonItSettlesOn(@Nullable String held, String answer) {
+        String url = "yarn@https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js";
+        String actual;
+        try {
+            SpecUtils.findProjectSpec("", 1, dir -> dir.isEmpty() ? "{\"name\":\"p\",\"version\":\"1.0.0\"}" :
+                    "{\"name\":\"root\",\"packageManager\":\"" + url + "\"}", held == null ? NOTHING :
+                    Arrays.asList(held.split(","))::contains, "yarn", NO_ENV);
+            actual = "runs";
         } catch (Rejected e) {
             actual = e.getMessage().startsWith("Illegal use of URL for known package manager.") ? "refused" :
                     e.getMessage();

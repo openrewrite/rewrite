@@ -48,6 +48,18 @@ import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class YarnBerryInputsTest {
 
+    private static final RegistrySource NO_REGISTRY = new RegistrySource() {
+        @Override
+        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
+            return null;
+        }
+
+        @Override
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
+            return null;
+        }
+    };
+
     /**
      * Yarn 4.10.3 run in a member reads every .yarnrc.yml from there up (open-member-yarnrc-run-in-member), not a
      * sibling's.
@@ -216,6 +228,34 @@ class YarnBerryInputsTest {
             assertThat(asked(inputs)).containsExactly(entry("https://corp.example a",
               hostToken == null ? null : "Bearer corp-token"));
         }
+    }
+
+    /**
+     * corepack 0.35.0 reads the env file beside the package.json it settles on, above the project too, so a held one
+     * there decides whether that package.json's URL runs.
+     */
+    @Test
+    void theDirectoriesAboveTheProjectGiveTheirPaths() {
+        String url = "https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js";
+        Request.RequestBuilder request = Request.builder()
+          .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\"}")
+          .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n  version: 0.0.0-use.local\n" +
+                "  resolution: \"p@workspace:.\"\n  languageName: unknown\n  linkType: soft\n")
+          .packageJsonPath(Paths.get("app/package.json"))
+          .packageManagerFile(Paths.get("package.json"), "{\"name\":\"root\",\"packageManager\":\"yarn@" + url + "\"}");
+
+        Inputs without = YarnBerryInputs.from(LockDirectory.of(request.projectPaths(new HashSet<>(Arrays.asList(
+          Paths.get("app/package.json"), Paths.get("package.json")))).build()), Host.UNKNOWN, Instant.EPOCH, null,
+          null);
+        Inputs with = YarnBerryInputs.from(LockDirectory.of(request.projectPaths(new HashSet<>(Arrays.asList(
+          Paths.get("app/package.json"), Paths.get("package.json"), Paths.get(".corepack.env")))).build()),
+          Host.UNKNOWN, Instant.EPOCH, null, null);
+
+        assertThat(with.getPaths()).containsExactlyInAnyOrder("package.json", "../package.json", "../.corepack.env");
+        assertThat(new YarnBerryLockRegenerator(without, NO_REGISTRY).regenerate().getErrorMessage())
+          .contains("Illegal use of URL for known package manager.");
+        assertThat(new YarnBerryLockRegenerator(with, NO_REGISTRY).regenerate().getErrorMessage())
+          .endsWith("the engine cannot know ../.corepack.env (its contents were not read)");
     }
 
     /**
