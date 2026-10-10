@@ -122,10 +122,10 @@ final class Main {
     }
 
     // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON; config
-    // reads it as every project manifest is read
+    // converts it after the .npmrc's credentials, as every project manifest is converted
     private static Map<String, @Nullable Object> rootManifest(String text) {
         try {
-            return Manifests.readProjectManifest(text, "package.json");
+            return Manifests.parse(text, "package.json");
         } catch (PnpmError e) {
             if ("ERR_PNPM_JSON_PARSE".equals(e.getCode())) {
                 throw new JsError("ERR_INVALID_PACKAGE_CONFIG", "Invalid package config package.json.");

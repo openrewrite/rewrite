@@ -162,6 +162,10 @@ final class PnpmOptions {
             }
         }
         config.put("registries", new LinkedHashMap<>(registriesFromNpmrc));
+        if (rootManifest != null) {
+            // the root manifest is read only now, converted as every read converts it
+            Manifests.convertManifestAfterRead(rootManifest);
+        }
         if (rootManifest != null && config.get("nodeVersion") == null) {
             config.put("nodeVersion", getNodeVersionFromEnginesRuntime(rootManifest));
         }

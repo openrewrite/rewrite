@@ -1,0 +1,1 @@
+A lock whose mkdirp 1.0.4 (a package with a bin) records no hasBin; the edit adds wrappy. resolveDependencies.ts' branch that takes hasBin from the snapshot (=== true) would keep it absent; the one that runs reads the manifest.

@@ -72,7 +72,7 @@ final class Manifests {
         return convertManifestAfterRead((Map<String, @Nullable Object>) value);
     }
 
-    private static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {
+    static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies");
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies");
         return manifest;

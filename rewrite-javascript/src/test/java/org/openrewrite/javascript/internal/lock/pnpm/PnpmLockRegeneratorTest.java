@@ -410,6 +410,20 @@ class PnpmLockRegeneratorTest {
           .hasMessage("tokenHelper must not be configured in project-level .npmrc");
     }
 
+    /**
+     * config/reader checks the project .npmrc's credentials before it reads the root manifest (index.ts:317-328, 402),
+     * whose engines.runtime conversion raises a TypeError here.
+     */
+    @Test
+    void theNpmrcCredentialsBeforeTheRootManifest() {
+        String manifest = WITH + "\"engines\":{\"runtime\":[null]}}";
+        assertThatThrownBy(() -> install(LOCK, manifest, null, Collections.singletonMap(".npmrc",
+          "//registry.npmjs.org/:tokenHelper=/bin/echo")))
+          .hasMessage("tokenHelper must not be configured in project-level .npmrc");
+        assertThatThrownBy(() -> install(LOCK, manifest, null, Collections.emptyMap()))
+          .isInstanceOfSatisfying(JsError.class, e -> assertThat(e.getMessage()).contains("reading 'name'"));
+    }
+
     @Test
     void anAuthPairPnpmCannotUse() {
         assertThatThrownBy(() -> install(null, "_auth=Zm9vYmFy"))
