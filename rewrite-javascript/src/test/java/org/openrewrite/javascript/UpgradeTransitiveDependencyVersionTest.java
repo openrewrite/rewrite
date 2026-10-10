@@ -605,6 +605,20 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           "yarn applies is-odd/is-number before a global override of is-number");
     }
 
+    // pnpm 11.2.2's root-finder stops at a misspelt workspace manifest, findWorkspaceDir rejects it
+    @Test
+    void pnpmStopsAtAMisspeltWorkspaceManifest() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo("pnpm finds pnpm-workspace.yml " +
+                "where it reads pnpm-workspace.yaml (ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME)")),
+          packageJson("{\"name\":\"p\",\"dependencies\":{\"is-odd\":\"3.0.1\"}}", null,
+            nodeResolutionResult(PackageManager.Pnpm), s -> s.noTrim()),
+          text("packages:\n  - .\n", s -> s.path("pnpm-workspace.yml"))
+        );
+    }
+
     @Test
     void pnpmNamesAnOverrideScopedToAParentThatStillApplies() {
         golden("pnpm/override-recipe-parent-selector-present", PackageManager.Pnpm, "7.0.0", null,

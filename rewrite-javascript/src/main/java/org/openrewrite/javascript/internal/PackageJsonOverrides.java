@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.bun.OverrideMap;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
@@ -195,7 +196,7 @@ public final class PackageJsonOverrides {
     private static Place place(PackageManager pm, Json.Document root, WorkspaceSettings workspace, int release) {
         switch (pm) {
             case Bun:
-                return member(root, "overrides") == null && member(root, "resolutions") != null ?
+                return "resolutions".equals(OverrideMap.readsFrom(PackageJsonHelper.printed(root))) ?
                         Place.RESOLUTIONS : Place.OVERRIDES;
             case YarnClassic:
             case YarnBerry:

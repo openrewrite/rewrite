@@ -26,7 +26,7 @@ import java.util.Map;
  * Port of @pnpm/catalogs.config, @pnpm/catalogs.protocol-parser and @pnpm/catalogs.resolver (pnpm 11.2.2): the
  * catalogs pnpm-workspace.yaml defines, by catalog name then alias, and the {@code catalog:} protocol over them.
  */
-final class Catalogs {
+public final class Catalogs {
 
     private static final String CATALOG_PROTOCOL = "catalog:";
 
@@ -80,7 +80,7 @@ final class Catalogs {
     /**
      * {@code parseCatalogProtocol}: the catalog a {@code catalog:} specifier names, null for any other specifier.
      */
-    static @Nullable String parseCatalogProtocol(String bareSpecifier) {
+    public static @Nullable String parseCatalogProtocol(String bareSpecifier) {
         if (!bareSpecifier.startsWith(CATALOG_PROTOCOL)) {
             return null;
         }

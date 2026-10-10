@@ -15,7 +15,10 @@
  */
 package org.openrewrite.javascript.internal;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
@@ -72,6 +75,34 @@ class NodeDependencyEditsTest {
         NodeCatalogs secondSees = requireNonNull(second.of(ctx, MEMBER));
         assertThat(secondSees.specifier("default", "wrappy")).isEqualTo("1.0.3");
         assertThat(secondSees.specifier("legacy", "ms")).isEqualTo("2.1.2");
+    }
+
+    // pnpm's getWantedPackageManager reads packageManager and devEngines.packageManager; yarn below 2 is classic
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "{\"packageManager\":\"yarn@1.22.22+sha512.abc\"}                                | YarnClassic",
+      "{\"packageManager\":\"yarn@4.10.3\"}                                            | YarnBerry",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"^1.22.0\"}}} | YarnClassic",
+      "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"10.x\"}]}} | Pnpm",
+      "{\"packageManager\":\"bun@1.3.10\"}                                             | Bun",
+      "{\"packageManager\":\"npm@11.17.0\"}                                            | Npm",
+      "{\"packageManager\":\"deno@2.0.0\"}                                             |"
+    })
+    void theManifestNamesThePackageManagerItsMarkerDoesNot(String manifest, @Nullable PackageManager named) {
+        NodeDependencyEdits acc = new NodeDependencyEdits(new NodeDependencyEdits.Rows() {
+            @Override
+            public void failure(ExecutionContext ctx, Path packageJson, LockFileRegeneration.Failure failure) {
+            }
+
+            @Override
+            public void declined(ExecutionContext ctx, Path path, String reason) {
+            }
+        });
+        SourceFile root = json(manifest);
+        acc.scan(root.withMarkers(root.getMarkers().add(nodeResolutionResult(null))));
+        List<@Nullable PackageManager> seen = new ArrayList<>();
+        acc.decideAll(new InMemoryExecutionContext(), (decision, c) -> seen.add(decision.getPackageManager()));
+        assertThat(seen).containsExactly(named);
     }
 
     private static final Path MEMBER = Paths.get("packages/a/package.json");

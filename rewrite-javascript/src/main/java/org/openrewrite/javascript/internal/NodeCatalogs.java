@@ -21,6 +21,8 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.berry.Catalogs;
+import org.openrewrite.javascript.internal.lock.bun.CatalogMap;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
@@ -47,6 +49,7 @@ import java.util.Set;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
+import static org.openrewrite.javascript.internal.lock.pnpm.Catalogs.parseCatalogProtocol;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -399,11 +402,7 @@ public abstract class NodeCatalogs {
 
         @Override
         public @Nullable String catalogOf(String value) {
-            if (!value.startsWith(PROTOCOL)) {
-                return null;
-            }
-            String name = EcmaScript.trim(value.substring(PROTOCOL.length()));
-            return name.isEmpty() ? DEFAULT : name;
+            return parseCatalogProtocol(value);
         }
 
         /**
@@ -539,7 +538,7 @@ public abstract class NodeCatalogs {
 
         @Override
         public @Nullable String catalogOf(String value) {
-            return value.startsWith(PROTOCOL) ? value.substring(PROTOCOL.length()) : null;
+            return Catalogs.catalogOf(value);
         }
 
         @Override
@@ -595,7 +594,7 @@ public abstract class NodeCatalogs {
 
         @Override
         public @Nullable String catalogOf(String value) {
-            return value.startsWith(PROTOCOL) ? value.substring(PROTOCOL.length()).trim() : null;
+            return CatalogMap.groupOf(value);
         }
 
         @Override

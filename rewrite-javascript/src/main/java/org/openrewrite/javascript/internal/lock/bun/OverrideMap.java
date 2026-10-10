@@ -26,7 +26,21 @@ import java.util.Map;
  * Port of bun's src/install/lockfile/OverrideMap.zig (bun 1.3.10): one flat map from a name hash to the dependency
  * every edge of that name resolves with, from {@code overrides}, else {@code resolutions}.
  */
-final class OverrideMap {
+public final class OverrideMap {
+
+    /**
+     * The field of the root manifest parseAppend reads overrides from: {@code overrides} when it has one, else
+     * {@code resolutions} when it has that, else null.
+     */
+    public static @Nullable String readsFrom(String rootManifest) {
+        Json.Expr expr;
+        try {
+            expr = Json.parse(rootManifest);
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return expr.get("overrides") != null ? "overrides" : expr.get("resolutions") != null ? "resolutions" : null;
+    }
 
     final LinkedHashMap<Long, Dependency> map = new LinkedHashMap<>();
 

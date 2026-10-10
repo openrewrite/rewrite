@@ -27,6 +27,7 @@ import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
@@ -112,6 +113,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             return;
         }
         Path path = decision.getPath();
+        Path found = pm == PackageManager.Pnpm ? pnpmWorkspaceManifest(acc.scan, path) : null;
+        if (found != null && !WORKSPACE_MANIFEST.equals(String.valueOf(found.getFileName()))) {
+            decision.decline("pnpm finds " + found + " where it reads " + WORKSPACE_MANIFEST +
+                             " (ERR_PNPM_BAD_WORKSPACE_MANIFEST_NAME)");
+            return;
+        }
         Path root = workspaceRoot(acc.scan, path, pm);
         if (!root.equals(path)) {
             if (!acc.holds(root)) {
@@ -193,19 +200,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
         return rows;
     }
 
-    // pnpm's workspace root holds the pnpm-workspace.yaml found above packageJson; for the others, the package.json
-    // whose lock an edit of packageJson lands in, else the nearest that lists it as a member
+    // pnpm's workspace root holds the workspace manifest its root-finder finds above packageJson; for the others, the
+    // package.json whose lock an edit of packageJson lands in, else the nearest that lists it as a member
     private static Path workspaceRoot(NodeDependencyScan.Accumulator acc, Path packageJson, PackageManager pm) {
-        if (pm == PackageManager.Pnpm) {
-            for (Path dir = packageJson.getParent(); ; dir = dir.getParent()) {
-                Path manifest = dir == null ? Paths.get(WORKSPACE_MANIFEST) : dir.resolve(WORKSPACE_MANIFEST);
-                if (acc.paths.contains(manifest)) {
-                    return manifest.resolveSibling("package.json");
-                }
-                if (dir == null) {
-                    break;
-                }
-            }
+        Path found = pm == PackageManager.Pnpm ? pnpmWorkspaceManifest(acc, packageJson) : null;
+        if (found != null) {
+            return found.resolveSibling("package.json");
         }
         Path lock = NodeDependencyScan.lockFor(acc, packageJson);
         Path root = lock == null ? null : acc.lockToPackage.get(lock);
@@ -220,5 +220,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             }
         }
         return packageJson;
+    }
+
+    // pnpm's root-finder from packageJson's directory up over the files the host holds, misspellings included
+    private static @Nullable Path pnpmWorkspaceManifest(NodeDependencyScan.Accumulator acc, Path packageJson) {
+        Path dir = packageJson.getParent();
+        String found = WorkspaceRootFinder.findWorkspaceManifest(path -> acc.paths.contains(Paths.get(path)),
+                dir == null ? "" : dir.toString().replace('\\', '/'));
+        return found == null ? null : Paths.get(found);
     }
 }

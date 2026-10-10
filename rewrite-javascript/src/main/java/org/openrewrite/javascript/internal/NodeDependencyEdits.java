@@ -25,12 +25,14 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.semver.NodeSemver;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
@@ -760,38 +762,24 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return ps == null ? null : ps.capturedPackageJson;
     }
 
+    // the package manager a manifest names, as pnpm's getWantedPackageManager reads packageManager and
+    // devEngines.packageManager; a yarn release below 2 is Yarn classic
     private static @Nullable PackageManager named(SourceFile manifest) {
-        if (!(manifest instanceof Json.Document) || !(((Json.Document) manifest).getValue() instanceof
-                Json.JsonObject)) {
+        PnpmOptions.WantedPackageManager wanted;
+        try {
+            wanted = PnpmOptions.wantedPackageManager(PackageJsonHelper.printed(manifest), null);
+        } catch (RuntimeException e) {
             return null;
         }
-        Json.JsonObject root = (Json.JsonObject) ((Json.Document) manifest).getValue();
-        String spec = NodeCatalogs.string(NodeCatalogs.member(root, "packageManager"));
-        Json devEngines = NodeCatalogs.member(root, "devEngines");
-        Json declared = devEngines instanceof Json.JsonObject ?
-                NodeCatalogs.member((Json.JsonObject) devEngines, "packageManager") : null;
-        if (spec == null && declared instanceof Json.JsonObject) {
-            String name = NodeCatalogs.string(NodeCatalogs.member((Json.JsonObject) declared, "name"));
-            String version = NodeCatalogs.string(NodeCatalogs.member((Json.JsonObject) declared, "version"));
-            spec = name == null ? null : name + "@" + (version == null ? "" : version);
+        Object name = wanted == null ? null : wanted.getName();
+        if ("yarn".equals(name)) {
+            Object version = wanted.getVersion();
+            String least = version instanceof String ? NodeSemver.minVersion((String) version,
+                    NodeSemver.Options.DEFAULT) : null;
+            return least != null && least.startsWith("1.") ? PackageManager.YarnClassic : PackageManager.YarnBerry;
         }
-        if (spec == null) {
-            return null;
-        }
-        if (spec.startsWith("pnpm@")) {
-            return PackageManager.Pnpm;
-        }
-        if (spec.startsWith("bun@")) {
-            return PackageManager.Bun;
-        }
-        if (spec.startsWith("npm@")) {
-            return PackageManager.Npm;
-        }
-        if (spec.startsWith("yarn@")) {
-            return spec.startsWith("yarn@1.") || "yarn@1".equals(spec) ? PackageManager.YarnClassic :
-                    PackageManager.YarnBerry;
-        }
-        return null;
+        return "pnpm".equals(name) ? PackageManager.Pnpm : "bun".equals(name) ? PackageManager.Bun :
+                "npm".equals(name) ? PackageManager.Npm : null;
     }
 
     private static <T extends Tree> T warn(T tree, String message) {

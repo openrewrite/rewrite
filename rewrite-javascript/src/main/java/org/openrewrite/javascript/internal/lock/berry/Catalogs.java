@@ -22,7 +22,7 @@ import java.util.Map;
 /**
  * Port of @yarnpkg/plugin-catalog sources/index.ts {@code reduceDependency} and sources/utils.ts (Yarn 4.10.3).
  */
-final class Catalogs {
+public final class Catalogs {
 
     static final String CATALOG_DESCRIPTOR_PREFIX = "catalog:";
 
@@ -39,6 +39,17 @@ final class Catalogs {
             return resolveDescriptorFromCatalog(project, dependency, resolver, opts);
         }
         return dependency;
+    }
+
+    /**
+     * The catalog a range references, {@code ""} for {@code catalog:}'s default one; null for no catalog reference.
+     */
+    public static @Nullable String catalogOf(String range) {
+        if (!isCatalogReference(range)) {
+            return null;
+        }
+        String name = range.substring(CATALOG_DESCRIPTOR_PREFIX.length());
+        return name.isEmpty() ? "" : name;
     }
 
     static @Nullable String getCatalogName(Descriptor dependency) {
