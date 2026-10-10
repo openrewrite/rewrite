@@ -48,6 +48,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Function;
@@ -283,9 +284,29 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         } else if (result != null) {
             failure(ctx, requireNonNull(importer), requireNonNull(result.getFailure()));
             out = warn(sf, "lock regeneration failed: " + result.getErrorMessage());
+        } else {
+            String beside = writtenBeside(ctx, p);
+            out = beside == null || beside.equals(print(sf)) ? sf : PackageJsonHelper.reparseLock(sf, beside);
         }
         left.put(p, print(out));
         return out;
+    }
+
+    // what the regeneration of the lock beside p writes at p besides that lock: npm's yarn.lock
+    private @Nullable String writtenBeside(ExecutionContext ctx, Path p) {
+        for (Path lock : scan.lockToPackage.keySet()) {
+            if (lock.equals(p) || !Objects.equals(lock.getParent(), p.getParent())) {
+                continue;
+            }
+            Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, lock));
+            LockFileRegeneration.Result result = importer == null ? null :
+                    regeneration(ctx, importer).result.getRegenResult();
+            String text = result == null ? null : result.getFiles().get(String.valueOf(p.getFileName()));
+            if (text != null) {
+                return text;
+            }
+        }
+        return null;
     }
 
     // the importer whose regeneration the lock takes: the first that edits its own manifest, else the last whose
@@ -413,7 +434,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         Path importer = importerOf(ctx, NodeDependencyScan.lockImporters(scan, path));
         LockFileRegeneration.Result result = importer == null ? null :
                 regeneration(ctx, importer).result.getRegenResult();
-        return result != null && result.isSuccess() ? result.getLockFileContent() : print(at);
+        if (result == null) {
+            String beside = writtenBeside(ctx, path);
+            return beside == null ? print(at) : beside;
+        }
+        return result.isSuccess() ? result.getLockFileContent() : print(at);
     }
 
     private void rebuild() {

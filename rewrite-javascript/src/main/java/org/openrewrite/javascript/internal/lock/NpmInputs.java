@@ -45,9 +45,14 @@ final class NpmInputs {
         return ".npmrc".equals(fileName);
     }
 
+    static boolean writesBesideLock(String fileName) {
+        return Shrinkwrap.writesBesideLock(fileName::equals);
+    }
+
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         return Inputs.builder()
                 .lock(dir.getLock())
+                .yarnLock(dir.file("yarn.lock"))
                 .npmrc(dir.file(".npmrc"))
                 .paths(dir.pathsUnder(""))
                 .host(host)
@@ -101,13 +106,16 @@ final class NpmInputs {
     }
 
     /**
-     * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules).
+     * npm's walk from where it runs; it stops where npm writes a file no regeneration writes (Shrinkwrap's rules): its
+     * lock as an npm-shrinkwrap.json, or the yarn.lock beside a lock the host does not hold.
      */
     static InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = NpmLockRegenerator.installRoot(dir.getRunsIn(), dir.getManifests(), parentTrees(dir));
         String root = dir.aboveRunsIn(walked.getDepth());
         Predicate<String> holds = name -> dir.holds(RootRelativePath.join(root, name));
-        return walked.isStopped() || !Shrinkwrap.readsShrinkwrap(holds) && !Shrinkwrap.writesBesideLock(holds) ?
-                walked : InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
+        boolean another = Shrinkwrap.readsShrinkwrap(holds) || Shrinkwrap.writesBesideLock(holds) &&
+                                                                !holds.test("package-lock.json");
+        return walked.isStopped() || !another ? walked :
+                InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
     }
 }

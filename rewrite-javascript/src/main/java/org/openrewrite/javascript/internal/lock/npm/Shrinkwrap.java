@@ -966,6 +966,13 @@ public final class Shrinkwrap {
         }
     }
 
+    /**
+     * The yarn.lock save writes beside the lock, rebuilt from the tree by {@link #commit()}; null when it writes none.
+     */
+    public @Nullable String yarnLockText() {
+        return yarnLock == null || yarnLock.getEntries().isEmpty() ? null : yarnLock.toString();
+    }
+
     public Map<String, Object> toJSON() {
         loadedData();
         return commit();

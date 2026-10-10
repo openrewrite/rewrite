@@ -70,6 +70,13 @@ class NpmScenarioTest extends LockScenarioTest {
         }
         ScenarioRegistry http = new ScenarioRegistry(scenario);
         Result result = new NpmLockRegenerator(ScenarioReplay.inputs(edit), ScenarioReplay.registry(http)).regenerate();
+        String yarnLock = edit.getResult() != null && "after".equals(edit.getResult().getFileName()) &&
+                          scenario.has("after-yarn") ? scenario.file("after-yarn") : null;
+        if (expect.isExact() && yarnLock != null && result.isSuccess() &&
+            !yarnLock.equals(result.getFiles().get("yarn.lock"))) {
+            failed(label, http, "mismatch", "yarn.lock " + firstDifference(yarnLock,
+                    String.valueOf(result.getFiles().get("yarn.lock"))), " wrote another yarn.lock than npm");
+        }
         check(label, expect, expectedLock(edit, scenario.expect()), result, http);
     }
 

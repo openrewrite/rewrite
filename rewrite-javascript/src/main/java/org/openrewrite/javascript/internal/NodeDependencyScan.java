@@ -310,6 +310,13 @@ public final class NodeDependencyScan {
         }
         Path root = directory(manifests.isEmpty() ? packageJsonPath : manifests.keySet().iterator().next());
         Path edited = directory(packageJsonPath);
+        for (Map.Entry<Path, String> lock : acc.locks.entrySet()) {
+            if (regeneration != null && directory(lock.getKey()).equals(root) &&
+                regeneration.writesBesideLock(String.valueOf(lock.getKey().getFileName()))) {
+                String text = before.apply(lock.getKey());
+                files.put(lock.getKey(), text == null ? lock.getValue() : text);
+            }
+        }
         if (regeneration != null && regeneration.readsOtherLocks()) {
             Path own = root.resolve(regeneration.getLockFile());
             for (Map.Entry<Path, String> lock : acc.locks.entrySet()) {

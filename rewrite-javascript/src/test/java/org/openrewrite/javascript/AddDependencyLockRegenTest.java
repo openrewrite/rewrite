@@ -109,6 +109,26 @@ class AddDependencyLockRegenTest implements RewriteTest {
         );
     }
 
+    // recorded with npm 11.17.0 (lock/npm/open-yarn-lock-incremental), which rewrites the yarn.lock beside its lock
+    @Test
+    void anNpmProjectsYarnLockIsRewrittenAsNpmRewritesIt() {
+        String scenario = "lock/npm/open-yarn-lock-incremental/";
+        routes.put("https://registry.npmjs.org/kind-of", resource(scenario + "http/kind-of"));
+        routes.put("https://registry.npmjs.org/kind-of/6.0.3", resource(scenario + "http/kind-of-6.0.3"));
+
+        rewriteRun(
+                spec -> spec.recipe(new AddDependency("kind-of", "^6.0.0", "dependencies")).executionContext(ctx),
+                packageJson(resource(scenario + "pkg-before"), null,
+                        nodeResolutionResult(PackageManager.Npm, dependency("is-odd", "3.0.1")), s -> s.after(actual -> {
+                            assertThat(actual).contains("kind-of").doesNotContain("lock regeneration failed");
+                            return actual;
+                        })),
+                packageLock(resource(scenario + "before"), resource(scenario + "after"), s -> s.noTrim()),
+                text(resource(scenario + "before-yarn"), resource(scenario + "after-yarn"),
+                        s -> s.path("yarn.lock").noTrim())
+        );
+    }
+
     @Test
     void metadataLeafAddRegeneratesLockByteExact() {
         // A leaf carrying object metadata (engines) is written byte-exact end-to-end.

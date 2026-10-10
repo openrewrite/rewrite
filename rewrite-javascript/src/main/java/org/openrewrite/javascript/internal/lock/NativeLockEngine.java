@@ -51,15 +51,16 @@ public final class NativeLockEngine {
 
     static {
         PORTS.put(PackageManager.Npm, new Port(NpmInputs::reads, NpmInputs::readsOnlyBesideLock, name -> false, false,
-                NpmInputs::installRoot, NativeLockEngine::regenerateNpm));
+                NpmInputs::writesBesideLock, NpmInputs::installRoot, NativeLockEngine::regenerateNpm));
         PORTS.put(PackageManager.Bun, new Port(BunInputs::reads, BunInputs::readsOnlyBesideLock, name -> false, false,
-                BunInputs::installRoot, NativeLockEngine::regenerateBun));
+                name -> false, BunInputs::installRoot, NativeLockEngine::regenerateBun));
         PORTS.put(PackageManager.YarnClassic, new Port(YarnClassicInputs::reads, name -> false, name -> false, false,
-                YarnClassicInputs::installRoot, NativeLockEngine::regenerateYarnClassic));
+                name -> false, YarnClassicInputs::installRoot, NativeLockEngine::regenerateYarnClassic));
         PORTS.put(PackageManager.YarnBerry, new Port(YarnBerryInputs::reads, name -> false, name -> false, false,
-                YarnBerryInputs::installRoot, NativeLockEngine::regenerateYarnBerry));
+                name -> false, YarnBerryInputs::installRoot, NativeLockEngine::regenerateYarnBerry));
         PORTS.put(PackageManager.Pnpm, new Port(PnpmInputs::reads, name -> false, PnpmInputs::readsAsManifest,
-                PnpmInputs.readsOtherLocks(), PnpmInputs::installRoot, NativeLockEngine::regeneratePnpm));
+                PnpmInputs.readsOtherLocks(), name -> false, PnpmInputs::installRoot,
+                NativeLockEngine::regeneratePnpm));
     }
 
     private NativeLockEngine() {
@@ -118,22 +119,33 @@ public final class NativeLockEngine {
         return port != null && port.readsOtherLocks;
     }
 
+    /**
+     * Whether the package manager reads and rewrites a file of this name beside its lock: npm's yarn.lock.
+     */
+    public static boolean writesBesideLock(PackageManager pm, String fileName) {
+        Port port = PORTS.get(pm);
+        return port != null && port.writesBesideLock.test(fileName);
+    }
+
     // what the dispatch asks one package manager's port
     private static final class Port {
         final Predicate<String> reads;
         final Predicate<String> readsOnlyBesideLock;
         final Predicate<String> readsAsManifest;
         final boolean readsOtherLocks;
+        final Predicate<String> writesBesideLock;
         final Function<LockDirectory, InstallRoot> installRoot;
         final BiFunction<Request, ExecutionContext, Result> regenerate;
 
         Port(Predicate<String> reads, Predicate<String> readsOnlyBesideLock, Predicate<String> readsAsManifest,
-             boolean readsOtherLocks, Function<LockDirectory, InstallRoot> installRoot,
+             boolean readsOtherLocks, Predicate<String> writesBesideLock,
+             Function<LockDirectory, InstallRoot> installRoot,
              BiFunction<Request, ExecutionContext, Result> regenerate) {
             this.reads = reads;
             this.readsOnlyBesideLock = readsOnlyBesideLock;
             this.readsAsManifest = readsAsManifest;
             this.readsOtherLocks = readsOtherLocks;
+            this.writesBesideLock = writesBesideLock;
             this.installRoot = installRoot;
             this.regenerate = regenerate;
         }

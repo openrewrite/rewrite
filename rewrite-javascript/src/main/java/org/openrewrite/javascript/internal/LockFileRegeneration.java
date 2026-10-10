@@ -34,7 +34,9 @@ import java.util.Map;
 import java.util.Set;
 
 import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableList;
+import static java.util.Collections.unmodifiableMap;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -224,19 +226,28 @@ public final class LockFileRegeneration {
     }
 
     /**
-     * The regenerated lock, or the failure that stands in its place.
+     * The regenerated lock and the other files the install writes, or the failure that stands in their place.
      */
     @Value
     public static class Result {
         @Nullable String lockFileContent;
         @Nullable Failure failure;
 
+        /**
+         * The files the install writes besides the lock, by path from the lock's directory; none when it fails.
+         */
+        Map<String, String> files;
+
         public static Result success(String lockFileContent) {
-            return new Result(lockFileContent, null);
+            return new Result(lockFileContent, null, emptyMap());
+        }
+
+        public static Result success(String lockFileContent, Map<String, String> files) {
+            return new Result(lockFileContent, null, unmodifiableMap(new LinkedHashMap<>(files)));
         }
 
         public static Result failure(Failure failure) {
-            return new Result(null, failure);
+            return new Result(null, failure, emptyMap());
         }
 
         public boolean isSuccess() {
@@ -309,6 +320,13 @@ public final class LockFileRegeneration {
      */
     public boolean readsOtherLocks() {
         return NativeLockEngine.readsOtherLocks(pm);
+    }
+
+    /**
+     * Whether its install reads and rewrites a file of this name beside its lock, which the regeneration writes too.
+     */
+    public boolean writesBesideLock(String fileName) {
+        return NativeLockEngine.writesBesideLock(pm, fileName);
     }
 
     /**

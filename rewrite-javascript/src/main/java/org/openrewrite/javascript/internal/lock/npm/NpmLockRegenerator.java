@@ -36,6 +36,7 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -134,6 +135,7 @@ public final class NpmLockRegenerator {
         NpmOptions options;
         String path;
         String written;
+        String yarnLock;
         try {
             INSTALL.requireInstallsAt(NpmOptions.loadLocalPrefix(inputs.getManifests().get(inputs.getRunsIn()),
                     inputs.getParentTrees()), inputs.getRunsIn(), "lock");
@@ -156,16 +158,19 @@ public final class NpmLockRegenerator {
                 return Result.success(Objects.requireNonNull(inputs.getLock()));
             }
             written = saveIdealTree(arb, options);
+            yarnLock = Objects.requireNonNull(arb.buildIdealTree().getMeta()).yarnLockText();
         } catch (NodeRegistryException e) {
             throw e;
         } catch (RuntimeException e) {
             return Result.failure(failure(e));
         }
-        return INSTALL.verify(written, lock -> {
+        Result verified = INSTALL.verify(written, lock -> {
             IdealTreeBuilder again = arborist(path, projectFiles(new LockFile(lock)), options);
             again.buildIdealTree();
             return saveIdealTree(again, options);
         }, NpmLockRegenerator::failure);
+        return yarnLock == null || !verified.isSuccess() ? verified :
+                Result.success(written, Collections.singletonMap("yarn.lock", yarnLock));
     }
 
     /**
