@@ -1,0 +1,1 @@
+The control of open-opt-no-lockfile-locked-unpublished without --no-lockfile: yarn reuses the entry, fetches its tarball and adds left-pad.

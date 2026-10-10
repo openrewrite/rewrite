@@ -1,0 +1,1 @@
+.yarnrc --no-lockfile true over a lock whose entry names a package the registry does not have: install.js starts from an empty lockfile, so yarn asks the registry for it and fails.
