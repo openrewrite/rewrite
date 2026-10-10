@@ -15,9 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import org.openrewrite.javascript.internal.lock.EventLoop;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.EventLoop;
+import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.Arrays;
 import java.util.List;
@@ -25,7 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.openrewrite.javascript.internal.lock.JsError;
 
 import static org.openrewrite.javascript.internal.lock.V8RegExp.DOT;
 

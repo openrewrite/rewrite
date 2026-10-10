@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
-
 import org.openrewrite.javascript.internal.lock.JsError;
 
 import java.util.List;
