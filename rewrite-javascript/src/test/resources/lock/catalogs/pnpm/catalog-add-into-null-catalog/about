@@ -1,0 +1,1 @@
+pnpm 11.2.2 add wrappy@1.0.2 --save-catalog in member a, the catalog key holding null: where the entry goes.

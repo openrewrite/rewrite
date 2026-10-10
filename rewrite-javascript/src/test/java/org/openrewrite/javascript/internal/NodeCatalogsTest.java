@@ -106,11 +106,18 @@ class NodeCatalogsTest {
           .isEqualTo(file("pnpm/catalog-cleanup-pnpm9/workspace").replace("wrappy: 1.0.2", "wrappy: 1.0.1"));
     }
 
+    // each range's first release and the one below it recorded (probes pnpm-releases, pnpm-writes-below)
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-      {"devEngines":{"packageManager":{"name":"pnpm","version":">=9"}}} | not one major
-      {"packageManager":"pnpm@12.0.0"}                                  | pnpm 12.x
-      {"packageManager":"pnpm@8.15.9"}                                  | pnpm 8.x
+      {"devEngines":{"packageManager":{"name":"pnpm","version":">=9"}}}     | >=9, is one the registry picks
+      {"devEngines":{"packageManager":{"name":"pnpm","version":"^10.0.0"}}} | ^10.0.0, is one the registry picks
+      {"packageManager":"pnpm@12.0.0"}                                      | pnpm 12.0.0 is not
+      {"packageManager":"pnpm@11.3.0"}                                      | pnpm 11.3.0 is not
+      {"packageManager":"pnpm@11.0.5"}                                      | pnpm 11.0.5 is not
+      {"packageManager":"pnpm@10.31.0"}                                     | pnpm 10.31.0 is not
+      {"packageManager":"pnpm@10.0.0"}                                      | pnpm 10.0.0 is not
+      {"packageManager":"pnpm@9.4.0"}                                       | pnpm 9.4.0 is not
+      {"packageManager":"pnpm@8.15.9"}                                      | pnpm 8.15.9 is not
       """)
     void aReleaseNoRecordingCoversIsDeclined(String root, String why) {
         NodeCatalogs.Pnpm catalogs = (NodeCatalogs.Pnpm) requireNonNull(NodeCatalogs.read(PackageManager.Pnpm,
@@ -216,10 +223,54 @@ class NodeCatalogsTest {
 
     @Test
     void aNewEntryNeverDuplicatesAKey() {
-        assertThat(pnpmOf("catalog:\npackages:\n  - a\n").withEntry("default", "wrappy", "1.0.2"))
+        assertThat(edited(pnpm("catalog-add-into-null-catalog").withEntry("default", "wrappy", "1.0.2")))
+          .as("catalog holds null").isEqualTo(file("pnpm/catalog-add-into-null-catalog/workspace"));
+        assertThat(pnpmOf("catalog: 1\npackages:\n  - a\n").withEntry("default", "wrappy", "1.0.2"))
           .as("catalog holds no mapping").isNull();
         assertThat(pnpmOf("catalog:\n  wrappy:\n    nested: 1\n").withEntry("default", "wrappy", "1.0.2"))
           .as("the entry holds no scalar").isNull();
+    }
+
+    // pnpm's yaml prints the whole document again, ending it with a newline (catalog-update-no-final-newline)
+    @Test
+    void pnpmEndsTheFileItWritesWithANewline() {
+        assertThat(edited(pnpm("catalog-update-no-final-newline").withSpecifier("default", "wrappy", "1.0.2")))
+          .isEqualTo(file("pnpm/catalog-update-no-final-newline/workspace"));
+    }
+
+    // the entries left keep their comments, as pnpm 11.2.2 and 10.34.6 wrote them (catalog-cleanup-comments-*)
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      catalog-cleanup-comments-middle-pnpm11, wrappy
+      catalog-cleanup-comments-first-pnpm11,  is-number
+      catalog-cleanup-comments-last-pnpm11,   wrappy
+      catalog-cleanup-comments-middle-pnpm10, wrappy
+      catalog-cleanup-comments-first-pnpm10,  is-number
+      catalog-cleanup-comments-last-pnpm10,   wrappy
+      """)
+    void aCleanupKeepsTheCommentsOfTheEntriesItLeaves(String scenario, String removed) {
+        Map<String, String> used = new LinkedHashMap<>();
+        for (String name : Arrays.asList("is-number", "ms", "wrappy")) {
+            if (!name.equals(removed)) {
+                used.put(name, "catalog:");
+            }
+        }
+        assertThat(edited(pnpmOfRoot(scenario).withoutUnused(projects(Arrays.asList(emptyMap(),
+          singletonMap("dependencies", used))))))
+          .isEqualTo(file("pnpm/" + scenario + "/workspace"));
+    }
+
+    // pnpm 10's cleanup reads the dependency fields only, pnpm 11's an override's catalog: too
+    @Test
+    void anOverridesCatalogReferenceKeepsAnEntryForPnpm11Only() {
+        Map<String, Map<String, String>> member = declares("wrappy", "catalog:");
+        assertThat(edited(pnpmOfRoot("catalog-cleanup-override-reference-pnpm10").withoutUnused(
+          projects(Arrays.asList(emptyMap(), member)))))
+          .isEqualTo(file("pnpm/catalog-cleanup-override-reference-pnpm10/workspace"));
+        NodeCatalogs.Pnpm pnpm11 = pnpmOfRoot("catalog-cleanup-override-reference-pnpm11");
+        assertThat(pnpm11.withoutUnused(projects(Arrays.asList(emptyMap(), member)))).isSameAs(pnpm11);
+        assertThat(file("pnpm/catalog-cleanup-override-reference-pnpm11/workspace"))
+          .isEqualTo(file("pnpm/catalog-cleanup-override-reference-pnpm11/workspace-before"));
     }
 
     @ParameterizedTest

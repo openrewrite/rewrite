@@ -187,8 +187,8 @@ class AddDependencyCatalogTest implements RewriteTest {
             }
           }
           """;
-        String why = "is-number@6.0.0 was not added: the pnpm release the project names is not one major (a range " +
-          "the registry decides between majors, or a value pnpm cannot read)";
+        String why = "is-number@6.0.0 was not added: the pnpm release the project names, >=9, is one the registry " +
+          "picks, not always a release whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2)";
         rewriteRun(
           spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()

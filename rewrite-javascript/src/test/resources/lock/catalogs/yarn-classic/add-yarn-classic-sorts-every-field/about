@@ -1,0 +1,1 @@
+yarn 1.22.22 add is-number@^7.0.0 in a project whose dependencies {wrappy, JSONStream, abbrev} and devDependencies {ms, is-odd} are unsorted: which fields it sorts, and by which collation.

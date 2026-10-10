@@ -1,0 +1,4 @@
+overrides:
+  abbrev: 1.1.1
+  is-number: 7.0.0
+  wrappy: 1.0.2

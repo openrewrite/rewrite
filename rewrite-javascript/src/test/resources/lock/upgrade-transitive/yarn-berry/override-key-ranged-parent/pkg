@@ -1,0 +1,11 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "is-odd": "3.0.1"
+  },
+  "resolutions": {
+    "is-odd@^3.0.0/is-number": "7.0.0"
+  }
+}

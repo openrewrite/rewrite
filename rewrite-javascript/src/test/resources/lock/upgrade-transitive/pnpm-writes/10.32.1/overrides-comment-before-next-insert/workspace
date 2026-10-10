@@ -1,0 +1,5 @@
+overrides:
+  aaa: 1.0.0
+  is-number: 7.0.0
+  # z
+  zzz: 1.0.0

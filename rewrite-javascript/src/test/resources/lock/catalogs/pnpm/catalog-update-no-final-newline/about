@@ -1,0 +1,1 @@
+pnpm 11.2.2 -r update --latest wrappy, pnpm-workspace.yaml without a final newline: whether the file it writes ends with one.

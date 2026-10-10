@@ -1,0 +1,9 @@
+{
+  "name": "a",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "catalog:",
+    "ms": "catalog:",
+    "wrappy": "catalog:"
+  }
+}

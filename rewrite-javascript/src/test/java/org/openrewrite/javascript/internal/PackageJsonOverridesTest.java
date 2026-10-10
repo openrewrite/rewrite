@@ -67,9 +67,8 @@ class PackageJsonOverridesTest {
     /**
      * Cases where pnpm re-indents what the edit leaves alone; the recipe keeps it, and the keys come in pnpm's order.
      */
-    private static final List<String> RE_INDENTED = Arrays.asList("11.2.2/overrides-four-spaces",
-            "11.2.2/packages-sequence-unindented", "10.34.6/overrides-four-spaces",
-            "10.34.6/packages-sequence-unindented");
+    private static final List<String> RE_INDENTED = Arrays.asList("overrides-four-spaces",
+            "packages-sequence-unindented");
 
     static Stream<Arguments> writes() throws IOException, URISyntaxException {
         Path root = Paths.get(Objects.requireNonNull(PackageJsonOverridesTest.class.getClassLoader()
@@ -103,7 +102,7 @@ class PackageJsonOverridesTest {
                 gt < 0 ? added.getKey() : added.getKey().substring(gt + 1), added.getValue(), path)
                 .applyToWorkspaceManifest();
         String pnpm = read(dir.resolve("workspace"));
-        if (RE_INDENTED.contains(name)) {
+        if (RE_INDENTED.contains(name.substring(name.indexOf('/') + 1))) {
             ObjectMapper json = new ObjectMapper();
             assertThat(json.writeValueAsString(new Yaml().load(written)))
               .isEqualTo(json.writeValueAsString(new Yaml().load(pnpm)));
@@ -132,11 +131,14 @@ class PackageJsonOverridesTest {
       "{\"packageManager\":\"pnpm@9.15.9+sha512.abc\"} ; 9",
       "{\"packageManager\":\"pnpm@^9.0.0\"} ; 11",
       "{\"packageManager\":\"yarn@4.10.3\"} ; 11",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^10.0.0\"}}} ; 10",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^10.0.0\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=9\"}}} ; -1",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^11.0.0\"}}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^11.0.0\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"9 || 10\"}}} ; -1",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^12.0.0\"}}} ; 12",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^12.0.0\"}}} ; -1",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=10.32.1 <=10.34.6\"}}} ; 10",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.0.6 - 11.2.2\"}}} ; 11",
+      "{\"packageManager\":\"pnpm@10.0.0\"} ; 10",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"pnpm@10.34.6\"} ; 11",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"npm\"},{\"name\":\"pnpm\",\"version\":\"9.15.9\"}]}} ; 9",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\",\"version\":\"9.15.9\"},{\"name\":\"npm\"}]}} ; 11",
@@ -176,7 +178,7 @@ class PackageJsonOverridesTest {
         PackageJsonOverrides changed = scanned.from(pnpm11, workspace);
         assertThat(changed.getPlace()).isEqualTo(PackageJsonOverrides.Place.WORKSPACE_MANIFEST);
         assertThat(changed.writesAs(scanned)).isFalse();
-        assertThat(changed.toString()).isEqualTo("pnpm-workspace.yaml for pnpm 11");
+        assertThat(changed.toString()).isEqualTo("pnpm-workspace.yaml for pnpm 11.2.2");
         assertThat(changed.writesAs(changed.from(pnpm11, workspace + "autoInstallPeers: false\n"))).isTrue();
         assertThat(changed.from(pnpm11, "packages: [apps/*]\n").declined()).contains("does not edit");
     }
@@ -225,7 +227,11 @@ class PackageJsonOverridesTest {
         assertThat(declined(Bun, plain, oneParent)).contains("nested overrides");
         assertThat(declined(Pnpm, plain, oneParent)).isNull();
         assertThat(declined(Pnpm, plain, twoParents)).contains("ERR_PNPM_INVALID_SELECTOR");
-        assertThat(declined(Pnpm, manifest("{\"packageManager\":\"pnpm@8.15.9\"}"), null)).contains("pnpm 8.x");
+        assertThat(declined(Pnpm, manifest("{\"packageManager\":\"pnpm@8.15.9\"}"), null))
+          .contains("pnpm 8.15.9 is not a release whose writes are recorded");
+        // pnpm 10.0.0 rejects a pnpm-workspace.yaml without packages and reads no overrides from it
+        assertThat(declined(Pnpm, manifest("{\"packageManager\":\"pnpm@10.0.0\"}"), null))
+          .contains("pnpm 10.0.0 is not a release whose writes are recorded");
         assertThat(declined(YarnBerry, plain, oneParent)).isNull();
         assertThat(declined(YarnBerry, plain, twoParents)).contains("YN0057");
         assertThat(declined(YarnBerry, plain, PackageJsonOverrides.parsePath("is-odd@3.0.1"))).isNull();

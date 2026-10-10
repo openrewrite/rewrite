@@ -1,0 +1,4 @@
+catalog:
+  wrappy: 1.0.2
+packages:
+  - packages/*

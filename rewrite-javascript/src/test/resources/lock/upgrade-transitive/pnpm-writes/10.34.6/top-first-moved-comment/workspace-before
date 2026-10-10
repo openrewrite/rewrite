@@ -1,0 +1,6 @@
+strictPeerDependencies: false
+# the catalog
+catalog:
+  ms: 2.1.3
+packages:
+  - packages/*

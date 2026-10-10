@@ -36,14 +36,14 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -273,27 +273,15 @@ public abstract class NodeCatalogs {
             return getRelease().writer();
         }
 
-        // pnpm 10 writes the manifest object sorted at every level, which patchDocument gives the document's pairs
+        // pnpm's writer patches the yaml document it read and prints all of it again
         @Override
-        @Nullable
-        NodeCatalogs written(SourceFile edited) {
-            if (!getRelease().sortsEveryLevel()) {
-                return reread(edited);
-            }
-            try {
-                return reread(everyLevelSorted((Yaml.Documents) edited, requireNonNull(writer())));
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
+        boolean rerenders() {
+            return true;
         }
 
-        private NodeCatalogs overridden(SourceFile edited) {
-            NodeCatalogs out = written(edited);
-            if (out == null) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml has a flow mapping, whose keys " +
-                                                   getRelease() + " sorts in a document it rewrites");
-            }
-            return out;
+        @Override
+        boolean sortsEveryLevel() {
+            return getRelease().sortsEveryLevel();
         }
 
         /**
@@ -351,20 +339,14 @@ public abstract class NodeCatalogs {
                 if (value.equals(unescaped(existing))) {
                     return this;
                 }
-                return overridden(replaceScalar(docs, existing, restyled(existing, value)));
+                return laidOut(Layout.of((Yaml.Documents) replaceScalar(docs, existing, restyled(existing, value))));
             }
-            Yaml.Mapping base = root == null ?
-                    new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
-            if (root != null && overrides == null && mapping(root, "overrides") == null && has(root, "overrides")) {
-                Yaml.Mapping child = insertEntry(new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null,
-                        null, null), newEntry(indentUnit(root), key, scalar(" ", value)));
-                return overridden(withRoot(docs, withValue(root, "overrides", child)));
-            }
-            Yaml.Mapping edited = put(base, singletonList("overrides"), 0, key, value, indentUnit(base));
+            Layout edited = Layout.of(docs).with(singletonList("overrides"), key, scalar(" ", value),
+                    requireNonNull(writer()), root == null ? "  " : indentUnit(root));
             if (edited == null) {
                 throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
             }
-            return overridden(withRoot(docs, edited));
+            return laidOut(edited);
         }
 
         // a value written inline is a plain or quoted scalar, or a block on the lines below
@@ -377,9 +359,11 @@ public abstract class NodeCatalogs {
                                                               ((Yaml.Scalar) value).getTag() != null ||
                                                               ((Yaml.Scalar) value).getStyle() ==
                                                               Yaml.Scalar.Style.PLAIN &&
-                                                              ((Yaml.Scalar) value).getValue().startsWith("{"));
+                                                              ((Yaml.Scalar) value).getValue().startsWith("{") &&
+                                                              !emptyFlow(value));
             if (inline || value instanceof Yaml.Alias ||
-                value instanceof Yaml.Mapping && (((Yaml.Mapping) value).getOpeningBracePrefix() != null ||
+                value instanceof Yaml.Mapping && (((Yaml.Mapping) value).getOpeningBracePrefix() != null &&
+                                                  !((Yaml.Mapping) value).getEntries().isEmpty() ||
                                                   ((Yaml.Mapping) value).getAnchor() != null ||
                                                   ((Yaml.Mapping) value).getTag() != null) ||
                 value instanceof Yaml.Sequence && (((Yaml.Sequence) value).getOpeningBracketPrefix() != null ||
@@ -394,25 +378,6 @@ public abstract class NodeCatalogs {
         private static boolean emptyBlock(Yaml.Block value) {
             return value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
                    ((Yaml.Scalar) value).getValue().isEmpty();
-        }
-
-        private static boolean has(Yaml.Mapping mapping, String key) {
-            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                if (key.equals(entry.getKey().getValue())) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static Yaml.Mapping withValue(Yaml.Mapping mapping, String key, Yaml.Block value) {
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-            for (int i = 0; i < entries.size(); i++) {
-                if (key.equals(entries.get(i).getKey().getValue())) {
-                    entries.set(i, entries.get(i).withValue(value));
-                }
-            }
-            return mapping.withEntries(entries);
         }
 
         private static Yaml.@Nullable Mapping blockMapping(Yaml.Mapping mapping, String key) {
@@ -501,6 +466,9 @@ public abstract class NodeCatalogs {
                 return this;
             }
             Map<String, @Nullable Object> cleaned = new LinkedHashMap<>(read);
+            if (!getRelease().cleanupKeepsOverrideReferences()) {
+                cleaned.remove("overrides");
+            }
             for (String key : Arrays.asList("catalog", "catalogs")) {
                 if (cleaned.get(key) instanceof Map) {
                     Map<String, @Nullable Object> copy =
@@ -518,51 +486,48 @@ public abstract class NodeCatalogs {
             if (isFlowStyle()) {
                 return null;
             }
-            Yaml.Mapping edited = root;
-            Yaml.Mapping catalog = mapping(root, "catalog");
-            if (catalog != null) {
-                Object kept = cleaned.get("catalog");
-                edited = kept instanceof Map ? with(edited, "catalog", retain(catalog, ((Map<?, ?>) kept).keySet())) :
-                        without(edited, "catalog");
-            }
-            Yaml.Mapping named = mapping(edited, "catalogs");
-            if (named != null) {
-                Object kept = cleaned.get("catalogs");
-                if (!(kept instanceof Map)) {
-                    edited = without(edited, "catalogs");
-                } else {
-                    List<Yaml.Mapping.Entry> groups = new ArrayList<>();
-                    for (Yaml.Mapping.Entry group : named.getEntries()) {
-                        Yaml.Mapping entries = asMapping(group.getValue());
-                        Object keptGroup = ((Map<?, ?>) kept).get(group.getKey().getValue());
-                        if (entries == null) {
-                            groups.add(group);
-                        } else if (keptGroup instanceof Map) {
-                            Yaml.Mapping retained = retain(entries, ((Map<?, ?>) keptGroup).keySet());
-                            groups.add(retained == entries ? group : group.withValue(retained));
+            try {
+                Layout layout = Layout.of(docs);
+                Layout edited = layout;
+                if (mapping(root, "catalog") != null) {
+                    Object kept = cleaned.get("catalog");
+                    edited = kept instanceof Map ? edited.retaining(singletonList("catalog"),
+                            ((Map<?, ?>) kept).keySet()) : edited.without(singletonList("catalog"));
+                }
+                Yaml.Mapping named = mapping(root, "catalogs");
+                if (named != null) {
+                    Object kept = cleaned.get("catalogs");
+                    if (!(kept instanceof Map)) {
+                        edited = edited.without(singletonList("catalogs"));
+                    } else {
+                        for (Yaml.Mapping.Entry group : named.getEntries()) {
+                            Object keptGroup = ((Map<?, ?>) kept).get(group.getKey().getValue());
+                            List<String> path = Arrays.asList("catalogs", group.getKey().getValue());
+                            if (asMapping(group.getValue()) != null) {
+                                edited = keptGroup instanceof Map ? edited.retaining(path,
+                                        ((Map<?, ?>) keptGroup).keySet()) : edited.without(path);
+                            }
                         }
                     }
-                    edited = with(edited, "catalogs", named.withEntries(firstPrefix(named.getEntries(), groups)));
                 }
+                return edited == layout ? this : laidOut(edited);
+            } catch (IllegalArgumentException e) {
+                return null;
             }
-            return edited == root ? this : written(withRoot(docs, edited));
         }
 
-        // the entries of a catalog's mapping whose keys pnpm keeps
-        private static Yaml.Mapping retain(Yaml.Mapping catalog, Set<?> keep) {
-            List<Yaml.Mapping.Entry> kept = new ArrayList<>();
-            for (Yaml.Mapping.Entry entry : catalog.getEntries()) {
-                if (keep.contains(entry.getKey().getValue())) {
-                    kept.add(entry);
-                }
-            }
-            return kept.size() == catalog.getEntries().size() ? catalog :
-                    catalog.withEntries(firstPrefix(catalog.getEntries(), kept));
-        }
-
+        // the release read once for the root: an edit leaving pmOnFail as it was leaves it
         @Override
         NodeCatalogs reread(SourceFile edited) {
-            return new Pnpm((Yaml.Documents) edited, rootManifest);
+            Pnpm next = new Pnpm((Yaml.Documents) edited, rootManifest);
+            if (release != null && Objects.equals(pmOnFail(next.getSettings()), pmOnFail(getSettings()))) {
+                next.release = release;
+            }
+            return next;
+        }
+
+        private static @Nullable Object pmOnFail(@Nullable Map<String, @Nullable Object> settings) {
+            return settings == null ? null : settings.get("pmOnFail");
         }
 
         // pnpm writes the default catalog where it is, `catalog` when it is neither place
@@ -764,11 +729,38 @@ public abstract class NodeCatalogs {
         abstract @Nullable WorkspaceManifestWriter writer();
 
         /**
-         * The catalogs of an edited revision, as the writer leaves the whole file; null when it would rewrite more.
+         * Whether a write prints the whole document again as the yaml library pnpm writes with does.
+         */
+        boolean rerenders() {
+            return false;
+        }
+
+        /**
+         * Whether the writer sorts every level of the document it writes.
+         */
+        boolean sortsEveryLevel() {
+            return false;
+        }
+
+        // the catalogs of a laid out revision as the writer leaves the whole file; an IllegalArgumentException names
+        // a layout whose comments are not placed here as the writer places them
+        NodeCatalogs laidOut(Layout layout) {
+            return reread((sortsEveryLevel() ? layout.sorted(requireNonNull(writer())) : layout).write(rerenders()));
+        }
+
+        /**
+         * The catalogs of an edited revision, as the writer leaves the whole file; null when it is not laid out here.
          */
         @Nullable
         NodeCatalogs written(SourceFile edited) {
-            return reread(edited);
+            if (!rerenders()) {
+                return reread(edited);
+            }
+            try {
+                return laidOut(Layout.of((Yaml.Documents) edited));
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         }
 
         @Override
@@ -797,25 +789,18 @@ public abstract class NodeCatalogs {
             if (current != null) {
                 return replaced(catalog, alias, specifier);
             }
-            if (writer() == null) {
+            WorkspaceManifestWriter writer = writer();
+            if (writer == null) {
                 return null;
             }
-            Yaml.Documents docs = (Yaml.Documents) getDocument();
-            Yaml.Mapping root = yamlRoot(docs);
-            if (root == null && (docs.getDocuments().isEmpty() ||
-                                 !(docs.getDocuments().get(0).getBlock() instanceof Yaml.Scalar) ||
-                                 !((Yaml.Scalar) docs.getDocuments().get(0).getBlock()).getValue().isEmpty())) {
-                return null;
-            }
-            Yaml.Mapping base = root == null ?
-                    new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
-            Yaml.Mapping edited;
+            Yaml.Mapping root = yamlRoot((Yaml.Documents) getDocument());
             try {
-                edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base));
+                Layout edited = Layout.of((Yaml.Documents) getDocument()).with(yamlPath(catalog), alias,
+                        scalar(" ", specifier), writer, root == null ? "  " : indentUnit(root));
+                return edited == null ? null : laidOut(edited);
             } catch (IllegalArgumentException e) {
                 return null;
             }
-            return edited == null ? null : written(withRoot(docs, edited));
         }
 
         private @Nullable NodeCatalogs replaced(String catalog, String alias, String specifier) {
@@ -832,81 +817,6 @@ public abstract class NodeCatalogs {
                 return null;
             }
             return written(replaceScalar(docs, scalar, rewritten));
-        }
-
-        // `mapping` with `alias: specifier` under the keys path[depth..], each created where missing; null where a
-        // key on the path holds no block mapping
-        Yaml.@Nullable Mapping put(Yaml.Mapping mapping, List<String> path, int depth, String alias, String specifier,
-                                   String unit) {
-            String indent = depth == 0 ? "" : repeat(unit, depth);
-            if (depth == path.size()) {
-                for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-                    if (alias.equals(entry.getKey().getValue())) {
-                        return null;
-                    }
-                }
-                return insertEntry(mapping, newEntry(indent, alias, scalar(" ", specifier)));
-            }
-            String key = path.get(depth);
-            for (int i = 0; i < mapping.getEntries().size(); i++) {
-                Yaml.Mapping.Entry entry = mapping.getEntries().get(i);
-                if (key.equals(entry.getKey().getValue())) {
-                    if (!(entry.getValue() instanceof Yaml.Mapping)) {
-                        return null;
-                    }
-                    Yaml.Mapping child = put((Yaml.Mapping) entry.getValue(), path, depth + 1, alias, specifier, unit);
-                    if (child == null) {
-                        return null;
-                    }
-                    List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-                    entries.set(i, entry.withValue(child));
-                    return mapping.withEntries(entries);
-                }
-            }
-            Yaml.Mapping child = put(new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                    path, depth + 1, alias, specifier, unit);
-            if (child == null) {
-                return null;
-            }
-            Yaml.Mapping.Entry created = newEntry(indent, key, child);
-            return depth == 0 ? insertKey(mapping, created) : insertEntry(mapping, created);
-        }
-
-        // a new pair where pnpm's writer puts it among a level's keys
-        Yaml.Mapping insertEntry(Yaml.Mapping mapping, Yaml.Mapping.Entry entry) {
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-            entries.add(requireNonNull(writer()).insertionIndex(entryKeys(entries), entry.getKey().getValue()), entry);
-            return mapping.withEntries(entries);
-        }
-
-        // a new top-level pair where pnpm's writer puts it, with the blank line it gives the pair and its neighbour
-        Yaml.Mapping insertKey(Yaml.Mapping root, Yaml.Mapping.Entry entry) {
-            WorkspaceManifestWriter writer = requireNonNull(writer());
-            List<Yaml.Mapping.Entry> entries = new ArrayList<>(root.getEntries());
-            List<Boolean> blankBefore = new ArrayList<>();
-            for (Yaml.Mapping.Entry e : entries) {
-                blankBefore.add(e.getPrefix().startsWith("\n\n"));
-            }
-            int at = writer.insertionIndex(entryKeys(entries), entry.getKey().getValue());
-            if (entries.isEmpty()) {
-                entry = entry.withPrefix("");
-            } else if (at == 0) {
-                Yaml.Mapping.Entry first = entries.get(0);
-                entry = entry.withPrefix(first.getPrefix());
-                entries.set(0, first.withPrefix(writer.blankLineStyle(blankBefore) ? "\n\n" : "\n"));
-            } else {
-                entry = entry.withPrefix(writer.blankBefore(blankBefore, at) ? "\n\n" : "\n");
-            }
-            entries.add(at, entry);
-            return root.withEntries(entries);
-        }
-
-        private static List<String> entryKeys(List<Yaml.Mapping.Entry> entries) {
-            List<String> keys = new ArrayList<>();
-            for (Yaml.Mapping.Entry e : entries) {
-                keys.add(e.getKey().getValue());
-            }
-            return keys;
         }
 
         // the YAML parser reads a flow mapping as one scalar
@@ -940,41 +850,6 @@ public abstract class NodeCatalogs {
             return null;
         }
         return (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
-    }
-
-    // the document with a new root; a top-level key added first to a document without one, or last before a trailing
-    // comment, is laid out as pnpm's writer leaves the text around it: a blank line between, and a final newline
-    private static SourceFile withRoot(Yaml.Documents docs, Yaml.Mapping root) {
-        if (docs.getDocuments().isEmpty()) {
-            return docs;
-        }
-        Yaml.Document document = docs.getDocuments().get(0);
-        Yaml.Document.End end = document.getEnd();
-        Yaml.Mapping placed = root;
-        boolean held = document.getBlock() instanceof Yaml.Mapping &&
-                       !((Yaml.Mapping) document.getBlock()).getEntries().isEmpty();
-        if (!held && !root.getEntries().isEmpty()) {
-            if (!document.getPrefix().trim().isEmpty() && !document.getPrefix().endsWith("\n\n")) {
-                List<Yaml.Mapping.Entry> entries = new ArrayList<>(root.getEntries());
-                entries.set(0, entries.get(0).withPrefix("\n" + entries.get(0).getPrefix()));
-                placed = root.withEntries(entries);
-            }
-            if (!end.getPrefix().endsWith("\n")) {
-                end = end.withPrefix(end.getPrefix() + "\n");
-            }
-        } else if (held && !root.getEntries().isEmpty()) {
-            String last = root.getEntries().get(root.getEntries().size() - 1).getKey().getValue();
-            boolean added = true;
-            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) document.getBlock()).getEntries()) {
-                added &= !last.equals(entry.getKey().getValue());
-            }
-            if (added && !end.getPrefix().trim().isEmpty() && !end.getPrefix().startsWith("\n\n")) {
-                end = end.withPrefix("\n" + end.getPrefix());
-            }
-        }
-        List<Yaml.Document> documents = new ArrayList<>(docs.getDocuments());
-        documents.set(0, document.withBlock(placed).withEnd(end));
-        return docs.withDocuments(documents);
     }
 
     private static Yaml.@Nullable Mapping mapping(Yaml.Mapping mapping, String key) {
@@ -1062,49 +937,6 @@ public abstract class NodeCatalogs {
         return scalar.getValue();
     }
 
-    // every mapping of the document in the writer's order; a pair keeps its prefix (blank line, comments) but for the
-    // first of a level, whose place the pair that now opens the level takes
-    private static Yaml.Documents everyLevelSorted(Yaml.Documents docs, WorkspaceManifestWriter writer) {
-        return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
-            @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, Integer p) {
-                if (scalar.getStyle() == Yaml.Scalar.Style.PLAIN && scalar.getValue().startsWith("{") &&
-                    !emptyFlow(scalar)) {
-                    throw new IllegalArgumentException("pnpm-workspace.yaml has a flow mapping, whose keys pnpm " +
-                                                       "sorts in a document it rewrites");
-                }
-                return scalar;
-            }
-
-            @Override
-            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
-                Yaml.Mapping m = super.visitMapping(mapping, p);
-                List<Yaml.Mapping.Entry> entries = m.getEntries();
-                List<Yaml.Mapping.Entry> sorted = new ArrayList<>();
-                List<String> keys = new ArrayList<>();
-                for (Yaml.Mapping.Entry entry : entries) {
-                    int at = writer.insertionIndex(keys, entry.getKey().getValue());
-                    keys.add(at, entry.getKey().getValue());
-                    sorted.add(at, entry);
-                }
-                boolean moved = false;
-                for (int i = 0; i < entries.size(); i++) {
-                    moved |= sorted.get(i) != entries.get(i);
-                }
-                if (!moved) {
-                    return m;
-                }
-                Yaml.Mapping.Entry first = entries.get(0);
-                if (sorted.get(0) != first) {
-                    String opening = first.getPrefix();
-                    sorted.set(sorted.indexOf(first), first.withPrefix(sorted.get(0).getPrefix()));
-                    sorted.set(0, sorted.get(0).withPrefix(opening));
-                }
-                return m.withEntries(sorted);
-            }
-        }.visitNonNull(docs, 0);
-    }
-
     private static Yaml.Mapping.Entry newEntry(String indent, String key, Yaml.Block value) {
         Yaml.Scalar yamlKey = scalar("", key);
         return new Yaml.Mapping.Entry(randomId(), "\n" + indent, Markers.EMPTY, yamlKey, "", value);
@@ -1140,38 +972,502 @@ public abstract class NodeCatalogs {
         return out.toString();
     }
 
-    // the first remaining entry takes the prefix of the first original one
-    private static List<Yaml.Mapping.Entry> firstPrefix(List<Yaml.Mapping.Entry> original,
-                                                        List<Yaml.Mapping.Entry> kept) {
-        if (kept.isEmpty() || original.isEmpty() || kept.get(0) == original.get(0)) {
-            return kept;
-        }
-        List<Yaml.Mapping.Entry> out = new ArrayList<>(kept);
-        out.set(0, kept.get(0).withPrefix(original.get(0).getPrefix()));
-        return out;
+    private static Yaml.Mapping newMapping() {
+        return new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null);
     }
 
-    private static Yaml.Mapping with(Yaml.Mapping mapping, String key, Yaml.Mapping value) {
-        List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
-        for (int i = 0; i < entries.size(); i++) {
-            if (key.equals(entries.get(i).getKey().getValue())) {
-                if (entries.get(i).getValue() == value) {
-                    return mapping;
+    /**
+     * A YAML file's block mappings with the text pnpm's yaml library attaches to each pair: the lines before a key, the
+     * comment after a value, a level's trailing lines; what opens a nested level stays where it opens.
+     */
+    static final class Layout {
+        private final Yaml.Documents docs;
+        private final String prelude;
+        private final Level root;
+        private final String trailing;
+
+        private Layout(Yaml.Documents docs, String prelude, Level root, String trailing) {
+            this.docs = docs;
+            this.prelude = prelude;
+            this.root = root;
+            this.trailing = trailing;
+        }
+
+        /**
+         * The layout of {@code docs}; an {@link IllegalArgumentException} for one whose comments it does not place.
+         */
+        static Layout of(Yaml.Documents docs) {
+            if (docs.getDocuments().size() != 1 || docs.getDocuments().get(0).isExplicit() ||
+                docs.getDocuments().get(0).getEnd().isExplicit()) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has document markers");
+            }
+            if (PackageJsonHelper.printed(docs).indexOf('\r') >= 0) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has CR line ends");
+            }
+            Yaml.Document doc = docs.getDocuments().get(0);
+            String after = doc.getEnd().getPrefix();
+            Yaml.Block block = doc.getBlock();
+            if (block instanceof Yaml.Mapping && ((Yaml.Mapping) block).getOpeningBracePrefix() == null &&
+                ((Yaml.Mapping) block).getEntries().isEmpty() ||
+                block instanceof Yaml.Scalar && ((Yaml.Scalar) block).getValue().isEmpty() && isNull(block)) {
+                return new Layout(docs, doc.getPrefix() + block.getPrefix(), new Level("", "", emptyList(), ""),
+                        after);
+            }
+            if (!isBlockMapping(block)) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping");
+            }
+            Yaml.Mapping mapping = (Yaml.Mapping) block;
+            String prelude = doc.getPrefix() + mapping.getPrefix() + mapping.getEntries().get(0).getPrefix();
+            // composer.ts decorate: a comment before the first key without a blank line after it is the key's
+            boolean glued = hasComment(prelude) && !blankAfterComments(prelude);
+            Read read = read(mapping, after, true, glued ? prelude : null);
+            return new Layout(docs, glued ? "" : prelude, read.level, read.rest);
+        }
+
+        /**
+         * This layout with {@code key: value} under the keys {@code path}, each created where missing, a new pair
+         * where {@code writer} puts it; null where a key on the path holds neither a block mapping nor null.
+         */
+        @Nullable
+        Layout with(List<String> path, String key, Yaml.Block value, WorkspaceManifestWriter writer, String unit) {
+            Level edited = put(root, path, 0, key, value, writer, unit);
+            return edited == null ? null : new Layout(docs, prelude, edited, trailing);
+        }
+
+        /**
+         * This layout without the pair at {@code path}; this one when there is none.
+         */
+        Layout without(List<String> path) {
+            String key = path.get(path.size() - 1);
+            return edited(path.subList(0, path.size() - 1), level -> level.retaining(k -> !k.equals(key)));
+        }
+
+        /**
+         * This layout with only the pairs of {@code keep} at the level {@code path} names; this one when it holds no
+         * other.
+         */
+        Layout retaining(List<String> path, Set<?> keep) {
+            return edited(path, level -> level.retaining(keep::contains));
+        }
+
+        /**
+         * This layout with every level's pairs in {@code writer}'s order, as pnpm 10's sortKeysByPriority leaves the
+         * object patchDocument then gives the document.
+         */
+        Layout sorted(WorkspaceManifestWriter writer) {
+            Level sorted = root.sorted(writer);
+            return sorted == root ? this : new Layout(docs, prelude, sorted, trailing);
+        }
+
+        /**
+         * The document as the writer leaves it; {@code rerendered} when it prints all of it again as pnpm's yaml does:
+         * a key line's comment on a line of its own, no pair whose value is null or {}, no blank line at either end.
+         */
+        Yaml.Documents write(boolean rerendered) {
+            Level level = rerendered ? root.withoutNulls() : root;
+            if (level.pairs.isEmpty()) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml would be left without a key");
+            }
+            Yaml.Document doc = docs.getDocuments().get(0);
+            String[] after = {""};
+            Yaml.Mapping mapping = write(isBlockMapping(doc.getBlock()) ? (Yaml.Mapping) doc.getBlock() : newMapping(),
+                    level, true, rerendered, after);
+            String opening = rerendered && !hasComment(prelude) ? "" : prelude;
+            if (hasComment(opening) && !blankAfterComments(opening)) {
+                opening += "\n";
+            }
+            String first = level.pairs.get(0).lead;
+            String end = hasComment(trailing) && !trailing.startsWith("\n") ? "\n" + trailing :
+                    rerendered && !hasComment(trailing) ? "" : trailing;
+            return docs.withDocuments(singletonList(doc.withPrefix(first == null ? opening : opening + first)
+                    .withBlock(mapping.withPrefix("")).withEnd(doc.getEnd().withPrefix(after[0] + end))));
+        }
+
+        private Layout edited(List<String> path, Function<Level, Level> edit) {
+            Level edited = edit(root, path, 0, edit);
+            return edited == root ? this : new Layout(docs, prelude, edited, trailing);
+        }
+
+        private static Level edit(Level level, List<String> path, int depth, Function<Level, Level> edit) {
+            if (depth == path.size()) {
+                return edit.apply(level);
+            }
+            int at = level.index(path.get(depth));
+            Level child = at < 0 ? null : level.pairs.get(at).child;
+            if (child == null) {
+                return level;
+            }
+            Level edited = edit(child, path, depth + 1, edit);
+            return edited == child ? level : level.with(at, level.pairs.get(at).withChild(edited));
+        }
+
+        private static @Nullable Level put(Level level, List<String> path, int depth, String key, Yaml.Block value,
+                                           WorkspaceManifestWriter writer, String unit) {
+            if (depth == path.size()) {
+                return level.index(key) >= 0 ? null :
+                        insert(level, new Pair(newEntry("", key, value), null, null, "", ""), writer, depth == 0);
+            }
+            String name = path.get(depth);
+            int at = level.index(name);
+            String indent = repeat(unit, depth + 1);
+            if (at < 0) {
+                Level child = put(new Level(indent, "\n" + indent, emptyList(), ""), path, depth + 1, key, value,
+                        writer, unit);
+                return child == null ? null : insert(level, new Pair(newEntry("", name, newMapping()), null, child,
+                        "", ""), writer, depth == 0);
+            }
+            Pair pair = level.pairs.get(at);
+            Level child = pair.child;
+            if (child == null && (!isNull(pair.entry.getValue()) || pair.tail == null || hasComment(pair.tail))) {
+                return null;
+            }
+            Level edited = put(child == null ? new Level(indent, "\n" + indent, emptyList(), "") : child, path,
+                    depth + 1, key, value, writer, unit);
+            return edited == null ? null : level.with(at, new Pair(child == null ?
+                    pair.entry.withValue(newMapping()) : pair.entry, pair.lead, edited, "", pair.trail));
+        }
+
+        // pnpm's writer: the key among the level's by its order, at the top level with pnpm 11's blank lines
+        private static Level insert(Level level, Pair pair, WorkspaceManifestWriter writer, boolean top) {
+            int at = writer.insertionIndex(level.keys(), pair.key());
+            List<Pair> pairs = new ArrayList<>(level.pairs);
+            Pair inserted = pair;
+            if (top && !pairs.isEmpty()) {
+                List<Boolean> blankBefore = new ArrayList<>();
+                for (int i = 0; i < pairs.size(); i++) {
+                    String lead = pairs.get(i).lead;
+                    blankBefore.add(i > 0 && lead != null && lead.startsWith("\n"));
                 }
-                entries.set(i, entries.get(i).withValue(value));
+                if (at == 0) {
+                    Pair first = pairs.get(0);
+                    pairs.set(0, first.withLead((writer.blankLineStyle(blankBefore) ? "\n" : "") +
+                                                (first.lead == null ? "" : first.lead)));
+                } else if (writer.blankBefore(blankBefore, at)) {
+                    inserted = pair.withLead("\n");
+                }
             }
+            pairs.add(at, inserted);
+            return level.withPairs(pairs);
         }
-        return mapping.withEntries(entries);
-    }
 
-    private static Yaml.Mapping without(Yaml.Mapping mapping, String key) {
-        List<Yaml.Mapping.Entry> kept = new ArrayList<>();
-        for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
-            if (!key.equals(entry.getKey().getValue())) {
-                kept.add(entry);
+        private static Read read(Yaml.Mapping mapping, String after, boolean top, @Nullable String firstLead) {
+            List<Yaml.Mapping.Entry> entries = mapping.getEntries();
+            String opening = top ? "" : entries.get(0).getPrefix();
+            String indent = lastLine(opening);
+            if (!indent.trim().isEmpty() || mapping.getAnchor() != null || mapping.getTag() != null) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has a mapping it does not lay out");
+            }
+            List<Pair> pairs = new ArrayList<>();
+            String lead = firstLead;
+            String remainder = "";
+            for (int i = 0; i < entries.size(); i++) {
+                Yaml.Mapping.Entry entry = entries.get(i);
+                requireLaidOut(entry);
+                String next = i + 1 < entries.size() ? entries.get(i + 1).getPrefix() : after;
+                Yaml.Block value = entry.getValue();
+                if (isBlockMapping(value)) {
+                    Read child = read((Yaml.Mapping) value, next, false, null);
+                    pairs.add(new Pair(entry, lead, child.level, "", ""));
+                    remainder = child.rest;
+                } else if (blockScalar(value)) {
+                    pairs.add(new Pair(entry, lead, null, null, ""));
+                    remainder = next;
+                } else {
+                    int nl = next.indexOf('\n');
+                    String tail = nl < 0 ? next : next.substring(0, nl);
+                    remainder = nl < 0 ? "" : next.substring(nl + 1);
+                    String trail = "";
+                    int items = value instanceof Yaml.Sequence && ((Yaml.Sequence) value).getOpeningBracketPrefix() ==
+                                                                  null ? lastLine(((Yaml.Sequence) value).getEntries()
+                            .get(0).getPrefix()).length() : -1;
+                    if (items > 0 && commentIndented(remainder, items)) {
+                        trail = fullLines(remainder);
+                        remainder = lastLine(remainder);
+                    }
+                    // parser.ts atIndentedComment: a comment indented below a value is that value's
+                    if (commentIndented(remainder, Math.max(indent.length(), items) + 1)) {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml has a comment below " +
+                                                           entry.getKey().getValue() + " indented under its value");
+                    }
+                    pairs.add(new Pair(entry, lead, null, tail, trail));
+                }
+                lead = remainder;
+            }
+            // parser.ts pop: a level keeps the comments after its last pair that are indented as deep as it
+            if (!top && commentIndented(remainder, indent.length())) {
+                return new Read(new Level(indent, opening, pairs, fullLines(remainder)), lastLine(remainder));
+            }
+            return new Read(new Level(indent, opening, pairs, ""), remainder);
+        }
+
+        private static void requireLaidOut(Yaml.Mapping.Entry entry) {
+            Yaml.Block value = entry.getValue();
+            boolean scalarKey = entry.getKey() instanceof Yaml.Scalar &&
+                                ((Yaml.Scalar) entry.getKey()).getStyle() != Yaml.Scalar.Style.LITERAL &&
+                                ((Yaml.Scalar) entry.getKey()).getStyle() != Yaml.Scalar.Style.FOLDED &&
+                                ((Yaml.Scalar) entry.getKey()).getAnchor() == null &&
+                                ((Yaml.Scalar) entry.getKey()).getTag() == null;
+            boolean laidOut = value instanceof Yaml.Scalar ? (blockScalar(value) ||
+                                                              ((Yaml.Scalar) value).getValue().indexOf('\n') < 0) &&
+                                                             ((Yaml.Scalar) value).getAnchor() == null &&
+                                                             ((Yaml.Scalar) value).getTag() == null :
+                    value instanceof Yaml.Mapping ? ((Yaml.Mapping) value).getAnchor() == null &&
+                                                    ((Yaml.Mapping) value).getTag() == null :
+                            value instanceof Yaml.Sequence && ((Yaml.Sequence) value).getAnchor() == null &&
+                            ((Yaml.Sequence) value).getTag() == null &&
+                            (((Yaml.Sequence) value).getOpeningBracketPrefix() != null ||
+                             !((Yaml.Sequence) value).getEntries().isEmpty());
+            if (!scalarKey || !laidOut) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has a value it does not lay out: " +
+                                                   entry.getKey().getValue());
             }
         }
-        return mapping.withEntries(firstPrefix(mapping.getEntries(), kept));
+
+        private static Yaml.Mapping write(Yaml.Mapping mapping, Level level, boolean top, boolean rerendered,
+                                          String[] after) {
+            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+            String previous = "";
+            for (int k = 0; k < level.pairs.size(); k++) {
+                Pair pair = level.pairs.get(k);
+                String prefix = k > 0 ? previous + (pair.lead == null ? level.indent : pair.lead) :
+                        top ? "" : opening(level, pair.lead, rerendered);
+                Yaml.Mapping.Entry entry = pair.entry.withPrefix(prefix);
+                if (pair.child != null) {
+                    String[] childAfter = {""};
+                    entry = entry.withValue(write((Yaml.Mapping) entry.getValue(), pair.child, false, rerendered,
+                            childAfter));
+                    previous = childAfter[0];
+                } else {
+                    previous = pair.tail == null ? pair.trail : pair.tail + "\n" + pair.trail;
+                }
+                entries.add(entry);
+            }
+            after[0] = previous + level.trail;
+            return mapping.withEntries(entries);
+        }
+
+        // where a nested level opens, then the lines of the pair now first; after a blank line yaml keeps the indent
+        private static String opening(Level level, @Nullable String lead, boolean rerendered) {
+            String opening = level.opening;
+            int nl = opening.indexOf('\n');
+            if (rerendered && nl > 0 && opening.substring(0, nl).trim().startsWith("#")) {
+                opening = "\n" + level.indent + opening.substring(0, nl).trim() + opening.substring(nl);
+            }
+            if (lead == null) {
+                return opening;
+            }
+            return lead.startsWith("\n") ? opening + lead : fullLines(opening) + lead;
+        }
+
+        private static boolean isBlockMapping(Yaml.@Nullable Block block) {
+            return block instanceof Yaml.Mapping && ((Yaml.Mapping) block).getOpeningBracePrefix() == null &&
+                   !((Yaml.Mapping) block).getEntries().isEmpty();
+        }
+
+        // a literal or folded scalar, whose text ends its last line
+        private static boolean blockScalar(Yaml.Block value) {
+            return value instanceof Yaml.Scalar && (((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.LITERAL ||
+                                                    ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.FOLDED);
+        }
+
+        private static boolean isNull(Yaml.Block value) {
+            return value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
+                   Arrays.asList("", "~", "null", "Null", "NULL").contains(((Yaml.Scalar) value).getValue());
+        }
+
+        private static boolean hasComment(String text) {
+            for (String line : text.split("\n", -1)) {
+                if (line.trim().startsWith("#")) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // whether a line of white space follows the text's last comment
+        private static boolean blankAfterComments(String text) {
+            int last = -1;
+            String[] lines = text.split("\n", -1);
+            for (int i = 0; i < lines.length; i++) {
+                if (lines[i].trim().startsWith("#")) {
+                    last = i;
+                }
+            }
+            return last >= 0 && last + 2 < lines.length;
+        }
+
+        // whether a full line of the text is a comment indented by at least `columns`
+        private static boolean commentIndented(String text, int columns) {
+            for (String line : fullLines(text).split("\n", -1)) {
+                if (line.trim().startsWith("#") && line.indexOf('#') >= columns) {
+                    return true;
+                }
+            }
+            return lastLine(text).trim().startsWith("#") && lastLine(text).indexOf('#') >= columns;
+        }
+
+        private static String fullLines(String text) {
+            return text.substring(0, text.lastIndexOf('\n') + 1);
+        }
+
+        private static String lastLine(String text) {
+            return text.substring(text.lastIndexOf('\n') + 1);
+        }
+
+        private static final class Read {
+            final Level level;
+            final String rest;
+
+            Read(Level level, String rest) {
+                this.level = level;
+                this.rest = rest;
+            }
+        }
+
+        // one block mapping: its pairs, the text it opens with (nested levels) and its trailing lines
+        private static final class Level {
+            final String indent;
+            final String opening;
+            final List<Pair> pairs;
+            final String trail;
+
+            Level(String indent, String opening, List<Pair> pairs, String trail) {
+                this.indent = indent;
+                this.opening = opening;
+                this.pairs = pairs;
+                this.trail = trail;
+            }
+
+            int index(String key) {
+                for (int i = 0; i < pairs.size(); i++) {
+                    if (key.equals(pairs.get(i).key())) {
+                        return i;
+                    }
+                }
+                return -1;
+            }
+
+            List<String> keys() {
+                List<String> keys = new ArrayList<>();
+                for (Pair pair : pairs) {
+                    keys.add(pair.key());
+                }
+                return keys;
+            }
+
+            Level withPairs(List<Pair> pairs) {
+                return new Level(indent, opening, pairs, trail);
+            }
+
+            Level with(int at, Pair pair) {
+                List<Pair> edited = new ArrayList<>(pairs);
+                edited.set(at, pair);
+                return withPairs(edited);
+            }
+
+            Level retaining(Predicate<String> keep) {
+                List<Pair> kept = new ArrayList<>();
+                for (Pair pair : pairs) {
+                    if (keep.test(pair.key())) {
+                        kept.add(pair);
+                    }
+                }
+                return kept.size() == pairs.size() ? this : withPairs(kept);
+            }
+
+            Level sorted(WorkspaceManifestWriter writer) {
+                List<Pair> sorted = new ArrayList<>();
+                List<String> keys = new ArrayList<>();
+                boolean changed = false;
+                for (Pair pair : pairs) {
+                    Pair p = pair;
+                    if (pair.child != null) {
+                        Level child = pair.child.sorted(writer);
+                        if (child != pair.child) {
+                            p = pair.withChild(child);
+                            changed = true;
+                        }
+                    } else if (holdsMapping(pair.entry.getValue())) {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml has a flow mapping or a sequence of " +
+                                                           "mappings, whose keys pnpm 10 sorts in a document it " +
+                                                           "rewrites");
+                    }
+                    int at = writer.insertionIndex(keys, p.key());
+                    keys.add(at, p.key());
+                    sorted.add(at, p);
+                    changed |= at != sorted.size() - 1;
+                }
+                return changed ? withPairs(sorted) : this;
+            }
+
+            Level withoutNulls() {
+                List<Pair> kept = new ArrayList<>();
+                boolean changed = false;
+                for (Pair pair : pairs) {
+                    if (pair.child != null) {
+                        Level child = pair.child.withoutNulls();
+                        if (child.pairs.isEmpty()) {
+                            throw new IllegalArgumentException("pnpm-workspace.yaml has " + pair.key() + " holding " +
+                                                               "nulls only, which pnpm writes as {}");
+                        }
+                        kept.add(child == pair.child ? pair : pair.withChild(child));
+                        changed |= child != pair.child;
+                    } else if (isNull(pair.entry.getValue()) || emptyFlow(pair.entry.getValue()) ||
+                               pair.entry.getValue() instanceof Yaml.Mapping &&
+                               ((Yaml.Mapping) pair.entry.getValue()).getEntries().isEmpty()) {
+                        changed = true;
+                    } else {
+                        kept.add(pair);
+                    }
+                }
+                return changed ? withPairs(kept) : this;
+            }
+
+            private static boolean holdsMapping(Yaml.Block value) {
+                if (value instanceof Yaml.Sequence) {
+                    for (Yaml.Sequence.Entry entry : ((Yaml.Sequence) value).getEntries()) {
+                        if (entry.getBlock() instanceof Yaml.Mapping) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                return value instanceof Yaml.Mapping && !((Yaml.Mapping) value).getEntries().isEmpty() ||
+                       value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
+                       ((Yaml.Scalar) value).getValue().startsWith("{") && !emptyFlow(value);
+            }
+        }
+
+        // a key and its value with the lines before it, and the rest of its value's last line (the comment after it;
+        // null after a block scalar) or its nested level; a sequence's own trailing lines
+        private static final class Pair {
+            final Yaml.Mapping.Entry entry;
+            final @Nullable String lead;
+            final @Nullable Level child;
+            final @Nullable String tail;
+            final String trail;
+
+            Pair(Yaml.Mapping.Entry entry, @Nullable String lead, @Nullable Level child, @Nullable String tail,
+                 String trail) {
+                this.entry = entry;
+                this.lead = lead;
+                this.child = child;
+                this.tail = tail;
+                this.trail = trail;
+            }
+
+            String key() {
+                return entry.getKey().getValue();
+            }
+
+            Pair withLead(@Nullable String lead) {
+                return new Pair(entry, lead, child, tail, trail);
+            }
+
+            Pair withChild(Level child) {
+                return new Pair(entry, lead, child, tail, trail);
+            }
+        }
     }
 
     static @Nullable Json member(Json.JsonObject object, String key) {

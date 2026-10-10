@@ -1,0 +1,11 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "is-odd": "3.0.0"
+  },
+  "resolutions": {
+    "**/is-odd@3.0.0/is-number": "7.0.0"
+  }
+}

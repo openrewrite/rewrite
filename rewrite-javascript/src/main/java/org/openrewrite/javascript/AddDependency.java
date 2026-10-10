@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PnpmRelease;
+import org.openrewrite.javascript.internal.lock.LocaleCompare;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.pnpm.InstallSome;
@@ -31,13 +32,19 @@ import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 
 @EqualsAndHashCode(callSuper = false)
 @Value
 public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
+
+    private static final List<String> DEPENDENCY_FIELDS = Arrays.asList("dependencies", "devDependencies",
+            "optionalDependencies", "peerDependencies");
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
     transient NodeDependencyEditsDeclined editsDeclined = new NodeDependencyEditsDeclined(this);
@@ -112,17 +119,36 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
                              " are written in flow style, which is not read");
             return;
         }
-        boolean pnpm = catalogs instanceof NodeCatalogs.Pnpm;
-        String value = pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) : version;
-        // pnpm, Yarn and Bun add sort the field (catalog-add-unsorted, catalog-add-{yarn,bun}-unsorted-member)
         PackageManager pm = decision.getPackageManager();
-        boolean sorted = pnpm || pm == PackageManager.YarnBerry || pm == PackageManager.Bun;
+        String value = catalogs instanceof NodeCatalogs.Pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) :
+                pm == PackageManager.Pnpm ? pnpmAdd(decision, PnpmRelease.of(PackageJsonHelper.printed(pkg), null)) :
+                        version;
         if (value != null) {
-            decision.editManifest(doc -> !matchesAdd(doc) ? doc : sorted ?
-                    PackageJsonHelper.sortMembers(PackageJsonHelper.addDependency(doc, packageName, value,
-                            targetScope()), targetScope()) :
-                    PackageJsonHelper.addDependency(doc, packageName, value, targetScope()));
+            decision.editManifest(doc -> !matchesAdd(doc) ? doc :
+                    saved(pm, PackageJsonHelper.addDependency(doc, packageName, value, targetScope())));
         }
+    }
+
+    // the manifest as each package manager's add saves it (add-<pm>-sorts-every-field, add-<pm>-beside-empty-field)
+    private Json.Document saved(@Nullable PackageManager pm, Json.Document doc) {
+        if (pm == null || pm == PackageManager.Bun) {
+            return pm == null ? doc : PackageJsonHelper.sortMembers(doc, targetScope(), String::compareTo);
+        }
+        Comparator<String> order = pm == PackageManager.Npm ? LocaleCompare::en : String::compareTo;
+        Json.Document sorted = doc;
+        for (String field : DEPENDENCY_FIELDS) {
+            sorted = PackageJsonHelper.sortMembers(sorted, field, order);
+        }
+        return pm == PackageManager.YarnClassic ? sorted : PackageJsonHelper.withoutEmptyObjects(sorted,
+                DEPENDENCY_FIELDS);
+    }
+
+    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, PnpmRelease release) {
+        if (release.declined() != null) {
+            declined(decision, packageName + "@" + version + " was not added: " + release.declined());
+            return null;
+        }
+        return version;
     }
 
     // what the pnpm release that runs writes, recorded: 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
@@ -130,12 +156,8 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
         PnpmRelease release = (root == null ? catalogs : catalogs.forRoot(PackageJsonHelper.printed(root)))
                 .getRelease();
-        if (release.declined() != null) {
-            declined(decision, packageName + "@" + version + " was not added: " + release.declined());
-            return null;
-        }
-        if (release.getMajor() == 9) {
-            return version;
+        if (release.declined() != null || release.getMajor() == 9) {
+            return pnpmAdd(decision, release);
         }
         InstallSome.Saved saved;
         try {

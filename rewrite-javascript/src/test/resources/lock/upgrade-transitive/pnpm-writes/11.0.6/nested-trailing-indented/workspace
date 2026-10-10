@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+catalog:
+  wrappy: 1.0.2
+  ms: 2.1.3
+  # end
+overrides:
+  is-number: 7.0.0
+strictPeerDependencies: false

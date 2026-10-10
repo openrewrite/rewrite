@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+cleanupUnusedCatalogs: true
+catalog:
+  # head
+  is-number: 7.0.0 # n
+  wrappy: 1.0.2 # w
+  # before ms
+  ms: 2.1.3 # m

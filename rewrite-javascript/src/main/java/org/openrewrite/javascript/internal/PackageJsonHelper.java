@@ -398,10 +398,10 @@ public class PackageJsonHelper {
     }
 
     /**
-     * {@code doc} with the members of its object {@code scope} in the lexical order of their keys, as pnpm writes a
-     * dependency field; each takes the layout of the member that stood in its place.
+     * {@code doc} with the members of its object {@code scope} in {@code order} of their keys, as a package manager
+     * writes a dependency field; each takes the layout of the member that stood in its place.
      */
-    public static Json.Document sortMembers(Json.Document doc, String scope) {
+    public static Json.Document sortMembers(Json.Document doc, String scope, Comparator<String> order) {
         if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
         Json.JsonObject root = (Json.JsonObject) doc.getValue();
         Json.JsonObject object = findObjectMember(root, scope);
@@ -412,7 +412,7 @@ public class PackageJsonHelper {
             if (!(member.getElement() instanceof Json.Member)) return doc;
             sorted.add((Json.Member) member.getElement());
         }
-        sorted.sort(Comparator.comparing(member -> String.valueOf(literalString(member.getKey()))));
+        sorted.sort(Comparator.comparing(member -> String.valueOf(literalString(member.getKey())), order));
         List<JsonRightPadded<Json>> out = new ArrayList<>();
         boolean changed = false;
         for (int i = 0; i < members.size(); i++) {
@@ -538,6 +538,28 @@ public class PackageJsonHelper {
             rootMembers.set(last, rootMembers.get(last).withAfter(originalLast.getAfter()));
         }
         return doc.withValue(root.getPadding().withMembers(rootMembers));
+    }
+
+    /**
+     * {@code doc} without each of its top-level {@code keys} whose value is an empty object.
+     */
+    public static Json.Document withoutEmptyObjects(Json.Document doc, Collection<String> keys) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        List<JsonRightPadded<Json>> members = root.getPadding().getMembers();
+        List<JsonRightPadded<Json>> kept = new ArrayList<>();
+        for (JsonRightPadded<Json> rp : members) {
+            Json elem = rp.getElement();
+            if (elem instanceof Json.Member && keys.contains(literalString(((Json.Member) elem).getKey())) &&
+                ((Json.Member) elem).getValue() instanceof Json.JsonObject && ((Json.JsonObject) ((Json.Member) elem)
+                    .getValue()).getMembers().stream().allMatch(m -> m instanceof Json.Empty)) {
+                continue;
+            }
+            kept.add(rp);
+        }
+        if (kept.size() == members.size() || kept.isEmpty()) return doc;
+        kept.set(kept.size() - 1, kept.get(kept.size() - 1).withAfter(members.get(members.size() - 1).getAfter()));
+        return doc.withValue(root.getPadding().withMembers(kept));
     }
 
     /** The indent unit of {@code doc}'s top-level members, or two spaces when none can be detected. */

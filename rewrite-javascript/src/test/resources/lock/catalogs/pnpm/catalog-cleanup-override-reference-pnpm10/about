@@ -1,0 +1,1 @@
+pnpm 10.34.6 remove ms in member a under cleanupUnusedCatalogs: true, the override ms: 'catalog:' the only other reference to the catalog entry: whether the cleanup keeps it.

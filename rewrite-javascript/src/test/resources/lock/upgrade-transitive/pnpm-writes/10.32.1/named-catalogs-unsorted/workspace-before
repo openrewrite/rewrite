@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+catalogs:
+  react:
+    react: 18.0.0
+  build:
+    ms: 2.1.3

@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Recipe;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
 
@@ -170,7 +171,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
               - packages/*
             catalog:
               acme-current: ^2.0.0
-            """, s -> s.path("pnpm-workspace.yaml"))
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 
@@ -195,7 +196,34 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
               acme-alias: 'npm:@acme/fork@^1.4.1'
               acme-folded: >
                 ~1.4.1
-            """, s -> s.path("pnpm-workspace.yaml"))
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
+        );
+    }
+
+    // pnpm 10.0.0 reads no overrides from pnpm-workspace.yaml and rejects one without packages (pnpm-releases)
+    @Test
+    void aCatalogEntryOfAReleaseNoRecordingCoversIsDeclined() {
+        String manifest = """
+          {
+            "name": "consumer",
+            "packageManager": "pnpm@10.0.0",
+            "dependencies": {
+              "acme-logger": "catalog:"
+            }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("acme-logger", null, "~1.5.0"))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo("acme-logger's catalog entry was not " +
+                "upgraded: pnpm 10.0.0 is not a release whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - " +
+                "10.34.6, 11.0.6 - 11.2.2)")),
+          packageJson(manifest, null, nodeResolutionResult(PackageManager.Pnpm, dependency("acme-logger", "1.4.1")),
+            s -> s.noTrim()),
+          yaml("""
+            catalog:
+              acme-logger: ~1.4.1
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 
@@ -217,7 +245,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             """, """
             catalog:
               acme-logger: ~1.5.0
-            """, s -> s.path("pnpm-workspace.yaml"))
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 
@@ -240,7 +268,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             """, """
             catalog:
               acme-logger: '>=2.0.0'
-            """, s -> s.path("pnpm-workspace.yaml"))
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 
@@ -306,7 +334,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             cleanupUnusedCatalogs: true
             catalog:
               wrappy: ^1.0.0
-            """, s -> s.path("pnpm-workspace.yaml"))
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 }

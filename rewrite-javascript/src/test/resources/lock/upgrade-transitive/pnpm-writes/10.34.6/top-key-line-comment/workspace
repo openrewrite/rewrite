@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+catalog:
+  # the catalog
+  ms: 2.1.3
+overrides:
+  is-number: 7.0.0

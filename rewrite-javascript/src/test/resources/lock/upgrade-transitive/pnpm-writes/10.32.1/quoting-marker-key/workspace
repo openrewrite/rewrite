@@ -1,0 +1,4 @@
+packages:
+  - .
+overrides:
+  ---x: 1.0.0

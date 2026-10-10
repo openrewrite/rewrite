@@ -1,0 +1,1 @@
+pnpm 10.34.6 remove is-number in member a under cleanupUnusedCatalogs: true, the default catalog's entries commented: where the comments of the entries left go.

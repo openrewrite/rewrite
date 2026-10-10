@@ -559,6 +559,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    // Yarn 4.10.3 applies is-odd@^3.0.0/is-number nowhere (yarn-berry/override-key-ranged-parent)
     @Test
     void yarnBerryCannotMatchARangedParent() {
         Scenario s = new Scenario("yarn-berry/override-recipe-path");
@@ -586,6 +587,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
+    // yarn 1.22.22 applies **/is-odd@3.0.0/is-number nowhere (yarn-classic/override-key-versioned-parent)
     @Test
     void yarnClassicCannotMatchAVersionedParent() {
         Scenario s = new Scenario("yarn-classic/override-recipe-path");

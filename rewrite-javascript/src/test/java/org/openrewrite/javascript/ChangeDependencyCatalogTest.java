@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
@@ -96,6 +97,37 @@ class ChangeDependencyCatalogTest implements RewriteTest {
                   .satisfies(w -> assertThat(((Markup.Warn) w).getMessage()).contains("acme-logger is declared as " +
                     value + " (" + protocol + ")").contains("left unchanged: " + remedy).doesNotContain("Exception"));
             }))
+        );
+    }
+
+    @Test
+    void aRenameInACatalogOfAReleaseNoRecordingCoversIsDeclinedAndMarked() {
+        String manifest = """
+          {
+            "name": "consumer",
+            "packageManager": "pnpm@10.0.0",
+            "dependencies": {
+              "acme-logger": "catalog:"
+            }
+          }
+          """;
+        String why = "acme-logger was not renamed: pnpm 10.0.0 is not a release whose writes are recorded (9.5.0 - " +
+          "9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2)";
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", null, null))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo(why)),
+          packageJson(manifest, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.noTrim()
+            .after(actual -> actual).afterRecipe(doc -> {
+                assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                  .isEqualTo(manifest);
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(w ->
+                  assertThat(w.getMessage()).isEqualTo(why));
+            })),
+          yaml("""
+            catalog:
+              acme-logger: ~1.4.1
+            """, s -> s.path("pnpm-workspace.yaml").noTrim())
         );
     }
 

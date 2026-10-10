@@ -1,0 +1,6 @@
+
+packages:
+  - packages/*
+overrides:
+  is-number: 7.0.0
+strictPeerDependencies: false

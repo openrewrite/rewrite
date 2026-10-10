@@ -1,0 +1,4 @@
+overrides:
+  # head
+  is-number: 7.0.0
+  zzz: 1.0.0

@@ -1,0 +1,13 @@
+{
+  "name": "a",
+  "version": "1.0.0",
+  "dependencies": {
+    "is-number": "^7.0.0",
+    "ms": "2.1.3",
+    "wrappy": "1.0.2"
+  },
+  "devDependencies": {
+    "abbrev": "1.1.1",
+    "is-odd": "3.0.1"
+  }
+}

@@ -47,6 +47,7 @@ import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 
 /**
  * An override of a transitive dependency written where the workspace root's package manager reads it, in its own key
@@ -61,10 +62,10 @@ public final class PackageJsonOverrides {
     private final String newVersion;
     private final @Nullable List<DependencyPathSegment> path;
     private final Json.Document root;
-    private final String rootText;
     private final WorkspaceSettings workspace;
-    private final PnpmRelease release;
+    private final @Nullable PnpmRelease release;
     private final Place place;
+    private @Nullable String rootText;
     private @Nullable String declined;
     private boolean declinedKnown;
 
@@ -76,9 +77,16 @@ public final class PackageJsonOverrides {
         this.newVersion = newVersion;
         this.path = path;
         this.workspace = workspace;
-        this.rootText = PackageJsonHelper.printed(root);
-        this.release = PnpmRelease.of(pm == PackageManager.Pnpm ? rootText : "{}", workspace.settings());
-        this.place = place(pm, root, rootText, workspace, release.getMajor());
+        this.release = pm == PackageManager.Pnpm ? PnpmRelease.of(rootText(), workspace.settings()) : null;
+        this.place = place(release == null ? -1 : release.getMajor());
+    }
+
+    // the root as printed, once
+    private String rootText() {
+        if (rootText == null) {
+            rootText = PackageJsonHelper.printed(root);
+        }
+        return rootText;
     }
 
     /**
@@ -132,7 +140,7 @@ public final class PackageJsonOverrides {
     }
 
     int getRelease() {
-        return pm == PackageManager.Pnpm ? release.getMajor() : -1;
+        return release == null ? -1 : release.getMajor();
     }
 
     /**
@@ -197,11 +205,10 @@ public final class PackageJsonOverrides {
         return new DependencyPathSegment(part, null);
     }
 
-    private static Place place(PackageManager pm, Json.Document root, String rootText, WorkspaceSettings workspace,
-                               int release) {
+    private Place place(int release) {
         switch (pm) {
             case Bun:
-                return "resolutions".equals(OverrideMap.readsFrom(rootText)) ?
+                return "resolutions".equals(OverrideMap.readsFrom(rootText())) ?
                         Place.RESOLUTIONS : Place.OVERRIDES;
             case YarnClassic:
             case YarnBerry:
@@ -266,7 +273,7 @@ public final class PackageJsonOverrides {
     private @Nullable String decline() {
         int depth = path == null ? 0 : path.size();
         if (pm == PackageManager.Pnpm) {
-            String declined = release.declined();
+            String declined = requireNonNull(release).declined();
             if (declined != null) {
                 return "the override is not written: " + declined;
             }
@@ -314,7 +321,8 @@ public final class PackageJsonOverrides {
         switch (place) {
             case OVERRIDES:
                 if (path == null || path.isEmpty()) {
-                    // npm reads an object's "." as its own override, the other keys below it (object-value-pinned)
+                    // npm reads an object's "." as its own override, the other keys below it
+                    // (override-recipe-object-value-pinned)
                     Json overrides = member(doc, "overrides");
                     return overrides instanceof Json.JsonObject &&
                            member((Json.JsonObject) overrides, packageName) instanceof Json.JsonObject ?
@@ -354,7 +362,7 @@ public final class PackageJsonOverrides {
      * new key or entry; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors).
      */
     public String applyToWorkspaceManifest() {
-        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, rootText)).print();
+        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, rootText())).print();
     }
 
     /**
@@ -362,7 +370,7 @@ public final class PackageJsonOverrides {
      * writes it, by the one editor of that file.
      */
     public NodeCatalogs applyTo(NodeCatalogs.Pnpm workspace) {
-        return workspace.forRoot(rootText).withOverride(pnpmKey(packageName, path), newVersion);
+        return workspace.forRoot(rootText()).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
     // the selector of the whole path, which pnpm reads with one parent only
@@ -383,11 +391,13 @@ public final class PackageJsonOverrides {
         return key.append(packageName).toString();
     }
 
-    // pnpm reads one parent, a>b (override-recipe-path); Yarn classic matches from the root (parent-not-root)
+    // pnpm reads one parent, a>b (override-recipe-path)
     private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {
         return path == null || path.isEmpty() ? packageName : segment(path.get(path.size() - 1)) + ">" + packageName;
     }
 
+    // Yarn Berry reads one parent (override-recipe-path), Yarn classic matches from the root
+    // (small-resolutions-parent-not-root)
     private static String resolutionKey(PackageManager pm, String packageName,
                                         @Nullable List<DependencyPathSegment> path) {
         if (path == null || path.isEmpty()) {
@@ -452,7 +462,7 @@ public final class PackageJsonOverrides {
     private Map<String, @Nullable Object> parsedResolutions() {
         Object parsed;
         try {
-            parsed = EcmaScript.jsonParse(rootText);
+            parsed = EcmaScript.jsonParse(rootText());
         } catch (RuntimeException e) {
             return emptyMap();
         }

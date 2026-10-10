@@ -1,0 +1,16 @@
+yarn add v1.22.22
+warning package.json: No license field
+warning p@1.0.0: No license field
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+warning Ignored scripts due to flag.
+success Saved lockfile.
+warning p@1.0.0: No license field
+success Saved 1 new dependency.
+info Direct dependencies
+└─ is-number@7.0.0
+info All dependencies
+└─ is-number@7.0.0
+Done in 0.17s.

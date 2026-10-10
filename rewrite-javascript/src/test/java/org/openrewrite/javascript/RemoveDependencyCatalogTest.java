@@ -50,6 +50,10 @@ class RemoveDependencyCatalogTest implements RewriteTest {
       catalog-remove-cleanup-capitalized-true | wrappy
       catalog-remove-cleanup-quoted-false  | wrappy
       catalog-remove-cleanup-no            | wrappy
+      catalog-cleanup-comments-middle-pnpm11 | wrappy
+      catalog-cleanup-comments-first-pnpm11 | is-number
+      catalog-cleanup-comments-last-pnpm11 | wrappy
+      catalog-cleanup-override-reference-pnpm11 | ms
       """)
     void removedAsPnpmRemovedIt(String scenario, String name) {
         CatalogRecording recording = new CatalogRecording("pnpm", scenario);
@@ -101,6 +105,46 @@ class RemoveDependencyCatalogTest implements RewriteTest {
 
     // pnpm 11.2.2 rejects an override that is no string before it cleans up (catalog-cleanup-override-number: "The
     // value of overrides.is-number should be a string, but got number"), so the workspace is left as it is
+    @Test
+    void aCleanupForAReleaseNoRecordingCoversDeclinesTheEdit() {
+        String member = """
+          {
+            "name": "a",
+            "dependencies": {
+              "ms": "2.1.3",
+              "wrappy": "catalog:"
+            }
+          }
+          """;
+        String why = "cleanupUnusedCatalogs makes pnpm rewrite pnpm-workspace.yaml, and pnpm 10.0.0 is not a release " +
+          "whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2), so this edit was not made";
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo(why)),
+          packageJson("""
+            {
+              "name": "root",
+              "packageManager": "pnpm@10.0.0"
+            }
+            """, null, nodeResolutionResult(PackageManager.Pnpm)),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
+            .noTrim().after(actual -> actual).afterRecipe(doc -> {
+                assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                  .isEqualTo(member);
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(w ->
+                  assertThat(w.getMessage()).isEqualTo(why));
+            })),
+          yaml("""
+            packages:
+              - packages/*
+            cleanupUnusedCatalogs: true
+            catalog:
+              wrappy: 1.0.2
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
     @Test
     void noCleanupIsWrittenForAWorkspacePnpmRejects() {
         rewriteRun(

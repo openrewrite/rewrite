@@ -64,6 +64,7 @@ import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.javascript.Assertions.packageLock;
 import static org.openrewrite.javascript.Assertions.pnpmLock;
 import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
@@ -96,8 +97,14 @@ final class CatalogRecording {
         } catch (URISyntaxException e) {
             throw new IllegalArgumentException(e);
         }
-        this.pm = "pnpm".equals(family) ? PackageManager.Pnpm :
-                "bun".equals(family) ? PackageManager.Bun : PackageManager.YarnBerry;
+        this.pm = "pnpm".equals(family) ? PackageManager.Pnpm : "bun".equals(family) ? PackageManager.Bun :
+                "npm".equals(family) ? PackageManager.Npm : "yarn-classic".equals(family) ? PackageManager.YarnClassic :
+                        PackageManager.YarnBerry;
+    }
+
+    private String lockName() {
+        return pm == PackageManager.Pnpm ? "pnpm-lock.yaml" : pm == PackageManager.Bun ? "bun.lock" :
+                pm == PackageManager.Npm ? "package-lock.json" : "yarn.lock";
     }
 
     ExecutionContext ctx() {
@@ -175,8 +182,7 @@ final class CatalogRecording {
             before.put(".yarnrc.yml", read("yarnrc"));
             after.put(".yarnrc.yml", read(has("yarnrc-after") ? "yarnrc-after" : "yarnrc"));
         }
-        String lock = pm == PackageManager.Pnpm ? "pnpm-lock.yaml" : pm == PackageManager.Bun ? "bun.lock" :
-                "yarn.lock";
+        String lock = lockName();
         before.put(lock, read("before"));
         after.put(lock, read("after"));
         List<String> failures = new ArrayList<>();
@@ -343,8 +349,11 @@ final class CatalogRecording {
         if (pm == PackageManager.Pnpm) {
             sources.add(pnpmLock(read("before"), lock, s -> s.noTrim().afterRecipe(doc -> assertThat(
                     doc.getMarkers().findFirst(Markup.Warn.class)).as("unserved " + unserved).isEmpty())));
+        } else if (pm == PackageManager.Npm) {
+            sources.add(packageLock(read("before"), lock, s -> s.noTrim().afterRecipe(doc -> assertThat(
+                    doc.getMarkers().findFirst(Markup.Warn.class)).as("unserved " + unserved).isEmpty())));
         } else {
-            Consumer<SourceSpec<PlainText>> spec = s -> s.path(pm == PackageManager.Bun ? "bun.lock" : "yarn.lock")
+            Consumer<SourceSpec<PlainText>> spec = s -> s.path(lockName())
                     .noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                             .as("unserved " + unserved).isEmpty());
             sources.add(lock == null ? text(read("before"), spec) : text(read("before"), lock, spec));

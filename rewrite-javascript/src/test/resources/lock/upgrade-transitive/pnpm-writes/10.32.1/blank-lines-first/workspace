@@ -1,0 +1,5 @@
+overrides:
+  is-number: 7.0.0
+
+savePrefix: "~"
+strictPeerDependencies: false
