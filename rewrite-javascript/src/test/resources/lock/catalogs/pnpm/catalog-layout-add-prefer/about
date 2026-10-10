@@ -1,0 +1,1 @@
+pnpm add wrappy@1.0.2 in member a, catalogMode prefer, over a 4-space workspace with an unindented sequence; the root declares wrappy ^1.0.0.

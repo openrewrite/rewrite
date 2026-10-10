@@ -1,0 +1,25 @@
+> (.) pnpm add is-number@6.0.0 -w --lockfile-only
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ is-number catalog:
+
+Packages: +1
++
+Done in 291ms using pnpm v11.2.2
+> (packages/a) pnpm add is-number@6.0.0 --lockfile-only
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
++ is-number catalog:
+
+Done in 189ms using pnpm v11.2.2
+> (.) pnpm -r update --latest is-number --lockfile-only
+Scope: all 2 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+[WARN] Skip adding is-number to the default catalog because it already exists as 6.0.0. Please use `pnpm update` to update the catalogs.
+[WARN] Skip adding is-number to the default catalog because it already exists as 6.0.0. Please use `pnpm update` to update the catalogs.
+Progress: resolved 1, reused 0, downloaded 0, added 0, done
+Done in 253ms using pnpm v11.2.2

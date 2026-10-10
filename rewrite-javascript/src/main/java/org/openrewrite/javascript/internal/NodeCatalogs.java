@@ -170,7 +170,7 @@ public abstract class NodeCatalogs {
     public abstract @Nullable NodeCatalogs withEntry(String catalog, String alias, String specifier);
 
     public String print() {
-        return document.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+        return printed(document);
     }
 
     /**
@@ -987,19 +987,22 @@ public abstract class NodeCatalogs {
         private final Json.Document manifest;
 
         private SourceFile from;
+        private @Nullable SourceFile base;
         private @Nullable Function<Json.Document, Json.Document> manifestEdit;
         private final List<UnaryOperator<NodeCatalogs>> catalogEdits = new ArrayList<>();
         private final Set<String> declines = new LinkedHashSet<>();
 
-        private Decision(Accumulator acc, Path path, Json.Document manifest) {
+        private Decision(Accumulator acc, Path path, Json.Document manifest, @Nullable SourceFile base) {
             this.acc = acc;
             this.path = path;
             this.manifest = manifest;
             this.from = manifest;
+            this.base = base;
         }
 
         /**
-         * The catalogs the manifest's package manager reads for it, with the edits decided so far.
+         * The catalogs the manifest's package manager reads for it, as the recipes before this one left them, with
+         * the edits decided so far.
          */
         public @Nullable NodeCatalogs catalogs() {
             CatalogFile file = acc.catalogFile(path);
@@ -1009,6 +1012,7 @@ public abstract class NodeCatalogs {
         public void editManifest(Function<Json.Document, Json.Document> edit) {
             Function<Json.Document, Json.Document> before = manifestEdit;
             manifestEdit = before == null ? edit : before.andThen(edit);
+            acc.version++;
         }
 
         /**
@@ -1028,6 +1032,7 @@ public abstract class NodeCatalogs {
                 };
                 catalogEdits.add(op);
                 file.append(op, edited);
+                acc.version++;
             }
             return true;
         }
@@ -1050,17 +1055,27 @@ public abstract class NodeCatalogs {
         }
     }
 
-    // a catalog file as scanned and the edits decided on it, applied in decision order
+    // a catalog file as scanned, as the recipes before this one left it, and the edits decided on it in decision order
     private static final class CatalogFile {
         final Path path;
         final NodeCatalogs scanned;
         final List<UnaryOperator<NodeCatalogs>> edits = new ArrayList<>();
+        NodeCatalogs base;
         NodeCatalogs current;
         int applied;
+
+        @Nullable
+        SourceFile editedFrom;
+
+        int editedAt = -1;
+
+        @Nullable
+        SourceFile edited;
 
         CatalogFile(NodeCatalogs scanned) {
             this.path = scanned.getPath();
             this.scanned = scanned;
+            this.base = scanned;
             this.current = scanned;
         }
 
@@ -1069,6 +1084,14 @@ public abstract class NodeCatalogs {
                 current = edits.get(applied++).apply(current);
             }
             return current;
+        }
+
+        void rebase(SourceFile before) {
+            if (before != base.getDocument()) {
+                base = before == scanned.getDocument() ? scanned : scanned.reread(before);
+                current = base;
+                applied = 0;
+            }
         }
 
         void append(UnaryOperator<NodeCatalogs> edit, NodeCatalogs result) {
@@ -1080,7 +1103,7 @@ public abstract class NodeCatalogs {
 
         void reset() {
             edits.clear();
-            current = scanned;
+            current = base;
             applied = 0;
         }
 
@@ -1093,10 +1116,10 @@ public abstract class NodeCatalogs {
     }
 
     /**
-     * A dependency recipe's scan and its decisions this cycle, made in generate from the scanned manifests and again
-     * at visit time for a manifest an earlier recipe changed, while nothing written yet depends on them.
+     * A dependency recipe's scan and its decisions this cycle, made in generate from the documents as the earlier
+     * recipes leave them, and again at visit time for one that differs, while nothing written yet depends on them.
      */
-    public static final class Accumulator {
+    public static final class Accumulator implements PackageJsonHelper.FileEditor {
         public final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
         private final Set<Object> rows = new HashSet<>();
         private final Map<Path, SourceFile> files = new HashMap<>();
@@ -1105,6 +1128,7 @@ public abstract class NodeCatalogs {
         private final Map<Path, Decision> decisions = new LinkedHashMap<>();
         private final Map<Path, PackageJsonHelper.EditAndRegenerateResult> results = new LinkedHashMap<>();
         private final Set<Path> written = new HashSet<>();
+        private int version;
 
         /**
          * Note what a dependency recipe's scan reads from {@code sf}.
@@ -1135,20 +1159,51 @@ public abstract class NodeCatalogs {
          * Decide every scanned manifest's edit.
          */
         public void decideAll(ExecutionContext ctx, Decider decider) {
+            PackageJsonHelper.addFileEditor(ctx, this);
             for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : new TreeMap<>(scan.projects).entrySet()) {
                 SourceFile pkg = project.getValue().capturedPackageJson;
                 if (pkg != null) {
-                    decide(project.getKey(), pkg, ctx, decider);
+                    decide(project.getKey(), PackageJsonHelper.editedBefore(ctx, this, pkg), ctx, decider);
                 }
             }
         }
 
         /**
-         * The catalogs the package manager of {@code packageJson} reads for it, with this cycle's edits.
+         * The catalogs the package manager of {@code packageJson} reads for it, as the recipes before this one left
+         * them, with this cycle's edits.
          */
-        public @Nullable NodeCatalogs of(Path packageJson) {
+        public @Nullable NodeCatalogs of(ExecutionContext ctx, Path packageJson) {
             CatalogFile file = catalogFile(packageJson);
-            return file == null ? null : file.current();
+            return file == null ? null : rebased(ctx, file).current();
+        }
+
+        /**
+         * A manifest or catalog file with this cycle's edits, and pnpm's cleanup of the catalogs they leave unused.
+         */
+        @Override
+        public SourceFile edit(ExecutionContext ctx, SourceFile file) {
+            CatalogFile catalogFile = catalogFiles.get(file.getSourcePath());
+            if (catalogFile != null && catalogFile.editedFrom == file && catalogFile.editedAt == version) {
+                return requireNonNull(catalogFile.edited);
+            }
+            Decision decision = decisions.get(file.getSourcePath());
+            SourceFile edited = decision == null || decision.manifestEdit == null || !(file instanceof Json.Document) ?
+                    file : decision.manifestEdit.apply((Json.Document) file);
+            if (catalogFile != null) {
+                NodeCatalogs in = edited == catalogFile.scanned.getDocument() ? catalogFile.scanned :
+                        catalogFile.scanned.reread(edited);
+                NodeCatalogs out = output(catalogFile, catalogFile.replay(in));
+                catalogFile.editedFrom = file;
+                catalogFile.editedAt = version;
+                catalogFile.edited = out == null ? edited : out.getDocument();
+                return catalogFile.edited;
+            }
+            return edited;
+        }
+
+        private CatalogFile rebased(ExecutionContext ctx, CatalogFile file) {
+            file.rebase(PackageJsonHelper.editedBefore(ctx, this, file.scanned.getDocument()));
+            return file;
         }
 
         /**
@@ -1208,25 +1263,33 @@ public abstract class NodeCatalogs {
             };
         }
 
-        // decide path's edit from this revision of its manifest, unless what this recipe wrote depends on the last one
+        // decide path's edit from this revision of its manifest and catalogs, unless what this recipe wrote depends on
+        // the last one
         private void decide(Path path, SourceFile manifest, ExecutionContext ctx, Decider decider) {
-            Decision previous = decisions.get(path);
-            if (!(manifest instanceof Json.Document) || previous != null && previous.from == manifest) {
+            if (!(manifest instanceof Json.Document)) {
                 return;
             }
+            CatalogFile catalogs = catalogFile(path);
+            SourceFile base = catalogs == null ? null : rebased(ctx, catalogs).base.getDocument();
+            Decision previous = decisions.get(path);
+            if (previous != null && same(previous.from, manifest) && same(previous.base, base)) {
+                return;
+            }
+            version++;
             if (previous != null && (results.containsKey(path) || written.contains(path))) {
                 previous.from = manifest;
+                previous.base = base;
                 return;
             }
             Map<Path, String> before = previous == null ? emptyMap() : writtenCatalogs(ctx);
-            Decision decision = new Decision(this, path, (Json.Document) manifest);
+            Decision decision = new Decision(this, path, (Json.Document) manifest, base);
             decisions.put(path, decision);
             if (previous != null) {
                 rebuild();
             }
             decider.decide(decision, ctx);
             CatalogFile file = decision.edits() ? catalogFile(path) : null;
-            if (file != null && file.current().isFlowStyle() && output(ctx, file, file.current()) == null) {
+            if (file != null && file.current().isFlowStyle() && output(file, file.current()) == null) {
                 decision.manifestEdit = null;
                 decision.catalogEdits.clear();
                 decision.decline("cleanupUnusedCatalogs would make pnpm rewrite the flow-style catalogs of " +
@@ -1237,6 +1300,7 @@ public abstract class NodeCatalogs {
                 rebuild();
                 if (!before.equals(writtenCatalogs(ctx))) {
                     previous.from = manifest;
+                    previous.base = base;
                     decisions.put(path, previous);
                     rebuild();
                 }
@@ -1261,7 +1325,7 @@ public abstract class NodeCatalogs {
             Map<Path, String> out = new HashMap<>();
             for (CatalogFile file : catalogFiles.values()) {
                 if (file != null && written.contains(file.path)) {
-                    NodeCatalogs output = output(ctx, file, file.current());
+                    NodeCatalogs output = output(file, rebased(ctx, file).current());
                     out.put(file.path, output == null ? "" : output.print());
                 }
             }
@@ -1343,8 +1407,8 @@ public abstract class NodeCatalogs {
             }
         }
 
-        // the catalog files other than a manifest that a regeneration for packageJson reads, as this cycle leaves them;
-        // Bun's root manifest, as edited so far, when packageJson is another
+        // the catalog files other than a manifest that a regeneration for packageJson reads, as the recipes so far and
+        // this cycle's edits leave them; Bun's root manifest, as edited so far, when packageJson is another
         private Map<Path, String> editedFiles(ExecutionContext ctx, Path packageJson) {
             CatalogFile file = catalogFile(packageJson);
             if (file == null || file.path.equals(packageJson)) {
@@ -1356,9 +1420,10 @@ public abstract class NodeCatalogs {
                     return emptyMap();
                 }
                 SourceFile live = PackageJsonHelper.getLiveTree(ctx, file.path);
-                output = live instanceof Json.Document ? file.replay(file.scanned.reread(live)) : file.current();
+                output = live instanceof Json.Document ? file.replay(file.scanned.reread(live)) : file.scanned.reread(
+                        edit(ctx, PackageJsonHelper.editedBefore(ctx, this, file.scanned.getDocument())));
             } else {
-                output = output(ctx, file, file.current());
+                output = output(file, rebased(ctx, file).current());
             }
             written.add(file.path);
             return output == null || output.getDocument() == file.scanned.getDocument() ? emptyMap() :
@@ -1375,14 +1440,15 @@ public abstract class NodeCatalogs {
                 return null;
             }
             written.add(file.path);
-            NodeCatalogs edited = visited == file.scanned.getDocument() ? file.current() :
+            NodeCatalogs edited = visited == rebased(ctx, file).base.getDocument() ? file.current() :
                     file.replay(file.scanned.reread(visited));
-            NodeCatalogs output = output(ctx, file, edited);
+            NodeCatalogs output = output(file, edited);
             return output == null || output.getDocument() == visited ? null : output.getDocument();
         }
 
-        // pnpm's cleanupUnusedCatalogs, which any install it runs applies, when this cycle edits the workspace
-        private @Nullable NodeCatalogs output(ExecutionContext ctx, CatalogFile file, NodeCatalogs edited) {
+        // pnpm's cleanupUnusedCatalogs, which any install it runs applies, when this cycle edits the workspace; each
+        // project as this recipe's decision leaves it
+        private @Nullable NodeCatalogs output(CatalogFile file, NodeCatalogs edited) {
             if (!(edited instanceof Pnpm) || !((Pnpm) edited).isCleanupUnusedCatalogs()) {
                 return edited;
             }
@@ -1395,8 +1461,7 @@ public abstract class NodeCatalogs {
                 }
                 Decision decision = decisions.get(project.getKey());
                 touched |= decision != null && decision.edits();
-                SourceFile live = PackageJsonHelper.getLiveTree(ctx, project.getKey());
-                SourceFile doc = live != null ? live : decision != null ? decision.from : captured;
+                SourceFile doc = decision != null ? decision.from : captured;
                 if (doc instanceof Json.Document && decision != null && decision.manifestEdit != null) {
                     doc = decision.manifestEdit.apply((Json.Document) doc);
                 }
@@ -1533,5 +1598,13 @@ public abstract class NodeCatalogs {
         private static <T extends Tree> T warn(T tree, String message) {
             return Markup.markup(tree, new Markup.Warn(randomId(), message, null));
         }
+
+        private static boolean same(@Nullable SourceFile a, @Nullable SourceFile b) {
+            return a == b || a != null && b != null && printed(a).equals(printed(b));
+        }
+    }
+
+    private static String printed(SourceFile document) {
+        return document.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 }

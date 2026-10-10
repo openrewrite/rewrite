@@ -27,6 +27,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
+import org.yaml.snakeyaml.Yaml;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -38,6 +39,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -122,10 +125,34 @@ final class CatalogRecording {
     }
 
     /**
+     * {@link #sources()}, in reverse when {@code reversed}: the lock before the catalog file, the members before the
+     * root.
+     */
+    SourceSpecs[] sources(boolean reversed) {
+        SourceSpecs[] sources = sources();
+        if (reversed) {
+            Collections.reverse(Arrays.asList(sources));
+        }
+        return sources;
+    }
+
+    /**
      * {@link #sources()} where the recipe declines the edit of {@code member} with a warning naming {@code warning},
      * leaving its text as it was.
      */
     SourceSpecs[] sources(@Nullable String member, @Nullable String warning) {
+        return sources(member, warning, null);
+    }
+
+    /**
+     * {@link #sources()} where pnpm re-renders pnpm-workspace.yaml in its own layout and the recipe edits it in place:
+     * the workspace comes out as {@code inPlace}, which must read as the same document pnpm wrote.
+     */
+    SourceSpecs[] sourcesWithTheWorkspaceEditedInPlace(String inPlace) {
+        return sources(null, null, inPlace);
+    }
+
+    private SourceSpecs[] sources(@Nullable String member, @Nullable String warning, @Nullable String inPlace) {
         List<SourceSpecs> sources = new ArrayList<>();
         Map<String, String> before = tree("tree-before");
         Map<String, String> after = new TreeMap<>(before);
@@ -154,7 +181,12 @@ final class CatalogRecording {
             sources.add(packageJson(text, changed(text, failed ? null : after.get(path)), nodeResolutionResult(pm),
                     s -> s.path(path).noTrim()));
         }
-        if (has("workspace-before")) {
+        if (inPlace != null) {
+            Object written = new Yaml().load(read("workspace"));
+            sources.add(yaml(read("workspace-before"), inPlace, s -> s.path("pnpm-workspace.yaml").noTrim()
+                    .afterRecipe(doc -> assertThat((Object) new Yaml().load(doc.printAll(new PrintOutputCapture<>(0,
+                            PrintOutputCapture.MarkerPrinter.SANITIZED)))).isEqualTo(written))));
+        } else if (has("workspace-before")) {
             String edited = failed ? null : has("workspace") ? read("workspace") : read("workspace-before");
             sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), edited),
                     "pnpm-workspace.yaml"));

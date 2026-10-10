@@ -1,0 +1,3 @@
+pnpm 11.2.2, node v24.19.0, 2026-10-10T05:32:10Z
+before exit=0, after exit=0
+phase 2: pnpm -r update --latest wrappy --lockfile-only

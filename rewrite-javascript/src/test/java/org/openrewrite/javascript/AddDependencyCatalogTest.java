@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -116,6 +117,37 @@ class AddDependencyCatalogTest implements RewriteTest {
             .dataTable(NodeLockRegenerationFailures.Row.class, rows -> assertThat(rows).singleElement()
               .satisfies(row -> assertThat(row.getDetail()).contains("ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC"))),
           recording.sourcesWhoseInstallFails("ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC")
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void anAdditionAfterAnUpgradeOfTheCatalogInTheSameRun(boolean reversed) {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-update-then-add");
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeDependencyVersion("wrappy", null, "1.0.2"),
+              new AddDependency("wrappy", "1.0.2", null))
+            .executionContext(recording.ctx()),
+          recording.sources(reversed)
+        );
+    }
+
+    @Test
+    void aWorkspaceInAnotherLayoutGetsTheEntryInPlace() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-add-prefer");
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("wrappy", "1.0.2", null)).executionContext(recording.ctx()),
+          recording.sourcesWithTheWorkspaceEditedInPlace("""
+            # workspace
+            packages:
+            - packages/*
+
+            catalogMode: prefer
+
+            catalog:
+                is-number: 7.0.0
+                wrappy: 1.0.2
+            """)
         );
     }
 

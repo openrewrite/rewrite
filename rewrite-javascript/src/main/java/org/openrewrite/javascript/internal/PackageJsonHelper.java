@@ -94,6 +94,61 @@ public class PackageJsonHelper {
         map.put(packageJsonPath, tree);
     }
 
+    /**
+     * A recipe's edits of the package-manager files beside the manifests, such as pnpm-workspace.yaml or .yarnrc.yml.
+     */
+    @FunctionalInterface
+    public interface FileEditor {
+
+        /**
+         * {@code file}, as the recipes before this one in the cycle left it, with this recipe's edits.
+         */
+        SourceFile edit(ExecutionContext ctx, SourceFile file);
+    }
+
+    private static final String FILE_EDITORS = "org.openrewrite.javascript.packageManagerFileEditors";
+
+    private static final class FileEditors {
+        @Nullable
+        Object cycle;
+
+        final List<FileEditor> editors = new ArrayList<>();
+    }
+
+    /**
+     * Add {@code editor} to this cycle's editors of package-manager files, after those added before it.
+     */
+    public static void addFileEditor(ExecutionContext ctx, FileEditor editor) {
+        List<FileEditor> editors = fileEditors(ctx);
+        if (!editors.contains(editor)) {
+            editors.add(editor);
+        }
+    }
+
+    /**
+     * {@code scanned} as the editors added this cycle before {@code editor} leave it, in the order they were added.
+     */
+    public static SourceFile editedBefore(ExecutionContext ctx, FileEditor editor, SourceFile scanned) {
+        SourceFile file = scanned;
+        for (FileEditor earlier : new ArrayList<>(fileEditors(ctx))) {
+            if (earlier == editor) {
+                break;
+            }
+            file = earlier.edit(ctx, file);
+        }
+        return file;
+    }
+
+    private static List<FileEditor> fileEditors(ExecutionContext ctx) {
+        FileEditors editors = ctx.computeMessageIfAbsent(FILE_EDITORS, k -> new FileEditors());
+        Object cycle = ctx.getMessage(ExecutionContext.CURRENT_CYCLE);
+        if (editors.cycle != cycle) {
+            editors.cycle = cycle;
+            editors.editors.clear();
+        }
+        return editors.editors;
+    }
+
     public static Json.Document reparseJson(Json.Document original, String newContent) {
         JsonParser parser = new JsonParser();
         Parser.Input input = Parser.Input.fromString(original.getSourcePath(), newContent);

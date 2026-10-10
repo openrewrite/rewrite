@@ -1,0 +1,13 @@
+> (.) pnpm -r update --latest is-number --lockfile-only
+Scope: all 2 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 2, reused 0, downloaded 0, added 0, done
+Done in 243ms using pnpm v11.2.2
+> (packages/a) pnpm remove wrappy --lockfile-only
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0
+../..                                    | Progress: resolved 1, reused 0, downloaded 0, added 0, done
+
+dependencies:
+- wrappy catalog:
+
+Done in 188ms using pnpm v11.2.2

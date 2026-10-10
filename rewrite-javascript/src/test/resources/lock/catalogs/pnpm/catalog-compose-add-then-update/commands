@@ -1,0 +1,3 @@
+. add is-number@6.0.0 -w
+packages/a add is-number@6.0.0
+. -r update --latest is-number

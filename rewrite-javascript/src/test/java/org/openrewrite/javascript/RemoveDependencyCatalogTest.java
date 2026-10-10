@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.marker.Markup;
@@ -82,6 +83,33 @@ class RemoveDependencyCatalogTest implements RewriteTest {
             cleanupUnusedCatalogs: true
             catalog: {wrappy: 1.0.2}
             """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void aRemovalAfterAnUpgradeOfTheCatalogInTheSameRun(boolean reversed) {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-update-then-remove");
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
+              new RemoveDependency("wrappy", null))
+            .executionContext(recording.ctx()),
+          recording.sources(reversed)
+        );
+    }
+
+    @Test
+    void aWorkspaceInAnotherLayoutIsCleanedInPlace() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-remove-cleanup");
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)).executionContext(recording.ctx()),
+          recording.sourcesWithTheWorkspaceEditedInPlace("""
+            packages:
+            - packages/*
+            cleanupUnusedCatalogs: true
+            catalog:
+                is-number: 7.0.0
+            """)
         );
     }
 

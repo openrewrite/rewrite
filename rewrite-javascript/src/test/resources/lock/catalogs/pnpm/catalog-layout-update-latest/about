@@ -1,0 +1,1 @@
+pnpm -r update --latest wrappy over a 4-space workspace with an unindented sequence and a comment.

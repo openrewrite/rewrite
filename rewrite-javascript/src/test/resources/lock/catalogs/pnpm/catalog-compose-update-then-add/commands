@@ -1,0 +1,2 @@
+. -r update --latest wrappy
+. add wrappy@1.0.2 -w

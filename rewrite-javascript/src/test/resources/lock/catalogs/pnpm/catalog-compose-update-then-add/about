@@ -1,0 +1,1 @@
+pnpm -r update --latest wrappy (the default catalog entry 1.0.1 member a declares), then pnpm add wrappy@1.0.2 -w at the root, which the updated entry now holds.

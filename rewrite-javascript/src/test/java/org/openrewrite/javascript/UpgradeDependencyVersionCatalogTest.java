@@ -18,6 +18,7 @@ package org.openrewrite.javascript;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.test.RewriteTest;
@@ -31,7 +32,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
  * A {@code catalog:} reference is upgraded in its catalog entry, and the lock follows as the package manager wrote it
- * in the recordings under {@code lock/catalogs/};a value that is no version range is left alone and recorded.
+ * in the recordings under {@code lock/catalogs/}; a value that is no version range is left alone and recorded.
  */
 class UpgradeDependencyVersionCatalogTest implements RewriteTest {
 
@@ -58,6 +59,54 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
           spec -> spec.recipe(new UpgradeDependencyVersion(name, null, version)).executionContext(recording.ctx())
             .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyProtocolsSkipped.class)).isEmpty()),
           recording.sources()
+        );
+    }
+
+    @ParameterizedTest(name = "{0}/{1} reversed={6}")
+    @CsvSource(delimiter = '|', textBlock = """
+      pnpm       | catalog-entry-quoted                        | is-number | >=7.0.0 | wrappy | 1.0.2 | false
+      pnpm       | catalog-entry-quoted                        | is-number | >=7.0.0 | wrappy | 1.0.2 | true
+      yarn-berry | catalog-yarnrc-quoted-edit                  | is-number | >=7.0.0 | ms     | 2.1.3 | false
+      yarn-berry | catalog-yarnrc-quoted-edit                  | is-number | >=7.0.0 | ms     | 2.1.3 | true
+      bun        | catalog-workspaces-catalog-two-entries-edit | is-number | ^7.0.0  | ms     | 2.1.3 | false
+      bun        | catalog-workspaces-catalog-two-entries-edit | is-number | ^7.0.0  | ms     | 2.1.3 | true
+      """)
+    void twoUpgradesInOneRunEachReadTheCatalogAsTheOtherLeftIt(String family, String scenario, String first,
+                                                               String firstVersion, String second,
+                                                               String secondVersion, boolean reversed) {
+        CatalogRecording recording = new CatalogRecording(family, scenario);
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeDependencyVersion(first, null, firstVersion),
+              new UpgradeDependencyVersion(second, null, secondVersion))
+            .executionContext(recording.ctx()),
+          recording.sources(reversed)
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void anEntryAnEarlierRecipeAddedInTheSameRun(boolean reversed) {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-compose-add-then-update");
+        rewriteRun(
+          spec -> spec.recipes(new AddDependency("is-number", "6.0.0", null),
+              new UpgradeDependencyVersion("is-number", null, "7.0.0"))
+            .executionContext(recording.ctx()),
+          recording.sources(reversed)
+        );
+    }
+
+    @Test
+    void aWorkspaceInAnotherLayoutIsEditedInPlace() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-update-latest");
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("wrappy", null, "1.0.2")).executionContext(recording.ctx()),
+          recording.sourcesWithTheWorkspaceEditedInPlace("""
+            packages:
+            - packages/*
+            catalog:
+                # pinned
+                wrappy: 1.0.2
+            """)
         );
     }
 
