@@ -167,8 +167,8 @@ class YarnBerryInputsTest {
         Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
         scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", null, null, null, null, true, null,
           true, false));
-        NodeRegistry registry = new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, true, null,
-          true, false);
+        NodeRegistry registry = new NodeRegistry(null, "https://registry.npmjs.org/", null, null, null, null, true,
+          null, true, false);
 
         NodeRegistries user = new NodeRegistries(registry, scopes, null, null, null);
         assertThat(YarnBerryInputs.userYarnrc(user, user)).isEqualTo(
