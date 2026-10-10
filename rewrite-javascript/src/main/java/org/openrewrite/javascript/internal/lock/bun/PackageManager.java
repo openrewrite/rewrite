@@ -79,7 +79,7 @@ final class PackageManager {
     final BunOptions options;
     final Log log;
     private final Map<String, String> projectManifests;
-    private final @Nullable ManifestSource registry;
+    private final ManifestSource registry;
     private final double nowMs;
 
     private final Map<Long, DependencyVersion> knownNpmAliases = new HashMap<>();
@@ -92,9 +92,29 @@ final class PackageManager {
     private final Map<String, Integer> folders = new HashMap<>();
 
     /**
-     * The edges resolved from a packument before the peers are, for {@link ManifestArrivalOrder}.
+     * An edge resolved from its packument: its spec and the version {@code findBestVersion} picked before the dedupe.
      */
-    final List<ManifestArrivalOrder.Resolved> firstPass = new ArrayList<>();
+    static final class Resolved {
+        final int dependencyId;
+        final DependencyVersion version;
+        final PackageManifest manifest;
+        final PackageManifest.FindResult pick;
+        final Resolution resolution;
+
+        Resolved(int dependencyId, DependencyVersion version, PackageManifest manifest,
+                 PackageManifest.FindResult pick) {
+            this.dependencyId = dependencyId;
+            this.version = version;
+            this.manifest = manifest;
+            this.pick = pick;
+            this.resolution = Resolution.npm(pick.version, pick.packageVersion.tarballUrl);
+        }
+    }
+
+    /**
+     * The edges resolved from a packument before the peers are.
+     */
+    final List<Resolved> firstPass = new ArrayList<>();
     private boolean peersStarted;
 
     /**
@@ -103,13 +123,8 @@ final class PackageManager {
     private @Nullable Set<Long> namesBeforePeers;
     private final Map<Integer, DependencyVersion> peersOfNewNames = new LinkedHashMap<>();
 
-    /**
-     * The packuments requested, in order.
-     */
-    final List<String> requested = new ArrayList<>();
-
     PackageManager(Lockfile lockfile, BunOptions options, Log log, Map<String, String> projectManifests,
-                   @Nullable ManifestSource registry, double nowMs) {
+                   ManifestSource registry, double nowMs) {
         this.lockfile = lockfile;
         this.options = options;
         this.log = log;
@@ -339,7 +354,7 @@ final class PackageManager {
             long nameHash, String name, DependencyVersion version, int dependencyId, Behavior behavior,
             PackageManifest manifest, PackageManifest.FindResult findResult, boolean installPeer) {
         if (!peersStarted) {
-            firstPass.add(new ManifestArrivalOrder.Resolved(dependencyId, version, manifest, findResult));
+            firstPass.add(new Resolved(dependencyId, version, manifest, findResult));
         }
         Integer id = lockfile.getPackageID(nameHash, version,
                 Resolution.npm(findResult.version, findResult.packageVersion.tarballUrl));
@@ -595,8 +610,7 @@ final class PackageManager {
         NetworkTask task = networkTasks.poll();
         if (task != null) {
             String scope = options.scopeForPackageName(task.name);
-            requested.add(task.name);
-            String text = registry == null ? null : registry.packument(scope, task.name, task.extended);
+            String text = registry.packument(scope, task.name, task.extended);
             if (text == null) {
                 String message = "GET " + scope + task.name + " - 404";
                 if (networkDedupeMap.getOrDefault(task.name, true)) {
@@ -648,7 +662,7 @@ final class PackageManager {
             drainDependencyList();
             runTasks(false);
         }
-        List<String> arrivalOrder = ManifestArrivalOrder.detect(lockfile, packagesBefore, firstPass);
+        List<String> arrivalOrder = manifestArrivalOrder(packagesBefore);
         if (!arrivalOrder.isEmpty()) {
             throw new CannotKnow(String.join("; ", arrivalOrder));
         }
@@ -665,14 +679,14 @@ final class PackageManager {
                 runTasks(true);
             } while (!peerDependencies.isEmpty() || pendingTaskCount() > 0);
         }
-        List<String> peerOrder = ManifestArrivalOrder.detectPeers(lockfile, peerPicks());
+        List<String> peerOrder = peerArrivalOrder(peerPicks());
         if (!peerOrder.isEmpty()) {
             throw new CannotKnow(String.join("; ", peerOrder));
         }
     }
 
-    private List<ManifestArrivalOrder.Resolved> peerPicks() {
-        List<ManifestArrivalOrder.Resolved> picks = new ArrayList<>();
+    private List<Resolved> peerPicks() {
+        List<Resolved> picks = new ArrayList<>();
         for (Map.Entry<Integer, DependencyVersion> peer : peersOfNewNames.entrySet()) {
             DependencyVersion version = peer.getValue();
             PackageManifest manifest = manifests.get(Wyhash11.stringHash(version.npm().name));
@@ -680,12 +694,106 @@ final class PackageManager {
                     manifest.findBestVersionWithFilter(version.npm().version, options.getMinimumReleaseAgeMs(),
                             options.getMinimumReleaseAgeExcludes(), nowMs).result;
             if (pick != null) {
-                picks.add(new ManifestArrivalOrder.Resolved(peer.getKey(), version, manifest, pick));
+                picks.add(new Resolved(peer.getKey(), version, manifest, pick));
             }
         }
         return picks;
     }
 
+    /**
+     * The dedupe in {@code getOrPutResolvedPackageWithFindResult} that network timing decides: one line per name whose
+     * result depends on the order its first-pass edges ran ({@code packagesBefore}: the count when the install began).
+     */
+    List<String> manifestArrivalOrder(int packagesBefore) {
+        Map<String, List<Resolved>> byName = new LinkedHashMap<>();
+        for (Resolved edge : firstPass) {
+            if (!lockfile.dependencies.get(edge.dependencyId).behavior.isPeer()) {
+                byName.computeIfAbsent(edge.manifest.name, k -> new ArrayList<>()).add(edge);
+            }
+        }
+        List<String> out = new ArrayList<>();
+        for (Map.Entry<String, List<Resolved>> entry : byName.entrySet()) {
+            List<Resolved> edges = entry.getValue();
+            pairs:
+            for (int i = 0; i < edges.size(); i++) {
+                for (int j = 0; j < edges.size(); j++) {
+                    if (i != j && dependsOnOrder(packagesBefore, edges.get(i), edges.get(j))) {
+                        Resolved a = edges.get(Math.min(i, j));
+                        Resolved b = edges.get(Math.max(i, j));
+                        out.add("manifest arrival order: " + entry.getKey() + " for " + requirer(a) + " (" +
+                                a.version.literal + ") and " + requirer(b) + " (" + b.version.literal +
+                                ") resolved in one install");
+                        break pairs;
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * One line per name whose required peers nothing satisfied when the peers began and whose picks differ: the order
+     * the requirers' manifests arrived in decides which pick the later peers take.
+     */
+    List<String> peerArrivalOrder(List<Resolved> peers) {
+        Map<String, List<Resolved>> byName = new LinkedHashMap<>();
+        for (Resolved edge : peers) {
+            byName.computeIfAbsent(edge.manifest.name, k -> new ArrayList<>()).add(edge);
+        }
+        List<String> out = new ArrayList<>();
+        for (Map.Entry<String, List<Resolved>> entry : byName.entrySet()) {
+            List<Resolved> edges = entry.getValue();
+            for (int i = 1; i < edges.size(); i++) {
+                if (!edges.get(i).resolution.eql(edges.get(0).resolution)) {
+                    Resolved a = edges.get(0);
+                    Resolved b = edges.get(i);
+                    out.add("manifest arrival order: peer " + entry.getKey() + " for " + requirer(a) + " (" +
+                            a.version.literal + ") and " + requirer(b) + " (" + b.version.literal +
+                            ") installed in one install");
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    // run first, `edge` takes the first pre-existing package it accepts (getPackageID walks highest first) or appends
+    // its pick; run after `other` appended its pick, it takes that pick when it accepts it and it walks earlier
+    private boolean dependsOnOrder(int packagesBefore, Resolved edge, Resolved other) {
+        if (existing(packagesBefore, other) != null || !accepts(edge, other.resolution)) {
+            return false;
+        }
+        Resolution first = existing(packagesBefore, edge);
+        return first == null ? !other.resolution.eql(edge.resolution) : other.resolution.order(first) > 0;
+    }
+
+    @Nullable
+    private Resolution existing(int packagesBefore, Resolved edge) {
+        List<Integer> ids = lockfile.packageIndex.get(Wyhash11.stringHash(edge.manifest.name));
+        if (ids != null) {
+            for (int id : ids) {
+                if (id < packagesBefore && accepts(edge, lockfile.packages.get(id).resolution)) {
+                    return lockfile.packages.get(id).resolution;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean accepts(Resolved edge, Resolution candidate) {
+        return candidate.eql(edge.resolution) ||
+               candidate.tag == Resolution.Tag.NPM && edge.version.tag == DependencyVersion.Tag.NPM &&
+               edge.version.npm().version.satisfies(candidate.version);
+    }
+
+    private String requirer(Resolved edge) {
+        for (Package pkg : lockfile.packages) {
+            if (pkg.containsDependency(edge.dependencyId)) {
+                return pkg.resolution.tag == Resolution.Tag.ROOT ? pkg.name : pkg.name + "@" + pkg.resolution;
+            }
+        }
+        return lockfile.dependencies.get(edge.dependencyId).name;
+    }
     /**
      * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it.
      */

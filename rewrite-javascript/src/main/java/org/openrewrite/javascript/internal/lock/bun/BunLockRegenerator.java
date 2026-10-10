@@ -132,7 +132,7 @@ public final class BunLockRegenerator {
      * ignores it), or one that loaded.
      */
     @Getter
-    public static final class LoadResult {
+    private static final class LoadResult {
         private final @Nullable Lockfile lockfile;
         private final TextLockfileReader.@Nullable ParseError error;
 
@@ -157,27 +157,20 @@ public final class BunLockRegenerator {
     }
 
     /**
-     * The install after the root's diff: the package manager holding the lockfile, and the dependency ids the diff
-     * enqueued, in order.
+     * The install after the root's diff: the package manager holding the lockfile and the package count before it
+     * enqueued anything.
      */
     @Getter
-    public static final class PendingInstall {
+    private static final class PendingInstall {
         private final LoadResult loadResult;
         private final PackageManager manager;
         private final int configVersion;
-        private final boolean needsNewLockfile;
-        private final PackageDiff.@Nullable Summary summary;
-        private final List<Integer> enqueued;
         private final int packagesBefore;
 
-        PendingInstall(LoadResult loadResult, PackageManager manager, int configVersion, boolean needsNewLockfile,
-                       PackageDiff.@Nullable Summary summary, List<Integer> enqueued, int packagesBefore) {
+        PendingInstall(LoadResult loadResult, PackageManager manager, int configVersion, int packagesBefore) {
             this.loadResult = loadResult;
             this.manager = manager;
             this.configVersion = configVersion;
-            this.needsNewLockfile = needsNewLockfile;
-            this.summary = summary;
-            this.enqueued = enqueued;
             this.packagesBefore = packagesBefore;
         }
 
@@ -185,23 +178,12 @@ public final class BunLockRegenerator {
             return manager.lockfile;
         }
 
-        boolean hasPendingWork() {
-            return manager.pendingTaskCount() > 0 || !manager.peerDependencies.isEmpty();
-        }
-
         /**
-         * {@code cleanWithLogger} then {@code saveLockfile}: the bun.lock text, or null when bun deletes the empty
-         * lockfile. Only meaningful once nothing is left to resolve.
+         * {@code saveLockfile} over the cleaned lockfile: the bun.lock text, or null when bun deletes the empty
+         * lockfile.
          */
         @Nullable
-        String save() {
-            if (hasPendingWork()) {
-                throw new IllegalStateException("the install has dependencies left to resolve");
-            }
-            return write(Cleaner.clean(manager.lockfile));
-        }
-
-        private @Nullable String write(Lockfile cleaned) {
+        String write(Lockfile cleaned) {
             if (cleaned.isEmpty()) {
                 return null;
             }
@@ -391,7 +373,7 @@ public final class BunLockRegenerator {
         return INSTALL.failure(e);
     }
 
-    static LoadResult loadFromCwd(@Nullable String lock, BunOptions options) {
+    private static LoadResult loadFromCwd(@Nullable String lock, BunOptions options) {
         if (lock == null) {
             return new LoadResult(null, null);
         }
@@ -402,14 +384,10 @@ public final class BunLockRegenerator {
         }
     }
 
-    static PendingInstall installWithManager(Inputs inputs, @Nullable ManifestSource registry) {
-        return installWithManager(inputs, registry, new Log());
-    }
-
     /**
      * Up to the resolution of what the diff enqueued. A lock bun would ignore is not installed over.
      */
-    static PendingInstall installWithManager(Inputs inputs, @Nullable ManifestSource registry, Log log) {
+    private static PendingInstall installWithManager(Inputs inputs, ManifestSource registry, Log log) {
         BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
                 DotEnv.load(HostEnvironment.of(inputs.getEnv()), inputs.getFiles()));
         LoadResult loadResult = loadFromCwd(inputs.getLock(), options);
@@ -424,11 +402,9 @@ public final class BunLockRegenerator {
         PackageManager manager = new PackageManager(loaded != null ? loaded : new Lockfile(), options, log, manifests,
                 registry, inputs.getNow().toEpochMilli());
         boolean needsNewLockfile = !loadResult.isOk();
-        PackageDiff.Summary summary = null;
-        List<Integer> enqueued = new ArrayList<>();
         int packagesBefore = manager.lockfile.packages.size();
         if (!loadResult.isOk() && inputs.getLock() != null) {
-            return new PendingInstall(loadResult, manager, configVersion, true, null, enqueued, packagesBefore);
+            return new PendingInstall(loadResult, manager, configVersion, packagesBefore);
         }
 
         if (loadResult.isOk()) {
@@ -443,10 +419,10 @@ public final class BunLockRegenerator {
                 manager.registerAliases(lockfile, maybeRoot);
                 int[] mapping = new int[maybeRoot.dependenciesLen];
                 Arrays.fill(mapping, INVALID_PACKAGE_ID);
-                summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root, maybeRoot, mapping,
-                        manifests);
+                PackageDiff.Summary summary = PackageDiff.generate(options, log, manager.lockfile, lockfile, root,
+                        maybeRoot, mapping, manifests);
                 if (summary.hasDiffs()) {
-                    replaceRoot(manager, lockfile, maybeRoot, mapping, summary, enqueued);
+                    replaceRoot(manager, lockfile, maybeRoot, mapping, summary);
                 }
             }
         }
@@ -462,19 +438,15 @@ public final class BunLockRegenerator {
             manager.registerAliases(manager.lockfile, root);
             root = manager.lockfile.appendPackage(root);
             packagesBefore = manager.lockfile.packages.size();
-            for (int depId = root.dependenciesOff; depId < root.dependenciesEnd(); depId++) {
-                enqueued.add(depId);
-            }
             manager.enqueueDependencyList(root.dependenciesOff, root.dependenciesLen);
         } else {
             manager.drainDependencyList();
         }
-        return new PendingInstall(loadResult, manager, configVersion, needsNewLockfile, summary, enqueued,
-                packagesBefore);
+        return new PendingInstall(loadResult, manager, configVersion, packagesBefore);
     }
 
     private static void replaceRoot(PackageManager manager, Lockfile lockfile, Package maybeRoot, int[] mapping,
-                                    PackageDiff.Summary summary, List<Integer> enqueued) {
+                                    PackageDiff.Summary summary) {
         Lockfile managerLockfile = manager.lockfile;
         List<Dependency> newDependencies = new ArrayList<>(lockfile.dependenciesOf(maybeRoot));
         int off = managerLockfile.dependencies.size();
@@ -520,7 +492,6 @@ public final class BunLockRegenerator {
                 Dependency dependency = managerLockfile.dependencies.get(i);
                 if (allNameHashes.contains(dependency.nameHash)) {
                     managerLockfile.resolutions.set(i, INVALID_PACKAGE_ID);
-                    enqueued.add(i);
                     manager.enqueueDependencyWithMain(i, dependency, INVALID_PACKAGE_ID, false);
                 }
             }
@@ -531,7 +502,6 @@ public final class BunLockRegenerator {
                 Dependency dep = managerLockfile.dependencies.get(i);
                 if (dep.version.tag == DependencyVersion.Tag.CATALOG) {
                     managerLockfile.resolutions.set(i, INVALID_PACKAGE_ID);
-                    enqueued.add(i);
                     manager.enqueueDependencyWithMain(i, dep, INVALID_PACKAGE_ID, false);
                 }
             }
@@ -540,7 +510,6 @@ public final class BunLockRegenerator {
             for (int i = 0; i < mapping.length; i++) {
                 if (mapping[i] == INVALID_PACKAGE_ID) {
                     int dependencyId = off + i;
-                    enqueued.add(dependencyId);
                     manager.enqueueDependencyWithMain(dependencyId, managerLockfile.dependencies.get(dependencyId),
                             managerLockfile.resolutions.get(dependencyId), false);
                 }

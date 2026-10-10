@@ -18,6 +18,8 @@ package org.openrewrite.javascript.internal.lock.bun;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -32,6 +34,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class BunLockRoundTripTest {
 
+    private static final ManifestSource NO_REQUEST = (registry, name, extended) -> {
+        throw new AssertionError("bun resolves nothing on an install that changes nothing: " + name);
+    };
+
     static Stream<Arguments> locks() {
         List<Arguments> out = new ArrayList<>();
         for (BunScenarios.Scenario scenario : BunScenarios.discover()) {
@@ -42,39 +48,35 @@ class BunLockRoundTripTest {
         return out.stream();
     }
 
-    static BunLockRegenerator.PendingInstall install(BunScenarios.Lock lock) {
-        return BunLockRegenerator.installWithManager(BunLockRegenerator.Inputs.builder()
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("locks")
+    void writesBackWhatBunWrites(String name, BunScenarios.Lock lock) {
+        BunScenarios.Scenario scenario = lock.getScenario();
+        BunLockRegenerator.Inputs inputs = BunLockRegenerator.Inputs.builder()
           .lock(lock.getText())
           .manifests(lock.manifests())
           .npmrc(lock.npmrc())
           .bunfig(lock.bunfig())
+          .files(scenario.tree(lock.isBefore()))
+          .paths(scenario.paths(lock.isBefore(), lock.getText()))
           .env(Collections.emptyMap())
-          .now(lock.getScenario().now())
-          .build(), null);
-    }
-
-    @ParameterizedTest(name = "{0}")
-    @MethodSource("locks")
-    void writesBackWhatBunWrites(String name, BunScenarios.Lock lock) {
-        BunLockRegenerator.PendingInstall install = install(lock);
+          .now(scenario.now())
+          .build();
         String loadError = lock.loadError();
+        boolean resolves = loadError == null && lock.resolvesAgain();
+        Result result = new BunLockRegenerator(inputs, resolves ?
+          new BunScenarioTest.ScenarioRegistry(scenario) : NO_REQUEST).regenerate();
         if (loadError != null) {
-            TextLockfileReader.ParseError error = install.getLoadResult().getError();
-            assertThat(error).as("bun ignores the lock: " + loadError).isNotNull();
-            // bun prints a multi-line log entry under one "error:"; the recording keeps its first line
-            String firstLine = error.getMessage().split("\n", 2)[0];
-            assertThat(error.error + ": " + firstLine).isEqualTo(loadError);
-            return;
+            assertThat(result.getFailure()).as("bun ignores the lock: " + loadError).isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.DISCARDS_LOCK);
+            assertThat(result.getFailure().getDetail()).endsWith(": " + loadError);
+        } else if (lock.deletedAgain()) {
+            assertThat(result.getFailure()).as("bun deletes the lock").isNotNull();
+            assertThat(result.getFailure().getKind()).isEqualTo(Kind.DELETES_LOCK);
+        } else {
+            String rewritten = lock.rewritten();
+            assertThat(result.getErrorMessage()).isNull();
+            assertThat(result.getLockFileContent()).isEqualTo(rewritten != null ? rewritten : lock.getText());
         }
-        assertThat(install.getLoadResult().getError()).isNull();
-        if (lock.resolvesAgain()) {
-            assertThat(install.getEnqueued()).as("bun resolves on an install that changes nothing").isNotEmpty();
-            return;
-        }
-        assertThat(install.hasPendingWork()).as("dependencies left to resolve").isFalse();
-        assertThat(install.getEnqueued()).as("dependencies enqueued").isEmpty();
-        String rewritten = lock.rewritten();
-        String expected = lock.deletedAgain() ? null : rewritten != null ? rewritten : lock.getText();
-        assertThat(install.save()).isEqualTo(expected);
     }
 }

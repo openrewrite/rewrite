@@ -19,15 +19,16 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The recorded {@code dedupe-arrival-order} and {@code small-dedupe-arrival-existing} cases, where bun 1.3.10 wrote two
- * locks over repeated runs, and the shapes whose result {@code getPackageID} settles whatever the order.
+ * The arrival-order check: the recorded {@code dedupe-arrival-order} and {@code small-dedupe-arrival-existing}, where
+ * bun 1.3.10 wrote two locks over repeated runs, and the shapes {@code getPackageID} settles whatever the order.
  */
-class ManifestArrivalOrderTest {
+class PackageManagerTest {
 
     private static final String MS = "{\"name\":\"ms\",\"dist-tags\":{\"latest\":\"2.1.3\"},\"versions\":{" +
                                      version("2.0.0") + "," + version("2.1.1") + "," + version("2.1.3") + "}}";
@@ -41,8 +42,8 @@ class ManifestArrivalOrderTest {
     void onePickSatisfiesTheOtherRange() {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).containsExactly(
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).containsExactly(
           "manifest arrival order: ms for debug@2.6.9 (2.0.0) and humanize-ms@1.2.1 (^2.0.0) resolved in one install");
     }
 
@@ -50,16 +51,16 @@ class ManifestArrivalOrderTest {
     void samePick() {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "^2.0.0", "~2.1.0");
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).isEmpty();
     }
 
     @Test
     void neitherPickSatisfiesTheOtherRange() {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "2.1.3");
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).isEmpty();
     }
 
     @Test
@@ -67,8 +68,8 @@ class ManifestArrivalOrderTest {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
         append(lockfile, pkg("ms", "2.0.0"));
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).isEmpty();
     }
 
     @Test
@@ -76,8 +77,8 @@ class ManifestArrivalOrderTest {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "^2.1.3", "^2.0.0");
         append(lockfile, pkg("ms", "2.0.0"));
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).containsExactly(
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).containsExactly(
           "manifest arrival order: ms for debug@2.6.9 (^2.1.3) and humanize-ms@1.2.1 (^2.0.0) resolved in one install");
     }
 
@@ -86,8 +87,8 @@ class ManifestArrivalOrderTest {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
         append(lockfile, pkg("ms", "2.1.3"));
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).isEmpty();
     }
 
     @Test
@@ -96,8 +97,8 @@ class ManifestArrivalOrderTest {
         int debugMs = requirers(lockfile, "^2.1.3", "^2.0.0");
         int packagesBefore = lockfile.packages.size();
         append(lockfile, pkg("ms", "2.0.0"));
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, packagesBefore, resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(packagesBefore)).isEmpty();
     }
 
     @Test
@@ -105,8 +106,8 @@ class ManifestArrivalOrderTest {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
         lockfile.dependencies.get(debugMs + 1).behavior = Behavior.of(Behavior.PEER);
-        List<ManifestArrivalOrder.Resolved> resolved = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detect(lockfile, lockfile.packages.size(), resolved)).isEmpty();
+        PackageManager manager = firstPass(lockfile, debugMs, debugMs + 1);
+        assertThat(manager.manifestArrivalOrder(lockfile.packages.size())).isEmpty();
     }
 
     @Test
@@ -115,8 +116,8 @@ class ManifestArrivalOrderTest {
         int debugMs = requirers(lockfile, "2.0.0", "^2.0.0");
         lockfile.dependencies.get(debugMs).behavior = Behavior.of(Behavior.PEER);
         lockfile.dependencies.get(debugMs + 1).behavior = Behavior.of(Behavior.PEER);
-        List<ManifestArrivalOrder.Resolved> peers = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detectPeers(lockfile, peers)).containsExactly(
+        PackageManager manager = manager(lockfile);
+        assertThat(manager.peerArrivalOrder(resolved(lockfile, debugMs, debugMs + 1))).containsExactly(
           "manifest arrival order: peer ms for debug@2.6.9 (2.0.0) and humanize-ms@1.2.1 (^2.0.0) " +
           "installed in one install");
     }
@@ -125,8 +126,8 @@ class ManifestArrivalOrderTest {
     void peersOfANewNameWithOnePick() {
         Lockfile lockfile = new Lockfile();
         int debugMs = requirers(lockfile, "^2.1.0", "^2.0.0");
-        List<ManifestArrivalOrder.Resolved> peers = resolved(lockfile, debugMs, debugMs + 1);
-        assertThat(ManifestArrivalOrder.detectPeers(lockfile, peers)).isEmpty();
+        PackageManager manager = manager(lockfile);
+        assertThat(manager.peerArrivalOrder(resolved(lockfile, debugMs, debugMs + 1))).isEmpty();
     }
 
     private static int requirers(Lockfile lockfile, String debugRange, String humanizeRange) {
@@ -140,15 +141,28 @@ class ManifestArrivalOrderTest {
         return debug.dependenciesOff;
     }
 
-    private static List<ManifestArrivalOrder.Resolved> resolved(Lockfile lockfile, int... dependencyIds) {
+    private static PackageManager manager(Lockfile lockfile) {
+        return new PackageManager(lockfile, BunOptions.defaults(), new Log(), Collections.emptyMap(),
+          (registry, name, extended) -> {
+              throw new AssertionError("no packument is needed: " + name);
+          }, 0);
+    }
+
+    private static PackageManager firstPass(Lockfile lockfile, int... dependencyIds) {
+        PackageManager manager = manager(lockfile);
+        manager.firstPass.addAll(resolved(lockfile, dependencyIds));
+        return manager;
+    }
+
+    private static List<PackageManager.Resolved> resolved(Lockfile lockfile, int... dependencyIds) {
         PackageManifest manifest = PackageManifest.parse(new Log(), MS, "ms", false);
         assertThat(manifest).isNotNull();
-        List<ManifestArrivalOrder.Resolved> out = new ArrayList<>();
+        List<PackageManager.Resolved> out = new ArrayList<>();
         for (int dependencyId : dependencyIds) {
             DependencyVersion version = lockfile.dependencies.get(dependencyId).version;
             PackageManifest.FindResult pick = manifest.findBestVersion(version.npm().version);
             assertThat(pick).isNotNull();
-            out.add(new ManifestArrivalOrder.Resolved(dependencyId, version, manifest, pick));
+            out.add(new PackageManager.Resolved(dependencyId, version, manifest, pick));
         }
         return out;
     }
