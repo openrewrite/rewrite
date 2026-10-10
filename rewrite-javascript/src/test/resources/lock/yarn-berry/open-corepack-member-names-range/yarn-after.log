@@ -1,0 +1,1 @@
+Invalid package manager specification in package.json (yarn@^4.10.0); expected a semver version

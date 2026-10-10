@@ -33,7 +33,6 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -196,22 +195,13 @@ public final class YarnBerryLockRegenerator {
      * wrote to {@code .yarnrc.yml}, added to when this install migrates the lock.
      */
     String install(String lock, Map<String, Object> settings) {
-        if (lock.contains(MERGE_CONFLICT_START)) {
-            throw new CannotKnow("how Yarn repairs the lock's merge conflict (it asks git for each side)");
-        }
-        Manifest rootManifest;
-        try {
-            rootManifest = manifest("");
-        } catch (Js.SyntaxError e) {
-            throw Rejected.rejects(Reason.MALFORMED_MANIFEST, "Invalid package.json in package.json (corepack)");
-        }
-        if (rootManifest != null && rootManifest.packageManager != null) {
-            parseSpec(rootManifest.packageManager);
-        }
         YarnRelease release = release();
         if (options().getThirdPartyPlugin() != null) {
             throw new CannotKnow("what the plugin " + options().getThirdPartyPlugin() + " does to the lock (Yarn " +
                                  "runs its code)");
+        }
+        if (lock.contains(MERGE_CONFLICT_START)) {
+            throw new CannotKnow("how Yarn repairs the lock's merge conflict (it asks git for each side)");
         }
         Loaded loaded = load(release, settings);
         Project project = loaded.getProject();
@@ -257,41 +247,12 @@ public final class YarnBerryLockRegenerator {
     }
 
     /**
-     * corepack's {@code parseSpec} of the root manifest's {@code packageManager}, which corepack reads before it
-     * starts the release it names (corepack 0.35.0).
-     */
-    private static void parseSpec(String raw) {
-        int atIndex = raw.indexOf('@');
-        if (atIndex == -1 || atIndex == raw.length() - 1) {
-            throw corepackRejects("No version specified for " + raw + " in \"packageManager\" of package.json");
-        }
-        String name = raw.substring(0, atIndex);
-        String range = raw.substring(atIndex + 1);
-        boolean supported = "npm".equals(name) || "pnpm".equals(name) || "yarn".equals(name);
-        if (WhatwgUrl.tryParse(range) == null) {
-            if (!SemverUtils.valid(range)) {
-                throw corepackRejects("Invalid package manager specification in package.json (" + raw + "); " +
-                                      "expected a semver version");
-            }
-            if (!supported) {
-                throw corepackRejects("Unsupported package manager specification (" + raw + ")");
-            }
-        } else if (supported) {
-            throw corepackRejects("Illegal use of URL for known package manager. Instead, select a specific " +
-                                  "version, or set COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=1 in your environment (" + raw +
-                                  ")");
-        }
-    }
-
-    private static Rejected corepackRejects(String message) {
-        return Rejected.rejects(Reason.MALFORMED_MANIFEST, message + " (corepack)");
-    }
-
-    /**
-     * The release the project runs: {@code yarnPath}'s file unless {@code ignorePath}, else {@code packageManager};
-     * CannotKnow when neither names a version, the data lacks it, or it is later than the release ported.
+     * The release the project runs: {@code yarnPath}'s file unless {@code ignorePath}, else the {@code packageManager}
+     * corepack finds from where Yarn runs; CannotKnow when neither names a version, the data lacks it, or it is later
+     * than the release ported.
      */
     YarnRelease release() {
+        String packageManager = packageManager();
         BerryOptions options = options();
         Object yarnPath = options.get("yarnPath");
         String version;
@@ -301,8 +262,7 @@ public final class YarnBerryLockRegenerator {
                 throw new CannotKnow("the Yarn release " + Js.string(yarnPath) + " is (yarnPath names no version)");
             }
         } else {
-            Manifest rootManifest = manifest("");
-            version = BerryOptions.packageManagerVersion(rootManifest == null ? null : rootManifest.packageManager);
+            version = BerryOptions.packageManagerVersion(packageManager);
             if (version == null) {
                 throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no " +
                                      "yarnPath)");
@@ -441,13 +401,28 @@ public final class YarnBerryLockRegenerator {
         return options;
     }
 
-    private @Nullable Manifest manifest(String location) {
+    // what corepack reads before it starts the release it names
+    private @Nullable String packageManager() {
+        SpecUtils.Found found = SpecUtils.loadSpec(inputs.getRunsIn(), this::manifestText);
+        if (found == null) {
+            return null;
+        }
+        SpecUtils.parseSpec(found.getPackageManager(), found.getSource());
+        return (String) found.getPackageManager();
+    }
+
+    private @Nullable String manifestText(String location) {
         String text = inputs.getManifests().get(location);
+        String file = location.isEmpty() ? "package.json" : location + "/package.json";
+        if (text == null && inputs.getPaths() != null && inputs.getPaths().contains(file)) {
+            throw new CannotKnow(file + " (its contents were not read)");
+        }
+        return text;
+    }
+
+    private @Nullable Manifest manifest(String location) {
+        String text = manifestText(location);
         if (text == null) {
-            String file = location.isEmpty() ? "package.json" : location + "/package.json";
-            if (inputs.getPaths() != null && inputs.getPaths().contains(file)) {
-                throw new CannotKnow(file + " (its contents were not read)");
-            }
             return null;
         }
         Object parsed = manifests.computeIfAbsent(location, l -> {

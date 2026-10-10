@@ -1,0 +1,3 @@
+[31m[1mUsage Error[22m[39m: Unrecognized or legacy configuration settings found: catalog - run "yarn config -v" to see the list of settings supported in Yarn (in <tmp>/project/.yarnrc.yml)
+
+[1m$ [22myarn install [--json] [--immutable] [--immutable-cache] [--refresh-lockfile] [--check-cache] [--check-resolutions] [--inline-builds] [--mode #0]

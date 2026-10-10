@@ -1,0 +1,1 @@
+A member whose package.json names yarn@^4.10.0 (a range) under a root naming yarn@4.10.3 bumps is-number, Yarn run in the member: corepack's parseSpec rejects the member's packageManager, naming package.json from where Yarn runs.

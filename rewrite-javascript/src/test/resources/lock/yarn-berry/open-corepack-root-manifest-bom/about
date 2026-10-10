@@ -1,0 +1,1 @@
+The edit bumps ms in a root package.json that starts with a byte order mark, Yarn run at the root: corepack reads package.json with JSON.parse, which the mark fails, before Yarn starts.

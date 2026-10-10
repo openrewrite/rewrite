@@ -1,0 +1,1 @@
+A member whose package.json names yarn@4.10.3 under a root naming yarn@4.5.3 adds a catalog: dependency the edit adds to the root .yarnrc.yml, Yarn run in the member: corepack's loadSpec stops at the member's packageManager, so 4.10.3 runs and resolves the catalog.

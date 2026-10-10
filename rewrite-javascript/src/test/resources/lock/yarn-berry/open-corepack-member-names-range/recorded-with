@@ -1,0 +1,2 @@
+yarn 4.10.3 then Invalid package manager specification in package.json (yarn@^4.10.0); expected a semver version (corepack 0.35.0), node v24.19.0, Darwin x86_64 (node darwin-arm64), 2026-10-10
+before exit=0, after exit=1
