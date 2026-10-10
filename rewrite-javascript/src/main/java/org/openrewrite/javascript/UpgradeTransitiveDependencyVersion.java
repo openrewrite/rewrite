@@ -260,11 +260,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
             return ips.regenResult;
         }
-        PackageJsonOverrides override = overrideOf(acc, ctx, importer);
         NodeDependencyScan.ProjectState rootPs = acc.scan.projects.get(root);
-        if (override == null || rootPs == null || ips.capturedLockContent == null ||
-            !importer.equals(acc.scan.lockToPackage.get(lockPath)) ||
-            packageManager(rootPs.capturedPackageJson) != pm) {
+        if (rootPs == null || ips.capturedLockContent == null || packageManager(rootPs.capturedPackageJson) != pm ||
+            !importer.equals(acc.scan.lockToPackage.get(lockPath))) {
+            return null;
+        }
+        PackageJsonOverrides override = overrideOf(acc, ctx, importer);
+        if (override == null) {
             return null;
         }
         // pnpm writes a lock per project when the workspace does not share one, and each reads the root's overrides
