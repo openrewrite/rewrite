@@ -61,10 +61,10 @@
  * (Copyright (c) 2017-2023 Zoltan Kochan &lt;z@kochan.io&gt;); @pnpm/config.env-replace 4.1.0;
  * {@code SemverRangeIntersect}, semver-range-intersect 0.3.1 (Copyright (c) 2019 sounisi5011); {@code GraphCycles},
  * graph-cycles 3.0.0 and rotated-array-set 3.0.0 (Copyright (c) 2021 Gustaf Räntilä); {@code Tinyglobby},
- * tinyglobby 0.2.16 (Copyright (c) 2024 Madeline Gurriarán); {@code internal.lock.Picomatch}, {@code PicomatchParse}
- * and {@code PicomatchScan}, picomatch 4.0.4 (Copyright (c) 2017-present, Jon Schlinkert); and the {@code parseRange}
- * of semver-utils 1.1.4 (Copyright 2013 AJ ONeal, offered under the MIT License or Apache-2.0, used here under the
- * MIT License).
+ * tinyglobby 0.2.16 (Copyright (c) 2024 Madeline Gurriarán); {@code Picomatch}, {@code PicomatchParse} and
+ * {@code PicomatchScan}, picomatch 4.0.4 (Copyright (c) 2017-present, Jon Schlinkert); and the {@code parseRange} of
+ * semver-utils 1.1.4
+ * (Copyright 2013 AJ ONeal, offered under the MIT License or Apache-2.0, used here under the MIT License).
  * <p>
  * {@code ParseOverrides} ports the name check of validate-npm-package-name 7.0.2 (Copyright (c) 2015, npm, Inc), and
  * {@code ProjectsGraph} parts of @pnpm/npm-package-arg 2.0.0 (Copyright (c) Isaac Z. Schlueter) and of

@@ -42,8 +42,7 @@ final class PnpmInputs {
 
     // a pnpmfile only by its path: pnpm runs it, which the engine cannot
     static boolean reads(String fileName) {
-        return WORKSPACE_MANIFEST.equals(fileName) || ".npmrc".equals(fileName) || fileName.endsWith(".patch") ||
-               "package.yaml".equals(fileName) || "package.json5".equals(fileName);
+        return WORKSPACE_MANIFEST.equals(fileName) || ".npmrc".equals(fileName) || fileName.endsWith(".patch");
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {

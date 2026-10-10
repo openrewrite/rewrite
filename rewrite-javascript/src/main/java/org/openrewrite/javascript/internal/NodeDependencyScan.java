@@ -128,6 +128,20 @@ public final class NodeDependencyScan {
         return regeneration == null ? readAwayFromLock(name) : regeneration.reads(name);
     }
 
+    // a member's manifest in another format than package.json, kept under the project as a patch is
+    private static boolean readAsManifest(@Nullable LockFileRegeneration regeneration, Path file) {
+        String name = String.valueOf(file.getFileName());
+        if (regeneration != null) {
+            return regeneration.readsAsManifest(name);
+        }
+        for (LockFileRegeneration any : LockFileRegeneration.ALL) {
+            if (any.readsAsManifest(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public static final class ProjectState {
         public @Nullable SourceFile capturedPackageJson;
         public @Nullable String capturedLockContent;
@@ -311,7 +325,8 @@ public final class NodeDependencyScan {
                 continue;
             }
             if (directories.contains(dir) || above(dir, directories) ||
-                (file.getKey().toString().endsWith(".patch") || isManifest(file.getKey())) && under(dir, directories)) {
+                (file.getKey().toString().endsWith(".patch") || readAsManifest(regeneration, file.getKey())) &&
+                under(dir, directories)) {
                 files.put(file.getKey(), file.getValue());
             }
         }
@@ -344,12 +359,6 @@ public final class NodeDependencyScan {
             }
         }
         return new ProjectFiles(manifests, files, paths);
-    }
-
-    // a workspace member's manifest in another format than package.json, which the scan keeps as it keeps a patch
-    private static boolean isManifest(Path file) {
-        String name = String.valueOf(file.getFileName());
-        return "package.yaml".equals(name) || "package.json5".equals(name);
     }
 
     private static Path directory(Path file) {

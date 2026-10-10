@@ -295,6 +295,10 @@ final class YarnClassicScenarios {
         return LockScenario.discover(FAMILY, YarnClassicScenarios::isScenario, Scenario::new);
     }
 
+    static String read(Path path) {
+        return LockScenario.read(path);
+    }
+
     private static boolean isScenario(Path dir) {
         for (String lock : LOCKS) {
             if (Files.isRegularFile(dir.resolve(lock))) {

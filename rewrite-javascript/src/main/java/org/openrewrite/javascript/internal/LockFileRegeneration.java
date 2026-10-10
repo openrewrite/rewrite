@@ -47,7 +47,8 @@ public final class LockFileRegeneration {
             "n.lock");
     public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lo" +
             "ck");
-    public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
+    public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml",
+            "package.yaml", "package.json5");
     public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
     public static final List<LockFileRegeneration> ALL = unmodifiableList(asList(NPM, YARN_CLASSIC, YARN_BERRY, PNPM,
             BUN));
@@ -237,10 +238,12 @@ public final class LockFileRegeneration {
 
     private final PackageManager pm;
     private final String lockFile;
+    private final List<String> otherManifests;
 
-    private LockFileRegeneration(PackageManager pm, String lockFile) {
+    private LockFileRegeneration(PackageManager pm, String lockFile, String... otherManifests) {
         this.pm = pm;
         this.lockFile = lockFile;
+        this.otherManifests = asList(otherManifests);
     }
 
     public String getLockFile() {
@@ -251,7 +254,14 @@ public final class LockFileRegeneration {
      * Whether the package manager reads the contents of a project file of this name.
      */
     public boolean reads(String fileName) {
-        return NativeLockEngine.reads(pm, fileName);
+        return readsAsManifest(fileName) || NativeLockEngine.reads(pm, fileName);
+    }
+
+    /**
+     * Whether it reads a project's manifest from a file of this name, as it reads a package.json.
+     */
+    public boolean readsAsManifest(String fileName) {
+        return otherManifests.contains(fileName);
     }
 
     /**
