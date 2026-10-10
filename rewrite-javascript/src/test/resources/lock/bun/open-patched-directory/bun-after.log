@@ -1,0 +1,3 @@
+bun install v1.3.10 (30e609e0)
+Resolving dependencies
+error: failed to read from patch file: EISDIR: Is a directory (pread()) (<tmp>/proj/patches/ms)

@@ -61,6 +61,10 @@ class BunScenarioTest extends LockScenarioTest {
             super(scenario);
         }
 
+        BunScenarios.Scenario recording() {
+            return scenario;
+        }
+
         @Override
         public @Nullable String packument(String registry, String name, boolean extended) {
             String file = extended ? name + "@full" : name;
@@ -90,6 +94,7 @@ class BunScenarioTest extends LockScenarioTest {
           .files(scenario.tree(false))
           .paths(scenario.paths(false, before))
           .runsIn(scenario.runDir())
+          .host(scenario.host())
           .parentManifests(scenario.parentManifests())
           .env(Collections.emptyMap())
           .now(scenario.now())
@@ -121,10 +126,31 @@ class BunScenarioTest extends LockScenarioTest {
                 return failure.getKind() == (expect.getKind().equals("pm-rejects") ? Kind.PM_REJECTS : Kind.PM_FAILS) &&
                        failure.getDetail().contains(rest.replaceFirst("^error: ", "")) && http.missing.isEmpty();
             case "second-install-rejects":
+                return failure.getKind() == Kind.SECOND_INSTALL && rewritesAsBunDid(failure, (ScenarioRegistry) http);
             case "unstable":
                 return failure.getKind() == Kind.SECOND_INSTALL;
             default:
                 return false;
         }
+    }
+
+    // with bun's after and its own rewrite of it recorded, the second install over the lock written rewrites as bun did
+    private static boolean rewritesAsBunDid(Failure failure, ScenarioRegistry http) {
+        String after = http.recording().file("after");
+        String again = http.recording().file("again");
+        if (after == null || again == null) {
+            return true;
+        }
+        String[] a = after.split("\n", -1);
+        String[] b = again.split("\n", -1);
+        for (int i = 0; i < Math.max(a.length, b.length); i++) {
+            String x = i < a.length ? a[i] : "";
+            String y = i < b.length ? b[i] : "";
+            if (!x.equals(y)) {
+                return failure.getDetail().endsWith(" would rewrite it: line " + (i + 1) + " \"" + x.trim() +
+                                                    "\" becomes \"" + y.trim() + "\"");
+            }
+        }
+        return false;
     }
 }

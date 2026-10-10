@@ -1,0 +1,1 @@
+{"name":"p","version":"1.0.0","dependencies":{"ms":"2.1.3"},"patchedDependencies":{"ms@2.1.3":"patches/ms"}}

@@ -1,0 +1,1 @@
+A dependency file:lib\\x (a backslash) with lib/x/package.json present: whether bun on POSIX reads the backslash as a separator.

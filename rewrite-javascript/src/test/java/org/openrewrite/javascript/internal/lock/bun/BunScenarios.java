@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
@@ -45,6 +46,7 @@ final class BunScenarios {
     private static final Pattern LOAD_ERROR = Pattern.compile("(?m)^error: (.*)$");
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
+    private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
 
     private BunScenarios() {
     }
@@ -166,6 +168,20 @@ final class BunScenarios {
         }
 
         /**
+         * The platform bun ran on, as the open-question recorder writes it ({@code platform os=<os> cpu=<cpu>
+         * libc=<libc>}), else unknown.
+         */
+        Host host() {
+            String recorded = file("recorded-with");
+            Matcher platform = recorded == null ? null : PLATFORM.matcher(recorded);
+            if (platform == null || !platform.find()) {
+                return Host.UNKNOWN;
+            }
+            return Host.builder().os(platform.group(1)).cpu(platform.group(2))
+                    .libc(platform.group(3).isEmpty() ? null : platform.group(3)).build();
+        }
+
+        /**
          * Every lock bun wrote or was given: {@code before}, {@code after}, {@code fresh}, and what bun rewrote each
          * to on an install that changes nothing ({@code <lock>-again}, {@code again}).
          */
@@ -249,6 +265,20 @@ final class BunScenarios {
                 }
             }
             return parents;
+        }
+
+        /**
+         * The files of {@code above/} by path relative to the lock's directory ({@code ../../patches/x.patch}).
+         */
+        Map<String, String> filesAbove() {
+            Map<String, String> out = new TreeMap<>();
+            String lockDir = file("lock-dir");
+            if (lockDir != null) {
+                for (Map.Entry<String, String> file : tree("above").entrySet()) {
+                    out.put(RootRelativePath.relative(lockDir.trim(), file.getKey()), file.getValue());
+                }
+            }
+            return out;
         }
 
         @Nullable

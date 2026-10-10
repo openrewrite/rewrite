@@ -1,0 +1,1 @@
+A bun.lock in packages/a whose patchedDependencies names ../../patches/ms@2.1.3.patch, above the lock's directory: whether bun reads it.

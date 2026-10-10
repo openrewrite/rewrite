@@ -1,0 +1,9 @@
+bun install v1.3.10 (30e609e0)
+Resolving dependencies
+error: Couldn't find patch file: 'patches\ms@2.1.3.patch'
+
+To create a new patch file run:
+
+  bun patch patches\ms@2.1.3.patch
+exit=1
+lock unchanged (over before: the edit failed)

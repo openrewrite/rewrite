@@ -342,11 +342,15 @@ public final class BunLockRegenerator {
             }
         }
         for (String patch : lockfile.patchedDependencies.values()) {
-            String path = RootRelativePath.normalize(patch.replace('\\', '/'));
+            String path = RootRelativePath.normalize(separated(patch, inputs.getHost()));
             String contents = files.get(path);
             if (contents == null) {
-                if (paths == null || paths.contains(path) || path.equals("..") || path.startsWith("../")) {
+                if (paths == null || paths.contains(path) || RootRelativePath.climbsAboveRoot(path)) {
                     throw new CannotKnow("patch file " + patch + " (its contents were not read)");
+                }
+                if (holdsBelow(path, paths, files.keySet())) {
+                    throw Rejected.rejects(Reason.RESOLUTION_REQUIRED,
+                            "failed to read from patch file: EISDIR: Is a directory (pread()) (" + path + ")");
                 }
                 throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Couldn't find patch file: '" + patch + "'");
             }
@@ -355,6 +359,27 @@ public final class BunLockRegenerator {
                         "patchfile " + path + " is empty, please restore or delete it.");
             }
         }
+    }
+
+    // joinZBuf(.auto) keeps a backslash on POSIX, as recorded; on Windows it separates, which no recording shows
+    private static String separated(String patch, Host host) {
+        if (patch.indexOf('\\') >= 0 && (host.getOs() == null || "win32".equals(host.getOs()))) {
+            throw new CannotKnow("patch file " + patch + " (bun on Windows reads its backslash as a separator, and " +
+                                 "the host is not known to be another platform)");
+        }
+        return patch;
+    }
+
+    // a held path below it makes the patch path a directory, which stat accepts and pread refuses
+    private static boolean holdsBelow(String dir, Set<String> paths, Set<String> files) {
+        for (Set<String> held : Arrays.asList(paths, files)) {
+            for (String path : held) {
+                if (dir.isEmpty() || path.startsWith(dir + "/")) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static Reason reasonFor(List<String> errors) {

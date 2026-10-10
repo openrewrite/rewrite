@@ -1,0 +1,5 @@
+bun install v1.3.10 (30e609e0)
+1 | {"name":"root","private":true,"workspaces":["packages\\*"],"dependencies":{"ms":"2.1.3"}}
+                                                ^
+error: Workspace not found "packages\*"
+    at <tmp>/fresh/package.json:1:45

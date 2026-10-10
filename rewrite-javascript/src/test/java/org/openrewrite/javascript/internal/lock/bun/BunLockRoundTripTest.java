@@ -60,6 +60,7 @@ class BunLockRoundTripTest {
           .npmrc(lock.npmrc())
           .bunfig(lock.bunfig())
           .files(patches(scenario.tree(lock.isBefore())))
+          .files(lock.isBefore() ? Collections.emptyMap() : patches(scenario.filesAbove()))
           .runsIn(lock.isBefore() ? "" : scenario.runDir())
           .parentManifests(lock.isBefore() ? Collections.emptyMap() : scenario.parentManifests())
           .env(Collections.emptyMap())

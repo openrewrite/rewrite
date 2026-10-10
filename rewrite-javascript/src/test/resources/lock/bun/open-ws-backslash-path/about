@@ -1,0 +1,1 @@
+workspaces ["packages\\a"] (a backslash, no glob) with packages/a present: whether bun on POSIX finds the member.
