@@ -54,7 +54,7 @@ public final class HostRegistries {
      */
     public static NodeResolutionResult userMarker(String npmrc) {
         Map<String, String> properties = new LinkedHashMap<>();
-        for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
+        for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc, Ini.Release.V6_0_0).entrySet()) {
             properties.put(entry.getKey(), String.valueOf(entry.getValue()));
         }
         return nodeResolutionResult(PackageManager.Npm)
