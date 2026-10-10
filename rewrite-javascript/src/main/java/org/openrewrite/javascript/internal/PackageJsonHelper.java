@@ -95,7 +95,7 @@ public class PackageJsonHelper {
     }
 
     /**
-     * A recipe's edits of the package-manager files beside the manifests, such as pnpm-workspace.yaml or .yarnrc.yml.
+     * A recipe's edits of the manifests and the package-manager files beside them, such as pnpm-workspace.yaml.
      */
     @FunctionalInterface
     public interface FileEditor {
@@ -116,7 +116,7 @@ public class PackageJsonHelper {
     }
 
     /**
-     * Add {@code editor} to this cycle's editors of package-manager files, after those added before it.
+     * Add {@code editor} to this cycle's editors of manifests and package-manager files, after those added before it.
      */
     public static void addFileEditor(ExecutionContext ctx, FileEditor editor) {
         List<FileEditor> editors = fileEditors(ctx);
