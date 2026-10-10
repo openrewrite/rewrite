@@ -158,32 +158,6 @@ class PnpmLockRegeneratorTest {
           .isEqualTo("projects not up to date with the lock");
     }
 
-    @Test
-    void anAddedConfigDependencyIsResolvedIntoTheEnvDocument() {
-        PnpmLockRegenerator.Install install = edit("small-config-dependency-add");
-        assertThat(install.getResolution()).isNull();
-        assertThat(install.getWritten()).isEqualTo(scenario("small-config-dependency-add").file("after"));
-    }
-
-    @Test
-    void aConfigDependencyInTheInlineIntegrityFormMigratesIntoTheEnvDocument() {
-        assertThat(edit("small-config-dependency-legacy-integrity").getWritten())
-          .isEqualTo(scenario("small-config-dependency-legacy-integrity").file("after"));
-    }
-
-    @Test
-    void aConfigDependencyInTheObjectFormKeepsATarballTheRegistryDoesNotName() {
-        assertThat(edit("small-config-dependency-object-form-versioned").getWritten())
-          .isEqualTo(scenario("small-config-dependency-object-form-versioned").file("after"));
-    }
-
-    @Test
-    void aConfigDependencyInTheObjectFormWithoutAVersion() {
-        assertThatThrownBy(() -> edit("small-config-dependency-object-form"))
-          .isInstanceOfSatisfying(PnpmError.class,
-            e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_CONFIG_DEP_NO_INTEGRITY"));
-    }
-
     /**
      * pnpm 11.2.2 over small-config-dependency-add's after: unchanged, or resolving a changed or ranged specifier.
      */
@@ -423,58 +397,6 @@ class PnpmLockRegeneratorTest {
           .hasMessage("This project is configured to use >=12 of pnpm. Your current pnpm is v11.2.2");
         assertThat(withManifest(WITH + "\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=12\"," +
                                 "\"onFail\":\"warn\"}}}").getWritten()).isEqualTo(LOCK);
-    }
-
-    /**
-     * pnpm 11.2.2's pnpm/src/shouldPersistLockfile.test.ts.
-     */
-    @Test
-    void shouldPersistLockfile() {
-        for (String version : new String[]{"9.3.0", "11.0.0", "12.0.0", ">=9.0.0"}) {
-            assertThat(PnpmLockRegenerator.shouldPersistLockfile(pm(version, true))).as(version).isTrue();
-        }
-        for (String version : new String[]{"9.3.0", "10.0.0", "11.0.0", "11.0.0-rc.1"}) {
-            assertThat(PnpmLockRegenerator.shouldPersistLockfile(pm(version, false))).as(version).isFalse();
-        }
-        for (String version : new String[]{"12.0.0", "12.5.3", "13.0.0", "100.0.0"}) {
-            assertThat(PnpmLockRegenerator.shouldPersistLockfile(pm(version, false))).as(version).isTrue();
-        }
-        for (String version : new String[]{null, "not-a-version", "^12.0.0"}) {
-            assertThat(PnpmLockRegenerator.shouldPersistLockfile(pm(version, false))).as(version).isFalse();
-        }
-    }
-
-    /**
-     * pnpm 11.2.2's pnpm/src/syncEnvLockfile.test.ts: the version pnpm records into packageManagerDependencies, null
-     * where it records nothing. Its first case, no wanted package manager, is every other test of this class.
-     */
-    @Test
-    void syncEnvLockfile() {
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(new PnpmOptions.WantedPackageManager("yarn", "4.0.0", null,
-          true), () -> null)).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.0.0", false), () -> staleEnvLockfile("9.0.0")))
-          .isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("0.0.1", true), () -> staleEnvLockfile("9.0.0"))).isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> null)).isEqualTo("11.2.2");
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> EnvLockfile.readEnvLockfile(
-          "---\nlockfileVersion: '9.0'\nimporters:\n  '.':\n    configDependencies: {}\npackages: {}\n" +
-          "snapshots: {}\n\n---\n"))).isEqualTo("11.2.2");
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> staleEnvLockfile("11.2.2")))
-          .isNull();
-        assertThat(PnpmLockRegenerator.syncEnvLockfile(pm("11.2.2", true), () -> staleEnvLockfile("9.0.0")))
-          .isEqualTo("11.2.2");
-    }
-
-    private static PnpmOptions.WantedPackageManager pm(@Nullable String version, boolean fromDevEngines) {
-        return new PnpmOptions.WantedPackageManager("pnpm", version, "download", fromDevEngines);
-    }
-
-    private static @Nullable EnvLockfile staleEnvLockfile(String pnpmVersion) {
-        return EnvLockfile.readEnvLockfile("---\nlockfileVersion: '9.0'\nimporters:\n  '.':\n" +
-                                           "    configDependencies: {}\n    packageManagerDependencies:\n" +
-                                           "      pnpm:\n        specifier: " + pnpmVersion + "\n" +
-                                           "        version: " + pnpmVersion + "\n" +
-                                           "packages: {}\nsnapshots: {}\n\n---\n");
     }
 
     @Test

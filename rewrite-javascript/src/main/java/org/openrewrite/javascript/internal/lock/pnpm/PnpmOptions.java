@@ -21,6 +21,7 @@ import lombok.With;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Ini;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -1027,5 +1028,209 @@ final class PnpmOptions {
     double getLinkWorkspacePackagesDepth() {
         Object link = config.get("linkWorkspacePackages");
         return "deep".equals(link) ? Double.POSITIVE_INFINITY : Js.truthy(link) ? 0 : -1;
+    }
+
+    /**
+     * config.lockfileDir, from the directory pnpm runs in: pnpm-workspace.yaml's (here only that directory), else the
+     * workspace's when it shares one lock; null when each project installs into its own.
+     */
+    @Nullable
+    String getLockfileDir(String dir) {
+        Object lockfileDir = config.get("lockfileDir");
+        if (!Js.truthy(lockfileDir)) {
+            return isTrue("sharedWorkspaceLockfile") ? "" : null;
+        }
+        if (!(lockfileDir instanceof String)) {
+            throw new CannotKnow("what pnpm makes of lockfileDir (" + Js.typeOf(lockfileDir) +
+                                 ", where pnpm reads a path)");
+        }
+        String path = (String) lockfileDir;
+        if (path.startsWith("/") || path.matches("^[A-Za-z]:.*") ||
+            !RootRelativePath.join(dir, path).equals(dir)) {
+            throw new CannotKnow("the lock pnpm writes in lockfileDir " + path + " (a path from the directory " +
+                                 "pnpm runs in, here " + (dir.isEmpty() ? "the root" : dir) + ")");
+        }
+        return dir;
+    }
+
+    /**
+     * extendInstallOptions' tag, the dist-tag a bare specifier resolves to.
+     */
+    String getTag() {
+        Object tag = config.get("tag");
+        if (tag == null || tag == JsYaml.UNDEFINED) {
+            return "latest";
+        }
+        if (!(tag instanceof String) || ((String) tag).isEmpty()) {
+            throw new CannotKnow("what pnpm makes of tag (" + Js.jsonStringify(tag) + ", where pnpm reads a dist-tag)");
+        }
+        return (String) tag;
+    }
+
+    /**
+     * The install command's getFetchFullMetadata.ts: {@code supportedArchitectures.libc && true}.
+     */
+    @Nullable
+    Object getFetchFullMetadata() {
+        Map<String, @Nullable Object> supportedArchitectures = getSupportedArchitectures();
+        Object libc = supportedArchitectures == null ? null : supportedArchitectures.get("libc");
+        return Js.truthy(libc) ? Boolean.TRUE : libc;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    Map<String, @Nullable Object> getSupportedArchitectures() {
+        Object supportedArchitectures = config.get("supportedArchitectures");
+        return supportedArchitectures instanceof Map ? (Map<String, @Nullable Object>) supportedArchitectures : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    Map<String, @Nullable Object> getNodeDownloadMirrors() {
+        Object mirrors = config.get("nodeDownloadMirrors");
+        return mirrors instanceof Map ? (Map<String, @Nullable Object>) mirrors : null;
+    }
+
+    /**
+     * The nodeVersion setting in whatever type pnpm-workspace.yaml gives it; null for the host's Node.js.
+     */
+    @Nullable
+    Object getNodeVersion() {
+        Object nodeVersion = config.get("nodeVersion");
+        return nodeVersion == JsYaml.UNDEFINED ? null : nodeVersion;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    Map<String, @Nullable Object> getNamedRegistries() {
+        Object value = config.get("namedRegistries");
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(value instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of namedRegistries (" + Js.typeOf(value) +
+                                 ", where pnpm reads an object)");
+        }
+        return (Map<String, @Nullable Object>) value;
+    }
+
+    List<String> getNamedRegistryPrefixes() {
+        List<String> namedRegistryPrefixes = new ArrayList<>();
+        namedRegistryPrefixes.add("gh:");
+        Object named = config.get("namedRegistries");
+        if (named instanceof Map) {
+            for (Object key : ((Map<?, ?>) named).keySet()) {
+                if (!"gh".equals(key)) {
+                    namedRegistryPrefixes.add(key + ":");
+                }
+            }
+        }
+        return namedRegistryPrefixes;
+    }
+
+    @Nullable
+    Double getNumber(String name) {
+        Object value = config.get(name);
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(value instanceof Number)) {
+            throw new CannotKnow("what pnpm makes of " + name + " (" + Js.typeOf(value) +
+                                 ", where pnpm reads a number)");
+        }
+        return ((Number) value).doubleValue();
+    }
+
+    @Nullable
+    List<String> getStrings(String name) {
+        return strings(config.get(name), name);
+    }
+
+    private static @Nullable List<String> strings(@Nullable Object value, String name) {
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        List<String> out = new ArrayList<>();
+        if (value instanceof String) {
+            // for...of over a string: its code points
+            ((String) value).codePoints().forEach(c -> out.add(new String(Character.toChars(c))));
+            return out;
+        }
+        if (!(value instanceof List)) {
+            throw new CannotKnow("what pnpm makes of " + name + " (" + Js.typeOf(value) +
+                                 ", where pnpm reads an array)");
+        }
+        for (Object item : (List<?>) value) {
+            if (!(item instanceof String)) {
+                throw new CannotKnow("what pnpm makes of " + name + " (an item that is not a string)");
+            }
+            out.add((String) item);
+        }
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    List<@Nullable Object> getIgnoredOptionalDependencies() {
+        Object value = config.get("ignoredOptionalDependencies");
+        if (value == null || value == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(value instanceof List)) {
+            throw new CannotKnow("what pnpm makes of ignoredOptionalDependencies (" + Js.typeOf(value) +
+                                 ", where pnpm reads an array)");
+        }
+        return (List<@Nullable Object>) value;
+    }
+
+    @SuppressWarnings("unchecked")
+    ReportPeerDependencyIssues.@Nullable PeerDependencyRules getPeerDependencyRules() {
+        Object rules = config.get("peerDependencyRules");
+        if (rules == null || rules == JsYaml.UNDEFINED) {
+            return null;
+        }
+        if (!(rules instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of peerDependencyRules (" + Js.typeOf(rules) +
+                                 ", where pnpm reads an object)");
+        }
+        Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) rules;
+        Map<String, String> allowedVersions = null;
+        Object allowed = map.get("allowedVersions");
+        if (allowed != null && allowed != JsYaml.UNDEFINED) {
+            if (!(allowed instanceof Map)) {
+                throw new CannotKnow("what pnpm makes of peerDependencyRules.allowedVersions (" + Js.typeOf(allowed) +
+                                     ", where pnpm reads an object)");
+            }
+            allowedVersions = new LinkedHashMap<>();
+            for (String key : Js.keys((Map<String, @Nullable Object>) allowed)) {
+                Object range = ((Map<String, @Nullable Object>) allowed).get(key);
+                if (!(range instanceof String)) {
+                    throw new CannotKnow("what pnpm makes of peerDependencyRules.allowedVersions." + key + " (" +
+                                         Js.typeOf(range) + ", where pnpm reads a string)");
+                }
+                allowedVersions.put(key, (String) range);
+            }
+        }
+        return new ReportPeerDependencyIssues.PeerDependencyRules(
+                strings(map.get("ignoreMissing"), "peerDependencyRules.ignoreMissing"),
+                strings(map.get("allowAny"), "peerDependencyRules.allowAny"), allowedVersions);
+    }
+
+    /**
+     * The settings object pnpm sets on the lock, in its key order.
+     */
+    Map<String, @Nullable Object> getLockfileSettings() {
+        Map<String, @Nullable Object> settings = new LinkedHashMap<>();
+        settings.put("autoInstallPeers", undefinedIfAbsent(config.get("autoInstallPeers")));
+        Object dedupePeers = config.get("dedupePeers");
+        settings.put("dedupePeers", Js.truthy(dedupePeers) ? dedupePeers : JsYaml.UNDEFINED);
+        settings.put("excludeLinksFromLockfile", undefinedIfAbsent(config.get("excludeLinksFromLockfile")));
+        settings.put("peersSuffixMaxLength", undefinedIfAbsent(config.get("peersSuffixMaxLength")));
+        settings.put("injectWorkspacePackages", undefinedIfAbsent(config.get("injectWorkspacePackages")));
+        return settings;
+    }
+
+    private static Object undefinedIfAbsent(@Nullable Object value) {
+        return value == null ? JsYaml.UNDEFINED : value;
     }
 }

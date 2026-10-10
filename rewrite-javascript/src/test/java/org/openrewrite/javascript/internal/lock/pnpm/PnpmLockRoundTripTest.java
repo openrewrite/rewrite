@@ -123,7 +123,7 @@ class PnpmLockRoundTripTest {
                            (log.contains("Progress: resolved") || log.contains("Merge conflict detected"));
         if (resolves) {
             assertThat(install.getResolution()).as("pnpm resolves on this install").isNotNull();
-            if (!install.isLockfileHadConflicts()) {
+            if (!install.getCtx().isLockfileHadConflicts()) {
                 assertModelRoundTrip(lock);
             }
             return;
@@ -186,10 +186,11 @@ class PnpmLockRoundTripTest {
 
     // nothing for pnpm to resolve: no package in the lock and no dependency in any project
     private static boolean nothingToResolve(PnpmLockRegenerator.Install install) {
-        if (install.getWantedLockfile().getPackages() != null && !install.getWantedLockfile().getPackages().isEmpty()) {
+        Map<String, PackageSnapshot> packages = install.getCtx().getWantedLockfile().getPackages();
+        if (packages != null && !packages.isEmpty()) {
             return false;
         }
-        for (Verification.Project project : install.getProjects()) {
+        for (Verification.Project project : install.getCtx().getProjects()) {
             for (String field : new String[]{"dependencies", "devDependencies", "optionalDependencies",
               "peerDependencies"}) {
                 if (!Verification.field(project.getManifest(), field).isEmpty()) {

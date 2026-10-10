@@ -38,6 +38,58 @@ final class EnvLockfile {
         this.document = document;
     }
 
+    /**
+     * The pnpm-lock.yaml an install reads and writes: its env document parsed at the first read, then what each
+     * {@code writeEnvLockfile} leaves.
+     */
+    static final class OnDisk {
+        private final @Nullable String text;
+        private @Nullable String envDocument;
+        private boolean envWritten;
+        private boolean read;
+        private @Nullable EnvLockfile envLockfile;
+
+        OnDisk(@Nullable String text) {
+            this.text = text;
+            this.envDocument = LockfileReader.readFirstYamlDocument(text);
+        }
+
+        @Nullable
+        EnvLockfile readEnvLockfile() {
+            if (!read) {
+                envLockfile = parse(envDocument);
+                read = true;
+            }
+            return envLockfile;
+        }
+
+        void writeEnvLockfile(EnvLockfile lockfile) {
+            envDocument = LockfileWriter.lockfileYamlDump(SortLockfileKeys.sortLockfileKeys(lockfile.document));
+            envWritten = true;
+            envLockfile = lockfile;
+            read = true;
+        }
+
+        /**
+         * The file as it is now; null when there is none.
+         */
+        @Nullable
+        String text() {
+            if (!envWritten) {
+                return text;
+            }
+            return LockfileReader.YAML_DOCUMENT_START + envDocument + LockfileReader.YAML_DOCUMENT_SEPARATOR +
+                   (text == null ? "" : LockfileReader.extractMainDocument(text));
+        }
+
+        /**
+         * {@code writeWantedLockfile}: the file with {@code wantedLockfile} as its main document.
+         */
+        String writeWantedLockfile(LockfileObject wantedLockfile) {
+            return LockfileWriter.writeWantedLockfile(wantedLockfile, text());
+        }
+    }
+
     static EnvLockfile createEnvLockfile() {
         Map<String, @Nullable Object> document = new LinkedHashMap<>();
         document.put("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
@@ -54,9 +106,12 @@ final class EnvLockfile {
     /**
      * {@code readEnvLockfile} of the file's text: null without an env document or with one of another shape.
      */
-    @SuppressWarnings("unchecked")
     static @Nullable EnvLockfile readEnvLockfile(@Nullable String lockText) {
-        String rawContent = LockfileReader.readFirstYamlDocument(lockText);
+        return parse(LockfileReader.readFirstYamlDocument(lockText));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable EnvLockfile parse(@Nullable String rawContent) {
         if (rawContent == null) {
             return null;
         }
