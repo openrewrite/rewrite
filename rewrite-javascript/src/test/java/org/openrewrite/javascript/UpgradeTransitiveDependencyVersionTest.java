@@ -79,6 +79,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void npmPathWhoseParentIsNotInTheTree() {
+        golden("npm/override-recipe-path-parent-absent", PackageManager.Npm, "^7.0.0", "a>is-odd");
+    }
+
+    @Test
     void npmBesideAnOverrideAlreadyPresent() {
         golden("npm/override-recipe-global-noop", PackageManager.Npm, "^6.0.0", null);
     }
