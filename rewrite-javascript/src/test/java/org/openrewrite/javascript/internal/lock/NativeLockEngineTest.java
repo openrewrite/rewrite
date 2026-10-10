@@ -223,8 +223,6 @@ class NativeLockEngineTest {
     void yarnClassicRegeneratesFromTheRegistryItsConfigNames() {
         String scenario = "lock/yarn-classic/small-registry-yarnrc-npmjs/";
         routes.put("https://registry.npmjs.org/which-module", resource(scenario + "http/which-module"));
-        binaryRoutes.put("https://registry.npmjs.org/which-module/-/which-module-2.0.1.tgz",
-                bytes(scenario + "http/which-module-2.0.1.tgz"));
 
         Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, Request.builder()
                 .packageJson(resource(scenario + "pkg"))
@@ -249,8 +247,6 @@ class NativeLockEngineTest {
                         resource(scenario + "tree-before/packages/b/package.json"))
                 .build();
         routes.put("https://registry.yarnpkg.com/is-number", resource(scenario + "http/is-number"));
-        binaryRoutes.put("https://registry.yarnpkg.com/is-number/-/is-number-7.0.0.tgz",
-                bytes(scenario + "http/is-number-7.0.0.tgz"));
 
         Result result = NativeLockEngine.regenerate(PackageManager.YarnClassic, request, ctx);
 
