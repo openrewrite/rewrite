@@ -143,7 +143,11 @@ class NpmInputsTest {
       "rejects EJSONPARSE",
       "workspaces-not-an-array|{\"name\":\"root\",\"workspaces\":\"packages/*\"}||rejects EWORKSPACESCONFIG",
       "unlisted-duplicate-under-node-modules|{\"name\":\"root\",\"workspaces\":[\"libs/**\"]}|" +
-      "libs/x/package.json={\"name\":\"dup\"};libs/x/node_modules/y/package.json={\"name\":\"dup\"}|installs here"
+      "libs/x/package.json={\"name\":\"dup\"};libs/x/node_modules/y/package.json={\"name\":\"dup\"}|installs here",
+      "unlisted-member-name-number|{\"name\":\"root\",\"workspaces\":[\"libs/*\"]}|" +
+      "libs/x/package.json={\"name\":5}|installs here",
+      "listed-plus-member-name-number|{\"name\":\"root\",\"workspaces\":[\"packages/*\",\"libs/*\"]}|" +
+      "libs/x/package.json={\"name\":5}|installs at ../.."
     })
     void npmMapsTheWorkspacesOfEachPackageJsonAboveOverWhatIsUnderIt(String name, String root,
                                                                      @Nullable String files, String outcome) {

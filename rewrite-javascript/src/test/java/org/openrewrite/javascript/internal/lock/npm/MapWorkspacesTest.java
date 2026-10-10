@@ -59,11 +59,11 @@ class MapWorkspacesTest {
         return VirtualTreeLoader.ProjectFiles.builder().manifests(manifests).build();
     }
 
-    private static List<List<String>> relative(Map<String, String> members) {
+    private static List<List<String>> relative(Map<?, String> members) {
         List<List<String>> out = new ArrayList<>();
-        for (Map.Entry<String, String> e : members.entrySet()) {
+        for (Map.Entry<?, String> e : members.entrySet()) {
             List<String> pair = new ArrayList<>();
-            pair.add(e.getKey());
+            pair.add(String.valueOf(e.getKey()));
             pair.add(Relpath.relpath(CWD, e.getValue()));
             out.add(pair);
         }

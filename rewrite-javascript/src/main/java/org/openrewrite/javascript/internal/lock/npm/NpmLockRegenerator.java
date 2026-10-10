@@ -35,6 +35,7 @@ import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -252,7 +253,15 @@ public final class NpmLockRegenerator {
      * project's directories become its workspace edges.
      */
     static Node setWorkspaces(Node node, VirtualTreeLoader.ProjectFiles files) {
-        Map<String, String> workspaces = MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(), files);
+        Map<String, String> workspaces = new LinkedHashMap<>();
+        for (Map.Entry<Object, String> workspace : MapWorkspaces.mapWorkspaces(node.getPath(), node.getPackage(),
+                files).entrySet()) {
+            // the workspace edge the name becomes is what refuses it
+            if (!(workspace.getKey() instanceof String)) {
+                throw new IllegalArgumentException("must provide dependency name");
+            }
+            workspaces.put((String) workspace.getKey(), workspace.getValue());
+        }
         if (!workspaces.isEmpty()) {
             node.setWorkspaces(workspaces);
         }

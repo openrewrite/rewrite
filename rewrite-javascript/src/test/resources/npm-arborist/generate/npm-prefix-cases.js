@@ -85,6 +85,9 @@ const WALKS = [
   ['workspaces-not-an-array', '{"name":"root","workspaces":"packages/*"}'],
   ['unlisted-duplicate-under-node-modules', '{"name":"root","workspaces":["libs/**"]}',
     'libs/x/package.json={"name":"dup"};libs/x/node_modules/y/package.json={"name":"dup"}'],
+  ['unlisted-member-name-number', '{"name":"root","workspaces":["libs/*"]}', 'libs/x/package.json={"name":5}'],
+  ['listed-plus-member-name-number', '{"name":"root","workspaces":["packages/*","libs/*"]}',
+    'libs/x/package.json={"name":5}'],
 ]
 
 const PREFIXES = [

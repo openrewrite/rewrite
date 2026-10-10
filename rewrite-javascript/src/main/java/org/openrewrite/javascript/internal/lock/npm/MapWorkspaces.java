@@ -118,11 +118,11 @@ final class MapWorkspaces {
      * {@code mapWorkspaces({cwd, pkg})} over the locations holding a package.json ({@code ""} the root): package name
      * to absolute path, in the order the patterns list them.
      */
-    static Map<String, String> mapWorkspaces(String cwd, Map<String, Object> pkg,
+    static Map<Object, String> mapWorkspaces(String cwd, Map<String, Object> pkg,
             VirtualTreeLoader.ProjectFiles files) {
         Object workspaces = pkg.containsKey("workspaces") ? pkg.get("workspaces") : new ArrayList<>();
         Patterns p = getPatterns(workspaces);
-        Map<String, String> results = new LinkedHashMap<>();
+        Map<Object, String> results = new LinkedHashMap<>();
         if (p.patterns.isEmpty() && p.negatedPatterns.isEmpty()) {
             return results;
         }
@@ -189,13 +189,7 @@ final class MapWorkspaces {
         if (errors.size() > 1) {
             throw new WorkspacesException(String.join("\n", errors), "EDUPLICATEWORKSPACE");
         }
-        for (Map.Entry<Object, String> entry : byName.entrySet()) {
-            // the workspace edge the name becomes is what refuses it
-            if (!(entry.getKey() instanceof String)) {
-                throw new IllegalArgumentException("must provide dependency name");
-            }
-            results.put((String) entry.getKey(), entry.getValue());
-        }
+        results.putAll(byName);
         return results;
     }
 
