@@ -231,8 +231,7 @@ public final class Spec {
 
     /**
      * What a manifest's dependency value is: {@code npa.resolve(name, value)}, a pnpm, Yarn or Bun protocol, or a
-     * protocol npa does not support.
-     * @throws InvalidSpecException npa's error for a value that is none of those
+     * protocol npa does not support; npa's {@link InvalidSpecException} for a value that is none of those.
      */
     public static Spec ofDependency(String name, String value) {
         for (Type type : Type.values()) {
