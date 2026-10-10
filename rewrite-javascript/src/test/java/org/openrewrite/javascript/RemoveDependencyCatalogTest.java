@@ -103,6 +103,33 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         );
     }
 
+    // the cleanup is pnpm's write of the whole file, which is not made where it holds what the port of yaml does not read
+    @Test
+    void declinedWhenTheCleanupWouldRewriteALayoutNotWrittenAsPnpmWritesIt() {
+        String member = """
+          {
+            "name": "a",
+            "dependencies": {
+              "wrappy": "catalog:"
+            }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
+            .noTrim().after(actual -> actual).afterRecipe(doc -> assertThat(doc.getMarkers()
+              .findFirst(Markup.Warn.class)).hasValueSatisfying(w -> assertThat(w.getMessage())
+              .contains("pnpm-workspace.yaml has an anchor or a tag")))),
+          yaml("""
+            packages:
+              - &members packages/*
+            cleanupUnusedCatalogs: true
+            catalog:
+              wrappy: 1.0.2
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
     @Test
     void aCleanupForAReleaseNoRecordingCoversDeclinesTheEdit() {
         String member = """

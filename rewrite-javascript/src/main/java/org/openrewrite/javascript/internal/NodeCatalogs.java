@@ -301,7 +301,8 @@ public abstract class NodeCatalogs {
 
         /**
          * The file without what the port's {@link WorkspaceManifestWriter#cleanupUnusedCatalogs} removes over the
-         * {@code projects} by directory (null where the recipes do not read one); null when not written or declined.
+         * {@code projects} by directory (null where the recipes do not read one); null when declined. An
+         * {@link IllegalArgumentException} names why it is not written as pnpm writes it.
          */
         public @Nullable NodeCatalogs withoutUnused(Map<String, @Nullable Map<String, @Nullable Object>> projects) {
             if (declined() != null) {
@@ -320,24 +321,20 @@ public abstract class NodeCatalogs {
                 return this;
             }
             if (isFlowStyle()) {
-                return null;
+                throw new IllegalArgumentException("its flow-style catalogs are not read");
             }
-            try {
-                return written(manifest -> {
-                    retain(manifest, "catalog", cleaned.get("catalog"));
-                    Object named = manifest.get("catalogs");
-                    if (named instanceof Map) {
-                        Object kept = cleaned.get("catalogs");
-                        for (String group : new ArrayList<>(asMap(named).keySet())) {
-                            retain(asMap(named), group, kept instanceof Map ? asMap(kept).get(group) : null);
-                        }
+            return written(manifest -> {
+                retain(manifest, "catalog", cleaned.get("catalog"));
+                Object named = manifest.get("catalogs");
+                if (named instanceof Map) {
+                    Object kept = cleaned.get("catalogs");
+                    for (String group : new ArrayList<>(asMap(named).keySet())) {
+                        retain(asMap(named), group, kept instanceof Map ? asMap(kept).get(group) : null);
                     }
-                    retain(manifest, "catalogs", cleaned.get("catalogs"));
-                    return true;
-                });
-            } catch (IllegalArgumentException e) {
-                return null;
-            }
+                }
+                retain(manifest, "catalogs", cleaned.get("catalogs"));
+                return true;
+            });
         }
 
         private static void retain(Map<String, @Nullable Object> map, String key, @Nullable Object kept) {

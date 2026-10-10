@@ -583,7 +583,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         try {
             return ((NodeCatalogs.Pnpm) edited).withoutUnused(projects(file, new HashMap<>()));
-        } catch (CannotKnow e) {
+        } catch (CannotKnow | IllegalArgumentException e) {
             return null;
         } catch (JsError e) {
             // the override value it trips on is one pnpm rejects before it cleans up (catalog-cleanup-override-number)
@@ -606,9 +606,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         Map<String, Path> unread = new HashMap<>();
         try {
-            return ((NodeCatalogs.Pnpm) current).withoutUnused(projects(file, unread)) != null ? null :
-                    "cleanupUnusedCatalogs would make pnpm rewrite the flow-style catalogs of " + file.path +
-                    ", so this edit was not made";
+            ((NodeCatalogs.Pnpm) current).withoutUnused(projects(file, unread));
+            return null;
+        } catch (IllegalArgumentException e) {
+            return "cleanupUnusedCatalogs would make pnpm rewrite " + file.path + ", and " + e.getMessage() +
+                   ", so this edit was not made";
         } catch (CannotKnow e) {
             Path other = unread.isEmpty() ? file.path : unread.values().iterator().next();
             return "cleanupUnusedCatalogs counts the dependencies of " + other + ", which the recipes do not read, " +

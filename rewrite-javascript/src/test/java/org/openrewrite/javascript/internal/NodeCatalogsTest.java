@@ -49,6 +49,7 @@ import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Each catalog read and edit against what pnpm 11.2.2, Yarn 4.10.3 and Bun 1.3.10 read or wrote in the recordings
@@ -256,7 +257,8 @@ class NodeCatalogsTest {
         assertThat(catalogs.withSpecifier("default", "wrappy", "1.0.2")).isNull();
         assertThat(catalogs.withSpecifier("legacy", "wrappy", "1.0.2")).isNull();
         assertThat(catalogs.withEntry("default", "is-number", "7.0.0")).isNull();
-        assertThat(catalogs.withoutUnused(projects(singletonList(declares("ms", "catalog:"))))).isNull();
+        assertThatThrownBy(() -> catalogs.withoutUnused(projects(singletonList(declares("ms", "catalog:")))))
+          .hasMessageContaining("flow-style catalogs");
         assertThat(pnpmOf("catalog:\n  wrappy: 1.0.1\n").isFlowStyle()).isFalse();
     }
 
