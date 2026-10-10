@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.Spec;
 
 import java.util.List;
@@ -27,7 +28,8 @@ import static org.openrewrite.javascript.internal.lock.npm.Js.truthy;
  */
 final class ReleaseAgeExclude {
 
-    private static final Minimatch.Options OPTIONS = Minimatch.Options.builder().nonegate(true).nocomment(true).build();
+    private static final Minimatch.Options OPTIONS = Minimatch.Options.builder(Minimatch.Release.V10_2_5)
+            .nonegate(true).nocomment(true).build();
 
     private ReleaseAgeExclude() {
     }

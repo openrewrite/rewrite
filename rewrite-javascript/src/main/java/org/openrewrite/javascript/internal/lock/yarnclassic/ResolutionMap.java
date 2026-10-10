@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -114,7 +115,7 @@ public final class ResolutionMap {
         path.add(normalized.getName());
         String modulePath = String.join("/", path);
         for (Resolution resolution : resolutions) {
-            if (Minimatch.minimatch(modulePath, resolution.getGlobPattern())) {
+            if (Minimatch.minimatch(modulePath, resolution.getGlobPattern(), Minimatch.Release.V3_0_4)) {
                 String range = resolution.getRange();
                 String reqRange = normalized.getRange();
                 if (NodeSemver.validRange(reqRange, YarnClassicOptions.SEMVER) != null &&

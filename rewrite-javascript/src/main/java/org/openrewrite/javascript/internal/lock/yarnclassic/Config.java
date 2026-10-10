@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
@@ -403,7 +404,8 @@ final class Config {
         }
         List<String> found = new ArrayList<>();
         for (String file : files) {
-            if (Minimatch.minimatch(file, include) && !Minimatch.minimatch(file, ignore)) {
+            if (Minimatch.minimatch(file, include, Minimatch.Release.V3_0_4) &&
+                !Minimatch.minimatch(file, ignore, Minimatch.Release.V3_0_4)) {
                 String loc = file.substring(0, file.lastIndexOf('/'));
                 if (file.endsWith("/yarn.json") || !inputs.getManifests().containsKey(loc)) {
                     throw new CannotKnow("the workspace member " + file + " (the host did not give its contents)");

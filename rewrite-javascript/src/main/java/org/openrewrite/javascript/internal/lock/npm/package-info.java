@@ -74,8 +74,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
  * USE OR OTHER DEALINGS IN THE SOFTWARE.
  * </pre>
- * {@code Minimatch} is a port of minimatch, distributed under the Blue Oak Model License 1.0.0
- * (https://blueoakcouncil.org/license/1.0.0): each contributor licenses you to do everything with this
+ * {@code internal.lock.Minimatch} is a port of minimatch 10.2.5, distributed under the Blue Oak Model License
+ * 1.0.0 (https://blueoakcouncil.org/license/1.0.0): each contributor licenses you to do everything with this
  * software that would otherwise infringe that contributor's copyright in it, provided that everyone who
  * gets a copy of any part of it from you also gets the text of that license or a link to it; as far as the
  * law allows, this software comes as is, without any warranty or condition, and no contributor will be

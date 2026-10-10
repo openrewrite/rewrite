@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.LocaleCompare;
+import org.openrewrite.javascript.internal.lock.Minimatch;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.util.ArrayList;
@@ -54,9 +55,9 @@ final class MapWorkspaces {
     }
 
     private static final Minimatch.Options PARTIAL =
-            Minimatch.Options.builder().partial(true).windowsPathsNoEscape(true).build();
+            Minimatch.Options.builder(Minimatch.Release.V10_2_5).partial(true).windowsPathsNoEscape(true).build();
     private static final Minimatch.Options IGNORE =
-            Minimatch.Options.builder().dot(true).nocomment(true).nonegate(true).build();
+            Minimatch.Options.builder(Minimatch.Release.V10_2_5).dot(true).nocomment(true).nonegate(true).build();
 
     private MapWorkspaces() {
     }
@@ -85,7 +86,7 @@ final class MapWorkspaces {
                 out.negatedPatterns.add(pattern);
             } else {
                 for (int i = 0; i < out.negatedPatterns.size(); i++) {
-                    if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), Minimatch.Options.DEFAULT)) {
+                    if (Minimatch.minimatch(pattern, out.negatedPatterns.get(i), Minimatch.Release.V10_2_5)) {
                         out.negatedPatterns.remove(i);
                     }
                 }
@@ -93,7 +94,7 @@ final class MapWorkspaces {
             }
         }
         for (String negated : out.negatedPatterns) {
-            for (String pattern : Minimatch.match(new ArrayList<>(out.patterns), negated, Minimatch.Options.DEFAULT)) {
+            for (String pattern : Minimatch.match(new ArrayList<>(out.patterns), negated, Minimatch.Release.V10_2_5)) {
                 out.patterns.remove(pattern);
             }
         }
@@ -137,7 +138,7 @@ final class MapWorkspaces {
                 continue;
             }
             for (String pattern : p.patterns) {
-                if (Minimatch.minimatch(dir, globPattern(pattern), Minimatch.Options.DEFAULT)) {
+                if (Minimatch.minimatch(dir, globPattern(pattern), Minimatch.Release.V10_2_5)) {
                     matches.add(dir);
                     break;
                 }
@@ -235,14 +236,14 @@ final class MapWorkspaces {
 
         List<String> packageKeys = new ArrayList<>(Js.keys(packages));
         for (String pattern : p.negatedPatterns) {
-            for (String key : Minimatch.match(new ArrayList<>(packageKeys), pattern, Minimatch.Options.DEFAULT)) {
+            for (String key : Minimatch.match(new ArrayList<>(packageKeys), pattern, Minimatch.Release.V10_2_5)) {
                 packageKeys.remove(key);
             }
         }
 
         Map<String, String> byPath = new LinkedHashMap<>();
         for (String pattern : p.patterns) {
-            for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Options.DEFAULT)) {
+            for (String key : Minimatch.match(packageKeys, pattern, Minimatch.Release.V10_2_5)) {
                 String pathname = PosixPath.join(cwd, key);
                 byPath.put(pathname, Js.string(getPackageName(Js.get(packages, key), pathname)));
             }

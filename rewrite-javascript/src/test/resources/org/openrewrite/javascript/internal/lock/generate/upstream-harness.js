@@ -134,8 +134,22 @@ function makeT(name) {
     testdir: () => require('os').tmpdir()
   }
   t.assert = t.ok
-  t.deepEqual = t.deepEqual
-  return t
+  t.equivalent = t.same
+  t.inequivalent = t.notSame
+  t.isEqual = t.equal
+  t.isNot = t.notEqual
+  t.strictDeepEqual = t.strictSame
+  // an assertion this harness does not know passes, so that the rest of the test still runs
+  return new Proxy(t, {
+    get(target, prop) {
+      if (prop in target || typeof prop === 'symbol' || prop === 'then') {
+        return target[prop]
+      }
+      state.unknown = state.unknown || new Set()
+      state.unknown.add(prop)
+      return () => undefined
+    }
+  })
 }
 
 function entry(name, opts, fn) {

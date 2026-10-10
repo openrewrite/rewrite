@@ -283,7 +283,8 @@ async function main() {
     `with its answer; generate/upstream-calls.js generate/upstream/${path.basename(specPath)} <checkout> ${release}`}
   process.stdout.write([JSON.stringify(header), ...rows].join('\n') + '\n')
   process.stderr.write(`${rows.length} rows, ${harness.state.assertions} assertions, ` +
-    `${harness.state.failures.length} failed\n` + harness.state.failures.slice(0, 40).join('\n') + '\n')
+    `${harness.state.failures.length} failed; unknown assertions: ${[...(harness.state.unknown || [])].join(' ')}\n` +
+    harness.state.failures.slice(0, 40).join('\n') + '\n')
 }
 
 main().then(() => process.exit(0), e => {
