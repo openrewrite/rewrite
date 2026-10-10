@@ -17,9 +17,12 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.pnpm.PreferredVersions.Selector;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.InfoFromLockfile;
+import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.MissingPeerInfo;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.WantedDependency;
 
+import java.util.AbstractMap.SimpleEntry;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,8 +34,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
 
 /**
- * Port of pnpm 11.2.2's installing/deps-resolver/test/replaceVersionInPref.test.ts, unwrapPackageName.test.ts,
- * parentIdsContainSequence.test.ts, getManifestFromResponse.test.ts and validatePeerDependencies.test.ts.
+ * Port of pnpm 11.2.2's installing/deps-resolver tests replaceVersionInPref, unwrapPackageName, hoistPeers,
+ * parentIdsContainSequence, getManifestFromResponse and validatePeerDependencies.
  */
 class ResolveDependenciesTest {
 
@@ -185,5 +188,92 @@ class ResolveDependenciesTest {
               .hasMessage("The peerDependencies field named 'foo' of package 'my-pkg' has an invalid value: '" + spec +
                           "'");
         }
+    }
+
+    @Test
+    void picksAnAlreadyAvailablePrereleaseVersion() {
+        assertThat(hoistPeers(false, preferred("foo", "1.0.0-beta.0", Selector.of("version")), "foo", "*"))
+          .containsExactly(entry("foo", "1.0.0-beta.0"));
+    }
+
+    @Test
+    void respectsPeerDepRangeWhenPreferredVersionsExist() {
+        Map<String, Map<String, Selector>> preferred = preferred("chai", "5.2.1", Selector.of("version"));
+        preferred.get("chai").put("4.3.0", Selector.of("version"));
+        assertThat(hoistPeers(true, preferred, "chai", "4.3.0")).containsExactly(entry("chai", "4.3.0"));
+    }
+
+    @Test
+    void fallsBackToRangeWhenNoPreferredVersionSatisfiesIt() {
+        assertThat(hoistPeers(true, preferred("chai", "5.2.1", Selector.of("version")), "chai", "4.3.0"))
+          .containsExactly(entry("chai", "4.3.0"));
+    }
+
+    @Test
+    void picksHighestPreferredVersionForDeduplicationWhenRangeIsNotExact() {
+        Map<String, Map<String, Selector>> preferred = preferred("foo", "2.0.0", Selector.of("version"));
+        preferred.get("foo").put("2.1.0", Selector.of("version"));
+        preferred.get("foo").put("3.0.0", Selector.of("version"));
+        assertThat(hoistPeers(true, preferred, "foo", "^2.0.0")).containsExactly(entry("foo", "3.0.0"));
+    }
+
+    @Test
+    void reusesHigherPreferredVersionWhenRangeIsNotExact() {
+        assertThat(hoistPeers(true, preferred("foo", "2.0.0", Selector.of("version")), "foo", "1"))
+          .containsExactly(entry("foo", "2.0.0"));
+    }
+
+    @Test
+    void returnsValidSpecifierWhenGivenOnlyRangePreferredVersionSelectors() {
+        assertThat(hoistPeers(true, preferred("foo", "^2.0.0", Selector.of("range")), "foo", "2"))
+          .containsExactly(entry("foo", "^2.0.0"));
+    }
+
+    @Test
+    void handlesWorkspaceProtocolRangeWithoutThrowing() {
+        assertThat(hoistPeers(true, preferred("foo", "1.0.0", Selector.of("version")), "foo", "workspace:*"))
+          .containsExactly(entry("foo", "1.0.0"));
+    }
+
+    @Test
+    void handlesVersionSelectorWithWeight() {
+        assertThat(hoistPeers(true, preferred("foo", "1.0.0", Selector.of("version", 1)), "foo", "1"))
+          .containsExactly(entry("foo", "1.0.0"));
+    }
+
+    @Test
+    void getHoistableOptionalPeersOnlyPicksAVersionThatSatisfiesAllOptionalRanges() {
+        Map<String, Map<String, Selector>> preferred = preferred("foo", "1.0.0", Selector.of("version"));
+        for (String version : Arrays.asList("2.0.0", "2.1.0", "3.0.0")) {
+            preferred.get("foo").put(version, Selector.of("version"));
+        }
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
+          .containsExactly(entry("foo", "2.1.0"));
+    }
+
+    @Test
+    void getHoistableOptionalPeersPicksTheHighestVersionThatSatisfiesAllTheOptionalRanges() {
+        Map<String, Map<String, Selector>> preferred = preferred("foo", "2.1.0", Selector.of("version"));
+        preferred.get("foo").put("2.1.1", Selector.of("version"));
+        assertThat(ResolveDependencies.getHoistableOptionalPeers(
+          Collections.singletonMap("foo", Arrays.asList("2", "2.1")), preferred))
+          .containsExactly(entry("foo", "2.1.1"));
+    }
+
+    private static Map<String, Map<String, Selector>> preferred(String name, String spec, Selector selector) {
+        Map<String, Selector> selectors = new LinkedHashMap<>();
+        selectors.put(spec, selector);
+        Map<String, Map<String, Selector>> preferred = new LinkedHashMap<>();
+        preferred.put(name, selectors);
+        return preferred;
+    }
+
+    private static Map<String, String> hoistPeers(boolean autoInstallPeers,
+                                                  Map<String, Map<String, Selector>> preferred,
+                                                  String peerName, String range) {
+        List<Map.Entry<String, MissingPeerInfo>> missing = Collections.singletonList(
+          new SimpleEntry<>(peerName, new MissingPeerInfo(range, false)));
+        return ResolveDependencies.hoistPeers(autoInstallPeers, preferred, Collections.emptyList(), missing);
     }
 }

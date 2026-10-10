@@ -23,11 +23,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.json;
 import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
+import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.sortedJson;
 
 /**
- * The version-choice cases of pnpm 11.2.2's resolving/npm-resolver/test/index.ts, run through {@code
- * parseBareSpecifier} and {@code pickPackageFromMeta} as {@code resolveNpm} runs them.
+ * The version-choice cases of pnpm 11.2.2's resolving/npm-resolver/test/index.ts as resolveNpm runs them, and
+ * resolving/registry/pkg-metadata-filter/test/index.ts with its snapshots (keys sorted, as Jest prints them).
  */
 class PickPackageFromMetaTest {
 
@@ -166,5 +168,38 @@ class PickPackageFromMetaTest {
         assertThat(PickPackage.pickMatchingVersionFinal(options, spec, obj(meta)).get("version")).isEqualTo("2.0.2");
         spec = PickPackageFromMeta.parseBareSpecifier("^2.3.0", "c", "latest", REGISTRY);
         assertThat(PickPackage.pickMatchingVersionFinal(options, spec, obj(meta)).get("version")).isEqualTo("2.3.0");
+    }
+
+    private static String version(String version, String extra) {
+        return "'" + version + "':{'name':'dist-tag-date','version':'" + version + "','dist':{'tarball':" +
+               "'https://registry.npmjs.org/dist-tag-date/-/dist-tag-date-" + version + ".tgz','shasum':''}" + extra +
+               "}";
+    }
+
+    private static String filter(String doc) {
+        return sortedJson(json(PickPackageFromMeta.filterPkgMetadataByPublishDate(obj(doc),
+          Instant.parse("2020-04-01T00:00:00.000Z"), null)));
+    }
+
+    @Test
+    void filterPkgMetadataByPublishDate() {
+        assertThat(filter("{'name':'dist-tag-date','versions':{" + version("3.0.0", "") + "," +
+                          version("3.1.0", ",'deprecated':'This version is deprecated'") + "," +
+                          version("3.2.0", "") + "," + version("2.9.9", "") + "}," +
+                          "'dist-tags':{'latest':'3.2.0'},'time':{'2.9.9':'2020-01-01T00:00:00.000Z'," +
+                          "'3.0.0':'2020-02-01T00:00:00.000Z','3.1.0':'2020-03-01T00:00:00.000Z'," +
+                          "'3.2.0':'2020-05-01T00:00:00.000Z'}}"))
+          .isEqualTo(sortedJson("{'dist-tags':{'latest':'3.0.0'},'name':'dist-tag-date','time':{" +
+                                "'2.9.9':'2020-01-01T00:00:00.000Z','3.0.0':'2020-02-01T00:00:00.000Z'," +
+                                "'3.1.0':'2020-03-01T00:00:00.000Z','3.2.0':'2020-05-01T00:00:00.000Z'}," +
+                                "'versions':{" + version("2.9.9", "") + "," + version("3.0.0", "") + "," +
+                                version("3.1.0", ",'deprecated':'This version is deprecated'") + "}}"));
+
+        assertThat(filter("{'name':'dist-tag-date','versions':{" + version("3.0.0", "") + "," +
+                          version("2.9.9", "") + "},'dist-tags':{'latest':'3.0.0','stable':'3.0.0'}," +
+                          "'time':{'2.9.9':'2020-03-01T00:00:00.000Z','3.0.0':'2020-05-01T00:00:00.000Z'}}"))
+          .isEqualTo(sortedJson("{'dist-tags':{'latest':'2.9.9'},'name':'dist-tag-date','time':{" +
+                                "'2.9.9':'2020-03-01T00:00:00.000Z','3.0.0':'2020-05-01T00:00:00.000Z'}," +
+                                "'versions':{" + version("2.9.9", "") + "}}"));
     }
 }

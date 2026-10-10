@@ -26,7 +26,7 @@ import static org.openrewrite.javascript.internal.lock.pnpm.PnpmTestSupport.obj;
  * resolving/npm-resolver/test/distTagsByDate.test.ts of pnpm 11.2.2: resolving {@code latest} under a
  * {@code publishedBy} cutoff, the packument picked from as the resolver does once it has the document.
  */
-class DistTagsByDateTest {
+class PickPackageTest {
 
     private static final String REGISTRY = "https://registry.npmjs.org/";
 
