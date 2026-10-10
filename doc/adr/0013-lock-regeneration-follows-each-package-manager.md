@@ -6,7 +6,8 @@ Date: 2026-10-07
 
 Accepted. Supersedes [ADR 0011](0011-native-node-lock-regeneration.md). Amended 2026-10-09: every package manager
 regenerates through the port of its own resolver, and the shared engine of ADR 0011 is removed. Amended 2026-10-10:
-what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager.
+what `internal.lock` holds, and how the recipes write overrides and follow catalogs for each package manager; and
+again: one port per library, the host's registries as the user's config, corepack, the regenerators by module.
 
 ## Context
 
@@ -33,13 +34,15 @@ path, ini, `localeCompare`, the host's Node version and platform (`Host`) and en
 - Bun 1.3.10 in `internal.lock.bun`: `Lockfile`, the bun.lock reader and writer, the hoisted `Tree`, `PackageManager`
   (enqueueing, prefer-existing versions, peers last), `BunLockRegenerator`.
 - Yarn classic 1.22.22 in `internal.lock.yarnclassic`: the lock as patterns to entries, `PackageResolver` and
-  `PackageRequest` on a model of Node's event loop, `YarnClassicOptions`, `YarnClassicLockRegenerator`.
+  `PackageRequest` on a model of Node's event loop, `Config` (config.js), `Rc`, `Cli`, `Install`,
+  `YarnClassicLockRegenerator`.
 - Yarn Berry 4.10.3 in `internal.lock.berry`: `Project.resolveEverything` with the virtual pass, the resolver and
   fetcher chain, checksums (`Cache`, `TgzUtils`, `ZipArchive`), each release's settings and builtin data as resources,
   `YarnBerryLockRegenerator`.
 - pnpm 11.2.2 in `internal.lock.pnpm`: the lock keyed by peer suffix, `PnpmOptions` with pnpm-workspace.yaml,
   `ResolveDependencyTree`, `ResolveDependencies` and `ResolvePeers` on a model of Node's event loop, `UpdateLockfile`
-  with the pruner, `PnpmLockRegenerator`.
+  with the pruner, `Main`, `InstallDeps`, `Recursive`, `Install`, `ExtendInstallOptions`, and `PnpmLockRegenerator`
+  for main.ts's install entry.
 
 Three rules decide the result:
 
@@ -93,15 +96,12 @@ changes only when a recording says so.
   (npm's yarn.lock);
 - Node's and V8's behavior: `EcmaScript`, `EventLoop`, `V8Date`, `V8RegExp`, `V8Sort` (V8's TimSort at any length),
   `WhatwgUrl`, `UriComponent`, `PosixPath`, `RootRelativePath`, `Ini`, `LocaleCompare`, `Host`, `HostEnvironment`;
-- one port of some upstream libraries that several package managers bundle, the release an option: `Spec`
-  (npm-package-arg), `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1),
-  `YarnpkgSemverUtils`. Others are still one port per package manager: minimatch (npm's 10.2.5, Yarn classic's
-  3.0.4), brace-expansion, ssri, ini (Yarn classic's 1.3.5 beside `Ini`, ini 6.0.0), braces and fill-range (Yarn
-  classic's, Berry's), glob-parent and is-glob, pnpm's own npm-package-arg and hosted-git-info inside its projects
-  graph, and pnpm's js-yaml fork;
+- one port of each upstream library that several package managers bundle, the release an option (the amendment
+  below lists them);
 - the registry sources ask the registry each port's own config names for the package, and give the request the
   host's credentials by its URL for npm and pnpm (the longest registry above it holding credentials, as npm's
-  `getAuth` and pnpm's `getAuthHeaderByURI` pick them), by the package's scope for Yarn and Bun.
+  `getAuth` and pnpm's `getAuthHeaderByURI` pick them); Bun's by the registry's host, as bun gives a user .npmrc
+  credential to every registry there; Yarn's as each Yarn's own request computes them from its config.
 
 `Spec` is also the one classifier of a manifest's dependency value for the recipes: npa's kinds, and the catalog,
 workspace, link, portal, patch, jsr and exec protocols npa rejects, each its own kind. A recipe leaves a value that is
@@ -114,8 +114,8 @@ Overrides are written where the project's package manager reads them, at the wor
 - Yarn classic: `resolutions` with `**/<path>/x`, since `parent/x` matches from the root only; the resolution yarn
   reads as the same glob (`x` is `**/x`) is edited in place, since yarn applies the first that matches. Yarn Berry:
   `resolutions` with one parent, by name or exact version.
-- pnpm, by the release the project names (`devEngines.packageManager`, `packageManager`, 11.2.2 when none, the rule
-  `PnpmOptions.releaseMajor`; a range open between majors is declined, the registry picking the release): 11 reads
+- pnpm, by the release pnpm runs (`PnpmRelease`: the one the root names and pnpm switches to, 11.2.2 otherwise; a
+  range open between majors, or a release whose writes are not recorded, is declined): 11 reads
   pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
   pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release other than 11.2.2 makes the
@@ -136,8 +136,8 @@ ParseWantedDependencies`, `InstallSome`'s `catalogMode` check, `ResolveDependenc
 open between majors is declined. pnpm's cleanup is the port's (`WorkspaceManifestWriter.cleanupUnusedCatalogs`, the
 recipes removing from the tree what it removed). pnpm-workspace.yaml has one editor, the YAML tree, placing a new key
 by the port of pnpm's workspace manifest writer for the release the root names, for an override as for a catalog
-entry. A catalog reference is read by each port's own parse, and the package manager a manifest names by pnpm's
-`getWantedPackageManager`.
+entry. A catalog reference is read by each port's own parse, and the package manager a manifest names by corepack's
+`loadSpec` (below).
 
 The five dependency recipes are one engine, `NodeDependencyEdits`: each adds its edits of manifests and
 package-manager files to the cycle in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the
@@ -147,3 +147,58 @@ pnpm-workspace.yaml. Another recipe's edit is seen only at its file's visit: a l
 earlier revision is warned with one row, and a decision that visit overturns after files were written by it is
 withdrawn, warned and rowed. No marker is read as state: declines are derived from the documents each cycle, a marker
 is a content-equal warning, and rows are deduplicated within a cycle.
+
+## Amendment 2026-10-10: one port per library, the host's registries, corepack
+
+One port per upstream library, in `internal.lock`, stands for every release a package manager bundles, the release an
+option, and every upstream test case of every release runs against it (`lock/generate/upstream-calls.js` records each
+call with its answer, `UpstreamCalls` replays them): `Minimatch` (3.0.4, 10.2.5 with its extglobs), `BraceExpansion`,
+`Braces` and `FillRange`, `GlobParent`, `IsGlob`, `IsExtglob`, `Ssri`, `Ini` (1.3.5, 6.0.0), `StripBom`,
+`ValidateNpmPackageName`, `Spec` (npm-package-arg 13.0.2 and pnpm's fork 2.0.0), `GitHost` (hosted-git-info 4.1.0
+and 9.0.3), `JsYaml` (3.13.1, 3.14.1 and pnpm's @zkochan/js-yaml 0.0.11) with `JsYamlDumper`, `Picomatch`, and
+`YamlDocument` (yaml 2.9.0's parseDocument and toString, with pnpm's patchDocument). A JavaScript built-in is ported
+once too: `EcmaScript` (JSON.parse and JSON.stringify, parseInt, Number, Object.entries, the string functions),
+`V8RegExp` (V8's u-flag grammar and messages; without the u flag Java still reads a surrogate pair as one code point),
+`V8Date` (toISOString, Date.UTC, TimeClip), `UriComponent`, `PosixPath` for Node's `path.posix`.
+
+The host's registry configuration is each package manager's user-level configuration, under the project's own files
+and by its precedence. `NativeLockEngine` reads it with `RegistryDiscovery.discover` over the marker's npmrc scopes
+that package manager reads (npm and Yarn classic the global and user ones, pnpm and Bun the user's only, as recorded),
+never the marker's project npmrc, which is the repository root's file:
+
+- npm and pnpm take it as the user .npmrc, under the project's .npmrc; npm no longer falls back to npmjs where the
+  project names no registry, and asks the host's;
+- Bun takes the registries the host names as the user .npmrc, read after bunfig.toml and before the project's .npmrc,
+  so a host default of npmjs is still a named default;
+- Yarn classic takes them, with the host's credentials for the registries a project .npmrc names, as the home .npmrc,
+  each credential under always-auth; Yarn Berry as the home .yarnrc.yml (`npmRegistryServer`, `npmScopes`,
+  `npmRegistries` holding the credentials), which Yarn reads under every project rc file.
+
+What the package manager writes with that configuration (resolved URLs, `tarball:` entries) is what the port writes;
+each rule was recorded with a user config naming a second registry. The registry sources still take the request's
+credentials from `discover` over every scope.
+
+corepack 0.35.0's specUtils is `SpecUtils`: `parseSpec`, `parsePackageJSON` (`packageManager` checked against
+`devEngines.packageManager`, a mismatch corepack's error, the latter alone as a spec), `loadSpec` walking up through
+the package.json files the host holds with the `.corepack.env` beside the one it settles on, `findProjectSpec` and the
+release `installVersion` starts. A spec corepack rejects is the package manager rejecting the edit, with corepack's
+message. Three questions ask it:
+
+- Berry's release is the one corepack starts (`yarn@1` is corepack's error, not Yarn Berry);
+- the package manager a lockless root names, for the recipes, is `loadSpec`'s (bun, which corepack does not run, by
+  its name); a spec corepack rejects declines the edit with its message;
+- pnpm's release on the manifest side is the one pnpm switches to, declined where corepack would start another
+  (devEngines beside packageManager, `onFail` or `pmOnFail` ignore or warn): the host does not say whether pnpm runs
+  under corepack. pnpm's own reader decides only the port's switchCliVersion.
+
+A regenerator ports its package manager's entry module only. pnpm's main.ts install entry is `PnpmLockRegenerator`;
+main.ts is `Main`, installDeps.ts `InstallDeps`, recursive.ts `Recursive` (with `bail: false`), install/index.ts
+`Install`, extendInstallOptions.ts `ExtendInstallOptions`. Yarn classic's config.js is `Config`, set while `init` runs
+and read only afterwards, beside `Rc`, `Cli` and `Install`; Berry's Configuration.ts is `Configuration`.
+
+pnpm-workspace.yaml is printed as pnpm 10 and 11 print it, through `YamlDocument` and `WorkspaceManifestWriter`
+(pnpm 10's sortKeysByPriority, pnpm 11's reorderRecursive and propagateBlankLinesToNewPairs), for the releases whose
+writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2); pnpm 9's catalogs and Yarn's .yarnrc.yml
+are edited in place, and a layout the port does not read (document markers, CR line ends, a tab before a comment, a
+flow mapping with entries) is declined. AddDependency sorts the dependency fields as each package manager's add saves
+them, and still keeps inline arrays and objects that npm, pnpm and yarn 1 print again with `JSON.stringify`.
