@@ -32,12 +32,12 @@ import java.util.Set;
  * Port of pnpm/src main.ts and getConfig.ts (pnpm 11.2.2) up to the command: the workspace pnpm finds, its config,
  * the package manager check, the config dependencies, the pnpmfile hooks and the workspace's projects.
  */
-final class Main {
+public final class Main {
 
     /**
      * @pnpm/cli.meta's packageManager.version: the release ported.
      */
-    static final String PNPM_VERSION = "11.2.2";
+    public static final String PNPM_VERSION = "11.2.2";
 
     // the inputs' root: workspaceDir, which is also rootProjectManifestDir, or the project's directory without one
     static final String WORKSPACE_DIR = "";

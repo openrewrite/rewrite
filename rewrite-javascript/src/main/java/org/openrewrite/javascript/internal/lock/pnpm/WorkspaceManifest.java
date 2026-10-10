@@ -24,7 +24,7 @@ import java.util.Map;
  * Port of @pnpm/workspace.workspace-manifest-reader src/index.ts and src/catalogs.ts
  * (pnpm 11.2.2).
  */
-final class WorkspaceManifest {
+public final class WorkspaceManifest {
 
     private WorkspaceManifest() {
     }
@@ -33,7 +33,7 @@ final class WorkspaceManifest {
      * {@code readWorkspaceManifest}: null for an absent or empty file; pnpm's INVALID_WORKSPACE_CONFIGURATION for one
      * it rejects, a {@link JsYaml.YamlException} for one that is not YAML.
      */
-    static @Nullable Map<String, @Nullable Object> readWorkspaceManifest(@Nullable String text) {
+    public static @Nullable Map<String, @Nullable Object> readWorkspaceManifest(@Nullable String text) {
         if (text == null) {
             return null;
         }

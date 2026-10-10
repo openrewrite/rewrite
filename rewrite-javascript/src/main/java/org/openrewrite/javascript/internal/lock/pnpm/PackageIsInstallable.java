@@ -32,7 +32,7 @@ import java.util.Map;
  */
 final class PackageIsInstallable {
 
-    static final String PNPM_VERSION = "11.2.2";
+    static final String PNPM_VERSION = Main.PNPM_VERSION;
 
     private PackageIsInstallable() {
     }

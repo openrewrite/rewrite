@@ -24,6 +24,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
+import org.openrewrite.javascript.internal.lock.pnpm.Main;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -31,9 +34,6 @@ import org.openrewrite.json.tree.JsonValue;
 import org.openrewrite.json.tree.Space;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.semver.NodeSemver;
-import org.yaml.snakeyaml.LoaderOptions;
-import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -53,8 +53,6 @@ import static java.util.Objects.requireNonNull;
 public final class PackageJsonOverrides {
 
     public static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
-
-    private static final String PNPM_RELEASE = "11.2.2";
 
     private final PackageManager pm;
     private final String packageName;
@@ -349,57 +347,26 @@ public final class PackageJsonOverrides {
         return workspace.manifest(release).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
-    // the major of the pnpm release that installs the root: the one it names, unless onFail or the workspace's
-    // pmOnFail lets the ported release run; 11 when it names none; -1 when a range leaves it open
+    // the major of the pnpm release that installs the root: the one getConfig wants, unless its onFail lets the
+    // ported release run; -1 when a range leaves it open or pnpm cannot read what the root names
     private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
-        Json devEngines = member(root, "devEngines");
-        Json engine = devEngines instanceof Json.JsonObject ?
-                member((Json.JsonObject) devEngines, "packageManager") : null;
-        String onFail = engine == null ? null : literal(engine, "onFail");
-        if (engine instanceof Json.Array && !((Json.Array) engine).getValues().isEmpty()) {
-            List<JsonValue> engines = ((Json.Array) engine).getValues();
-            int pnpm = -1;
-            for (int i = 0; i < engines.size() && pnpm < 0; i++) {
-                if ("pnpm".equals(literal(engines.get(i), "name"))) {
-                    pnpm = i;
-                }
-            }
-            engine = engines.get(Math.max(pnpm, 0));
-            String own = literal(pnpm < 0 ? engines.get(engines.size() - 1) : engine, "onFail");
-            onFail = own != null ? own : pnpm < 0 || pnpm == engines.size() - 1 ? "error" : "ignore";
+        PnpmOptions.WantedPackageManager wanted;
+        try {
+            wanted = PnpmOptions.wantedPackageManager(root.printAll(), workspace.settings());
+        } catch (RuntimeException e) {
+            return -1;
         }
-        Json name = engine instanceof Json.JsonObject ? member((Json.JsonObject) engine, "name") : null;
-        String wanted = null;
-        boolean exact = false;
-        if (truthy(name)) {
-            Json version = member((Json.JsonObject) requireNonNull(engine), "version");
-            wanted = "pnpm".equals(string(name)) ? string(version) : null;
-            if (wanted != null && NodeSemver.validRange(wanted, NodeSemver.Options.DEFAULT) == null) {
-                wanted = null;
-            }
-        } else {
-            onFail = null;
-            String named = string(member(root, "packageManager"));
-            if (named != null && named.startsWith("pnpm@") && !named.contains(":")) {
-                String version = named.substring("pnpm@".length()).split("\\+", -1)[0];
-                exact = version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT));
-                wanted = exact ? version : null;
-            }
-        }
-        Object pmOnFail = workspace.setting("pmOnFail");
-        if (pmOnFail != null && !Boolean.FALSE.equals(pmOnFail) && !"".equals(pmOnFail) &&
-            !(pmOnFail instanceof Number && (((Number) pmOnFail).doubleValue() == 0 ||
-                                             Double.isNaN(((Number) pmOnFail).doubleValue())))) {
-            onFail = String.valueOf(pmOnFail);
-        }
-        if (wanted == null || onFail != null && !"download".equals(onFail) && !"error".equals(onFail)) {
+        if (wanted == null || !"pnpm".equals(wanted.getName()) || !(wanted.getVersion() instanceof String) ||
+            !"download".equals(wanted.getOnFail()) && !"error".equals(wanted.getOnFail())) {
             return 11;
         }
-        return exact ? Integer.parseInt(wanted.substring(0, wanted.indexOf('.'))) : releaseOf(wanted);
+        String version = (String) wanted.getVersion();
+        return version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT)) ?
+                Integer.parseInt(version.substring(0, version.indexOf('.'))) : releaseOf(version);
     }
 
     private static int releaseOf(String range) {
-        if (NodeSemver.satisfies(PNPM_RELEASE, range, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        if (NodeSemver.satisfies(Main.PNPM_VERSION, range, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             return 11;
         }
         int found = -1;
@@ -627,38 +594,41 @@ public final class PackageJsonOverrides {
      */
     private static final class WorkspaceSettings {
         private final @Nullable String text;
-        private final @Nullable Object loaded;
+        private final @Nullable Map<String, @Nullable Object> loaded;
         private final @Nullable RuntimeException unreadable;
-        private @Nullable WorkspaceManifest manifest;
+        private @Nullable WorkspaceLines manifest;
         private @Nullable IllegalArgumentException refused;
         private int manifestRelease;
 
         WorkspaceSettings(@Nullable String text) {
             this.text = text;
-            Object document = null;
+            Map<String, @Nullable Object> document = null;
             RuntimeException error = null;
-            if (text != null) {
-                try {
-                    document = new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
-                } catch (RuntimeException e) {
-                    error = e;
-                }
+            try {
+                document = WorkspaceManifest.readWorkspaceManifest(text);
+            } catch (RuntimeException e) {
+                error = e;
             }
             this.loaded = document;
             this.unreadable = error;
+        }
+
+        @Nullable
+        Map<String, @Nullable Object> settings() {
+            return loaded;
         }
 
         boolean isText(@Nullable String other) {
             return text == null ? other == null : text.equals(other);
         }
 
-        WorkspaceManifest manifest(int release) {
+        WorkspaceLines manifest(int release) {
             if (manifest == null && refused == null || manifestRelease != release) {
                 manifestRelease = release;
                 manifest = null;
                 refused = null;
                 try {
-                    manifest = new WorkspaceManifest(this, release);
+                    manifest = new WorkspaceLines(this, release);
                 } catch (IllegalArgumentException e) {
                     refused = e;
                 }
@@ -671,7 +641,7 @@ public final class PackageJsonOverrides {
 
         @Nullable
         Object setting(String key) {
-            return loaded instanceof Map ? ((Map<?, ?>) loaded).get(key) : null;
+            return loaded == null ? null : loaded.get(key);
         }
 
         boolean holdsOverrides() {
@@ -684,7 +654,7 @@ public final class PackageJsonOverrides {
      * pnpm-workspace.yaml as lines, with its top-level entries and those of its {@code overrides}, edited in place
      * where pnpm's workspace manifest writer puts a new key or entry.
      */
-    private static final class WorkspaceManifest {
+    private static final class WorkspaceLines {
         private static final Pattern PLAIN_UNSAFE = Pattern.compile(
                 "^[\\n\\t ,\\[\\]{}#&*!|>'\"%@`]|^[?-]$|^[?-][ \\t]|[\\n:][ \\t]|[ \\t]\\n|[\\n\\t ]#|[\\n\\t :]$");
         private static final Pattern CORE_SCHEMA = Pattern.compile(
@@ -697,7 +667,7 @@ public final class PackageJsonOverrides {
         private final List<String> lines = new ArrayList<>();
         private final List<Entry> entries;
 
-        WorkspaceManifest(WorkspaceSettings settings, int release) {
+        WorkspaceLines(WorkspaceSettings settings, int release) {
             this.text = settings.text;
             this.release = release;
             if (text == null) {

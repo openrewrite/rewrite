@@ -153,6 +153,7 @@ class PackageJsonOverridesTest {
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":10}}} ; 11",
       "{\"devEngines\":{\"packageManager\":{\"name\":false}},\"packageManager\":\"pnpm@10.34.6\"} ; 10",
       "{\"devEngines\":{\"packageManager\":{\"name\":0}},\"packageManager\":\"pnpm@9.15.9\"} ; 9",
+      "{\"packageManager\":5} ; -1",
     })
     void thePnpmReleaseIsTheOnePnpmRuns(String root, int release) {
         assertThat(release(manifest(root), null)).isEqualTo(release);
@@ -165,6 +166,8 @@ class PackageJsonOverridesTest {
         assertThat(release(root, "pmOnFail: download\n")).isEqualTo(10);
         assertThat(release(root, "pmOnFail: ''\n")).isEqualTo(10);
         assertThat(release(root, "pmOnFail: .nan\n")).isEqualTo(10);
+        assertThat(release(root, "pmOnFail: no\n")).isEqualTo(11);
+        assertThat(release(root, "pmOnFail: off\n")).isEqualTo(11);
     }
 
     @Test

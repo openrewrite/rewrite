@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.pnpm;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
@@ -42,8 +43,8 @@ import java.util.regex.Pattern;
  * Port of @pnpm/config.reader src/index.ts {@code getConfig} (pnpm 11.2.2) and the modules it reads the project's
  * .npmrc, pnpm-workspace.yaml and environment with, for {@code pnpm install --lockfile-only}.
  */
-@Getter
-final class PnpmOptions {
+@Getter(AccessLevel.PACKAGE)
+public final class PnpmOptions {
 
     private static final Pattern CAMEL_CASE = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
     private static final Pattern ENV_EXPR = Pattern.compile("(?<!\\\\)(\\\\*)\\$\\{([^${}]+)}");
@@ -92,7 +93,7 @@ final class PnpmOptions {
 
     @Value
     @With
-    static class WantedPackageManager {
+    public static class WantedPackageManager {
         Object name;
 
         @Nullable
@@ -252,16 +253,29 @@ final class PnpmOptions {
         Object gitBranchLockfile = config.get("gitBranchLockfile");
         config.put("useGitBranchLockfile", gitBranchLockfile instanceof Boolean ? gitBranchLockfile : false);
         WantedPackageManager wantedPackageManager = rootManifest == null ? null :
-                getWantedPackageManager(rootManifest);
-        if (wantedPackageManager != null) {
-            Object pmOnFail = config.get("pmOnFail");
-            if (Js.truthy(pmOnFail)) {
-                wantedPackageManager = wantedPackageManager.withOnFail(pmOnFail);
-            } else if (wantedPackageManager.getOnFail() == null) {
-                wantedPackageManager = wantedPackageManager.withOnFail("download");
-            }
-        }
+                withPmOnFail(getWantedPackageManager(rootManifest), config.get("pmOnFail"));
         return new PnpmOptions(config, explicitlySetKeys, catalogs, registries, patterns, wantedPackageManager);
+    }
+
+    /**
+     * The release getConfig wants for the root manifest {@code rootManifest}, under the {@code pmOnFail} of the
+     * workspace's pnpm-workspace.yaml as pnpm reads it (null without one); null when the manifest names none.
+     */
+    public static @Nullable WantedPackageManager wantedPackageManager(String rootManifest,
+                                                                       @Nullable Map<String, @Nullable Object> workspace) {
+        return withPmOnFail(getWantedPackageManager(Manifests.parse(rootManifest, "package.json")),
+                workspace == null ? null : workspace.get("pmOnFail"));
+    }
+
+    private static @Nullable WantedPackageManager withPmOnFail(@Nullable WantedPackageManager pm,
+                                                               @Nullable Object pmOnFail) {
+        if (pm == null) {
+            return null;
+        }
+        if (Js.truthy(pmOnFail)) {
+            return pm.withOnFail(pmOnFail);
+        }
+        return pm.getOnFail() == null ? pm.withOnFail("download") : pm;
     }
 
     @SuppressWarnings("unchecked")
