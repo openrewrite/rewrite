@@ -83,6 +83,18 @@ class NodeCatalogsTest {
         assertThat(catalogs.specifier("default", "wrappy")).isEqualTo("1.0.1");
     }
 
+    // the writer of the release the root names: pnpm 10 sorts every level (pnpm-writes/10.34.6/unordered), 11 appends
+    @Test
+    void aNewEntryIsPlacedByTheWriterOfTheReleaseTheRootNames() {
+        String workspace = "catalog:\n  d: 1.0.0\n  b: 1.0.0\n";
+        assertThat(edited(requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(workspace),
+          "{\"packageManager\":\"pnpm@10.34.6\"}")).withEntry("default", "c", "1.0.0")))
+          .isEqualTo("catalog:\n  d: 1.0.0\n  c: 1.0.0\n  b: 1.0.0\n");
+        assertThat(edited(requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(workspace),
+          "{\"packageManager\":\"pnpm@11.2.2\"}")).withEntry("default", "c", "1.0.0")))
+          .isEqualTo("catalog:\n  d: 1.0.0\n  b: 1.0.0\n  c: 1.0.0\n");
+    }
+
     @Test
     void anEditHasThreeAnswers() {
         NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(

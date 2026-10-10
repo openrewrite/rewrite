@@ -684,10 +684,16 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private @Nullable ManagedFile managedAt(Path path, PackageManager pm) {
         if (!managed.containsKey(path)) {
             SourceFile document = pm == PackageManager.Bun ? captured(path) : yamlFiles.get(path);
-            NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(pm, document);
+            NodeCatalogs catalogs = document == null ? null : NodeCatalogs.read(pm, document, rootBeside(path));
             managed.put(path, catalogs == null ? null : new ManagedFile(catalogs, false));
         }
         return managed.get(path);
+    }
+
+    // the package.json beside a package-manager file, as scanned, which names the release that writes the file
+    private @Nullable String rootBeside(Path file) {
+        SourceFile root = captured(file.resolveSibling("package.json"));
+        return root == null ? null : print(root);
     }
 
     // a file beside the manifest the host does not hold, which the decision's edits create
@@ -697,7 +703,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         if (file == null && !scan.paths.contains(path)) {
             SourceFile empty = YamlParser.builder().build().parse(ctx, "").findFirst().orElse(null);
             NodeCatalogs catalogs = empty == null ? null :
-                    NodeCatalogs.read(PackageManager.Pnpm, empty.withSourcePath(path));
+                    NodeCatalogs.read(PackageManager.Pnpm, empty.withSourcePath(path), rootBeside(path));
             if (catalogs != null) {
                 file = new ManagedFile(catalogs, true);
                 managed.put(path, file);
@@ -899,18 +905,17 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
 
         /**
-         * Edit the text of the file {@code name} beside the manifest, which the package manager reads, creating it
-         * when the host holds none there (null text); false, editing nothing, when the edit cannot be made.
+         * Edit the file {@code name} beside the manifest, which the package manager reads, creating it when the host
+         * holds none there; false, editing nothing, when the edit cannot be made in place.
          */
-        public boolean editFileBeside(String name, Function<@Nullable String, String> edit) {
+        public boolean editFileBeside(String name, Function<NodeCatalogs, @Nullable NodeCatalogs> edit) {
             ManagedFile file = acc.managedOf(path);
             if (file == null || !file.path.equals(path.resolveSibling(name))) {
                 file = acc.created(ctx, path, name);
             }
-            boolean created = file != null && file.created;
             return edit(file, c -> {
                 try {
-                    return c.withText(edit.apply(created && c.print().isEmpty() ? null : c.print()));
+                    return edit.apply(c);
                 } catch (IllegalArgumentException e) {
                     return null;
                 }

@@ -45,7 +45,6 @@ import java.util.Objects;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static java.util.Objects.requireNonNull;
 
 /**
  * An override of a transitive dependency written where the workspace root's package manager reads it, in its own key
@@ -345,7 +344,15 @@ public final class PackageJsonOverrides {
      * new key or entry; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors).
      */
     public String applyToWorkspaceManifest() {
-        return workspace.manifest(release).withOverride(pnpmKey(packageName, path), newVersion);
+        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, PackageJsonHelper.printed(root))).print();
+    }
+
+    /**
+     * {@code workspace}, a revision of pnpm-workspace.yaml, with the override as {@link #applyToWorkspaceManifest()}
+     * writes it, by the one editor of that file.
+     */
+    public NodeCatalogs applyTo(NodeCatalogs.Pnpm workspace) {
+        return workspace.withOverride(new WorkspaceManifestWriter(release), pnpmKey(packageName, path), newVersion);
     }
 
     private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
@@ -652,28 +659,21 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * A revision of pnpm-workspace.yaml as a YAML document and as lines, each read once; no settings when absent or
-     * unreadable.
+     * A revision of pnpm-workspace.yaml as pnpm reads it, once; no settings when absent or unreadable.
      */
     private static final class WorkspaceSettings {
         private final @Nullable String text;
         private final @Nullable Map<String, @Nullable Object> loaded;
-        private final @Nullable RuntimeException unreadable;
-        private @Nullable WorkspaceLines manifest;
-        private @Nullable IllegalArgumentException refused;
-        private int manifestRelease;
 
         WorkspaceSettings(@Nullable String text) {
             this.text = text;
             Map<String, @Nullable Object> document = null;
-            RuntimeException error = null;
             try {
                 document = WorkspaceManifest.readWorkspaceManifest(text);
-            } catch (RuntimeException e) {
-                error = e;
+            } catch (RuntimeException ignored) {
+                // the editor names why pnpm rejects it
             }
             this.loaded = document;
-            this.unreadable = error;
         }
 
         @Nullable
@@ -685,23 +685,6 @@ public final class PackageJsonOverrides {
             return text == null ? other == null : text.equals(other);
         }
 
-        WorkspaceLines manifest(int release) {
-            if (manifest == null && refused == null || manifestRelease != release) {
-                manifestRelease = release;
-                manifest = null;
-                refused = null;
-                try {
-                    manifest = new WorkspaceLines(this, release);
-                } catch (IllegalArgumentException e) {
-                    refused = e;
-                }
-            }
-            if (refused != null) {
-                throw refused;
-            }
-            return requireNonNull(manifest);
-        }
-
         @Nullable
         Object setting(String key) {
             return loaded == null ? null : loaded.get(key);
@@ -710,275 +693,6 @@ public final class PackageJsonOverrides {
         boolean holdsOverrides() {
             Object overrides = setting("overrides");
             return overrides instanceof Map && !((Map<?, ?>) overrides).isEmpty();
-        }
-    }
-
-    /**
-     * pnpm-workspace.yaml as lines, with its top-level entries and those of its {@code overrides}, edited in place
-     * where pnpm's workspace manifest writer puts a new key or entry.
-     */
-    private static final class WorkspaceLines {
-        private final @Nullable String text;
-        private final WorkspaceManifestWriter writer;
-        private final List<String> lines = new ArrayList<>();
-        private final List<Entry> entries;
-
-        WorkspaceLines(WorkspaceSettings settings, int release) {
-            this.text = settings.text;
-            this.writer = new WorkspaceManifestWriter(release);
-            if (text == null) {
-                entries = emptyList();
-                return;
-            }
-            if (settings.unreadable != null) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml is not YAML pnpm reads: " +
-                                                   settings.unreadable.getMessage(), settings.unreadable);
-            }
-            if (text.indexOf('\r') >= 0) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml has CR line ends");
-            }
-            lines.addAll(Arrays.asList(text.split("\n", -1)));
-            if (lines.get(lines.size() - 1).isEmpty()) {
-                lines.remove(lines.size() - 1);
-            }
-            entries = scan(0, lines.size(), true);
-            if (!keys(entries).equals(keysOf(settings.loaded))) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping of plain keys");
-            }
-            Entry overrides = entry(entries, "overrides");
-            Object loadedOverrides = overrides == null ? null : settings.setting("overrides");
-            if (overrides != null && (overrides.inline != null ||
-                                      !keys(children(overrides)).equals(keysOf(loadedOverrides)))) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
-            }
-        }
-
-        String withOverride(String key, String value) {
-            String entry = WorkspaceManifestWriter.scalar(key) + ": " + WorkspaceManifestWriter.scalar(value);
-            List<String> out = new ArrayList<>(lines);
-            Entry overrides = entry(entries, "overrides");
-            if (entries.isEmpty()) {
-                if (!out.isEmpty() && !out.get(out.size() - 1).trim().isEmpty()) {
-                    out.add("");
-                }
-                out.add("overrides:");
-                out.add("  " + entry);
-            } else if (overrides == null) {
-                out.addAll(topLevelIndex(), topLevelBlock(entry));
-            } else {
-                List<Entry> children = children(overrides);
-                Entry existing = entry(children, key);
-                if (existing != null) {
-                    if (existing.inline == null || existing.end > existing.keyLine + 1) {
-                        throw new IllegalArgumentException("pnpm-workspace.yaml's override of " + key +
-                                                           " is not a scalar");
-                    }
-                    if (value.equals(unquote(existing.inline))) {
-                        return requireNonNull(text);
-                    }
-                    out.set(existing.keyLine, lines.get(existing.keyLine).substring(0, existing.valueStart) +
-                                              restyle(existing.inline, value) + existing.comment);
-                } else if (children.isEmpty()) {
-                    out.add(overrides.keyLine + 1, "  " + entry);
-                } else {
-                    String indent = lines.get(children.get(0).keyLine).substring(0, children.get(0).indent);
-                    int at = writer.insertionIndex(keys(children), key);
-                    out.add(at < children.size() ? children.get(at).prefixStart :
-                            children.get(children.size() - 1).end, indent + entry);
-                }
-            }
-            return String.join("\n", out) + "\n";
-        }
-
-        private int topLevelIndex() {
-            int at = writer.insertionIndex(keys(entries), "overrides");
-            return at < entries.size() ? entries.get(at).prefixStart : entries.get(entries.size() - 1).end;
-        }
-
-        private List<String> topLevelBlock(String entry) {
-            int at = writer.insertionIndex(keys(entries), "overrides");
-            List<Boolean> blankBefore = new ArrayList<>();
-            for (Entry e : entries) {
-                blankBefore.add(e.spaceBefore);
-            }
-            List<String> block = new ArrayList<>();
-            if (writer.blankBefore(blankBefore, at)) {
-                block.add("");
-            }
-            block.add("overrides:");
-            block.add("  " + entry);
-            int trailer = entries.get(entries.size() - 1).end;
-            if (at == 0 && writer.blankLineStyle(blankBefore) && !entries.get(0).spaceBefore ||
-                at == entries.size() && trailer < lines.size() && !lines.get(trailer).trim().isEmpty()) {
-                block.add("");
-            }
-            return block;
-        }
-
-        // the entries of lines [from, to) whose keys sit at the column of the first key there
-        private List<Entry> scan(int from, int to, boolean topLevel) {
-            List<Entry> found = new ArrayList<>();
-            int column = -1;
-            int lastContent = from - 1;
-            Entry current = null;
-            for (int i = from; i < to; i++) {
-                String line = lines.get(i);
-                String trimmed = line.trim();
-                int indent = 0;
-                while (indent < line.length() && (line.charAt(indent) == ' ' || line.charAt(indent) == '\t')) {
-                    indent++;
-                }
-                if (trimmed.isEmpty() || trimmed.startsWith("#") && (column < 0 || indent <= column)) {
-                    continue;
-                }
-                if (topLevel && (line.startsWith("---") || line.startsWith("...") || line.startsWith("%"))) {
-                    throw new IllegalArgumentException("pnpm-workspace.yaml has document markers");
-                }
-                if (column < 0) {
-                    column = indent;
-                }
-                boolean sequenceItem = "-".equals(trimmed) || trimmed.startsWith("- ");
-                if (indent == column && !sequenceItem) {
-                    if (current != null) {
-                        current.end = lastContent + 1;
-                    }
-                    current = Entry.parse(line, i, indent, lastContent + 1, blankBetween(lastContent + 1, i));
-                    found.add(current);
-                } else if (indent < column || current == null) {
-                    throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping");
-                }
-                lastContent = i;
-            }
-            if (current != null) {
-                current.end = lastContent + 1;
-            }
-            return found;
-        }
-
-        private List<Entry> children(Entry parent) {
-            return parent.inline != null ? emptyList() : scan(parent.keyLine + 1, parent.end, false);
-        }
-
-        private boolean blankBetween(int from, int to) {
-            for (int i = from; i < to; i++) {
-                if (lines.get(i).trim().isEmpty()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private static @Nullable Entry entry(List<Entry> entries, String key) {
-            for (Entry e : entries) {
-                if (e.key.equals(key)) {
-                    return e;
-                }
-            }
-            return null;
-        }
-
-        private static List<String> keys(List<Entry> entries) {
-            List<String> keys = new ArrayList<>();
-            for (Entry e : entries) {
-                keys.add(e.key);
-            }
-            return keys;
-        }
-
-        private static List<?> keysOf(@Nullable Object loaded) {
-            if (loaded == null) {
-                return emptyList();
-            }
-            if (!(loaded instanceof Map)) {
-                throw new IllegalArgumentException("pnpm-workspace.yaml is not a mapping");
-            }
-            return new ArrayList<>(((Map<?, ?>) loaded).keySet());
-        }
-
-        // a scalar keeps its quotes when its value changes
-        private static String restyle(String old, String value) {
-            if (old.startsWith("'")) {
-                return "'" + value.replace("'", "''") + "'";
-            }
-            return old.startsWith("\"") ? WorkspaceManifestWriter.doubleQuoted(value) :
-                    WorkspaceManifestWriter.scalar(value);
-        }
-
-        private static String unquote(String scalar) {
-            if (scalar.length() >= 2 && scalar.startsWith("'") && scalar.endsWith("'")) {
-                return scalar.substring(1, scalar.length() - 1).replace("''", "'");
-            }
-            if (scalar.length() >= 2 && scalar.startsWith("\"") && scalar.endsWith("\"")) {
-                return scalar.substring(1, scalar.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
-            }
-            return scalar;
-        }
-
-        private static final class Entry {
-            final String key;
-            final int keyLine;
-            final int indent;
-            final int prefixStart;
-            final boolean spaceBefore;
-            final int valueStart;
-            final @Nullable String inline;
-            final String comment;
-            int end;
-
-            Entry(String key, int keyLine, int indent, int prefixStart, boolean spaceBefore, int valueStart,
-                  @Nullable String inline, String comment) {
-                this.key = key;
-                this.keyLine = keyLine;
-                this.indent = indent;
-                this.prefixStart = prefixStart;
-                this.spaceBefore = spaceBefore;
-                this.valueStart = valueStart;
-                this.inline = inline;
-                this.comment = comment;
-            }
-
-            static Entry parse(String line, int keyLine, int indent, int prefixStart, boolean spaceBefore) {
-                char first = line.charAt(indent);
-                int colon;
-                String key;
-                if (first == '\'' || first == '"') {
-                    int close = indent + 1;
-                    while (close < line.length() && line.charAt(close) != first) {
-                        close += first == '"' && line.charAt(close) == '\\' ||
-                                 first == '\'' && line.startsWith("''", close) ? 2 : 1;
-                    }
-                    key = unquote(line.substring(indent, Math.min(close + 1, line.length())));
-                    colon = close + 1;
-                    while (colon < line.length() && line.charAt(colon) == ' ') {
-                        colon++;
-                    }
-                    if (colon >= line.length() || line.charAt(colon) != ':') {
-                        throw new IllegalArgumentException("pnpm-workspace.yaml has a key it cannot read: " + line);
-                    }
-                } else {
-                    colon = line.indexOf(':', indent);
-                    while (colon >= 0 && colon + 1 < line.length() && line.charAt(colon + 1) != ' ' &&
-                           line.charAt(colon + 1) != '\t') {
-                        colon = line.indexOf(':', colon + 1);
-                    }
-                    if (colon < 0 || first == '?' || first == '{' || first == '[') {
-                        throw new IllegalArgumentException("pnpm-workspace.yaml has a key it cannot read: " + line);
-                    }
-                    key = line.substring(indent, colon).trim();
-                }
-                int valueStart = colon + 1;
-                while (valueStart < line.length() && line.charAt(valueStart) == ' ') {
-                    valueStart++;
-                }
-                String rest = line.substring(valueStart);
-                int hash = rest.startsWith("'") || rest.startsWith("\"") ? -1 : rest.indexOf(" #");
-                String value = (hash < 0 ? rest : rest.substring(0, hash)).trim();
-                if (!value.isEmpty() && "&*|>!{[".indexOf(value.charAt(0)) >= 0) {
-                    throw new IllegalArgumentException("pnpm-workspace.yaml has a value it does not edit: " + line);
-                }
-                return new Entry(key, keyLine, indent, prefixStart, spaceBefore, valueStart,
-                        value.isEmpty() ? null : value, hash < 0 ? "" : rest.substring(hash));
-            }
         }
     }
 }

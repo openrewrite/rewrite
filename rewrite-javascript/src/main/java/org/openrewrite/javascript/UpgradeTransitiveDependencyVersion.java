@@ -157,8 +157,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             decision.decline(outranked);
         }
         if (inWorkspace) {
-            decision.editFileBeside(WORKSPACE_MANIFEST, text -> override.from(manifest, text)
-                    .applyToWorkspaceManifest());
+            decision.editFileBeside(WORKSPACE_MANIFEST, c -> c instanceof NodeCatalogs.Pnpm ?
+                    override.from(manifest, c.print()).applyTo((NodeCatalogs.Pnpm) c) : null);
         } else {
             decision.editManifest(override::apply);
         }

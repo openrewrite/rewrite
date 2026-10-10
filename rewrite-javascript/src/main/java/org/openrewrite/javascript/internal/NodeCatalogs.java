@@ -17,18 +17,22 @@ package org.openrewrite.javascript.internal;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.YamlParser;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -42,6 +46,7 @@ import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -52,7 +57,6 @@ import static org.openrewrite.Tree.randomId;
 public abstract class NodeCatalogs {
 
     private static final String PROTOCOL = "catalog:";
-    private static final WorkspaceManifestWriter WRITER = new WorkspaceManifestWriter(11);
 
     /**
      * The file the package manager reads them from.
@@ -84,8 +88,17 @@ public abstract class NodeCatalogs {
      * from, or a Bun package.json without workspaces.
      */
     public static @Nullable NodeCatalogs read(@Nullable PackageManager pm, SourceFile document) {
+        return read(pm, document, null);
+    }
+
+    /**
+     * As {@link #read(PackageManager, SourceFile)}, pnpm's placed by the writer of the release {@code rootManifest}
+     * names (the ported one when it names none).
+     */
+    public static @Nullable NodeCatalogs read(@Nullable PackageManager pm, SourceFile document,
+                                              @Nullable String rootManifest) {
         if (pm == PackageManager.Pnpm && document instanceof Yaml.Documents) {
-            return new Pnpm((Yaml.Documents) document);
+            return new Pnpm((Yaml.Documents) document, rootManifest);
         }
         if (pm == PackageManager.YarnBerry && document instanceof Yaml.Documents) {
             return new YarnBerry((Yaml.Documents) document);
@@ -148,13 +161,6 @@ public abstract class NodeCatalogs {
 
     abstract NodeCatalogs reread(SourceFile edited);
 
-    /**
-     * The file as {@code text}, read again.
-     */
-    NodeCatalogs withText(String text) {
-        return reread(PackageJsonHelper.reparseLock(document, text));
-    }
-
     private static boolean isVersionSpec(String alias, String value) {
         Spec spec = Spec.ofDependencyOrNull(alias, value);
         return spec != null && spec.isVersionSpec();
@@ -168,12 +174,26 @@ public abstract class NodeCatalogs {
 
         private static final String DEFAULT = "default";
 
+        private final @Nullable String rootManifest;
         private @Nullable Map<String, @Nullable Object> settings;
         private boolean settingsRead;
-        private boolean rejected;
+        private @Nullable RuntimeException rejection;
 
-        Pnpm(Yaml.Documents document) {
+        Pnpm(Yaml.Documents document, @Nullable String rootManifest) {
             super(document, read(yamlRoot(document)));
+            this.rootManifest = rootManifest;
+        }
+
+        /**
+         * pnpm-workspace.yaml as {@code text} (none when null), for the release {@code rootManifest} names.
+         */
+        static Pnpm parse(@Nullable String text, String rootManifest) {
+            SourceFile parsed = YamlParser.builder().build().parse(new InMemoryExecutionContext(),
+                    text == null ? "" : text).findFirst().orElseThrow(IllegalStateException::new);
+            if (!(parsed instanceof Yaml.Documents)) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not YAML pnpm reads");
+            }
+            return new Pnpm((Yaml.Documents) parsed.withSourcePath(Paths.get("pnpm-workspace.yaml")), rootManifest);
         }
 
         /**
@@ -186,7 +206,7 @@ public abstract class NodeCatalogs {
                 try {
                     settings = WorkspaceManifest.readWorkspaceManifest(print());
                 } catch (RuntimeException e) {
-                    rejected = true;
+                    rejection = e;
                 }
             }
             return settings;
@@ -197,8 +217,167 @@ public abstract class NodeCatalogs {
          */
         public boolean isRejected() {
             getSettings();
-            return rejected;
+            return rejection != null;
         }
+
+        // the release's writer; one pnpm does not write with is the ported release's
+        @Override
+        WorkspaceManifestWriter writer() {
+            int release = PnpmOptions.releaseMajor(rootManifest == null ? "{}" : rootManifest, getSettings());
+            return new WorkspaceManifestWriter(release >= 9 && release <= 11 ? release : 11);
+        }
+
+        /**
+         * The file with the override {@code key: value} where pnpm's writer puts a new entry, an existing one's
+         * value replaced with its quotes kept; this one when it holds that value.
+         * @throws IllegalArgumentException naming why the file is not edited in place
+         */
+        public NodeCatalogs withOverride(WorkspaceManifestWriter writer, String key, String value) {
+            if (rejection != null || isRejected()) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not YAML pnpm reads: " +
+                                                   requireNonNull(rejection).getMessage(), rejection);
+            }
+            Yaml.Documents docs = (Yaml.Documents) getDocument();
+            if (print().indexOf('\r') >= 0) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has CR line ends");
+            }
+            if (docs.getDocuments().size() > 1 || !docs.getDocuments().isEmpty() &&
+                                                  (docs.getDocuments().get(0).isExplicit() ||
+                                                   docs.getDocuments().get(0).getEnd().isExplicit())) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has document markers");
+            }
+            Yaml.Mapping root = yamlRoot(docs);
+            Map<String, @Nullable Object> read = getSettings();
+            if (root == null ? read != null && !read.isEmpty() : !keys(root).equals(keysOf(read))) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping of plain keys");
+            }
+            Yaml.Mapping overrides = root == null ? null : blockMapping(root, "overrides");
+            for (Yaml.Mapping.Entry entry : root == null ? Collections.<Yaml.Mapping.Entry>emptyList() :
+                    root.getEntries()) {
+                requireEditable(entry);
+                if ("overrides".equals(entry.getKey().getValue()) &&
+                    (overrides == null && !emptyBlock(entry.getValue()) ||
+                     overrides != null && !keys(overrides).equals(keysOf(read == null ? null :
+                             read.get("overrides"))))) {
+                    throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
+                }
+            }
+            if (overrides != null) {
+                for (Yaml.Mapping.Entry entry : overrides.getEntries()) {
+                    requireEditable(entry);
+                    if (key.equals(entry.getKey().getValue()) && !(entry.getValue() instanceof Yaml.Scalar)) {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml's override of " + key +
+                                                           " is not a scalar");
+                    }
+                }
+            }
+            Yaml.Scalar existing = entryScalar(root, singletonList("overrides"), key);
+            if (existing != null) {
+                if (value.equals(unescaped(existing))) {
+                    return this;
+                }
+                return reread(replaceScalar(docs, existing, restyled(existing, value)));
+            }
+            Yaml.Mapping base = root == null ?
+                    new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
+            if (root != null && overrides == null && mapping(root, "overrides") == null && has(root, "overrides")) {
+                Yaml.Mapping child = insert(new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null,
+                        null), newEntry(indentUnit(root), key, scalar(" ", value)), false, writer);
+                return reread(withRoot(docs, withValue(root, "overrides", child)));
+            }
+            Yaml.Mapping edited = put(base, singletonList("overrides"), 0, key, value, indentUnit(base), writer);
+            if (edited == null) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
+            }
+            return reread(withRoot(docs, edited));
+        }
+
+        // a value written inline is a plain or quoted scalar, or a block on the lines below
+        private static void requireEditable(Yaml.Mapping.Entry entry) {
+            Yaml.Block value = entry.getValue();
+            boolean inline = value instanceof Yaml.Scalar && (((Yaml.Scalar) value).getStyle() ==
+                                                              Yaml.Scalar.Style.LITERAL || ((Yaml.Scalar) value)
+                                                                      .getStyle() == Yaml.Scalar.Style.FOLDED ||
+                                                              ((Yaml.Scalar) value).getAnchor() != null ||
+                                                              ((Yaml.Scalar) value).getTag() != null ||
+                                                              ((Yaml.Scalar) value).getStyle() ==
+                                                              Yaml.Scalar.Style.PLAIN &&
+                                                              ((Yaml.Scalar) value).getValue().startsWith("{"));
+            if (inline || value instanceof Yaml.Alias ||
+                value instanceof Yaml.Mapping && (((Yaml.Mapping) value).getOpeningBracePrefix() != null ||
+                                                  ((Yaml.Mapping) value).getAnchor() != null ||
+                                                  ((Yaml.Mapping) value).getTag() != null) ||
+                value instanceof Yaml.Sequence && (((Yaml.Sequence) value).getOpeningBracketPrefix() != null ||
+                                                   ((Yaml.Sequence) value).getAnchor() != null ||
+                                                   ((Yaml.Sequence) value).getTag() != null)) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has a value it does not edit: " +
+                                                   entry.getKey().getValue());
+            }
+        }
+
+        // a key without a value, which pnpm reads as null
+        private static boolean emptyBlock(Yaml.Block value) {
+            return value instanceof Yaml.Scalar && ((Yaml.Scalar) value).getStyle() == Yaml.Scalar.Style.PLAIN &&
+                   ((Yaml.Scalar) value).getValue().isEmpty();
+        }
+
+        private static boolean has(Yaml.Mapping mapping, String key) {
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                if (key.equals(entry.getKey().getValue())) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static Yaml.Mapping withValue(Yaml.Mapping mapping, String key, Yaml.Block value) {
+            List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
+            for (int i = 0; i < entries.size(); i++) {
+                if (key.equals(entries.get(i).getKey().getValue())) {
+                    entries.set(i, entries.get(i).withValue(value));
+                }
+            }
+            return mapping.withEntries(entries);
+        }
+
+        private static Yaml.@Nullable Mapping blockMapping(Yaml.Mapping mapping, String key) {
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                if (key.equals(entry.getKey().getValue()) && entry.getValue() instanceof Yaml.Mapping &&
+                    ((Yaml.Mapping) entry.getValue()).getOpeningBracePrefix() == null) {
+                    return (Yaml.Mapping) entry.getValue();
+                }
+            }
+            return null;
+        }
+
+        private static List<String> keys(Yaml.Mapping mapping) {
+            List<String> keys = new ArrayList<>();
+            for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
+                if (!(entry.getKey() instanceof Yaml.Scalar) ||
+                    ((Yaml.Scalar) entry.getKey()).getStyle() == Yaml.Scalar.Style.LITERAL ||
+                    ((Yaml.Scalar) entry.getKey()).getStyle() == Yaml.Scalar.Style.FOLDED) {
+                    throw new IllegalArgumentException("pnpm-workspace.yaml has a key it cannot read: " +
+                                                       entry.getKey().getValue());
+                }
+                keys.add(unescaped((Yaml.Scalar) entry.getKey()));
+            }
+            return keys;
+        }
+
+        private static List<String> keysOf(@Nullable Object loaded) {
+            if (loaded == null) {
+                return emptyList();
+            }
+            if (!(loaded instanceof Map)) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not a mapping");
+            }
+            List<String> keys = new ArrayList<>();
+            for (Object key : ((Map<?, ?>) loaded).keySet()) {
+                keys.add(String.valueOf(key));
+            }
+            return keys;
+        }
+
 
         private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
             Map<String, Map<String, String>> catalogs = new LinkedHashMap<>();
@@ -302,7 +481,7 @@ public abstract class NodeCatalogs {
 
         @Override
         NodeCatalogs reread(SourceFile edited) {
-            return new Pnpm((Yaml.Documents) edited);
+            return new Pnpm((Yaml.Documents) edited, rootManifest);
         }
 
         // pnpm writes the default catalog where it is, `catalog` when it is neither place
@@ -378,6 +557,12 @@ public abstract class NodeCatalogs {
         @Override
         NodeCatalogs reread(SourceFile edited) {
             return new YarnBerry((Yaml.Documents) edited);
+        }
+
+        // .yarnrc.yml takes a new key where pnpm 11's writer would
+        @Override
+        WorkspaceManifestWriter writer() {
+            return new WorkspaceManifestWriter(11);
         }
 
         @Override
@@ -511,6 +696,11 @@ public abstract class NodeCatalogs {
          */
         abstract List<String> yamlPath(String catalog);
 
+        /**
+         * Where a new key goes and its blank line.
+         */
+        abstract WorkspaceManifestWriter writer();
+
         @Override
         public boolean isFlowStyle() {
             return flowStyle;
@@ -548,7 +738,7 @@ public abstract class NodeCatalogs {
                     new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
             Yaml.Mapping edited;
             try {
-                edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base));
+                edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base), writer());
             } catch (IllegalArgumentException e) {
                 return null;
             }
@@ -564,10 +754,7 @@ public abstract class NodeCatalogs {
             }
             Yaml.Scalar rewritten;
             try {
-                Yaml.Scalar written = scalar("", specifier);
-                rewritten = scalar.getStyle() == Yaml.Scalar.Style.PLAIN ?
-                        scalar.withStyle(written.getStyle()).withValue(written.getValue()) :
-                        scalar.withValue(specifier);
+                rewritten = restyled(scalar, specifier);
             } catch (IllegalArgumentException e) {
                 return null;
             }
@@ -607,12 +794,38 @@ public abstract class NodeCatalogs {
         return (Yaml.Mapping) docs.getDocuments().get(0).getBlock();
     }
 
+    // the document with a new root; a top-level key added first to a document without one, or last before a trailing
+    // comment, is laid out as pnpm's writer leaves the text around it: a blank line between, and a final newline
     private static SourceFile withRoot(Yaml.Documents docs, Yaml.Mapping root) {
         if (docs.getDocuments().isEmpty()) {
             return docs;
         }
+        Yaml.Document document = docs.getDocuments().get(0);
+        Yaml.Document.End end = document.getEnd();
+        Yaml.Mapping placed = root;
+        boolean held = document.getBlock() instanceof Yaml.Mapping &&
+                       !((Yaml.Mapping) document.getBlock()).getEntries().isEmpty();
+        if (!held && !root.getEntries().isEmpty()) {
+            if (!document.getPrefix().trim().isEmpty() && !document.getPrefix().endsWith("\n\n")) {
+                List<Yaml.Mapping.Entry> entries = new ArrayList<>(root.getEntries());
+                entries.set(0, entries.get(0).withPrefix("\n" + entries.get(0).getPrefix()));
+                placed = root.withEntries(entries);
+            }
+            if (!end.getPrefix().endsWith("\n")) {
+                end = end.withPrefix(end.getPrefix() + "\n");
+            }
+        } else if (held && !root.getEntries().isEmpty()) {
+            String last = root.getEntries().get(root.getEntries().size() - 1).getKey().getValue();
+            boolean added = true;
+            for (Yaml.Mapping.Entry entry : ((Yaml.Mapping) document.getBlock()).getEntries()) {
+                added &= !last.equals(entry.getKey().getValue());
+            }
+            if (added && !end.getPrefix().trim().isEmpty() && !end.getPrefix().startsWith("\n\n")) {
+                end = end.withPrefix("\n" + end.getPrefix());
+            }
+        }
         List<Yaml.Document> documents = new ArrayList<>(docs.getDocuments());
-        documents.set(0, documents.get(0).withBlock(root));
+        documents.set(0, document.withBlock(placed).withEnd(end));
         return docs.withDocuments(documents);
     }
 
@@ -674,10 +887,37 @@ public abstract class NodeCatalogs {
         }.visitNonNull(docs, 0);
     }
 
+    // a scalar given a new value keeps its quotes, escaped as they need; a plain one is written as pnpm's yaml writes it
+    private static Yaml.Scalar restyled(Yaml.Scalar scalar, String value) {
+        switch (scalar.getStyle()) {
+            case SINGLE_QUOTED:
+                WorkspaceManifestWriter.scalar(value);
+                return scalar.withValue(value.replace("'", "''"));
+            case DOUBLE_QUOTED:
+                WorkspaceManifestWriter.scalar(value);
+                String quoted = WorkspaceManifestWriter.doubleQuoted(value);
+                return scalar.withValue(quoted.substring(1, quoted.length() - 1));
+            default:
+                Yaml.Scalar written = scalar("", value);
+                return scalar.withStyle(written.getStyle()).withValue(written.getValue());
+        }
+    }
+
+    // a scalar's value: a quoted one's text without its escapes
+    private static String unescaped(Yaml.Scalar scalar) {
+        if (scalar.getStyle() == Yaml.Scalar.Style.SINGLE_QUOTED) {
+            return scalar.getValue().replace("''", "'");
+        }
+        if (scalar.getStyle() == Yaml.Scalar.Style.DOUBLE_QUOTED) {
+            return scalar.getValue().replace("\\\"", "\"").replace("\\\\", "\\");
+        }
+        return scalar.getValue();
+    }
+
     // `mapping` with `alias: specifier` under the keys path[depth..], each created where missing; null where a key on
     // the path holds no block mapping
     private static Yaml.@Nullable Mapping put(Yaml.Mapping mapping, List<String> path, int depth, String alias,
-                                              String specifier, String unit) {
+                                              String specifier, String unit, WorkspaceManifestWriter writer) {
         String indent = depth == 0 ? "" : repeat(unit, depth);
         if (depth == path.size()) {
             for (Yaml.Mapping.Entry entry : mapping.getEntries()) {
@@ -685,7 +925,7 @@ public abstract class NodeCatalogs {
                     return null;
                 }
             }
-            return insert(mapping, newEntry(indent, alias, scalar(" ", specifier)), false);
+            return insert(mapping, newEntry(indent, alias, scalar(" ", specifier)), false, writer);
         }
         String key = path.get(depth);
         for (int i = 0; i < mapping.getEntries().size(); i++) {
@@ -694,7 +934,8 @@ public abstract class NodeCatalogs {
                 if (!(entry.getValue() instanceof Yaml.Mapping)) {
                     return null;
                 }
-                Yaml.Mapping child = put((Yaml.Mapping) entry.getValue(), path, depth + 1, alias, specifier, unit);
+                Yaml.Mapping child = put((Yaml.Mapping) entry.getValue(), path, depth + 1, alias, specifier, unit,
+                        writer);
                 if (child == null) {
                     return null;
                 }
@@ -704,12 +945,13 @@ public abstract class NodeCatalogs {
             }
         }
         Yaml.Mapping child = put(new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null),
-                path, depth + 1, alias, specifier, unit);
-        return child == null ? null : insert(mapping, newEntry(indent, key, child), depth == 0);
+                path, depth + 1, alias, specifier, unit, writer);
+        return child == null ? null : insert(mapping, newEntry(indent, key, child), depth == 0, writer);
     }
 
     // where pnpm's writer puts a new key and, at the top level, its blank line
-    private static Yaml.Mapping insert(Yaml.Mapping mapping, Yaml.Mapping.Entry entry, boolean topLevel) {
+    private static Yaml.Mapping insert(Yaml.Mapping mapping, Yaml.Mapping.Entry entry, boolean topLevel,
+                                       WorkspaceManifestWriter writer) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
         List<String> keys = new ArrayList<>();
         List<Boolean> blankBefore = new ArrayList<>();
@@ -717,15 +959,15 @@ public abstract class NodeCatalogs {
             keys.add(e.getKey().getValue());
             blankBefore.add(e.getPrefix().startsWith("\n\n"));
         }
-        int at = WRITER.insertionIndex(keys, entry.getKey().getValue());
+        int at = writer.insertionIndex(keys, entry.getKey().getValue());
         if (topLevel && entries.isEmpty()) {
             entry = entry.withPrefix("");
         } else if (topLevel && at == 0) {
             Yaml.Mapping.Entry first = entries.get(0);
             entry = entry.withPrefix(first.getPrefix());
-            entries.set(0, first.withPrefix(WRITER.blankLineStyle(blankBefore) ? "\n\n" : "\n"));
+            entries.set(0, first.withPrefix(writer.blankLineStyle(blankBefore) ? "\n\n" : "\n"));
         } else if (topLevel) {
-            entry = entry.withPrefix(WRITER.blankBefore(blankBefore, at) ? "\n\n" : "\n");
+            entry = entry.withPrefix(writer.blankBefore(blankBefore, at) ? "\n\n" : "\n");
         }
         entries.add(at, entry);
         return mapping.withEntries(entries);
