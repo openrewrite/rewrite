@@ -261,9 +261,11 @@ public class NpmOptions {
 
     /**
      * The options of the user's config (the host's registries; null for none) and a project's {@code .npmrc} over it,
-     * as npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, follows the environment.
+     * as npm's config loads them; a {@code ${VAR}} in a key read, or one it could expand to, is cannot-know.
      */
-    public static NpmOptions fromNpmrc(@Nullable NodeRegistries user, @Nullable String npmrc, HostEnvironment env) {
+    public static NpmOptions fromNpmrc(@Nullable NodeRegistries user, @Nullable String npmrc) {
+        // npm reads no file that sets a variable, and the host does not know the environment npm runs in
+        HostEnvironment env = HostEnvironment.UNKNOWN;
         NpmOptionsBuilder options = builder();
         Map<String, String> scopedRegistries = new LinkedHashMap<>();
         if (user != null) {
@@ -561,7 +563,7 @@ public class NpmOptions {
     }
 
     // @npmcli/config env-replace.js: an unset ${NAME} stays as written, ${NAME?} is empty, an escaped one literal
-    private static String envReplace(String f, HostEnvironment env) {
+    static String envReplace(String f, HostEnvironment env) {
         Matcher m = ENV_EXPR.matcher(f);
         StringBuffer out = new StringBuffer();
         while (m.find()) {

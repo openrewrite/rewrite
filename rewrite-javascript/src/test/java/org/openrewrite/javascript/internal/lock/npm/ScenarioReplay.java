@@ -20,7 +20,6 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.Host;
-import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.NpmRegistryPackuments;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
@@ -177,11 +176,11 @@ final class ScenarioReplay {
 
     static NpmOptions options(NpmScenarios.Scenario scenario) {
         String npmrc = scenario.npmrc() == null ? "" : scenario.npmrc() + "\n";
-        return NpmOptions.fromNpmrc(scenario.userConfig(), npmrc + scenario.argsAfter(), HostEnvironment.UNKNOWN);
+        return NpmOptions.fromNpmrc(scenario.userConfig(), npmrc + scenario.argsAfter());
     }
 
     static NpmOptions options(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(null, npmrc, HostEnvironment.UNKNOWN);
+        return NpmOptions.fromNpmrc(null, npmrc);
     }
 
     static NpmLockRegenerator.Inputs inputs(NpmScenarios.Edit edit) {

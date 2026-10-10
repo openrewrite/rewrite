@@ -37,7 +37,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class NpmOptionsTest {
 
     private static NpmOptions fromNpmrc(@Nullable String npmrc) {
-        return NpmOptions.fromNpmrc(null, npmrc, HostEnvironment.UNKNOWN);
+        return NpmOptions.fromNpmrc(null, npmrc);
     }
 
     @Test
@@ -94,12 +94,11 @@ class NpmOptionsTest {
         types.put("@types", "https://registry.npmmirror.com/");
         NodeRegistries user = ScenarioReplay.registries("https://registry.npmmirror.com/", types);
 
-        NpmOptions userOnly = NpmOptions.fromNpmrc(user, null, HostEnvironment.UNKNOWN);
+        NpmOptions userOnly = NpmOptions.fromNpmrc(user, null);
         assertThat(userOnly.registryFor("ms")).isEqualTo("https://registry.npmmirror.com/");
         assertThat(userOnly.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
 
-        NpmOptions project = NpmOptions.fromNpmrc(user, "registry=https://registry.yarnpkg.com/\n",
-          HostEnvironment.UNKNOWN);
+        NpmOptions project = NpmOptions.fromNpmrc(user, "registry=https://registry.yarnpkg.com/\n");
         assertThat(project.registryFor("ms")).isEqualTo("https://registry.yarnpkg.com/");
         assertThat(project.registryFor("@types/ms")).isEqualTo("https://registry.npmmirror.com/");
         assertThat(fromNpmrc("registry=https://registry.yarnpkg.com/\n").registryFor("@types/ms"))
@@ -280,19 +279,30 @@ class NpmOptionsTest {
           .hasMessage("Invalid lockfileVersion config: NaN");
     }
 
-    // @npmcli/config env-replace.js under an environment the host knows: a set variable expands, an unset one stays
-    // as written, or is empty under ?
-    @Test
-    void environmentReferencesTheHostKnows() {
+    // @npmcli/config 10.11.0 test/env-replace.js (npm 11.17.0), every case, under the environment it names
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "${foo}|bar",
+      "${foo?}|bar",
+      "${foo}${bar}|barbaz",
+      "${foo?}${baz?}|bar",
+      "\\${foo}|${foo}",
+      "\\\\${foo}|\\bar",
+      "\\\\\\${foo}|\\${foo}",
+      "${baz}|${baz}",
+      "\\${baz}|${baz}",
+      "\\\\${baz}|\\${baz}",
+      "\\${foo?}|${foo?}",
+      "\\\\${foo?}|\\bar",
+      "${baz?}|''",
+      "\\${baz?}|${baz?}",
+      "\\\\${baz?}|\\"
+    })
+    void envReplaceAsNpmsOwnTests(String f, String expected) {
         Map<String, String> env = new HashMap<>();
-        env.put("LFV", "2");
-        env.put("K", "legacy");
-        HostEnvironment known = HostEnvironment.of(env);
-        assertThat(NpmOptions.fromNpmrc(null, "lockfile-version=${LFV}\n", known).getLockfileVersion()).isEqualTo(2);
-        assertThat(NpmOptions.fromNpmrc(null, "${K}-peer-deps=true\n", known).isLegacyPeerDeps()).isTrue();
-        assertThat(NpmOptions.fromNpmrc(null, "legacy-peer-deps=${LPD?}\n", known).isLegacyPeerDeps()).isFalse();
-        assertThatThrownBy(() -> NpmOptions.fromNpmrc(null, "lockfile-version=${UNSET}\n", known))
-          .hasMessage("Invalid lockfileVersion config: NaN");
+        env.put("foo", "bar");
+        env.put("bar", "baz");
+        assertThat(NpmOptions.envReplace(f, HostEnvironment.of(env))).isEqualTo(expected);
     }
 
     // installed with npm 11.17.0: a truthy global-style or legacy-bundling overrides install-strategy wherever it
