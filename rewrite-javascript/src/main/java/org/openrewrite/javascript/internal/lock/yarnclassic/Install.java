@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
+import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
 import java.util.ArrayList;
@@ -94,7 +95,7 @@ final class Install {
         ResolutionMap resolutionMap = new ResolutionMap(options);
         InstallCwdRequest request = fetchRequestFromCwd(lockfile, resolutionMap);
         String rootText = inputs.getManifests().get("");
-        if (rootText != null && Js.jsonParse(LockfileParser.stripBom(rootText)) instanceof List) {
+        if (rootText != null && Js.jsonParse(StripBom.stripBom(rootText)) instanceof List) {
             throw Rejected.rejects(Reason.MALFORMED_MANIFEST, "package.json is an array, not an object: yarn writes " +
                                                               "a lock with no entries");
         }

@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
+import org.openrewrite.javascript.internal.lock.StripBom;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -428,15 +429,11 @@ final class LockfileParser {
      * The module's default export.
      */
     static ParseResult parseLockfile(String str, String fileLoc) {
-        str = stripBom(str);
+        str = StripBom.stripBom(str);
         return hasMergeConflicts(str) ? parseWithConflict(str, fileLoc) : new ParseResult(SUCCESS, parse(str, fileLoc));
     }
 
     static ParseResult parseLockfile(String str) {
         return parseLockfile(str, "lockfile");
-    }
-
-    static String stripBom(String str) {
-        return !str.isEmpty() && str.charAt(0) == '\uFEFF' ? str.substring(1) : str;
     }
 }

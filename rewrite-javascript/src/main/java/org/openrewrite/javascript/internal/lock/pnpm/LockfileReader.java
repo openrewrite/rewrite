@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -64,7 +65,7 @@ final class LockfileReader {
      * {@link IgnoredLockfile}.
      */
     static ReadResult read(String text) {
-        String lockfileRawContent = extractMainDocument(stripBom(text));
+        String lockfileRawContent = extractMainDocument(StripBom.stripBom(text));
         if (Js.trim(lockfileRawContent).isEmpty()) {
             return new ReadResult(null, false);
         }
@@ -113,10 +114,6 @@ final class LockfileReader {
         return Long.parseLong(valid.substring(0, valid.indexOf('.')));
     }
 
-    static String stripBom(String s) {
-        return !s.isEmpty() && s.charAt(0) == '\uFEFF' ? s.substring(1) : s;
-    }
-
     /**
      * The main document of a lock that may start with the env document.
      */
@@ -139,7 +136,7 @@ final class LockfileReader {
         if (text == null) {
             return null;
         }
-        String buffer = stripBom(text).replace("\r\n", "\n");
+        String buffer = StripBom.stripBom(text).replace("\r\n", "\n");
         if (!buffer.startsWith(YAML_DOCUMENT_START)) {
             return null;
         }

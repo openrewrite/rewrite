@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
+import org.openrewrite.javascript.internal.lock.StripBom;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -63,7 +64,7 @@ final class Manifests {
     static Map<String, @Nullable Object> readPackageYaml(String text, String path) {
         Object value;
         try {
-            value = JsYaml.load(LockfileReader.stripBom(text));
+            value = JsYaml.load(StripBom.stripBom(text));
         } catch (JsYaml.YamlException e) {
             throw new PnpmError("YAML_PARSE", e.getMessage() + "\nin " + path);
         }
@@ -87,7 +88,7 @@ final class Manifests {
     static Map<String, @Nullable Object> parse(String text, String path) {
         Object value;
         try {
-            value = Js.jsonParse(LockfileReader.stripBom(text));
+            value = Js.jsonParse(StripBom.stripBom(text));
         } catch (JsonSyntaxError e) {
             throw new PnpmError("JSON_PARSE", e.getMessage() + " in " + path);
         }

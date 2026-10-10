@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.StripBom;
 
 /**
  * Port of yarn src/util/fs.js (yarn 1.22.22): {@code readJson} and {@code writeFilePreservingEol}.
@@ -33,7 +34,7 @@ final class Fs {
      */
     static @Nullable Object readJson(String file, String text) {
         try {
-            return Js.jsonParse(LockfileParser.stripBom(text));
+            return Js.jsonParse(StripBom.stripBom(text));
         } catch (JsError e) {
             throw new JsError(e.getName(), file + ": " + e.getMessage());
         }
