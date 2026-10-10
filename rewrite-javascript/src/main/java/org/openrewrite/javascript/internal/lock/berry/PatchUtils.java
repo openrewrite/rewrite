@@ -127,7 +127,7 @@ final class PatchUtils {
 
     /**
      * {@code loadPatchFiles} where no path is a builtin the release ships: each file's text with LF line endings, null
-     * for any other builtin (no hook answers it); throws CannotKnow for a file outside the project or a non-workspace's.
+     * for any other builtin (no hook answers); throws CannotKnow for a file outside the project or a non-workspace's.
      */
     static List<@Nullable String> loadPatchFiles(@Nullable Locator parentLocator, List<String> patchPaths,
                                                  Project project) {

@@ -44,9 +44,8 @@ final class Cache {
     }
 
     /**
-     * {@code fetchPackageFromCache} for a locator the lockfile has no checksum for: a disabled package is mocked; a
-     * conditional one is loaded with its checksum hidden, unless the lockfile held it, whose entry stands in for
-     * its registry archive; any other gets the checksum of the archive the loader brings.
+     * {@code fetchPackageFromCache} for a locator without a stored checksum: a disabled package is mocked, a new
+     * conditional one loaded with its checksum hidden (a locked one's entry stands in), any other one checksummed.
      */
     static @Nullable String fetchPackageFromCache(Locator locator, Supplier<Archive> loader, Project project) {
         if (project.disabledLocators.contains(locator.locatorHash)) {
