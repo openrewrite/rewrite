@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
-import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import static java.util.Objects.requireNonNull;
@@ -40,7 +39,7 @@ public abstract class LockScenarioTest extends ScenarioTest {
     }
 
     /**
-     * Whether the failure is the one an expect line of a kind other than {@code pm-fails} names.
+     * Whether the failure is the one the expect line names.
      */
     protected abstract boolean names(Expect expect, Failure failure, RecordedRegistry<?> http);
 
@@ -73,10 +72,7 @@ public abstract class LockScenarioTest extends ScenarioTest {
             failed(label, http, "unexpected-success", "expected " + expect + written,
                     " expected \"" + expect + "\" but regeneration succeeded" + written);
         }
-        Failure failed = requireNonNull(failure);
-        boolean ok = Expect.PM_FAILS.equals(expect.getKind()) ? failed.getKind() == Kind.PM_FAILS :
-                names(expect, failed, http);
-        if (!ok) {
+        if (!names(expect, requireNonNull(failure), http)) {
             failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown,
                     " expected \"" + expect + "\" but got " + thrown);
         }
