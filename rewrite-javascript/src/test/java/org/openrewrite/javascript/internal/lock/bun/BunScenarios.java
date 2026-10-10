@@ -17,17 +17,20 @@ package org.openrewrite.javascript.internal.lock.bun;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.BunInputs;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.LockScenario;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +52,8 @@ final class BunScenarios {
     private static final Pattern LOAD_ERROR_NAME = Pattern.compile("(?m)^(\\w+): failed to parse lockfile");
     private static final Pattern EDIT_STARTED = Pattern.compile("(?m)^edit started (\\S+)$");
     private static final Pattern PLATFORM = Pattern.compile("(?m)^platform os=(\\S+) cpu=(\\S+) libc=(\\S*)$");
+    private static final Pattern REQUEST = Pattern.compile("(?m)^GET ([a-z]+://[^/ ]+)");
+    private static final Pattern ORIGIN = Pattern.compile("^[a-z]+://[^/]+");
 
     private BunScenarios() {
     }
@@ -181,6 +186,25 @@ final class BunScenarios {
         }
 
         /**
+         * Whether the edit's install, rerun from an empty cache, asked the host of {@code registry}: any host when
+         * {@code requests-after.log} names none.
+         */
+        boolean asked(String registry) {
+            String requests = file("requests-after.log");
+            Set<String> origins = new TreeSet<>();
+            Matcher request = REQUEST.matcher(requests == null ? "" : requests);
+            while (request.find()) {
+                origins.add(request.group(1));
+            }
+            return origins.isEmpty() || origins.contains(origin(registry));
+        }
+
+        static String origin(String url) {
+            Matcher origin = ORIGIN.matcher(url);
+            return origin.find() ? origin.group() : url;
+        }
+
+        /**
          * Every lock bun wrote or was given: {@code before}, {@code after}, {@code fresh}, and what bun rewrote each
          * to on an install that changes nothing ({@code <lock>-again}, {@code again}).
          */
@@ -303,13 +327,16 @@ final class BunScenarios {
 
         /**
          * The user's .npmrc of a phase ({@code user-npmrc}, {@code user-npmrc-before}; an empty one is none) as the
-         * host hands it over: its registries.
+         * host hands it over, the marker's user npmrc: the registries it names.
          */
-        @Nullable
-        NodeRegistries userConfig(Phase phase) {
+        List<NodeRegistry> userConfig(Phase phase) {
             String npmrc = phase == Phase.BEFORE && has("user-npmrc-before") ? file("user-npmrc-before") :
                     file("user-npmrc");
-            return npmrc == null || npmrc.isEmpty() ? null : HostRegistries.fromUserNpmrc(npmrc, getDir());
+            if (npmrc == null || npmrc.isEmpty()) {
+                return Collections.emptyList();
+            }
+            return BunInputs.userConfig(new InMemoryExecutionContext(), HostRegistries.userMarker(npmrc),
+                    HostRegistries.environment(getDir()));
         }
 
         @Nullable

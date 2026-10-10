@@ -19,10 +19,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -63,21 +62,34 @@ class BunOptionsTest {
           .isEqualTo(MIRROR);
     }
 
-    // the host's registries cannot tell a user .npmrc naming npm's own registry from one naming none
+    // lock/bun/open-user-registry-npmjs-bunfig-add: bun asks registry.npmjs.org and writes ""
     @Test
-    void aHostDefaultOfNpmsOwnRegistryNamesNone() {
+    void namingNpmsOwnRegistryItNamesThatOverTheProjectsBunfig() {
         String bunfig = "[install]\nregistry = \"" + OTHER + "\"\n";
 
         assertThat(BunOptions.load(bunfig, user(BunOptions.DEFAULT_REGISTRY, null), null, HostEnvironment.UNKNOWN)
-          .getRegistry()).isEqualTo(OTHER);
+          .getRegistry()).isEqualTo(BunOptions.DEFAULT_REGISTRY);
     }
 
-    private static NodeRegistries user(String registry, @Nullable String types) {
-        Map<String, NodeRegistry> byScope = new LinkedHashMap<>();
-        if (types != null) {
-            byScope.put("@types", registry("@types", types));
+    // lock/bun/open-user-registry-scope-bunfig-mirror-add: bun asks the mirror for ms
+    @Test
+    void namingOnlyAScopeItLeavesTheProjectsBunfigRegistry() {
+        String bunfig = "[install]\nregistry = \"" + MIRROR + "\"\n";
+        BunOptions options = BunOptions.load(bunfig, user(null, OTHER), null, HostEnvironment.UNKNOWN);
+
+        assertThat(options.getRegistry()).isEqualTo(MIRROR);
+        assertThat(options.scopeForPackageName("@types/ms")).isEqualTo(OTHER);
+    }
+
+    private static List<NodeRegistry> user(@Nullable String registry, @Nullable String types) {
+        List<NodeRegistry> named = new ArrayList<>();
+        if (registry != null) {
+            named.add(registry(null, registry));
         }
-        return new NodeRegistries(registry(null, registry), byScope, null, null, null);
+        if (types != null) {
+            named.add(registry("@types", types));
+        }
+        return named;
     }
 
     private static NodeRegistry registry(@Nullable String scope, String url) {

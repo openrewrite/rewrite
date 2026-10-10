@@ -69,6 +69,10 @@ class BunScenarioTest extends LockScenarioTest {
         @Override
         public @Nullable String packument(String registry, String name, boolean extended) {
             String file = extended ? name + "@full" : name;
+            if (!scenario.asked(registry)) {
+                notRecorded(BunScenarios.Scenario.origin(registry) + "/" + file);
+                return null;
+            }
             String mirror = mirror(registry, "npmjs");
             String body = mirror == null ? null : scenario.file(mirror + "/" + file);
             if (body == null && mirror != null) {

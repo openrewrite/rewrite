@@ -19,7 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,10 +61,10 @@ public final class BunOptions {
     }
 
     /**
-     * The options from the project's bunfig.toml, the user's .npmrc (the host's registries), the project's .npmrc and
-     * the environment, any of which may be absent.
+     * The options from the project's bunfig.toml, the registries the user's .npmrc names (the host's), the project's
+     * .npmrc and the environment, any of which may be absent.
      */
-    public static BunOptions load(@Nullable String bunfigToml, @Nullable NodeRegistries user, @Nullable String npmrc,
+    public static BunOptions load(@Nullable String bunfigToml, List<NodeRegistry> user, @Nullable String npmrc,
                                   HostEnvironment env) {
         Install install = new Install();
         if (bunfigToml != null) {
@@ -75,9 +74,7 @@ public final class BunOptions {
                 install.readBunfig(installObj);
             }
         }
-        if (user != null) {
-            install.readUserNpmrc(user);
-        }
+        install.readUserNpmrc(user);
         if (npmrc != null) {
             install.readNpmrc(npmrc, env);
         }
@@ -223,15 +220,15 @@ public final class BunOptions {
             return b != null ? b : current;
         }
 
-        // loadNpmrc over the user's .npmrc: registry and @scope:registry; a host default of npm's own registry is read
-        // as none named, since the host's registries cannot tell the two apart
-        void readUserNpmrc(NodeRegistries user) {
-            String registry = user.getDefaultRegistry().getUrl();
-            if (!Strings.withoutTrailingSlash(registry).equals(Strings.withoutTrailingSlash(DEFAULT_REGISTRY))) {
-                defaultRegistry = registry;
-            }
-            for (Map.Entry<String, NodeRegistry> scope : user.getByScope().entrySet()) {
-                scoped.put(scope.getKey().substring(1), scope.getValue().getUrl());
+        // loadNpmrc over the user's .npmrc: its registry and each @scope:registry
+        void readUserNpmrc(List<NodeRegistry> user) {
+            for (NodeRegistry registry : user) {
+                String scope = registry.getScope();
+                if (scope == null) {
+                    defaultRegistry = registry.getUrl();
+                } else {
+                    scoped.put(scope.substring(1), registry.getUrl());
+                }
             }
         }
 

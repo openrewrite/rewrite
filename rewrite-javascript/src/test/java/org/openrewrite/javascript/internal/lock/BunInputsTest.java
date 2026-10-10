@@ -19,12 +19,13 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.BunOptions;
 import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -33,9 +34,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -55,7 +58,7 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("repo/packages/a/.npmrc"), "registry=https://example.com/\n")
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), emptyList(), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
@@ -77,7 +80,7 @@ class BunInputsTest {
           .packageManagerFile(Paths.get("other/patches/x.patch"), "")
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), emptyList(), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getFiles()).containsOnlyKeys("patches/ms@2.1.3.patch", ".env", "../other/patches/x.patch");
         assertThat(inputs.getFiles()).containsEntry("patches/ms@2.1.3.patch", "--- a/index.js\n+++ b/index.js\n");
@@ -94,20 +97,41 @@ class BunInputsTest {
             Paths.get("repo/patches/./ms@2.1.3.patch"), Paths.get("other/patches/x.patch"))))
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), emptyList(), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", "bun.lock", "patches/ms@2.1.3.patch");
     }
 
     @Test
     void theHostsRegistriesAreBunsUserNpmrc() {
-        NodeRegistries registries = new NodeRegistries(new NodeRegistry(null, "https://registry.npmmirror.com/", null,
-          null, null, null, false, null, true, false), Collections.emptyMap(), null, null, null);
+        List<NodeRegistry> registries = singletonList(registry(null, "https://registry.npmmirror.com/"));
         Request request = Request.builder().packageJson("{}").lock("{}").build();
 
         Inputs inputs = BunInputs.from(LockDirectory.of(request), registries, Host.UNKNOWN, Instant.EPOCH);
 
-        assertThat(inputs.getUserConfig()).isSameAs(registries);
+        assertThat(inputs.getUserConfig()).isEqualTo(registries);
+    }
+
+    // bun 1.3.10 under a user .npmrc naming registry.npmjs.org asks it over bunfig.toml's registry and writes ""
+    // (lock/bun/open-user-registry-npmjs-bunfig-add); naming only @types, bunfig's (-scope-bunfig-mirror-add)
+    @Test
+    void aDefaultTheHostNamesIsNamedEvenWhenItIsNpmsOwn(@TempDir Path home) {
+        String bunfig = "[install]\nregistry = \"https://registry.yarnpkg.com/\"\n";
+        Npmrc npmjs = new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.npmjs.org/"));
+        Npmrc types = new Npmrc(NpmrcScope.User, singletonMap("@types:registry", "https://registry.npmmirror.com/"));
+
+        assertThat(userRegistry(home, "", bunfig, npmjs)).isEqualTo("https://registry.npmjs.org/");
+        assertThat(userRegistry(home, "", bunfig, types)).isEqualTo("https://registry.yarnpkg.com/");
+        assertThat(userRegistry(home, "", bunfig)).isEqualTo("https://registry.yarnpkg.com/");
+    }
+
+    @Test
+    void theViewNamesTheDefaultOnlyWhenItListsOne() {
+        NodeRegistry npmjs = registry(null, "https://registry.npmjs.org/");
+        NodeRegistry types = registry("@types", "https://registry.npmmirror.com/");
+
+        assertThat(viewed(npmjs, types)).containsExactly(npmjs, types);
+        assertThat(viewed(types)).containsExactly(types);
     }
 
     @Test
@@ -120,7 +144,7 @@ class BunInputsTest {
             new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://project.example/")))))
           .build();
 
-        Inputs inputs = BunInputs.from(LockDirectory.of(request), null, Host.UNKNOWN, Instant.EPOCH);
+        Inputs inputs = BunInputs.from(LockDirectory.of(request), emptyList(), Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getNpmrc()).contains("registry=https://project.example/");
         assertThat(inputs.getBunfig()).isNull();
@@ -158,10 +182,21 @@ class BunInputsTest {
             request.packageManagerFile(Paths.get(dir, "bunfig.toml"), bunfig);
         }
         Request built = request.build();
-        NodeRegistries user = BunInputs.userConfig(new InMemoryExecutionContext(), built.getMarker(),
+        List<NodeRegistry> user = BunInputs.userConfig(new InMemoryExecutionContext(), built.getMarker(),
           HostRegistries.environment(home));
         Inputs inputs = BunInputs.from(LockDirectory.of(built), user, Host.UNKNOWN, Instant.EPOCH);
         return BunOptions.load(inputs.getBunfig(), inputs.getUserConfig(), inputs.getNpmrc(), HostEnvironment.UNKNOWN)
           .getRegistry();
+    }
+
+    private static List<NodeRegistry> viewed(NodeRegistry... registries) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        NodeExecutionContextView.view(ctx).setRegistries(Arrays.asList(registries));
+        return BunInputs.userConfig(ctx, nodeResolutionResult(PackageManager.Bun).withNpmrcConfigs(singletonList(
+          new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.yarnpkg.com/")))), Environment.SYSTEM);
+    }
+
+    private static NodeRegistry registry(@Nullable String scope, String url) {
+        return new NodeRegistry(scope, url, null, null, null, null, false, null, true, false);
     }
 }

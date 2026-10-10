@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -45,12 +46,19 @@ public final class HostRegistries {
      * @param home the directory standing for the recording's scratch HOME, which holds no other config
      */
     public static NodeRegistries fromUserNpmrc(String npmrc, Path home) {
+        return RegistryDiscovery.discover(new InMemoryExecutionContext(), userMarker(npmrc), environment(home));
+    }
+
+    /**
+     * A marker whose only npmrc is a recording's user .npmrc, in the user scope.
+     */
+    public static NodeResolutionResult userMarker(String npmrc) {
         Map<String, String> properties = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
             properties.put(entry.getKey(), String.valueOf(entry.getValue()));
         }
-        return RegistryDiscovery.discover(new InMemoryExecutionContext(), nodeResolutionResult(PackageManager.Npm)
-          .withNpmrcConfigs(singletonList(new Npmrc(NpmrcScope.User, properties))), environment(home));
+        return nodeResolutionResult(PackageManager.Npm)
+          .withNpmrcConfigs(singletonList(new Npmrc(NpmrcScope.User, properties)));
     }
 
     /**

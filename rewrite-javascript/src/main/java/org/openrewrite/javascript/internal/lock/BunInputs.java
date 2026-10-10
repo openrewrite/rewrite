@@ -17,6 +17,8 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.javascript.NodeExecutionContextView;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
@@ -26,20 +28,24 @@ import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
  * The Bun regenerator's inputs: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and
  * bunfig.toml, the patch and .env files under it, and the package.json of each directory above the one bun runs in.
  */
-final class BunInputs {
+public final class BunInputs {
 
     private BunInputs() {
     }
@@ -53,23 +59,34 @@ final class BunInputs {
     }
 
     /**
-     * The host's registries as bun's user .npmrc: the view's, else the marker's user npmrc. bun reads no global npmrc,
-     * and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc where it installs there.
+     * The registries bun's user .npmrc names, the host's: the view's, else those the marker's user npmrc names. bun
+     * reads no global npmrc, and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc.
      */
-    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
-        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
-                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
-                        .filter(npmrc -> npmrc.getScope() == NpmrcScope.User).collect(toList())), env);
+    public static List<NodeRegistry> userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
+                                                Environment env) {
+        List<NodeRegistry> explicit = NodeExecutionContextView.view(ctx).getRegistries();
+        if (!explicit.isEmpty() || marker == null || marker.getNpmrcConfigs() == null) {
+            return explicit;
+        }
+        List<Npmrc> user = marker.getNpmrcConfigs().stream()
+                .filter(npmrc -> npmrc.getScope() == NpmrcScope.User).collect(toList());
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker.withNpmrcConfigs(user), env);
+        List<NodeRegistry> named = new ArrayList<>();
+        if (user.stream().anyMatch(npmrc -> npmrc.getProperties().containsKey("registry"))) {
+            named.add(registries.getDefaultRegistry());
+        }
+        named.addAll(registries.getByScope().values());
+        return named;
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
-        return from(dir, null, host, now);
+        return from(dir, emptyList(), host, now);
     }
 
     /**
-     * @param registries the host's registries, bun's user .npmrc; null when the host gives none
+     * @param registries the registries bun's user .npmrc names, the host's
      */
-    static Inputs from(LockDirectory dir, @Nullable NodeRegistries registries, Host host, Instant now) {
+    static Inputs from(LockDirectory dir, List<NodeRegistry> registries, Host host, Instant now) {
         Map<String, String> files = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.filesUnder("").entrySet()) {
             if (DotEnv.FILES.contains(file.getKey())) {

@@ -21,6 +21,7 @@ import lombok.NonNull;
 import lombok.Singular;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
@@ -32,7 +33,6 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.SharedError;
-import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -83,11 +83,11 @@ public final class BunLockRegenerator {
         String bunfig;
 
         /**
-         * The host's registries, which bun reads as the user's own .npmrc, after bunfig.toml and before the project's
-         * .npmrc; null for none.
+         * The registries the user's own .npmrc names, the host's, which bun reads after bunfig.toml and before the
+         * project's .npmrc: the one without a scope is its {@code registry}.
          */
-        @Nullable
-        NodeRegistries userConfig;
+        @Singular("userRegistry")
+        List<NodeRegistry> userConfig;
 
         /**
          * The project's package-manager files under the root, by path relative to it, with their contents: the
