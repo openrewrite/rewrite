@@ -112,7 +112,9 @@ final class PnpmInputs {
                 .dir(relative(dir.fromRoot(workspaceDir), dir.fromRoot(dir.getRunsIn())))
                 .manifests(manifests)
                 .files(files)
-                .paths(dir.pathsUnder(workspaceDir));
+                .paths(dir.pathsUnder(workspaceDir))
+                .filesAbove(dir.filesAbove(workspaceDir))
+                .pathsAbove(dir.pathsAbove(workspaceDir));
     }
 
     // the nearest directory from the lock's up holding a pnpm-workspace.yaml, read or not, else a misspelt one pnpm

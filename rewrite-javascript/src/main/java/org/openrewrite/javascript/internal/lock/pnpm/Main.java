@@ -19,8 +19,11 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.SpecUtils;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -32,6 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Port of pnpm/src main.ts and getConfig.ts (pnpm 11.2.2) up to the command: the workspace pnpm finds, its config,
@@ -305,6 +309,9 @@ public final class Main {
      */
     void checkWantedPackageManager(PnpmOptions options) {
         PnpmOptions.WantedPackageManager pm = options.getWantedPackageManager();
+        if (inputs.getEnv() == null) {
+            release(pm, this::corepackSpec);
+        }
         if (pm == null || "ignore".equals(pm.getOnFail())) {
             return;
         }
@@ -363,6 +370,58 @@ public final class Main {
         other = new EnvLockfile.OnDisk(text);
         otherLockFiles.put(dir, other);
         return other;
+    }
+
+    /**
+     * The release pnpm installs with: the one it switches to or fails without, else this one; CannotKnow where corepack
+     * would start another or refuse the spec ({@code corepack}), as the host does not say whether it starts pnpm.
+     */
+    public static String release(PnpmOptions.@Nullable WantedPackageManager wanted,
+                                 Supplier<SpecUtils.@Nullable Descriptor> corepack) {
+        boolean checks = wanted != null && ("download".equals(wanted.getOnFail()) ||
+                                            "error".equals(wanted.getOnFail()));
+        if (checks && !"pnpm".equals(wanted.getName())) {
+            return PNPM_VERSION;
+        }
+        String direct = checks && wanted.getVersion() instanceof String ? (String) wanted.getVersion() :
+                PNPM_VERSION;
+        String starts;
+        try {
+            SpecUtils.Descriptor spec = corepack.get();
+            if (spec == null) {
+                return direct;
+            }
+            String version = SpecUtils.installVersion(spec);
+            if (version != null && version.equals(NodeSemver.valid(direct, NodeSemver.Options.DEFAULT))) {
+                return direct;
+            }
+            starts = version == null ? "starts the release at " + spec.getRange() : "starts pnpm " + version;
+        } catch (Rejected e) {
+            starts = "refuses to start pnpm (" + e.getMessage() + ")";
+        }
+        throw new CannotKnow("the pnpm release that installs the project: corepack " + starts + " and pnpm run " +
+                             "directly installs with " + direct + "; the host does not say which runs");
+    }
+
+    // corepack's findProjectSpec from where pnpm runs, up through the directories above the root the host holds
+    private SpecUtils.@Nullable Descriptor corepackSpec() {
+        int levels = 0;
+        Set<String> above = new LinkedHashSet<>(inputs.getFilesAbove().keySet());
+        if (inputs.getPathsAbove() != null) {
+            above.addAll(inputs.getPathsAbove());
+        }
+        for (String path : above) {
+            levels = Math.max(levels, path.split("/").length - 1);
+        }
+        return SpecUtils.findProjectSpec(dir(), levels, dir -> {
+            if (!dir.startsWith("..")) {
+                return inputs.getManifests().get(dir);
+            }
+            String file = dir + "/package.json";
+            return CannotKnow.requireRead(inputs.getFilesAbove().get(file), inputs.getPathsAbove(), file);
+        }, path -> path.startsWith("..") ? inputs.getFilesAbove().containsKey(path) ||
+                                           inputs.getPathsAbove() != null && inputs.getPathsAbove().contains(path) :
+                inputs.holds(path), "pnpm", HostEnvironment.UNKNOWN);
     }
 
     private static void checkPackageManager(PnpmOptions.WantedPackageManager pm, boolean underCorepack) {

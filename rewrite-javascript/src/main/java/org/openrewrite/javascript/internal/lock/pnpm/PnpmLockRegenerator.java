@@ -113,6 +113,16 @@ public final class PnpmLockRegenerator {
         @Nullable
         Set<String> paths;
 
+        /**
+         * The files the host read directly in each directory above the root, by path from it ({@code
+         * ../package.json}), and those it holds there, when it says: what corepack's walk from where pnpm runs reads.
+         */
+        @Builder.Default
+        Map<String, String> filesAbove = Collections.emptyMap();
+
+        @Nullable
+        Set<String> pathsAbove;
+
         boolean holds(String path) {
             return files.containsKey(path) || paths != null && paths.contains(path);
         }

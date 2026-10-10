@@ -61,8 +61,8 @@ class PnpmReleaseTest {
     void theRootNamesTheReleaseWhenPnpmSwitchesToIt() {
         assertThat(PnpmRelease.of("{}", null)).hasToString("pnpm 11.2.2");
         assertThat(PnpmRelease.of("{\"packageManager\":\"pnpm@10.34.6\"}", null)).hasToString("pnpm 10.34.6");
-        assertThat(PnpmRelease.of("{\"packageManager\":\"pnpm@10.0.0\"}", singletonMap("pmOnFail", "ignore")))
-          .hasToString("pnpm 11.2.2");
+        assertThat(PnpmRelease.of("{\"packageManager\":\"pnpm@10.0.0\"}", singletonMap("pmOnFail", "ignore"))
+          .declined()).contains("corepack starts pnpm 10.0.0 and pnpm run directly installs with 11.2.2");
         assertThat(PnpmRelease.of("{\"packageManager\":5}", null).declined())
           .startsWith("pnpm cannot read the release the project names");
     }
@@ -73,10 +73,8 @@ class PnpmReleaseTest {
         PnpmRelease pnpm10 = PnpmRelease.named("10.34.6");
         PnpmRelease pnpm11 = PnpmRelease.named("11.2.2");
         assertThat(pnpm9.cleansUpUnusedCatalogs()).isFalse();
-        assertThat(pnpm10.sortsEveryLevel()).isTrue();
         assertThat(pnpm10.cleansUpUnusedCatalogs()).isTrue();
         assertThat(pnpm10.cleanupKeepsOverrideReferences()).isFalse();
-        assertThat(pnpm11.sortsEveryLevel()).isFalse();
         assertThat(pnpm11.cleanupKeepsOverrideReferences()).isTrue();
     }
 }

@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * A regeneration's request seen from the lock's directory: manifests, package-manager files and held paths by path
@@ -37,6 +38,8 @@ import java.util.Set;
 @Getter
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public final class LockDirectory {
+
+    private static final Pattern ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
 
     /**
      * The lock's directory relative to the repository's root; {@code ""} is the root.
@@ -152,6 +155,39 @@ public final class LockDirectory {
     }
 
     /**
+     * The paths the host holds directly in each directory above {@code dir}, a directory relative to the lock's, by
+     * path relative to it ({@code ../package.json}); null when the host has not said which paths exist.
+     */
+    public @Nullable Set<String> pathsAbove(String dir) {
+        if (paths == null) {
+            return null;
+        }
+        Set<String> above = new LinkedHashSet<>();
+        for (String held : paths) {
+            String relative = above(dir, held);
+            if (relative != null) {
+                above.add(relative);
+            }
+        }
+        return above;
+    }
+
+    /**
+     * The files the host read directly in each directory above {@code dir}, a directory relative to the lock's, by
+     * path relative to it ({@code ../package.json}).
+     */
+    public Map<String, String> filesAbove(String dir) {
+        Map<String, String> above = new LinkedHashMap<>();
+        for (Map.Entry<String, String> file : files.entrySet()) {
+            String relative = above(dir, file.getKey());
+            if (relative != null) {
+                above.put(relative, file.getValue());
+            }
+        }
+        return above;
+    }
+
+    /**
      * Whether the host holds the file at {@code path}, from the lock's directory ({@code ../yarn.lock}), read or not.
      */
     public boolean holds(String path) {
@@ -235,6 +271,12 @@ public final class LockDirectory {
      */
     public String fromRoot(String dir) {
         return normalize(Paths.get(path.isEmpty() ? "." : path).resolve(dir.isEmpty() ? "." : dir));
+    }
+
+    // relativePath from dir when it is directly in a directory above dir
+    private @Nullable String above(String dir, String relativePath) {
+        String relative = relative(fromRoot(dir), fromRoot(relativePath));
+        return ABOVE.matcher(relative).matches() ? relative : null;
     }
 
     private @Nullable String under(String dir, String relativePath) {

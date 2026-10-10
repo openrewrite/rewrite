@@ -185,15 +185,10 @@ final class YarnClassicInputs {
 
     // the paths under the lock's directory and those directly in a directory above it
     private static @Nullable Set<String> paths(LockDirectory dir) {
-        if (dir.getPaths() == null) {
-            return null;
-        }
-        Set<String> paths = new LinkedHashSet<>();
-        for (String path : dir.getPaths()) {
-            int slash = path.lastIndexOf('/');
-            if (!path.startsWith("../") || path.substring(0, slash).matches("\\.\\.(/\\.\\.)*")) {
-                paths.add(path);
-            }
+        Set<String> paths = dir.pathsUnder("");
+        Set<String> above = dir.pathsAbove("");
+        if (paths != null && above != null) {
+            paths.addAll(above);
         }
         return paths;
     }

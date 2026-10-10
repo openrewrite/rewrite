@@ -173,7 +173,7 @@ class AddDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    // a range open between majors is left to the registry, and pnpm 9 and 10 add differently (PnpmRelease)
+    // corepack 0.35.0 refuses a range (recorded) where pnpm run directly leaves the release to the registry
     @Test
     void aReleaseRangeOpenBetweenMajorsIsDeclined() {
         String manifest = """
@@ -187,8 +187,9 @@ class AddDependencyCatalogTest implements RewriteTest {
             }
           }
           """;
-        String why = "is-number@6.0.0 was not added: the pnpm release the project names, >=9, is one the registry " +
-          "picks, not always a release whose writes are recorded (9.5.0 - 9.15.9, 10.32.1 - 10.34.6, 11.0.6 - 11.2.2)";
+        String why = "is-number@6.0.0 was not added: the pnpm release that installs the project: corepack refuses " +
+          "to start pnpm (Invalid package manager specification in package.json (pnpm@>=9); expected a semver " +
+          "version (corepack)) and pnpm run directly installs with >=9; the host does not say which runs";
         rewriteRun(
           spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()

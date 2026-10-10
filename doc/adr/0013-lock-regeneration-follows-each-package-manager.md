@@ -187,9 +187,11 @@ message. Three questions ask it:
 - Berry's release is the one corepack starts (`yarn@1` is corepack's error, not Yarn Berry);
 - the package manager a lockless root names, for the recipes, is `loadSpec`'s (bun, which corepack does not run, by
   its name); a spec corepack rejects declines the edit with its message;
-- pnpm's release on the manifest side is the one pnpm switches to, declined where corepack would start another
-  (devEngines beside packageManager, `onFail` or `pmOnFail` ignore or warn): the host does not say whether pnpm runs
-  under corepack. pnpm's own reader decides only the port's switchCliVersion.
+- pnpm's release, for the port and the recipes alike, is the one pnpm switches to or fails without (`pmOnFail`
+  download or error), else 11.2.2 (`Main.release`). Where corepack would start another release or refuse the spec
+  (devEngines beside packageManager, `onFail` or `pmOnFail` ignore or warn, a range or a value that is no string,
+  recorded), the host does not say whether pnpm runs under corepack: the regeneration is cannot-know and the recipes
+  decline. With the environment known, pnpm's own reader and `COREPACK_ROOT` decide, as in pnpm's tests.
 
 A regenerator ports its package manager's entry module only. pnpm's main.ts install entry is `PnpmLockRegenerator`;
 main.ts is `Main`, installDeps.ts `InstallDeps`, recursive.ts `Recursive` (with `bail: false`), install/index.ts

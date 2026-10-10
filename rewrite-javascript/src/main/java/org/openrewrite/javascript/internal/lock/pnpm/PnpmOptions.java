@@ -283,38 +283,6 @@ public final class PnpmOptions {
                 workspace == null ? null : workspace.get("pmOnFail"));
     }
 
-    /**
-     * The major of the pnpm release that installs the root: the one getConfig wants unless its onFail lets this
-     * release run; -1 when pnpm cannot read what the root names or a range leaves the major to the registry.
-     */
-    public static int releaseMajor(String rootManifest, @Nullable Map<String, @Nullable Object> workspace) {
-        WantedPackageManager wanted;
-        try {
-            wanted = wantedPackageManager(rootManifest, workspace);
-        } catch (RuntimeException e) {
-            return -1;
-        }
-        int running = Integer.parseInt(Main.PNPM_VERSION.substring(0, Main.PNPM_VERSION.indexOf('.')));
-        if (wanted == null || !"pnpm".equals(wanted.getName()) || !(wanted.getVersion() instanceof String) ||
-            !"download".equals(wanted.getOnFail()) && !"error".equals(wanted.getOnFail())) {
-            return running;
-        }
-        String version = (String) wanted.getVersion();
-        if (version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT))) {
-            return Integer.parseInt(version.substring(0, version.indexOf('.')));
-        }
-        int found = -1;
-        for (int major = 9; major <= running + 1; major++) {
-            if (NodeSemver.intersects(version, "^" + major + ".0.0", NodeSemver.Options.DEFAULT)) {
-                if (found != -1) {
-                    return -1;
-                }
-                found = major;
-            }
-        }
-        return found;
-    }
-
     private static @Nullable WantedPackageManager withPmOnFail(@Nullable WantedPackageManager pm,
                                                                @Nullable Object pmOnFail) {
         if (pm == null) {

@@ -17,7 +17,10 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.SpecUtils;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -235,5 +238,37 @@ class MainTest {
         assertThatThrownBy(() -> install(manifest(devEngines("{\"name\":\"pnpm\",\"version\":\">=1.0.0\"," +
                                                              "\"onFail\":\"error\"}")), null))
           .hasMessageContaining("fetched https://registry.npmjs.org/pnpm");
+    }
+
+    /**
+     * Recorded with corepack 0.35.0: it starts devEngines' 10.34.6 and refuses a range, where pnpm run directly
+     * installs with 11.2.2; with the environment unknown the host does not say which runs.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}|corepack starts pnpm 10.34.6 and pnpm run " +
+      "directly installs with 11.2.2",
+      "{\"name\":\"pnpm\",\"version\":\">=1.0.0\",\"onFail\":\"error\"}|corepack refuses to start pnpm (Invalid " +
+      "package manager specification in package.json (pnpm@>=1.0.0); expected a semver version",
+    })
+    void corepackMustPickTheReleasePnpmRunDirectlyInstallsWith(String packageManager, String subject) {
+        PnpmLockRegenerator.Inputs inputs = PnpmLockRegenerator.Inputs.builder()
+          .lock(LOCK)
+          .manifest("", manifest(devEngines(packageManager)))
+          .now(Instant.parse("2026-10-08T00:00:00Z"))
+          .build();
+        assertThatThrownBy(() -> new PnpmLockRegenerator(inputs, NO_REGISTRY).install())
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains(subject));
+    }
+
+    @Test
+    void theReleaseIsTheOnePnpmRunDirectlyInstallsWithWhereCorepackAgrees() {
+        PnpmOptions.WantedPackageManager ported = new PnpmOptions.WantedPackageManager("pnpm", "11.2.2", "download",
+          false);
+        assertThat(Main.release(ported, () -> new SpecUtils.Descriptor("pnpm", "11.2.2"))).isEqualTo("11.2.2");
+        assertThat(Main.release(null, () -> null)).isEqualTo(Main.PNPM_VERSION);
+        assertThat(Main.release(ported.withName("yarn"), () -> fail("asked corepack"))).isEqualTo(Main.PNPM_VERSION);
+        assertThat(Main.release(ported.withVersion("10.34.6"), () -> new SpecUtils.Descriptor("pnpm", "10.34.6")))
+          .isEqualTo("10.34.6");
     }
 }

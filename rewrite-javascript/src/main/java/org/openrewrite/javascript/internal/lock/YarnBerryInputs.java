@@ -47,7 +47,6 @@ final class YarnBerryInputs {
 
     private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
     private static final Pattern MANIFEST_ABOVE = Pattern.compile("(\\.\\./)+package\\.json");
-    private static final Pattern ABOVE = Pattern.compile("(\\.\\./)+[^/]+");
 
     private YarnBerryInputs() {
     }
@@ -178,12 +177,9 @@ final class YarnBerryInputs {
             }
         }
         Set<String> paths = dir.pathsUnder("");
-        if (paths != null) {
-            for (String held : dir.getPaths()) {
-                if (ABOVE.matcher(held).matches()) {
-                    paths.add(held);
-                }
-            }
+        Set<String> above = dir.pathsAbove("");
+        if (paths != null && above != null) {
+            paths.addAll(above);
         }
         return Inputs.builder()
                 .lock(dir.getLock())

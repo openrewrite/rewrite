@@ -16,8 +16,8 @@
 package org.openrewrite.javascript.internal;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
-import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SpecUtils;
 import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
@@ -49,8 +49,8 @@ public final class PnpmRelease {
     }
 
     /**
-     * The release pnpm runs for {@code rootManifest} under {@code workspace} (null without one): the one it switches
-     * to, else the ported one; declined where corepack would start another, as the host does not say which runs pnpm.
+     * The release pnpm installs {@code rootManifest} with under {@code workspace} (null without one), by the port's
+     * rule; declined where corepack would start another or refuse the spec, as the host does not say which runs.
      */
     public static PnpmRelease of(String rootManifest, @Nullable Map<String, @Nullable Object> workspace) {
         PnpmOptions.WantedPackageManager wanted;
@@ -59,35 +59,12 @@ public final class PnpmRelease {
         } catch (RuntimeException e) {
             return new PnpmRelease("", -1, "pnpm cannot read the release the project names (" + e.getMessage() + ")");
         }
-        // getConfig's pmOnFail: download and error switch to the release named, ignore and warn run this one
-        boolean switches = wanted != null && "pnpm".equals(wanted.getName()) &&
-                           wanted.getVersion() instanceof String &&
-                           ("download".equals(wanted.getOnFail()) || "error".equals(wanted.getOnFail()));
-        PnpmRelease release = named(switches ? (String) wanted.getVersion() : Main.PNPM_VERSION);
-        String corepack = corepackStarts(rootManifest);
-        if (release.declined != null || corepack == null ||
-            corepack.equals(NodeSemver.valid(release.version, NodeSemver.Options.DEFAULT))) {
-            return release;
-        }
-        return new PnpmRelease(release.version, -1, "corepack starts pnpm " + corepack + " for the project and pnpm " +
-                                                    "run directly runs " + release.version + "; the host does not " +
-                                                    "say which runs it");
-    }
-
-    // the release corepack's pnpm shim starts for the spec findProjectSpec reads; null where it names none or fails
-    private static @Nullable String corepackStarts(String rootManifest) {
-        SpecUtils.Descriptor spec;
         try {
-            spec = SpecUtils.findProjectSpec("", 0, dir -> dir.isEmpty() ? rootManifest : null, path -> false, "pnpm",
-                    HostEnvironment.UNKNOWN);
-        } catch (Rejected e) {
-            return null;
+            return named(Main.release(wanted, () -> SpecUtils.findProjectSpec("", 0,
+                    dir -> dir.isEmpty() ? rootManifest : null, path -> false, "pnpm", HostEnvironment.UNKNOWN)));
+        } catch (CannotKnow e) {
+            return new PnpmRelease("", -1, e.getSubject());
         }
-        if (spec == null) {
-            return null;
-        }
-        String version = SpecUtils.installVersion(spec);
-        return version == null ? "from a URL" : version;
     }
 
     /**
@@ -128,13 +105,6 @@ public final class PnpmRelease {
      */
     public @Nullable WorkspaceManifestWriter writer() {
         return declined != null || major == 9 ? null : new WorkspaceManifestWriter(major);
-    }
-
-    /**
-     * Whether the writer sorts every level of the document, packages first (pnpm 10's sortKeysByPriority).
-     */
-    public boolean sortsEveryLevel() {
-        return major == 10;
     }
 
     /**

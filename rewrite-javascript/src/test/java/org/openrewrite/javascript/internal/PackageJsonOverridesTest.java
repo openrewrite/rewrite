@@ -110,20 +110,24 @@ class PackageJsonOverridesTest {
           .isInstanceOf(IllegalArgumentException.class);
     }
 
+    /**
+     * Recorded with corepack 0.35.0: it refuses a range, a version that is no string and a devEngines name that is
+     * none, which pnpm run directly reads past, so the host's not saying which runs declines those.
+     */
     @ParameterizedTest
     @CsvSource(delimiter = ';', value = {
       "{} ; 11",
       "{\"packageManager\":\"pnpm@10.34.6\"} ; 10",
       "{\"packageManager\":\"pnpm@9.15.9+sha512.abc\"} ; 9",
-      "{\"packageManager\":\"pnpm@^9.0.0\"} ; 11",
+      "{\"packageManager\":\"pnpm@^9.0.0\"} ; -1",
       "{\"packageManager\":\"yarn@4.10.3\"} ; 11",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^10.0.0\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=9\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^11.0.0\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"9 || 10\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"^12.0.0\"}}} ; -1",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=10.32.1 <=10.34.6\"}}} ; 10",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.0.6 - 11.2.2\"}}} ; 11",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=10.32.1 <=10.34.6\"}}} ; -1",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.0.6 - 11.2.2\"}}} ; -1",
       "{\"packageManager\":\"pnpm@10.0.0\"} ; 10",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}},\"packageManager\":\"pnpm@10.34.6\"} ; -1",
       "{\"devEngines\":{\"packageManager\":[{\"name\":\"npm\"},{\"name\":\"pnpm\",\"version\":\"9.15.9\"}]}} ; 9",
@@ -131,9 +135,9 @@ class PackageJsonOverridesTest {
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"ignore\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"warn\"}}} ; -1",
       "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"10.34.6\",\"onFail\":\"error\"}}} ; 10",
-      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":10}}} ; 11",
-      "{\"devEngines\":{\"packageManager\":{\"name\":false}},\"packageManager\":\"pnpm@10.34.6\"} ; 10",
-      "{\"devEngines\":{\"packageManager\":{\"name\":0}},\"packageManager\":\"pnpm@9.15.9\"} ; 9",
+      "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":10}}} ; -1",
+      "{\"devEngines\":{\"packageManager\":{\"name\":false}},\"packageManager\":\"pnpm@10.34.6\"} ; -1",
+      "{\"devEngines\":{\"packageManager\":{\"name\":0}},\"packageManager\":\"pnpm@9.15.9\"} ; -1",
       "{\"packageManager\":5} ; -1",
     })
     void thePnpmReleaseIsTheOnePnpmRuns(String root, int release) {
