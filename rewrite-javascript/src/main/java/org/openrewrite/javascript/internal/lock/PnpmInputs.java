@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
@@ -43,6 +44,19 @@ final class PnpmInputs {
         return WORKSPACE_MANIFEST.equals(fileName) || ".npmrc".equals(fileName) || fileName.endsWith(".patch");
     }
 
+    static boolean readsAsManifest(String fileName) {
+        return PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(fileName);
+    }
+
+    // a workspace whose projects keep their own locks: pnpm installs every project in the same run
+    static boolean readsOtherLocks() {
+        return true;
+    }
+
+    static InstallRoot installRoot(LockDirectory dir) {
+        return PnpmLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
+    }
+
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         String workspaceDir = workspaceDir(dir);
         Map<String, String> manifests = new LinkedHashMap<>();
@@ -54,7 +68,7 @@ final class PnpmInputs {
                 manifests.put("", file.getValue());
             } else if (path.endsWith("/package.json")) {
                 manifests.put(path.substring(0, path.length() - "/package.json".length()), file.getValue());
-            } else if (reads(name) || LOCK.equals(name) || PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(name)) {
+            } else if (reads(name) || LOCK.equals(name) || readsAsManifest(name)) {
                 files.put(path, file.getValue());
             }
         }

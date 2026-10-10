@@ -352,7 +352,7 @@ class YarnClassicLockRegeneratorTest {
             inputs.configFile(configFile, "registry \"https://registry.npmjs.org\"\n");
         }
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.build()))
-                .isEqualTo(new InstallRoot(installRoot, false));
+                .isEqualTo(InstallRoot.at(installRoot));
     }
 
     /**
@@ -367,12 +367,12 @@ class YarnClassicLockRegeneratorTest {
                 .directory("a")
                 .now(Instant.EPOCH);
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("", "{\"name\":\"a\"}").build()))
-                .isEqualTo(new InstallRoot(1, false));
+                .isEqualTo(InstallRoot.at(1));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.manifest("",
                 "{\"name\":\"a\",\"packageManager\":\"yarn@1.22.22\"}").build()))
-                .isEqualTo(new InstallRoot(1, false));
+                .isEqualTo(InstallRoot.at(1));
         assertThat(YarnClassicLockRegenerator.installRoot(inputs.configFile("../.yarnrc", "--focus true\n").build()))
-                .isEqualTo(new InstallRoot(1, false));
+                .isEqualTo(InstallRoot.at(1));
     }
 
     /**

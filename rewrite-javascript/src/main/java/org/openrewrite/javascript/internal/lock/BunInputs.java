@@ -80,7 +80,7 @@ final class BunInputs {
         }
         boolean rewritten = holds(dir, root, "bun.lockb") || !holds(dir, root, "package-lock.json") &&
                             !holds(dir, root, "yarn.lock") && holds(dir, root, "pnpm-lock.yaml");
-        return rewritten ? new InstallRoot(walked.getDepth(), true) : walked;
+        return rewritten ? InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE) : walked;
     }
 
     private static boolean holds(LockDirectory dir, String root, String file) {

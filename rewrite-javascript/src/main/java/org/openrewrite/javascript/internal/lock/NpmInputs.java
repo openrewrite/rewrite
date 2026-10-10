@@ -35,6 +35,10 @@ final class NpmInputs {
     private NpmInputs() {
     }
 
+    static boolean reads(String fileName) {
+        return readsOnlyBesideLock(fileName);
+    }
+
     static boolean readsOnlyBesideLock(String fileName) {
         return ".npmrc".equals(fileName);
     }
@@ -103,6 +107,6 @@ final class NpmInputs {
         String root = dir.aboveRunsIn(walked.getDepth());
         return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "npm-shrinkwrap.json")) &&
                                      !dir.holds(RootRelativePath.join(root, "yarn.lock")) ? walked :
-                new InstallRoot(walked.getDepth(), true);
+                InstallRoot.stops(walked.getDepth(), InstallRoot.Stop.WRITES_ANOTHER_FILE);
     }
 }

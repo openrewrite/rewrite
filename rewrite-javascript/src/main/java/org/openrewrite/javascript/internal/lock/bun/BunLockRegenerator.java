@@ -229,7 +229,7 @@ public final class BunLockRegenerator {
      */
     public static InstallRoot installRoot(Inputs inputs) {
         try {
-            return new InstallRoot(findWorkspaceRoot(inputs), false);
+            return InstallRoot.at(findWorkspaceRoot(inputs));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }

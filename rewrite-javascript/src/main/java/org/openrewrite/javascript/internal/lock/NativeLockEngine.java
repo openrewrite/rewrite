@@ -35,31 +35,43 @@ import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.Map;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
- * Builds the package manager's inputs from the {@link Request} and runs the port of its own install.
+ * Builds the package manager's inputs from the {@link Request} and runs the port of its own install: a table of the
+ * five ports, each answering which files its package manager reads and where it installs.
  */
 public final class NativeLockEngine {
+
+    private static final Map<PackageManager, Port> PORTS = new EnumMap<>(PackageManager.class);
+
+    static {
+        PORTS.put(PackageManager.Npm, new Port(NpmInputs::reads, NpmInputs::readsOnlyBesideLock, name -> false, false,
+                NpmInputs::installRoot, NativeLockEngine::regenerateNpm));
+        PORTS.put(PackageManager.Bun, new Port(BunInputs::reads, BunInputs::readsOnlyBesideLock, name -> false, false,
+                BunInputs::installRoot, NativeLockEngine::regenerateBun));
+        PORTS.put(PackageManager.YarnClassic, new Port(YarnClassicInputs::reads, name -> false, name -> false, false,
+                YarnClassicInputs::installRoot, NativeLockEngine::regenerateYarnClassic));
+        PORTS.put(PackageManager.YarnBerry, new Port(YarnBerryInputs::reads, name -> false, name -> false, false,
+                YarnBerryInputs::installRoot, NativeLockEngine::regenerateYarnBerry));
+        PORTS.put(PackageManager.Pnpm, new Port(PnpmInputs::reads, name -> false, PnpmInputs::readsAsManifest,
+                PnpmInputs.readsOtherLocks(), PnpmInputs::installRoot, NativeLockEngine::regeneratePnpm));
+    }
 
     private NativeLockEngine() {
     }
 
     public static Result regenerate(PackageManager pm, Request request, ExecutionContext ctx) {
+        Port port = PORTS.get(pm);
+        if (port == null) {
+            return Result.failure(LockOnlyInstall.cannotKnow(new CannotKnow("the lock " + pm + " writes")));
+        }
         try {
-            switch (pm) {
-                case Npm:
-                    return regenerateNpm(request, ctx);
-                case Bun:
-                    return regenerateBun(request, ctx);
-                case YarnClassic:
-                    return regenerateYarnClassic(request, ctx);
-                case YarnBerry:
-                    return regenerateYarnBerry(request, ctx);
-                case Pnpm:
-                    return regeneratePnpm(request, ctx);
-                default:
-                    return Result.failure(LockOnlyInstall.NPM.failure(new CannotKnow("the lock " + pm + " writes")));
-            }
+            return port.regenerate.apply(request, ctx);
         } catch (NodeRegistryException nre) {
             return Result.failure(LockOnlyInstall.failure(nre));
         }
@@ -70,70 +82,61 @@ public final class NativeLockEngine {
      * localPrefix, Bun's workspace root, Yarn classic's findWorkspaceRoot, Berry's project, pnpm's workspace dir.
      */
     public static InstallRoot installRoot(PackageManager pm, Request request) {
-        LockDirectory dir = LockDirectory.of(request);
-        switch (pm) {
-            case Npm:
-                return NpmInputs.installRoot(dir);
-            case Bun:
-                return BunInputs.installRoot(dir);
-            case YarnClassic:
-                return YarnClassicLockRegenerator.installRoot(YarnClassicInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
-            case YarnBerry:
-                return YarnBerryLockRegenerator.installRoot(YarnBerryInputs.holds(dir), dir.depth());
-            case Pnpm:
-                return PnpmLockRegenerator.installRoot(PnpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH));
-            default:
-                return InstallRoot.STOPS_HERE;
-        }
+        Port port = PORTS.get(pm);
+        return port == null ? InstallRoot.STOPS_HERE : port.installRoot.apply(LockDirectory.of(request));
     }
 
     /**
      * Whether the package manager reads the contents of a project file of this name.
      */
     public static boolean reads(PackageManager pm, String fileName) {
-        switch (pm) {
-            case Npm:
-                return NpmInputs.readsOnlyBesideLock(fileName);
-            case Bun:
-                return BunInputs.reads(fileName);
-            case YarnClassic:
-                return YarnClassicInputs.reads(fileName);
-            case YarnBerry:
-                return YarnBerryInputs.reads(fileName);
-            case Pnpm:
-                return PnpmInputs.reads(fileName);
-            default:
-                return false;
-        }
+        Port port = PORTS.get(pm);
+        return port != null && port.reads.test(fileName);
     }
 
     /**
      * Whether the package manager reads a file of this name only from its lock's directory.
      */
     public static boolean readsOnlyBesideLock(PackageManager pm, String fileName) {
-        switch (pm) {
-            case Npm:
-                return NpmInputs.readsOnlyBesideLock(fileName);
-            case Bun:
-                return BunInputs.readsOnlyBesideLock(fileName);
-            default:
-                return false;
-        }
+        Port port = PORTS.get(pm);
+        return port != null && port.readsOnlyBesideLock.test(fileName);
     }
 
     /**
      * Whether the package manager reads a project's manifest from a file of this name, as it reads a package.json.
      */
     public static boolean readsAsManifest(PackageManager pm, String fileName) {
-        return pm == PackageManager.Pnpm && PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(fileName);
+        Port port = PORTS.get(pm);
+        return port != null && port.readsAsManifest.test(fileName);
     }
 
     /**
-     * Whether the package manager's install also reads the locks of the workspace's other projects: pnpm's of a
-     * workspace whose projects keep their own, which it installs in the same run.
+     * Whether the package manager's install also reads the locks of the workspace's other projects.
      */
     public static boolean readsOtherLocks(PackageManager pm) {
-        return pm == PackageManager.Pnpm;
+        Port port = PORTS.get(pm);
+        return port != null && port.readsOtherLocks;
+    }
+
+    // what the dispatch asks one package manager's port
+    private static final class Port {
+        final Predicate<String> reads;
+        final Predicate<String> readsOnlyBesideLock;
+        final Predicate<String> readsAsManifest;
+        final boolean readsOtherLocks;
+        final Function<LockDirectory, InstallRoot> installRoot;
+        final BiFunction<Request, ExecutionContext, Result> regenerate;
+
+        Port(Predicate<String> reads, Predicate<String> readsOnlyBesideLock, Predicate<String> readsAsManifest,
+             boolean readsOtherLocks, Function<LockDirectory, InstallRoot> installRoot,
+             BiFunction<Request, ExecutionContext, Result> regenerate) {
+            this.reads = reads;
+            this.readsOnlyBesideLock = readsOnlyBesideLock;
+            this.readsAsManifest = readsAsManifest;
+            this.readsOtherLocks = readsOtherLocks;
+            this.installRoot = installRoot;
+            this.regenerate = regenerate;
+        }
     }
 
     private static Result regenerateNpm(Request request, ExecutionContext ctx) {

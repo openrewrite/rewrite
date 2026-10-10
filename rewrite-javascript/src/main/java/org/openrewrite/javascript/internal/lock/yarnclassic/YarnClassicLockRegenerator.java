@@ -248,7 +248,7 @@ public final class YarnClassicLockRegenerator {
             cli.main();
             int workspaceRoot = new Config(inputs).findWorkspaceRoot(YarnClassicOptions.looseSemver(rc),
                     new ArrayList<>());
-            return new InstallRoot(Math.max(workspaceRoot, 0), false);
+            return InstallRoot.at(Math.max(workspaceRoot, 0));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }

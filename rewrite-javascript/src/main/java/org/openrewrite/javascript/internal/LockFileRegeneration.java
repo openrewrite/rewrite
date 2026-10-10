@@ -170,11 +170,39 @@ public final class LockFileRegeneration {
      */
     @Value
     public static class InstallRoot {
-        public static final InstallRoot HERE = new InstallRoot(0, false);
-        public static final InstallRoot STOPS_HERE = new InstallRoot(0, true);
+        public static final InstallRoot HERE = new InstallRoot(0, null);
+        public static final InstallRoot STOPS_HERE = new InstallRoot(0, Stop.WALK_FAILS);
 
         int depth;
-        boolean stopped;
+
+        /**
+         * Why the walk stops before it picks a lock; null when it does not.
+         */
+        @Nullable Stop stop;
+
+        public static InstallRoot at(int depth) {
+            return new InstallRoot(depth, null);
+        }
+
+        public static InstallRoot stops(int depth, Stop why) {
+            return new InstallRoot(depth, why);
+        }
+
+        public boolean isStopped() {
+            return stop != null;
+        }
+
+        public enum Stop {
+            /**
+             * The walk fails there, which the regeneration of that lock reports.
+             */
+            WALK_FAILS,
+
+            /**
+             * Where the package manager installs, it writes a file beside the lock that no regeneration writes.
+             */
+            WRITES_ANOTHER_FILE
+        }
     }
 
     @Value

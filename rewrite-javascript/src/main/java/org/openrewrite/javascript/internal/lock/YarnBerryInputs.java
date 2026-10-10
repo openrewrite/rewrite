@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.berry.BerryOptions;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 
@@ -36,6 +38,10 @@ final class YarnBerryInputs {
 
     static boolean reads(String fileName) {
         return DEFAULT_RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");
+    }
+
+    static InstallRoot installRoot(LockDirectory dir) {
+        return YarnBerryLockRegenerator.installRoot(holds(dir), dir.depth());
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {

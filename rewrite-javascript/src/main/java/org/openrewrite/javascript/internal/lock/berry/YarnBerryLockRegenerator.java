@@ -152,7 +152,7 @@ public final class YarnBerryLockRegenerator {
      */
     public static InstallRoot installRoot(Predicate<String> holds, int levels) {
         int projectCwd = Configuration.findProjectCwd(holds, levels);
-        return projectCwd < 0 ? InstallRoot.STOPS_HERE : new InstallRoot(projectCwd, false);
+        return projectCwd < 0 ? InstallRoot.STOPS_HERE : InstallRoot.at(projectCwd);
     }
 
     /**

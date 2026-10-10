@@ -189,7 +189,7 @@ public final class NpmLockRegenerator {
      */
     public static InstallRoot installRoot(Inputs inputs) {
         try {
-            return new InstallRoot(loadLocalPrefix(inputs), false);
+            return InstallRoot.at(loadLocalPrefix(inputs));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
         }

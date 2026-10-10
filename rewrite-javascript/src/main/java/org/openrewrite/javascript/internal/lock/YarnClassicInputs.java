@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
@@ -39,6 +41,10 @@ final class YarnClassicInputs {
 
     static boolean reads(String fileName) {
         return CONFIG_FILES.contains(fileName);
+    }
+
+    static InstallRoot installRoot(LockDirectory dir) {
+        return YarnClassicLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {

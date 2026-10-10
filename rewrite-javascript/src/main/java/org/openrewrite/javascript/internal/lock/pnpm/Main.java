@@ -68,7 +68,7 @@ public final class Main {
         try {
             String into = installsInto(inputs, lockDir);
             if (into.isEmpty()) {
-                return new InstallRoot(workspaceRoot, false);
+                return InstallRoot.at(workspaceRoot);
             }
             if (!into.equals(lockDir) || inputs.getLock() != null) {
                 return InstallRoot.HERE;
@@ -77,10 +77,10 @@ public final class Main {
             PnpmOptions options = getConfig(inputs, WorkspaceRootFinder.findWorkspaceDir(inputs::holds, lockDir,
                     inputs.getEnv()));
             return Js.truthy(options.get("lockfileDir")) && FindPackages.findWorkspaceProjects(manifestDirs(inputs),
-                    options.getWorkspacePackagePatterns()).contains(lockDir) ? new InstallRoot(workspaceRoot, true) :
+                    options.getWorkspacePackagePatterns()).contains(lockDir) ? InstallRoot.stops(workspaceRoot, InstallRoot.Stop.WALK_FAILS) :
                     InstallRoot.HERE;
         } catch (RuntimeException e) {
-            return new InstallRoot(workspaceRoot, true);
+            return InstallRoot.stops(workspaceRoot, InstallRoot.Stop.WALK_FAILS);
         }
     }
 
