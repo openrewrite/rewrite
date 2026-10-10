@@ -63,30 +63,6 @@ class PnpmLockRegeneratorTest {
         }
     };
 
-    // pnpm 9.15.0 and @pnpm/exe 9.15.0 alone, without dependencies
-    private static final RegistryMetadata PNPM_9_15_0 = new RegistryMetadata() {
-        @Override
-        public @Nullable String packument(String registry, String name, boolean fullMetadata) {
-            if (!"pnpm".equals(name) && !"@pnpm/exe".equals(name)) {
-                return fail("fetched " + registry + name);
-            }
-            return "{\"name\":\"" + name + "\",\"dist-tags\":{\"latest\":\"9.15.0\"},\"versions\":{\"9.15.0\":" +
-                   "{\"name\":\"" + name + "\",\"version\":\"9.15.0\",\"dist\":{\"integrity\":\"sha512-AA==\"," +
-                   "\"tarball\":\"" + registry + name + "/-/" + name.substring(name.indexOf('/') + 1) +
-                   "-9.15.0.tgz\"}}}}";
-        }
-
-        @Override
-        public @Nullable String attestations(String registry, String name, String version) {
-            return fail("fetched the attestations of " + name + "@" + version);
-        }
-
-        @Override
-        public @Nullable String document(String url) {
-            return fail("fetched " + url);
-        }
-    };
-
     private static PnpmLockRegenerator.Install install(@Nullable String workspace, @Nullable String npmrc,
                                                        String... env) {
         Map<String, String> files = new LinkedHashMap<>();
@@ -358,7 +334,7 @@ class PnpmLockRegeneratorTest {
           .manifest("", WITH + "\"packageManager\":\"pnpm@9.15.0\"}")
           .env(Collections.singletonMap("pnpm_config_minimum_release_age", "0"))
           .now(Instant.parse("2026-10-08T00:00:00Z"))
-          .build(), PNPM_9_15_0).install())
+          .build(), NO_REGISTRY).install())
           .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject()).contains("9.15.0"));
         assertThat(withManifest(WITH + "\"packageManager\":\"pnpm@11.2.2+sha512.0000\"}").getWritten())
           .isEqualTo(LOCK);
@@ -397,6 +373,17 @@ class PnpmLockRegeneratorTest {
           .hasMessage("This project is configured to use >=12 of pnpm. Your current pnpm is v11.2.2");
         assertThat(withManifest(WITH + "\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\">=12\"," +
                                 "\"onFail\":\"warn\"}}}").getWritten()).isEqualTo(LOCK);
+    }
+
+    /**
+     * NPM_CONFIG_WORKSPACE_DIR names the workspace pnpm reads; the inputs are the one found from the lock up.
+     */
+    @Test
+    void theWorkspaceTheEnvironmentNames() {
+        assertThat(install("packages:\n  - '.'\n", null, "NPM_CONFIG_WORKSPACE_DIR", ".").getWritten())
+          .isEqualTo(LOCK);
+        assertThatThrownBy(() -> install("packages:\n  - '.'\n", null, "NPM_CONFIG_WORKSPACE_DIR", "sub"))
+          .isInstanceOf(CannotKnow.class);
     }
 
     @Test

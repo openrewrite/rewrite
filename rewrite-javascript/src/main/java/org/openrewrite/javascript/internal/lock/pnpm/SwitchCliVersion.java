@@ -58,7 +58,15 @@ final class SwitchCliVersion {
         EnvLockfile envLockfile = save ? lockFile.readEnvLockfile() : null;
         Object pmVersion = EnvInstaller.lockedVersion(
                 envLockfile == null ? null : envLockfile.packageManagerDependencies(), "pnpm");
-        if (!Js.truthy(pmVersion) || !NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+        boolean locked = Js.truthy(pmVersion) &&
+                         NodeSemver.satisfies(pmVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE);
+        // the release pnpm hands over to is the locked one, else one the registry has in range: when that cannot be
+        // the ported release, resolving it only names another
+        if (locked ? !Main.PNPM_VERSION.equals(Js.string(pmVersion)) :
+                !NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            throw switchesTo(locked ? Js.string(pmVersion) : version);
+        }
+        if (!locked) {
             EnvLockfile resolved = envInstaller.resolvePackageManagerIntegrities(version, envLockfile, save,
                     lockFile, options);
             pmVersion = EnvInstaller.lockedVersion(resolved.packageManagerDependencies(), "pnpm");

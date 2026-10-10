@@ -85,7 +85,7 @@ final class Main {
      * project into.
      */
     static String installsInto(PnpmLockRegenerator.Inputs inputs, String dir) {
-        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir);
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir, inputs.getEnv());
         if (workspaceDir == null || dir.isEmpty()) {
             return dir;
         }
@@ -103,7 +103,13 @@ final class Main {
      * main.ts' findWorkspaceDir from the lock's directory, then getConfig.
      */
     PnpmOptions config() {
-        WorkspaceRootFinder.findWorkspaceDir(inputs::holds, inputs.getLockDir());
+        String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, inputs.getLockDir(),
+                inputs.getEnv());
+        if (workspaceDir != null && !workspaceDir.equals(WORKSPACE_DIR)) {
+            // the inputs are the workspace's found from the lock up; the environment names another
+            throw new CannotKnow("the workspace in " + workspaceDir + " (NPM_CONFIG_WORKSPACE_DIR), whose files " +
+                                 "the inputs do not hold");
+        }
         return getConfig(inputs);
     }
 
