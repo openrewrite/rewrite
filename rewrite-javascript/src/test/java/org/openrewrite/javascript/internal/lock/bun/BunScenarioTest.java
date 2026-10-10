@@ -56,7 +56,7 @@ class BunScenarioTest extends LockScenarioTest {
      * The registry as the scenario recorded it: {@code http/<name>}, or {@code http/<name>@full}, whatever its url; a
      * downloaded fixture's empty versions are filled from its {@code http/<name>-<version>} documents.
      */
-    static final class ScenarioRegistry extends RecordedRegistry implements ManifestSource {
+    static final class ScenarioRegistry extends RecordedRegistry<BunScenarios.Scenario> implements ManifestSource {
         ScenarioRegistry(BunScenarios.Scenario scenario) {
             super(scenario);
         }
@@ -73,7 +73,7 @@ class BunScenarioTest extends LockScenarioTest {
                 body = scenario.http(file);
             }
             if (body == null) {
-                missing.add(file);
+                notRecorded(file);
                 return null;
             }
             return withRecordedVersions(name, body);
@@ -105,7 +105,7 @@ class BunScenarioTest extends LockScenarioTest {
     }
 
     @Override
-    protected boolean names(Expect expect, Failure failure, RecordedRegistry http) {
+    protected boolean names(Expect expect, Failure failure, RecordedRegistry<?> http) {
         String rest = expect.getRest();
         switch (expect.getKind()) {
             case "exact":

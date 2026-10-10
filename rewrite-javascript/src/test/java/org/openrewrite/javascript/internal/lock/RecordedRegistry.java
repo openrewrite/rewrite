@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -30,15 +31,24 @@ import java.util.Map;
 /**
  * A registry replaying a scenario's recorded responses, which reports every route it was asked for and does not have.
  */
-public abstract class RecordedRegistry {
+public abstract class RecordedRegistry<S extends LockScenario> {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    protected final LockScenario scenario;
-    public final List<String> missing = new ArrayList<>();
+    protected final S scenario;
+    private final List<String> unrecorded = new ArrayList<>();
 
-    protected RecordedRegistry(LockScenario scenario) {
+    /**
+     * The routes the replay asked for that the scenario does not record, in the order asked.
+     */
+    public final List<String> missing = Collections.unmodifiableList(unrecorded);
+
+    protected RecordedRegistry(S scenario) {
         this.scenario = scenario;
+    }
+
+    protected void notRecorded(String route) {
+        unrecorded.add(route);
     }
 
     /**

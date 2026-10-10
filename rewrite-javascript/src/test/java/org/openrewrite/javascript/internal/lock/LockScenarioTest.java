@@ -16,90 +16,40 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.TestInstance;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * A family's scenario test: each recorded edit replayed through its port and held to its expect line, one result line
- * per edit in the file the family's results variable names, which a corpus run tallies.
+ * A family's scenario test: each recorded edit regenerated through its port, byte for byte the package manager's lock
+ * or the failure its expect line names.
  */
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-public abstract class LockScenarioTest {
+public abstract class LockScenarioTest extends ScenarioTest {
 
-    private final String resultsEnv;
     private final String packageManager;
-    private final List<String> results = Collections.synchronizedList(new ArrayList<>());
 
     /**
      * @param packageManager as the failure messages name it: {@code npm}, {@code Yarn}, ...
      */
     protected LockScenarioTest(String resultsEnv, String packageManager) {
-        this.resultsEnv = resultsEnv;
+        super(resultsEnv);
         this.packageManager = packageManager;
     }
 
     /**
      * Whether the failure is the one an expect line of a kind other than {@code pm-fails} names.
      */
-    protected abstract boolean names(Expect expect, Failure failure, RecordedRegistry http);
-
-    @AfterAll
-    void writeResults() {
-        String file = System.getenv(resultsEnv);
-        if (file == null || file.isEmpty()) {
-            return;
-        }
-        try {
-            List<String> sorted = new ArrayList<>(results);
-            Collections.sort(sorted);
-            Files.write(Paths.get(file), (String.join("\n", sorted) + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    protected void record(String label, String outcome, String detail) {
-        results.add(label + "\t" + outcome + "\t" + detail.replace('\n', ' ').replace('\t', ' '));
-    }
-
-    /**
-     * Skips an edit before its replay: one a re-recording supersedes, or one its expect line says the engine does not
-     * reproduce, with the reason.
-     */
-    protected void skipUnlessReplayed(String label, LockScenario scenario, Expect expect) {
-        LockScenario supersededBy = scenario.getSupersededBy();
-        if (supersededBy != null) {
-            record(label, "skipped", "superseded by " + supersededBy.getName());
-            assumeTrue(false, label + " is superseded by " + supersededBy.getName());
-        }
-        if (Expect.NOT_REPRODUCED.equals(expect.getKind())) {
-            record(label, "skipped", "not reproduced: " + expect.getRest());
-            assumeTrue(false, label + " is not reproduced: " + expect.getRest());
-        }
-    }
+    protected abstract boolean names(Expect expect, Failure failure, RecordedRegistry<?> http);
 
     /**
      * The verdict on a regeneration: byte for byte the lock the package manager wrote, or the failure the expect line
      * names. A replay the registry could not serve is skipped; every other departure from the recording fails.
      */
-    protected void check(String label, Expect expect, @Nullable String expected, Result result, RecordedRegistry http) {
+    protected void check(String label, Expect expect, @Nullable String expected, Result result,
+                         RecordedRegistry<?> http) {
         Failure failure = result.getFailure();
         String thrown = failure == null ? String.valueOf(result.getErrorMessage()) :
                 failure.getReason() + ": " + failure.getDetail();
@@ -131,21 +81,6 @@ public abstract class LockScenarioTest {
                     " expected \"" + expect + "\" but got " + thrown);
         }
         record(label, "expected-failure", thrown + http.describe());
-    }
-
-    /**
-     * Records a departure from the recording and fails with {@code message} when it has one; a replay the stub could
-     * not serve is skipped instead.
-     */
-    protected void failed(String label, RecordedRegistry http, String outcome, String detail, String message) {
-        if (http.unservedElsewhereRecording()) {
-            record(label, "skipped", "not served offline:" + http.describe());
-            assumeTrue(false, label + " cannot be replayed offline" + http.describe());
-        }
-        record(label, outcome, detail + http.describe());
-        if (!message.isEmpty()) {
-            fail(label + message + http.describe());
-        }
     }
 
     public static String firstDifference(String expected, String actual) {

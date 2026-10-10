@@ -75,16 +75,6 @@ final class ScenarioReplay {
         throw new IllegalArgumentException(scenario);
     }
 
-    /**
-     * The first word of the {@code expect} line: {@code exact} when there is none.
-     */
-    static String kind(@Nullable String expect) {
-        if (expect == null || expect.isEmpty()) {
-            return "exact";
-        }
-        return expect.split("\\s+")[0];
-    }
-
     // "malformed override key <key>" or "malformed override reference <$ref> reached from <name>"
     static String malformedKey(String expect) {
         String[] words = expect.split("\\s+");
@@ -94,7 +84,7 @@ final class ScenarioReplay {
     /**
      * A registry answering from the scenario's recorded responses, reporting every route it lacks.
      */
-    static final class ScenarioRegistry extends RecordedRegistry implements HttpSender {
+    static final class ScenarioRegistry extends RecordedRegistry<NpmScenarios.Scenario> implements HttpSender {
         final List<String> requests = new ArrayList<>();
 
         ScenarioRegistry(NpmScenarios.Scenario scenario) {
@@ -108,7 +98,7 @@ final class ScenarioReplay {
             requests.add(file);
             String body = scenario.http(file);
             if (body == null) {
-                missing.add(file);
+                notRecorded(file);
             }
             return new Response(body == null ? 404 : 200,
               new ByteArrayInputStream((body == null ? "" : body).getBytes(StandardCharsets.UTF_8)), () -> {
@@ -139,10 +129,6 @@ final class ScenarioReplay {
             }
             return full ? name + "@full" : name.toString();
         }
-    }
-
-    static String missing(ScenarioRegistry http) {
-        return http.describe();
     }
 
     static PackumentSource registry(ScenarioRegistry http) {

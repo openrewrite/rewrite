@@ -59,7 +59,8 @@ class YarnClassicScenarioTest extends LockScenarioTest {
      * The registry as the scenario recorded it, {@code http/<name>} whatever the registry's url; a downloaded fixture's
      * empty versions are filled from its {@code http/<name>-<version>} documents.
      */
-    static final class ScenarioRegistry extends RecordedRegistry implements PackumentSource {
+    static final class ScenarioRegistry extends RecordedRegistry<YarnClassicScenarios.Scenario>
+            implements PackumentSource {
         ScenarioRegistry(YarnClassicScenarios.Scenario scenario) {
             super(scenario);
         }
@@ -69,7 +70,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
             String body = mirror == null ? scenario.http(name) : scenario.file(mirror + "/" + name);
             if (body == null) {
-                missing.add(name);
+                notRecorded(name);
                 return null;
             }
             return withRecordedVersions(name, body);
@@ -88,7 +89,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
     }
 
     @Override
-    protected boolean names(Expect expect, Failure failure, RecordedRegistry http) {
+    protected boolean names(Expect expect, Failure failure, RecordedRegistry<?> http) {
         String rest = expect.getRest();
         String detail = failure.getDetail();
         switch (expect.getKind()) {

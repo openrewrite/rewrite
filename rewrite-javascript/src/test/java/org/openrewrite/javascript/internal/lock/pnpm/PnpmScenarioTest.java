@@ -127,7 +127,7 @@ class PnpmScenarioTest extends LockScenarioTest {
     }
 
     @Override
-    protected boolean names(Expect expect, Failure failure, RecordedRegistry http) {
+    protected boolean names(Expect expect, Failure failure, RecordedRegistry<?> http) {
         String rest = expect.getRest();
         String detail = failure.getDetail();
         String code = rest.isEmpty() ? "" : rest.split("\\s+")[0];

@@ -98,7 +98,7 @@ class YarnBerryScenarioTest extends LockScenarioTest {
     }
 
     @Override
-    protected boolean names(Expect expect, Failure failure, RecordedRegistry http) {
+    protected boolean names(Expect expect, Failure failure, RecordedRegistry<?> http) {
         String rest = expect.getRest();
         String detail = failure.getDetail();
         switch (expect.getKind()) {

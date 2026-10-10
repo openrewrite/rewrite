@@ -16,22 +16,15 @@
 package org.openrewrite.javascript.internal.lock.npm;
 
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Expect;
+import org.openrewrite.javascript.internal.lock.ScenarioTest;
 import org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.ScenarioRegistry;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Stream;
@@ -39,37 +32,19 @@ import java.util.stream.Stream;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.assertj.core.api.Assertions.fail;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
-import static org.openrewrite.javascript.internal.lock.npm.ScenarioReplay.missing;
 
 /**
  * Replays every recorded edit {@link NpmScenarios} finds through {@link IdealTreeBuilder}: the tree npm's {@code after}
  * loads to, or npm's failure; {@code REWRITE_LOCK_REPLAY_RESULTS} names a file for one line per edit.
  */
-class IdealTreeBuilderTest {
+class IdealTreeBuilderTest extends ScenarioTest {
 
-    static final String RESULTS_ENV = "REWRITE_LOCK_REPLAY_RESULTS";
-
-    private static final List<String> results = Collections.synchronizedList(new ArrayList<>());
+    IdealTreeBuilderTest() {
+        super("REWRITE_LOCK_REPLAY_RESULTS");
+    }
 
     static Stream<Arguments> edits() {
         return ScenarioReplay.edits();
-    }
-
-    @AfterAll
-    static void writeResults() {
-        String file = System.getenv(RESULTS_ENV);
-        if (file == null || file.isEmpty()) {
-            return;
-        }
-        try {
-            List<String> sorted = new ArrayList<>(results);
-            Collections.sort(sorted);
-            Files.write(Paths.get(file), (String.join("\n", sorted) + "\n").getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
     }
 
     /**
@@ -156,10 +131,6 @@ class IdealTreeBuilderTest {
         return t instanceof NpmError ? ((NpmError) t).getCode() : null;
     }
 
-    private static void record(String label, String outcome, String detail) {
-        results.add(label + "\t" + outcome + "\t" + detail.replace('\n', ' ').replace('\t', ' '));
-    }
-
     // pacote renders --before with toISOString() in every fetcher's constructor, so the date is read at the
     // first fetch it filters: an exempted package never reads it
     @Test
@@ -184,18 +155,20 @@ class IdealTreeBuilderTest {
     @MethodSource("edits")
     void buildsWhatNpmWrote(String name, NpmScenarios.Edit edit) {
         NpmScenarios.Scenario scenario = edit.getScenario();
-        String expect = scenario.expect();
-        String kind = ScenarioReplay.kind(expect);
+        Expect expect = Expect.of(scenario.expect());
+        String kind = expect.getKind();
+        String label = scenario.getLabel() + "/" + edit.getStart().getFileName();
+        skipUnlessReplayed(label, scenario, expect);
         NpmScenarios.Lock result = edit.getResult();
         String path = ScenarioReplay.projectPath(result != null ? result.getText() : edit.getStart().getText());
         NpmOptions options = ScenarioReplay.options(scenario.npmrc());
         ScenarioRegistry http = new ScenarioRegistry(scenario);
-        String label = scenario.getLabel() + "/" + edit.getStart().getFileName();
 
         // the directory's name is the regenerator's input, not the builder's: here it is given
         boolean expectTree = result != null && (kind.equals("exact") || kind.equals("peer-conflict") ||
                                                 kind.equals("unstable") ||
-                                                expect.startsWith("cannot-know the project directory name"));
+                                                String.valueOf(expect.getLine())
+                                                  .startsWith("cannot-know the project directory name"));
         // what npm read from the disk may be among the manifests the project supplies (a workspace tree):
         // then the build is expected to succeed with npm's tree instead
         boolean treeOrCannotKnow = result != null && kind.equals("cannot-know");
@@ -207,16 +180,16 @@ class IdealTreeBuilderTest {
             String thrown = e.getClass().getSimpleName() + (code != null ? "[" + code + "]" : "") + ": " +
               e.getMessage();
             if (expectTree) {
-                failed(label, http, "failed", thrown);
-                throw new AssertionError(label + " expected npm's tree but the build failed: " + thrown + missing(http),
-                  e);
+                failed(label, http, "failed", thrown, "");
+                throw new AssertionError(label + " expected npm's tree but the build failed: " + thrown +
+                                         http.describe(), e);
             }
-            assertExpectedFailure(label, expect, kind, e, code, thrown, http);
+            assertExpectedFailure(label, expect, e, code, thrown, http);
             return;
         }
         if (!expectTree && !treeOrCannotKnow) {
-            failed(label, http, "unexpected-success", "expected " + expect);
-            fail(label + " expected \"" + expect + "\" but the build succeeded" + missing(http));
+            failed(label, http, "unexpected-success", "expected " + expect,
+              " expected \"" + expect + "\" but the build succeeded");
         }
         if (result.loadError() != null || kind.equals("unstable") ||
             ScenarioReplay.lockfileVersion(result.getText()) < 2) {
@@ -224,27 +197,27 @@ class IdealTreeBuilderTest {
             // or it is a lockfileVersion 1 lock, whose entries hold less than the tree): compare what is written
             String written = built.getMeta().toString();
             if (!written.equals(result.getText())) {
-                failed(label, http, "mismatch", "written lock differs");
-                assertThat(written).as(label + missing(http)).isEqualTo(result.getText());
+                failed(label, http, "mismatch", "written lock differs", "");
+                assertThat(written).as(label + http.describe()).isEqualTo(result.getText());
             }
-            record(label, "exact", "bytes" + missing(http));
+            record(label, "exact", "bytes" + http.describe());
             return;
         }
         Map<String, String> expected = describe(ScenarioReplay.load(result, options, path), path);
         Map<String, String> actual = describe(built, path);
         String difference = firstDifference(expected, actual);
         if (difference != null) {
-            failed(label, http, "mismatch", difference);
-            assertThat(actual).as(label + ": " + difference + missing(http)).isEqualTo(expected);
+            failed(label, http, "mismatch", difference, "");
+            assertThat(actual).as(label + ": " + difference + http.describe()).isEqualTo(expected);
         }
-        record(label, "exact", missing(http).trim());
+        record(label, "exact", http.describe().trim());
     }
 
-    private void assertExpectedFailure(String label, @Nullable String expect, String kind, RuntimeException e,
-                                       @Nullable String code, String thrown, ScenarioRegistry http) {
-        String[] words = expect == null ? new String[0] : expect.split("\\s+");
+    private void assertExpectedFailure(String label, Expect expect, RuntimeException e, @Nullable String code,
+                                       String thrown, ScenarioRegistry http) {
+        String[] words = expect.words();
         boolean ok;
-        switch (kind) {
+        switch (expect.getKind()) {
             case "npm-rejects":
                 // a route the stub lacked may be the failure's cause instead, unless npm's own answer was the 404
                 ok = words[1].equals(code) &&
@@ -261,25 +234,17 @@ class IdealTreeBuilderTest {
             case "malformed":
                 // a lock npm would discard, or an override key or reference the loader refuses by name
                 ok = e instanceof MalformedLock ||
-                     e.getMessage() != null && e.getMessage().contains(ScenarioReplay.malformedKey(expect));
+                     e.getMessage() != null &&
+                     e.getMessage().contains(ScenarioReplay.malformedKey(String.valueOf(expect.getLine())));
                 break;
             default:
                 ok = false;
                 break;
         }
         if (!ok) {
-            failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown);
-            throw new AssertionError(label + " expected \"" + expect + "\" but got " + thrown + missing(http), e);
+            failed(label, http, "wrong-failure", "expected " + expect + " got " + thrown, "");
+            throw new AssertionError(label + " expected \"" + expect + "\" but got " + thrown + http.describe(), e);
         }
-        record(label, "expected-failure", thrown + missing(http));
-    }
-
-    // a replay the stub could not serve is skipped, every other departure from the recording fails
-    private static void failed(String label, ScenarioRegistry http, String outcome, String detail) {
-        if (http.unservedElsewhereRecording()) {
-            record(label, "skipped", "not served offline:" + missing(http));
-            assumeTrue(false, label + " cannot be replayed offline" + missing(http));
-        }
-        record(label, outcome, detail + missing(http));
+        record(label, "expected-failure", thrown + http.describe());
     }
 }

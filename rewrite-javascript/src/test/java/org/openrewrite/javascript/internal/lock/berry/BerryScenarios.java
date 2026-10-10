@@ -390,33 +390,30 @@ final class BerryScenarios {
     /**
      * {@link Scenario#registry()}, with every route it was asked for and does not have.
      */
-    static final class ScenarioRegistry extends RecordedRegistry implements RegistrySource {
+    static final class ScenarioRegistry extends RecordedRegistry<Scenario> implements RegistrySource {
         private static final ObjectMapper JSON = new ObjectMapper();
-
-        private final Scenario recording;
 
         ScenarioRegistry(Scenario scenario) {
             super(scenario);
-            this.recording = scenario;
         }
 
         @Override
         public @Nullable String packument(String registry, String name) {
             byte[] body = scenario.httpBytes(name);
             if (body == null) {
-                missing.add(name);
+                notRecorded(name);
                 return null;
             }
             String text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), false);
-            byte[] cached = scenario.getHttpCache() == null ? null : recording.cached(name);
+            byte[] cached = scenario.getHttpCache() == null ? null : scenario.cached(name);
             if (text == null && cached != null) {
                 text = withRecordedVersions(name, new String(cached, StandardCharsets.UTF_8), false);
             }
             if (text == null) {
-                missing.add(name + "-<version> for the versions recorded empty");
+                notRecorded(name + "-<version> for the versions recorded empty");
                 text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), true);
             }
-            String recorded = recording.recordingRegistry();
+            String recorded = scenario.recordingRegistry();
             return recorded == null ? text : text.replace(NPM_REGISTRY, recorded + "/");
         }
 
@@ -425,7 +422,7 @@ final class BerryScenarios {
             String file = name + "-" + version + ".tgz";
             byte[] tgz = scenario.httpBytes(file);
             if (tgz == null) {
-                missing.add(file);
+                notRecorded(file);
             }
             return tgz;
         }
