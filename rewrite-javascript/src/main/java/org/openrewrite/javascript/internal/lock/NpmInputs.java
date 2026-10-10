@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -54,8 +55,16 @@ final class NpmInputs {
 
     private static Map<String, Map<String, @Nullable String>> parentTrees(LockDirectory dir) {
         Map<String, Map<String, @Nullable String>> trees = new LinkedHashMap<>();
-        for (String seenFrom : dir.manifestsAbove(dir.getRunsIn()).keySet()) {
-            String parent = dir.aboveRunsIn(seenFrom.split("/").length);
+        Set<String> withManifest = dir.manifestsAbove(dir.getRunsIn()).keySet();
+        String runsIn = dir.fromRoot(dir.getRunsIn());
+        String[] segments = runsIn.isEmpty() ? new String[0] : runsIn.split("/");
+        for (int depth = 1; depth <= segments.length; depth++) {
+            String parent = dir.aboveRunsIn(depth);
+            String seenFrom = String.join("/", Arrays.asList(segments).subList(segments.length - depth,
+                    segments.length));
+            if (!withManifest.contains(seenFrom) && !dir.holds(RootRelativePath.join(parent, "package.json"))) {
+                continue;
+            }
             Map<String, @Nullable String> tree = new LinkedHashMap<>();
             Set<String> held = dir.pathsUnder(parent);
             if (held != null) {

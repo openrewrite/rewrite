@@ -646,6 +646,36 @@ class NodeDependencyScanTest {
         assertThat(result.getFailure().getDetail()).startsWith(reported);
     }
 
+    /**
+     * npm's walk maps the root's workspaces over every package.json under it, so one the host holds without its
+     * contents, away from the edited project, is unknown to the member's regeneration.
+     */
+    @Test
+    void aPackageJsonUnderADirectoryAboveTheHostDidNotReadReachesTheWalk() {
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        String lock = "{\"name\":\"a\",\"version\":\"1.0.0\",\"lockfileVersion\":3,\"requires\":true," +
+                      "\"packages\":{\"\":{\"name\":\"a\",\"version\":\"1.0.0\"}}}\n";
+        captureFile(acc, "packages/a/package-lock.json", lock);
+        project(acc, ROOT, "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"libs/*\"]}",
+          nodeResolutionResult(PackageManager.Npm, emptyList()));
+        Path unread = Paths.get("libs/x/package.json");
+        NodeDependencyScan.capturePackageManagerFile(acc, new Quark(Tree.randomId(), unread, Markers.EMPTY, null, null));
+        SourceFile member = project(acc, MEMBER, "{\"name\":\"a\",\"version\":\"1.0.0\"}",
+          nodeResolutionResult(PackageManager.Npm));
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc, ctx, MEMBER);
+        LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
+          acc.projects.get(MEMBER).capturedLockContent, files, ctx);
+
+        assertThat(files.getPaths()).contains(unread);
+        assertThat(result).isNotNull();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).contains("libs/x/package.json (its contents were not read)");
+    }
+
     private static void captureFile(NodeDependencyScan.Accumulator acc, String path, String text) {
         SourceFile file = PlainText.builder().sourcePath(Paths.get(path)).text(text).build();
         NodeDependencyScan.capturePackageManagerFile(acc, file);

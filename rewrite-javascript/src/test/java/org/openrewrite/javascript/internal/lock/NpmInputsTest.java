@@ -203,6 +203,25 @@ class NpmInputsTest {
         assertThat(NpmInputs.installRoot(dir).isStopped()).isTrue();
     }
 
+    /**
+     * npm reads the package.json of each directory above to see whether its workspaces hold the project: one the host
+     * holds without its contents is unknown.
+     */
+    @Test
+    void aDirectoryAboveWhosePackageJsonTheHostDidNotReadIsCannotKnow() {
+        LockDirectory dir = LockDirectory.of(member()
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("package.json"), Paths.get("packages/a/package.json"))))
+          .build());
+
+        Result result = new NpmLockRegenerator(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH), NO_REGISTRY)
+          .regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).contains("package.json (its contents were not read)");
+        assertThat(NpmInputs.installRoot(dir).isStopped()).isTrue();
+    }
+
     private static Request.RequestBuilder member() {
         return Request.builder()
           .packageJson(MEMBER)

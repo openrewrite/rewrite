@@ -351,14 +351,26 @@ public final class NodeDependencyScan {
                 files.put(project.getKey(), print(ctx, project.getKey(), project.getValue()));
             }
         }
+        Set<Path> ancestors = new LinkedHashSet<>();
+        for (Path path : acc.paths) {
+            Path dir = directory(path);
+            if (isPackageJson(path) && !dir.equals(root) && above(dir, Collections.singleton(root))) {
+                ancestors.add(dir);
+            }
+        }
         Set<Path> paths = new LinkedHashSet<>();
         for (Path path : acc.paths) {
             Path dir = directory(path);
-            if (under(dir, directories) || above(dir, directories)) {
+            if (under(dir, directories) || above(dir, directories) || isPackageJson(path) && under(dir, ancestors)) {
                 paths.add(path);
             }
         }
         return new ProjectFiles(manifests, files, paths);
+    }
+
+    // the walk of a package manager maps an ancestor's workspaces over every package.json under it
+    private static boolean isPackageJson(Path path) {
+        return "package.json".equals(String.valueOf(path.getFileName()));
     }
 
     private static Path directory(Path file) {
