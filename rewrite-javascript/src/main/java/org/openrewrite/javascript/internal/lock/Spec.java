@@ -36,17 +36,29 @@ import static org.openrewrite.javascript.internal.lock.UriComponent.encodeURICom
 
 /**
  * Port of npm-package-arg 13.0.2 ({@code lib/npa.js}, its {@code Result}) on POSIX paths: what a
- * dependency spec asks for.
+ * dependency spec asks for. {@link #ofDependency} also names the pnpm, Yarn and Bun protocols npa rejects.
  */
 @Getter
 public final class Spec {
 
     public enum Type {
-        VERSION, RANGE, TAG, ALIAS, GIT, FILE, DIRECTORY, REMOTE;
+        VERSION, RANGE, TAG, ALIAS, GIT, FILE, DIRECTORY, REMOTE,
+        CATALOG("catalog:"), WORKSPACE("workspace:"), LINK("link:"), PORTAL("portal:"), PATCH("patch:"), JSR("jsr:"),
+        EXEC("exec:"), UNKNOWN_PROTOCOL;
+
+        private final @Nullable String prefix;
+
+        Type() {
+            this(null);
+        }
+
+        Type(@Nullable String prefix) {
+            this.prefix = prefix;
+        }
 
         @Override
         public String toString() {
-            return name().toLowerCase(Locale.ROOT);
+            return name().toLowerCase(Locale.ROOT).replace('_', '-');
         }
     }
 
@@ -215,6 +227,80 @@ public final class Spec {
 
     public static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where) {
         return resolve(name, spec, where, null);
+    }
+
+    /**
+     * What a manifest's dependency value is: {@code npa.resolve(name, value)}, a pnpm, Yarn or Bun protocol, or a
+     * protocol npa does not support.
+     * @throws InvalidSpecException npa's error for a value that is none of those
+     */
+    public static Spec ofDependency(String name, String value) {
+        for (Type type : Type.values()) {
+            if (type.prefix != null && value.startsWith(type.prefix)) {
+                Spec res = new Spec(null, name, value);
+                res.type = type;
+                return res;
+            }
+        }
+        try {
+            return resolve(name, value, null);
+        } catch (InvalidSpecException e) {
+            if (!"EUNSUPPORTEDPROTOCOL".equals(e.getCode())) {
+                throw e;
+            }
+            Spec res = new Spec(null, name, value);
+            res.type = Type.UNKNOWN_PROTOCOL;
+            return res;
+        }
+    }
+
+    /**
+     * The protocol the value names or expands to ({@code user/repo} is {@code github:}); null for a version, range or
+     * tag of the named package.
+     */
+    public @Nullable String getProtocol() {
+        if (type == null || isVersionSpec()) {
+            return null;
+        }
+        if (type.prefix != null) {
+            return type.prefix;
+        }
+        switch (type) {
+            case ALIAS:
+                return "npm:";
+            case FILE:
+            case DIRECTORY:
+                return "file:";
+            default:
+                if (hosted != null) {
+                    return hosted.getType() + ":";
+                }
+                Matcher scheme = IS_URL.matcher(rawSpec);
+                return scheme.find() ? scheme.group().toLowerCase(Locale.ROOT) : "git+ssh:";
+        }
+    }
+
+    /**
+     * A version, range or tag of the package the dependency names, which a version upgrade replaces.
+     */
+    public boolean isVersionSpec() {
+        return type == Type.VERSION || type == Type.RANGE || type == Type.TAG;
+    }
+
+    /**
+     * Where the package comes from rather than which version: a git host or URL, a path, a tarball URL, a link or a
+     * portal.
+     */
+    public boolean isLocation() {
+        return type == Type.GIT || type == Type.FILE || type == Type.DIRECTORY || type == Type.REMOTE ||
+               type == Type.LINK || type == Type.PORTAL;
+    }
+
+    /**
+     * The text after {@code catalog:}, as written; null for any other kind.
+     */
+    public @Nullable String getCatalogName() {
+        return type == Type.CATALOG ? rawSpec.substring("catalog:".length()) : null;
     }
 
     private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,

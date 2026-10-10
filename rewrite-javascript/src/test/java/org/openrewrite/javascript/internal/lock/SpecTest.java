@@ -21,7 +21,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -288,6 +290,110 @@ class SpecTest {
             .isEqualTo(Spec.Type.RANGE);
         assertThat(Spec.npa("e@1.0.0", "/test/a/b").getType()).as("version like specifier is never a local file")
             .isEqualTo(Spec.Type.VERSION);
+    }
+
+    // npa's type for a dependency value (npm 11.17.0's npm-package-arg 13.0.2, npa.resolve(name, value)), or the
+    // pnpm, Yarn or Bun protocol it rejects with EUNSUPPORTEDPROTOCOL
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(delimiter = '|', nullValues = "null", textBlock = """
+      catalog:                          | catalog          | catalog:
+      catalog:react17                   | catalog          | catalog:
+      workspace:^                       | workspace        | workspace:
+      workspace:1.4.1                   | workspace        | workspace:
+      npm:@acme/logger@^1.4.1           | alias            | npm:
+      patch:acme-logger@1.4.1#fix.patch | patch            | patch:
+      portal:../acme-logger             | portal           | portal:
+      file:../acme-logger               | directory        | file:
+      link:../acme-logger               | link             | link:
+      jsr:@std/path@^1                  | jsr              | jsr:
+      exec:./gen.js                     | exec             | exec:
+      github:acme/logger                | git              | github:
+      https://example.com/acme.tgz      | remote           | https:
+      http://example.com/a.tgz          | remote           | http:
+      git+ssh://example.com/acme.git    | git              | git+ssh:
+      git+https://example.com/a.git     | git              | git+https:
+      git+file:///tmp/a                 | git              | git+file:
+      git:x                             | git              | git:
+      user/repo                         | git              | github:
+      mochajs/mocha#4727d357ea          | git              | github:
+      user/repo#semver:^1.0.0           | git              | github:
+      user/repo#semver:>=1 <2           | git              | github:
+      git@github.com:user/repo.git      | git              | github:
+      gitlab:a/b                        | git              | gitlab:
+      bitbucket:a/b                     | git              | bitbucket:
+      gist:abc                          | git              | gist:
+      sourcehut:a/b                     | git              | sourcehut:
+      ../pkg                            | directory        | file:
+      ./pkg                             | directory        | file:
+      /abs/pkg                          | directory        | file:
+      ~/pkg                             | directory        | file:
+      .local                            | directory        | file:
+      C:\\pkgs\\foo                     | directory        | file:
+      c:/pkgs/foo                       | directory        | file:
+      foo-1.0.0.tgz                     | file             | file:
+      team/sub/repo                     | directory        | file:
+      @scope/pkg                        | directory        | file:
+      Catalog:                          | unknown-protocol | catalog:
+      gitmoji:x                         | unknown-protocol | gitmoji:
+      future:x                          | unknown-protocol | future:
+      ^1.4.1                            | range            | null
+      ~1.4.1                            | range            | null
+      1.4.1                             | version          | null
+      1.x                               | range            | null
+      *                                 | range            | null
+      ''                                | range            | null
+      latest                            | tag              | null
+      next                              | tag              | null
+      >=1.0.0 <2.0.0                    | range            | null
+      1.2.3 - 2.3.4                     | range            | null
+      1.2.3-beta.1                      | version          | null
+      1.2.3+build.4                     | version          | null
+      """)
+    void dependencyValue(String value, String type, @Nullable String protocol) {
+        Spec spec = Spec.ofDependency("acme-logger", value);
+        assertThat(spec.getType()).hasToString(type);
+        assertThat(spec.getProtocol()).isEqualTo(protocol);
+        assertThat(spec.isVersionSpec()).isEqualTo(protocol == null);
+    }
+
+    // on POSIX a backslash is no separator, and a scheme is letters only: npa takes each for an invalid tag
+    @ParameterizedTest
+    @ValueSource(strings = {"foo\\bar", "git-lfs:x", "x+y:abc", "-bad:"})
+    void dependencyValueNpaRejects(String value) {
+        assertThatThrownBy(() -> Spec.ofDependency("acme-logger", value))
+          .isInstanceOf(Spec.InvalidSpecException.class)
+          .satisfies(e -> assertThat(((Spec.InvalidSpecException) e).getCode()).isEqualTo("EINVALIDTAGNAME"));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      github:me/old-fork          | true
+      git+https://example.com/a   | true
+      https://example.com/a.tgz   | true
+      file:../a                   | true
+      ../a                        | true
+      foo-1.0.0.tgz               | true
+      link:../a                   | true
+      portal:../a                 | true
+      sourcehut:a/b               | true
+      catalog:                    | false
+      workspace:*                 | false
+      patch:a@1.0.0#./p.patch     | false
+      npm:other@^1                | false
+      jsr:@std/path@^1            | false
+      exec:./gen.js               | false
+      future:x                    | false
+      ^1.0.0                      | false
+      """)
+    void location(String value, boolean location) {
+        assertThat(Spec.ofDependency("acme-logger", value).isLocation()).isEqualTo(location);
+    }
+
+    @Test
+    void catalogName() {
+        assertThat(Spec.ofDependency("ms", "catalog:").getCatalogName()).isEmpty();
+        assertThat(Spec.ofDependency("ms", "catalog: legacy ").getCatalogName()).isEqualTo(" legacy ");
+        assertThat(Spec.ofDependency("ms", "^1.0.0").getCatalogName()).isNull();
     }
 
     @Test
