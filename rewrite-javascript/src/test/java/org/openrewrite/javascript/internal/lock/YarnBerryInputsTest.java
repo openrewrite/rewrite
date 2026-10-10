@@ -185,7 +185,8 @@ class YarnBerryInputsTest {
 
         assertThat(inputs.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
           "npmRegistries:\n  \"//corp.example.com\":\n    npmAuthToken: \"corp-token\"\n");
-        assertThat(asked).as(String.valueOf(error)).containsExactly(entry("https://corp.example.com @corp/a", "Bearer corp-token"));
+        assertThat(asked).as(String.valueOf(error))
+          .containsExactly(entry("https://corp.example.com @corp/a", "Bearer corp-token"));
     }
 
     /**
@@ -200,7 +201,8 @@ class YarnBerryInputsTest {
 
         assertThat(homeYarnrc(home, root)).isEmpty();
         assertThat(homeYarnrc(home, root, user, global)).isEqualTo("npmRegistryServer: " +
-          "\"https://registry.yarnpkg.com/\"\nnpmScopes:\n  \"types\":\n    npmRegistryServer: \"https://types.example/\"\n");
+          "\"https://registry.yarnpkg.com/\"\nnpmScopes:\n  \"types\":\n" +
+          "    npmRegistryServer: \"https://types.example/\"\n");
     }
 
     private static String homeYarnrc(Path home, Npmrc... marker) {

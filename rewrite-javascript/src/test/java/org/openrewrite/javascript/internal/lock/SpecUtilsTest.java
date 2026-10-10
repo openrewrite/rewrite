@@ -197,7 +197,8 @@ class SpecUtilsTest {
                 .isEqualTo(new SpecUtils.Descriptor("yarn", "1.22.22"));
         assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}").getSpec(true, NO_ENV)).isNull();
         assertThat(SpecUtils.loadSpec("", 0, dir -> null).getSpec(true, NO_ENV)).isNull();
-        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}").getSpec(true, NO_ENV))
+        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}")
+                .getSpec(true, NO_ENV))
                 .isInstanceOf(Rejected.class)
                 .hasMessageContaining("expected a semver version");
     }
