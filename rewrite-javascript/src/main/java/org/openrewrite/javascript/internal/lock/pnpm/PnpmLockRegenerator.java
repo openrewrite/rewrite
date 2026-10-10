@@ -601,8 +601,9 @@ public final class PnpmLockRegenerator {
             main.installConfigDepsAndLoadHooks(options, lockfileDir);
             allProjects = workspace ? main.filterProjectsFromDir(options) : null;
             if (options.isTrue("global")) {
-                throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. Use " +
-                                                                    "\"pnpm add -g <pkg>\" to install global packages.");
+                throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. " +
+                                                                    "Use \"pnpm add -g <pkg>\" to install global " +
+                                                                    "packages.");
             }
             projectsGraph = allProjects == null ? null : ProjectsGraph.createProjectsGraph(allProjects, false,
                     Js.truthy(options.get("linkWorkspacePackages")));
