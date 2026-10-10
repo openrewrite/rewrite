@@ -265,7 +265,8 @@ class UpgradeTransitiveDependencyVersionProtocolTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("acme-logger", "~2.0.0", null))
             .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows ->
-              assertThat(rows).extracting("protocol", "currentValue").containsExactly(tuple("workspace:", "workspace:*"))),
+              assertThat(rows).extracting("protocol", "currentValue")
+                .containsExactly(tuple("workspace:", "workspace:*"))),
           packageJson(ROOT, null, nodeResolutionResult(PackageManager.Pnpm, singletonList("packages/a/package.json"))),
           packageJson(member("workspace:*"), null, nodeResolutionResult(PackageManager.Pnpm),
             s -> s.path("packages/a/package.json")),

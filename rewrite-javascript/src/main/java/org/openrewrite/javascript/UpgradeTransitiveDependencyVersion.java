@@ -479,7 +479,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
             SourceFile manifest = project.getKey().equals(root) ? rootRevision :
                     PackageJsonHelper.editedBefore(ctx, acc, captured);
-            if (parent != null && (project.getKey().equals(root) || !parent.equals(PackageJsonHelper.declaredName(manifest)))) {
+            if (parent != null && (project.getKey().equals(root) ||
+                                   !parent.equals(PackageJsonHelper.declaredName(manifest)))) {
                 continue;
             }
             for (Map.Entry<String, Map<String, String>> scope :

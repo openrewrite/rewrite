@@ -56,9 +56,8 @@ public class NodeRegistries {
     }
 
     /**
-     * The registry a request for {@code packageName} to {@code url} goes through: of the host's registries, the one
-     * whose URL is {@code url} or the longest under which it lies, as npm picks credentials by the request's URL;
-     * otherwise {@code url} without credentials, since the host's go nowhere else.
+     * The registry a request to {@code url} goes through: of the host's, the one at or the longest above {@code url},
+     * as npm picks credentials by the request's URL; otherwise {@code url} without, since the host's go nowhere else.
      */
     public NodeRegistry registryFor(String packageName, String url) {
         String target = trimSlash(url);
