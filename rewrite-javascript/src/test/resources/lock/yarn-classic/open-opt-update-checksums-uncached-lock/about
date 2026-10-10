@@ -1,0 +1,1 @@
+--update-checksums in .yarnrc over a given lock yarn never installed (its cache cold), with an unrelated add: does yarn rewrite the integrity of the entries it reuses?

@@ -1,0 +1,1 @@
+cannot-know whether yarn's cache holds the packages it fetches: --update-checksums rewrites the integrity of each it downloads (open-opt-update-checksums-uncached-lock) and keeps it for one it finds (open-opt-update-checksums-warm-cache)

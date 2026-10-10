@@ -1,0 +1,1 @@
+--update-checksums in the .yarnrc of phase 2 only: phase 1 put ms@2.1.3 in yarn's cache, phase 2 adds left-pad. Does yarn rewrite the integrity of the cached ms as it does of a downloaded one?
