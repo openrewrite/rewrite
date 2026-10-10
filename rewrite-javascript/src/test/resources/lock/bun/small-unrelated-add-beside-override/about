@@ -1,0 +1,1 @@
+An add of ms, unrelated to the root's override of is-number, which stays in place: bun keeps the override.
