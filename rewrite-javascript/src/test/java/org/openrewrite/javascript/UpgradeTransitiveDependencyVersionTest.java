@@ -33,6 +33,7 @@ import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.yaml.ChangePropertyValue;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -111,6 +112,21 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     @Test
     void pnpmAtTheRootOfAMember() {
         golden("pnpm/override-recipe-member", PackageManager.Pnpm, "7.0.0", null);
+    }
+
+    @Test
+    void pnpmKeepsAnEarlierRecipesEditOfTheWorkspaceManifest() {
+        Scenario s = new Scenario("pnpm/override-recipe-path");
+        String workspace = requireNonNull(s.file("workspace"))
+          .replace("strictPeerDependencies: false", "strictPeerDependencies: true");
+        rewriteRun(
+          spec -> s.spec(spec, "7.0.0", "is-odd").recipes(
+            new ChangePropertyValue("strictPeerDependencies", "true", null, null, null, null),
+            new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", "is-odd")),
+          s.root(PackageManager.Pnpm, s.file("pkg")),
+          yaml(s.file("workspace-before"), workspace, spec -> spec.path("pnpm-workspace.yaml").noTrim()),
+          s.lock(PackageManager.Pnpm, s.file("after"))
+        );
     }
 
     @Test
