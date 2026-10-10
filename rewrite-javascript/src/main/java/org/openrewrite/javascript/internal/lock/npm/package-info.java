@@ -25,7 +25,8 @@
  *     <li>ssri, which {@code internal.lock.Ssri} ports: Copyright (c) npm, Inc.</li>
  *     <li>npm-package-arg, which {@code internal.lock.Spec} ports: Copyright (c) npm, Inc.</li>
  *     <li>hosted-git-info, which {@code internal.lock.GitHost} ports: Copyright (c) 2015, Rebecca Turner</li>
- *     <li>validate-npm-package-name: Copyright (c) 2015, npm, Inc</li>
+ *     <li>validate-npm-package-name, which {@code internal.lock.ValidateNpmPackageName} ports: Copyright (c) 2015,
+ *     npm, Inc</li>
  *     <li>@npmcli/package-json: Copyright GitHub Inc.</li>
  *     <li>@npmcli/name-from-folder: Copyright npm, Inc.</li>
  *     <li>@npmcli/map-workspaces: Copyright npm, Inc.</li>

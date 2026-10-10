@@ -19,6 +19,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -211,7 +212,7 @@ final class ProjectsGraph {
         } else if (nameEndsAt > 0) {
             name = namePart;
             spec = arg.substring(nameEndsAt + 1);
-        } else if (ParseOverrides.validForOldPackages(arg)) {
+        } else if (ValidateNpmPackageName.validForOldPackages(arg, ValidateNpmPackageName.Release.V4_0_0)) {
             name = arg;
         } else {
             spec = arg;
@@ -221,7 +222,8 @@ final class ProjectsGraph {
 
     // npa.js resolve
     private Spec resolve(@Nullable String name, @Nullable String spec, String where) {
-        if (name != null && !name.isEmpty() && !ParseOverrides.validForOldPackages(name)) {
+        if (name != null && !name.isEmpty() &&
+            !ValidateNpmPackageName.validForOldPackages(name, ValidateNpmPackageName.Release.V4_0_0)) {
             throw new NpaError("Invalid package name \"" + name + "\"");
         }
         if (spec == null || spec.isEmpty()) {

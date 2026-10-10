@@ -86,7 +86,6 @@ public final class Spec {
     private static final Pattern IS_POSIX_FILE = Pattern.compile("^(?:[.]|~[/]|[/]|[a-zA-Z]:)");
     private static final Pattern GIT_SSH = Pattern.compile("^git\\+ssh://([^:#]+:[^#]+(?:\\.git)?)(?:#(.*))?$",
             Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-    private static final Pattern SCOPED_PACKAGE = Pattern.compile("^(?:@([^/]+?)[/])?([^/]+?)$", Pattern.DOTALL);
 
     // npm-package-arg resolves '~' against os.homedir(); the virtual filesystem's home is its root.
     static final String HOME = PosixPath.CWD;
@@ -214,7 +213,7 @@ public final class Spec {
                 spec = "*";
             }
         } else {
-            if (validatePackageNameErrors(arg).isEmpty()) {
+            if (ValidateNpmPackageName.validForOldPackages(arg, ValidateNpmPackageName.Release.V7_0_2)) {
                 name = arg;
                 spec = "*";
             } else {
@@ -346,7 +345,7 @@ public final class Spec {
     }
 
     private void setName(String name) {
-        List<String> errors = validatePackageNameErrors(name);
+        List<String> errors = ValidateNpmPackageName.errors(name, ValidateNpmPackageName.Release.V7_0_2);
         if (!errors.isEmpty()) {
             throw new InvalidSpecException("Invalid package name \"" + name + "\" of package \"" + raw + "\": " +
                                            String.join("; ", errors) + ".", "EINVALIDPACKAGENAME");
@@ -587,43 +586,4 @@ public final class Spec {
         return res;
     }
 
-    // The errors of validate-npm-package-name 7.0.2; npa only asks validForOldPackages.
-    static List<String> validatePackageNameErrors(String name) {
-        List<String> errors = new ArrayList<>();
-        if (name.isEmpty()) {
-            errors.add("name length must be greater than zero");
-        }
-        if (name.startsWith(".")) {
-            errors.add("name cannot start with a period");
-        }
-        if (name.startsWith("-")) {
-            errors.add("name cannot start with a hyphen");
-        }
-        if (name.startsWith("_")) {
-            errors.add("name cannot start with an underscore");
-        }
-        if (!trim(name).equals(name)) {
-            errors.add("name cannot contain leading or trailing spaces");
-        }
-        for (String excludedName : new String[]{"node_modules", "favicon.ico"}) {
-            if (name.toLowerCase(Locale.ROOT).equals(excludedName)) {
-                errors.add(excludedName + " is not a valid package name");
-            }
-        }
-        if (!encodeURIComponent(name).equals(name)) {
-            Matcher nameMatch = SCOPED_PACKAGE.matcher(name);
-            if (nameMatch.matches()) {
-                String user = nameMatch.group(1);
-                String pkg = nameMatch.group(2);
-                if (pkg.startsWith(".")) {
-                    errors.add("name cannot start with a period");
-                }
-                if (user != null && encodeURIComponent(user).equals(user) && encodeURIComponent(pkg).equals(pkg)) {
-                    return errors;
-                }
-            }
-            errors.add("name can only contain URL-friendly characters");
-        }
-        return errors;
-    }
 }

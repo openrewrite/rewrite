@@ -17,19 +17,18 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.UriComponent;
+import org.openrewrite.javascript.internal.lock.ValidateNpmPackageName;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
  * Port of @pnpm/config.parse-overrides src/index.ts and @pnpm/resolving.parse-wanted-dependency
- * (pnpm 11.2.2), with validate-npm-package-name 7.0.2's {@code validForOldPackages}.
+ * (pnpm 11.2.2).
  */
 public final class ParseOverrides {
 
@@ -46,7 +45,6 @@ public final class ParseOverrides {
     }
 
     private static final Pattern DELIMITER_REGEX = Pattern.compile("[^ |@]>");
-    private static final Pattern SCOPED_PACKAGE = Pattern.compile("^(?:@([^/]+?)[/])?([^/]+?)$");
 
     private ParseOverrides() {
     }
@@ -134,48 +132,18 @@ public final class ParseOverrides {
         int versionDelimiter = rawWantedDependency.indexOf('@', 1);
         if (versionDelimiter != -1) {
             String alias = rawWantedDependency.substring(0, versionDelimiter);
-            if (validForOldPackages(alias)) {
+            if (ValidateNpmPackageName.validForOldPackages(alias, ValidateNpmPackageName.Release.V7_0_2)) {
                 return new ParsedWantedDependency(alias, rawWantedDependency.substring(versionDelimiter + 1));
             }
             return new ParsedWantedDependency(null, rawWantedDependency);
         }
-        if (validForOldPackages(rawWantedDependency)) {
+        if (ValidateNpmPackageName.validForOldPackages(rawWantedDependency,
+                ValidateNpmPackageName.Release.V7_0_2)) {
             return new ParsedWantedDependency(rawWantedDependency, null);
         }
         return new ParsedWantedDependency(null, rawWantedDependency);
     }
 
-    /**
-     * validate-npm-package-name 7.0.2: a name with no errors (its warnings do not count for old packages).
-     */
-    static boolean validForOldPackages(String name) {
-        if (name.isEmpty() || name.startsWith(".") || name.startsWith("-") || name.startsWith("_")) {
-            return false;
-        }
-        if (!Js.trim(name).equals(name)) {
-            return false;
-        }
-        String lower = name.toLowerCase(Locale.ROOT);
-        if ("node_modules".equals(lower) || "favicon.ico".equals(lower)) {
-            return false;
-        }
-        if (!UriComponent.encodeURIComponent(name).equals(name)) {
-            Matcher nameMatch = SCOPED_PACKAGE.matcher(name);
-            if (nameMatch.matches()) {
-                String user = nameMatch.group(1);
-                String pkg = nameMatch.group(2);
-                if (pkg.startsWith(".")) {
-                    return false;
-                }
-                if (user != null && UriComponent.encodeURIComponent(user).equals(user) &&
-                    UriComponent.encodeURIComponent(pkg).equals(pkg)) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        return true;
-    }
 
     /**
      * @pnpm/lockfile.settings-checker {@code createOverridesMapFromParsed}: the {@code overrides} block of the lock.

@@ -67,8 +67,8 @@
  * 2017-present, Jon Schlinkert); and the {@code parseRange} of semver-utils 1.1.4
  * (Copyright 2013 AJ ONeal, offered under the MIT License or Apache-2.0, used here under the MIT License).
  * <p>
- * {@code internal.lock.Ssri} ports ssri 13.0.1 (Copyright (c) npm, Inc.), {@code ParseOverrides} the name check of
- * validate-npm-package-name 7.0.2 (Copyright (c) 2015, npm, Inc), and
+ * {@code internal.lock.Ssri} ports ssri 13.0.1 (Copyright (c) npm, Inc.), {@code internal.lock.ValidateNpmPackageName}
+ * validate-npm-package-name 4.0.0 and 7.0.2 (Copyright (c) 2015, npm, Inc), and
  * {@code ProjectsGraph} parts of @pnpm/npm-package-arg 2.0.0 (Copyright (c) Isaac Z. Schlueter) and of
  * hosted-git-info 4.1.0 (Copyright (c) 2015, Rebecca Turner), each distributed under the ISC License:
  * <pre>
