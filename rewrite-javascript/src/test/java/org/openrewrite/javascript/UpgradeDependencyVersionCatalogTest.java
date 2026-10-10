@@ -59,6 +59,7 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
             .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyProtocolsSkipped.class)).isEmpty()),
           recording.sources()
         );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion(name, null, version));
     }
 
     @ParameterizedTest(name = "{0}/{1}")

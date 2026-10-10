@@ -52,6 +52,7 @@ class ChangeDependencyCatalogTest implements RewriteTest {
             .afterRecipe(run -> assertThat(run.getDataTableRows(NodeDependencyProtocolsSkipped.class)).isEmpty()),
           recording.sources()
         );
+        recording.assertEveryVisitOrder(new ChangeDependency(from, "is-number", version, null));
     }
 
     private static String manifest(String value) {

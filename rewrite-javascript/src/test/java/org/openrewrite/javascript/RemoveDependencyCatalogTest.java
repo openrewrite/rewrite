@@ -55,6 +55,7 @@ class RemoveDependencyCatalogTest implements RewriteTest {
           spec -> spec.recipe(new RemoveDependency(name, null)).executionContext(recording.ctx()),
           recording.sources()
         );
+        recording.assertEveryVisitOrder(new RemoveDependency(name, null));
     }
 
     @Test

@@ -59,6 +59,7 @@ class AddDependencyCatalogTest implements RewriteTest {
           spec -> spec.recipe(new AddDependency(name, version, null)).executionContext(recording.ctx()),
           recording.sources()
         );
+        recording.assertEveryVisitOrder(new AddDependency(name, version, null));
     }
 
     @ParameterizedTest
@@ -83,6 +84,7 @@ class AddDependencyCatalogTest implements RewriteTest {
           spec -> spec.recipe(new AddDependency(name, version, null)).executionContext(recording.ctx()),
           recording.sources()
         );
+        recording.assertEveryVisitOrder(new AddDependency(name, version, null));
     }
 
     @ParameterizedTest
