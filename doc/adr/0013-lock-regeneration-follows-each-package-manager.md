@@ -89,7 +89,10 @@ changes only when a recording says so.
 - Node's and V8's behavior: `EcmaScript`, `EventLoop`, `V8Date`, `V8RegExp`, `V8Sort` (V8's TimSort at any length),
   `WhatwgUrl`, `UriComponent`, `PosixPath`, `RootRelativePath`, `Ini`, `LocaleCompare`, `Host`, `HostEnvironment`;
 - one port per upstream library that several package managers bundle, the release an option: `Spec` (npm-package-arg),
-  `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1), `YarnpkgSemverUtils`.
+  `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1), `YarnpkgSemverUtils`;
+  minimatch is still two ports, npm's 10.2.5 in `npm` and Yarn classic's 3.0.4 in `yarnclassic`;
+- the registry sources pick the host's credentials as their package manager does: by the request's URL for npm and
+  pnpm, by the package's scope for Yarn and Bun.
 
 `Spec` is also the one classifier of a manifest's dependency value for the recipes: npa's kinds, and the catalog,
 workspace, link, portal, patch, jsr and exec protocols npa rejects, each its own kind. A recipe leaves a value that is
@@ -114,10 +117,12 @@ top-level fallback, Yarn 4.10's `.yarnrc.yml`), as `NodeCatalogs`. A recipe that
 edits the entry in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key
 and gives the catalog the new name's entry; AddDependency and RemoveDependency do what `pnpm add` and `pnpm remove` do
 under `catalogMode`, `saveCatalogName` and `cleanupUnusedCatalogs`, the cleanup counting the projects the
-workspace's `packages` match.
+workspace's `packages` match. What a recipe adds to pnpm-workspace.yaml, an override or a catalog entry, is placed and
+quoted by one port of pnpm's workspace manifest writer, and its settings are read by pnpm's own reader.
 
-The dependency recipes compose in one cycle as a fold: each adds its edits of manifests and package-manager files to the
-cycle in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the documents as the recipes
-before it leave them, and regenerates from those, so the lock written last holds every recipe's edit in any visit
-order. No marker is read as state: declines are derived from the documents each cycle, a marker is a content-equal
-warning, and rows are deduplicated within a cycle. A recipe outside the fold is seen only at its visit.
+The dependency recipes compose in one cycle: each adds its edits of manifests and package-manager files to the cycle
+in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the documents as the recipes before it
+leave them, and regenerates from those, so the lock written last holds every recipe's edit in any visit order. No
+marker is read as state: declines are derived from the documents each cycle, a marker is a content-equal warning, and
+rows are deduplicated within a cycle. Another recipe's edit is seen only at its file's visit; a lock written before
+that visit is warned with a row.
