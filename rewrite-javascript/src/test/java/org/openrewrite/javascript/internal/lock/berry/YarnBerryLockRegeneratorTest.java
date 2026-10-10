@@ -18,10 +18,12 @@ package org.openrewrite.javascript.internal.lock.berry;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.time.Instant;
@@ -135,6 +137,47 @@ class YarnBerryLockRegeneratorTest {
                                                  "unknownSetting");
         assertThat(requireNonNull(conflict).getKind()).isEqualTo(Kind.CANNOT_KNOW);
         assertThat(conflict.getDetail()).contains("merge conflict");
+    }
+
+    /**
+     * Of two problems, Yarn 4.10.3 reports the one Configuration.find meets first: the core settings, then (after the
+     * third-party plugins run) the plugins' settings, then an unknown key; recorded over an empty lock.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "unknownSetting: true\\ncompressionLevel: nope|Internal Error: Invalid value, expected one of mixed, 0, " +
+            "1, 2, 3, 4, 5, 6, 7, 8, 9 in .yarnrc.yml",
+            "npmAlwaysAuth: nope\\ncompressionLevel: nope|Internal Error: Invalid value, expected one of mixed, 0, 1, " +
+            "2, 3, 4, 5, 6, 7, 8, 9 in .yarnrc.yml",
+            "unknownSetting: true\\nnpmScopes:\\n  foo:\\n    npmRegistryServr: https://x.example|Usage Error: " +
+            "Unrecognized configuration settings found: npmScopes['foo'].npmRegistryServr",
+            "supportedArchitectures:\\n  osx: [darwin]\\nunknownSetting: true|Usage Error: Unrecognized configuration " +
+            "settings found: supportedArchitectures.osx",
+            "npmScopes:\\n  foo:\\n    npmRegistryServr: https://x.example\\nsupportedArchitectures:\\n  osx: [darwin]|" +
+            "Usage Error: Unrecognized configuration settings found: supportedArchitectures.osx"
+    })
+    void reportsTheProblemConfigurationFindMeetsFirst(String yarnrc, String reported) {
+        Failure failure = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+                .lock("")
+                .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}")
+                .configFile(".yarnrc.yml", yarnrc.replace("\\n", "\n") + "\n")
+                .now(Instant.EPOCH)
+                .build(), BerryScenarios.NO_REGISTRY).regenerate().getFailure();
+
+        assertThat(requireNonNull(failure).getDetail()).contains(reported);
+    }
+
+    /**
+     * An unknown key in the home directory's .yarnrc.yml is set aside, strict or not (Yarn 4.10.3 installs over it).
+     */
+    @Test
+    void anUnknownKeyOfTheHomeRcFileIsSetAside() {
+        Configuration options = Configuration.load(Collections.singletonMap(Configuration.HOME + ".yarnrc.yml",
+                "unknownSetting: true\n"), HostEnvironment.of(Collections.emptyMap()));
+        options.restrictTo(requireNonNull(YarnRelease.of("4.10.3")));
+        assertThatThrownBy(() -> Configuration.load(Collections.singletonMap(".yarnrc.yml", "unknownSetting: true\n"),
+                HostEnvironment.of(Collections.emptyMap())).restrictTo(requireNonNull(YarnRelease.of("4.10.3"))))
+                .isInstanceOf(Configuration.UsageError.class);
     }
 
     /**

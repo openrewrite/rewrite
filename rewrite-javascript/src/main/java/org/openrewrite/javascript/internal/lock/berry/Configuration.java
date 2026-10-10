@@ -66,6 +66,20 @@ public final class Configuration {
     private static final List<String> PRIMARY_FIELDS = Arrays.asList("yarnPath", "ignorePath",
             "injectEnvironmentFiles");
 
+    // the keys of Yarn 4.10.3's coreDefinitions; every other setting is a plugin's or unknown
+    private static final Set<String> CORE_FIELDS = new LinkedHashSet<>(Arrays.asList("lastUpdateCheck", "yarnPath",
+            "ignorePath", "globalFolder", "cacheFolder", "compressionLevel", "virtualFolder", "installStatePath",
+            "immutablePatterns", "rcFilename", "enableGlobalCache", "cacheMigrationMode", "enableColors",
+            "enableHyperlinks", "enableInlineBuilds", "enableMessageNames", "enableProgressBars", "enableTimers",
+            "enableTips", "preferInteractive", "preferTruncatedLines", "progressBarStyle", "defaultLanguageName",
+            "defaultProtocol", "enableTransparentWorkspaces", "supportedArchitectures", "enableMirror",
+            "enableNetwork", "enableOfflineMode", "httpProxy", "httpsProxy", "unsafeHttpWhitelist", "httpTimeout",
+            "httpRetry", "networkConcurrency", "taskPoolConcurrency", "taskPoolMode", "networkSettings",
+            "httpsCaFilePath", "httpsKeyFilePath", "httpsCertFilePath", "enableStrictSsl", "logFilters",
+            "enableTelemetry", "telemetryInterval", "telemetryUserId", "enableHardenedMode", "enableScripts",
+            "enableStrictSettings", "enableImmutableCache", "enableCacheClean", "checksumBehavior",
+            "injectEnvironmentFiles", "packageExtensions"));
+
     private static final Set<String> LEGACY_PLUGINS = new LinkedHashSet<>(Arrays.asList(
             "@yarnpkg/plugin-constraints", "@yarnpkg/plugin-exec", "@yarnpkg/plugin-interactive-tools",
             "@yarnpkg/plugin-stage", "@yarnpkg/plugin-typescript", "@yarnpkg/plugin-version",
@@ -310,11 +324,19 @@ public final class Configuration {
         if (resolvedRcFile != null) {
             options.use(resolvedRcFile.getSource(), pickPrimaryCoreFields(asMap(resolvedRcFile.getValue())));
         }
-        options.use("<environment>", pickSecondaryFields(environmentSettings));
+        options.use("<environment>", pickSecondaryCoreFields(environmentSettings));
         if (resolvedRcFile != null) {
-            options.use(resolvedRcFile.getSource(), pickSecondaryFields(asMap(resolvedRcFile.getValue())));
+            options.use(resolvedRcFile.getSource(), pickSecondaryCoreFields(asMap(resolvedRcFile.getValue())));
         }
+        // the plugins' settings are read after the third-party plugins run
         options.thirdPartyPlugin = thirdPartyPlugin(environmentSettings, rcFiles);
+        if (options.thirdPartyPlugin != null) {
+            return options;
+        }
+        options.use("<environment>", pickPluginFields(environmentSettings));
+        if (resolvedRcFile != null) {
+            options.use(resolvedRcFile.getSource(), pickPluginFields(asMap(resolvedRcFile.getValue())));
+        }
         return options;
     }
 
@@ -329,10 +351,19 @@ public final class Configuration {
         return out;
     }
 
-    // pickSecondaryCoreFields and pickPluginFields, read as one pass
-    private static Map<String, @Nullable Object> pickSecondaryFields(Map<String, @Nullable Object> data) {
+    private static Map<String, @Nullable Object> pickSecondaryCoreFields(Map<String, @Nullable Object> data) {
+        Map<String, @Nullable Object> out = new LinkedHashMap<>();
+        for (Map.Entry<String, @Nullable Object> entry : data.entrySet()) {
+            if (CORE_FIELDS.contains(entry.getKey()) && !PRIMARY_FIELDS.contains(entry.getKey())) {
+                out.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return out;
+    }
+
+    private static Map<String, @Nullable Object> pickPluginFields(Map<String, @Nullable Object> data) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>(data);
-        out.keySet().removeAll(PRIMARY_FIELDS);
+        out.keySet().removeAll(CORE_FIELDS);
         return out;
     }
 
@@ -478,7 +509,7 @@ public final class Configuration {
 
     /**
      * {@code use}'s check of a key against the settings the release defines: under {@code enableStrictSettings}
-     * an unknown key is Yarn's usage error, otherwise it is set aside and its default stays.
+     * an unknown key is Yarn's usage error but in the home rc file; otherwise it is set aside and its default stays.
      */
     void restrictTo(YarnRelease release) {
         this.release = release;
@@ -489,7 +520,7 @@ public final class Configuration {
             if (release.getSettings().contains(key.getKey())) {
                 continue;
             }
-            if (strict) {
+            if (strict && !key.getValue().startsWith(HOME)) {
                 throw new UsageError("Unrecognized or legacy configuration settings found: " + key.getKey() +
                                      " - run \"" + release.getUnknownSettingHint() + "\" to see the list of " +
                                      "settings supported in Yarn (in " + key.getValue() + ")");
