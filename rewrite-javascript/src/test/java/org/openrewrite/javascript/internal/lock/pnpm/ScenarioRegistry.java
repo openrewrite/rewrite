@@ -62,7 +62,7 @@ final class ScenarioRegistry extends RecordedRegistry<PnpmScenarios.Scenario> im
         if (npmrc == null) {
             return config;
         }
-        Map<String, @Nullable Object> decoded = Ini.decode(npmrc);
+        Map<String, @Nullable Object> decoded = Ini.decode(npmrc, Ini.Release.V6_0_0);
         for (Map.Entry<String, @Nullable Object> entry : decoded.entrySet()) {
             String key = entry.getKey();
             if (entry.getValue() instanceof String && ("registry".equals(key) ||

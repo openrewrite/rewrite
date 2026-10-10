@@ -83,7 +83,7 @@ final class Manifests {
     static Map<String, @Nullable Object> readJson5(String text, String path) {
         Object value;
         try {
-            value = Json5.parse(LockfileReader.stripBom(text));
+            value = Json5.parse(StripBom.stripBom(text));
         } catch (Json5.SyntaxError e) {
             throw new PnpmError("JSON5_PARSE", e.getMessage() + " in " + path);
         }
