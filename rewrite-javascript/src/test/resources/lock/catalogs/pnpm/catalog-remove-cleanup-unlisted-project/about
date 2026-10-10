@@ -1,0 +1,1 @@
+pnpm remove wrappy in member a, cleanupUnusedCatalogs: examples/x is no project of the workspace (packages/* only), so its ms: catalog: keeps no entry.

@@ -59,6 +59,17 @@ class RemoveDependencyCatalogTest implements RewriteTest {
     }
 
     @Test
+    void aProjectTheWorkspaceDoesNotListKeepsNoEntry() {
+        CatalogRecording recording = new CatalogRecording("pnpm", "catalog-remove-cleanup-unlisted-project")
+          .fromTheGivenWorkspace();
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)).executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new RemoveDependency("wrappy", null));
+    }
+
+    @Test
     void declinedWhenTheCleanupWouldRewriteAFlowStyleCatalog() {
         String member = """
           {

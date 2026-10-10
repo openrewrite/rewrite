@@ -50,6 +50,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -78,6 +79,7 @@ final class CatalogRecording {
 
     private final Path dir;
     private final PackageManager pm;
+    private String workspaceBefore = "workspace-before";
     final List<String> unserved = new ArrayList<>();
 
     CatalogRecording(String family, String scenario) {
@@ -128,6 +130,14 @@ final class CatalogRecording {
     }
 
     /**
+     * This recording run over the pnpm-workspace.yaml it was given, which the package manager's first install rewrote.
+     */
+    CatalogRecording fromTheGivenWorkspace() {
+        workspaceBefore = "workspace-given";
+        return this;
+    }
+
+    /**
      * Every file the recording holds, before the edit and as the package manager left it ({@code null} for one it
      * left unchanged); the lock must regenerate without a warning.
      */
@@ -152,8 +162,8 @@ final class CatalogRecording {
             before.put(member, members.get(member));
             after.put(member, membersAfter.get(member));
         }
-        if (has("workspace-before") || has("workspace")) {
-            String workspace = read(has("workspace-before") ? "workspace-before" : "workspace");
+        String workspace = workspace();
+        if (workspace != null) {
             before.put("pnpm-workspace.yaml", workspace);
             after.put("pnpm-workspace.yaml", has("workspace") ? read("workspace") : workspace);
         }
@@ -169,7 +179,7 @@ final class CatalogRecording {
         for (List<String> order : orders(new ArrayList<>(before.keySet()))) {
             List<SourceFile> sources = new ArrayList<>();
             for (String path : order) {
-                sources.add(parse(path, before.get(path), new ArrayList<>(members.keySet())));
+                sources.add(parse(path, before.get(path), listed(members.keySet())));
             }
             List<SourceFile> edited = run(sources, recipes);
             for (SourceFile sf : edited) {
@@ -217,6 +227,32 @@ final class CatalogRecording {
                     nodeResolutionResult(pm, members) : nodeResolutionResult(pm)));
         }
         return sf;
+    }
+
+    // the pnpm-workspace.yaml the edit starts from; `workspace` alone holds for both phases
+    private @Nullable String workspace() {
+        return has(workspaceBefore) ? read(workspaceBefore) : has("workspace") ? read("workspace") : null;
+    }
+
+    // the member manifests the host's root marker names: for pnpm those pnpm-workspace.yaml's packages match
+    private List<String> listed(Collection<String> manifests) {
+        String workspace = workspace();
+        Object packages = pm != PackageManager.Pnpm || workspace == null ? null :
+                ((Map<?, ?>) new Yaml().load(workspace)).get("packages");
+        if (!(packages instanceof List)) {
+            return new ArrayList<>(manifests);
+        }
+        List<String> listed = new ArrayList<>();
+        for (String manifest : manifests) {
+            String dir = manifest.substring(0, manifest.length() - "/package.json".length());
+            for (Object glob : (List<?>) packages) {
+                if (dir.matches(String.valueOf(glob).replace(".", "\\.").replace("*", "[^/]*"))) {
+                    listed.add(manifest);
+                    break;
+                }
+            }
+        }
+        return listed;
     }
 
     private static List<List<String>> orders(List<String> paths) {
@@ -269,7 +305,7 @@ final class CatalogRecording {
         }
         boolean failed = !has("after");
         sources.add(packageJson(read("pkg-before"), changed(read("pkg-before"), failed ? null : read("pkg")),
-                nodeResolutionResult(pm, members), s -> s.noTrim()));
+                nodeResolutionResult(pm, listed(members)), s -> s.noTrim()));
         for (String path : members) {
             String text = before.get(path);
             if (path.equals(member)) {
@@ -285,17 +321,15 @@ final class CatalogRecording {
             sources.add(packageJson(text, changed(text, failed ? null : after.get(path)), nodeResolutionResult(pm),
                     s -> s.path(path).noTrim()));
         }
+        String workspace = workspace();
         if (inPlace != null) {
             Object written = new Yaml().load(read("workspace"));
-            sources.add(yaml(read("workspace-before"), inPlace, s -> s.path("pnpm-workspace.yaml").noTrim()
+            sources.add(yaml(workspace, inPlace, s -> s.path("pnpm-workspace.yaml").noTrim()
                     .afterRecipe(doc -> assertThat((Object) new Yaml().load(doc.printAll(new PrintOutputCapture<>(0,
                             PrintOutputCapture.MarkerPrinter.SANITIZED)))).isEqualTo(written))));
-        } else if (has("workspace-before")) {
-            String edited = failed ? null : has("workspace") ? read("workspace") : read("workspace-before");
-            sources.add(yamlFile(read("workspace-before"), changed(read("workspace-before"), edited),
-                    "pnpm-workspace.yaml"));
-        } else if (has("workspace")) {
-            sources.add(yamlFile(read("workspace"), null, "pnpm-workspace.yaml"));
+        } else if (workspace != null) {
+            String edited = failed ? null : has("workspace") ? read("workspace") : workspace;
+            sources.add(yamlFile(workspace, changed(workspace, edited), "pnpm-workspace.yaml"));
         }
         if (has("yarnrc")) {
             String edited = failed ? null : has("yarnrc-after") ? read("yarnrc-after") : read("yarnrc");

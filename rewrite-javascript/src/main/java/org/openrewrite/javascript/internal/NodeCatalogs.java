@@ -1453,6 +1453,7 @@ public abstract class NodeCatalogs {
                 return edited;
             }
             boolean touched = false;
+            Set<Path> workspaceProjects = workspaceProjects(file);
             List<Map<String, Map<String, String>>> projects = new ArrayList<>();
             for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
                 SourceFile captured = project.getValue().capturedPackageJson;
@@ -1461,6 +1462,9 @@ public abstract class NodeCatalogs {
                 }
                 Decision decision = decisions.get(project.getKey());
                 touched |= decision != null && decision.edits();
+                if (workspaceProjects != null && !workspaceProjects.contains(project.getKey())) {
+                    continue;
+                }
                 SourceFile doc = decision != null ? decision.from : captured;
                 if (doc instanceof Json.Document && decision != null && decision.manifestEdit != null) {
                     doc = decision.manifestEdit.apply((Json.Document) doc);
@@ -1468,6 +1472,18 @@ public abstract class NodeCatalogs {
                 projects.add(PackageJsonHelper.declaredDependencies(doc));
             }
             return touched ? ((Pnpm) edited).withoutUnused(projects) : edited;
+        }
+
+        // pnpm's allProjects: the workspace root and the members its packages list; null without the root's manifest
+        private @Nullable Set<Path> workspaceProjects(CatalogFile file) {
+            Path root = file.path.resolveSibling("package.json");
+            SourceFile manifest = captured(root);
+            if (manifest == null) {
+                return null;
+            }
+            Set<Path> projects = new HashSet<>(PackageJsonHelper.workspaceMemberPaths(manifest));
+            projects.add(root);
+            return projects;
         }
 
         // Bun's root manifest with this cycle's catalog edits
