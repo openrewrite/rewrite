@@ -128,11 +128,12 @@ public final class LockOnlyInstall {
             }
             return Result.failure(new Failure(Kind.SECOND_INSTALL, failure.getReason(), failure.getPackageName(),
                     describe(Kind.SECOND_INSTALL) + (failure.getKind() == Kind.PM_FAILS ? " would fail: " :
-                            " would reject it: ") + failure.getDetail()));
+                            " would reject it: ") + failure.getDetail(), written));
         }
         if (!rewritten.equals(written)) {
             return Result.failure(new Failure(Kind.SECOND_INSTALL, Reason.RESOLUTION_REQUIRED, null,
-                    describe(Kind.SECOND_INSTALL) + " would rewrite it: " + firstDifference(written, rewritten)));
+                    describe(Kind.SECOND_INSTALL) + " would rewrite it: " + firstDifference(written, rewritten),
+                    written));
         }
         return Result.success(written);
     }

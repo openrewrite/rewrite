@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Singular;
 import lombok.Value;
@@ -193,11 +194,21 @@ public final class LockFileRegeneration {
     }
 
     @Value
+    @AllArgsConstructor
     public static class Failure {
         Kind kind;
         Reason reason;
         @Nullable String packageName;
         String detail;
+
+        /**
+         * The lock the install wrote, where the second install rejects or rewrites it; null otherwise.
+         */
+        @Nullable String written;
+
+        public Failure(Kind kind, Reason reason, @Nullable String packageName, String detail) {
+            this(kind, reason, packageName, detail, null);
+        }
     }
 
     @Value

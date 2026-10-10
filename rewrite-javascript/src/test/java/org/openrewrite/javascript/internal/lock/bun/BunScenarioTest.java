@@ -125,12 +125,16 @@ class BunScenarioTest extends LockScenarioTest {
         }
     }
 
-    // with bun's after and its own rewrite of it recorded, the second install over the lock written rewrites as bun did
+    // with bun's after and its own rewrite of it recorded, the lock written is bun's and the second install over it
+    // rewrites it as bun did
     private static boolean rewritesAsBunDid(Failure failure, ScenarioRegistry http) {
         String after = http.recording().file("after");
         String again = http.recording().file("again");
         if (after == null || again == null) {
             return true;
+        }
+        if (!after.equals(failure.getWritten())) {
+            return false;
         }
         String[] a = after.split("\n", -1);
         String[] b = again.split("\n", -1);
