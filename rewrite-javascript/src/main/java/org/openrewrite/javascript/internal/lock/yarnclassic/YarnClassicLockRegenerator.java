@@ -50,18 +50,6 @@ public final class YarnClassicLockRegenerator {
     private static final LockOnlyInstall INSTALL = LockOnlyInstall.YARN;
     private static final Pattern CONFIG_FILE = Pattern.compile("(\\.\\./)*\\.(yarnrc|yarnrc\\.yml|npmrc)");
 
-    private static final RegistrySource NO_REGISTRY = new RegistrySource() {
-        @Override
-        public @Nullable String packument(String registry, String name) {
-            return null;
-        }
-
-        @Override
-        public byte @Nullable [] tarball(String url, String name, String version) {
-            return null;
-        }
-    };
-
     /**
      * What the engine is given for a Yarn classic project.
      */
@@ -189,10 +177,6 @@ public final class YarnClassicLockRegenerator {
     public YarnClassicLockRegenerator(Inputs inputs, RegistrySource registry) {
         this.inputs = inputs;
         this.registry = registry;
-    }
-
-    YarnClassicLockRegenerator(Inputs inputs) {
-        this(inputs, NO_REGISTRY);
     }
 
     /**

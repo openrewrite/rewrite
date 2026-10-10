@@ -1,0 +1,1 @@
+cannot-know the lock yarn writes: run in tools/x, which no workspaces list, it writes tools/x/yarn.lock (member lock written), not this lock

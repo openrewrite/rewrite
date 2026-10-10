@@ -239,17 +239,18 @@ class YarnClassicLockRegeneratorTest {
                 .lock("# yarn lockfile v1\n\n\n")
                 .now(Instant.EPOCH);
         Result unread = new YarnClassicLockRegenerator(inputs.paths(new LinkedHashSet<>(Arrays.asList(
-                "package.json", "yarn.lock", "next/package.json"))).build()).regenerate();
+                "package.json", "yarn.lock", "next/package.json"))).build(), YarnClassicScenarios.NO_REGISTRY)
+                .regenerate();
         assertThat(unread.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know the package.json " +
                                                        "of file:next, which the project's manifests do not include");
 
         Result absent = new YarnClassicLockRegenerator(inputs.paths(new LinkedHashSet<>(Arrays.asList(
-                "package.json", "yarn.lock"))).build()).regenerate();
+                "package.json", "yarn.lock"))).build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
         assertThat(requireNonNull(absent.getFailure()).getReason()).isEqualTo(Reason.PACKAGE_NOT_FOUND);
 
         Result outside = new YarnClassicLockRegenerator(inputs.manifest("", "{\"name\":\"p\",\"version\":\"1.0.0\"," +
                                                                             "\"dependencies\":{\"x\":\"a/../../b\"}}")
-                .build()).regenerate();
+                .build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
         assertThat(outside.getErrorMessage()).isEqualTo("RESOLUTION_REQUIRED: the engine cannot know whether " +
                                                         "a/../../b/package.json exists outside the project, which " +
                                                         "makes the range a/../../b a file: dependency");
@@ -276,7 +277,8 @@ class YarnClassicLockRegeneratorTest {
         if (paths != null) {
             inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
         }
-        assertThat(new YarnClassicLockRegenerator(inputs.build()).regenerate().getErrorMessage()).isEqualTo(outcome);
+        assertThat(new YarnClassicLockRegenerator(inputs.build(), YarnClassicScenarios.NO_REGISTRY).regenerate()
+                .getErrorMessage()).isEqualTo(outcome);
     }
 
     /**
@@ -299,7 +301,7 @@ class YarnClassicLockRegeneratorTest {
                 .directory(directory)
                 .now(Instant.EPOCH)
                 .build();
-        assertThat(untilTheFirstStep((inputs))).startsWith(outcome);
+        assertThat(untilTheFirstStep(inputs)).startsWith(outcome);
     }
 
     /**
@@ -313,13 +315,13 @@ class YarnClassicLockRegeneratorTest {
                 .lock("# yarn lockfile v1\n\n\n")
                 .configFile("../package.json", "{\"private\":true,\"workspaces\":[\"a*\"]}")
                 .now(Instant.EPOCH);
-        assertThat(untilTheFirstStep((inputs.build()))).isEqualTo(CANNOT_KNOW +
+        assertThat(untilTheFirstStep(inputs.build())).isEqualTo(CANNOT_KNOW +
                 "whether the workspaces of ../package.json list this project, whose directory in the repository the " +
                 "host did not give");
-        assertThat(untilTheFirstStep((inputs.directory("app").build()))).isEqualTo(
+        assertThat(untilTheFirstStep(inputs.directory("app").build())).isEqualTo(
                 CANNOT_KNOW + "the lock yarn writes for this edit: yarn installs at the workspace root ../, whose " +
                 "workspaces list app, and writes ../yarn.lock, not this project's");
-        assertThat(untilTheFirstStep((inputs.directory("b").build())))
+        assertThat(untilTheFirstStep(inputs.directory("b").build()))
                 .isEqualTo("requests");
     }
 
@@ -392,6 +394,25 @@ class YarnClassicLockRegeneratorTest {
     }
 
     /**
+     * Run where no workspaces list, yarn installs there on its own ({@code open-cwd-unlisted-member} and its
+     * {@code -focus} twin).
+     */
+    @Test
+    void findsNoWorkspaceRootWhereTheRootDoesNotListWhereYarnRuns() {
+        YarnClassicLockRegenerator.Inputs.InputsBuilder inputs = YarnClassicLockRegenerator.Inputs.builder()
+                .manifest("", WORKSPACE_ROOT)
+                .manifest("tools/x", "{\"name\":\"x\",\"version\":\"1.0.0\"}")
+                .cwd("tools/x")
+                .now(Instant.EPOCH);
+        assertThat(untilTheFirstStep(inputs.build())).isEqualTo(CANNOT_KNOW + "the lock yarn writes: run in " +
+                                                                "tools/x, which no workspaces list, it makes that " +
+                                                                "directory its lockfileFolder and writes its " +
+                                                                "yarn.lock, not this lock");
+        assertThat(untilTheFirstStep(inputs.configFile("tools/x/.yarnrc", "--focus true\n").build()))
+                .isEqualTo("error This command can only be run inside an individual workspace.");
+    }
+
+    /**
      * Run in packages/a, yarn finds the packageManager and tests a range's directory from there while it writes the
      * root's lock ({@code open-member-cwd-package-manager-root-other}, {@code open-member-cwd-implicit-file-root-dir}).
      */
@@ -415,7 +436,7 @@ class YarnClassicLockRegeneratorTest {
                                 "\"packageManager\":\"pnpm@9.15.0\"}")
                     .manifest("packages/a", "{\"name\":\"a\",\"version\":\"1.0.0\"," +
                                             "\"packageManager\":\"yarn@1.22.22\"}");
-            assertThat(untilTheFirstStep((inputs.build())))
+            assertThat(untilTheFirstStep(inputs.build()))
                     .startsWith(outcome);
             return;
         }
@@ -462,13 +483,13 @@ class YarnClassicLockRegeneratorTest {
                 .directory("mid/app")
                 .now(Instant.EPOCH)
                 .build();
-        assertThat(untilTheFirstStep((inputs))).startsWith(outcome);
+        assertThat(untilTheFirstStep(inputs)).startsWith(outcome);
     }
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("probes")
     void stopsWhereYarnStopsWhenProbed(String label, YarnClassicLockRegenerator.Inputs inputs, String outcome) {
-        assertThat(untilTheFirstStep((inputs))).isEqualTo(outcome);
+        assertThat(untilTheFirstStep(inputs)).isEqualTo(outcome);
     }
 
     /**
@@ -623,7 +644,7 @@ class YarnClassicLockRegeneratorTest {
         if (paths != null) {
             inputs.paths(new LinkedHashSet<>(Arrays.asList(paths.split(","))));
         }
-        Result result = new YarnClassicLockRegenerator(inputs.build()).regenerate();
+        Result result = new YarnClassicLockRegenerator(inputs.build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
         if ("success".equals(outcome)) {
             assertThat(result.getLockFileContent()).isEqualTo("# THIS IS AN AUTOGENERATED FILE. DO NOT EDIT THIS " +
                                                               "FILE DIRECTLY.\n# yarn lockfile v1\n\n\n" +
@@ -659,7 +680,7 @@ class YarnClassicLockRegeneratorTest {
                 .paths(new LinkedHashSet<>(Arrays.asList("package.json", "packages/a/package.json", path)))
                 .host(Host.builder().os("darwin").build())
                 .now(Instant.EPOCH)
-                .build()).regenerate();
+                .build(), YarnClassicScenarios.NO_REGISTRY).regenerate();
         if (cannotKnow == null) {
             assertThat(result.isSuccess()).as(String.valueOf(result.getErrorMessage())).isTrue();
         } else {

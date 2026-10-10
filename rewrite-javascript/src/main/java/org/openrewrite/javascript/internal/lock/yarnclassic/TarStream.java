@@ -52,8 +52,11 @@ final class TarStream {
         }
     }
 
+    /**
+     * An entry with its content, the {@code size} bytes of the archive from {@code offset}.
+     */
     interface OnEntry {
-        void entry(Header header, byte[] content);
+        void entry(Header header, byte[] archive, int offset, int size);
     }
 
     /**
@@ -110,20 +113,24 @@ final class TarStream {
             }
             size = (int) (Double.isNaN(header.size) ? 0 : header.size);
             if (size == 0 || "directory".equals(header.type)) {
-                onEntry.entry(header, new byte[0]);
+                onEntry.entry(header, data, offset, 0);
                 continue;
             }
-            byte[] content = take(data, offset, size);
-            onEntry.entry(header, content);
+            require(data, offset, size);
+            onEntry.entry(header, data, offset, size);
             offset = drain(data, offset + size, size);
         }
     }
 
     private static byte[] take(byte[] data, int offset, int size) {
+        require(data, offset, size);
+        return Arrays.copyOfRange(data, offset, offset + size);
+    }
+
+    private static void require(byte[] data, int offset, int size) {
         if (size < 0 || data.length - offset < size) {
             throw new JsError(JsError.ERROR, UNEXPECTED_END);
         }
-        return Arrays.copyOfRange(data, offset, offset + size);
     }
 
     private static int drain(byte[] data, int offset, int size) {

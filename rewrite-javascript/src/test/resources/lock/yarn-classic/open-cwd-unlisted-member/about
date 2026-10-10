@@ -1,0 +1,1 @@
+yarn run in tools/x, which the edit drops from the root's workspaces: it installs tools/x on its own and writes tools/x/yarn.lock, not the root's.

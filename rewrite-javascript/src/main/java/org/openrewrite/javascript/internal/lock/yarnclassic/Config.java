@@ -76,6 +76,10 @@ final class Config {
         if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
             throw new MessageError("This command can only be run inside an individual workspace.");
         }
+        if (workspaceRoot < 0 && !inputs.getCwd().isEmpty()) {
+            throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + ", which no workspaces list, it " +
+                                 "makes that directory its lockfileFolder and writes its yarn.lock, not this lock");
+        }
         if (focus) {
             focusedWorkspaceName = readRootManifest(looseSemver, warnings).getName();
         }
@@ -131,18 +135,18 @@ final class Config {
 
     /**
      * {@code findWorkspaceRoot}: how many directories above the project's the nearest manifest with a workspaces
-     * list is when that list matches the project's path from it, 0 for the project's own, else -1.
+     * list is when it is where yarn runs or that list matches the path from it to there, 0 the project's, else -1.
      */
     int findWorkspaceRoot(boolean looseSemver, List<String> warnings) {
+        String cwd = inputs.getCwd();
         for (int depth = 0; depth <= inputs.reach(); depth++) {
             Manifest manifest = findManifest(depth, looseSemver, warnings);
             Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
             if (ws != null && Js.truthy(ws.get("packages"))) {
-                if (depth == 0) {
-                    return 0;
-                }
-                return Micromatch.micromatch(singletonList(inputs.relativePath(depth)), ws.get("packages"))
-                               .isEmpty() ? -1 : depth;
+                String relativePath = depth == 0 ? cwd : cwd.isEmpty() ? inputs.relativePath(depth) :
+                        inputs.relativePath(depth) + "/" + cwd;
+                return relativePath.isEmpty() ||
+                       !Micromatch.micromatch(singletonList(relativePath), ws.get("packages")).isEmpty() ? depth : -1;
             }
         }
         return -1;
@@ -220,7 +224,7 @@ final class Config {
         if (node.directory) {
             throw new JsError(JsError.ERROR, "EISDIR: illegal operation on a directory, read");
         }
-        return new String(node.content, StandardCharsets.UTF_8).replace("\r\n", "\n");
+        return new String(node.content(), StandardCharsets.UTF_8).replace("\r\n", "\n");
     }
 
     // an object, or an array with its indices; a property set on any other value is a TypeError

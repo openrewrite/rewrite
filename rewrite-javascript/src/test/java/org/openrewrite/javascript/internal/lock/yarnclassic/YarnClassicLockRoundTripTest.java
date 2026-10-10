@@ -76,7 +76,7 @@ class YarnClassicLockRoundTripTest {
         assumeFalse(!log.contains("exit=0") && expected != null && expected.startsWith("cannot-know"),
                 "yarn's second install read its cache, which the engine cannot know");
         assertThat(log).contains("exit=0");
-        if (installsAbove(lock)) {
+        if (installsElsewhere(lock)) {
             return;
         }
         Loaded loaded = load(lock);
@@ -96,11 +96,13 @@ class YarnClassicLockRoundTripTest {
         }
     }
 
-    // yarn runs the install at a workspace root above the project and leaves this lock as it is
-    private static boolean installsAbove(YarnClassicScenarios.Lock lock) {
+    // yarn installs at a workspace root above the project, or where it runs when no workspaces list that, and leaves
+    // this lock as it is
+    private static boolean installsElsewhere(YarnClassicScenarios.Lock lock) {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         boolean looseSemver = YarnClassicOptions.looseSemver(YarnClassicOptions.rc(inputs.getConfigFiles()));
-        if (new Config(inputs).findWorkspaceRoot(looseSemver, new ArrayList<>()) <= 0) {
+        int workspaceRoot = new Config(inputs).findWorkspaceRoot(looseSemver, new ArrayList<>());
+        if (workspaceRoot == 0 || workspaceRoot < 0 && inputs.getCwd().isEmpty()) {
             return false;
         }
         assertThat(lock.getScenario().expect()).startsWith("cannot-know");

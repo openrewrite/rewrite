@@ -32,16 +32,23 @@ import java.util.Map;
 final class TarFs {
 
     /**
-     * A file, a directory or a symbolic link; the names of a hard link share one file.
+     * A file, a directory or a symbolic link; the names of a hard link share one file, whose bytes stay in the
+     * archive until read.
      */
     static final class Node {
         final boolean directory;
         final @Nullable String symlink;
-        byte[] content = new byte[0];
+        private byte[] archive = new byte[0];
+        private int offset;
+        private int size;
 
         private Node(boolean directory, @Nullable String symlink) {
             this.directory = directory;
             this.symlink = symlink;
+        }
+
+        byte[] content() {
+            return Arrays.copyOfRange(archive, offset, offset + size);
         }
     }
 
@@ -62,7 +69,7 @@ final class TarFs {
         return fs;
     }
 
-    private void entry(TarStream.Header header, byte[] content) {
+    private void entry(TarStream.Header header, byte[] archive, int offset, int size) {
         header.name = strip(header.name);
         String linkname = header.linkname;
         if (Js.truthy(linkname) && ("link".equals(header.type) || PosixPath.isAbsolute(linkname))) {
@@ -81,7 +88,7 @@ final class TarFs {
         validate(dir);
         mkdirp(dir);
         if ("file".equals(header.type)) {
-            write(name, content);
+            write(name, archive, offset, size);
         } else if ("link".equals(header.type) || "symlink".equals(header.type)) {
             if (header.linkname == null) {
                 throw JsError.invalidArgType("The \"" + ("link".equals(header.type) ? "path" : "target") +
@@ -178,7 +185,7 @@ final class TarFs {
     }
 
     // createWriteStream opens through symbolic links; a directory is no file to write
-    private void write(String name, byte[] content) {
+    private void write(String name, byte[] archive, int offset, int size) {
         String real = real(name, true);
         Node node = node(real);
         if (node == null) {
@@ -191,7 +198,9 @@ final class TarFs {
         } else if (node.directory) {
             throw error("EISDIR: illegal operation on a directory, open '" + name + "'");
         }
-        node.content = content;
+        node.archive = archive;
+        node.offset = offset;
+        node.size = size;
     }
 
     // tar-fs ignores what unlink says: a directory stays
