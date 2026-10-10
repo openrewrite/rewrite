@@ -286,29 +286,33 @@ public final class BerryOptions {
 
         Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env.known());
         environmentSettings.remove("rcFilename");
-        for (boolean primary : new boolean[]{true, false}) {
-            options.use("<environment>", fields(environmentSettings, primary));
-            if (resolvedRcFile != null) {
-                options.use(resolvedRcFile.getSource(), fields(asMap(resolvedRcFile.getValue()), primary));
-            }
+        options.use("<environment>", pickPrimaryCoreFields(environmentSettings));
+        if (resolvedRcFile != null) {
+            options.use(resolvedRcFile.getSource(), pickPrimaryCoreFields(asMap(resolvedRcFile.getValue())));
+        }
+        options.use("<environment>", pickSecondaryFields(environmentSettings));
+        if (resolvedRcFile != null) {
+            options.use(resolvedRcFile.getSource(), pickSecondaryFields(asMap(resolvedRcFile.getValue())));
         }
         options.thirdPartyPlugin = thirdPartyPlugin(environmentSettings, rcFiles);
         return options;
     }
 
     // Configuration.find's pickPrimaryCoreFields, read first: the release yarnPath picks reads the others
-    private static Map<String, @Nullable Object> fields(Map<String, @Nullable Object> data, boolean primary) {
+    private static Map<String, @Nullable Object> pickPrimaryCoreFields(Map<String, @Nullable Object> data) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
-        if (primary) {
-            for (String key : PRIMARY_FIELDS) {
-                if (data.containsKey(key)) {
-                    out.put(key, data.get(key));
-                }
+        for (String key : PRIMARY_FIELDS) {
+            if (data.containsKey(key)) {
+                out.put(key, data.get(key));
             }
-        } else {
-            out.putAll(data);
-            out.keySet().removeAll(PRIMARY_FIELDS);
         }
+        return out;
+    }
+
+    // pickSecondaryCoreFields and pickPluginFields, read as one pass
+    private static Map<String, @Nullable Object> pickSecondaryFields(Map<String, @Nullable Object> data) {
+        Map<String, @Nullable Object> out = new LinkedHashMap<>(data);
+        out.keySet().removeAll(PRIMARY_FIELDS);
         return out;
     }
 
