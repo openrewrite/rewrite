@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -86,9 +87,9 @@ final class Manifests {
     static Map<String, @Nullable Object> parse(String text, String path) {
         Object value;
         try {
-            value = order(MAPPER.readValue(LockfileReader.stripBom(text), Object.class));
-        } catch (JsonProcessingException e) {
-            throw new PnpmError("JSON_PARSE", e.getOriginalMessage() + " in " + path);
+            value = Js.jsonParse(LockfileReader.stripBom(text));
+        } catch (JsonSyntaxError e) {
+            throw new PnpmError("JSON_PARSE", e.getMessage() + " in " + path);
         }
         if (!(value instanceof Map)) {
             throw new CannotKnow("what pnpm makes of " + path + " (JSON, but not an object)");
@@ -101,9 +102,9 @@ final class Manifests {
      */
     static @Nullable Object parseValue(String text, String path) {
         try {
-            return order(MAPPER.readValue(text, Object.class));
-        } catch (JsonProcessingException e) {
-            throw new PnpmError("JSON_PARSE", e.getOriginalMessage() + " in " + path);
+            return Js.jsonParse(text);
+        } catch (JsonSyntaxError e) {
+            throw new PnpmError("JSON_PARSE", e.getMessage() + " in " + path);
         }
     }
 
@@ -133,7 +134,7 @@ final class Manifests {
                         }
                         members.put(name, Js.ordered(keys));
                     } else if (whole.contains(name) || keysOnly.contains(name)) {
-                        members.put(name, order(MEMBER.readValue(parser)));
+                        members.put(name, Js.jsonValue(MEMBER.readValue(parser)));
                     } else {
                         parser.skipChildren();
                     }
@@ -146,28 +147,5 @@ final class Manifests {
         } catch (IOException e) {
             throw new PnpmError("JSON_PARSE", e.getMessage() + " in " + path);
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static @Nullable Object order(@Nullable Object value) {
-        if (value instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) value;
-            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
-            for (String key : Js.keys(map)) {
-                ordered.put(key, order(map.get(key)));
-            }
-            return ordered;
-        }
-        if (value instanceof List) {
-            List<@Nullable Object> list = new ArrayList<>();
-            for (Object item : (List<Object>) value) {
-                list.add(order(item));
-            }
-            return list;
-        }
-        if (value instanceof Number && !(value instanceof Double)) {
-            return ((Number) value).doubleValue();
-        }
-        return value;
     }
 }

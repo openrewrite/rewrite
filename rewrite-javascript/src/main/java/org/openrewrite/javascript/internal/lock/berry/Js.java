@@ -15,12 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -32,10 +29,6 @@ import java.util.Map;
  * Yarn's plain objects as the port holds them: property reads, {@code Object.entries} and {@code JSON.parse}.
  */
 final class Js extends EcmaScript {
-
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
 
     /**
      * {@code JSON.parse} rejecting its input.
@@ -97,35 +90,12 @@ final class Js extends EcmaScript {
     /**
      * {@code JSON.parse}, objects with their keys in the order JavaScript gives them and numbers as doubles.
      */
-    static @Nullable Object jsonParse(String text) {
+    public static @Nullable Object jsonParse(String text) {
         try {
-            return order(MAPPER.readValue(text, Object.class));
-        } catch (JsonProcessingException e) {
-            throw new SyntaxError(e.getOriginalMessage());
+            return EcmaScript.jsonParse(text);
+        } catch (JsonSyntaxError e) {
+            throw new SyntaxError(e.getMessage());
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static @Nullable Object order(@Nullable Object value) {
-        if (value instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) value;
-            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
-            for (String key : keys(map)) {
-                ordered.put(key, order(map.get(key)));
-            }
-            return ordered;
-        }
-        if (value instanceof List) {
-            List<@Nullable Object> list = new ArrayList<>();
-            for (Object item : (List<Object>) value) {
-                list.add(order(item));
-            }
-            return list;
-        }
-        if (value instanceof Number && !(value instanceof Double)) {
-            return ((Number) value).doubleValue();
-        }
-        return value;
     }
 
     static boolean isInteger(double d) {

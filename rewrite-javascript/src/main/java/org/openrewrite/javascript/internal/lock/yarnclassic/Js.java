@@ -15,12 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
+import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -39,10 +36,6 @@ final class Js extends EcmaScript {
      * The characters JavaScript's {@code .} matches; Java's also leaves out {@code \u0085}.
      */
     static final String DOT = "[^\\n\\r\\u2028\\u2029]";
-
-    private static final ObjectMapper MAPPER = JsonMapper.builder()
-            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-            .build();
 
     private Js() {
     }
@@ -124,35 +117,12 @@ final class Js extends EcmaScript {
      * {@code JSON.parse}, with every object's keys in the order JavaScript gives them.
      * @throws JsError a {@code SyntaxError} when the text is not JSON.
      */
-    static @Nullable Object jsonParse(String text) {
+    public static @Nullable Object jsonParse(String text) {
         try {
-            return order(MAPPER.readValue(text, Object.class));
-        } catch (JsonProcessingException e) {
-            throw new JsError(JsError.SYNTAX_ERROR, e.getOriginalMessage());
+            return EcmaScript.jsonParse(text);
+        } catch (JsonSyntaxError e) {
+            throw new JsError(JsError.SYNTAX_ERROR, e.getMessage());
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static @Nullable Object order(@Nullable Object value) {
-        if (value instanceof Map) {
-            Map<String, Object> map = (Map<String, Object>) value;
-            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
-            for (String key : keys(map)) {
-                ordered.put(key, order(map.get(key)));
-            }
-            return ordered;
-        }
-        if (value instanceof List) {
-            List<@Nullable Object> list = new ArrayList<>();
-            for (Object item : (List<Object>) value) {
-                list.add(order(item));
-            }
-            return list;
-        }
-        if (value instanceof Number && !(value instanceof Double)) {
-            return ((Number) value).doubleValue();
-        }
-        return value;
     }
 
     /**

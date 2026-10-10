@@ -16,11 +16,9 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 
 /**
  * A JavaScript regular expression source as V8 reads it without the {@code u} flag, as a {@link Pattern}.
@@ -34,15 +32,7 @@ final class JsRegExp {
      * {@code new RegExp(source)}: null when V8 throws its SyntaxError.
      */
     static @Nullable Pattern compile(String source) {
-        String java = V8RegExp.toJava(source);
-        if (java == null) {
-            return null;
-        }
-        try {
-            return Pattern.compile(java);
-        } catch (PatternSyntaxException e) {
-            throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
-        }
+        return V8RegExp.compile(source);
     }
 
     /**

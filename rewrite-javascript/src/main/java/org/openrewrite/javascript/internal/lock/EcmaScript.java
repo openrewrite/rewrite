@@ -15,6 +15,10 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
@@ -23,6 +27,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -32,6 +37,10 @@ import java.util.regex.Pattern;
  * strict equality, keys and their order, white space. Each port's {@code Js} extends it with its own object model.
  */
 public class EcmaScript {
+
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+            .build();
 
     /**
      * What JavaScript reads from a property that is not there. JSON's {@code null} is Java's.
@@ -84,6 +93,53 @@ public class EcmaScript {
             return d != 0 && !Double.isNaN(d);
         }
         return true;
+    }
+
+    /**
+     * {@code JSON.parse}: objects with their keys in the order JavaScript gives them, numbers as doubles.
+     * @throws JsonSyntaxError for text that is not JSON, which each port raises as its own SyntaxError
+     */
+    public static @Nullable Object jsonParse(String text) {
+        try {
+            return jsonValue(MAPPER.readValue(text, Object.class));
+        } catch (JsonProcessingException e) {
+            throw new JsonSyntaxError(e.getOriginalMessage());
+        }
+    }
+
+    /**
+     * A value Jackson read, as {@code JSON.parse} gives it.
+     */
+    @SuppressWarnings("unchecked")
+    public static @Nullable Object jsonValue(@Nullable Object value) {
+        if (value instanceof Map) {
+            Map<String, Object> map = (Map<String, Object>) value;
+            Map<String, @Nullable Object> ordered = new LinkedHashMap<>();
+            for (String key : keys(map)) {
+                ordered.put(key, jsonValue(map.get(key)));
+            }
+            return ordered;
+        }
+        if (value instanceof List) {
+            List<@Nullable Object> list = new ArrayList<>();
+            for (Object item : (List<Object>) value) {
+                list.add(jsonValue(item));
+            }
+            return list;
+        }
+        if (value instanceof Number && !(value instanceof Double)) {
+            return ((Number) value).doubleValue();
+        }
+        return value;
+    }
+
+    /**
+     * {@code JSON.parse}'s SyntaxError, with Jackson's message.
+     */
+    public static final class JsonSyntaxError extends IllegalArgumentException {
+        JsonSyntaxError(String message) {
+            super(message);
+        }
     }
 
     /**

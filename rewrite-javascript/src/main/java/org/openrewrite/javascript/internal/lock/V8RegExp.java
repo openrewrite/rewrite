@@ -25,6 +25,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 /**
  * A JavaScript regular expression source as V8 reads it without the {@code u} flag (the syntax of ECMAScript Annex
@@ -43,6 +44,21 @@ public final class V8RegExp {
             {'\u3000', '\u3000'}, {'\uFEFF', '\uFEFF'}};
 
     private V8RegExp() {
+    }
+
+    /**
+     * {@code new RegExp(source)}: null when V8 throws its SyntaxError; cannot-know where Java reads the pattern apart.
+     */
+    public static @Nullable Pattern compile(String source) {
+        String java = toJava(source);
+        if (java == null) {
+            return null;
+        }
+        try {
+            return Pattern.compile(java);
+        } catch (PatternSyntaxException e) {
+            throw new CannotKnow("how V8 reads the regular expression /" + source + "/");
+        }
     }
 
     /**
