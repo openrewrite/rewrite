@@ -118,7 +118,7 @@ class ConfigurationTest {
     void ignoresYarnRegistryIfSet() {
         BerryOptions options = BerryOptions.load(Collections.emptyMap(),
                 HostEnvironment.of(Collections.singletonMap("YARN_REGISTRY", "https://example.org")));
-        options.restrictTo(YarnRelease.of("4.10.3").getSettings());
+        options.restrictTo(YarnRelease.of("4.10.3"));
         assertThat(options.get("npmRegistryServer")).isEqualTo("https://registry.yarnpkg.com");
     }
 
@@ -136,12 +136,12 @@ class ConfigurationTest {
                 "YARN_REGISTRY", "YARN_IGNORE_CWD"}) {
             BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"),
                     HostEnvironment.of(Collections.singletonMap(variable, "1")));
-            options.restrictTo(YarnRelease.of("4.10.3").getSettings());
+            options.restrictTo(YarnRelease.of("4.10.3"));
             assertThat(options.get("compressionLevel")).as(variable).isEqualTo(3);
         }
         assertThatThrownBy(() ->
                 BerryOptions.load(Collections.emptyMap(), HostEnvironment.of(Collections.singletonMap("YARN_COMMAND",
-                "x"))).restrictTo(YarnRelease.of("4.10.3").getSettings()))
+                "x"))).restrictTo(YarnRelease.of("4.10.3")))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: command");
     }

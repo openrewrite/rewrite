@@ -78,9 +78,15 @@ final class YarnRelease {
 
     private final Set<String> settings;
 
+    /**
+     * The command the usage error for an unknown setting names ({@code yarn config -v} before 4.9.3).
+     */
+    private final String unknownSettingHint;
+
     private YarnRelease(String version, List<Map.Entry<String, Map<String, @Nullable Object>>> packageExtensions,
                         List<String> patches, Pattern nodeGypMatch, String nodeGypRange, List<String> plugins,
-                        boolean jsrScope, boolean checksumWithoutCacheKey, Set<String> settings) {
+                        boolean jsrScope, boolean checksumWithoutCacheKey, Set<String> settings,
+                        String unknownSettingHint) {
         this.version = version;
         this.packageExtensions = packageExtensions;
         this.patches = patches;
@@ -90,6 +96,7 @@ final class YarnRelease {
         this.jsrScope = jsrScope;
         this.checksumWithoutCacheKey = checksumWithoutCacheKey;
         this.settings = settings;
+        this.unknownSettingHint = unknownSettingHint;
     }
 
     boolean hasPlugin(String name) {
@@ -120,7 +127,8 @@ final class YarnRelease {
                 Pattern.compile(jsRegExp((String) nodeGyp.get("pattern"))), (String) nodeGyp.get("range"),
                 Collections.unmodifiableList((List<String>) tables.get((String) Js.get(release, "plugins"))),
                 Boolean.TRUE.equals(Js.get(release, "jsrScope")),
-                Boolean.TRUE.equals(Js.get(release, "checksumWithoutCacheKey")), Collections.unmodifiableSet(settings));
+                Boolean.TRUE.equals(Js.get(release, "checksumWithoutCacheKey")), Collections.unmodifiableSet(settings),
+                (String) Js.get(release, "unknownSettingHint"));
     }
 
     /**

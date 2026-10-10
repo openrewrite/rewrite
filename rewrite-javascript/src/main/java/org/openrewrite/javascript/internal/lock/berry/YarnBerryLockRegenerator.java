@@ -269,7 +269,7 @@ public final class YarnBerryLockRegenerator {
      */
     Loaded load(YarnRelease release, Map<String, Object> settings) {
         BerryOptions options = options().copy();
-        options.restrictTo(release.getSettings());
+        options.restrictTo(release);
         for (Map.Entry<String, Object> setting : settings.entrySet()) {
             options.useCompat(setting.getKey(), setting.getValue());
         }

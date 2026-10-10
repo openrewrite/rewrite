@@ -403,17 +403,17 @@ public final class BerryOptions {
      * {@code use}'s check of a key against the settings the release defines: under {@code enableStrictSettings}
      * an unknown key is Yarn's usage error, otherwise it is set aside and its default stays.
      */
-    void restrictTo(Set<String> releaseSettings) {
+    void restrictTo(YarnRelease release) {
         // an unknown key is read in the plugin pass, under the stored value, which only the environment sets
         boolean strict = getBoolean("enableStrictSettings");
         for (Map.Entry<String, String> key : keySources.entrySet()) {
-            if (releaseSettings.contains(key.getKey())) {
+            if (release.getSettings().contains(key.getKey())) {
                 continue;
             }
             if (strict) {
                 throw new UsageError("Unrecognized or legacy configuration settings found: " + key.getKey() +
-                                     " - run \"yarn config\" to see the list of settings supported in Yarn (in " +
-                                     key.getValue() + ")");
+                                     " - run \"" + release.getUnknownSettingHint() + "\" to see the list of " +
+                                     "settings supported in Yarn (in " + key.getValue() + ")");
             }
             Definition definition = DEFINITIONS.get(key.getKey());
             if (definition != null) {

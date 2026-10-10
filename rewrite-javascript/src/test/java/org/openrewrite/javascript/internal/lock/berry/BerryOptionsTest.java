@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -118,7 +117,8 @@ class BerryOptionsTest {
         assertThat(release.getVersion()).isEqualTo("4.5.3");
         assertThatThrownBy(() -> regenerator.load(release, Collections.emptyMap()))
                 .isInstanceOf(BerryOptions.UsageError.class)
-                .hasMessageStartingWith("Unrecognized or legacy configuration settings found: catalog");
+                .hasMessageStartingWith("Unrecognized or legacy configuration settings found: catalog - run \"yarn " +
+                                        "config -v\" to see the list of settings supported in Yarn");
         assertThat(regenerator.load(YarnRelease.of("4.10.3"), Collections.emptyMap()).getProject().configuration
                 .getRelease().hasPlugin("@yarnpkg/plugin-catalog")).isTrue();
     }
@@ -156,30 +156,31 @@ class BerryOptionsTest {
      */
     @Test
     void onlyTheEnvironmentTurnsStrictSettingsOff() {
-        Set<String> settings = YarnRelease.of("4.10.3").getSettings();
+        YarnRelease release = YarnRelease.of("4.10.3");
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "enableStrictSettings: false\nfooUnknownSetting: 1\ncompressionLevel: 3\n"),
                         HostEnvironment.of(Collections.emptyMap()))
-                .restrictTo(settings))
+                .restrictTo(release))
                 .isInstanceOf(BerryOptions.UsageError.class)
-                .hasMessageStartingWith("Unrecognized or legacy configuration settings found: fooUnknownSetting");
+                .hasMessageStartingWith("Unrecognized or legacy configuration settings found: fooUnknownSetting - " +
+                                        "run \"yarn config\" to see the list of settings supported in Yarn");
 
         BerryOptions options = BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "fooUnknownSetting: 1\ncompressionLevel: 3\n"),
                 HostEnvironment.of(Collections.singletonMap("YARN_ENABLE_STRICT_SETTINGS", "false")));
-        options.restrictTo(settings);
+        options.restrictTo(release);
         assertThat(options.get("compressionLevel")).isEqualTo(3);
 
         Map<String, String> env = new LinkedHashMap<>();
         env.put("YARN_ENABLE_STRICT_SETTINGS", "false");
         env.put("YARN_FOO_UNKNOWN", "1");
         BerryOptions.load(Collections.singletonMap(".yarnrc.yml", "compressionLevel: 3\n"), HostEnvironment.of(env))
-                .restrictTo(settings);
+                .restrictTo(release);
 
         assertThatThrownBy(() -> BerryOptions.load(Collections.singletonMap(".yarnrc.yml",
                 "enableStrictSettings: false\nfooUnknownSetting: 1\n"),
                 HostEnvironment.of(Collections.singletonMap("YARN_ENABLE_STRICT_SETTINGS", "true")))
-                        .restrictTo(settings))
+                        .restrictTo(release))
                 .isInstanceOf(BerryOptions.UsageError.class);
     }
 

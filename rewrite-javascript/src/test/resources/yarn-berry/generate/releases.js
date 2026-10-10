@@ -16,9 +16,9 @@
 // Writes yarn-releases.json.gz, the data each Yarn 4.x release ships that reaches a lock: the builtin package
 // extensions (packages/yarnpkg-extensions), the packages the compat plugin patches, the node-gyp rule of the npm
 // semver resolver, the plugins the CLI bundles, whether the npm plugin sends the jsr scope to npm.jsr.io, whether the
-// lockfile writes a checksum without the lockfile's cache key, and the names of the settings the release knows
-// (`yarn config --json` of the @yarnpkg/cli-dist bundle). Sources are read at each @yarnpkg/cli/<version> tag of
-// github.com/yarnpkg/berry; identical tables are stored once.
+// lockfile writes a checksum without the lockfile's cache key, the names of the settings the release knows
+// (`yarn config --json` of the @yarnpkg/cli-dist bundle) and the command its unknown-setting error names. Sources
+// are read at each @yarnpkg/cli/<version> tag of github.com/yarnpkg/berry; identical tables are stored once.
 //
 // Usage: node releases.js <rewrite-javascript/src/main/resources/org/openrewrite/javascript/internal/lock/berry>
 'use strict';
@@ -119,6 +119,15 @@ async function checksumWithoutCacheKeyAt(sha) {
   return /if \(entryCacheKey === cacheKey\) \{\s*entryChecksum = hash;/.test(source);
 }
 
+// the command the usage error for an unknown setting tells the user to run
+async function unknownSettingHintAt(sha) {
+  const source = await fetchText(`${RAW}/${sha}/packages/yarnpkg-core/sources/Configuration.ts`);
+  const hint = source.match(/Unrecognized or legacy configuration settings found: \$\{key\} - run "([^"]+)"/);
+  if (!hint)
+    throw new Error(`no unknown-setting message at ${sha}`);
+  return hint[1];
+}
+
 function untar(tgz, wanted) {
   const tar = zlib.gunzipSync(tgz);
   for (let offset = 0; offset + 512 <= tar.length;) {
@@ -180,6 +189,7 @@ async function main() {
       jsrScope: await jsrScopeAt(sha),
       checksumWithoutCacheKey: await checksumWithoutCacheKeyAt(sha),
       settings: store(tables, await settingsOf(version)),
+      unknownSettingHint: await unknownSettingHintAt(sha),
     };
   }
   const json = JSON.stringify({releases: out, tables}, null, 1) + '\n';
