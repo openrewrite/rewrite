@@ -934,6 +934,31 @@
 {"test":"RegExp","fn":"match","args":["\\-","-"],"out":["-"]}
 {"test":"RegExp","fn":"match","args":["(?<a>.)(?<b>.)","xy"],"out":["xy","x","y"]}
 {"test":"RegExp","fn":"match","args":["(?<a>x)|(?<a>y)","y"],"out":["y",{"$":"undefined"},"y"]}
+{"test":"RegExp","fn":"match","args":["{2,1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{2,1}/: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a){2,1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){2,1}/: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a){1}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a){1}/: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=a){","a{"],"out":null}
+{"test":"RegExp","fn":"match","args":["(?<=a){","a{"],"out":["{"]}
+{"test":"RegExp","fn":"match","args":["x{1}{2}",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /x{1}{2}/: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?i:a)","A"],"out":["A"]}
+{"test":"RegExp","fn":"match","args":["(?-:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-:a)/: Invalid flag group"}}
+{"test":"RegExp","fn":"match","args":["(?ii:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?ii:a)/: Repeated flag in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?--:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?--:a)/: Multiple dashes in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?i",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?I:a)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?I:a)/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?i-m)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i-m)/: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<n>",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k<n>/: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k/: Invalid named reference"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k</: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<1a>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<1a>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a-b>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a-b>x)/: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)\\k<b>(",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a>x)\\k<b>(/: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["[\\k<a>](?<a>x)",""],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /[\\k<a>](?<a>x)/: Invalid escape"}}
+{"test":"RegExp","fn":"match","args":["[\\k]","k"],"out":["k"]}
+{"test":"RegExp","fn":"match","args":["(?<a>.)\\k<a>","xx"],"out":["xx","x"]}
+{"test":"RegExp","fn":"match","args":["\\k<a>(?<a>x)","x"],"out":["x","x"]}
+{"test":"RegExp","fn":"match","args":["(?<a>x\\k<a>)","x"],"out":["x","x"]}
 {"test":"RegExp","fn":"match","args":["\\-","-","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\-/u: Invalid escape"}}
 {"test":"RegExp","fn":"match","args":["\\,",",","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\,/u: Invalid escape"}}
 {"test":"RegExp","fn":"match","args":["\\#","#","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\#/u: Invalid escape"}}
@@ -1078,3 +1103,40 @@
 {"test":"RegExp","fn":"match","args":["^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$","ab-x","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^(?!\\.)[\\p{L}\\p{Nl}][^/]*?\\-x$/u: Invalid escape"}}
 {"test":"RegExp","fn":"match","args":["^(?!\\.)[^/]*?\\.js$","a.js","u"],"out":["a.js"]}
 {"test":"RegExp","fn":"match","args":["^(?!\\.)([\\p{L}]|[^\\p{Z}\\p{C}])$",".","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /{2,1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a){2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=a){2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=a){2,1}/u: numbers out of order in {} quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=a){1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a){1}/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?=){","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=){/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["(?<=){ ","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<=){ /u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["^{2,1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^{2,1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["({1})","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /({1})/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b{1}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b{1}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["\\b{1","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\b{1/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["^{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /^{/u: Lone quantifier brackets"}}
+{"test":"RegExp","fn":"match","args":["x{1}{2}","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /x{1}{2}/u: Nothing to repeat"}}
+{"test":"RegExp","fn":"match","args":["(?=a)?","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?=a)?/u: Invalid quantifier"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>(","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>(/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>{","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>{/u: Incomplete quantifier"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>(?<m>a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>(?<m>a)/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["(?<m>a)\\k<n>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<m>a)\\k<n>/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>*","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>*/u: Invalid named capture referenced"}}
+{"test":"RegExp","fn":"match","args":["\\k<1>","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<1>/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["\\k<n","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>)/u: Unmatched ')'"}}
+{"test":"RegExp","fn":"match","args":["\\k<n>[","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /\\k<n>[/u: Unterminated character class"}}
+{"test":"RegExp","fn":"match","args":["(?<a>x)\\k<b>(","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a>x)\\k<b>(/u: Unterminated group"}}
+{"test":"RegExp","fn":"match","args":["(?<a>.)\\k<a>","xx","u"],"out":["xx","x"]}
+{"test":"RegExp","fn":"match","args":["(?-i-s:a)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-i-s:a)/u: Multiple dashes in flag group"}}
+{"test":"RegExp","fn":"match","args":["(?i-:a)","a","u"],"out":["a"]}
+{"test":"RegExp","fn":"match","args":["(?i","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?i/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?-)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?-)/u: Invalid group"}}
+{"test":"RegExp","fn":"match","args":["(?<1a>x)","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<1a>x)/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["(?<a","","u"],"threw":{"$":"error","name":"SyntaxError","message":"Invalid regular expression: /(?<a/u: Invalid capture group name"}}
+{"test":"RegExp","fn":"match","args":["[\\S]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[\\s\\S]","😀b","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[^\\S]","😀","u"],"out":null}
+{"test":"RegExp","fn":"match","args":["\\S","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[^\\s]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["[\\S\\d]","😀","u"],"out":["😀"]}
+{"test":"RegExp","fn":"match","args":["\\S+","a😀 ","u"],"out":["a😀"]}

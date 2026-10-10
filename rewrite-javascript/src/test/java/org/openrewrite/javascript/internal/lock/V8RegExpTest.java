@@ -22,7 +22,6 @@ import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,12 +38,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class V8RegExpTest {
 
-    // a group name used twice, which V8 13.6 allows across alternatives and Java never does
-    private static final List<String> CANNOT_KNOW = Collections.singletonList("(?<a>x)|(?<a>y)");
+    // a group name used twice, which V8 13.6 allows across alternatives and Java never does, and a modifier group
+    private static final List<String> CANNOT_KNOW = Arrays.asList("(?<a>x)|(?<a>y)", "(?i:a)");
 
-    // with the u flag, also a property other than a General_Category and a group other than V8's four
+    // with the u flag, also a property other than a General_Category
     private static final List<String> UNICODE_CANNOT_KNOW = Arrays.asList("(?<a>x)|(?<a>y)", "\\p{Letter}",
-      "\\p{Script=Greek}", "\\p{ASCII}", "\\p{Foo}", "(?x)");
+      "\\p{Script=Greek}", "\\p{ASCII}", "\\p{Foo}", "(?i-:a)");
 
     static Stream<Call> calls() {
         return UpstreamCalls.read(EcmaScriptTest.BUILTINS).stream()
