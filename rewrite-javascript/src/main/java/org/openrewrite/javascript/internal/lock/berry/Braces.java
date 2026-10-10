@@ -475,7 +475,8 @@ final class Braces {
         if (!isInteger(min) || !isInteger(max)) {
             return false;
         }
-        return limit != null && (toNumber(max) - toNumber(min)) / toNumber(step) >= toNumber(limit);
+        return limit != null && (Js.toNumber(max) - Js.toNumber(min)) / Js.toNumber(step) >=
+                                Js.toNumber(limit);
     }
 
     private static boolean isInteger(@Nullable Object num) {
@@ -486,9 +487,6 @@ final class Braces {
                Js.isInteger(Js.toNumber((String) num));
     }
 
-    private static double toNumber(Object value) {
-        return value instanceof Double ? (Double) value : Js.toNumber((String) value);
-    }
 
     private static String str(@Nullable String s) {
         return s == null ? "undefined" : s;

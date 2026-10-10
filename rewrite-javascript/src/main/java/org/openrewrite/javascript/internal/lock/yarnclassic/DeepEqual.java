@@ -59,26 +59,9 @@ final class DeepEqual {
         if (a instanceof String && b instanceof String) {
             return a.equals(b);
         }
-        return toNumber(a) == toNumber(b);
+        return Js.toNumber(a) == Js.toNumber(b);
     }
 
-    private static double toNumber(Object value) {
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
-        }
-        if (value instanceof Boolean) {
-            return (Boolean) value ? 1 : 0;
-        }
-        String s = Js.trim(value.toString());
-        if (s.isEmpty()) {
-            return 0;
-        }
-        try {
-            return Double.parseDouble(s);
-        } catch (NumberFormatException e) {
-            return Double.NaN;
-        }
-    }
 
     private static boolean objEquiv(Object a, Object b) {
         Map<String, @Nullable Object> ka = entries(a);

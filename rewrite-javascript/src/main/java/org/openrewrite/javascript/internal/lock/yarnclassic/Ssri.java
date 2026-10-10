@@ -36,7 +36,6 @@ final class Ssri {
 
     private static final Pattern SRI_REGEX = Pattern.compile("^([^-]+)-([^?]+)([^" + Js.WHITESPACE_CLASS + "]*)\\z");
     private static final Pattern WHITESPACE = Pattern.compile("[" + Js.WHITESPACE_CLASS + "]+");
-    private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 
     private Ssri() {
     }
@@ -207,14 +206,7 @@ final class Ssri {
 
     // Number(item) & 255 as Buffer.from reads an array's elements
     private static int toNumber(@Nullable Object item) {
-        double d = 0;
-        if (item instanceof Number) {
-            d = ((Number) item).doubleValue();
-        } else if (item instanceof Boolean) {
-            d = (Boolean) item ? 1 : 0;
-        } else if (item instanceof String && NUMBER.matcher(Js.trim((String) item)).matches()) {
-            d = Double.parseDouble(Js.trim((String) item));
-        }
+        double d = Js.toNumber(item);
         return Double.isNaN(d) || Double.isInfinite(d) ? 0 : (int) (long) d;
     }
 

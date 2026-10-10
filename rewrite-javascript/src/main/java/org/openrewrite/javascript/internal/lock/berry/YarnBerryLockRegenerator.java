@@ -291,7 +291,7 @@ public final class YarnBerryLockRegenerator {
         Object lockfileLastVersion = project.lockfileLastVersion;
         if (lockfileLastVersion != null) {
             boolean legacy = Integer.valueOf(-1).equals(lockfileLastVersion);
-            boolean old = !legacy && Project.toNumber(lockfileLastVersion) < Project.LOCKFILE_VERSION;
+            boolean old = !legacy && Js.toNumber(lockfileLastVersion) < Project.LOCKFILE_VERSION;
             if (legacy && options.useCompat("nodeLinker", "node-modules")) {
                 migratedSettings.put("nodeLinker", "node-modules");
             }

@@ -402,6 +402,26 @@ public class EcmaScript {
     }
 
     /**
+     * {@code Number(value)} of a value a port holds: null 0, a boolean 1 or 0, a string or an array by its text; NaN
+     * for undefined and an object.
+     */
+    public static double toNumber(@Nullable Object value) {
+        if (value == null) {
+            return 0;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        if (value instanceof Boolean) {
+            return (Boolean) value ? 1 : 0;
+        }
+        if (value instanceof String || value instanceof List) {
+            return toNumber(string(value));
+        }
+        return Double.NaN;
+    }
+
+    /**
      * {@code Number.prototype.toString()} of a number parsed from JSON.
      */
     public static String numberToString(Number n) {

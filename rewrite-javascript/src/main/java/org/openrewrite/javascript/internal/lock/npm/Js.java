@@ -20,7 +20,6 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
-import java.math.BigInteger;
 import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.regex.Pattern;
 
 /**
  * JavaScript's semantics for the values and strings npm reads from package and lock data.
@@ -59,8 +57,6 @@ final class Js extends EcmaScript {
             "trimRight trimStart");
     private static final Set<String> NUMBER_MEMBERS = members("toExponential toFixed toPrecision");
 
-    private static final Pattern DECIMAL_LITERAL = Pattern.compile("[+-]?(?:Infinity|(?:\\d+\\.?\\d*|\\.\\d+)(?:[eE]" +
-            "[+-]?\\d+)?)");
 
     private Js() {
     }
@@ -187,44 +183,6 @@ final class Js extends EcmaScript {
         }
     }
 
-    /**
-     * {@code Number(value)} for a value parsed from JSON, as the relational operators coerce it.
-     */
-    static double toNumber(@Nullable Object val) {
-        if (val == null) {
-            return 0;
-        }
-        if (val instanceof Number) {
-            return ((Number) val).doubleValue();
-        }
-        if (val instanceof Boolean) {
-            return (Boolean) val ? 1 : 0;
-        }
-        if (val instanceof String) {
-            String s = trim((String) val);
-            if (s.isEmpty()) {
-                return 0;
-            }
-            if (DECIMAL_LITERAL.matcher(s).matches()) {
-                return Double.parseDouble(s);
-            }
-            if (s.length() > 2 && s.charAt(0) == '0') {
-                char radix = Character.toLowerCase(s.charAt(1));
-                int base = radix == 'x' ? 16 : radix == 'o' ? 8 : radix == 'b' ? 2 : 0;
-                if (base != 0) {
-                    try {
-                        return new BigInteger(s.substring(2), base).doubleValue();
-                    } catch (NumberFormatException ignored) {
-                    }
-                }
-            }
-            return Double.NaN;
-        }
-        if (val instanceof List) {
-            return toNumber(string(val));
-        }
-        return Double.NaN;
-    }
 
     /**
      * How Node's {@code ERR_INVALID_ARG_TYPE} names the value it received.

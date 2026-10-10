@@ -169,7 +169,7 @@ final class Project {
             Object lockfileVersion = Js.get(metadata, "version");
             Object cacheKey = Js.get(metadata, "cacheKey");
             lockfileLastVersion = lockfileVersion;
-            lockfileNeedsRefresh = toNumber(lockfileVersion) < LOCKFILE_VERSION;
+            lockfileNeedsRefresh = Js.toNumber(lockfileVersion) < LOCKFILE_VERSION;
 
             for (String key : Js.keys(parsed)) {
                 if ("__metadata".equals(key)) {
@@ -221,7 +221,7 @@ final class Project {
 
                 for (String entry : MULTIPLE_KEYS_REGEXP.split(key, -1)) {
                     Descriptor descriptor = StructUtils.parseDescriptor(entry);
-                    if (toNumber(lockfileVersion) <= 6) {
+                    if (Js.toNumber(lockfileVersion) <= 6) {
                         descriptor = configuration.normalizeDependency(descriptor);
                         // `$1` names a group inside the lookahead, which never captures: it is replaced by nothing
                         Matcher legacyPatch = LEGACY_PATCH.matcher(descriptor.range);
@@ -1187,17 +1187,4 @@ final class Project {
         return EOL.matcher(newContent).replaceAll(Matcher.quoteReplacement(eol));
     }
 
-    // JavaScript's relational comparison of a lockfile scalar with a number
-    static double toNumber(@Nullable Object value) {
-        if (value instanceof Number) {
-            return ((Number) value).doubleValue();
-        }
-        if (value instanceof Boolean) {
-            return (Boolean) value ? 1 : 0;
-        }
-        if (value == null) {
-            return 0;
-        }
-        return value instanceof String ? Js.toNumber((String) value) : Double.NaN;
-    }
 }
