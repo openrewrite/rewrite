@@ -15,10 +15,12 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
-import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
-import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
+import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -34,6 +36,7 @@ import java.util.Set;
 final class YarnClassicInputs {
 
     private static final List<String> CONFIG_FILES = Arrays.asList(".yarnrc", ".yarnrc.yml", ".npmrc");
+    private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
 
     private YarnClassicInputs() {
     }
@@ -47,7 +50,38 @@ final class YarnClassicInputs {
     }
 
     static Inputs from(LockDirectory dir, Host host) {
-        return project(dir).host(host).build();
+        return from(dir, host, null);
+    }
+
+    /**
+     * With the host's registry configuration as the home directory's .npmrc, which yarn reads under the project's.
+     */
+    static Inputs from(LockDirectory dir, Host host, @Nullable NodeRegistries registries) {
+        Inputs.InputsBuilder inputs = project(dir).host(host);
+        if (registries != null) {
+            inputs.homeFile(".npmrc", userNpmrc(registries));
+        }
+        return inputs.build();
+    }
+
+    /**
+     * The registries as .npmrc lines; npm's own default, which the host also reports when nothing names a
+     * registry, is left unnamed.
+     */
+    static String userNpmrc(NodeRegistries registries) {
+        StringBuilder npmrc = new StringBuilder();
+        NodeRegistry registry = registries.getDefaultRegistry();
+        if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || hasCredentials(registry)) {
+            npmrc.append("registry=").append(registry.getUrl()).append('\n');
+        }
+        for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
+            npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
+        }
+        return npmrc.toString();
+    }
+
+    private static boolean hasCredentials(NodeRegistry registry) {
+        return registry.getAuthToken() != null || registry.getAuthBase64() != null || registry.getUsername() != null;
     }
 
     // what yarn reads of the project, which is all its walk reads

@@ -1,0 +1,2 @@
+CONNECT registry.npmjs.org:443
+CONNECT registry.yarnpkg.com:443
