@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.V8Sort;
 
 import java.util.ArrayList;
@@ -107,7 +108,8 @@ final class LockfileStringifier {
         if (n >= 64) {
             for (String key : a) {
                 if (OBJECT_PROTOTYPE.contains(key)) {
-                    throw new UnknownOrder(key);
+                    throw new CannotKnow("the order yarn writes the " + n + " keys of a map holding \"" + key +
+                                         "\" in, which its comparator does not order consistently");
                 }
             }
             a.sort(LockfileStringifier::priorityThenAlphaSort);
@@ -115,15 +117,6 @@ final class LockfileStringifier {
         }
         V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort, "keys");
         return a;
-    }
-
-    /**
-     * A key yarn sorts with an inconsistent comparator in an array too long for the port's sort to follow V8's.
-     */
-    static final class UnknownOrder extends RuntimeException {
-        UnknownOrder(String key) {
-            super("the order yarn writes the keys of a map holding \"" + key + "\" in");
-        }
     }
 
     @SuppressWarnings("unchecked")
