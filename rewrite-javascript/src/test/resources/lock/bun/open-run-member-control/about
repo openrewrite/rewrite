@@ -1,0 +1,1 @@
+A member's edit (ms 2.0.0 -> ^2.0.0) with bun run in packages/a: bun installs at the root and writes the root's bun.lock.

@@ -274,6 +274,9 @@ public final class BunLockRegenerator {
         PendingInstall install;
         try {
             install = installWithManager(these, registry, log);
+            if (!install.getManager().options.isLoadLockfile()) {
+                throw Rejected.discardsLock("BUN_CONFIG_SKIP_LOAD_LOCKFILE is set, so bun does not load bun.lock");
+            }
             if (!install.getLoadResult().isOk()) {
                 TextLockfileReader.ParseError error = install.getLoadResult().getError();
                 throw Rejected.discardsLock(error == null ?
@@ -390,7 +393,7 @@ public final class BunLockRegenerator {
     private static PendingInstall installWithManager(Inputs inputs, ManifestSource registry, Log log) {
         BunOptions options = BunOptions.load(inputs.getBunfig(), inputs.getNpmrc(),
                 DotEnv.load(HostEnvironment.of(inputs.getEnv()), inputs.getFiles()));
-        LoadResult loadResult = loadFromCwd(inputs.getLock(), options);
+        LoadResult loadResult = loadFromCwd(options.isLoadLockfile() ? inputs.getLock() : null, options);
         int configVersion = loadResult.chooseConfigVersion();
         Map<String, String> manifests = inputs.getManifests();
         String rootManifest = manifests.get("");

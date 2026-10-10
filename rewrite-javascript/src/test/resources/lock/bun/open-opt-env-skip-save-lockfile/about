@@ -1,0 +1,1 @@
+A .env setting BUN_CONFIG_SKIP_SAVE_LOCKFILE=1 (PackageManagerOptions.zig do.save_lockfile): whether --lockfile-only still writes the lock.

@@ -1,0 +1,1 @@
+A member's edit with bun run in packages/a, the member's own .npmrc naming a registry: whether bun reads it.

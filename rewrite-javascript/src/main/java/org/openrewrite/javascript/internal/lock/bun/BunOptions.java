@@ -49,6 +49,7 @@ public final class BunOptions {
     private boolean frozenLockfile;
     private boolean exactVersions;
     private boolean dryRun;
+    private boolean loadLockfile = true;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
@@ -144,6 +145,10 @@ public final class BunOptions {
                 registry = value;
                 break;
             }
+        }
+        String skipLoad = env.setting("BUN_CONFIG_SKIP_LOAD_LOCKFILE");
+        if (skipLoad != null) {
+            loadLockfile = "0".equals(skipLoad);
         }
     }
 

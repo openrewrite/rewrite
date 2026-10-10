@@ -1,0 +1,1 @@
+A member's edit to another resolution (ms 2.0.0 -> 2.1.3), bun run in packages/a, its own bunfig.toml frozenLockfile = true: whether bun reads it.

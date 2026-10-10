@@ -24,6 +24,8 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,8 +59,8 @@ class BunLockRoundTripTest {
           .manifests(lock.manifests())
           .npmrc(lock.npmrc())
           .bunfig(lock.bunfig())
-          .files(scenario.tree(lock.isBefore()))
-          .paths(scenario.paths(lock.isBefore(), lock.getText()))
+          .files(patches(scenario.tree(lock.isBefore())))
+          .runsIn(lock.isBefore() ? "" : scenario.runDir())
           .parentManifests(lock.isBefore() ? Collections.emptyMap() : scenario.parentManifests())
           .env(Collections.emptyMap())
           .now(scenario.now())
@@ -79,5 +81,16 @@ class BunLockRoundTripTest {
             assertThat(result.getErrorMessage()).isNull();
             assertThat(result.getLockFileContent()).isEqualTo(rewritten != null ? rewritten : lock.getText());
         }
+    }
+
+    // the lock's patch files, which an install reads; the phase's .env files are the scenario test's
+    private static Map<String, String> patches(Map<String, String> tree) {
+        Map<String, String> patches = new TreeMap<>();
+        for (Map.Entry<String, String> file : tree.entrySet()) {
+            if (file.getKey().endsWith(".patch")) {
+                patches.put(file.getKey(), file.getValue());
+            }
+        }
+        return patches;
     }
 }

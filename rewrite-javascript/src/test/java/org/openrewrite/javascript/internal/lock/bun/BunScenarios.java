@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.bun;
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -210,11 +211,29 @@ final class BunScenarios {
         }
 
         /**
-         * The package.json of each directory above the lock's in the edit's phase, nearest first, keyed by the lock's
-         * directory as seen from there: {@code above/} holds them by path from the directory {@code lock-dir} is in.
+         * The directory bun ran the edit in, relative to the lock's: {@code run-dir}, else the lock's own.
+         */
+        String runDir() {
+            String runDir = file("run-dir");
+            return runDir == null ? "" : RootRelativePath.normalize(runDir.trim());
+        }
+
+        /**
+         * The package.json of each directory above the one bun ran the edit in, nearest first, keyed by that directory
+         * as seen from there; {@code above/} holds those above the lock's, by path from where {@code lock-dir} starts.
          */
         Map<String, String> parentManifests() {
             Map<String, String> parents = new LinkedHashMap<>();
+            String before = file("before");
+            Map<String, String> manifests = manifests(false, before == null ? "" : before);
+            String runDir = runDir();
+            List<String> within = runDir.isEmpty() ? new ArrayList<>() : Arrays.asList(runDir.split("/"));
+            for (int up = 1; up <= within.size(); up++) {
+                String manifest = manifests.get(String.join("/", within.subList(0, within.size() - up)));
+                if (manifest != null) {
+                    parents.put(String.join("/", within.subList(within.size() - up, within.size())), manifest);
+                }
+            }
             String lockDir = file("lock-dir");
             if (lockDir == null) {
                 return parents;
@@ -225,7 +244,8 @@ final class BunScenarios {
                 String ancestor = String.join("/", segments.subList(0, segments.size() - up));
                 String manifest = above.get(ancestor.isEmpty() ? "package.json" : ancestor + "/package.json");
                 if (manifest != null) {
-                    parents.put(String.join("/", segments.subList(segments.size() - up, segments.size())), manifest);
+                    String below = String.join("/", segments.subList(segments.size() - up, segments.size()));
+                    parents.put(runDir.isEmpty() ? below : below + "/" + runDir, manifest);
                 }
             }
             return parents;

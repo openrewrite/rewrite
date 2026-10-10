@@ -1,0 +1,3 @@
+bun install v1.3.10 (30e609e0)
+error: lockfile had changes, but lockfile is frozen
+note: try re-running without --frozen-lockfile and commit the updated lockfile

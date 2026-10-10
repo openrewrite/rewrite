@@ -1,0 +1,1 @@
+A member's edit with bun run in packages/a, the root's .env setting BUN_CONFIG_REGISTRY: whether bun loads it.

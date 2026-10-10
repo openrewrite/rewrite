@@ -1,0 +1,1 @@
+A .env setting BUN_CONFIG_SKIP_LOAD_LOCKFILE=1 (do.load_lockfile): bun does not load the lock and resolves from scratch (ms ^2.0.0 over a locked 2.0.0).
