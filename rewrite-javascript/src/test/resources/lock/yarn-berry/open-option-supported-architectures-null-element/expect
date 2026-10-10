@@ -1,0 +1,1 @@
+pm-fails Internal Error: Expected configuration setting "supportedArchitectures.os[0]" to be a string, got object

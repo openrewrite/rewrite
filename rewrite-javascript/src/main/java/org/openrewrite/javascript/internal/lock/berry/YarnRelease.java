@@ -79,7 +79,7 @@ final class YarnRelease {
     private final Set<String> settings;
 
     /**
-     * The command the usage error for an unknown setting names ({@code yarn config -v} before 4.9.3).
+     * The command the usage errors for an unknown setting or shape key name ({@code yarn config -v} before 4.9.3).
      */
     private final String unknownSettingHint;
 

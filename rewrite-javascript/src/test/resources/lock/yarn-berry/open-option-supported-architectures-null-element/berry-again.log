@@ -1,0 +1,14 @@
+[31m[1mInternal Error[22m[39m: Expected configuration setting "supportedArchitectures.os[0]" to be a string, got object in <tmp>/project/.yarnrc.yml (in <home>/.yarnrc.yml, <tmp>/project/.yarnrc.yml)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:147:1390
+    at fj (<corepack>/v1/yarn/4.10.3/yarn.js:147:1763)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:147:805
+    at Array.map (<anonymous>)
+    at gj (<corepack>/v1/yarn/4.10.3/yarn.js:147:794)
+    at Rnt (<corepack>/v1/yarn/4.10.3/yarn.js:147:2298)
+    at fj (<corepack>/v1/yarn/4.10.3/yarn.js:147:1085)
+    at gj (<corepack>/v1/yarn/4.10.3/yarn.js:147:979)
+    at t.use (<corepack>/v1/yarn/4.10.3/yarn.js:147:23593)
+    at t.useWithSource (<corepack>/v1/yarn/4.10.3/yarn.js:147:22776)
+over=before
+exit=1
+no lock written

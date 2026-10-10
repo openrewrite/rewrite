@@ -1,0 +1,1 @@
+pm-rejects Usage Error: Unrecognized configuration settings found: npmScopes['foo'].npmRegistryServr - run "yarn config" to see the list of settings supported in Yarn

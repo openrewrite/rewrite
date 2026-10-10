@@ -181,6 +181,7 @@ public final class YarnBerryLockRegenerator {
      */
     String install(String lock, Map<String, Object> settings) {
         YarnRelease release = release();
+        options().checkShapeKeys(release);
         if (options().getThirdPartyPlugin() != null) {
             throw new CannotKnow("what the plugin " + options().getThirdPartyPlugin() + " does to the lock (Yarn " +
                                  "runs its code)");

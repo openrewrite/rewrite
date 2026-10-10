@@ -1,0 +1,14 @@
+[31m[1mInternal Error[22m[39m: Non-nullable configuration settings "catalog['ms']" cannot be set to null in <tmp>/project/.yarnrc.yml (in <home>/.yarnrc.yml, <tmp>/project/.yarnrc.yml)
+    at fj (<corepack>/v1/yarn/4.10.3/yarn.js:147:1183)
+    at gj (<corepack>/v1/yarn/4.10.3/yarn.js:147:979)
+    at Tnt (<corepack>/v1/yarn/4.10.3/yarn.js:147:2633)
+    at fj (<corepack>/v1/yarn/4.10.3/yarn.js:147:1117)
+    at gj (<corepack>/v1/yarn/4.10.3/yarn.js:147:979)
+    at t.use (<corepack>/v1/yarn/4.10.3/yarn.js:147:23593)
+    at t.useWithSource (<corepack>/v1/yarn/4.10.3/yarn.js:147:22776)
+    at t.find (<corepack>/v1/yarn/4.10.3/yarn.js:147:20597)
+    at async dke (<corepack>/v1/yarn/4.10.3/yarn.js:752:8079)
+    at async dbt (<corepack>/v1/yarn/4.10.3/yarn.js:752:9425)
+over=before
+exit=1
+no lock written

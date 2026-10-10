@@ -1,0 +1,3 @@
+npmScopes:
+  foo:
+    npmRegistryServr: "https://registry.npmjs.org"

@@ -1,0 +1,1 @@
+The edit adds a package extension whose dependency has no range (null) beside an ms 2.1.2 to 2.1.3 bump: the range has no default, so Yarn rejects it as a non-nullable setting set to null.

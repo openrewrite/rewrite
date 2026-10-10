@@ -1,0 +1,1 @@
+open-option-npm-scopes-unknown-key under Yarn 4.5.3, whose usage error tells the user to run yarn config -v.

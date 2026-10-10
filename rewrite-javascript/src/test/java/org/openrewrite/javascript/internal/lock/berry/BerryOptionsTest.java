@@ -208,6 +208,48 @@ class BerryOptionsTest {
         assertThat(BerryOptions.parseInt("99999999999")).isEqualTo(99999999999d);
     }
 
+    /**
+     * Yarn 4.10.3 (open-option-supported-architectures-null-element, -catalog-entry-null,
+     * -package-extension-dependency-null): null is non-nullable unless nullable or the default, else not a string.
+     */
+    @Test
+    void aNullValueIsRejectedAsItsDefinitionSays() {
+        assertThatThrownBy(() -> options("supportedArchitectures:\n  os:\n    -\n"))
+                .isInstanceOf(JsError.class)
+                .hasMessage("Expected configuration setting \"supportedArchitectures.os[0]\" to be a string, got " +
+                            "object in .yarnrc.yml");
+        assertThatThrownBy(() -> options("catalog:\n  ms:\n"))
+                .isInstanceOf(JsError.class)
+                .hasMessage("Non-nullable configuration settings \"catalog['ms']\" cannot be set to null in " +
+                            ".yarnrc.yml");
+        assertThatThrownBy(() -> options("packageExtensions:\n  \"ms@*\":\n    dependencies:\n      lodash:\n"))
+                .isInstanceOf(JsError.class)
+                .hasMessageStartingWith("Non-nullable configuration settings " +
+                                        "\"packageExtensions['ms@*'].dependencies['lodash']\" cannot be set to null");
+        assertThatThrownBy(() -> options("npmPublishRegistry:\n"))
+                .isInstanceOf(JsError.class)
+                .hasMessageStartingWith("Expected configuration setting \"npmPublishRegistry\" to be a string");
+    }
+
+    /**
+     * Yarn 4.10.3 and 4.5.3 (open-option-npm-scopes-unknown-key, -by-4.5.3, -before-yarn-path): the release yarnPath
+     * picks, read before any other setting, words the error for a key a shape lacks.
+     */
+    @Test
+    void theReleaseThatReadsTheSettingsWordsAnUnknownKeyOfAShape() {
+        String scope = "npmScopes:\n  foo:\n    npmRegistryServr: \"https://registry.npmjs.org\"\n";
+        String message = "Unrecognized configuration settings found: npmScopes['foo'].npmRegistryServr - run \"%s\" " +
+                         "to see the list of settings supported in Yarn in .yarnrc.yml";
+        BerryOptions options = options(scope + "yarnPath: .yarn/releases/yarn-4.5.3.cjs\n");
+        assertThat(options.get("yarnPath")).isEqualTo(".yarn/releases/yarn-4.5.3.cjs");
+        assertThatThrownBy(() -> options.restrictTo(YarnRelease.of("4.5.3")))
+                .isInstanceOf(BerryOptions.UsageError.class)
+                .hasMessage(String.format(message, "yarn config -v"));
+        assertThatThrownBy(() -> options(scope).checkShapeKeys(YarnRelease.of("4.10.3")))
+                .isInstanceOf(BerryOptions.UsageError.class)
+                .hasMessage(String.format(message, "yarn config"));
+    }
+
     private static BerryOptions options(String yarnrc) {
         return BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
                 HostEnvironment.of(Collections.emptyMap()));

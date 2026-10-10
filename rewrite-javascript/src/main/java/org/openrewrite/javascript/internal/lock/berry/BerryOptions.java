@@ -54,6 +54,9 @@ public final class BerryOptions {
             "binFolder", "version", "flags", "profile", "gpg", "ignoreNode", "wrapOutput", "home", "confDir",
             "registry", "ignoreCwd"));
 
+    private static final List<String> PRIMARY_FIELDS = Arrays.asList("yarnPath", "ignorePath",
+            "injectEnvironmentFiles");
+
     private static final Set<String> LEGACY_PLUGINS = new LinkedHashSet<>(Arrays.asList(
             "@yarnpkg/plugin-constraints", "@yarnpkg/plugin-exec", "@yarnpkg/plugin-interactive-tools",
             "@yarnpkg/plugin-stage", "@yarnpkg/plugin-typescript", "@yarnpkg/plugin-version",
@@ -68,32 +71,43 @@ public final class BerryOptions {
      */
     private static final class Definition {
         final Type type;
+
+        /**
+         * {@link Syml#UNDEFINED} where the definition has none, which unlike a null default rejects a null value.
+         */
         final @Nullable Object defaultValue;
+
         final @Nullable List<Object> values;
         final boolean isArray;
+        final boolean isNullable;
         final Map<String, Definition> properties;
         final @Nullable Definition valueDefinition;
 
         Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
-                   Map<String, Definition> properties, @Nullable Definition valueDefinition) {
+                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition) {
             this.type = type;
             this.defaultValue = defaultValue;
             this.values = values;
             this.isArray = isArray;
+            this.isNullable = isNullable;
             this.properties = properties;
             this.valueDefinition = valueDefinition;
         }
 
         static Definition of(Type type, @Nullable Object defaultValue) {
-            return new Definition(type, defaultValue, null, false, Collections.emptyMap(), null);
+            return new Definition(type, defaultValue, null, false, false, Collections.emptyMap(), null);
+        }
+
+        static Definition withoutDefault(Type type) {
+            return of(type, Syml.UNDEFINED);
         }
 
         static Definition map(Definition valueDefinition) {
-            return new Definition(Type.MAP, null, null, false, Collections.emptyMap(), valueDefinition);
+            return new Definition(Type.MAP, null, null, false, false, Collections.emptyMap(), valueDefinition);
         }
 
         static Definition shape(Map<String, Definition> properties) {
-            return new Definition(Type.SHAPE, null, null, false, properties, null);
+            return new Definition(Type.SHAPE, null, null, false, false, properties, null);
         }
     }
 
@@ -104,7 +118,7 @@ public final class BerryOptions {
         DEFINITIONS.put("ignorePath", Definition.of(Type.BOOLEAN, false));
         DEFINITIONS.put("enableStrictSettings", Definition.of(Type.BOOLEAN, true));
         DEFINITIONS.put("compressionLevel", new Definition(Type.NUMBER, 0,
-                Arrays.asList("mixed", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), false, Collections.emptyMap(), null));
+                Arrays.asList("mixed", 0, 1, 2, 3, 4, 5, 6, 7, 8, 9), false, false, Collections.emptyMap(), null));
         DEFINITIONS.put("defaultLanguageName", Definition.of(Type.STRING, "node"));
         DEFINITIONS.put("defaultProtocol", Definition.of(Type.STRING, "npm:"));
         DEFINITIONS.put("enableTransparentWorkspaces", Definition.of(Type.BOOLEAN, true));
@@ -115,8 +129,8 @@ public final class BerryOptions {
         Map<String, Definition> peerMeta = new LinkedHashMap<>();
         peerMeta.put("optional", Definition.of(Type.BOOLEAN, false));
         Map<String, Definition> extension = new LinkedHashMap<>();
-        extension.put("dependencies", Definition.map(Definition.of(Type.STRING, null)));
-        extension.put("peerDependencies", Definition.map(Definition.of(Type.STRING, null)));
+        extension.put("dependencies", Definition.map(Definition.withoutDefault(Type.STRING)));
+        extension.put("peerDependencies", Definition.map(Definition.withoutDefault(Type.STRING)));
         extension.put("peerDependenciesMeta", Definition.map(Definition.shape(peerMeta)));
         DEFINITIONS.put("packageExtensions", Definition.map(Definition.shape(extension)));
 
@@ -130,7 +144,7 @@ public final class BerryOptions {
         scope.put("npmRegistryServer", Definition.of(Type.STRING, "https://registry.yarnpkg.com"));
         DEFINITIONS.putAll(scope);
         DEFINITIONS.put("npmMinimalAgeGate", Definition.of(Type.NUMBER, 0));
-        DEFINITIONS.put("npmPreapprovedPackages", new Definition(Type.STRING, new ArrayList<>(), null, true,
+        DEFINITIONS.put("npmPreapprovedPackages", new Definition(Type.STRING, new ArrayList<>(), null, true, false,
                 Collections.emptyMap(), null));
         DEFINITIONS.put("npmScopes", Definition.map(Definition.shape(scope)));
         DEFINITIONS.put("npmRegistries", Definition.map(Definition.shape(registry)));
@@ -138,12 +152,12 @@ public final class BerryOptions {
         Map<String, Definition> architectures = new LinkedHashMap<>();
         for (String property : new String[]{"os", "cpu", "libc"}) {
             architectures.put(property, new Definition(Type.STRING, Collections.singletonList("current"), null, true,
-                    Collections.emptyMap(), null));
+                    true, Collections.emptyMap(), null));
         }
         DEFINITIONS.put("supportedArchitectures", Definition.shape(architectures));
 
-        DEFINITIONS.put("catalog", Definition.map(Definition.of(Type.STRING, null)));
-        DEFINITIONS.put("catalogs", Definition.map(Definition.map(Definition.of(Type.STRING, null))));
+        DEFINITIONS.put("catalog", Definition.map(Definition.withoutDefault(Type.STRING)));
+        DEFINITIONS.put("catalogs", Definition.map(Definition.map(Definition.withoutDefault(Type.STRING))));
     }
 
     /**
@@ -152,6 +166,16 @@ public final class BerryOptions {
     public static final class UsageError extends RuntimeException {
         UsageError(String message) {
             super(message);
+        }
+    }
+
+    // parseShape's usage error, which names the command of the release that reads the sources
+    private static final class UnrecognizedShapeKey extends RuntimeException {
+        final String path;
+
+        UnrecognizedShapeKey(String path) {
+            super(path);
+            this.path = path;
         }
     }
 
@@ -172,6 +196,12 @@ public final class BerryOptions {
     @Getter
     private @Nullable String thirdPartyPlugin;
 
+    /**
+     * A key a shape setting lacks, with its source: Yarn's reading of the sources ended there.
+     */
+    private @Nullable String unrecognizedShapeKey;
+    private @Nullable String unrecognizedShapeKeySource;
+
     private BerryOptions(HostEnvironment env) {
         this.env = env;
         for (Map.Entry<String, Definition> definition : DEFINITIONS.entrySet()) {
@@ -188,6 +218,8 @@ public final class BerryOptions {
         copy.sources.putAll(sources);
         copy.keySources.putAll(keySources);
         copy.thirdPartyPlugin = thirdPartyPlugin;
+        copy.unrecognizedShapeKey = unrecognizedShapeKey;
+        copy.unrecognizedShapeKeySource = unrecognizedShapeKeySource;
         return copy;
     }
 
@@ -254,12 +286,30 @@ public final class BerryOptions {
 
         Map<String, @Nullable Object> environmentSettings = getEnvironmentSettings(env.known());
         environmentSettings.remove("rcFilename");
-        options.use("<environment>", environmentSettings);
-        if (resolvedRcFile != null) {
-            options.use(resolvedRcFile.getSource(), asMap(resolvedRcFile.getValue()));
+        for (boolean primary : new boolean[]{true, false}) {
+            options.use("<environment>", fields(environmentSettings, primary));
+            if (resolvedRcFile != null) {
+                options.use(resolvedRcFile.getSource(), fields(asMap(resolvedRcFile.getValue()), primary));
+            }
         }
         options.thirdPartyPlugin = thirdPartyPlugin(environmentSettings, rcFiles);
         return options;
+    }
+
+    // Configuration.find's pickPrimaryCoreFields, read first: the release yarnPath picks reads the others
+    private static Map<String, @Nullable Object> fields(Map<String, @Nullable Object> data, boolean primary) {
+        Map<String, @Nullable Object> out = new LinkedHashMap<>();
+        if (primary) {
+            for (String key : PRIMARY_FIELDS) {
+                if (data.containsKey(key)) {
+                    out.put(key, data.get(key));
+                }
+            }
+        } else {
+            out.putAll(data);
+            out.keySet().removeAll(PRIMARY_FIELDS);
+        }
+        return out;
     }
 
     // Configuration.find's third-party plugin pass, up to the first plugin it would run
@@ -354,6 +404,9 @@ public final class BerryOptions {
     }
 
     void use(String source, Map<String, @Nullable Object> data) {
+        if (unrecognizedShapeKey != null) {
+            return;
+        }
         List<String> keys = new ArrayList<>();
         keys.add("enableStrictSettings");
         keys.addAll(Js.keys(data));
@@ -386,6 +439,10 @@ public final class BerryOptions {
             Object parsed;
             try {
                 parsed = parseValue(key, value, definition);
+            } catch (UnrecognizedShapeKey e) {
+                unrecognizedShapeKey = e.path;
+                unrecognizedShapeKeySource = source;
+                return;
             } catch (UsageError e) {
                 throw new UsageError(e.getMessage() + " in " + source);
             } catch (JsError e) {
@@ -411,6 +468,7 @@ public final class BerryOptions {
      * an unknown key is Yarn's usage error, otherwise it is set aside and its default stays.
      */
     void restrictTo(YarnRelease release) {
+        checkShapeKeys(release);
         // an unknown key is read in the plugin pass, under the stored value, which only the environment sets
         boolean strict = getBoolean("enableStrictSettings");
         for (Map.Entry<String, String> key : keySources.entrySet()) {
@@ -427,6 +485,17 @@ public final class BerryOptions {
                 values.put(key.getKey(), getDefaultValue(definition, false));
                 sources.remove(key.getKey());
             }
+        }
+    }
+
+    /**
+     * parseShape's usage error for a key a shape setting lacks, as the release that reads the sources words it.
+     */
+    void checkShapeKeys(YarnRelease release) {
+        if (unrecognizedShapeKey != null) {
+            throw new UsageError("Unrecognized configuration settings found: " + unrecognizedShapeKey + " - run \"" +
+                                 release.getUnknownSettingHint() + "\" to see the list of settings supported in " +
+                                 "Yarn in " + unrecognizedShapeKeySource);
         }
     }
 
@@ -465,7 +534,7 @@ public final class BerryOptions {
             default:
                 break;
         }
-        if (value == null && definition.defaultValue != null) {
+        if (value == null && !definition.isNullable && definition.defaultValue != null) {
             throw new JsError(JsError.ERROR, "Non-nullable configuration settings \"" + path +
                                              "\" cannot be set to null");
         }
@@ -515,8 +584,7 @@ public final class BerryOptions {
             String subPath = path + "." + entry.getKey();
             Definition subDefinition = definition.properties.get(entry.getKey());
             if (subDefinition == null) {
-                throw new UsageError("Unrecognized configuration settings found: " + subPath +
-                                     " - run \"yarn config\" to see the list of settings supported in Yarn");
+                throw new UnrecognizedShapeKey(subPath);
             }
             result.put(entry.getKey(), parseValue(subPath, entry.getValue(), subDefinition));
         }

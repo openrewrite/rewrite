@@ -17,7 +17,7 @@
 // extensions (packages/yarnpkg-extensions), the packages the compat plugin patches, the node-gyp rule of the npm
 // semver resolver, the plugins the CLI bundles, whether the npm plugin sends the jsr scope to npm.jsr.io, whether the
 // lockfile writes a checksum without the lockfile's cache key, the names of the settings the release knows
-// (`yarn config --json` of the @yarnpkg/cli-dist bundle) and the command its unknown-setting error names. Sources
+// (`yarn config --json` of the @yarnpkg/cli-dist bundle) and the command its unknown-setting errors name. Sources
 // are read at each @yarnpkg/cli/<version> tag of github.com/yarnpkg/berry; identical tables are stored once.
 //
 // Usage: node releases.js <rewrite-javascript/src/main/resources/org/openrewrite/javascript/internal/lock/berry>
@@ -119,12 +119,15 @@ async function checksumWithoutCacheKeyAt(sha) {
   return /if \(entryCacheKey === cacheKey\) \{\s*entryChecksum = hash;/.test(source);
 }
 
-// the command the usage error for an unknown setting tells the user to run
+// the command the usage errors for an unknown setting and an unknown key of a shape tell the user to run
 async function unknownSettingHintAt(sha) {
   const source = await fetchText(`${RAW}/${sha}/packages/yarnpkg-core/sources/Configuration.ts`);
   const hint = source.match(/Unrecognized or legacy configuration settings found: \$\{key\} - run "([^"]+)"/);
-  if (!hint)
+  const shape = source.match(/Unrecognized configuration settings found: \$\{path\}\.\$\{propKey\} - run "([^"]+)"/);
+  if (!hint || !shape)
     throw new Error(`no unknown-setting message at ${sha}`);
+  if (hint[1] !== shape[1])
+    throw new Error(`the unknown-setting messages at ${sha} name different commands`);
   return hint[1];
 }
 
