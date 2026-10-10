@@ -300,9 +300,8 @@ public abstract class NodeCatalogs {
         }
 
         /**
-         * The file without what the port's {@link WorkspaceManifestWriter#cleanupUnusedCatalogs} removes over the
-         * {@code projects} by directory (null where the recipes do not read one); null when declined. An
-         * {@link IllegalArgumentException} names why it is not written as pnpm writes it.
+         * The file without what {@link WorkspaceManifestWriter#cleanupUnusedCatalogs} removes over {@code projects}
+         * (null when unread); null when declined, an {@link IllegalArgumentException} when not written as pnpm does.
          */
         public @Nullable NodeCatalogs withoutUnused(Map<String, @Nullable Map<String, @Nullable Object>> projects) {
             if (declined() != null) {
