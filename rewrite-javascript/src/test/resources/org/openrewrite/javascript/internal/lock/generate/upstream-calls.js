@@ -26,7 +26,8 @@ const harness = require('./upstream-harness.js')
 
 const [specPath, checkout, release, ...only] = process.argv.slice(2)
 const spec = require(path.resolve(specPath))
-const dir = path.resolve(checkout)
+// by its real path, which the ES module hooks see
+const dir = fs.realpathSync(path.resolve(checkout))
 const rows = []
 let testFile = ''
 
@@ -96,10 +97,7 @@ function encode(v, depth = 0) {
 
 // the checkout's directory, wherever a value names it, as <checkout>
 function redact(line) {
-  for (const d of [fs.realpathSync(dir), dir]) {
-    line = line.split(JSON.stringify(d).slice(1, -1)).join('<checkout>')
-  }
-  return line
+  return line.split(JSON.stringify(dir).slice(1, -1)).join('<checkout>')
 }
 
 function record(row) {
