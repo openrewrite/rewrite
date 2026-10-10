@@ -181,6 +181,14 @@ class PnpmOptionsTest {
           .isEqualTo("{'foo':'abc/def/ghi','bar':'~/abc/def/ghi','baz':'~\\abc\\def\\ghi'}");
     }
 
+    // Node 24.19.0: path.join('/srv/fake-user', '') is '/srv/fake-user'; with 'a/' it keeps the slash
+    @Test
+    void aPathSettingOfTheHomeDirectoryIsJoinedAsNodeJoinsIt() {
+        Map<String, String> env = env("HOME", HOME, "pnpm_config_foo", "~/", "pnpm_config_bar", "~/a/");
+        assertThat(pairsToObject(PnpmOptions.parseEnvVars(alwaysSchema(ConfigTypes.Type.PATH), env)))
+          .isEqualTo("{'foo':'/srv/fake-user','bar':'/srv/fake-user/a/'}");
+    }
+
     @Test
     void parseEnvVarsWorksWithUrls() {
         Map<String, String> env = env("HOME", HOME, "PATH", PATH, "pnpm_config_foo", "https://registry.npmjs.com",

@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
@@ -843,7 +844,7 @@ public final class PnpmOptions {
                 String home = env.get("HOME");
                 Matcher m = HOME_PREFIX.matcher(envVar);
                 if (home != null && !home.isEmpty() && m.find()) {
-                    return join(home, envVar.substring(m.end()));
+                    return PosixPath.join(home, envVar.substring(m.end()));
                 }
                 return envVar;
             }
@@ -857,28 +858,6 @@ public final class PnpmOptions {
             default:
                 return Js.UNDEFINED;
         }
-    }
-
-    // Node's posix path.join of two segments
-    private static String join(String dir, String path) {
-        String joined = dir + "/" + path;
-        boolean absolute = joined.startsWith("/");
-        List<String> out = new ArrayList<>();
-        for (String segment : joined.split("/")) {
-            if (segment.isEmpty() || ".".equals(segment)) {
-                continue;
-            }
-            if ("..".equals(segment) && !out.isEmpty() && !"..".equals(out.get(out.size() - 1))) {
-                out.remove(out.size() - 1);
-            } else if (!"..".equals(segment) || !absolute) {
-                out.add(segment);
-            }
-        }
-        String normalized = String.join("/", out);
-        if (!normalized.isEmpty() && joined.endsWith("/")) {
-            normalized += "/";
-        }
-        return absolute ? "/" + normalized : normalized.isEmpty() ? "." : normalized;
     }
 
     private static @Nullable String getEnvKeySuffix(String envKey) {

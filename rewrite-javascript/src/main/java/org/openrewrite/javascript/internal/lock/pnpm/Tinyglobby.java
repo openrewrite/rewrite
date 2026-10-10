@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Picomatch;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.util.ArrayList;
@@ -119,7 +120,7 @@ final class Tinyglobby {
             throw new CannotKnow("the projects the workspace pattern \"" + pattern + "\" matches (an absolute " +
                                  "path, which needs the project's own)");
         }
-        result = posixNormalize(result);
+        result = PosixPath.normalize(result);
         if (PARENT_DIRECTORY.matcher(result).find()) {
             throw new CannotKnow("the projects the workspace pattern \"" + pattern + "\" matches (paths outside " +
                                  "the project)");
@@ -147,7 +148,7 @@ final class Tinyglobby {
             depthOffset = newCommonPath.size();
             commonPath = newCommonPath;
             // buildCrawler drops every backslash of the root
-            root = posixNormalize(String.join("/", newCommonPath)).replace("\\", "");
+            root = PosixPath.normalize(String.join("/", newCommonPath)).replace("\\", "");
             if (".".equals(root)) {
                 root = "";
             }
@@ -220,29 +221,5 @@ final class Tinyglobby {
     static boolean isDynamicPattern(String pattern) {
         PicomatchScan.State scan = PicomatchScan.scan(pattern, false);
         return scan.isGlob() || scan.isNegated();
-    }
-
-    // Node's posix path.normalize over a relative path
-    static String posixNormalize(String path) {
-        if (path.isEmpty()) {
-            return ".";
-        }
-        List<String> out = new ArrayList<>();
-        for (String segment : path.split("/")) {
-            if (segment.isEmpty() || ".".equals(segment)) {
-                continue;
-            }
-            if ("..".equals(segment)) {
-                if (!out.isEmpty() && !"..".equals(out.get(out.size() - 1))) {
-                    out.remove(out.size() - 1);
-                } else {
-                    out.add("..");
-                }
-            } else {
-                out.add(segment);
-            }
-        }
-        String result = out.isEmpty() ? "." : String.join("/", out);
-        return path.endsWith("/") ? result + "/" : result;
     }
 }

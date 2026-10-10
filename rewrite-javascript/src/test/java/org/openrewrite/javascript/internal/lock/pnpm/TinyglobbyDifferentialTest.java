@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.PicomatchScan;
+import org.openrewrite.javascript.internal.lock.PosixPath;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -91,7 +92,7 @@ class TinyglobbyDifferentialTest {
 
     private static boolean outside(List<String> patterns) {
         for (String pattern : patterns) {
-            String p = Tinyglobby.posixNormalize(pattern.startsWith("!") ? pattern.substring(1) : pattern);
+            String p = PosixPath.normalize(pattern.startsWith("!") ? pattern.substring(1) : pattern);
             if (p.startsWith("..") || p.startsWith("/")) {
                 return true;
             }

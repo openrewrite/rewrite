@@ -19,7 +19,8 @@
  * lockfile/settings-checker, lockfile/verification, lockfile/preferred-versions, lockfile/utils, deps/path,
  * object/key-sorting, config/reader (the .npmrc, pnpm-workspace.yaml and environment settings), config/matcher,
  * config/version-policy, config/pick-registry-for-package, config/parse-overrides, catalogs/*,
- * workspace/workspace-manifest-reader, workspace/project-manifest-reader, workspace/projects-reader,
+ * workspace/workspace-manifest-reader, workspace/workspace-manifest-writer, yaml/document-sync (patchDocument, in
+ * {@code internal.lock.YamlDocument}), workspace/project-manifest-reader, workspace/projects-reader,
  * pkg-manifest/utils, resolving/resolver-base, resolving/parse-wanted-dependency, resolving/npm-resolver
  * (pickPackage, pickPackageFromMeta, the resolution verifier, trustChecks), resolving/registry/pkg-metadata-filter,
  * crypto/object-hasher, crypto/hash, installing/env-installer, installing/deps-installer (the lock-only install and
@@ -69,8 +70,9 @@
  * <p>
  * {@code internal.lock.Ssri} ports ssri 13.0.1 (Copyright (c) npm, Inc.), {@code internal.lock.ValidateNpmPackageName}
  * validate-npm-package-name 4.0.0 and 7.0.2 (Copyright (c) 2015, npm, Inc), {@code internal.lock.Spec} the
- * npm-package-arg fork @pnpm/npm-package-arg 2.0.0 (Copyright (c) Isaac Z. Schlueter) and {@code internal.lock.GitHost}
- * hosted-git-info 4.1.0 (Copyright (c) 2015, Rebecca Turner), each distributed under the ISC License:
+ * npm-package-arg fork @pnpm/npm-package-arg 2.0.0 (Copyright (c) Isaac Z. Schlueter), {@code internal.lock.GitHost}
+ * hosted-git-info 4.1.0 (Copyright (c) 2015, Rebecca Turner) and {@code internal.lock.YamlDocument} yaml 2.9.0
+ * (Copyright Eemeli Aro &lt;eemeli@gmail.com&gt;), each distributed under the ISC License:
  * <pre>
  * Copyright (c) 2015, npm, Inc
  *
