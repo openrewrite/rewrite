@@ -33,7 +33,9 @@ import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonHelper.EditAndRegenerateResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
+import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
@@ -51,6 +53,7 @@ import java.util.List;
 import java.util.function.Function;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -103,6 +106,27 @@ class EditedPackageManagerFileLockRegenTest implements RewriteTest {
                         s -> s.noTrim().afterRecipe(doc -> assertThat(doc.getMarkers().findFirst(Markup.Warn.class))
                                 .as("regeneration must not warn; requested " + requested).isEmpty()))
         );
+    }
+
+    @Test
+    void anEditOfOnlyThePackageManagerFileLeavesThePackageJsonAsItIs() {
+        SourceFile packageJson = JsonParser.builder().build().parse(resource(SCENARIO + "pkg")).findFirst()
+                .orElseThrow(IllegalStateException::new)
+                .withSourcePath(Paths.get("package.json"))
+                .withMarkers(Markers.build(singletonList(
+                        nodeResolutionResult(PackageManager.Pnpm, dependency("wrappy", "^1.0.2")))));
+        NodeDependencyScan.ProjectFiles files = new NodeDependencyScan.ProjectFiles(Collections.emptyMap(),
+                Collections.singletonMap(WORKSPACE_MANIFEST, resource(SCENARIO + "workspace-before")), null);
+
+        EditAndRegenerateResult result = PackageJsonHelper.editAndRegenerate(packageJson, Function.identity(),
+                Collections.singletonMap(WORKSPACE_MANIFEST, resource(SCENARIO + "workspace")),
+                resource(SCENARIO + "before"), files, ctx);
+
+        assertThat(result.isChanged()).isTrue();
+        assertThat(result.getModifiedPackageJson()).isNull();
+        assertThat(result.getEditedFiles()).containsOnlyKeys(WORKSPACE_MANIFEST);
+        assertThat(requireNonNull(result.getRegenResult()).getLockFileContent())
+                .isEqualTo(resource(SCENARIO + "after"));
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal;
 
+import lombok.Value;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
@@ -34,6 +35,7 @@ import org.openrewrite.yaml.tree.Yaml;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -643,9 +645,13 @@ public class PackageJsonHelper {
                 spacedValue);
     }
 
-    @lombok.Value
+    @Value
     public static class EditAndRegenerateResult {
+        /**
+         * The package.json as the edit leaves it; null when the edit changes only {@link #editedFiles}.
+         */
         @Nullable SourceFile modifiedPackageJson;
+
         LockFileRegeneration.@Nullable Result regenResult;
 
         /**
@@ -653,7 +659,10 @@ public class PackageJsonHelper {
          */
         Map<Path, String> editedFiles;
 
-        public boolean isChanged() { return modifiedPackageJson != null; }
+        /**
+         * Whether the edit changes the package.json or one of {@link #editedFiles}, and so the lock was regenerated.
+         */
+        public boolean isChanged() { return modifiedPackageJson != null || !editedFiles.isEmpty(); }
 
         /**
          * {@code visited} as the edit leaves it, parsed as it was, when it is one of {@link #editedFiles}; else null.
@@ -679,7 +688,7 @@ public class PackageJsonHelper {
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
-            java.util.function.Function<Json.Document, Json.Document> editFn,
+            Function<Json.Document, Json.Document> editFn,
             @Nullable String capturedLockContent,
             ExecutionContext ctx) {
         return editAndRegenerate(packageJson, editFn, capturedLockContent, NodeDependencyScan.ProjectFiles.NONE, ctx);
@@ -691,7 +700,7 @@ public class PackageJsonHelper {
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
-            java.util.function.Function<Json.Document, Json.Document> editFn,
+            Function<Json.Document, Json.Document> editFn,
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
@@ -704,7 +713,7 @@ public class PackageJsonHelper {
      */
     public static EditAndRegenerateResult editAndRegenerate(
             SourceFile packageJson,
-            java.util.function.Function<Json.Document, Json.Document> editFn,
+            Function<Json.Document, Json.Document> editFn,
             Map<Path, String> editedFiles,
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
@@ -721,7 +730,7 @@ public class PackageJsonHelper {
         SourceFile refreshed = refreshMarker(after);
         LockFileRegeneration.Result regen = capturedLockContent == null ? null
                 : regenerateLockContent(refreshed, capturedLockContent, projectFiles, changed, ctx);
-        return new EditAndRegenerateResult(withResolvedDeps(refreshed, regen), regen, changed);
+        return new EditAndRegenerateResult(after == before ? null : withResolvedDeps(refreshed, regen), regen, changed);
     }
 
     private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
@@ -744,7 +753,7 @@ public class PackageJsonHelper {
      * earlier recipe in the run changed since; the declared dependencies are what the lock depends on.
      */
     public static SourceFile reapplyEdit(SourceFile packageJson,
-                                         java.util.function.Function<Json.Document, Json.Document> editFn,
+                                         Function<Json.Document, Json.Document> editFn,
                                          LockFileRegeneration.@Nullable Result regen) {
         if (!(packageJson instanceof Json.Document)) {
             return packageJson;
