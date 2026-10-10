@@ -154,13 +154,14 @@ final class Install {
                 projects : readPackage(readPackageHook, allProjects);
 
         String lockText = lockFile.text();
-        LockfileReader.ReadResult read = lockText == null ? new LockfileReader.ReadResult(null, false) :
+        LockfileReader.ReadResult read = lockText == null ?
+                new LockfileReader.ReadResult(createLockfileObject(projects, options), false) :
                 LockfileReader.read(lockText);
         if (read.getLockfile() == null) {
             throw new LockfileReader.IgnoredLockfile("no " + LockfileReader.WANTED_LOCKFILE);
         }
         LockfileObject wantedLockfile = read.getLockfile();
-        boolean existsWantedLockfile = true;
+        boolean existsWantedLockfile = lockText != null;
         for (Verification.Project project : projects) {
             if (!wantedLockfile.getImporters().containsKey(project.getId())) {
                 wantedLockfile.getImporters().put(project.getId(), new ProjectSnapshot());
@@ -404,6 +405,24 @@ final class Install {
         Map<String, @Nullable Object> catalog = catalogs.get(catalogName);
         Object nextSpec = catalog == null ? null : catalog.get(alias);
         return Js.strictEquals(prevSpec, nextSpec);
+    }
+
+    // readLockfiles without a lock: lockfile.fs' createLockfileObject over the projects installed
+    private static LockfileObject createLockfileObject(List<Verification.Project> projects, PnpmOptions options) {
+        LockfileObject lockfile = new LockfileObject();
+        for (Verification.Project project : projects) {
+            ProjectSnapshot importer = new ProjectSnapshot();
+            importer.setDependencies(new LinkedHashMap<>());
+            importer.setSpecifiers(new LinkedHashMap<>());
+            lockfile.getImporters().put(project.getId(), importer);
+        }
+        lockfile.set("lockfileVersion", LockfileObject.LOCKFILE_VERSION);
+        Map<String, @Nullable Object> settings = new LinkedHashMap<>();
+        settings.put("autoInstallPeers", options.get("autoInstallPeers"));
+        settings.put("excludeLinksFromLockfile", options.get("excludeLinksFromLockfile"));
+        settings.put("peersSuffixMaxLength", options.get("peersSuffixMaxLength"));
+        lockfile.set("settings", settings);
+        return lockfile;
     }
 
     // getContext runs the readPackage hooks over each project's manifest

@@ -1,0 +1,32 @@
+lockfileVersion: '9.0'
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+overrides:
+  wrappy: 1.0.1
+
+importers:
+
+  .:
+    dependencies:
+      once:
+        specifier: 1.4.0
+        version: 1.4.0
+
+packages:
+
+  once@1.4.0:
+    resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
+
+  wrappy@1.0.1:
+    resolution: {integrity: sha512-42h1d25nW6G/N7l16Oz4vqCOLIFobFBOwZrBYlCxJ/QuS2o1Gdn1PzSoiYndbnL9rgGIGZ6Qn09AIpyhrkepfw==}
+
+snapshots:
+
+  once@1.4.0:
+    dependencies:
+      wrappy: 1.0.1
+
+  wrappy@1.0.1: {}

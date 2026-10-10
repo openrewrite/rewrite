@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.pnpm.ExtendInstallOptions.InstallOptions;
 
@@ -92,13 +93,15 @@ final class Recursive {
         return result;
     }
 
-    // the other projects install in the same run: one that resolves shares pnpm's resolution cache with this lock's,
-    // and its failure stops the run whether or not this lock is written yet
+    // the other projects install in the same run: one that resolves shares pnpm's resolution cache with this lock's;
+    // under bail its failure stops the run whether or not this lock is written yet, else throwOnCommandFail ends it
     private void requireOtherInstalls(List<Verification.Project> allProjects, PnpmOptions opts,
                                       NpmResolver storeController,
                                       @Nullable Map<String, Map<String, @Nullable Object>> projectConfigRecord,
                                       @Nullable Consumer<List<ResolveDependencies.PolicyViolation>> policyHandlers) {
         String lockDir = install.getLockDir();
+        boolean bail = opts.isTrue("bail");
+        int failures = 0;
         Map<String, String> ownOverrides = null;
         for (Verification.Project project : allProjects) {
             String dir = project.getRootDir();
@@ -108,27 +111,34 @@ final class Recursive {
             try {
                 requireHooks(opts, dir);
             } catch (PnpmError e) {
-                throw failsBeside(dir, e);
+                failed(dir, e, bail);
+                failures++;
+                continue;
             } catch (CannotKnow e) {
                 // getContext runs its readPackage hooks over its manifest, so its lock cannot say whether it resolves
                 throw sharesCacheWith(dir);
             }
             String lockPath = RootRelativePath.join(dir, LockfileReader.WANTED_LOCKFILE);
             String lock = CannotKnow.requireRead(inputs.getFiles().get(lockPath), inputs.getPaths(), lockPath);
-            if (lock == null) {
-                continue;
+            if (lock == null && inputs.getPaths() == null) {
+                throw new CannotKnow("whether " + lockfilePath(dir) + ", which the install of " + project(dir) +
+                                     " in the same run reads, exists (the host does not say which files the " +
+                                     "project holds)");
             }
             if (ownOverrides == null) {
                 ownOverrides = projectOverrides(projectConfigRecord, lockDir, allProjects, opts);
             }
             Map<String, String> overrides = projectOverrides(projectConfigRecord, dir, allProjects, opts);
+            // without a lock of its own the project installs from scratch
             Install other = new Install(inputs, dir, new EnvLockfile.OnDisk(lock), registry, stores, now);
             Install.Result otherInstall;
             try {
                 otherInstall = other.install(new Verification.Project(dir, ".", project.getManifest()),
                         new InstallOptions(opts, overrides, allProjects, true, storeController, policyHandlers));
             } catch (RuntimeException e) {
-                throw failsBeside(dir, e);
+                failed(dir, e, bail);
+                failures++;
+                continue;
             }
             if (otherInstall.getResolution() == null) {
                 continue;
@@ -139,8 +149,24 @@ final class Recursive {
             try {
                 other.installInContext(otherInstall);
             } catch (RuntimeException e) {
-                throw failsBeside(dir, e);
+                failed(dir, e, bail);
+                failures++;
             }
+        }
+        if (failures > 0) {
+            // recursiveSummary.ts' throwOnCommandFail, once every project's install has run
+            throw new PnpmError("RECURSIVE_FAIL", "\"pnpm recursive install\" failed in " + failures + " packages");
+        }
+    }
+
+    // under bail the failure stops the run, which may or may not have written this lock yet; else pnpm counts it
+    private void failed(String dir, RuntimeException e, boolean bail) {
+        if (bail) {
+            throw failsBeside(dir, e);
+        }
+        if (!(e instanceof PnpmError) && !(e instanceof JsError)) {
+            throw new CannotKnow("whether the install of " + project(dir) + ", in the same run, fails (" +
+                                 e.getMessage() + ")");
         }
     }
 

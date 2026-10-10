@@ -174,12 +174,28 @@ class SwitchCliVersionTest {
         assertThat(member(BAD_NAMED_REGISTRY, resolved).beforeNextStoreController(missing)).isSameAs(missing);
     }
 
-    // packages/a's lock under a root pinning pnpm 11.2.2 in devEngines, after the package manager check
+    /**
+     * A member's lock where the root's lock records no release: switchCliVersion, or syncEnvLockfile under onFail
+     * error, resolves pnpm's integrities into the root's env document, which asks the registry.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"download", "error"})
+    void aMembersPackageManagerCheckResolvesIntoTheRootsLock(String onFail) {
+        assertThatThrownBy(() -> member(null, MAIN_DOCUMENT, onFail))
+          .hasMessageContaining("fetched https://registry.npmjs.org/pnpm");
+    }
+
     private static Main member(@Nullable String workspaceSettings, @Nullable String rootLock) {
+        return member(workspaceSettings, rootLock, "download");
+    }
+
+    // packages/a's lock under a root pinning pnpm 11.2.2 in devEngines, after the package manager check
+    private static Main member(@Nullable String workspaceSettings, @Nullable String rootLock, String onFail) {
         PnpmLockRegenerator.Inputs.InputsBuilder inputs = PnpmLockRegenerator.Inputs.builder()
           .lock(MAIN_DOCUMENT)
           .lockDir("packages/a")
-          .manifest("", "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.2.2\"}}}")
+          .manifest("", "{\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\",\"version\":\"11.2.2\"," +
+                        "\"onFail\":\"" + onFail + "\"}}}")
           .manifest("packages/a", "{\"name\":\"a\"}")
           .file("pnpm-workspace.yaml", "packages:\n  - packages/*\nsharedWorkspaceLockfile: false\n" +
                                        (workspaceSettings == null ? "" : workspaceSettings))

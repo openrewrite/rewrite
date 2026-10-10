@@ -475,6 +475,7 @@ public final class PnpmOptions {
     private static Map<String, @Nullable Object> defaultOptions() {
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
         config.put("auto-install-peers", true);
+        config.put("bail", true);
         config.put("dedupe-peer-dependents", true);
         config.put("dedupe-peers", false);
         config.put("dedupe-direct-deps", false);

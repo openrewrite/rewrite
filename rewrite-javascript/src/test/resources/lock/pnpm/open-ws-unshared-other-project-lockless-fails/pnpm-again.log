@@ -1,0 +1,19 @@
+Scope: all 4 workspace projects
+? Verifying lockfile against supply-chain policies (1 entry)...
+? Verifying lockfile at pnpm-lock.yaml against supply-chain policies (2 entries)...
+? Verifying lockfile at ../b/pnpm-lock.yaml against supply-chain policies (2 entries)...
+undefined
+<tmp>/project/packages/c:
+[ERR_PNPM_NO_MATCHING_VERSION] No matching version found for inherits@99.0.0 while fetching it from https://registry.npmjs.org/
+
+This error happened while installing a direct dependency of <tmp>/project/packages/c
+
+The latest release of inherits is "2.0.4".
+
+If you need the full list of all 7 published versions run "pnpm view inherits versions".
+✓ Lockfile passes supply-chain policies (1 entry in 103ms)
+✓ Lockfile at pnpm-lock.yaml passes supply-chain policies (2 entries in 103ms)
+✓ Lockfile at ../b/pnpm-lock.yaml passes supply-chain policies (2 entries in 103ms)
+pnpm 11.2.2, node v24.19.0, 2026-10-10T13:31:08Z
+exit=1
+no lock written

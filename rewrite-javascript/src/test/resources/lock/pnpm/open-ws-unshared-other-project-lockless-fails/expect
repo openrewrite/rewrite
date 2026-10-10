@@ -1,0 +1,1 @@
+cannot-know whether pnpm writes packages/a/pnpm-lock.yaml before the install of packages/c, in the same run, fails

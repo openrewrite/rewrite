@@ -1,0 +1,1 @@
+pnpm run in packages/a of an unshared workspace: a adds abbrev while packages/c, added without a lock, names a version the registry lacks

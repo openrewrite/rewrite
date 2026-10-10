@@ -1,0 +1,18 @@
+Scope: all 3 workspace projects
+? Verifying lockfile at pnpm-lock.yaml against supply-chain policies (2 entries)...
+? Verifying lockfile at ../b/pnpm-lock.yaml against supply-chain policies (2 entries)...
+? Verifying lockfile against supply-chain policies (1 entry)...
+✓ Lockfile at pnpm-lock.yaml passes supply-chain policies (2 entries in 88ms)
+✓ Lockfile at ../b/pnpm-lock.yaml passes supply-chain policies (2 entries in 87ms)
+✓ Lockfile passes supply-chain policies (1 entry in 88ms)
+undefined
+[ERR_PNPM_RECURSIVE_FAIL] 
+
+
+Summary: 1 fails, 2 passes
+
+<tmp>/project/packages/b:
+[ERROR] No matching version found for once@99.0.0 while fetching it from https://registry.npmjs.org/
+pnpm 11.2.2, node v24.19.0, 2026-10-10T13:31:17Z
+exit=1
+no lock written

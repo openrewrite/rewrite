@@ -1,0 +1,1 @@
+pnpm run in packages/a of an unshared workspace with bail false: a adds abbrev while b's once moves to a version the registry lacks

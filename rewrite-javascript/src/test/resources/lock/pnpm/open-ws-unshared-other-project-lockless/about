@@ -1,0 +1,1 @@
+pnpm run in packages/a of an unshared workspace: a adds abbrev while packages/c, added without a lock, is installed from scratch in the same run
