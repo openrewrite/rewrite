@@ -148,6 +148,10 @@ for (const [kind, value, extra] of stringified) {
 for (const t of [0, -0, -1, 1.5, -1.5, 1791462896789, 253402300799999, 253402300800000, -62167219200000,
   -62167219200001, 8.64e15, -8.64e15, 8.64e15 + 1, NaN, Infinity]) {
   ask('Date.prototype.toISOString', 'toISOString', [t], x => new Date(x).toISOString())
+  ask('TimeClip', 'timeClip', [t], x => new Date(x).getTime())
+}
+for (const t of [0.999, -0.5, 1e15 + 0.5, -8.64e15 - 1, 1791462896789.75]) {
+  ask('TimeClip', 'timeClip', [t], x => new Date(x).getTime())
 }
 for (const fields of [[2020, 0, 1, 0, 0, 0, 0], [99, 11, 31, 23, 59, 59, 999], [0, 0, 1, 0, 0, 0, 0],
   [100, 0, 1, 0, 0, 0, 0], [2020, 1, 30, 0, 0, 0, 0], [2020, 13, 1, 0, 0, 0, 0], [2020, -1, 1, 0, 0, 0, 0],

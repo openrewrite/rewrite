@@ -832,20 +832,40 @@
 {"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
 {"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[0],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[0],"out":0}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"-0"}],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"-0"}],"out":0}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-1],"out":-1}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[1.5],"out":"1970-01-01T00:00:00.001Z"}
+{"test":"TimeClip","fn":"timeClip","args":[1.5],"out":1}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1.5],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-1.5],"out":-1}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[1791462896789],"out":"2026-10-08T12:34:56.789Z"}
+{"test":"TimeClip","fn":"timeClip","args":[1791462896789],"out":1791462896789}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300799999],"out":"9999-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[253402300799999],"out":253402300799999}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300800000],"out":"+010000-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[253402300800000],"out":253402300800000}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200000],"out":"0000-01-01T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-62167219200000],"out":-62167219200000}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200001],"out":"-000001-12-31T23:59:59.999Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-62167219200001],"out":-62167219200001}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000000],"out":"+275760-09-13T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[8640000000000000],"out":8640000000000000}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[-8640000000000000],"out":"-271821-04-20T00:00:00.000Z"}
+{"test":"TimeClip","fn":"timeClip","args":[-8640000000000000],"out":-8640000000000000}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000001],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[8640000000000001],"out":{"$":"number","value":"NaN"}}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"NaN"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"NaN"}],"out":{"$":"number","value":"NaN"}}
 {"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"Infinity"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"TimeClip","fn":"timeClip","args":[{"$":"number","value":"Infinity"}],"out":{"$":"number","value":"NaN"}}
+{"test":"TimeClip","fn":"timeClip","args":[0.999],"out":0}
+{"test":"TimeClip","fn":"timeClip","args":[-0.5],"out":0}
+{"test":"TimeClip","fn":"timeClip","args":[1000000000000000.5],"out":1000000000000000}
+{"test":"TimeClip","fn":"timeClip","args":[-8640000000000001],"out":{"$":"number","value":"NaN"}}
+{"test":"TimeClip","fn":"timeClip","args":[1791462896789.75],"out":1791462896789}
 {"test":"Date.UTC","fn":"utc","args":[2020,0,1,0,0,0,0],"out":1577836800000}
 {"test":"Date.UTC","fn":"utc","args":[99,11,31,23,59,59,999],"out":946684799999}
 {"test":"Date.UTC","fn":"utc","args":[0,0,1,0,0,0,0],"out":-2208988800000}

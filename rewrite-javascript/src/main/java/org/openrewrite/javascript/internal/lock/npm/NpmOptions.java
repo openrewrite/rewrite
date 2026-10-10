@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 import org.openrewrite.javascript.internal.lock.Ini;
+import org.openrewrite.javascript.internal.lock.V8Date;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -248,14 +249,12 @@ public class NpmOptions {
             return before;
         }
         if (minReleaseAge != null && minReleaseAge != Js.UNDEFINED) {
-            return truthy(minReleaseAge) ? timeClip(now.toEpochMilli() - 86400000d * Js.toNumber(minReleaseAge)) : null;
+            if (!truthy(minReleaseAge)) {
+                return null;
+            }
+            return V8Date.timeClip(now.toEpochMilli() - 86400000d * Js.toNumber(minReleaseAge));
         }
         return null;
-    }
-
-    // new Date(ms) holds no time value beyond 8.64e15 milliseconds from the epoch
-    private static double timeClip(double ms) {
-        return Math.abs(ms) > 8.64e15 ? Double.NaN : ms;
     }
 
     /**

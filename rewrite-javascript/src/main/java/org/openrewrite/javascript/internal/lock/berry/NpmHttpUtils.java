@@ -193,8 +193,7 @@ final class NpmHttpUtils {
             return (Boolean) value ? 1 : 0;
         }
         if (value instanceof Number) {
-            double time = ((Number) value).doubleValue();
-            return Math.abs(time) > 8.64e15 ? Double.NaN : time < 0 ? Math.ceil(time) : Math.floor(time);
+            return V8Date.timeClip(((Number) value).doubleValue());
         }
         String text = Js.string(value);
         String what = "the publish time \"" + text + "\" of " + StructUtils.stringifyIdent(ident) + "@" +

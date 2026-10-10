@@ -48,10 +48,11 @@ public final class V8Date {
      * @throws JsError V8's RangeError for NaN or a time beyond the range of a Date
      */
     public static String toISOString(double time) {
-        if (Double.isNaN(time) || Math.abs(time) > MAX_TIME) {
+        double clipped = timeClip(time);
+        if (Double.isNaN(clipped)) {
             throw new JsError(JsError.RANGE_ERROR, "Invalid time value");
         }
-        Instant instant = Instant.ofEpochMilli((long) time);
+        Instant instant = Instant.ofEpochMilli((long) clipped);
         int year = instant.atZone(ZoneOffset.UTC).getYear();
         String yearText = year >= 0 && year <= 9999 ? String.format("%04d", year) :
                 (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year));
@@ -107,10 +108,13 @@ public final class V8Date {
     }
 
     /**
-     * TimeClip: NaN beyond the range of a Date.
+     * TimeClip, {@code new Date(time).getTime()}: NaN beyond the range of a Date, else the integer toward zero.
      */
     public static double timeClip(double time) {
-        return Math.abs(time) > MAX_TIME ? Double.NaN : time;
+        if (Double.isNaN(time) || Math.abs(time) > MAX_TIME) {
+            return Double.NaN;
+        }
+        return (time < 0 ? Math.ceil(time) : Math.floor(time)) + 0.0;
     }
 
     // MakeDay: a day past the month's end rolls into the next

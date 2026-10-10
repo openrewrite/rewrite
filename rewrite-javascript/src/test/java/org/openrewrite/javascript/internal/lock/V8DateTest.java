@@ -57,7 +57,8 @@ class V8DateTest {
 
     static Stream<Call> calls() {
         return UpstreamCalls.read(EcmaScriptTest.BUILTINS).stream()
-          .filter(call -> "toISOString".equals(call.getFn()) || "utc".equals(call.getFn()));
+          .filter(call -> "toISOString".equals(call.getFn()) || "utc".equals(call.getFn()) ||
+                          "timeClip".equals(call.getFn()));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -69,6 +70,8 @@ class V8DateTest {
               .hasToString(threw.get("name") + ": " + threw.get("message"));
         } else if ("toISOString".equals(call.getFn())) {
             assertThat(V8Date.toISOString(number(call, 0))).isEqualTo(call.getOut());
+        } else if ("timeClip".equals(call.getFn())) {
+            assertThat(V8Date.timeClip(number(call, 0))).isEqualTo(call.getOut());
         } else {
             assertThat(V8Date.utc(number(call, 0), number(call, 1), number(call, 2), number(call, 3), number(call, 4),
               number(call, 5), number(call, 6))).isEqualTo(call.getOut());

@@ -210,8 +210,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
     // new Date(value).getTime()
     private static double timeValue(Object value) {
         if (value instanceof Number) {
-            double time = ((Number) value).doubleValue();
-            return Math.abs(time) > 8.64e15 ? Double.NaN : time;
+            return V8Date.timeClip(((Number) value).doubleValue());
         }
         return Js.dateParse(Js.string(value));
     }
