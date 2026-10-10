@@ -19,7 +19,9 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -122,7 +124,7 @@ final class Pacote {
 
         // the fetcher's constructor parses a string integrity; a value of another type is kept as it is
         Object held = opts.getIntegrity();
-        String integrity = held instanceof String ? Ssri.parse((String) held) : null;
+        Ssri.Integrity integrity = held instanceof String ? Ssri.parse(held, Ssri.Release.V13_0_1) : null;
         boolean heldRaw = !(held instanceof String) && truthy(held);
         Object dist = mani.get("dist");
         if (truthy(dist)) {
@@ -134,26 +136,34 @@ final class Pacote {
                     fetched.getSaveSpec());
             Object distIntegrity = Js.get(dist, "integrity");
             Object shasum = Js.get(dist, "shasum");
-            String parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity)) :
-                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1") : null;
+            Ssri.Integrity parsed = truthy(distIntegrity) ? Ssri.parse(Js.string(distIntegrity), Ssri.Release.V13_0_1) :
+                    truthy(shasum) ? Ssri.fromHex(Js.string(shasum), "sha1", Ssri.Release.V13_0_1) : null;
             if (parsed != null) {
                 if (heldRaw) {
                     throw new IllegalArgumentException("this.integrity.match is not a function");
                 }
-                if (integrity != null && !Ssri.match(integrity, parsed)) {
-                    for (String algorithm : Ssri.algorithms(integrity)) {
-                        if (Ssri.algorithms(parsed).contains(algorithm)) {
+                if (integrity != null && integrity.match(parsed) == null) {
+                    for (String algorithm : integrity.getHashes().keySet()) {
+                        if (parsed.getHashes().containsKey(algorithm)) {
                             throw new NpmRejection("EINTEGRITY", "Integrity checksum failed when using " + algorithm +
                                                                  ": wanted " + integrity + " but got " + parsed + ".",
                                                                      null);
                         }
                     }
                 }
-                integrity = integrity == null ? parsed : Ssri.merge(integrity, parsed);
+                if (integrity == null) {
+                    integrity = parsed;
+                } else {
+                    try {
+                        integrity.merge(parsed);
+                    } catch (JsError e) {
+                        throw new NpmRejection(null, e.getMessage(), null);
+                    }
+                }
             }
         }
         if (integrity != null || heldRaw) {
-            mani.put("_integrity", integrity != null ? integrity : Js.string(held));
+            mani.put("_integrity", integrity != null ? integrity.toString() : Js.string(held));
             if (!truthy(dist)) {
                 // dist.signatures is read whether or not the manifest has a dist
                 throw new IllegalArgumentException("Cannot read properties of undefined (reading 'signatures')");

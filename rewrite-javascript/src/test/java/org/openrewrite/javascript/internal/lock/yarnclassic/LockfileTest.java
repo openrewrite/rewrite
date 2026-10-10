@@ -23,6 +23,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -198,7 +199,7 @@ class LockfileTest {
         Lockfile lockfile = new Lockfile();
         PackageResolver resolver = YarnClassicScenarios.resolver(YarnClassicOptions.defaults(), lockfile);
         Manifest foobar = manifest(resolver, "foobar", "0.0.0", null, "http://example.com/foobar", "npm");
-        Ssri.Integrity integrity = Ssri.parse("sha1-foo sha512-bar");
+        Ssri.Integrity integrity = Ssri.parse("sha1-foo sha512-bar", Ssri.Release.V5_3_0);
         foobar.remote.integrity = integrity;
         Map<String, Manifest> patterns = new LinkedHashMap<>();
         patterns.put("foobar", foobar);

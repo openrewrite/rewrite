@@ -54,6 +54,13 @@ public final class UpstreamCalls {
     public static class Call {
         String test;
         String fn;
+
+        /**
+         * The receiver of a method, as the spec writes it.
+         */
+        @Nullable
+        Object self;
+
         List<@Nullable Object> args;
 
         @Nullable
@@ -65,13 +72,27 @@ public final class UpstreamCalls {
         @Nullable
         Map<String, @Nullable Object> threw;
 
+        /**
+         * The receiver after a method the spec names as one that changes it.
+         */
+        @Nullable
+        Object selfAfter;
+
         public @Nullable Object arg(int i) {
             return i < args.size() ? args.get(i) : EcmaScript.UNDEFINED;
         }
 
+        /**
+         * Whether the call passed an argument at {@code i} that is not undefined.
+         */
+        public boolean has(int i) {
+            return i < args.size() && args.get(i) != EcmaScript.UNDEFINED;
+        }
+
         @Override
         public String toString() {
-            return fn + args + (threw != null ? " throws " + threw.get("message") : " = " + out);
+            return (self != null ? shape(self) + "." : "") + fn + args +
+                   (threw != null ? " throws " + threw.get("message") : " = " + out);
         }
     }
 
@@ -100,8 +121,10 @@ public final class UpstreamCalls {
                 @SuppressWarnings("unchecked")
                 Map<String, @Nullable Object> threw = row.has("threw") ?
                         (Map<String, @Nullable Object>) value(row.get("threw")) : null;
-                calls.add(new Call(row.get("test").asText(), row.get("fn").asText(), args,
-                        row.has("out") ? value(row.get("out")) : null, threw));
+                calls.add(new Call(row.get("test").asText(), row.get("fn").asText(),
+                        row.has("self") ? value(row.get("self")) : null, args,
+                        row.has("out") ? value(row.get("out")) : null, threw,
+                        row.has("selfAfter") ? value(row.get("selfAfter")) : null));
             }
         } catch (IOException e) {
             throw new UncheckedIOException(e);

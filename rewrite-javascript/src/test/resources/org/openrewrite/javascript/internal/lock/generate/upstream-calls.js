@@ -89,27 +89,49 @@ function record(row) {
   }
 }
 
-// a recording function in the place of fn
+// a recording function in the place of fn; a call made inside another recorded call is the library's own
+let depth = 0
+function quiet(fn) {
+  depth++
+  try {
+    return fn()
+  } finally {
+    depth--
+  }
+}
+
 function recorded(name, fn, self) {
   const wrapper = function (...args) {
-    const encodedArgs = encode(args)
+    const outer = depth === 0
+    depth++
+    let row
     try {
+      const encodedArgs = outer ? encode(args) : undefined
+      const receiver = outer && spec.receiver && this && this !== globalThis ? spec.receiver(this) : undefined
+      row = Object.assign({fn: name}, receiver !== undefined ? {self: receiver} : {}, {args: encodedArgs})
       const out = new.target ? Reflect.construct(fn, args, new.target) : fn.apply(self === undefined ? this : self,
         args)
-      if (out && typeof out.then === 'function') {
+      if (outer && out && typeof out.then === 'function') {
         return out.then(v => {
-          record({fn: name, args: encodedArgs, out: encode(v)})
+          record(Object.assign(row, {out: quiet(() => encode(v))}))
           return v
         }, e => {
-          record({fn: name, args: encodedArgs, threw: encode(e)})
+          record(Object.assign(row, {threw: quiet(() => encode(e))}))
           throw e
         })
       }
-      record({fn: name, args: encodedArgs, out: encode(spec.result ? spec.result(name, out) : out)})
+      if (outer) {
+        record(Object.assign(row, {out: encode(spec.result ? spec.result(name, out) : out)},
+          receiver !== undefined && (spec.mutates || []).includes(name) ? {selfAfter: spec.receiver(this)} : {}))
+      }
       return out
     } catch (e) {
-      record({fn: name, args: encodedArgs, threw: encode(e)})
+      if (outer) {
+        record(Object.assign(row, {threw: encode(e)}))
+      }
       throw e
+    } finally {
+      depth--
     }
   }
   Object.defineProperty(wrapper, 'name', {value: fn.name})
@@ -117,9 +139,11 @@ function recorded(name, fn, self) {
 }
 
 function wrapModule(real) {
-  if (spec.wrap) {
-    return spec.wrap(real, {recorded, record, encode})
-  }
+  return spec.wrap ? spec.wrap(real, {recorded, record, encode, wrapFunctions}) : wrapFunctions(real)
+}
+
+// the module with spec.functions recorded (and the module itself, when it is a function and spec.self names it)
+function wrapFunctions(real) {
   const names = spec.functions || []
   let out
   if (typeof real === 'function' && spec.self) {

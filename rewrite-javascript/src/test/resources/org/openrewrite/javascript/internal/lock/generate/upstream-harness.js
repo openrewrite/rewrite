@@ -112,6 +112,8 @@ function makeT(name) {
     strictNotSame: (a, b) => check('notSame', () => assert.notDeepStrictEqual(a, b)),
     notDeepStrictEqual: (a, b) => check('notSame', () => assert.notDeepStrictEqual(a, b)),
     match: (a, p) => check('match', () => assert.ok(hasShape(a, p), 'match')),
+    similar: (a, p) => check('similar', () => assert.ok(hasShape(a, p), 'similar')),
+    notSimilar: (a, p) => check('notSimilar', () => assert.ok(!hasShape(a, p))),
     has: (a, p) => check('has', () => assert.ok(hasShape(a, p), 'has')),
     hasStrict: (a, p) => check('has', () => assert.ok(hasShape(a, p), 'has')),
     notMatch: (a, p) => check('notMatch', () => assert.ok(!hasShape(a, p))),

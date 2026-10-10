@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -152,7 +153,8 @@ final class PackageFetcher {
         boolean integrities = Js.truthy(a.integrity) && Js.truthy(b.integrity);
         return (hashes || integrities) &&
                (!hashes || String.valueOf(a.hash).equals(b.hash)) &&
-               (!integrities || Ssri.stringify(a.integrity).equals(Ssri.stringify(b.integrity)));
+               (!integrities || Ssri.stringify(a.integrity, Ssri.Release.V5_3_0)
+                       .equals(Ssri.stringify(b.integrity, Ssri.Release.V5_3_0)));
     }
 
     /**

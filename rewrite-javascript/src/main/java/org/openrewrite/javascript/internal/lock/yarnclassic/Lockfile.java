@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Getter;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -157,7 +158,7 @@ final class Lockfile {
         or(obj, "name", getName(pattern));
         Object integrity = obj.get("integrity");
         if (Js.truthy(integrity) && Js.truthy(Js.get(integrity, "isIntegrity"))) {
-            obj.put("integrity", Ssri.parse(integrity));
+            obj.put("integrity", Ssri.parse(integrity, Ssri.Release.V5_3_0, Js::templateString));
         }
         return obj;
     }

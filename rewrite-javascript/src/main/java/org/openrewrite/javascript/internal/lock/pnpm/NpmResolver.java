@@ -18,13 +18,12 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
+import org.openrewrite.javascript.internal.lock.Ssri;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
-import java.io.ByteArrayOutputStream;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -616,27 +615,13 @@ final class NpmResolver {
         if (!Js.truthy(dist.get("shasum"))) {
             return null;
         }
-        String integrity = fromHex(Js.string(dist.get("shasum")));
+        Ssri.Integrity integrity = Ssri.fromHex(Js.string(dist.get("shasum")), "sha1", Ssri.Release.V13_0_1);
         if (integrity == null) {
             throw new PnpmError("INVALID_TARBALL_INTEGRITY", "Tarball \"" + Js.string(dist.get("tarball")) +
                                                              "\" has invalid shasum specified in its metadata: " +
                                                              Js.string(dist.get("shasum")));
         }
-        return integrity;
-    }
-
-    // ssri's fromHex(hex, 'sha1'): Buffer.from(hex, 'hex') stops at the first pair that is not hex
-    private static @Nullable String fromHex(String hex) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        for (int i = 0; i + 1 < hex.length(); i += 2) {
-            int hi = Character.digit(hex.charAt(i), 16);
-            int lo = Character.digit(hex.charAt(i + 1), 16);
-            if (hi < 0 || lo < 0) {
-                break;
-            }
-            bytes.write(hi << 4 | lo);
-        }
-        return bytes.size() == 0 ? null : "sha1-" + Base64.getEncoder().encodeToString(bytes.toByteArray());
+        return integrity.toString();
     }
 
     static String normalizeRegistryUrl(String url) {

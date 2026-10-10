@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -24,6 +25,7 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
 
@@ -102,7 +104,7 @@ final class TarballFetcher {
         byte[] tarball = download();
         TarFs extracted = untar(reference(), tarball);
         Ssri.Integrity integrity = integrity(remote);
-        if (integrity != null && integrity.hashes.isEmpty()) {
+        if (integrity != null && integrity.getHashes().isEmpty()) {
             throw new MessageError(reference() + ": " + Lang.format("Integrity checked failed for $0 (none of " +
                                                                     "the specified algorithms are supported)",
                     remote.packageName));
@@ -142,18 +144,19 @@ final class TarballFetcher {
      */
     boolean isNamedBy(byte[] tarball, PackageRemote other) {
         Ssri.Integrity integrity = integrity(other);
-        return (Js.truthy(other.hash) || integrity != null && !integrity.hashes.isEmpty()) &&
+        return (Js.truthy(other.hash) || integrity != null && !integrity.getHashes().isEmpty()) &&
                !mismatches(tarball, other);
     }
 
     private boolean mismatches(byte[] tarball, PackageRemote expected) {
         Ssri.Integrity integrity = integrity(expected);
-        return Js.truthy(expected.hash) && !matches(tarball, Ssri.fromHex(expected.hash, "sha1")) ||
-               integrity != null && !integrity.hashes.isEmpty() && !matches(tarball, integrity);
+        return Js.truthy(expected.hash) &&
+               !matches(tarball, Objects.requireNonNull(Ssri.fromHex(expected.hash, "sha1", Ssri.Release.V5_3_0))) ||
+               integrity != null && !integrity.getHashes().isEmpty() && !matches(tarball, integrity);
     }
 
     private static Ssri.@Nullable Integrity integrity(PackageRemote of) {
-        return Js.truthy(of.integrity) ? Ssri.parse(of.integrity) : null;
+        return Js.truthy(of.integrity) ? Ssri.parse(of.integrity, Ssri.Release.V5_3_0, Js::templateString) : null;
     }
 
     // the reference _fetch requests, without its file: prefix
@@ -182,11 +185,11 @@ final class TarballFetcher {
 
     // isHashAlgorithmSupported over every algorithm named, then ssri's integrityStream check with the strongest
     private boolean matches(byte[] data, Ssri.Integrity expected) {
-        if (expected.hashes.isEmpty()) {
+        if (expected.getHashes().isEmpty()) {
             return false;
         }
         String algorithm = null;
-        for (String candidate : Js.keys(expected.hashes)) {
+        for (String candidate : Js.keys(expected.getHashes())) {
             String lower = candidate.toLowerCase(Locale.ROOT);
             if (!digestible(lower)) {
                 throw new CannotKnow("whether the Node yarn runs under has the " + candidate + " digest the " +
@@ -199,8 +202,8 @@ final class TarballFetcher {
             }
         }
         String digest = digest(data, algorithm);
-        for (Ssri.Hash hash : expected.hashes.get(algorithm)) {
-            if (digest.equals(hash.digest)) {
+        for (Ssri.Hash hash : expected.getHashes().get(algorithm)) {
+            if (digest.equals(hash.getDigest())) {
                 return true;
             }
         }

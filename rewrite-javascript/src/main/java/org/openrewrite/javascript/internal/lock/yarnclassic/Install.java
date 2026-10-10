@@ -23,6 +23,7 @@ import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
+import org.openrewrite.javascript.internal.lock.Ssri;
 import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 
@@ -417,7 +418,7 @@ final class Install {
             if (integrityPatternsAreSameAsInLockfile && Js.truthy(existingIntegrityInfo)) {
                 Object manifestIntegrity = manifest == null ? null : manifest.get("integrity");
                 if (!Js.truthy(manifestIntegrity) ||
-                    !Ssri.stringify(manifestIntegrity).equals(existingIntegrityInfo)) {
+                    !Ssri.stringify(manifestIntegrity, Ssri.Release.V5_3_0).equals(existingIntegrityInfo)) {
                     integrityPatternsAreSameAsInLockfile = false;
                 }
             }

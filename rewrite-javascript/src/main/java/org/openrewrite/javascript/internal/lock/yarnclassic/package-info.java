@@ -44,8 +44,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * </pre>
- * {@code Ssri} ports ssri 5.3.0, {@code internal.lock.Ini} ports ini 1.3.5, {@code Minimatch} ports minimatch 3.0.4
- * and {@code ParseGlob} glob-parent 2.0.0, as yarn 1.22.22 bundles them, all distributed under the ISC License:
+ * {@code internal.lock.Ssri} ports ssri 5.3.0, {@code internal.lock.Ini} ports ini 1.3.5, {@code Minimatch} ports
+ * minimatch 3.0.4 and {@code ParseGlob} glob-parent 2.0.0, as yarn 1.22.22 bundles them, all distributed under the
+ * ISC License:
  * <ul>
  *     <li>ssri: Copyright (c) npm, Inc.</li>
  *     <li>ini: Copyright (c) Isaac Z. Schlueter and Contributors</li>

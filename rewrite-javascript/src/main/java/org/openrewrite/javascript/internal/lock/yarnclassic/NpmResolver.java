@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.EventLoop.Promise;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.Ssri;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -189,9 +190,10 @@ final class NpmResolver {
             Object dist = data.get("dist");
             if (shrunk != null && shrunk.remote != null) {
                 Object integrity = Js.get(dist, "integrity");
-                shrunk.remote.integrity = Js.truthy(dist) && Js.truthy(integrity) ? Ssri.parse(integrity) :
+                shrunk.remote.integrity = Js.truthy(dist) && Js.truthy(integrity) ?
+                        Ssri.parse(integrity, Ssri.Release.V5_3_0, Js::templateString) :
                         Ssri.fromHex(Js.truthy(dist) && Js.truthy(Js.get(dist, "shasum")) ?
-                                Js.get(dist, "shasum") : "", "sha1");
+                                Js.get(dist, "shasum") : "", "sha1", Ssri.Release.V5_3_0);
                 return Promise.resolved(loop, shrunk);
             }
 
@@ -205,7 +207,8 @@ final class NpmResolver {
                 remote.type = "tarball";
                 remote.reference = tarball;
                 remote.hash = shasum instanceof String ? (String) shasum : null;
-                remote.integrity = Js.truthy(integrity) ? Ssri.parse(integrity) : Ssri.fromHex(shasum, "sha1");
+                remote.integrity = Js.truthy(integrity) ? Ssri.parse(integrity, Ssri.Release.V5_3_0,
+                        Js::templateString) : Ssri.fromHex(shasum, "sha1", Ssri.Release.V5_3_0);
                 remote.registry = NPM_REGISTRY_ID;
                 remote.packageName = data.get("name");
                 info.remote = remote;
