@@ -29,6 +29,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SpecUtilsTest {
 
+    private static final HostEnvironment NO_ENV = HostEnvironment.of(Collections.emptyMap());
+
     /**
      * parsePackageJSON with devEngines.packageManager: the spec it reads, or the usage error corepack 0.35.0 stops on
      * ({@code open-corepack-devengines-mismatch}); a warning leaves {@code packageManager} as it is.
@@ -134,7 +136,7 @@ class SpecUtilsTest {
     void parsesTheSpecCorepackRuns(String raw, String answer) {
         String actual;
         try {
-            SpecUtils.Descriptor spec = SpecUtils.parseSpec(raw, "package.json", true);
+            SpecUtils.Descriptor spec = SpecUtils.parseSpec(raw, "package.json", true, NO_ENV);
             actual = spec.getName() + " " + spec.getRange();
         } catch (Rejected e) {
             actual = e.getMessage();
@@ -191,13 +193,30 @@ class SpecUtilsTest {
     @Test
     void theSpecALookupFindsNamesThePackageManager() {
         String both = "{\"packageManager\":\"yarn@1.22.22\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"}}}";
-        assertThat(SpecUtils.loadSpec("", 0, dir -> both).getSpec(true))
+        assertThat(SpecUtils.loadSpec("", 0, dir -> both).getSpec(true, NO_ENV))
                 .isEqualTo(new SpecUtils.Descriptor("yarn", "1.22.22"));
-        assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}").getSpec(true)).isNull();
-        assertThat(SpecUtils.loadSpec("", 0, dir -> null).getSpec(true)).isNull();
-        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}").getSpec(true))
+        assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}").getSpec(true, NO_ENV)).isNull();
+        assertThat(SpecUtils.loadSpec("", 0, dir -> null).getSpec(true, NO_ENV)).isNull();
+        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}").getSpec(true, NO_ENV))
                 .isInstanceOf(Rejected.class)
                 .hasMessageContaining("expected a semver version");
+    }
+
+    /**
+     * corepack takes a URL for a known package manager only under COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=1 and runs what
+     * it downloads (4.10.3, for repo.yarnpkg.com's yarn.js); {@code true} is refused as an unset variable is.
+     */
+    @Test
+    void aUrlForAKnownPackageManagerNeedsTheUnsafeSetting() {
+        String url = "https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js";
+        SpecUtils.Descriptor spec = SpecUtils.parseSpec("yarn@" + url, "package.json", true,
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")));
+        assertThat(spec).isEqualTo(new SpecUtils.Descriptor("yarn", url));
+        assertThat(SpecUtils.installVersion(spec)).isNull();
+        assertThatThrownBy(() -> SpecUtils.parseSpec("yarn@" + url, "package.json", true,
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "true"))))
+                .isInstanceOf(Rejected.class)
+                .hasMessageStartingWith("Illegal use of URL for known package manager.");
     }
 
     /**

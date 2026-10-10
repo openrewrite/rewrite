@@ -113,6 +113,14 @@ class YarnBerryLockRegeneratorTest {
                 "COREPACK_ENABLE_PROJECT_SPEC", "0")))
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("the Yarn release that runs");
+        String url = "https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js";
+        assertThatThrownBy(() -> release("yarn@" + url, null, Collections.emptyMap()))
+                .isInstanceOf(Rejected.class)
+                .hasMessageStartingWith("Illegal use of URL for known package manager.");
+        assertThatThrownBy(() -> release("yarn@" + url, null, Collections.singletonMap(
+                "COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")))
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("the Yarn release at " + url + " (corepack downloads it)");
     }
 
     /**
@@ -166,6 +174,24 @@ class YarnBerryLockRegeneratorTest {
                 .build(), BerryScenarios.NO_REGISTRY).regenerate().getFailure();
 
         assertThat(requireNonNull(failure).getDetail()).contains(reported);
+    }
+
+    /**
+     * Yarn 4.10.3 runs a third-party plugin before it reads the plugins' settings: beside a scope's unknown key it
+     * reports the key, the plugin's own error or "Cannot redefine settings", as the plugin's code decides.
+     */
+    @Test
+    void aThirdPartyPluginRunsBeforeThePluginsSettingsAreRead() {
+        Failure failure = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+                .lock("")
+                .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}")
+                .configFile(".yarnrc.yml", "npmScopes:\n  foo:\n    npmRegistryServr: https://x.example\n" +
+                                           "plugins:\n  - .yarn/plugins/plugin-a.cjs\n")
+                .now(Instant.EPOCH)
+                .build(), BerryScenarios.NO_REGISTRY).regenerate().getFailure();
+
+        assertThat(requireNonNull(failure).getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(failure.getDetail()).contains("what the plugin .yarn/plugins/plugin-a.cjs (.yarnrc.yml) does");
     }
 
     /**

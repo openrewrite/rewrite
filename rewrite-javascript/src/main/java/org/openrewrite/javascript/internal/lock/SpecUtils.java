@@ -69,11 +69,11 @@ public final class SpecUtils {
         /**
          * {@code getSpec} of a lookup that found a spec, null for none; throws Rejected where parseSpec refuses it.
          */
-        public @Nullable Descriptor getSpec(boolean enforceExactVersion) {
+        public @Nullable Descriptor getSpec(boolean enforceExactVersion, HostEnvironment env) {
             if (target == null || rawPmSpec == EcmaScript.UNDEFINED) {
                 return null;
             }
-            return parseSpec(rawPmSpec, String.valueOf(source), enforceExactVersion);
+            return parseSpec(rawPmSpec, String.valueOf(source), enforceExactVersion, env);
         }
     }
 
@@ -198,9 +198,11 @@ public final class SpecUtils {
     }
 
     /**
-     * {@code parseSpec}; throws Rejected as corepack words its usage error.
+     * {@code parseSpec}, reading COREPACK_ENABLE_UNSAFE_CUSTOM_URLS from {@code env}; throws Rejected as corepack words
+     * its usage error.
      */
-    public static Descriptor parseSpec(@Nullable Object raw, String source, boolean enforceExactVersion) {
+    public static Descriptor parseSpec(@Nullable Object raw, String source, boolean enforceExactVersion,
+                                       HostEnvironment env) {
         if (!(raw instanceof String)) {
             throw corepackRejects("Invalid package manager specification in " + source + "; expected a string");
         }
@@ -226,7 +228,7 @@ public final class SpecUtils {
             if (!SUPPORTED.contains(name)) {
                 throw corepackRejects("Unsupported package manager specification (" + spec + ")");
             }
-        } else if (SUPPORTED.contains(name)) {
+        } else if (SUPPORTED.contains(name) && !"1".equals(env.setting("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS"))) {
             throw corepackRejects("Illegal use of URL for known package manager. Instead, select a specific " +
                                   "version, or set COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=1 in your environment (" + spec +
                                   ")");
@@ -245,7 +247,7 @@ public final class SpecUtils {
             return null;
         }
         Lookup lookup = loadSpec(initialCwd, levels, manifest);
-        Descriptor spec = lookup.getSpec(true);
+        Descriptor spec = lookup.getSpec(true, env);
         if (spec == null || spec.getName().equals(name)) {
             return spec;
         }
