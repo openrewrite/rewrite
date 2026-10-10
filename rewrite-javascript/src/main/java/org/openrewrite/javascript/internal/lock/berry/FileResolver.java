@@ -69,6 +69,7 @@ final class FileResolver implements Resolver {
     @Override
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
+        FileUtils.readBindings(descriptor, null, PROTOCOL);
         throw new CannotKnow("the file: folder contents of " + StructUtils.stringifyDescriptor(descriptor) +
                              " (Yarn hashes the folder on every install)");
     }

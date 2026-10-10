@@ -61,6 +61,7 @@ final class TarballFileResolver implements Resolver {
     @Override
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
+        FileUtils.readBindings(descriptor, "", FileResolver.PROTOCOL);
         throw new CannotKnow("the file: tarball hash of " + StructUtils.stringifyDescriptor(descriptor) +
                              " (Yarn hashes the file on every install)");
     }

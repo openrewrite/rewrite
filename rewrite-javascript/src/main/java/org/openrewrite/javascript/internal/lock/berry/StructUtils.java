@@ -296,6 +296,21 @@ final class StructUtils {
         return new Range(protocol, source, rawSelector, selectorParams, params);
     }
 
+    @Value
+    static class FileStyleRange {
+        Locator parentLocator;
+        String path;
+    }
+
+    static FileStyleRange parseFileStyleRange(String range, String protocol) {
+        Range parsed = parseRange(range, new RangeOptions(true, protocol, false, false));
+        Object locator = parsed.params == null ? null : parsed.params.get("locator");
+        if (!(locator instanceof String)) {
+            throw new JsError(JsError.ERROR, "Assertion failed: Invalid bindings for " + range);
+        }
+        return new FileStyleRange(parseLocator((String) locator, true), parsed.selector);
+    }
+
     static @Nullable Range tryParseRange(String range, RangeOptions opts) {
         try {
             return parseRange(range, opts);
