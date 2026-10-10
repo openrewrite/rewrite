@@ -1,0 +1,1 @@
+A member's own bun.lock, bun run in it, under a root whose workspaces array lists it: bun installs at the root.

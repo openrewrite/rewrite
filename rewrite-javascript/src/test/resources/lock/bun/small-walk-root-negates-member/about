@@ -1,0 +1,1 @@
+A member's own bun.lock under a root whose workspaces negate it (!packages/a): bun installs in the member.

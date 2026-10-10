@@ -59,6 +59,7 @@ class BunLockRoundTripTest {
           .bunfig(lock.bunfig())
           .files(scenario.tree(lock.isBefore()))
           .paths(scenario.paths(lock.isBefore(), lock.getText()))
+          .parentManifests(lock.isBefore() ? Collections.emptyMap() : scenario.parentManifests())
           .env(Collections.emptyMap())
           .now(scenario.now())
           .build();

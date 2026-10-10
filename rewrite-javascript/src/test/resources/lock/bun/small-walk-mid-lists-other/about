@@ -1,0 +1,1 @@
+A member's own bun.lock under packages/package.json whose workspaces do not list it: bun stops there and installs in the member.

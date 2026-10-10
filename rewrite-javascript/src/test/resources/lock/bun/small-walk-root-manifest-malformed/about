@@ -1,0 +1,1 @@
+A member's own bun.lock under a root package.json that does not parse: bun stops with its ParserError.

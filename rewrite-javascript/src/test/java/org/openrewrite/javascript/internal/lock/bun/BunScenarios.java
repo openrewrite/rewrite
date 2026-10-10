@@ -209,6 +209,28 @@ final class BunScenarios {
             return paths;
         }
 
+        /**
+         * The package.json of each directory above the lock's in the edit's phase, nearest first, keyed by the lock's
+         * directory as seen from there: {@code above/} holds them by path from the directory {@code lock-dir} is in.
+         */
+        Map<String, String> parentManifests() {
+            Map<String, String> parents = new LinkedHashMap<>();
+            String lockDir = file("lock-dir");
+            if (lockDir == null) {
+                return parents;
+            }
+            Map<String, String> above = tree("above");
+            List<String> segments = Arrays.asList(lockDir.trim().split("/"));
+            for (int up = 1; up <= segments.size(); up++) {
+                String ancestor = String.join("/", segments.subList(0, segments.size() - up));
+                String manifest = above.get(ancestor.isEmpty() ? "package.json" : ancestor + "/package.json");
+                if (manifest != null) {
+                    parents.put(String.join("/", segments.subList(segments.size() - up, segments.size())), manifest);
+                }
+            }
+            return parents;
+        }
+
         @Nullable
         String config(boolean before, String file, String treeFile) {
             String fromTree = tree(before).get(treeFile);

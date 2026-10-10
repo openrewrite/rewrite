@@ -1,0 +1,1 @@
+A member's own bun.lock under a root whose workspaces name its path: bun installs at the root.

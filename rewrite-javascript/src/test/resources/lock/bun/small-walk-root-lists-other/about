@@ -1,0 +1,1 @@
+A member's own bun.lock under a root whose workspaces list only libs/*: bun installs in the member.

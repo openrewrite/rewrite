@@ -1,0 +1,1 @@
+A member's own bun.lock, a package.json without workspaces between it and the root that lists it: bun installs at the root.

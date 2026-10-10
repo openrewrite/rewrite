@@ -1,0 +1,1 @@
+A member's own bun.lock under packages/package.json whose workspaces list it, below a root that lists packages/*: bun installs at packages/.
