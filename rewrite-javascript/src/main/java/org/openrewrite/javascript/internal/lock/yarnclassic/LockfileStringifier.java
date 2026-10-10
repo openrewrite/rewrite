@@ -97,16 +97,9 @@ final class LockfileStringifier {
         return p != null ? p : OBJECT_PROTOTYPE.contains(key) ? Double.NaN : 0;
     }
 
-    // only an inherited member's name makes the comparator inconsistent, and then V8's own sort decides the order
     static List<String> sortKeys(List<String> keys) {
         List<String> a = new ArrayList<>(keys);
-        for (String key : a) {
-            if (OBJECT_PROTOTYPE.contains(key)) {
-                V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort, "keys of a map holding \"" + key + "\"");
-                return a;
-            }
-        }
-        a.sort(LockfileStringifier::priorityThenAlphaSort);
+        V8Sort.sort(a, LockfileStringifier::priorityThenAlphaSort);
         return a;
     }
 

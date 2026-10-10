@@ -359,7 +359,7 @@ final class ReadPackageHook {
     private static @Nullable VersionOverride pickMostSpecificVersionOverride(List<VersionOverride> versionOverrides) {
         V8Sort.sort(versionOverrides, (a, b) -> isIntersectingRange(
                 orEmpty(b.override.getTargetPkg().getBareSpecifier()),
-                orEmpty(a.override.getTargetPkg().getBareSpecifier())) ? -1 : 1, "overrides of one package");
+                orEmpty(a.override.getTargetPkg().getBareSpecifier())) ? -1 : 1);
         return versionOverrides.isEmpty() ? null : versionOverrides.get(0);
     }
 

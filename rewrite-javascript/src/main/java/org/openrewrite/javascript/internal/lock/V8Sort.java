@@ -75,13 +75,6 @@ public final class V8Sort {
         }
     }
 
-    /**
-     * {@link #sort(List, Comparator)}, for callers that still name what they sort.
-     */
-    public static <T> void sort(List<T> a, Comparator<? super T> c, String what) {
-        sort(a, c);
-    }
-
     private int compare(Object x, Object y) {
         return comparator.compare(x, y);
     }

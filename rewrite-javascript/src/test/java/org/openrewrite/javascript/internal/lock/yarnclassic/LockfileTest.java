@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.internal.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -84,15 +84,14 @@ class LockfileTest {
     }
 
     @Test
-    void cannotKnowTheOrderOfALongMapHoldingAnInheritedName() {
+    void sortsALongMapHoldingAnInheritedNameAsV8Does() throws IOException {
         Map<String, @Nullable Object> dependencies = new LinkedHashMap<>();
         for (int i = 0; i < 63; i++) {
             dependencies.put("dep-" + i, "1.0.0");
         }
         dependencies.put("constructor", "1.0.0");
-        assertThatThrownBy(() -> LockfileStringifier.stringify(object("a@1.0.0", object("dependencies",
-                dependencies)), false, false, null)).isInstanceOf(CannotKnow.class)
-                .hasMessageContaining("64 keys of a map holding \"constructor\"");
+        assertThat(LockfileStringifier.stringify(object("a@1.0.0", object("dependencies", dependencies)), false, false,
+                null)).isEqualTo(resource("long-map-inherited-name.txt"));
         dependencies.remove("dep-0");
         assertThat(LockfileStringifier.stringify(object("a@1.0.0", object("dependencies", dependencies)), false, false,
                 null)).contains("  dependencies:\n    constructor \"1.0.0\"\n");
@@ -310,6 +309,12 @@ class LockfileTest {
             }
         }
         return rows.stream();
+    }
+
+    private static String resource(String resource) throws IOException {
+        try (InputStream is = requireNonNull(LockfileTest.class.getResourceAsStream(resource))) {
+            return StringUtils.readFully(is, StandardCharsets.UTF_8);
+        }
     }
 
     // entries whose fields hold other types, each pattern reused as the round trip does; yarn's answers recorded
