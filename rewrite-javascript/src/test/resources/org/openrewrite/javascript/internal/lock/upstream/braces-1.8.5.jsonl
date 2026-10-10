@@ -92,7 +92,7 @@
 {"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["0{1..9} {10..20}"],"out":["01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20"]}
 {"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["a{ ,c{d, },h}x"],"out":["a{",",c{d,","},h}x"]}
 {"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["a{ ,c{d, },h} "],"out":["a{",",c{d,","},h}"]}
-{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["/Users/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.{html,ejs}"],"out":["/Users/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.html","/Users/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.ejs"]}
+{"test":"test/test.js > braces > brace expansion > should handle spaces","fn":"braces","args":["/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.{html,ejs}"],"out":["/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.html","/srv/tobiasreich/Sites/aaa/bbb/ccc 2016/src/**/[^_]*.ejs"]}
 {"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{ }"],"out":["{","}"]}
 {"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["{}"],"out":["{}"]}
 {"test":"test/test.js > braces > brace expansion > should handle empty braces","fn":"braces","args":["}"],"out":["}"]}

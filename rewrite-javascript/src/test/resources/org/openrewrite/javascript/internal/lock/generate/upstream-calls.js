@@ -95,9 +95,10 @@ function encode(v, depth = 0) {
   return out
 }
 
-// the checkout's directory, wherever a value names it, as <checkout>
+// the checkout's directory, wherever a value names it, as <checkout>, and the spec's own redactions
 function redact(line) {
-  return line.split(JSON.stringify(dir).slice(1, -1)).join('<checkout>')
+  line = line.split(JSON.stringify(dir).slice(1, -1)).join('<checkout>')
+  return spec.redact ? spec.redact(line) : line
 }
 
 function record(row) {

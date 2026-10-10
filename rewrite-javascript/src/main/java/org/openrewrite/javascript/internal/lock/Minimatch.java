@@ -44,7 +44,7 @@ public final class Minimatch {
 
     /**
      * The release and the options its port reads: 3.0.4's {@code nocase}, {@code nobrace}, {@code noglobstar},
-     * {@code noext}, {@code matchBase} and {@code flipNegate}, 10.2.5's {@code partial} and {@code windowsPathsNoEscape}.
+     * {@code noext}, {@code matchBase}, {@code flipNegate}; 10.2.5's {@code partial}, {@code windowsPathsNoEscape}.
      */
     @Value
     @Builder(builderMethodName = "hiddenBuilder")

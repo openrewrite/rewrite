@@ -177,7 +177,8 @@ public final class UpstreamCalls {
      * How many rows each reason leaves out: the calls no predicate of {@code ported} takes, by the reason
      * {@code reason} gives each.
      */
-    public static Map<String, Integer> notPorted(List<Call> calls, Predicate<Call> ported, Function<Call, String> reason) {
+    public static Map<String, Integer> notPorted(List<Call> calls, Predicate<Call> ported,
+                                                 Function<Call, String> reason) {
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Call call : calls) {
             if (!ported.test(call)) {

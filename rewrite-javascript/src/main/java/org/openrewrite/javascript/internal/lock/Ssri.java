@@ -138,8 +138,7 @@ public final class Ssri {
 
         /**
          * {@code integrity.match(other)}: a hash of the strongest algorithm the other names (13.0.1: of those both
-         * name) that shares the other's digest, or null for {@code false}.
-         * @throws JsError 5.3.0's Error when the other names no algorithm
+         * name) sharing the other's digest, null for {@code false}; 5.3.0's Error when the other names none.
          */
         public @Nullable Hash match(@Nullable Object integrity) {
             Integrity other = parse(integrity, release, EcmaScript::string);
@@ -162,8 +161,7 @@ public final class Ssri {
 
         /**
          * 13.0.1's {@code integrity.merge(other)}: the algorithms this lacks are added; one both name must share a
-         * digest.
-         * @throws JsError when one does not
+         * digest, else a JsError.
          */
         public void merge(@Nullable Object integrity) {
             Integrity other = parse(integrity, release, EcmaScript::string);
@@ -189,9 +187,8 @@ public final class Ssri {
         }
 
         /**
-         * {@code pickAlgorithm(opts, among)}: the algorithm of highest priority, over those {@code among} names
-         * when it names any (13.0.1 only).
-         * @throws JsError 5.3.0's Error for an integrity with no algorithm
+         * {@code pickAlgorithm(opts, among)}: the algorithm of highest priority, over those {@code among} names when
+         * it names any (13.0.1 only); 5.3.0's Error for an integrity with no algorithm.
          */
         @Nullable
         String pickAlgorithm(Collection<String> among) {
@@ -204,7 +201,8 @@ public final class Ssri {
                 if (!among.isEmpty() && !among.contains(algorithm)) {
                     continue;
                 }
-                if (picked == null || priority.indexOf(picked.toLowerCase()) < priority.indexOf(algorithm.toLowerCase())) {
+                if (picked == null ||
+                    priority.indexOf(picked.toLowerCase()) < priority.indexOf(algorithm.toLowerCase())) {
                     picked = algorithm;
                 }
             }
@@ -349,10 +347,8 @@ public final class Ssri {
     }
 
     /**
-     * {@code ssri.fromHex(hexDigest, algorithm)}: Node's {@code Buffer.from(hexDigest, 'hex')}, which stops at the first
-     * pair that is not hexadecimal and reads an array's elements as {@code Number(item) & 255}.
-     * @throws JsError Node's {@code ERR_INVALID_ARG_TYPE} for a digest that is neither a string nor an array, as the
-     *                 values of yarn's JSON, whose objects have no prototype
+     * {@code ssri.fromHex(hexDigest, algorithm)}: {@code Buffer.from(hexDigest, 'hex')} (it stops at a pair that is not
+     * hexadecimal, an array's items as {@code Number(item) & 255}); ERR_INVALID_ARG_TYPE for any other digest.
      */
     public static @Nullable Integrity fromHex(@Nullable Object hexDigest, String algorithm, Release release) {
         byte[] bytes;
