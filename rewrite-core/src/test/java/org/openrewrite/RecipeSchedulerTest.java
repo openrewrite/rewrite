@@ -25,6 +25,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.config.DeclarativeRecipe;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.scheduling.RecipeRunCycle;
 import org.openrewrite.scheduling.WatchableExecutionContext;
@@ -42,8 +44,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -83,6 +87,31 @@ class RecipeSchedulerTest implements RewriteTest {
             "~~(boom)~~>hello"
           )
         );
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void errorSurvivesMarkersThatCannotBeUpdated() {
+        List<Marker> unusable = new ArrayList<>();
+        ((List) unusable).add(new LinkedHashMap<>());
+        PlainText source = PlainText.builder()
+          .sourcePath(Path.of("hello.txt"))
+          .text("hello")
+          .markers(Markers.build(unusable))
+          .build();
+
+        AtomicReference<Throwable> reported = new AtomicReference<>();
+        ExecutionContext ctx = new InMemoryExecutionContext(reported::set);
+
+        RecipeRun run = new NoCursorBoomRecipe()
+          .run(new InMemoryLargeSourceSet(List.of(source)), ctx);
+
+        assertThat(reported.get()).hasRootCauseMessage("boom");
+        List<SourcesFileErrors.Row> errors = run.getDataTableRows(SourcesFileErrors.class);
+        assertThat(errors).singleElement().satisfies(row -> {
+            assertThat(row.getSourcePath()).isEqualTo("hello.txt");
+            assertThat(row.getStackTrace()).contains("boom");
+        });
     }
 
     @Test
@@ -340,6 +369,24 @@ class RecipeSchedulerTest implements RewriteTest {
         assertThat(error.get())
           .isInstanceOf(IllegalStateException.class)
           .hasMessageContaining("generated a source file with an invalid path");
+    }
+}
+
+class NoCursorBoomRecipe extends Recipe {
+    @Getter
+    final String displayName = "We go boom without a cursor";
+
+    @Getter
+    final String description = "Test recipe.";
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                throw new RecipeRunException(new BoomException(), null);
+            }
+        };
     }
 }
 

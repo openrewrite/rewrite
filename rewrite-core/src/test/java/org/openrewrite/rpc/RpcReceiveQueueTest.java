@@ -17,12 +17,14 @@ package org.openrewrite.rpc;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Checksum;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.Tree;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.text.PlainText;
 
@@ -175,6 +177,49 @@ class RpcReceiveQueueTest {
         assertThat(after.getCreationTime()).isEqualTo(created);
         assertThat(requireNonNull(after.getCreationTime()).getZone()).isEqualTo(created.getZone());
         assertThat(after.getCreationTime().getNano()).isEqualTo(123456789);
+    }
+
+    @Test
+    void markerWithoutValueTypeIsReportedWithTheTypeItsPayloadNames() {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("@c", "org.openrewrite.marker.GitProvenance");
+        payload.put("id", Tree.randomId().toString());
+        batches.addLast(markersBatch(payload));
+
+        assertThatThrownBy(() -> rq.receive(Markers.EMPTY))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("no valueType")
+          .hasMessageContaining("org.openrewrite.marker.GitProvenance");
+    }
+
+    @Test
+    void markerWithoutValueTypeOrPayloadTypeIsReported() {
+        batches.addLast(markersBatch(new LinkedHashMap<String, Object>()));
+
+        assertThatThrownBy(() -> rq.receive(Markers.EMPTY))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining("rather than a " + Marker.class.getName());
+    }
+
+    @Test
+    void deletedMarkerStaysANullEntry() {
+        batches.addLast(markersBatch(null));
+
+        Markers received = rq.receive(Markers.EMPTY);
+
+        assertThat(received.getMarkers()).containsExactly((Marker) null);
+    }
+
+    private static List<RpcObjectData> markersBatch(@Nullable Object marker) {
+        return Arrays.asList(
+          new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+          new RpcObjectData(RpcObjectData.State.NO_CHANGE, null, null, null, false),
+          new RpcObjectData(RpcObjectData.State.CHANGE, null, null, null, false),
+          new RpcObjectData(RpcObjectData.State.CHANGE, null, List.of(RpcObjectData.ADDED_LIST_ITEM), null, false),
+          marker == null ?
+            new RpcObjectData(RpcObjectData.State.DELETE, null, null, null, false) :
+            new RpcObjectData(RpcObjectData.State.ADD, null, marker, null, false)
+        );
     }
 
     @Test

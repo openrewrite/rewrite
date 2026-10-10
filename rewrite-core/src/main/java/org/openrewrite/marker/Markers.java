@@ -196,7 +196,21 @@ public class Markers implements RpcCodec<Markers> {
 
     @Override
     public Markers rpcReceive(Markers before, RpcReceiveQueue q) {
-        return withId(q.receiveAndGet(getId(), UUID::fromString))
-                .withMarkers(requireNonNull(q.receiveList(getMarkers(), null)));
+        UUID id = q.receiveAndGet(getId(), UUID::fromString);
+        List<Marker> received = requireNonNull(q.receiveList(getMarkers(), null));
+        for (Object marker : (List<?>) received) {
+            if (marker != null && !(marker instanceof Marker)) {
+                throw new IllegalStateException(undeserializedMarker(marker));
+            }
+        }
+        return withId(id).withMarkers(received);
+    }
+
+    private static String undeserializedMarker(Object marker) {
+        Object payloadType = marker instanceof Map ? ((Map<?, ?>) marker).get("@c") : null;
+        return "A marker arrived as " + marker.getClass().getName() + " rather than a " +
+                Marker.class.getName() + ", because the remote sent no valueType for it. " +
+                (payloadType == null ? "" : "Its payload names '" + payloadType + "'. ") +
+                "Received: " + marker;
     }
 }

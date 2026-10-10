@@ -905,7 +905,7 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
                 after = (SourceFile) new FindRecipeRunException(vt).visitNonNull(after, 0);
             } catch (Throwable ignored) {
                 // Tree is too broken for node-level marker — fall back to marking the whole file
-                after = Markup.error(after, t);
+                after = markupError(after, sourceFile, t);
             }
         }
 
@@ -918,6 +918,18 @@ public class RecipeRunCycle<LSS extends LargeSourceSet> {
         ));
 
         return after;
+    }
+
+    private static SourceFile markupError(SourceFile after, SourceFile original, Throwable t) {
+        try {
+            return Markup.error(after, t);
+        } catch (Throwable unmarkable) {
+            try {
+                return Markup.error(original, t);
+            } catch (Throwable stillUnmarkable) {
+                return original;
+            }
+        }
     }
 
     /**
