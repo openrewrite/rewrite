@@ -74,3 +74,22 @@ def test_non_empty_result_is_a_fresh_mutable_list():
     assert result == ["A"]
     result.append("B")
     assert result == ["A", "B"]
+
+
+def test_a_desynchronized_positions_message_names_what_arrived():
+    """The queue reports a desync by formatting the message it got, so that message has to
+    render its contents and not an address."""
+    # given
+    rq = RpcReceiveQueue({}, None, lambda: [
+        {'state': 'CHANGE'},
+        {'state': 'CHANGE', 'valueType': 'org.openrewrite.Tree', 'value': 'not-a-list'},
+    ])
+
+    # when
+    with pytest.raises(RuntimeError) as error_info:
+        rq.receive_list(['A'])
+
+    # then
+    reported = str(error_info.value)
+    assert 'org.openrewrite.Tree' in reported
+    assert 'not-a-list' in reported

@@ -13,7 +13,22 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Callable, TypeVar
 from uuid import UUID
 
+from rewrite.java.support_types import JavaType
 from rewrite.rpc.reference import ReferenceMap
+
+# `receive_queue` imports RpcObjectState from this module, so importing its registry lookups back
+# at module level is circular; they are bound once on first use instead. They used to be imported
+# inside the two methods below, re-entering importlib for every element of every tree -- which the
+# profiler put at 5.5% of the peer's time in `_handle_fromlist` alone.
+_send_codec_of: Optional[Callable[[Any], Any]] = None
+_java_type_name_of: Optional[Callable[[type], Optional[str]]] = None
+
+
+def _bind_registry_lookups() -> None:
+    global _send_codec_of, _java_type_name_of
+    from rewrite.rpc import python_receiver  # noqa: F401 - importing it registers the codecs
+    from rewrite.rpc.receive_queue import get_java_type_name, get_send_codec
+    _send_codec_of, _java_type_name_of = get_send_codec, get_java_type_name
 
 
 class RpcObjectState(str, Enum):
@@ -54,10 +69,13 @@ class RpcSendQueue:
         return self.q
 
     def put(self, data: Dict[str, Any]) -> None:
-        """Add data to the queue."""
-        # Convert state enum to string value
-        if 'state' in data and isinstance(data['state'], RpcObjectState):
-            data['state'] = data['state'].value
+        """Add data to the queue.
+
+        Kept for the senders and codecs outside this module; the methods here append directly.
+        `RpcObjectState` subclasses `str`, so a member serialises to exactly the bytes its value
+        does -- verified on 3.12 and 3.13, with and without compact separators -- which is why no
+        enum-to-string conversion happens on the way in.
+        """
         self.q.append(data)
 
     def get_and_send(self, parent: T, getter: Callable[[T], Any],
@@ -98,7 +116,7 @@ class RpcSendQueue:
              on_change: Optional[Callable[[], None]] = None) -> None:
         """Send a value, comparing with before if provided."""
         if before is after:
-            self.put({'state': RpcObjectState.NO_CHANGE})
+            self.q.append({'state': RpcObjectState.NO_CHANGE})
             return
 
         if before is None or (after is not None and type(after) != type(before)):
@@ -107,7 +125,7 @@ class RpcSendQueue:
             return
 
         if after is None:
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
 
         # Changed value
@@ -116,16 +134,16 @@ class RpcSendQueue:
         value = None if on_change is not None or codec is not None else self._get_primitive_value(after)
         if self._has_no_wire_form(value_type, value, on_change, codec):
             # a CHANGE that carries nothing leaves the peer holding the value it had
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
-        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
+        self.q.append({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
         self._do_change(after, before, on_change, codec)
 
     def _send_as_ref(self, after: Any, before: Any = None,
                      on_change: Optional[Callable[[], None]] = None) -> None:
         """Send a value as a ref-tracked object. If already sent, emit just the ref number."""
         if before is after:
-            self.put({'state': RpcObjectState.NO_CHANGE})
+            self.q.append({'state': RpcObjectState.NO_CHANGE})
             return
 
         if before is None or (after is not None and type(after) != type(before)):
@@ -133,7 +151,7 @@ class RpcSendQueue:
             return
 
         if after is None:
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
 
         # A ref-deduplicated slot is resolved by the receiver against a persistent cache whose
@@ -152,72 +170,66 @@ class RpcSendQueue:
         If as_ref is True, list items are ref-tracked to avoid resending duplicates.
         """
         if before is after:
-            self.put({'state': RpcObjectState.NO_CHANGE})
+            self.q.append({'state': RpcObjectState.NO_CHANGE})
             return
 
         if after is None:
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
 
         add_fn = self._add_as_ref if as_ref else self._add
 
-        def list_change():
-            assert after is not None
-            if not before:
-                # Every element is an addition, so the positions are a constant that needs
-                # neither an index map nor a key computed per element.
-                self.put({'state': RpcObjectState.CHANGE, 'value': [ADDED_LIST_ITEM] * len(after)})
-                for item in after:
-                    add_fn(item, (lambda i=item: on_change(i)) if on_change else None)
-                return
+        # ADD for a new list, CHANGE for an existing one. The element walk below was a nested
+        # closure invoked as the last statement of both branches, so it cost one function
+        # object and one call per list-valued field for nothing.
+        self.q.append({'state': RpcObjectState.ADD if before is None else RpcObjectState.CHANGE})
+        assert after is not None
+        if not before:
+            # Every element is an addition, so the positions are a constant that needs
+            # neither an index map nor a key computed per element.
+            self.q.append({'state': RpcObjectState.CHANGE, 'value': [ADDED_LIST_ITEM] * len(after)})
+            for item in after:
+                add_fn(item, (lambda i=item: on_change(i)) if on_change else None)
+            return
 
-            before_idx = {}
-            for i, item in enumerate(before):
-                before_idx[id_getter(item)] = i
+        before_idx = {}
+        for i, item in enumerate(before):
+            before_idx[id_getter(item)] = i
 
-            positions = [before_idx.get(id_getter(item), ADDED_LIST_ITEM) for item in after]
-            self.put({'state': RpcObjectState.CHANGE, 'value': positions})
+        positions = [before_idx.get(id_getter(item), ADDED_LIST_ITEM) for item in after]
+        self.q.append({'state': RpcObjectState.CHANGE, 'value': positions})
 
-            # Send each item
-            for item, before_pos in zip(after, positions):
-                # Wrap on_change to capture current item
-                wrapped = (lambda i=item: on_change(i)) if on_change else None
+        # Send each item
+        for item, before_pos in zip(after, positions):
+            # Wrap on_change to capture current item
+            wrapped = (lambda i=item: on_change(i)) if on_change else None
 
-                if before_pos == ADDED_LIST_ITEM:
+            if before_pos == ADDED_LIST_ITEM:
+                add_fn(item, wrapped)
+            else:
+                a_before = before[before_pos]
+                if a_before is item:
+                    self.q.append({'state': RpcObjectState.NO_CHANGE})
+                elif as_ref or a_before is None or type(item) != type(a_before):
+                    # Type changed, or a ref-deduplicated item, which is always re-added
+                    # rather than CHANGEd (see _send_as_ref)
                     add_fn(item, wrapped)
                 else:
-                    a_before = before[before_pos]
-                    if a_before is item:
-                        self.put({'state': RpcObjectState.NO_CHANGE})
-                    elif as_ref or a_before is None or type(item) != type(a_before):
-                        # Type changed, or a ref-deduplicated item, which is always re-added
-                        # rather than CHANGEd (see _send_as_ref)
-                        add_fn(item, wrapped)
-                    else:
-                        codec = self._get_rpc_codec(item)
-                        # Without an on_change callback or codec, no property messages follow, so the
-                        # value must travel inline (as in send()) or the receiver keeps the stale element
-                        value = None if wrapped is not None or codec is not None else self._get_primitive_value(item)
-                        value_type = self._get_value_type(item)
-                        if self._has_no_wire_form(value_type, value, wrapped, codec):
-                            self.put({'state': RpcObjectState.DELETE})
-                            continue
-                        self.put({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
-                        self._do_change(item, a_before, wrapped, codec)
-
-        if before is None:
-            # ADD for new list
-            self.put({'state': RpcObjectState.ADD})
-            list_change()
-        else:
-            # CHANGE for existing list
-            self.put({'state': RpcObjectState.CHANGE})
-            list_change()
+                    codec = self._get_rpc_codec(item)
+                    # Without an on_change callback or codec, no property messages follow, so the
+                    # value must travel inline (as in send()) or the receiver keeps the stale element
+                    value = None if wrapped is not None or codec is not None else self._get_primitive_value(item)
+                    value_type = self._get_value_type(item)
+                    if self._has_no_wire_form(value_type, value, wrapped, codec):
+                        self.q.append({'state': RpcObjectState.DELETE})
+                        continue
+                    self.q.append({'state': RpcObjectState.CHANGE, 'valueType': value_type, 'value': value})
+                    self._do_change(item, a_before, wrapped, codec)
 
     def _add(self, obj: Any, on_change: Optional[Callable[[], None]] = None) -> None:
         """Add a new object to the queue."""
         if obj is None:
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
 
         value_type = self._get_value_type(obj)
@@ -227,21 +239,21 @@ class RpcSendQueue:
             self._require_wire_form(obj)
         if self._has_no_wire_form(value_type, value, on_change, codec):
             # an ADD that carries nothing is a broken message to the peer, where DELETE is null
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
-        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
+        self.q.append({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value})
         self._do_change(obj, None, on_change, codec)
 
     def _add_as_ref(self, obj: Any, on_change: Optional[Callable[[], None]] = None) -> None:
         """Add an object with ref tracking. If already sent, emit just the ref number."""
         if obj is None:
-            self.put({'state': RpcObjectState.DELETE})
+            self.q.append({'state': RpcObjectState.DELETE})
             return
 
         ref = self.refs.get(obj)
         if ref is not None:
             # Already sent — emit ref number only, no onChange
-            self.put({'state': RpcObjectState.ADD, 'ref': ref})
+            self.q.append({'state': RpcObjectState.ADD, 'ref': ref})
             return
 
         # First time — assign ref number and serialize fully
@@ -252,7 +264,7 @@ class RpcSendQueue:
         value = None if on_change is not None or codec is not None else self._get_primitive_value(obj)
         if value is None and on_change is None and codec is None:
             self._require_wire_form(obj)
-        self.put({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': ref})
+        self.q.append({'state': RpcObjectState.ADD, 'valueType': value_type, 'value': value, 'ref': ref})
         self._do_change(obj, None, on_change, codec)
 
     @staticmethod
@@ -286,17 +298,12 @@ class RpcSendQueue:
 
     def _get_rpc_codec(self, obj: Any) -> Optional[Callable[[Any, 'RpcSendQueue'], None]]:
         """Get the RpcCodec serialization function for an object."""
-        # Import python_receiver to ensure codecs are registered
-        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
-        from rewrite.rpc.receive_queue import get_send_codec
-        return get_send_codec(obj)
+        if _send_codec_of is None:
+            _bind_registry_lookups()
+        return _send_codec_of(obj)
 
     def _get_value_type(self, obj: Any) -> Optional[str]:
         """Get the Java type name for an object, or None for primitives."""
-        # Import python_receiver to ensure codecs are registered before get_java_type_name
-        from rewrite.rpc import python_receiver  # noqa: F401 - triggers codec registration
-        from rewrite.rpc.receive_queue import get_java_type_name
-
         if obj is None:
             return None
 
@@ -319,7 +326,6 @@ class RpcSendQueue:
 
         # JavaType.Primitive is a special Enum that needs its Java type name
         # Check for JavaType.Primitive before the general Enum check
-        from rewrite.java.support_types import JavaType
         if isinstance(obj, JavaType.Primitive):
             return 'org.openrewrite.java.tree.JavaType$Primitive'
         if isinstance(obj, JavaType.Method):
@@ -343,8 +349,11 @@ class RpcSendQueue:
         if isinstance(obj, Enum):
             return None
 
-        # Look up Java type name from codec registry
-        return get_java_type_name(obj_type)
+        # Look up Java type name from codec registry. Bound here rather than at the top: every
+        # primitive, dict, list, UUID and Path returns above without ever needing it.
+        if _java_type_name_of is None:
+            _bind_registry_lookups()
+        return _java_type_name_of(obj_type)
 
     def _get_primitive_value(self, obj: Any) -> Any:
         """Get the primitive value representation for serialization."""
