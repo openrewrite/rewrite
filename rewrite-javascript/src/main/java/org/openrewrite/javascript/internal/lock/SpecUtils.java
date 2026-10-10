@@ -24,6 +24,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 /**
@@ -35,6 +36,7 @@ public final class SpecUtils {
     private static final Pattern NODE_MODULES = Pattern.compile("[\\\\/]node_modules[\\\\/](@[^\\\\/]*[\\\\/])?" +
                                                                 "([^@\\\\/][^\\\\/]*)$");
     private static final List<String> SUPPORTED = Arrays.asList("npm", "pnpm", "yarn");
+    private static final String UNSAFE_CUSTOM_URLS = "COREPACK_ENABLE_UNSAFE_CUSTOM_URLS";
 
     private SpecUtils() {
     }
@@ -67,24 +69,39 @@ public final class SpecUtils {
         String source;
 
         /**
+         * The environment {@code getSpec} reads, under which the target's env file sets corepack's own variables.
+         */
+        HostEnvironment env;
+
+        /**
+         * The env file beside the target, which the host holds without its contents; null for none.
+         */
+        @Nullable
+        String envFile;
+
+        /**
          * {@code getSpec} of a lookup that found a spec, null for none; throws Rejected where parseSpec refuses it.
          */
-        public @Nullable Descriptor getSpec(boolean enforceExactVersion, HostEnvironment env) {
+        public @Nullable Descriptor getSpec(boolean enforceExactVersion) {
             if (target == null || rawPmSpec == EcmaScript.UNDEFINED) {
                 return null;
             }
-            return parseSpec(rawPmSpec, String.valueOf(source), enforceExactVersion, env);
+            return parseSpec(rawPmSpec, String.valueOf(source), enforceExactVersion, env, envFile);
         }
     }
 
     /**
      * {@code loadSpec} from {@code initialCwd} (a directory relative to the project's, {@code ../} above it) up to
      * {@code levels} directories above the project's; {@code manifest} answers a directory's package.json text.
+     * {@code holds} answers whether the host holds a file, by its path from the project's directory.
      */
-    public static Lookup loadSpec(String initialCwd, int levels, Function<String, @Nullable String> manifest) {
+    public static Lookup loadSpec(String initialCwd, int levels, Function<String, @Nullable String> manifest,
+                                  Predicate<String> holds, HostEnvironment env) {
         Object data = null;
         String target = null;
         String source = null;
+        String envFile = null;
+        String envFileName = env.setting("COREPACK_ENV_FILE");
         String currCwd = PosixPath.normalize(initialCwd.isEmpty() ? "." : initialCwd);
         String up = "";
         while (true) {
@@ -103,6 +120,7 @@ public final class SpecUtils {
                 data = parsed;
                 target = dir.isEmpty() ? "package.json" : dir + "/package.json";
                 source = up + "package.json";
+                envFile = "0".equals(envFileName) ? null : envFile(dir, envFileName, holds);
                 if (EcmaScript.truthy(get(data, "packageManager"))) {
                     break;
                 }
@@ -113,7 +131,18 @@ public final class SpecUtils {
             currCwd = PosixPath.normalize(currCwd + "/..");
             up += "../";
         }
-        return new Lookup(target, data == null ? EcmaScript.UNDEFINED : parsePackageJSON(data), source);
+        return new Lookup(target, data == null ? EcmaScript.UNDEFINED : parsePackageJSON(data), source, env,
+                envFile);
+    }
+
+    // path.resolve(currCwd, COREPACK_ENV_FILE ?? ".corepack.env") when the host holds it or it is outside the project
+    private static @Nullable String envFile(String dir, @Nullable String name, Predicate<String> holds) {
+        String file = name == null ? ".corepack.env" : name;
+        if (file.startsWith("/")) {
+            return file;
+        }
+        String path = PosixPath.normalize(dir.isEmpty() ? file : dir + "/" + file);
+        return holds.test(path) ? path : null;
     }
 
     // how many directories above the project's this one is
@@ -198,11 +227,11 @@ public final class SpecUtils {
     }
 
     /**
-     * {@code parseSpec}, reading COREPACK_ENABLE_UNSAFE_CUSTOM_URLS from {@code env}; throws Rejected as corepack words
-     * its usage error.
+     * {@code parseSpec}, reading COREPACK_ENABLE_UNSAFE_CUSTOM_URLS from {@code env}, or from {@code envFile} where it
+     * leaves it unset (CannotKnow); throws Rejected as corepack words its usage error.
      */
     public static Descriptor parseSpec(@Nullable Object raw, String source, boolean enforceExactVersion,
-                                       HostEnvironment env) {
+                                       HostEnvironment env, @Nullable String envFile) {
         if (!(raw instanceof String)) {
             throw corepackRejects("Invalid package manager specification in " + source + "; expected a string");
         }
@@ -228,7 +257,10 @@ public final class SpecUtils {
             if (!SUPPORTED.contains(name)) {
                 throw corepackRejects("Unsupported package manager specification (" + spec + ")");
             }
-        } else if (SUPPORTED.contains(name) && !"1".equals(env.setting("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS"))) {
+        } else if (SUPPORTED.contains(name) && !"1".equals(env.setting(UNSAFE_CUSTOM_URLS))) {
+            if (envFile != null && env.setting(UNSAFE_CUSTOM_URLS) == null) {
+                throw CannotKnow.unread(envFile);
+            }
             throw corepackRejects("Illegal use of URL for known package manager. Instead, select a specific " +
                                   "version, or set COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=1 in your environment (" + spec +
                                   ")");
@@ -241,13 +273,13 @@ public final class SpecUtils {
      * names, or null when corepack falls back to its own version; throws Rejected where corepack refuses to run.
      */
     public static @Nullable Descriptor findProjectSpec(String initialCwd, int levels,
-                                                       Function<String, @Nullable String> manifest, String name,
-                                                       HostEnvironment env) {
+                                                       Function<String, @Nullable String> manifest,
+                                                       Predicate<String> holds, String name, HostEnvironment env) {
         if ("0".equals(env.setting("COREPACK_ENABLE_PROJECT_SPEC"))) {
             return null;
         }
-        Lookup lookup = loadSpec(initialCwd, levels, manifest);
-        Descriptor spec = lookup.getSpec(true, env);
+        Lookup lookup = loadSpec(initialCwd, levels, manifest, holds, env);
+        Descriptor spec = lookup.getSpec(true);
         if (spec == null || spec.getName().equals(name)) {
             return spec;
         }

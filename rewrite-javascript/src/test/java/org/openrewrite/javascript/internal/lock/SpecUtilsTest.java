@@ -23,13 +23,16 @@ import org.junit.jupiter.params.provider.CsvSource;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SpecUtilsTest {
 
     private static final HostEnvironment NO_ENV = HostEnvironment.of(Collections.emptyMap());
+    private static final Predicate<String> NOTHING = path -> false;
 
     /**
      * parsePackageJSON with devEngines.packageManager: the spec it reads, or the usage error corepack 0.35.0 stops on
@@ -84,12 +87,13 @@ class SpecUtilsTest {
         manifests.put("", "{\"name\":\"root\"}");
         manifests.put("../..", "{\"packageManager\":\"pnpm@9.15.0\"}");
 
-        SpecUtils.Lookup lookup = SpecUtils.loadSpec("packages/a", 2, manifests::get);
+        SpecUtils.Lookup lookup = SpecUtils.loadSpec("packages/a", 2, manifests::get, NOTHING, NO_ENV);
 
         assertThat(lookup.getTarget()).isEqualTo("../../package.json");
         assertThat(lookup.getSource()).isEqualTo("../../../../package.json");
         assertThat(lookup.getRawPmSpec()).isEqualTo("pnpm@9.15.0");
-        assertThat(SpecUtils.loadSpec("packages/a", 1, manifests::get).getRawPmSpec()).isEqualTo(EcmaScript.UNDEFINED);
+        assertThat(SpecUtils.loadSpec("packages/a", 1, manifests::get, NOTHING, NO_ENV)
+                .getRawPmSpec()).isEqualTo(EcmaScript.UNDEFINED);
     }
 
     /**
@@ -102,16 +106,16 @@ class SpecUtilsTest {
         manifests.put("packages/a", "{\"name\":\"a\",\"packageManager\":\"pnpm@9.15.0\"}");
         manifests.put("", "{\"packageManager\":\"yarn@4.10.3\"}");
 
-        assertThatThrownBy(() -> SpecUtils.findProjectSpec("packages/a", 0, manifests::get, "yarn",
+        assertThatThrownBy(() -> SpecUtils.findProjectSpec("packages/a", 0, manifests::get, NOTHING, "yarn",
                 HostEnvironment.of(Collections.emptyMap())))
                 .isInstanceOf(Rejected.class)
                 .hasMessage("This project is configured to use pnpm because packages/a/package.json has a " +
                             "\"packageManager\" field (corepack)");
-        assertThat(SpecUtils.findProjectSpec("packages/a", 0, manifests::get, "yarn",
+        assertThat(SpecUtils.findProjectSpec("packages/a", 0, manifests::get, NOTHING, "yarn",
                 HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_STRICT", "0")))).isNull();
-        assertThat(SpecUtils.findProjectSpec("", 0, manifests::get, "yarn", HostEnvironment.of(Collections.emptyMap())))
+        assertThat(SpecUtils.findProjectSpec("", 0, manifests::get, NOTHING, "yarn", NO_ENV))
                 .isEqualTo(new SpecUtils.Descriptor("yarn", "4.10.3"));
-        assertThat(SpecUtils.findProjectSpec("", 0, dir -> nothing(), "yarn",
+        assertThat(SpecUtils.findProjectSpec("", 0, dir -> nothing(), NOTHING, "yarn",
                 HostEnvironment.of(Collections.emptyMap()))).isNull();
     }
 
@@ -136,7 +140,7 @@ class SpecUtilsTest {
     void parsesTheSpecCorepackRuns(String raw, String answer) {
         String actual;
         try {
-            SpecUtils.Descriptor spec = SpecUtils.parseSpec(raw, "package.json", true, NO_ENV);
+            SpecUtils.Descriptor spec = SpecUtils.parseSpec(raw, "package.json", true, NO_ENV, null);
             actual = spec.getName() + " " + spec.getRange();
         } catch (Rejected e) {
             actual = e.getMessage();
@@ -179,7 +183,7 @@ class SpecUtilsTest {
         String actual;
         try {
             SpecUtils.Descriptor spec = SpecUtils.findProjectSpec("", 0, dir -> dir.isEmpty() ? manifest : null,
-                    "yarn", HostEnvironment.of(Collections.emptyMap()));
+                    NOTHING, "yarn", HostEnvironment.of(Collections.emptyMap()));
             actual = spec == null ? "none" : String.valueOf(SpecUtils.installVersion(spec));
         } catch (Rejected e) {
             actual = e.getMessage();
@@ -193,12 +197,12 @@ class SpecUtilsTest {
     @Test
     void theSpecALookupFindsNamesThePackageManager() {
         String both = "{\"packageManager\":\"yarn@1.22.22\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"}}}";
-        assertThat(SpecUtils.loadSpec("", 0, dir -> both).getSpec(true, NO_ENV))
+        assertThat(SpecUtils.loadSpec("", 0, dir -> both, NOTHING, NO_ENV).getSpec(true))
                 .isEqualTo(new SpecUtils.Descriptor("yarn", "1.22.22"));
-        assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}").getSpec(true, NO_ENV)).isNull();
-        assertThat(SpecUtils.loadSpec("", 0, dir -> null).getSpec(true, NO_ENV)).isNull();
-        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}")
-                .getSpec(true, NO_ENV))
+        assertThat(SpecUtils.loadSpec("", 0, dir -> "{\"name\":\"p\"}", NOTHING, NO_ENV).getSpec(true)).isNull();
+        assertThat(SpecUtils.loadSpec("", 0, dir -> null, NOTHING, NO_ENV).getSpec(true)).isNull();
+        assertThatThrownBy(() -> SpecUtils.loadSpec("", 0, dir -> "{\"packageManager\":\"yarn@1\"}", NOTHING, NO_ENV)
+                .getSpec(true))
                 .isInstanceOf(Rejected.class)
                 .hasMessageContaining("expected a semver version");
     }
@@ -211,13 +215,49 @@ class SpecUtilsTest {
     void aUrlForAKnownPackageManagerNeedsTheUnsafeSetting() {
         String url = "https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js";
         SpecUtils.Descriptor spec = SpecUtils.parseSpec("yarn@" + url, "package.json", true,
-                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")));
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")), null);
         assertThat(spec).isEqualTo(new SpecUtils.Descriptor("yarn", url));
         assertThat(SpecUtils.installVersion(spec)).isNull();
         assertThatThrownBy(() -> SpecUtils.parseSpec("yarn@" + url, "package.json", true,
-                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "true"))))
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "true")), null))
                 .isInstanceOf(Rejected.class)
                 .hasMessageStartingWith("Illegal use of URL for known package manager.");
+    }
+
+    /**
+     * corepack 0.35.0 takes COREPACK_* from the env file beside the package.json it settles on, under the process's own
+     * ({@code s5y/corepack-env-probe.tsv}): a URL runs or is refused by its contents, which the host does not hold.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "url|.corepack.env|-|the engine cannot know .corepack.env (its contents were not read)",
+            "url|-|-|refused",
+            "url|.corepack.env|COREPACK_ENV_FILE=0|refused",
+            "url|.custom.env|COREPACK_ENV_FILE=.custom.env|the engine cannot know .custom.env (its contents were not " +
+            "read)",
+            "url|.corepack.env|COREPACK_ENV_FILE=.custom.env|refused",
+            "url|.corepack.env|COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=0|refused",
+            "url|../.corepack.env|-|refused",
+            "yarn@4.10.3|.corepack.env|-|4.10.3"
+    })
+    void readsTheEnvFileBesideThePackageJson(String spec, @Nullable String held, @Nullable String variable,
+                                             String answer) {
+        String raw = "url".equals(spec) ? "yarn@https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js" : spec;
+        HostEnvironment env = variable == null ? NO_ENV : HostEnvironment.of(Collections.singletonMap(
+                variable.substring(0, variable.indexOf('=')), variable.substring(variable.indexOf('=') + 1)));
+        String actual;
+        try {
+            SpecUtils.Descriptor found = SpecUtils.findProjectSpec("", 1,
+                    dir -> dir.isEmpty() ? "{\"packageManager\":\"" + raw + "\"}" : null, held == null ? NOTHING :
+                            held::equals, "yarn", env);
+            actual = String.valueOf(SpecUtils.installVersion(requireNonNull(found)));
+        } catch (Rejected e) {
+            actual = e.getMessage().startsWith("Illegal use of URL for known package manager.") ? "refused" :
+                    e.getMessage();
+        } catch (CannotKnow e) {
+            actual = e.getMessage();
+        }
+        assertThat(actual).isEqualTo(answer);
     }
 
     /**
@@ -225,7 +265,7 @@ class SpecUtilsTest {
      */
     @Test
     void readsNoSpecWithoutTheProjectSpec() {
-        assertThat(SpecUtils.findProjectSpec("", 0, dir -> "{\"packageManager\":\"pnpm@9.15.0\"}", "yarn",
+        assertThat(SpecUtils.findProjectSpec("", 0, dir -> "{\"packageManager\":\"pnpm@9.15.0\"}", NOTHING, "yarn",
                 HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_PROJECT_SPEC", "0")))).isNull();
     }
 

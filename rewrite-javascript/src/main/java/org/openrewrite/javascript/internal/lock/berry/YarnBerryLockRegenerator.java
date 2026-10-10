@@ -249,7 +249,8 @@ public final class YarnBerryLockRegenerator {
      */
     YarnRelease release() {
         SpecUtils.Descriptor spec = SpecUtils.findProjectSpec(inputs.getRunsIn(), levelsAbove(), this::manifestText,
-                "yarn", HostEnvironment.of(inputs.getEnv()));
+                path -> inputs.getPaths() != null && inputs.getPaths().contains(path), "yarn",
+                HostEnvironment.of(inputs.getEnv()));
         Configuration options = options();
         Object yarnPath = options.get("yarnPath");
         String version;

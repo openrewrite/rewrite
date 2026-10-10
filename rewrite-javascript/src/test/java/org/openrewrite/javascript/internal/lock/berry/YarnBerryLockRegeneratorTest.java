@@ -28,8 +28,10 @@ import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -121,6 +123,13 @@ class YarnBerryLockRegeneratorTest {
                 "COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")))
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("the Yarn release at " + url + " (corepack downloads it)");
+        assertThatThrownBy(() -> new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
+                .manifest("", "{\"name\": \"p\", \"packageManager\": \"yarn@" + url + "\"}")
+                .paths(new LinkedHashSet<>(Arrays.asList("package.json", ".corepack.env")))
+                .now(Instant.EPOCH)
+                .build(), BerryScenarios.NO_REGISTRY).release())
+                .isInstanceOf(CannotKnow.class)
+                .hasMessage("the engine cannot know .corepack.env (its contents were not read)");
     }
 
     /**
