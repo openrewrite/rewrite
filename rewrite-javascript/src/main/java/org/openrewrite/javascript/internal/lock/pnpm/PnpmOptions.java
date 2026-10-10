@@ -112,22 +112,34 @@ public final class PnpmOptions {
         return load(workspaceManifest, null, rootManifest, env);
     }
 
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc,
+                            @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
+        return load(workspaceManifest, npmrc, Collections.emptyMap(), rootManifest, env);
+    }
+
     /**
-     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc (null without one), the root manifest and
-     * the environment (null when the host does not know it).
+     * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc (null without one), the user's .npmrc as
+     * {@link RegistryMetadata#userConfig} gives it, the root manifest and the environment (null when unknown).
      */
     @SuppressWarnings("unchecked")
-    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc,
+    static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, Map<String, String> userNpmrc,
                             @Nullable Map<String, @Nullable Object> rootManifest, @Nullable Map<String, String> env) {
         Map<String, @Nullable Object> defaultOptions = defaultOptions();
         Map<String, @Nullable Object> workspaceNpmrc = npmrc == null ? new LinkedHashMap<>() :
                 readAndFilterNpmrc(npmrc, env);
+        Map<String, @Nullable Object> userConfig = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : userNpmrc.entrySet()) {
+            if (isNpmrcReadableKey(entry.getKey())) {
+                userConfig.put(entry.getKey(), entry.getValue());
+            }
+        }
         Map<String, @Nullable Object> builtin = new LinkedHashMap<>();
         builtin.put("registry", DEFAULT_REGISTRY);
         builtin.put("@jsr:registry", "https://npm.jsr.io/");
         Map<String, @Nullable Object> rawConfig = new LinkedHashMap<>();
         Map<String, @Nullable Object> mergedConfig = new LinkedHashMap<>();
-        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, workspaceNpmrc)) {
+        for (Map<String, @Nullable Object> source : Arrays.asList(builtin, defaultOptions, userConfig,
+                workspaceNpmrc)) {
             for (String key : Js.keys(source)) {
                 rawConfig.put(key, source.get(key));
                 if (isNpmrcReadableKey(key)) {
@@ -157,7 +169,8 @@ public final class PnpmOptions {
         registriesFromNpmrc.putAll(networkRegistries);
         getDefaultCreds(authConfig);
         for (String key : Js.keys(authConfig)) {
-            if (key.endsWith("tokenHelper")) {
+            if (key.endsWith("tokenHelper") && !(userConfig.containsKey(key) &&
+                                                 Js.strictEquals(userConfig.get(key), authConfig.get(key)))) {
                 throw new PnpmError("TOKEN_HELPER_IN_PROJECT_CONFIG",
                         "tokenHelper must not be configured in project-level .npmrc",
                         "The key \"" + key + "\" was found in project config. Move it to ~/.npmrc or the global " +

@@ -594,7 +594,7 @@ public final class PnpmLockRegenerator {
     }
 
     Install install() {
-        Main main = new Main(inputs, envInstaller, stores, lockFile);
+        Main main = new Main(inputs, registry.userConfig(), envInstaller, stores, lockFile);
         PnpmOptions options = main.config();
         requireSettings(options);
         boolean workspace = options.getWorkspacePackagePatterns() != null;

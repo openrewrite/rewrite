@@ -1,0 +1,1 @@
+the user .npmrc names the default registry and the project .npmrc a scope's: each key layers on its own

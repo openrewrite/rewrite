@@ -1,0 +1,1 @@
+the project .npmrc registry wins over the user .npmrc: the added package comes from the project's

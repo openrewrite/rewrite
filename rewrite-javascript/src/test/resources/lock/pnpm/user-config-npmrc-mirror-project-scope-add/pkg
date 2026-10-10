@@ -1,0 +1,9 @@
+{
+  "name": "user-config-probe",
+  "version": "1.0.0",
+  "dependencies": {
+    "ms": "2.1.3",
+    "abbrev": "1.1.1",
+    "@types/ms": "0.7.34"
+  }
+}

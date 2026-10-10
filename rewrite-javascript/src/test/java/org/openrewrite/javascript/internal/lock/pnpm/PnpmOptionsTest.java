@@ -21,6 +21,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -348,6 +349,36 @@ class PnpmOptionsTest {
         assertThat(json(options.getRegistries())).isEqualTo("{'default':'https://default.com/'," +
                                                            "'@jsr':'https://npm.jsr.io/','@foo':'https://foo.com/'," +
                                                            "'@bar':'https://bar.com/','@qar':'https://qar.com/qar'}");
+    }
+
+    @Test
+    void registriesInCurrentDirectorysNpmrcHaveBiggerPriorityThenGlobalConfigSettings() {
+        Map<String, String> userConfig = new LinkedHashMap<>();
+        userConfig.put("@foo:registry", "https://foo.com");
+        userConfig.put("@bar:registry", "https://bar.com");
+        userConfig.put("@qar:registry", "https://qar.com/qar");
+        userConfig.put("registry", "https://default.com");
+        PnpmOptions options = PnpmOptions.load(null, "registry=https://pnpm.io/", userConfig, null, env());
+        assertThat(json(options.getRegistries())).isEqualTo("{'default':'https://pnpm.io/'," +
+                                                           "'@jsr':'https://npm.jsr.io/','@foo':'https://foo.com/'," +
+                                                           "'@bar':'https://bar.com/','@qar':'https://qar.com/qar'}");
+    }
+
+    @Test
+    void theUsersNpmrcAloneNamesTheRegistries() {
+        PnpmOptions options = PnpmOptions.load(null, null,
+          Collections.singletonMap("registry", "https://registry.npmmirror.com/"), null, env());
+        assertThat(options.getRegistries().get("default")).isEqualTo("https://registry.npmmirror.com/");
+    }
+
+    @Test
+    void aTokenHelperIsReadFromTheUsersNpmrcOnly() {
+        Map<String, String> userConfig = Collections.singletonMap("//r.example.com/:tokenHelper", "/srv/helper");
+        PnpmOptions.load(null, null, userConfig, null, env());
+        assertThatThrownBy(() -> PnpmOptions.load(null, "//r.example.com/:tokenHelper=/srv/other\n", userConfig, null,
+          env()))
+          .isInstanceOf(PnpmError.class)
+          .hasMessageContaining("tokenHelper must not be configured in project-level .npmrc");
     }
 
     @Test
