@@ -1,0 +1,7 @@
+{
+  "name": "p",
+  "packageManager": "yarn@4.10.3",
+  "dependencies": {
+    "inherits": "^2.0.0"
+  }
+}

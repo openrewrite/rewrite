@@ -1,0 +1,1 @@
+a preapproved entry named constructor makes micromatch throw on the quarantined inherits@2.0.4; Yarn's candidate filter skips the version that throws: 2.0.3

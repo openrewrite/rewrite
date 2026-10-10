@@ -1,0 +1,1 @@
+npmPreapprovedPackages constructor then inh*: micromatch throws on constructor before inh* would let the quarantined inherits@2.0.4 through, and Yarn's candidate filter skips it: 2.0.3

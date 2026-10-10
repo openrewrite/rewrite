@@ -1,0 +1,4 @@
+npmMinimalAgeGate: 4000000
+npmPreapprovedPackages:
+  - "constructor"
+  - "inh*"
