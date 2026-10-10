@@ -1,0 +1,2 @@
+yarn 4.10.3 then This project is configured to use pnpm because <tmp>/project/packages/a/package.json has a "packageManager" field (corepack 0.35.0), node v24.19.0, Darwin x86_64 (node darwin-arm64), 2026-10-10
+before exit=0, after exit=1

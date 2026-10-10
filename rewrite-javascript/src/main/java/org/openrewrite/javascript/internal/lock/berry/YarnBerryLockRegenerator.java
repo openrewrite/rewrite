@@ -34,6 +34,7 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
+import org.openrewrite.javascript.internal.lock.SpecUtils;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -86,7 +87,7 @@ public final class YarnBerryLockRegenerator {
 
         /**
          * The rc files by path from the root, from where Yarn runs up: {@code packages/a/.yarnrc.yml},
-         * {@code .yarnrc.yml}, and {@code ../.yarnrc.yml} for a directory above.
+         * {@code .yarnrc.yml}, {@code ../.yarnrc.yml} for a directory above, and its {@code ../package.json}.
          */
         @Singular
         Map<String, String> configFiles;
@@ -245,7 +246,8 @@ public final class YarnBerryLockRegenerator {
      * CannotKnow when neither names a version, the data lacks it, or it is later than the release ported.
      */
     YarnRelease release() {
-        String packageManager = packageManager();
+        SpecUtils.Descriptor spec = SpecUtils.findProjectSpec(inputs.getRunsIn(), levelsAbove(), this::manifestText,
+                "yarn", HostEnvironment.of(inputs.getEnv()));
         Configuration options = options();
         Object yarnPath = options.get("yarnPath");
         String version;
@@ -255,10 +257,14 @@ public final class YarnBerryLockRegenerator {
                 throw new CannotKnow("the Yarn release " + Js.string(yarnPath) + " is (yarnPath names no version)");
             }
         } else {
-            version = Configuration.packageManagerVersion(packageManager);
-            if (version == null) {
+            if (spec == null) {
                 throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no " +
                                      "yarnPath)");
+            }
+            version = Configuration.packageManagerVersion("yarn@" + spec.getRange());
+            if (version == null) {
+                throw new CannotKnow("the Yarn release corepack runs for yarn@" + spec.getRange() + " (a version " +
+                                     "corepack accepts that no release is spelled as)");
             }
         }
         YarnRelease release = YarnRelease.of(version);
@@ -395,19 +401,27 @@ public final class YarnBerryLockRegenerator {
         return options;
     }
 
-    // what corepack reads before it starts the release it names
-    private @Nullable String packageManager() {
-        SpecUtils.Found found = SpecUtils.loadSpec(inputs.getRunsIn(), this::manifestText);
-        if (found == null) {
-            return null;
+    // how far above the project's directory the host's files reach, as far as corepack walks here
+    private int levelsAbove() {
+        int levels = 0;
+        List<String> held = new ArrayList<>(inputs.getConfigFiles().keySet());
+        if (inputs.getPaths() != null) {
+            held.addAll(inputs.getPaths());
         }
-        SpecUtils.parseSpec(found.getPackageManager(), found.getSource());
-        return (String) found.getPackageManager();
+        for (String path : held) {
+            int up = 0;
+            while (path.startsWith("../", 3 * up)) {
+                up++;
+            }
+            levels = Math.max(levels, up);
+        }
+        return levels;
     }
 
     private @Nullable String manifestText(String location) {
-        String text = inputs.getManifests().get(location);
         String file = location.isEmpty() ? "package.json" : location + "/package.json";
+        String text = location.startsWith("..") ? inputs.getConfigFiles().get(file) :
+                inputs.getManifests().get(location);
         return CannotKnow.requireRead(text, inputs.getPaths(), file);
     }
 

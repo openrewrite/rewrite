@@ -1,0 +1,119 @@
+/*
+ * Copyright 2026 the original author or authors.
+ * <p>
+ * Licensed under the Moderne Source Available License (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://docs.moderne.io/licensing/moderne-source-available-license
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.javascript.internal.lock;
+
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+class SpecUtilsTest {
+
+    /**
+     * parsePackageJSON with devEngines.packageManager: the spec it reads, or the usage error corepack 0.35.0 stops on
+     * ({@code open-corepack-devengines-mismatch}); a warning leaves {@code packageManager} as it is.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "{\"packageManager\":\"yarn@4.10.3\"}|yarn@4.10.3",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"4.10.3\"}}}|yarn@4.10.3",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"}}}|yarn@*",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"," +
+            "\"version\":\"^4.10.0\"}}}|yarn@4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"yarn\"," +
+            "\"version\":\"4.5.3\"}}}|\"packageManager\" field is set to \"yarn@4.10.3\" which does not match the " +
+            "value defined in \"devEngines.packageManager\" for \"yarn\" of \"4.5.3\" (corepack)",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"}}}|" +
+            "\"packageManager\" field is set to \"yarn@4.10.3\" which does not match the " +
+            "\"devEngines.packageManager\" field set to \"pnpm\" (corepack)",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"," +
+            "\"onFail\":\"warn\"}}}|yarn@4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":{\"name\":\"pnpm\"," +
+            "\"onFail\":\"ignore\"}}}|yarn@4.10.3",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"@yarn\"}}}|The value of devEngines.packageManager.name " +
+            "\"@yarn\" is not a supported string value (corepack)",
+            "{\"devEngines\":{\"packageManager\":{\"version\":\"4\"}}}|The value of devEngines.packageManager.name " +
+            "undefined is not a supported string value (corepack)",
+            "{\"devEngines\":{\"packageManager\":{\"name\":\"yarn\",\"version\":\"^^1\"}}}|The value of " +
+            "devEngines.packageManager.version \"^^1\" is not a valid semver range (corepack)",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":\"yarn\"}}|yarn@4.10.3",
+            "{\"packageManager\":\"yarn@4.10.3\",\"devEngines\":{\"packageManager\":[{\"name\":\"pnpm\"}]}}|" +
+            "yarn@4.10.3"
+    })
+    void readsTheSpecAPackageJsonNames(String manifest, String spec) {
+        String answer;
+        try {
+            Object raw = SpecUtils.parsePackageJSON(EcmaScript.jsonParse(manifest));
+            answer = raw == EcmaScript.UNDEFINED ? "undefined" : String.valueOf(raw);
+        } catch (Rejected e) {
+            answer = e.getMessage();
+        }
+        assertThat(answer).isEqualTo(spec);
+    }
+
+    /**
+     * loadSpec walks from where the package manager runs up through every directory the host holds, past one without
+     * packageManager ({@code open-member-yarnrc-run-in-member}) and above the project's own.
+     */
+    @Test
+    void walksUpPastAPackageJsonWithoutPackageManager() {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("packages/a", "{\"name\":\"a\"}");
+        manifests.put("", "{\"name\":\"root\"}");
+        manifests.put("../..", "{\"packageManager\":\"pnpm@9.15.0\"}");
+
+        SpecUtils.Lookup lookup = SpecUtils.loadSpec("packages/a", 2, manifests::get);
+
+        assertThat(lookup.getTarget()).isEqualTo("../../package.json");
+        assertThat(lookup.getSource()).isEqualTo("../../../../package.json");
+        assertThat(lookup.getRawPmSpec()).isEqualTo("pnpm@9.15.0");
+        assertThat(SpecUtils.loadSpec("packages/a", 1, manifests::get).getRawPmSpec()).isEqualTo(EcmaScript.UNDEFINED);
+    }
+
+    /**
+     * findProjectSpec refuses a project that names another package manager ({@code open-corepack-member-names-pnpm})
+     * unless COREPACK_ENABLE_STRICT is 0, and falls back when none is named.
+     */
+    @Test
+    void refusesAProjectThatNamesAnotherPackageManager() {
+        Map<String, String> manifests = new LinkedHashMap<>();
+        manifests.put("packages/a", "{\"name\":\"a\",\"packageManager\":\"pnpm@9.15.0\"}");
+        manifests.put("", "{\"packageManager\":\"yarn@4.10.3\"}");
+
+        assertThatThrownBy(() -> SpecUtils.findProjectSpec("packages/a", 0, manifests::get, "yarn",
+                HostEnvironment.of(Collections.emptyMap())))
+                .isInstanceOf(Rejected.class)
+                .hasMessage("This project is configured to use pnpm because packages/a/package.json has a " +
+                            "\"packageManager\" field (corepack)");
+        assertThat(SpecUtils.findProjectSpec("packages/a", 0, manifests::get, "yarn",
+                HostEnvironment.of(Collections.singletonMap("COREPACK_ENABLE_STRICT", "0")))).isNull();
+        assertThat(SpecUtils.findProjectSpec("", 0, manifests::get, "yarn", HostEnvironment.of(Collections.emptyMap())))
+                .isEqualTo(new SpecUtils.Descriptor("yarn", "4.10.3"));
+        assertThat(SpecUtils.findProjectSpec("", 0, dir -> nothing(), "yarn",
+                HostEnvironment.of(Collections.emptyMap()))).isNull();
+    }
+
+    private static @Nullable String nothing() {
+        return null;
+    }
+}

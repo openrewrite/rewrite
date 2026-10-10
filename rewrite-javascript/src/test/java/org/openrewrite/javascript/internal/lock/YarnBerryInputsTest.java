@@ -58,7 +58,8 @@ class YarnBerryInputsTest {
         assertThat(inputs.getManifests()).containsOnlyKeys("", "packages/a");
         assertThat(inputs.getManifests().get("packages/a")).isEqualTo("{\"name\":\"a\",\"version\":\"2.0.0\"}");
         assertThat(inputs.getRunsIn()).isEqualTo("packages/a");
-        assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc.yml", "../.yarnrc.yml", "packages/a/.yarnrc.yml");
+        assertThat(inputs.getConfigFiles()).containsOnlyKeys(".yarnrc.yml", "../.yarnrc.yml", "packages/a/.yarnrc.yml",
+          "../package.json");
         assertThat(inputs.getConfigFiles().get(".yarnrc.yml")).isEqualTo("compressionLevel: 0\n");
         assertThat(inputs.getPaths()).isNull();
         assertThat(inputs.getEnv()).isNull();

@@ -26,17 +26,20 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
 
 /**
  * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
- * {@code .yarnrc.yml} of each directory from where Yarn runs up.
+ * {@code .yarnrc.yml} of each directory from where Yarn runs up, and the package.json of those above it.
  */
 final class YarnBerryInputs {
 
     private static final String NPM_DEFAULT_REGISTRY = "https://registry.npmjs.org/";
+    private static final Pattern MANIFEST_ABOVE = Pattern.compile("(\\.\\./)+package\\.json");
 
     private YarnBerryInputs() {
     }
@@ -98,13 +101,27 @@ final class YarnBerryInputs {
                 patches.put(file.getKey(), file.getValue());
             }
         }
+        Map<String, String> configFiles = new LinkedHashMap<>(Configuration.findRcFiles(dir.getRunsIn(), rcFiles));
+        for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
+            if (MANIFEST_ABOVE.matcher(file.getKey()).matches()) {
+                configFiles.put(file.getKey(), file.getValue());
+            }
+        }
+        Set<String> paths = dir.pathsUnder("");
+        if (paths != null) {
+            for (String held : dir.getPaths()) {
+                if (MANIFEST_ABOVE.matcher(held).matches()) {
+                    paths.add(held);
+                }
+            }
+        }
         return Inputs.builder()
                 .lock(dir.getLock())
                 .manifests(dir.manifestsUnder(""))
-                .configFiles(Configuration.findRcFiles(dir.getRunsIn(), rcFiles))
+                .configFiles(configFiles)
                 .runsIn(dir.getRunsIn())
                 .files(patches)
-                .paths(dir.pathsUnder(""))
+                .paths(paths)
                 .host(host)
                 .now(now)
                 .build();

@@ -58,7 +58,7 @@
  * {@code internal.lock.IsGlob} is-glob 4.0.3 (Copyright (c) 2014-2017, Jon Schlinkert) and
  * {@code internal.lock.IsExtglob} is-extglob 2.1.1 (Copyright (c) 2014-2016, Jon Schlinkert);
  * {@code Configuration} camelcase 5.3.1 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
- * (sindresorhus.com)); {@code SpecUtils} corepack 0.35.0's {@code loadSpec} and {@code parseSpec} (Copyright (c)
+ * (sindresorhus.com)); {@code internal.lock.SpecUtils} corepack 0.35.0's specUtils.ts and Engine.ts (Copyright (c)
  * Corepack contributors); and {@code Tinylogic} tinylogic 2.0.0 (Copyright (c) 2020 Mael Nison) with the parser
  * pegjs 0.10 generates for it (Copyright (c) 2010-2016 David Majda), all distributed under the MIT License:
  * <pre>
