@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.MatchedDependency;
 import org.openrewrite.javascript.internal.NodeCatalogs;
+import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
@@ -38,7 +39,7 @@ import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class UpgradeDependencyVersion extends ScanningRecipe<NodeCatalogs.Accumulator> {
+public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
     transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
@@ -83,12 +84,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeCatalogs.Accumu
     }
 
     @Override
-    public NodeCatalogs.Accumulator getInitialValue(ExecutionContext ctx) {
-        return new NodeCatalogs.Accumulator();
+    public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyEdits();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyEdits acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -101,12 +102,12 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeCatalogs.Accumu
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(NodeCatalogs.Accumulator acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
         acc.decideAll(ctx, this::decide);
         return emptyList();
     }
 
-    private void decide(NodeCatalogs.Decision decision, ExecutionContext ctx) {
+    private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
         Predicate<String> nameMatcher = buildNameMatcher();
         List<MatchedDependency> matches = new ArrayList<>();
         for (Map.Entry<String, Map<String, String>> scope :
@@ -134,7 +135,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeCatalogs.Accumu
         }
     }
 
-    private boolean followCatalog(NodeCatalogs.Decision decision, String name, String value) {
+    private boolean followCatalog(NodeDependencyEdits.Decision decision, String name, String value) {
         NodeCatalogs catalogs = decision.catalogs();
         String catalog = catalogs == null ? null : catalogs.catalogOf(value);
         return catalog != null && decision.editCatalogs(c -> c.withSpecifier(catalog, name, newVersion));
@@ -149,7 +150,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeCatalogs.Accumu
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
         return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
                 lockRegenerationFailures, path, result, packageName));
     }

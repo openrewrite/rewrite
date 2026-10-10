@@ -20,7 +20,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
-import org.openrewrite.javascript.internal.NodeCatalogs;
+import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 
@@ -33,7 +33,7 @@ import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class RemoveDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
+public class RemoveDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
 
@@ -63,12 +63,12 @@ public class RemoveDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     }
 
     @Override
-    public NodeCatalogs.Accumulator getInitialValue(ExecutionContext ctx) {
-        return new NodeCatalogs.Accumulator();
+    public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyEdits();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyEdits acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -81,12 +81,12 @@ public class RemoveDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(NodeCatalogs.Accumulator acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
         acc.decideAll(ctx, this::decide);
         return emptyList();
     }
 
-    private void decide(NodeCatalogs.Decision decision, ExecutionContext ctx) {
+    private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
         Set<String> scopes = new LinkedHashSet<>();
         for (Map.Entry<String, Map<String, String>> declared :
                 PackageJsonHelper.declaredDependencies(decision.getManifest()).entrySet()) {
@@ -100,7 +100,7 @@ public class RemoveDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
         return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
                 lockRegenerationFailures, path, result, packageName));
     }

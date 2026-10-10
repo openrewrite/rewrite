@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeCatalogs;
+import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.NodeCatalogs.Pnpm.CatalogMode;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
@@ -34,7 +35,7 @@ import static java.util.Collections.emptyList;
 
 @EqualsAndHashCode(callSuper = false)
 @Value
-public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
+public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     private static final String CATALOG = "catalog:";
     private static final String DEFAULT = "default";
@@ -73,12 +74,12 @@ public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     private String targetScope() { return scope == null ? "dependencies" : scope; }
 
     @Override
-    public NodeCatalogs.Accumulator getInitialValue(ExecutionContext ctx) {
-        return new NodeCatalogs.Accumulator();
+    public NodeDependencyEdits getInitialValue(ExecutionContext ctx) {
+        return new NodeDependencyEdits();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(NodeDependencyEdits acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
@@ -91,12 +92,12 @@ public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     }
 
     @Override
-    public Collection<? extends SourceFile> generate(NodeCatalogs.Accumulator acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(NodeDependencyEdits acc, ExecutionContext ctx) {
         acc.decideAll(ctx, this::decide);
         return emptyList();
     }
 
-    private void decide(NodeCatalogs.Decision decision, ExecutionContext ctx) {
+    private void decide(NodeDependencyEdits.Decision decision, ExecutionContext ctx) {
         Json.Document pkg = decision.getManifest();
         if (!matchesAdd(pkg)) {
             return;
@@ -121,7 +122,8 @@ public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
 
     // what pnpm add writes: parseWantedDependencies' default-catalog match, installSome's catalogMode check and
     // resolveDependencyTree's saveCatalogName entry
-    private @Nullable String pnpmAdd(NodeCatalogs.Decision decision, ExecutionContext ctx, NodeCatalogs.Pnpm catalogs) {
+    private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, ExecutionContext ctx,
+                                     NodeCatalogs.Pnpm catalogs) {
         String inDefault = catalogs.resolve(packageName, CATALOG);
         String wanted = version.equals(inDefault) ? CATALOG : version;
         String save = catalogs.getSaveCatalogName();
@@ -158,7 +160,7 @@ public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
         return CATALOG + (DEFAULT.equals(save) ? "" : save);
     }
 
-    private @Nullable String reject(NodeCatalogs.Decision decision, ExecutionContext ctx, String detail) {
+    private @Nullable String reject(NodeDependencyEdits.Decision decision, ExecutionContext ctx, String detail) {
         decision.insertRow(lockRegenerationFailures, ctx, new NodeLockRegenerationFailures.Row(
                 decision.getPath().toString(), packageName, LockFileRegeneration.Reason.RESOLUTION_REQUIRED.toString(),
                 detail));
@@ -176,7 +178,7 @@ public class AddDependency extends ScanningRecipe<NodeCatalogs.Accumulator> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(NodeCatalogs.Accumulator acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(NodeDependencyEdits acc) {
         return acc.visitor(this::decide, (ctx, path, result) -> LockFileRegeneration.insertFailureRow(ctx,
                 lockRegenerationFailures, path, result, packageName));
     }

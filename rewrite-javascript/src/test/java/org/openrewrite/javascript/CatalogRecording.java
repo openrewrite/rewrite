@@ -187,8 +187,8 @@ final class CatalogRecording {
                 if (!after.get(path).equals(printed(sf))) {
                     failures.add(order + ": " + path + " is\n" + printed(sf));
                 }
-                sf.getMarkers().findFirst(Markup.class).ifPresent(m -> failures.add(order + ": " + path + " is marked " +
-                        m.getMessage()));
+                sf.getMarkers().findFirst(Markup.class).ifPresent(m -> failures.add(order + ": " + path +
+                        " is marked " + m.getMessage()));
             }
             List<SourceFile> again = run(edited, recipes);
             for (int i = 0; i < again.size(); i++) {
