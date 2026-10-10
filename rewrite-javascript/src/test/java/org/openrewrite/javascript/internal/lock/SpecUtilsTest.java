@@ -113,6 +113,35 @@ class SpecUtilsTest {
                 HostEnvironment.of(Collections.emptyMap()))).isNull();
     }
 
+    /**
+     * parseSpec with an exact version enforced, as findProjectSpec runs it: {@code yarn@1} is corepack's usage error
+     * ({@code open-corepack-member-names-range} for a range), a URL for a known package manager too.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "yarn@4.10.3|yarn 4.10.3",
+            "yarn@4.10.3+sha224.abc|yarn 4.10.3+sha224.abc",
+            "yarn@1|Invalid package manager specification in package.json (yarn@1); expected a semver version " +
+            "(corepack)",
+            "yarn@^4.10.0|Invalid package manager specification in package.json (yarn@^4.10.0); expected a semver " +
+            "version (corepack)",
+            "yarn|No version specified for yarn in \"packageManager\" of package.json (corepack)",
+            "bun@1.3.10|Unsupported package manager specification (bun@1.3.10) (corepack)",
+            "yarn@https://example.com/yarn.tgz|Illegal use of URL for known package manager. Instead, select a " +
+            "specific version, or set COREPACK_ENABLE_UNSAFE_CUSTOM_URLS=1 in your environment " +
+            "(yarn@https://example.com/yarn.tgz) (corepack)"
+    })
+    void parsesTheSpecCorepackRuns(String raw, String answer) {
+        String actual;
+        try {
+            SpecUtils.Descriptor spec = SpecUtils.parseSpec(raw, "package.json", true);
+            actual = spec.getName() + " " + spec.getRange();
+        } catch (Rejected e) {
+            actual = e.getMessage();
+        }
+        assertThat(actual).isEqualTo(answer);
+    }
+
     private static @Nullable String nothing() {
         return null;
     }
