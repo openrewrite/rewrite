@@ -82,17 +82,23 @@ changes only when a recording says so.
 `internal.lock` holds what more than one port needs, and nothing that resolves:
 
 - the dispatch (`NativeLockEngine`), the request seen from the lock's directory (`LockDirectory`), and per package
-  manager an `*Inputs` value type that selects the files its package manager reads and declares their names, so the
-  recipes' scan captures only those, and a registry source over the host's client;
+  manager an `*Inputs` mapper from it to that port's own `Inputs` value, which selects the files the package manager
+  reads and declares their names, so the recipes' scan captures only those, and a registry source over the host's
+  client;
 - the failure model: `CannotKnow`, `Rejected`, `SharedError`, and `LockOnlyInstall`, which words a failure with the
-  package manager's command and runs the second install;
+  package manager's command, gives it one of four kinds (cannot know, the package manager rejects, it fails, the
+  second install rejects or rewrites the lock) and runs the second install;
 - Node's and V8's behavior: `EcmaScript`, `EventLoop`, `V8Date`, `V8RegExp`, `V8Sort` (V8's TimSort at any length),
   `WhatwgUrl`, `UriComponent`, `PosixPath`, `RootRelativePath`, `Ini`, `LocaleCompare`, `Host`, `HostEnvironment`;
-- one port per upstream library that several package managers bundle, the release an option: `Spec` (npm-package-arg),
-  `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1), `YarnpkgSemverUtils`;
-  minimatch is still two ports, npm's 10.2.5 in `npm` and Yarn classic's 3.0.4 in `yarnclassic`;
-- the registry sources pick the host's credentials as their package manager does: by the request's URL for npm and
-  pnpm, by the package's scope for Yarn and Bun.
+- one port of some upstream libraries that several package managers bundle, the release an option: `Spec`
+  (npm-package-arg), `GitHost` (hosted-git-info), `Picomatch` (2.3.1 and 4.0.4), `JsYaml` (3.13.1 and 3.14.1),
+  `YarnpkgSemverUtils`. Others are still one port per package manager: minimatch (npm's 10.2.5, Yarn classic's
+  3.0.4), brace-expansion, ssri, ini (Yarn classic's 1.3.5 beside `Ini`, ini 6.0.0), braces and fill-range (Yarn
+  classic's, Berry's), glob-parent and is-glob, pnpm's own npm-package-arg and hosted-git-info inside its projects
+  graph, and pnpm's js-yaml fork;
+- the registry sources ask the registry each port's own config names for the package, and give the request the
+  host's credentials by its URL for npm and pnpm (the longest registry above it holding credentials, as npm's
+  `getAuth` and pnpm's `getAuthHeaderByURI` pick them), by the package's scope for Yarn and Bun.
 
 `Spec` is also the one classifier of a manifest's dependency value for the recipes: npa's kinds, and the catalog,
 workspace, link, portal, patch, jsr and exec protocols npa rejects, each its own kind. A recipe leaves a value that is
@@ -100,29 +106,37 @@ no version range unchanged and records it in `NodeDependencyProtocolsSkipped`.
 
 Overrides are written where the project's package manager reads them, at the workspace root only, and the lock follows:
 
-- npm: `overrides`. Bun: `overrides`, else `resolutions` when the root has only that; a dependency path is declined,
-  since Bun 1.3.10 ignores nested overrides.
-- Yarn classic: `resolutions` with `**/<path>/x`, since `parent/x` matches from the root only. Yarn Berry:
+- npm: `overrides`; a package already overridden by an object gets its `"."`. Bun: `overrides`, else `resolutions`
+  when the root has only that; a dependency path is declined, since Bun 1.3.10 ignores nested overrides.
+- Yarn classic: `resolutions` with `**/<path>/x`, since `parent/x` matches from the root only; the resolution yarn
+  reads as the same glob (`x` is `**/x`) is edited in place, since yarn applies the first that matches. Yarn Berry:
   `resolutions` with one parent, by name or exact version.
-- pnpm, by the release the project names (`devEngines.packageManager`, `packageManager`, 11.2.2 when none): 11 reads
+- pnpm, by the release the project names (`devEngines.packageManager`, `packageManager`, 11.2.2 when none, the rule
+  `PnpmOptions.releaseMajor`; a range open between majors is declined, the registry picking the release): 11 reads
   pnpm-workspace.yaml only; 10 reads package.json's `pnpm.overrides` and `resolutions` instead of the workspace's when
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
   pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release other than 11.2.2 makes the
   regeneration cannot-know.
 - An override the package manager cannot read, or one that would win over a declaration through a value that is no
-  version range (a catalog or workspace reference), is declined with a row and writes nothing.
+  version range (a catalog or workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes
+  nothing; an override scoped to a parent that pnpm or Berry applies before a global one is named in such a row.
 
 Catalogs are read where each package manager reads them (pnpm's pnpm-workspace.yaml, Bun's root `workspaces` with its
-top-level fallback, Yarn 4.10's `.yarnrc.yml`), as `NodeCatalogs`. A recipe that changes a `catalog:` dependency
-edits the entry in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key
-and gives the catalog the new name's entry; AddDependency and RemoveDependency do what `pnpm add` and `pnpm remove` do
-under `catalogMode`, `saveCatalogName` and `cleanupUnusedCatalogs`, the cleanup counting the projects the
-workspace's `packages` match. What a recipe adds to pnpm-workspace.yaml, an override or a catalog entry, is placed and
-quoted by one port of pnpm's workspace manifest writer, and its settings are read by pnpm's own reader.
+top-level fallback, Yarn 4.10's `.yarnrc.yml`), as `NodeCatalogs`, whose entries come from the OpenRewrite YAML or JSON
+tree and whose pnpm settings come from pnpm's own reader. A recipe that changes a `catalog:` dependency edits the entry
+in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key and gives the
+catalog the new name's entry; RemoveDependency does what `pnpm remove` does under `cleanupUnusedCatalogs`, the cleanup
+counting the projects the workspace's `packages` match; AddDependency saves what `pnpm add` saves (`lock.pnpm.
+InstallSome`: the default catalog's match, `catalogMode`, `saveCatalogName`), the version for pnpm 9, and the member's
+dependencies sorted, as pnpm writes them. pnpm-workspace.yaml is edited by two editors, a line editor for an override
+and the YAML tree for a catalog entry; both place a new key through one port of pnpm's workspace manifest writer, the
+catalogs at pnpm 11's rules.
 
-The dependency recipes compose in one cycle: each adds its edits of manifests and package-manager files to the cycle
-in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the documents as the recipes before it
-leave them, and regenerates from those, so the lock written last holds every recipe's edit in any visit order. No
-marker is read as state: declines are derived from the documents each cycle, a marker is a content-equal warning, and
-rows are deduplicated within a cycle. Another recipe's edit is seen only at its file's visit; a lock written before
-that visit is warned with a row.
+The five dependency recipes are one engine, `NodeDependencyEdits`: each adds its edits of manifests and
+package-manager files to the cycle in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the
+documents as the recipes before it leave them, and regenerates from those, so the lock written last holds every
+recipe's edit in any visit order. An override is the root's decision, an edit of package.json or of
+pnpm-workspace.yaml. Another recipe's edit is seen only at its file's visit: a lock written before that visit from an
+earlier revision is warned with one row, and a decision that visit overturns after files were written by it is
+withdrawn, warned and rowed. No marker is read as state: declines are derived from the documents each cycle, a marker
+is a content-equal warning, and rows are deduplicated within a cycle.

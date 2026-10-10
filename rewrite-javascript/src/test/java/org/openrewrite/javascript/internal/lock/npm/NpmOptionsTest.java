@@ -74,6 +74,19 @@ class NpmOptionsTest {
 
     // location=global turns global on in its flatten; the definitions flatten in the file's key order, so a
     // later global=false wins (npm 11.17.0: global=false then location=global is ESHRINKWRAPGLOBAL)
+    // npm 11.17.0's npm-registry-fetch pickRegistry over the same options
+    @Test
+    void theRegistryIsTheOneTheConfigNamesForThePackage() {
+        NpmOptions options = fromNpmrc("registry=https://r.example/npm/\n@corp:registry=https://corp.example/\n");
+        assertThat(options.registryFor("lodash")).isEqualTo("https://r.example/npm/");
+        assertThat(options.registryFor("@corp/a")).isEqualTo("https://corp.example/");
+        assertThat(options.registryFor("@other/a")).isEqualTo("https://r.example/npm/");
+        NpmOptions scoped = fromNpmrc("@corp:registry=https://corp.example/\nscope=corp\n");
+        assertThat(scoped.registryFor("lodash")).isEqualTo("https://corp.example/");
+        assertThat(scoped.registryFor("@corp/a")).isEqualTo("https://corp.example/");
+        assertThat(fromNpmrc(null).registryFor("@corp/a")).isEqualTo("https://registry.npmjs.org/");
+    }
+
     @Test
     void locationGlobalIsGlobal() {
         assertThat(fromNpmrc("location=global").isGlobal()).isTrue();

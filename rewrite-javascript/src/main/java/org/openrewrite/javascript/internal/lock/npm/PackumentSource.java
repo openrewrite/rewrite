@@ -26,11 +26,11 @@ public interface PackumentSource {
      * {@code GET /<name>}: the abbreviated packument, or the full one (with {@code time}) when {@code fullMetadata}.
      * @throws NpmRejection {@code E404} when the registry has no such package
      */
-    Map<String, Object> packument(String name, boolean fullMetadata);
+    Map<String, Object> packument(String registry, String name, boolean fullMetadata);
 
     /**
      * {@code GET /<name>/<version>}: the version document, which holds what the full packument's entry does
      * but in the registry's own key order.
      */
-    Map<String, Object> manifest(String name, String version);
+    Map<String, Object> manifest(String registry, String name, String version);
 }

@@ -41,13 +41,13 @@ class PacoteTest {
         Map<String, Object> doc = json(packument);
         return new PackumentSource() {
             @Override
-            public Map<String, Object> packument(String name, boolean fullMetadata) {
+            public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
                 return doc;
             }
 
             @Override
             @SuppressWarnings("unchecked")
-            public Map<String, Object> manifest(String name, String version) {
+            public Map<String, Object> manifest(String registry, String name, String version) {
                 return (Map<String, Object>) Js.get(doc.get("versions"), version);
             }
         };
@@ -59,7 +59,7 @@ class PacoteTest {
     }
 
     private static Pacote pacote(String packument, VirtualTreeLoader.ProjectFiles files) {
-        return new Pacote(registry(packument), files, "/");
+        return new Pacote(registry(packument), NpmOptions.builder().build(), files, "/");
     }
 
     private static String versioned(String dist) {

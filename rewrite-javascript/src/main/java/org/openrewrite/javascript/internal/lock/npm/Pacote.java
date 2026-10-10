@@ -61,14 +61,16 @@ final class Pacote {
     }
 
     private final PackumentSource registry;
+    private final NpmOptions options;
     private final VirtualTreeLoader.ProjectFiles files;
     private final String path;
 
     /**
      * @param path the project directory a directory spec's realpath is read relative to
      */
-    Pacote(PackumentSource registry, VirtualTreeLoader.ProjectFiles files, String path) {
+    Pacote(PackumentSource registry, NpmOptions options, VirtualTreeLoader.ProjectFiles files, String path) {
         this.registry = registry;
+        this.options = options;
         this.files = files;
         this.path = path;
     }
@@ -107,7 +109,7 @@ final class Pacote {
                         .npmVersion(opts.getNpmVersion())
                         .build());
         Map<String, Object> mani = full || !opts.isFullMetadata() ? picked :
-                withVersionDocument(picked, registry.manifest(name, versionKey(packument, picked)));
+                withVersionDocument(picked, registry.manifest(options.registryFor(name), name, versionKey(packument, picked)));
         PackageJson.syncNormalize(mani);
         PackageJson.normalizeBin(mani);
 
@@ -200,12 +202,12 @@ final class Pacote {
     // a registry that has no abbreviated packument is asked for the full one before the 404 counts
     private Map<String, Object> packument(String name, boolean full) {
         try {
-            return registry.packument(name, full);
+            return registry.packument(options.registryFor(name), name, full);
         } catch (NpmRejection e) {
             if (!"E404".equals(e.getCode()) || full) {
                 throw e;
             }
-            return registry.packument(name, true);
+            return registry.packument(options.registryFor(name), name, true);
         }
     }
 }

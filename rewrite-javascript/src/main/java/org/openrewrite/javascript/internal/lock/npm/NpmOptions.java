@@ -27,6 +27,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -57,7 +58,9 @@ public class NpmOptions {
             "prefer-dedupe", "strict-peer-deps", "force", "install-strategy", "global-style", "legacy-bundling",
             "engine-strict", "before", "min-release-age", "min-release-age-exclude", "omit", "include", "only",
             "production", "dev", "optional", "also", "allow-git", "allow-file", "allow-directory", "allow-remote",
-            "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global", "location");
+            "os", "cpu", "libc", "save", "tag", "format-package-lock", "dry-run", "global", "location", "registry",
+            "scope");
+    private static final Pattern SCOPED_REGISTRY = Pattern.compile("(@[^:]+):registry");
 
     // the definition's type, which npm's parseField reads from types[key]: Boolean, String, Number, or a
     // list of literal values
@@ -157,6 +160,18 @@ public class NpmOptions {
 
     @Builder.Default
     String allowRemote = "all";
+
+    /**
+     * {@code registry}, {@code @scope:registry} and {@code scope}: where npm asks for a package's documents.
+     */
+    @Builder.Default
+    String registry = "https://registry.npmjs.org/";
+
+    @Builder.Default
+    Map<String, String> scopedRegistries = Collections.emptyMap();
+
+    @Nullable
+    String scope;
 
     /**
      * {@code os}, {@code cpu}, {@code libc}: the platform optional dependencies are checked against instead
@@ -264,6 +279,7 @@ public class NpmOptions {
         // global-style and legacy-bundling flatten by writing install-strategy into the config they come from,
         // which install-strategy's own flatten then reads, wherever it stands in the file
         String installStrategyWritten = null;
+        Map<String, String> scopedRegistries = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : Ini.decode(npmrc).entrySet()) {
             String key;
             try {
@@ -395,12 +411,42 @@ public class NpmOptions {
                     Object tag = parseField(value, Type.STRING, env);
                     options.tag(truthy(tag) ? Js.string(tag) : null);
                     break;
+                case "registry":
+                    Object registry = parseField(value, Type.STRING, env);
+                    if (truthy(registry)) {
+                        options.registry(Js.string(registry));
+                    }
+                    break;
+                case "scope":
+                    Object scope = parseField(value, Type.STRING, env);
+                    options.scope(truthy(scope) ? Js.string(scope) : null);
+                    break;
                 default:
+                    Matcher scoped = SCOPED_REGISTRY.matcher(key);
+                    if (scoped.matches() && value instanceof String) {
+                        scopedRegistries.put(scoped.group(1), envReplace((String) value, env));
+                    }
                     break;
             }
         }
         options.omit(buildOmitList(omit, include, only, production, dev, optional, also));
+        options.scopedRegistries(scopedRegistries);
         return options.build();
+    }
+
+    /**
+     * npm-registry-fetch's {@code pickRegistry}: the registry of the package's scope, else of the {@code scope}
+     * option's, else {@code registry}.
+     */
+    public String registryFor(String name) {
+        String registry = null;
+        if (name.startsWith("@") && name.indexOf('/') > 0) {
+            registry = scopedRegistries.get(name.substring(0, name.indexOf('/')));
+        }
+        if (registry == null && scope != null) {
+            registry = scopedRegistries.get(scope.startsWith("@") ? scope : "@" + scope);
+        }
+        return registry != null ? registry : this.registry;
     }
 
     // arborist reads the allow-* option as `?? 'all'`

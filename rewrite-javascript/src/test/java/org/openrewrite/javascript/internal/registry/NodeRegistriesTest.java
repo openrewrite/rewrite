@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.registry;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.NodeRegistry;
@@ -53,6 +54,18 @@ class NodeRegistriesTest {
     })
     void byTheRequestsUrl(String name, String url, @Nullable String token, String requestedFrom) {
         assertSends(REGISTRIES.registryAt(name, url), name, token, requestedFrom);
+    }
+
+    // npm 11.17.0's getAuth: a default registry without credentials under one with them sends the outer one's
+    @Test
+    void aRegistryWithoutCredentialsUnderOneWithThemSendsTheOuterOnes() {
+        NodeRegistries nested = new NodeRegistries(
+                new NodeRegistry(null, "https://r.example.com/npm/", null, null, null, null, false, null, true, false),
+                singletonMap("@corp", new NodeRegistry("@corp", "https://r.example.com/", "corp-token", null, null,
+                        null, false, null, true, false)),
+                null, null, null);
+        assertSends(nested.registryAt("lodash", "https://r.example.com/npm/lodash"), "lodash", "corp-token",
+                "https://r.example.com/npm/lodash");
     }
 
     /**

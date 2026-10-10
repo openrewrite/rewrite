@@ -139,7 +139,7 @@ public final class IdealTreeBuilder {
         this.files = files;
         this.options = options;
         this.registry = registry;
-        this.pacote = new Pacote(registry, files, this.path);
+        this.pacote = new Pacote(registry, options, files, this.path);
         this.host = host;
         this.now = now;
         this.strictPeerDeps = options.isStrictPeerDeps();

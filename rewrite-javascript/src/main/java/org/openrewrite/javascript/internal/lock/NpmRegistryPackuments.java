@@ -44,11 +44,11 @@ public final class NpmRegistryPackuments implements PackumentSource {
     }
 
     @Override
-    public Map<String, Object> packument(String name, boolean fullMetadata) {
-        String key = (fullMetadata ? "full:" : "corgi:") + name;
+    public Map<String, Object> packument(String url, String name, boolean fullMetadata) {
+        String key = (fullMetadata ? "full:" : "corgi:") + url + " " + name;
         Map<String, Object> document = parsed.get(key);
         if (document == null) {
-            NodeRegistry registry = registries.registryFor(name);
+            NodeRegistry registry = registries.registryAt(name, url);
             document = parse(fetch(() -> client.getPackumentText(registry, name, fullMetadata), name, null), name);
             parsed.put(key, document);
         }
@@ -56,11 +56,11 @@ public final class NpmRegistryPackuments implements PackumentSource {
     }
 
     @Override
-    public Map<String, Object> manifest(String name, String version) {
-        String key = "manifest:" + name + "@" + version;
+    public Map<String, Object> manifest(String url, String name, String version) {
+        String key = "manifest:" + url + " " + name + "@" + version;
         Map<String, Object> document = parsed.get(key);
         if (document == null) {
-            NodeRegistry registry = registries.registryFor(name);
+            NodeRegistry registry = registries.registryAt(name, url);
             document = parse(fetch(() -> client.getManifestText(registry, name, version), name, version), name);
             parsed.put(key, document);
         }

@@ -35,12 +35,12 @@ class NpmLockRegeneratorTest {
 
     private static final PackumentSource NO_REGISTRY = new PackumentSource() {
         @Override
-        public Map<String, Object> packument(String name, boolean fullMetadata) {
+        public Map<String, Object> packument(String registry, String name, boolean fullMetadata) {
             throw new AssertionError("no packument is needed: " + name);
         }
 
         @Override
-        public Map<String, Object> manifest(String name, String version) {
+        public Map<String, Object> manifest(String registry, String name, String version) {
             throw new AssertionError("no manifest is needed: " + name);
         }
     };

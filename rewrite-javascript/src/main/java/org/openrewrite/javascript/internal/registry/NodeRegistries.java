@@ -65,18 +65,30 @@ public class NodeRegistries {
     }
 
     /**
-     * The registry a request to {@code url} goes through by its URL, as npm and pnpm pick credentials: of the host's,
-     * the one at or the longest above {@code url}; otherwise {@code url} without credentials.
+     * The registry a request to {@code url} goes through by its URL, as npm and pnpm pick credentials: of the host's at
+     * or above {@code url}, the longest holding credentials, else the longest; otherwise {@code url} without them.
      */
     public NodeRegistry registryAt(String packageName, String url) {
         NodeRegistry match = null;
         for (NodeRegistry candidate : candidates()) {
-            if (under(url, candidate) &&
-                (match == null || trimSlash(candidate.getUrl()).length() > trimSlash(match.getUrl()).length())) {
+            if (under(url, candidate) && (match == null || outranks(candidate, match))) {
                 match = candidate;
             }
         }
         return match != null ? at(url, match) : withoutCredentials(packageName, url);
+    }
+
+    // npm's regFromURI and pnpm's getAuthHeaderByURI walk up to the longest registry key holding credentials
+    private static boolean outranks(NodeRegistry candidate, NodeRegistry match) {
+        if (hasCredentials(candidate) != hasCredentials(match)) {
+            return hasCredentials(candidate);
+        }
+        return trimSlash(candidate.getUrl()).length() > trimSlash(match.getUrl()).length();
+    }
+
+    private static boolean hasCredentials(NodeRegistry registry) {
+        return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
+               registry.getUsername() != null && registry.getPassword() != null;
     }
 
     private static boolean under(String url, NodeRegistry registry) {
