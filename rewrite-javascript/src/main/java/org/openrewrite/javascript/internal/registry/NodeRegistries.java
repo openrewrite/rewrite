@@ -56,22 +56,40 @@ public class NodeRegistries {
     }
 
     /**
-     * The registry a request to {@code url} goes through: of the host's, the one at or the longest above {@code url},
-     * as npm picks credentials by the request's URL; otherwise {@code url} without, since the host's go nowhere else.
+     * The registry a request for {@code packageName} to {@code url} goes through, by the package's scope: the host's
+     * for that name when {@code url} is its URL or under it; otherwise {@code url} without credentials.
      */
     public NodeRegistry registryFor(String packageName, String url) {
-        String target = trimSlash(url);
+        NodeRegistry configured = registryFor(packageName);
+        return under(url, configured) ? at(url, configured) : withoutCredentials(packageName, url);
+    }
+
+    /**
+     * The registry a request to {@code url} goes through by its URL, as npm and pnpm pick credentials: of the host's,
+     * the one at or the longest above {@code url}; otherwise {@code url} without credentials.
+     */
+    public NodeRegistry registryAt(String packageName, String url) {
         NodeRegistry match = null;
         for (NodeRegistry candidate : candidates()) {
-            String base = trimSlash(candidate.getUrl());
-            if ((target.equals(base) || target.startsWith(base + "/")) &&
-                (match == null || base.length() > trimSlash(match.getUrl()).length())) {
+            if (under(url, candidate) &&
+                (match == null || trimSlash(candidate.getUrl()).length() > trimSlash(match.getUrl()).length())) {
                 match = candidate;
             }
         }
-        if (match != null) {
-            return target.equals(trimSlash(match.getUrl())) ? match : match.withUrl(url);
-        }
+        return match != null ? at(url, match) : withoutCredentials(packageName, url);
+    }
+
+    private static boolean under(String url, NodeRegistry registry) {
+        String base = trimSlash(registry.getUrl());
+        String target = trimSlash(url);
+        return target.equals(base) || target.startsWith(base + "/");
+    }
+
+    private static NodeRegistry at(String url, NodeRegistry registry) {
+        return trimSlash(url).equals(trimSlash(registry.getUrl())) ? registry : registry.withUrl(url);
+    }
+
+    private NodeRegistry withoutCredentials(String packageName, String url) {
         return new NodeRegistry(null, url, null, null, null, null, false, null,
                 registryFor(packageName).isStrictSsl(), false);
     }

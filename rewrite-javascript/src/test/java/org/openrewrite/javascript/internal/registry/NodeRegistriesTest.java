@@ -32,6 +32,10 @@ class NodeRegistriesTest {
                     null, false, null, true, false)),
             null, null, null);
 
+    /**
+     * npm 11.17.0's getAuth picks credentials by the request's URL; pnpm's getAuthHeaderByURI does too. Where npm
+     * sends the default registry's to the same host outside its path, the host's go nowhere but under a registry.
+     */
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource(delimiter = '|', value = {
             "lodash|https://registry.example.com/npm|default-token|https://registry.example.com/npm/",
@@ -44,10 +48,32 @@ class NodeRegistriesTest {
             "lodash|https://registry.yarnpkg.com||https://registry.yarnpkg.com",
             "@corp/a|https://corp.example.com/|corp-token|https://corp.example.com",
             "@corp/a|https://registry.example.com/npm/|default-token|https://registry.example.com/npm/",
+            "lodash|https://corp.example.com/lodash/-/lodash-4.17.21.tgz|corp-token|" +
+            "https://corp.example.com/lodash/-/lodash-4.17.21.tgz",
     })
-    void sendsTheHostsCredentialsOnlyToItsRegistryAndTheUrlsUnderIt(String name, String url, @Nullable String token,
-                                                                    String requestedFrom) {
-        NodeRegistry registry = REGISTRIES.registryFor(name, url);
+    void byTheRequestsUrl(String name, String url, @Nullable String token, String requestedFrom) {
+        assertSends(REGISTRIES.registryAt(name, url), name, token, requestedFrom);
+    }
+
+    /**
+     * The Yarn and Bun adapters' rule: the registry the package's scope names, its credentials only to its URLs.
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @CsvSource(delimiter = '|', value = {
+            "lodash|https://registry.example.com/npm/|default-token|https://registry.example.com/npm/",
+            "lodash|https://registry.example.com/npm/lodash/-/lodash-4.17.21.tgz|default-token|" +
+            "https://registry.example.com/npm/lodash/-/lodash-4.17.21.tgz",
+            "lodash|https://registry.example.com/npm-other/||https://registry.example.com/npm-other/",
+            "@corp/a|https://corp.example.com/|corp-token|https://corp.example.com",
+            "@corp/a|https://registry.example.com/npm/||https://registry.example.com/npm/",
+            "lodash|https://corp.example.com/lodash/-/lodash-4.17.21.tgz||" +
+            "https://corp.example.com/lodash/-/lodash-4.17.21.tgz",
+    })
+    void byThePackagesScope(String name, String url, @Nullable String token, String requestedFrom) {
+        assertSends(REGISTRIES.registryFor(name, url), name, token, requestedFrom);
+    }
+
+    private static void assertSends(NodeRegistry registry, String name, @Nullable String token, String requestedFrom) {
         assertThat(registry.getAuthToken()).isEqualTo(token);
         assertThat(registry.getUrl()).isEqualTo(requestedFrom);
         NodeRegistry answering = "corp-token".equals(token) ? REGISTRIES.getByScope().get("@corp") :

@@ -37,7 +37,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     @Override
     public @Nullable String packument(String registry, String name, boolean fullMetadata) {
         try {
-            return client.getPackumentText(registries.registryFor(name, registry), name, fullMetadata);
+            return client.getPackumentText(registries.registryAt(name, registry), name, fullMetadata);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -52,7 +52,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
         String url = base + "-/npm/v1/attestations/" + (name.startsWith("@") ? name.replace("/", "%2F") : name) +
                      "@" + version;
         try {
-            return client.getDocumentText(registries.registryFor(name, registry), name, version, url);
+            return client.getDocumentText(registries.registryAt(name, registry), name, version, url);
         } catch (NodeRegistryException e) {
             // fetchAttestationPublishedAt answers undefined for any failure, and pnpm reads the full document instead
             return null;
@@ -62,7 +62,7 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     @Override
     public @Nullable String document(String url) {
         try {
-            return client.getDocumentText(registries.registryFor("", url), url, null, url);
+            return client.getDocumentText(registries.registryAt("", url), url, null, url);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND ||
                 e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND) {
