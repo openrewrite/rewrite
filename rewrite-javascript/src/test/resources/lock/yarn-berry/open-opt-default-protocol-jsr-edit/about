@@ -1,0 +1,1 @@
+The edit sets defaultProtocol "jsr:" in .yarnrc.yml beside an ms 2.1.2 to 2.1.3 bump over a lock: ms@jsr:2.1.3 resolves through npm: aliases that re-normalize to jsr: without end, and Yarn runs out of heap in the resolution step (open-opt-default-protocol-jsr as an edit).

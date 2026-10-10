@@ -1,0 +1,4 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+ERROR: Yarn is terminating due to an unexpected empty event loop.
+Please report this issue at https://github.com/yarnpkg/berry/issues.

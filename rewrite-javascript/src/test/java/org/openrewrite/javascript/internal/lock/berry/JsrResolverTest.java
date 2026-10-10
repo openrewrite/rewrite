@@ -17,12 +17,14 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
+import java.time.Duration;
 import java.time.Instant;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
  * plugin-jsr helpers.ts: a jsr package is the npm package of its name wrapped into the {@code jsr} scope.
@@ -46,7 +48,7 @@ class JsrResolverTest {
      * resolver wraps into is normalized back to {@code jsr:}, one scope deeper each time.
      */
     @Test
-    void aDefaultProtocolOfJsrWrapsWithoutEnd() throws InterruptedException {
+    void aDefaultProtocolOfJsrWrapsWithoutEnd() {
         YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(YarnBerryLockRegenerator.Inputs.builder()
                 .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"ms@npm:2.1.2\":\n  version: 2.1.2\n  " +
                       "resolution: \"ms@npm:2.1.2\"\n  checksum: " +
@@ -58,16 +60,16 @@ class JsrResolverTest {
                               "\"dependencies\": {\"ms\": \"2.1.3\"}}")
                 .configFile(".yarnrc.yml", "defaultProtocol: \"jsr:\"\n")
                 .now(Instant.EPOCH)
-                .build());
-        AtomicReference<Result> result = new AtomicReference<>();
-        // a small stack ends the schedule in moments
-        Thread install = new Thread(null, () -> result.set(regenerator.regenerate()), "install", 1 << 18);
-        install.start();
-        install.join();
+                .build(), BerryScenarios.NO_REGISTRY);
+        Result result = assertTimeoutPreemptively(Duration.ofSeconds(2), regenerator::regenerate);
 
-        Failure failure = result.get().getFailure();
+        Failure failure = result.getFailure();
         assertThat(failure).isNotNull();
-        assertThat(failure.getDetail())
-                .isEqualTo("yarn fails on this edit: crash: JavaScript heap out of memory in the resolution step");
+        assertThat(failure.getKind()).isEqualTo(Kind.PM_FAILS);
+        assertThat(failure.getDetail()).isEqualTo("yarn fails on this edit: crash: JavaScript heap out of memory in " +
+                                                  "the resolution step (the resolution chain ms@jsr:2.1.3 -> " +
+                                                  "ms@npm:@jsr/ms@2.1.3 -> @jsr/ms@jsr:2.1.3 -> " +
+                                                  "@jsr/ms@npm:@jsr/jsr__ms@2.1.3 -> @jsr/jsr__ms@jsr:2.1.3 " +
+                                                  "revisits jsr:2.1.3 under a new name each time)");
     }
 }

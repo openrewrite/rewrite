@@ -344,7 +344,7 @@ public final class YarnBerryLockRegenerator {
         if (e instanceof Project.UnknownChecksums) {
             return new CannotKnow(String.valueOf(e.getMessage()), Reason.CHECKSUM_UNAVAILABLE);
         }
-        if (e instanceof Project.HeapExhausted) {
+        if (e instanceof ResolutionChain.Endless) {
             return Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, String.valueOf(e.getMessage()));
         }
         if (e instanceof ReportError) {

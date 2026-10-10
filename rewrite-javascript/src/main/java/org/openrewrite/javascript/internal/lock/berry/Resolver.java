@@ -15,7 +15,9 @@
  */
 package org.openrewrite.javascript.internal.lock.berry;
 
+import lombok.AllArgsConstructor;
 import lombok.Value;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -29,10 +31,21 @@ interface Resolver {
      * {@code ResolveOptions}: the project, the resolver chain at the top, and the registry the npm resolvers ask.
      */
     @Value
+    @AllArgsConstructor
     class ResolveOptions {
         Project project;
         Resolver resolver;
         RegistrySource registry;
+
+        /**
+         * The resolution step's chain of resolution dependencies, checked as each one is taken.
+         */
+        @Nullable
+        ResolutionChain chain;
+
+        ResolveOptions(Project project, Resolver resolver, RegistrySource registry) {
+            this(project, resolver, registry, null);
+        }
     }
 
     /**

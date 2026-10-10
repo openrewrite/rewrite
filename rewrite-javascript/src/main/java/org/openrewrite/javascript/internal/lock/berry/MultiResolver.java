@@ -55,7 +55,12 @@ final class MultiResolver implements Resolver {
 
     @Override
     public Map<String, Descriptor> getResolutionDependencies(Descriptor descriptor, ResolveOptions opts) {
-        return getResolverByDescriptor(descriptor, opts).getResolutionDependencies(descriptor, opts);
+        Resolver resolver = getResolverByDescriptor(descriptor, opts);
+        ResolutionChain chain = opts.getChain();
+        if (chain != null && !(resolver instanceof MultiResolver)) {
+            chain.enter(descriptor, resolver);
+        }
+        return resolver.getResolutionDependencies(descriptor, opts);
     }
 
     @Override

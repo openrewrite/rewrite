@@ -124,15 +124,6 @@ final class Project {
     }
 
     /**
-     * Yarn defers each scheduled descriptor on a promise, so a schedule without end exhausts its heap.
-     */
-    static final class HeapExhausted extends RuntimeException {
-        HeapExhausted() {
-            super("crash: JavaScript heap out of memory in the resolution step");
-        }
-    }
-
-    /**
      * Checksums of fetched packages the engine cannot compute, named.
      */
     static final class UnknownChecksums extends RuntimeException {
@@ -474,30 +465,26 @@ final class Project {
         Resolver resolver = new MultiResolver(new LockfileResolver(realResolver), legacyMigrationResolver,
                 realResolver);
         Resolver noLockfileResolver = new MultiResolver(legacyMigrationResolver, realResolver);
-        ResolutionPass pass = new ResolutionPass(new Resolver.ResolveOptions(this, resolver, registry),
+        ResolutionPass pass = new ResolutionPass(resolver, registry,
                 checkResolutions ? new Resolver.ResolveOptions(this, noLockfileResolver, registry) : null);
         for (Workspace workspace : workspaces) {
             pass.resolutionQueue.add(Collections.singletonList(workspace.getAnchoredDescriptor()));
         }
         CannotKnow unknown = null;
-        try {
-            while (!pass.resolutionQueue.isEmpty()) {
-                List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
-                pass.resolutionQueue.clear();
-                for (List<Descriptor> dependencies : copy) {
-                    for (Descriptor descriptor : dependencies) {
-                        try {
-                            pass.scheduleDescriptorResolution(descriptor);
-                        } catch (CannotKnow e) {
-                            if (unknown == null) {
-                                unknown = e;
-                            }
+        while (!pass.resolutionQueue.isEmpty()) {
+            List<List<Descriptor>> copy = new ArrayList<>(pass.resolutionQueue);
+            pass.resolutionQueue.clear();
+            for (List<Descriptor> dependencies : copy) {
+                for (Descriptor descriptor : dependencies) {
+                    try {
+                        pass.scheduleDescriptorResolution(descriptor);
+                    } catch (CannotKnow e) {
+                        if (unknown == null) {
+                            unknown = e;
                         }
                     }
                 }
             }
-        } catch (StackOverflowError e) {
-            throw new HeapExhausted();
         }
         if (unknown != null) {
             throw unknown;
@@ -538,6 +525,7 @@ final class Project {
      * {@code resolveEverything}'s scheduling, a wave of dependencies at a time.
      */
     private final class ResolutionPass {
+        final ResolutionChain chain = new ResolutionChain();
         final Resolver.ResolveOptions opts;
         final Resolver.@Nullable ResolveOptions checkOpts;
 
@@ -552,8 +540,8 @@ final class Project {
         final Map<String, Object> packageResolutions = new HashMap<>();
         final Map<String, Object> descriptorResolutions = new HashMap<>();
 
-        ResolutionPass(Resolver.ResolveOptions opts, Resolver.@Nullable ResolveOptions checkOpts) {
-            this.opts = opts;
+        ResolutionPass(Resolver resolver, RegistrySource registry, Resolver.@Nullable ResolveOptions checkOpts) {
+            this.opts = new Resolver.ResolveOptions(Project.this, resolver, registry, chain);
             this.checkOpts = checkOpts;
         }
 
@@ -577,13 +565,18 @@ final class Project {
         private Package startDescriptorResolution(Descriptor descriptor) {
             Resolver resolver = opts.getResolver();
             Map<String, Package> resolvedDependencies = new LinkedHashMap<>();
-            for (Map.Entry<String, Descriptor> dependency :
-                    resolver.getResolutionDependencies(descriptor, opts).entrySet()) {
-                Descriptor bound = resolver.bindDescriptor(dependency.getValue(),
-                        getTopLevelWorkspace().getAnchoredLocator(), opts);
-                Package resolvedPackage = scheduleDescriptorResolution(bound);
-                resolutionDependencies.add(resolvedPackage.locatorHash);
-                resolvedDependencies.put(dependency.getKey(), resolvedPackage);
+            int outer = chain.startStep();
+            try {
+                for (Map.Entry<String, Descriptor> dependency :
+                        resolver.getResolutionDependencies(descriptor, opts).entrySet()) {
+                    Descriptor bound = resolver.bindDescriptor(dependency.getValue(),
+                            getTopLevelWorkspace().getAnchoredLocator(), opts);
+                    Package resolvedPackage = scheduleDescriptorResolution(bound);
+                    resolutionDependencies.add(resolvedPackage.locatorHash);
+                    resolvedDependencies.put(dependency.getKey(), resolvedPackage);
+                }
+            } finally {
+                chain.endStep(outer);
             }
 
             List<Locator> candidateResolutions;

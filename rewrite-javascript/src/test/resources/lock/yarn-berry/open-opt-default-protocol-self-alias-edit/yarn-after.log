@@ -1,0 +1,15 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ RangeError: Maximum call stack size exceeded
+    at cs (<corepack>/v1/yarn/4.10.3/yarn.js:140:97854)
+    at Da (<corepack>/v1/yarn/4.10.3/yarn.js:140:100402)
+    at Object.HB (<corepack>/v1/yarn/4.10.3/yarn.js:140:103326)
+    at JD.supportsDescriptor (<corepack>/v1/yarn/4.10.3/yarn.js:695:2243)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:141:1561
+    at Array.find (<anonymous>)
+    at rm.tryResolverByDescriptor (<corepack>/v1/yarn/4.10.3/yarn.js:141:1551)
+    at rm.supportsDescriptor (<corepack>/v1/yarn/4.10.3/yarn.js:141:864)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:141:1661
+    at Array.find (<anonymous>)
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 25ms
