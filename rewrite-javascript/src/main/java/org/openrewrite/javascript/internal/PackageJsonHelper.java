@@ -748,6 +748,22 @@ public class PackageJsonHelper {
     }
 
     /**
+     * The {@code name} a package.json declares, read from the document; null when it holds no string there.
+     */
+    public static @Nullable String declaredName(SourceFile packageJson) {
+        if (!(packageJson instanceof Json.Document) || !(((Json.Document) packageJson).getValue() instanceof
+                Json.JsonObject)) {
+            return null;
+        }
+        for (Json m : ((Json.JsonObject) ((Json.Document) packageJson).getValue()).getMembers()) {
+            if (m instanceof Json.Member && "name".equals(literalString(((Json.Member) m).getKey()))) {
+                return literalString(((Json.Member) m).getValue());
+            }
+        }
+        return null;
+    }
+
+    /**
      * {@code doc} with the string member {@code key} of the object {@code path} leads to set to {@code value}, in place
      * or appended; unchanged when the path leads to no object holding members.
      */

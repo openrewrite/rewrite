@@ -19,11 +19,15 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
+import org.openrewrite.javascript.internal.DependencyPathSegment;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
+import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
 import org.openrewrite.javascript.internal.PackageJsonOverrides;
+import org.openrewrite.javascript.internal.lock.Spec;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.table.NodeDependencyProtocolsSkipped;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
@@ -44,6 +48,7 @@ import static java.util.Objects.requireNonNull;
 public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTransitiveDependencyVersion.Accumulator> {
 
     transient NodeLockRegenerationFailures lockRegenerationFailures = new NodeLockRegenerationFailures(this);
+    transient NodeDependencyProtocolsSkipped protocolsSkipped = new NodeDependencyProtocolsSkipped(this);
 
     @Option(displayName = "Package name",
             description = "The name of the transitive npm dependency to upgrade.",
@@ -75,8 +80,14 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 "shared with other dependency recipes.";
     }
 
-    public static class Accumulator {
+    public static class Accumulator implements PackageJsonHelper.FileEditor {
         final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
+        final UpgradeTransitiveDependencyVersion recipe;
+        /** Each pnpm-workspace.yaml as scanned. */
+        final Map<Path, SourceFile> workspaceManifests = new HashMap<>();
+        /** Each root's override as the recipes before this one leave its files, for the recipes after it. */
+        final Map<Path, PackageJsonOverrides> edits = new HashMap<>();
+        final Set<NodeDependencyProtocolsSkipped.Row> protocolRows = new HashSet<>();
         /** Each workspace root's override, decided from the revisions before this recipe it was last asked for. */
         final Map<Path, PackageJsonOverrides> overrides = new HashMap<>();
         /** The override each root's files were first written by; a later decision must write as it does. */
@@ -91,11 +102,20 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         final Set<Path> generated = new HashSet<>();
         /** The revisions this recipe published, told apart from those of the recipes before it. */
         final Set<SourceFile> published = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        Accumulator(UpgradeTransitiveDependencyVersion recipe) {
+            this.recipe = recipe;
+        }
+
+        @Override
+        public SourceFile edit(ExecutionContext ctx, SourceFile file) {
+            return recipe.editedForLaterRecipes(this, ctx, file);
+        }
     }
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
-        return new Accumulator();
+        return new Accumulator(this);
     }
 
     @Override
@@ -108,6 +128,9 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 Path p = sf.getSourcePath();
                 String basename = p.getFileName().toString();
 
+                if (sf instanceof Yaml.Documents && PackageJsonOverrides.WORKSPACE_MANIFEST.equals(basename)) {
+                    acc.workspaceManifests.put(p, sf);
+                }
                 if (NodeDependencyScan.capturePackageManagerFile(acc.scan, sf)) return tree;
                 if (PackageJsonHelper.isLockFile(basename)) {
                     if (sf instanceof Json.Document || sf instanceof Yaml.Documents || sf instanceof PlainText) {
@@ -129,6 +152,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     @Override
     public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        PackageJsonHelper.addFileEditor(ctx, acc);
         NodeDependencyScan.linkWorkspaceMembers(acc.scan);
         List<SourceFile> created = new ArrayList<>();
         for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : acc.scan.projects.entrySet()) {
@@ -278,9 +302,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (edited.isEmpty()) {
             return null;
         }
-        SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, importer);
-        ips.regenResult = PackageJsonHelper.regenerateLockContent(pkg == null ? ips.capturedPackageJson : pkg,
-                ips.capturedLockContent, NodeDependencyScan.projectFiles(acc.scan, ctx, importer), edited, ctx);
+        NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc.scan, ctx, importer);
+        for (Map.Entry<Path, String> manifest : otherManifests(acc, ctx, importer, files).entrySet()) {
+            edited.putIfAbsent(manifest.getKey(), manifest.getValue());
+        }
+        ips.regenResult = PackageJsonHelper.regenerateLockContent(PackageJsonHelper.editedBefore(ctx, acc,
+                requireNonNull(ips.capturedPackageJson)), ips.capturedLockContent, files, edited, ctx);
         return ips.regenResult;
     }
 
@@ -294,15 +321,18 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
         Map<Path, String> edited = workspaceEdit(acc, ctx, root, override);
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc.scan, ctx, root);
-        Map<Path, String> otherManifests = new HashMap<>(files.getManifests());
-        otherManifests.remove(root);
+        Map<Path, String> otherManifests = otherManifests(acc, ctx, root, files);
         List<Object> inputs = Arrays.asList(print(base), otherManifests, files.getPackageManagerFiles(),
                 files.getPaths(), edited);
         if (inputs.equals(acc.regeneratedFrom.put(root, inputs))) {
             return;
         }
+        Map<Path, String> read = new LinkedHashMap<>(edited);
+        if (!(base instanceof Json.Document) || override.apply((Json.Document) base) != base || !edited.isEmpty()) {
+            read.putAll(otherManifests);
+        }
         PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(base,
-                override::apply, edited, singletonMap(workspaceManifest, workspaceBase(acc, ctx, workspaceManifest)),
+                override::apply, read, singletonMap(workspaceManifest, workspaceBase(acc, ctx, workspaceManifest)),
                 ps.capturedLockContent, files, ctx);
         ps.modifiedPackageJson = r.getModifiedPackageJson();
         ps.regenResult = r.getRegenResult();
@@ -336,7 +366,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return workspaceEdit(acc, ctx, root, override).get(path);
     }
 
-    // the revision of pnpm-workspace.yaml before this recipe's edit: as visited, else as an earlier recipe left it
+    // the revision of pnpm-workspace.yaml before this recipe's edit: as visited, else as the recipes before it left it
     private static @Nullable String workspaceBase(Accumulator acc, ExecutionContext ctx, Path path) {
         if (acc.generated.contains(path)) {
             return null;
@@ -345,19 +375,32 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (visited != null) {
             return print(visited);
         }
-        SourceFile live = PackageJsonHelper.getLiveTree(ctx, path);
-        return live != null && !acc.published.contains(live) ? print(live) : acc.scan.packageManagerFiles.get(path);
+        SourceFile scanned = acc.workspaceManifests.get(path);
+        return scanned != null ? print(PackageJsonHelper.editedBefore(ctx, acc, scanned)) :
+                acc.scan.packageManagerFiles.get(path);
     }
 
-    // the root's package.json before this recipe's edit: as visited, else as an earlier recipe left it, else scanned
+    // the root's package.json before this recipe's edit: as visited, else as the recipes before it left it
     private static SourceFile base(Accumulator acc, ExecutionContext ctx, Path root,
                                    NodeDependencyScan.ProjectState ps) {
         SourceFile visited = acc.visited.get(root);
-        if (visited != null) {
-            return visited;
+        return visited != null ? visited : PackageJsonHelper.editedBefore(ctx, acc,
+                requireNonNull(ps.capturedPackageJson));
+    }
+
+    // the lock's other manifests a regeneration for packageJson reads, as the recipes before this one leave them
+    private static Map<Path, String> otherManifests(Accumulator acc, ExecutionContext ctx, Path packageJson,
+                                                   NodeDependencyScan.ProjectFiles files) {
+        Set<Path> manifests = new LinkedHashSet<>(files.getManifests().keySet());
+        manifests.addAll(files.getPackageManagerFiles().keySet());
+        Map<Path, String> out = new LinkedHashMap<>();
+        for (Path manifest : manifests) {
+            NodeDependencyScan.ProjectState ps = acc.scan.projects.get(manifest);
+            if (!manifest.equals(packageJson) && ps != null && ps.capturedPackageJson != null) {
+                out.put(manifest, print(PackageJsonHelper.editedBefore(ctx, acc, ps.capturedPackageJson)));
+            }
         }
-        SourceFile live = PackageJsonHelper.getLiveTree(ctx, root);
-        return live != null && !acc.published.contains(live) ? live : requireNonNull(ps.capturedPackageJson);
+        return out;
     }
 
     private static void publish(Accumulator acc, ExecutionContext ctx, Path path, SourceFile revision) {
@@ -393,7 +436,110 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             failure(ctx, ps, root, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, declined);
             return null;
         }
+        if (writes(acc, ctx, root, ps, override)) {
+            List<NodeDependencyProtocolsSkipped.Row> references = references(acc, ctx, root,
+                    base(acc, ctx, root, ps));
+            for (NodeDependencyProtocolsSkipped.Row row : references) {
+                if (acc.protocolRows.add(row)) {
+                    protocolsSkipped.insertRow(ctx, row);
+                }
+            }
+            if (!references.isEmpty()) {
+                return null;
+            }
+        }
         return override;
+    }
+
+    // whether the override changes the file it is written in
+    private static boolean writes(Accumulator acc, ExecutionContext ctx, Path root,
+                                  NodeDependencyScan.ProjectState ps, PackageJsonOverrides override) {
+        if (override.getPlace() == PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
+            return !override.applyToWorkspaceManifest().equals(workspaceBase(acc, ctx,
+                    root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST)));
+        }
+        SourceFile pkg = base(acc, ctx, root, ps);
+        return pkg instanceof Json.Document && override.apply((Json.Document) pkg) != pkg;
+    }
+
+    // the declarations the override would win over unnamed: packageName through a value that is no version range,
+    // in the root or a member it governs, or for an override scoped to a member, in that member
+    private List<NodeDependencyProtocolsSkipped.Row> references(Accumulator acc, ExecutionContext ctx, Path root,
+                                                                SourceFile rootRevision) {
+        List<DependencyPathSegment> path = dependencyPath == null ? null :
+                PackageJsonOverrides.parsePath(dependencyPath);
+        String parent = path == null || path.isEmpty() ? null : path.get(path.size() - 1).getName();
+        NodeResolutionResult.PackageManager pm = packageManager(rootRevision);
+        List<NodeDependencyProtocolsSkipped.Row> rows = new ArrayList<>();
+        for (Map.Entry<Path, NodeDependencyScan.ProjectState> project :
+                new TreeMap<>(acc.scan.projects).entrySet()) {
+            SourceFile captured = project.getValue().capturedPackageJson;
+            if (captured == null || !root.equals(workspaceRoot(acc.scan, project.getKey(), pm))) {
+                continue;
+            }
+            SourceFile manifest = project.getKey().equals(root) ? rootRevision :
+                    PackageJsonHelper.editedBefore(ctx, acc, captured);
+            if (parent != null && (project.getKey().equals(root) || !parent.equals(PackageJsonHelper.declaredName(manifest)))) {
+                continue;
+            }
+            for (Map.Entry<String, Map<String, String>> scope :
+                    PackageJsonHelper.declaredDependencies(manifest).entrySet()) {
+                String value = scope.getValue().get(packageName);
+                Spec spec = value == null ? null : NodeCatalogs.classify(packageName, value);
+                if (value != null && (spec == null || !spec.isVersionSpec())) {
+                    rows.add(new NodeDependencyProtocolsSkipped.Row(root.toString(), project.getKey().toString(),
+                            packageName, scope.getKey(), spec == null || spec.getProtocol() == null ? "" :
+                            spec.getProtocol(), value, newVersion));
+                }
+            }
+        }
+        return rows;
+    }
+
+    // file as the recipes before this one leave it, with this recipe's override, for the recipes after it
+    private SourceFile editedForLaterRecipes(Accumulator acc, ExecutionContext ctx, SourceFile file) {
+        Path p = file.getSourcePath();
+        boolean workspaceManifest = PackageJsonOverrides.WORKSPACE_MANIFEST.equals(String.valueOf(p.getFileName()));
+        Path root = workspaceManifest ? p.resolveSibling("package.json") : p;
+        NodeDependencyScan.ProjectState ps = acc.scan.projects.get(root);
+        NodeResolutionResult.PackageManager pm = ps == null ? null : packageManager(ps.capturedPackageJson);
+        if (pm == null || !root.equals(workspaceRoot(acc.scan, root, pm)) ||
+            !workspaceManifest && !(file instanceof Json.Document)) {
+            return file;
+        }
+        SourceFile pkg = workspaceManifest ? PackageJsonHelper.editedBefore(ctx, acc,
+                requireNonNull(ps.capturedPackageJson)) : file;
+        String workspace = null;
+        if (pm == NodeResolutionResult.PackageManager.Pnpm) {
+            Path path = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
+            SourceFile scanned = acc.workspaceManifests.get(path);
+            if (workspaceManifest) {
+                workspace = print(file);
+            } else if (scanned != null) {
+                workspace = print(PackageJsonHelper.editedBefore(ctx, acc, scanned));
+            } else if (acc.scan.paths.contains(path)) {
+                return file;
+            }
+        }
+        if (!(pkg instanceof Json.Document)) {
+            return file;
+        }
+        PackageJsonOverrides last = acc.edits.get(root);
+        PackageJsonOverrides override = last != null ? last.from((Json.Document) pkg, workspace) :
+                PackageJsonOverrides.of(pm, (Json.Document) pkg, workspace, packageName, newVersion,
+                        dependencyPath == null ? null : PackageJsonOverrides.parsePath(dependencyPath));
+        acc.edits.put(root, override);
+        if (override.declined() != null || !references(acc, ctx, root, pkg).isEmpty()) {
+            return file;
+        }
+        if (!workspaceManifest) {
+            return override.apply((Json.Document) file);
+        }
+        if (override.getPlace() != PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
+            return file;
+        }
+        String content = override.applyToWorkspaceManifest();
+        return content.equals(workspace) ? file : PackageJsonHelper.reparseLock(file, content);
     }
 
     // packageJson's workspace root; null, with a row, when that is not a package.json the recipe edits

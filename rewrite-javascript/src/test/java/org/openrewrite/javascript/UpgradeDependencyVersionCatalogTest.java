@@ -243,6 +243,33 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
         );
     }
 
+    // recorded with Bun 1.3.10: the root's override and the member's range, in every visit order
+    @Test
+    void anUpgradeAfterAnOverrideInOneRunRegeneratesWithTheOverride() {
+        CatalogRecording recording = new CatalogRecording("bun", "catalog-compose-override-then-member");
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null),
+              new UpgradeDependencyVersion("is-number", null, "^7.0.0"))
+            .executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null),
+          new UpgradeDependencyVersion("is-number", null, "^7.0.0"));
+    }
+
+    @Test
+    void anOverrideAfterAnUpgradeInOneRunRegeneratesWithTheUpgrade() {
+        CatalogRecording recording = new CatalogRecording("bun", "catalog-compose-override-then-member");
+        rewriteRun(
+          spec -> spec.recipes(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
+              new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null))
+            .executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new UpgradeDependencyVersion("is-number", null, "^7.0.0"),
+          new UpgradeTransitiveDependencyVersion("wrappy", "1.0.1", null));
+    }
+
     // recorded with pnpm 11.2.2: without a lock it still counts every project its packages match, so the cleanup
     // keeps the entry only a member references
     @Test
