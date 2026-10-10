@@ -91,9 +91,8 @@ public final class SpecUtils {
     }
 
     /**
-     * {@code loadSpec} from {@code initialCwd} (a directory relative to the project's, {@code ../} above it) up to
-     * {@code levels} directories above the project's; {@code manifest} answers a directory's package.json text.
-     * {@code holds} answers whether the host holds a file, by its path from the project's directory.
+     * {@code loadSpec} from {@code initialCwd} (relative to the project's directory) up to {@code levels} above it;
+     * {@code manifest} answers a directory's package.json text, {@code holds} whether the host holds a file there.
      */
     public static Lookup loadSpec(String initialCwd, int levels, Function<String, @Nullable String> manifest,
                                   Predicate<String> holds, HostEnvironment env) {

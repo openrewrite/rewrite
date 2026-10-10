@@ -242,7 +242,8 @@ class SpecUtilsTest {
     })
     void readsTheEnvFileBesideThePackageJson(String spec, @Nullable String held, @Nullable String variable,
                                              String answer) {
-        String raw = "url".equals(spec) ? "yarn@https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js" : spec;
+        String raw = "url".equals(spec) ? "yarn@https://repo.yarnpkg.com/4.10.3/packages/yarnpkg-cli/bin/yarn.js" :
+                spec;
         HostEnvironment env = variable == null ? NO_ENV : HostEnvironment.of(Collections.singletonMap(
                 variable.substring(0, variable.indexOf('=')), variable.substring(variable.indexOf('=') + 1)));
         String actual;

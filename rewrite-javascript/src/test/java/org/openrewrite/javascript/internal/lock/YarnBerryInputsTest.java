@@ -148,9 +148,8 @@ class YarnBerryInputsTest {
     }
 
     /**
-     * The host's token for the private registry a project's .yarnrc.yml names goes with an unscoped package's request
-     * too, under the project's top-level npmAlwaysAuth or without it: a home entry without npmAlwaysAuth would shadow
-     * the project's ({@code s5y/berry-keys} probe home-entry-project-always-auth).
+     * The host's token for the registry a project's .yarnrc.yml names goes with an unscoped package's request, with or
+     * without the project's top-level npmAlwaysAuth, which a home entry lacking its own would shadow.
      */
     @Test
     void theHostsCredentialsGoWithEveryRequestToTheirRegistry(@TempDir Path home) {
