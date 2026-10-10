@@ -17,10 +17,12 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -77,15 +79,27 @@ class BunRegistryManifestsTest {
         assertThat(scope.getUsername()).isNull();
     }
 
+    // a host's own key, //r.example/:_authToken, read from the user's .npmrc as the host reads it
+    @Test
+    void aHostsTokenReachesTheRegistryUnderIt(@TempDir Path home) {
+        NodeRegistries user = HostRegistries.fromUserNpmrc("registry=" + NPM + "\n//r.example/:_authToken=host-token\n",
+          home);
+
+        assertThat(manifests(user).scope("ms", NPM).getAuthToken()).isEqualTo("host-token");
+    }
+
     private static BunRegistryManifests manifests(NodeRegistry defaultRegistry, @Nullable NodeRegistry scoped) {
         Map<String, NodeRegistry> byScope = new LinkedHashMap<>();
         if (scoped != null) {
             byScope.put(scoped.getScope(), scoped);
         }
-        return new BunRegistryManifests(new NodeRegistries(defaultRegistry, byScope, null, null, null),
-          new NpmRegistryClient(request -> {
-              throw new AssertionError("no request: " + request.getUrl());
-          }));
+        return manifests(new NodeRegistries(defaultRegistry, byScope, null, null, null));
+    }
+
+    private static BunRegistryManifests manifests(NodeRegistries registries) {
+        return new BunRegistryManifests(registries, new NpmRegistryClient(request -> {
+            throw new AssertionError("no request: " + request.getUrl());
+        }));
     }
 
     private static NodeRegistry registry(@Nullable String scope, String url, @Nullable String token) {
