@@ -46,8 +46,8 @@ class NpmLockRegeneratorTest {
     };
 
     /**
-     * {@code npm prefix} (npm 11.17.0) run in packages/a under these package.json files: the root's at the top and,
-     * when given, that of packages/ in between. npm writes the lock of the directory it prints.
+     * {@code npm prefix} (npm 11.17.0) run in packages/a under the root's package.json and that of packages/ when
+     * given ({@code npm-arborist/generate/npm-prefix-cases.js}); npm writes the lock of the directory it prints.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', value = {

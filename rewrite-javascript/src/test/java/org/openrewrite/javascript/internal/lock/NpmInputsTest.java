@@ -107,8 +107,8 @@ class NpmInputsTest {
     }
 
     /**
-     * npm 11.17.0 run in packages/a, which holds its own lock, under these files: {@code npm prefix} and its
-     * {@code install --package-lock-only} there install at the member, at the root, or fail.
+     * {@code npm prefix} (npm 11.17.0) run in packages/a, which holds its own lock, under these files, and the error
+     * its walk raises where it fails ({@code npm-arborist/generate/npm-prefix-cases.js}).
      */
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
