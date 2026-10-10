@@ -67,9 +67,9 @@
  * IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  * </pre>
  * {@code DeepEqual} ports deep-equal 1.0.1, {@code internal.lock.JsYaml} the loader of js-yaml 3.13.1,
- * {@code ObjectPath} object-path 0.11.4, {@code BraceExpansion} brace-expansion 1.1.11 with balanced-match 1.0.0,
- * {@code Micromatch} micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff 2.0.0, {@code Braces} braces
- * 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
+ * {@code ObjectPath} object-path 0.11.4, {@code internal.lock.BraceExpansion} brace-expansion 1.1.11 with
+ * balanced-match 1.0.0, {@code Micromatch} micromatch 2.3.11 with is-glob 2.0.1, is-extglob 1.0.0 and arr-diff
+ * 2.0.0, {@code Braces} braces 1.8.5 with expand-range 1.8.2, fill-range 2.2.4, preserve 0.2.0, repeat-element 1.1.2, repeat-string 1.6.1 and
  * randomatic 3.0.0, {@code ExpandBrackets} expand-brackets 0.1.5 with is-posix-bracket 0.1.1, {@code Extglob} extglob
  * 0.3.2, {@code ParseGlob} parse-glob 3.0.4 with glob-base 0.3.0 and is-dotfile 1.0.3, {@code GunzipMaybe} gunzip-maybe
  * 1.4.1 with is-gzip 1.0.0 and is-deflate 1.0.0, {@code TarStream} tar-stream 1.6.1, {@code TarFs} tar-fs 1.16.3 and

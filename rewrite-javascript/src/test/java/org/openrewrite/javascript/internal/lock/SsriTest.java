@@ -133,7 +133,7 @@ class SsriTest {
     static Stream<Arguments> calls() {
         List<Arguments> out = new ArrayList<>();
         for (Ssri.Release release : Ssri.Release.values()) {
-            for (Call call : UpstreamCalls.read("ssri-" + version(release) + ".jsonl")) {
+            for (Call call : UpstreamCalls.read("ssri-" + version(release) + ".jsonl.gz")) {
                 if (notPorted(release, call) == null) {
                     out.add(Arguments.of(release, call));
                 }
@@ -254,7 +254,7 @@ class SsriTest {
     void namesEveryUpstreamCallItDoesNotReplay() {
         Map<String, Integer> notPorted = new LinkedHashMap<>();
         for (Ssri.Release release : Ssri.Release.values()) {
-            for (Call call : UpstreamCalls.read("ssri-" + version(release) + ".jsonl")) {
+            for (Call call : UpstreamCalls.read("ssri-" + version(release) + ".jsonl.gz")) {
                 String reason = notPorted(release, call);
                 if (reason != null) {
                     notPorted.merge(version(release) + " " + reason, 1, Integer::sum);

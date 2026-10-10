@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import lombok.Builder;
 import lombok.Value;
+import org.openrewrite.javascript.internal.lock.BraceExpansion;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -164,7 +165,7 @@ final class Minimatch {
         if (options.nobrace || !HAS_BRACES.matcher(pattern).find()) {
             return Collections.singletonList(pattern);
         }
-        return BraceExpansion.expand(pattern);
+        return BraceExpansion.expand(pattern, BraceExpansion.Release.V1_1_11);
     }
 
     /**

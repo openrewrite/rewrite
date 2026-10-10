@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.npm;
+package org.openrewrite.javascript.internal.lock;
 
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
@@ -25,9 +25,15 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 /**
- * Port of brace-expansion 5.0.6 (with balanced-match 4.0.4): {@code a{b,c}d} to {@code abd acd}.
+ * Port of brace-expansion with balanced-match, {@code a{b,c}d} to {@code abd acd}: 1.1.11 with 1.0.0, which minimatch
+ * 3.0.4 calls in yarn 1.22.22, and 5.0.6 with 4.0.4, which minimatch 10.2.5 calls in npm 11.17.0.
  */
-final class BraceExpansion {
+public final class BraceExpansion {
+
+    public enum Release {
+        V1_1_11,
+        V5_0_6
+    }
 
     private static final int EXPANSION_MAX = 100_000;
 
@@ -37,29 +43,31 @@ final class BraceExpansion {
     private static final String ESC_COMMA = "\0COMMA\0";
     private static final String ESC_PERIOD = "\0PERIOD\0";
 
-    private static final Pattern NUMERIC_SEQUENCE = Pattern.compile("^-?\\d+\\.\\.-?\\d+(?:\\.\\.-?\\d+)?$");
-    private static final Pattern ALPHA_SEQUENCE = Pattern.compile("^[a-zA-Z]\\.\\.[a-zA-Z](?:\\.\\.-?\\d+)?$");
-    private static final Pattern POST_HAS_COMMA_BRACE = Pattern.compile(",(?!,).*}");
-    private static final Pattern PADDED = Pattern.compile("^-?0\\d");
-    private static final Pattern DOTS = Pattern.compile("\\.\\.");
+    private static final Pattern NUMERIC_SEQUENCE = V8RegExp.of("^-?\\d+\\.\\.-?\\d+(?:\\.\\.-?\\d+)?$");
+    private static final Pattern ALPHA_SEQUENCE = V8RegExp.of("^[a-zA-Z]\\.\\.[a-zA-Z](?:\\.\\.-?\\d+)?$");
+    private static final Pattern COMMA_THEN_CLOSE_1_1_11 = V8RegExp.of(",.*\\}");
+    private static final Pattern COMMA_THEN_CLOSE_5_0_6 = V8RegExp.of(",(?!,).*\\}");
+    private static final Pattern PADDED = V8RegExp.of("^-?0\\d");
+    private static final Pattern DOTS = V8RegExp.of("\\.\\.");
 
     private BraceExpansion() {
     }
 
     @Value
-    private static class Balanced {
+    static class Balanced {
         String pre;
         String body;
         String post;
     }
 
-    private static @Nullable Balanced balanced(String str) {
+    static @Nullable Balanced balanced(String str) {
         int[] r = range(str);
         return r == null ? null : new Balanced(str.substring(0, r[0]), str.substring(r[0] + 1, r[1]),
                                                str.substring(r[1] + 1));
     }
 
-    private static int @Nullable [] range(String str) {
+    // balanced-match's range of '{' and '}', the same in 1.0.0 and 4.0.4 for two different characters
+    static int @Nullable [] range(String str) {
         List<Integer> begs = new ArrayList<>();
         int ai = str.indexOf('{');
         int bi = str.indexOf('}', ai + 1);
@@ -91,8 +99,13 @@ final class BraceExpansion {
         return result;
     }
 
-    private static int numeric(String str) {
-        return !Double.isNaN(Js.toNumber(str)) ? (int) Double.parseDouble(str.trim()) : str.charAt(0);
+    // 1.1.11's parseInt(str, 10) == str and 5.0.6's !isNaN(str) agree on the parts a sequence's pattern lets through
+    private static long numeric(String str) {
+        try {
+            return Long.parseLong(str);
+        } catch (NumberFormatException e) {
+            return str.charAt(0);
+        }
     }
 
     private static String escapeBraces(String str) {
@@ -123,7 +136,7 @@ final class BraceExpansion {
         return p;
     }
 
-    static List<String> expand(String str) {
+    public static List<String> expand(String str, Release release) {
         if (str.isEmpty()) {
             return Collections.emptyList();
         }
@@ -131,22 +144,25 @@ final class BraceExpansion {
             str = "\\{\\}" + str.substring(2);
         }
         List<String> out = new ArrayList<>();
-        for (String s : expand(escapeBraces(str), true)) {
+        for (String s : expand(escapeBraces(str), true, release)) {
             out.add(unescapeBraces(s));
         }
         return out;
     }
 
-    private static List<String> expand(String str, boolean isTop) {
+    private static List<String> expand(String str, boolean isTop, Release release) {
+        boolean v5 = release == Release.V5_0_6;
+        int max = v5 ? EXPANSION_MAX : Integer.MAX_VALUE;
         List<String> expansions = new ArrayList<>();
         Balanced m = balanced(str);
-        if (m == null) {
-            return Collections.singletonList(str);
+        if (m == null || !v5 && m.getPre().endsWith("$")) {
+            return new ArrayList<>(Collections.singletonList(str));
         }
         String pre = m.getPre();
-        List<String> post = m.getPost().isEmpty() ? Collections.singletonList("") : expand(m.getPost(), false);
+        // 5.0.6 expands the rest before the body, 1.1.11 only once the body is a sequence or a set
+        List<String> post = v5 ? post(m, release) : Collections.emptyList();
         if (pre.endsWith("$")) {
-            for (int k = 0; k < post.size() && k < EXPANSION_MAX; k++) {
+            for (int k = 0; k < post.size() && k < max; k++) {
                 expansions.add(pre + "{" + m.getBody() + "}" + post.get(k));
             }
             return expansions;
@@ -156,10 +172,11 @@ final class BraceExpansion {
         boolean isSequence = isNumericSequence || isAlphaSequence;
         boolean isOptions = m.getBody().contains(",");
         if (!isSequence && !isOptions) {
-            if (POST_HAS_COMMA_BRACE.matcher(m.getPost()).find()) {
-                return expand(pre + "{" + m.getBody() + ESC_CLOSE + m.getPost(), true);
+            if ((v5 ? COMMA_THEN_CLOSE_5_0_6 : COMMA_THEN_CLOSE_1_1_11).matcher(m.getPost()).find()) {
+                // 1.1.11 calls expand(str), whose isTop is undefined
+                return expand(pre + "{" + m.getBody() + ESC_CLOSE + m.getPost(), v5, release);
             }
-            return Collections.singletonList(str);
+            return new ArrayList<>(Collections.singletonList(str));
         }
         List<String> n;
         if (isSequence) {
@@ -168,25 +185,31 @@ final class BraceExpansion {
             n = parseCommaParts(m.getBody());
             if (n.size() == 1) {
                 List<String> embraced = new ArrayList<>();
-                for (String e : expand(n.get(0), false)) {
+                for (String e : expand(n.get(0), false, release)) {
                     embraced.add("{" + e + "}");
                 }
                 n = embraced;
                 if (n.size() == 1) {
                     List<String> out = new ArrayList<>();
-                    for (String p : post) {
+                    for (String p : v5 ? post : post(m, release)) {
                         out.add(pre + n.get(0) + p);
                     }
                     return out;
                 }
             }
         }
+        if (!v5) {
+            post = post(m, release);
+        }
         List<String> big = new ArrayList<>();
-        if (isSequence && n.size() >= 2) {
-            int x = numeric(n.get(0));
-            int y = numeric(n.get(1));
+        if (isSequence) {
+            long x = numeric(n.get(0));
+            long y = numeric(n.get(1));
             int width = Math.max(n.get(0).length(), n.get(1).length());
-            int incr = n.size() == 3 ? Math.max(Math.abs(numeric(n.get(2))), 1) : 1;
+            long incr = n.size() == 3 ? Math.abs(numeric(n.get(2))) : 1;
+            if (v5) {
+                incr = Math.max(incr, 1);
+            }
             boolean reverse = y < x;
             if (reverse) {
                 incr *= -1;
@@ -195,7 +218,7 @@ final class BraceExpansion {
             for (String el : n) {
                 pad |= PADDED.matcher(el).find();
             }
-            for (int i = x; (reverse ? i >= y : i <= y) && big.size() < EXPANSION_MAX; i += incr) {
+            for (long i = x; (reverse ? i >= y : i <= y) && big.size() < max; i += incr) {
                 String c;
                 if (isAlphaSequence) {
                     c = String.valueOf((char) i);
@@ -216,14 +239,18 @@ final class BraceExpansion {
                     }
                 }
                 big.add(c);
+                // 1.1.11 loops forever on a zero step
+                if (incr == 0) {
+                    break;
+                }
             }
         } else {
             for (String part : n) {
-                big.addAll(expand(part, false));
+                big.addAll(expand(part, false, release));
             }
         }
         for (String value : big) {
-            for (int k = 0; k < post.size() && expansions.size() < EXPANSION_MAX; k++) {
+            for (int k = 0; k < post.size() && expansions.size() < max; k++) {
                 String expansion = pre + value + post.get(k);
                 if (!isTop || isSequence || !expansion.isEmpty()) {
                     expansions.add(expansion);
@@ -231,5 +258,9 @@ final class BraceExpansion {
             }
         }
         return expansions;
+    }
+
+    private static List<String> post(Balanced m, Release release) {
+        return m.getPost().isEmpty() ? Collections.singletonList("") : expand(m.getPost(), false, release);
     }
 }

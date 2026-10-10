@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.npm;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.BraceExpansion;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -122,7 +123,7 @@ final class Minimatch {
         if (!HAS_BRACE.matcher(pattern).find()) {
             return Arrays.asList(pattern);
         }
-        return BraceExpansion.expand(pattern);
+        return BraceExpansion.expand(pattern, BraceExpansion.Release.V5_0_6);
     }
 
     private static List<String> levelOneOptimize(List<String> parts) {

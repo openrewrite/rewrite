@@ -63,6 +63,11 @@ function encode(v, depth = 0) {
     return {$: 'buffer', hex: v.toString('hex')}
   }
   if (Array.isArray(v)) {
+    // an array of more than 1000 strings as its length and the SHA-256 of its JSON
+    if (v.length > 1000 && v.every(x => typeof x === 'string')) {
+      return {$: 'strings', length: v.length,
+        sha256: require('crypto').createHash('sha256').update(JSON.stringify(v)).digest('hex')}
+    }
     return v.map(x => encode(x, depth + 1))
   }
   if (spec.encode) {
@@ -165,7 +170,7 @@ function wrapFunctions(real) {
   return out
 }
 
-const entryPath = require.resolve(path.join(dir, spec.entry(dir, release)))
+const entryPath = require.resolve(path.resolve(dir, spec.entry(dir, release)))
 const real = spec.implementation ? spec.implementation(dir, release) : require(entryPath)
 const wrapped = wrapModule(real)
 const entries = new Set([entryPath, ...(spec.alsoEntries ? spec.alsoEntries(dir, release) : [])
@@ -213,7 +218,8 @@ if (Module.registerHooks) {
       Object.keys(value).filter(k => /^[A-Za-z_$][\w$]*$/.test(k) && k !== 'default') : []
     const p = path.join(tmp, file)
     fs.writeFileSync(p, `const v = ${globalName}\nexport default v\n` +
-      names.map(n => `export const ${n} = v[${JSON.stringify(n)}]`).join('\n') + '\n')
+      names.map((n, i) => `const _${i} = v[${JSON.stringify(n)}]\nexport { _${i} as ${JSON.stringify(n)} }`)
+        .join('\n') + '\n')
     return pathToFileURL(p).href
   }
   const shimUrls = {}
@@ -250,7 +256,7 @@ async function main() {
     const cwd = process.cwd()
     process.chdir(path.dirname(file))
     try {
-      if (/\.(ts|mjs)$/.test(file) || spec.esm) {
+      if (/\.(ts|mjs)$/.test(file) || (typeof spec.esm === 'function' ? spec.esm(release) : spec.esm)) {
         await import(pathToFileURL(file).href)
       } else {
         require(file)

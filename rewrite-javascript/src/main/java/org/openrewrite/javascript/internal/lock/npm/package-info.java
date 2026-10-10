@@ -50,7 +50,7 @@
  * </pre>
  * {@code internal.lock.PosixPath} is a port of Node.js {@code lib/path.js}, {@code JsonParseEvenBetterErrors} of
  * json-parse-even-better-errors (Copyright 2017 Kat Marchán, Copyright npm, Inc.) and
- * {@code BraceExpansion} of brace-expansion and balanced-match (Copyright Julian Gruber, TypeScript
+ * {@code internal.lock.BraceExpansion} of brace-expansion and balanced-match (Copyright Julian Gruber, TypeScript
  * port Copyright Isaac Z. Schlueter), all distributed under the MIT License:
  * <pre>
  * Copyright Joyent, Inc. and other Node contributors.
