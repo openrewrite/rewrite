@@ -522,6 +522,31 @@ class ConfigurationTest {
                 .hasMessage(String.format(message, "yarn config"));
     }
 
+    /**
+     * Yarn 4.10.3 ({@code s5y/berry-keys} probes): an npmRegistries key loses its trailing slash before its value is
+     * read, so an error names the key so, and of two spellings in one file the later stands.
+     */
+    @Test
+    void npmRegistriesNormalizesItsKeys() {
+        assertThatThrownBy(() -> options("npmRegistries:\n  \"http://127.0.0.1:4898/\":\n    unknownField: true\n")
+                .checkShapeKeys(YarnRelease.of("4.10.3")))
+                .isInstanceOf(Configuration.UsageError.class)
+                .hasMessage("Unrecognized configuration settings found: npmRegistries['http://127.0.0.1:4898']" +
+                            ".unknownField - run \"yarn config\" to see the list of settings supported in Yarn in " +
+                            ".yarnrc.yml");
+        assertThatThrownBy(() -> options("npmRegistries:\n  \"//127.0.0.1:4898/\":\n    npmAuthToken: [\"a\"]\n"))
+                .isInstanceOf(JsError.class)
+                .hasMessage("Non-array configuration settings \"npmRegistries['//127.0.0.1:4898'].npmAuthToken\" " +
+                            "cannot be an array in .yarnrc.yml");
+        Map<String, Object> registries = options("npmRegistries:\n  \"//h\":\n    npmAuthToken: first\n" +
+                                                 "  \"//g/\":\n    npmAuthToken: g\n  \"//h/\":\n" +
+                                                 "    npmAuthToken: second\n").getMap("npmRegistries");
+        assertThat(registries).containsOnlyKeys("//h", "//g");
+        assertThat(registries.keySet()).containsExactly("//h", "//g");
+        assertThat(registries.get("//h").toString()).contains("npmAuthToken=second");
+        assertThat(options("npmScopes:\n  \"s/\":\n    npmAuthToken: t\n").getMap("npmScopes")).containsOnlyKeys("s/");
+    }
+
     private static Configuration options(String yarnrc) {
         return Configuration.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
                 HostEnvironment.of(Collections.emptyMap()));

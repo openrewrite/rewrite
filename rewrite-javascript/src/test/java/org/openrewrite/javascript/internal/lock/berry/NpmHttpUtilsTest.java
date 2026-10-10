@@ -22,6 +22,8 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -136,6 +138,47 @@ class NpmHttpUtilsTest {
         assertThat(NpmHttpUtils.getAuthenticationHeader(registry, null, configuration)).isEqualTo(unscoped);
         assertThat(NpmHttpUtils.getAuthenticationHeader(NpmHttpUtils.getScopeRegistry("types", configuration),
                 "types", configuration)).isEqualTo(scoped);
+    }
+
+    /**
+     * As above, a project and a home .yarnrc.yml: npmRegistries' keys lose a trailing slash (normalizeKeys), an entry
+     * stands whole for its registry, and the files merge an entry under its key as written.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', nullValues = "-", value = {
+            "npmRegistryServer: 'http://127.0.0.1:4897'\\nnpmRegistries:\\n  'http://127.0.0.1:4897/':\\n" +
+            "    npmAuthToken: entry-token\\n    npmAlwaysAuth: true|-|Bearer entry-token|Bearer entry-token",
+            "npmRegistryServer: 'http://127.0.0.1:4897'\\nnpmRegistries:\\n  '//127.0.0.1:4897/':\\n" +
+            "    npmAuthToken: entry-token\\n    npmAlwaysAuth: true|-|Bearer entry-token|Bearer entry-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'\\nnpmRegistries:\\n  '//127.0.0.1:4898':\\n" +
+            "    npmAuthToken: first-token\\n    npmAlwaysAuth: true\\n  '//127.0.0.1:4898/':\\n" +
+            "    npmAuthToken: second-token\\n    npmAlwaysAuth: true|-|Bearer second-token|Bearer second-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'\\nnpmRegistries:\\n  '//127.0.0.1:4898/':\\n" +
+            "    npmAuthToken: project-token|npmRegistries:\\n  '//127.0.0.1:4898':\\n    npmAuthToken: home-token\\n" +
+            "    npmAlwaysAuth: true|-|Bearer project-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'\\nnpmRegistries:\\n  '//127.0.0.1:4898':\\n" +
+            "    npmAuthToken: project-token|npmRegistries:\\n  '//127.0.0.1:4898':\\n    npmAuthToken: home-token\\n" +
+            "    npmAlwaysAuth: true|Bearer project-token|Bearer project-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'\\nnpmAlwaysAuth: true|npmRegistries:\\n" +
+            "  '//127.0.0.1:4898':\\n    npmAuthToken: home-token|-|Bearer home-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'|npmRegistries:\\n  '//127.0.0.1:4898':\\n" +
+            "    npmAuthToken: home-token\\n    npmAlwaysAuth: true|Bearer home-token|Bearer home-token",
+            "npmRegistryServer: 'http://127.0.0.1:4898'\\nnpmRegistries:\\n  '//127.0.0.1:4898':\\n" +
+            "    npmAlwaysAuth: false|npmRegistries:\\n  '//127.0.0.1:4898':\\n    npmAuthToken: home-token\\n" +
+            "    npmAlwaysAuth: true|-|Bearer home-token"
+    })
+    void readsTheRegistriesEntriesAsYarnDoes(String project, @Nullable String home, @Nullable String unscoped,
+                                             @Nullable String scoped) {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put(".yarnrc.yml", project.replace("\\n", "\n") + "\n");
+        if (home != null) {
+            files.put("~/.yarnrc.yml", home.replace("\\n", "\n") + "\n");
+        }
+        Configuration configuration = BerryScenarios.restricted(Configuration.load(files,
+                HostEnvironment.of(Collections.emptyMap())), YarnRelease.of("4.10.3"));
+        String registry = NpmHttpUtils.getScopeRegistry(null, configuration);
+        assertThat(NpmHttpUtils.getAuthenticationHeader(registry, null, configuration)).isEqualTo(unscoped);
+        assertThat(NpmHttpUtils.getAuthenticationHeader(registry, "types", configuration)).isEqualTo(scoped);
     }
 
     /**

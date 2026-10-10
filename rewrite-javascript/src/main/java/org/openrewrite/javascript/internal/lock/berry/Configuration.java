@@ -105,9 +105,11 @@ public final class Configuration {
         final boolean isNullable;
         final Map<String, Definition> properties;
         final @Nullable Definition valueDefinition;
+        final @Nullable Function<String, String> normalizeKeys;
 
         Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
-                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition) {
+                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition,
+                   @Nullable Function<String, String> normalizeKeys) {
             this.type = type;
             this.defaultValue = defaultValue;
             this.values = values;
@@ -115,6 +117,12 @@ public final class Configuration {
             this.isNullable = isNullable;
             this.properties = properties;
             this.valueDefinition = valueDefinition;
+            this.normalizeKeys = normalizeKeys;
+        }
+
+        Definition(Type type, @Nullable Object defaultValue, @Nullable List<Object> values, boolean isArray,
+                   boolean isNullable, Map<String, Definition> properties, @Nullable Definition valueDefinition) {
+            this(type, defaultValue, values, isArray, isNullable, properties, valueDefinition, null);
         }
 
         static Definition of(Type type, @Nullable Object defaultValue) {
@@ -126,7 +134,12 @@ public final class Configuration {
         }
 
         static Definition map(Definition valueDefinition) {
-            return new Definition(Type.MAP, null, null, false, false, Collections.emptyMap(), valueDefinition);
+            return map(valueDefinition, null);
+        }
+
+        static Definition map(Definition valueDefinition, @Nullable Function<String, String> normalizeKeys) {
+            return new Definition(Type.MAP, null, null, false, false, Collections.emptyMap(), valueDefinition,
+                    normalizeKeys);
         }
 
         static Definition shape(Map<String, Definition> properties) {
@@ -170,7 +183,7 @@ public final class Configuration {
         DEFINITIONS.put("npmPreapprovedPackages", new Definition(Type.STRING, new ArrayList<>(), null, true, false,
                 Collections.emptyMap(), null));
         DEFINITIONS.put("npmScopes", Definition.map(Definition.shape(scope)));
-        DEFINITIONS.put("npmRegistries", Definition.map(Definition.shape(registry)));
+        DEFINITIONS.put("npmRegistries", Definition.map(Definition.shape(registry), NpmHttpUtils::normalizeRegistry));
 
         Map<String, Definition> architectures = new LinkedHashMap<>();
         for (String property : new String[]{"os", "cpu", "libc"}) {
@@ -648,7 +661,9 @@ public final class Configuration {
             return result;
         }
         for (Map.Entry<String, @Nullable Object> entry : Js.entries(value)) {
-            result.put(entry.getKey(), parseValue(path + "['" + entry.getKey() + "']", entry.getValue(),
+            String normalizedKey = definition.normalizeKeys != null ? definition.normalizeKeys.apply(entry.getKey()) :
+                    entry.getKey();
+            result.put(normalizedKey, parseValue(path + "['" + normalizedKey + "']", entry.getValue(),
                     definition.valueDefinition));
         }
         return result;
