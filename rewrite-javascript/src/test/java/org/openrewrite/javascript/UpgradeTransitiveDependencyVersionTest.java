@@ -192,22 +192,22 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
 
     @Test
     void npmAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
-        memberCompose("npm/override-recipe-member-compose", PackageManager.Npm);
+        memberCompose(new Scenario("npm/override-recipe-member-compose"), PackageManager.Npm);
     }
 
     @Test
     void pnpmAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
-        memberCompose("pnpm/override-recipe-member-compose", PackageManager.Pnpm);
+        memberCompose(new Scenario("pnpm/override-recipe-member-compose"), PackageManager.Pnpm);
     }
 
     @Test
     void bunAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
-        memberCompose("bun/override-recipe-member-compose", PackageManager.Bun);
+        memberCompose(new Scenario("bun/override-recipe-member-compose"), PackageManager.Bun);
     }
 
     @Test
     void yarnClassicAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
-        memberCompose("yarn-classic/override-recipe-member-compose", PackageManager.YarnClassic);
+        memberCompose(new Scenario("yarn-classic/override-recipe-member-compose"), PackageManager.YarnClassic);
     }
 
     @Test
@@ -480,8 +480,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
     }
 
-    private static void memberCompose(String scenario, PackageManager pm) {
-        Scenario s = new Scenario(scenario);
+    private static void memberCompose(Scenario s, PackageManager pm) {
         inEveryOrder(s, new CompositeRecipe(Arrays.asList(new UpgradeDependencyVersion("is-odd", null, "3.0.1"),
           new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), s.workspaceSources(pm));
     }
