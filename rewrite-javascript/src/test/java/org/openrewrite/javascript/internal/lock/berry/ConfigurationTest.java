@@ -523,8 +523,8 @@ class ConfigurationTest {
     }
 
     /**
-     * Yarn 4.10.3 ({@code s5y/berry-keys} probes): an npmRegistries key loses its trailing slash before its value is
-     * read, so an error names the key so, and of two spellings in one file the later stands.
+     * Yarn 4.10.3: an npmRegistries key loses its trailing slash before its value is read, so an error names the key
+     * so, and of two spellings in one file the later stands.
      */
     @Test
     void npmRegistriesNormalizesItsKeys() {

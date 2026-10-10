@@ -225,8 +225,8 @@ class SpecUtilsTest {
     }
 
     /**
-     * corepack 0.35.0 takes COREPACK_* from the env file beside the package.json it settles on, under the process's own
-     * ({@code s5y/corepack-env-probe.tsv}): a URL runs or is refused by its contents, which the host does not hold.
+     * corepack 0.35.0 takes COREPACK_* from the env file beside the package.json it settles on, under the process's
+     * own: a URL runs or is refused by its contents, which the host does not hold.
      */
     @ParameterizedTest
     @CsvSource(delimiter = '|', nullValues = "-", value = {

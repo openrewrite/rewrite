@@ -168,7 +168,7 @@ class YarnClassicInputsTest {
 
     /**
      * yarn run in a member that a lockless root lists installs at that root and creates its lock, leaving the
-     * member's own lock as it is ({@code probes/sr-walk/yarn-rootless-own}): the walk answers the root.
+     * member's own lock as it is: the walk answers the root.
      */
     @Test
     void aMemberTheRootListsInstallsAtTheRootThoughItHoldsNoLock() {
