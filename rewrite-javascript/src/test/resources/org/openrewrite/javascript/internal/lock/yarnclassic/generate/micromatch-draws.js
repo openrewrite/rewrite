@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints, for patterns whose regex keeps preserve's random id (a literal, in a class, in a negated class) and paths
-// with few, many or all digits, what yarn 1.22.22's bundled micromatch answers: `true` or `false` when every draw
-// answers alike, `random` when draws differ. Draws: Math.random as it is, many times, every value whose id is not five
-// digits (the first row counts them), and one for each id the path spells. Usage: node micromatch-draws.js <cli> [runs]
+// What yarn 1.22.22's micromatch answers over Math.random draws for patterns whose regex keeps preserve's id.
+// Usage: node micromatch-draws.js <yarn>/lib/cli.js [runs]
 const fs = require('fs')
 const path = require('path')
 const Module = require('module')
@@ -77,7 +75,8 @@ for (const pattern of patterns) {
   for (const p of paths) {
     const answers = new Set()
     for (let i = 0; i < Number(runs); i++) answers.add(fresh([p], pattern).length > 0)
-    const spelled = [...p.matchAll(/__ID([0-9]{5})/g)].map(m => Math.floor(Number('0.' + m[1] + '1') * 2 ** 52) / 2 ** 52)
+    const spelled = [...p.matchAll(/__ID([0-9]{5})/g)]
+      .map(m => Math.floor(Number('0.' + m[1] + '1') * 2 ** 52) / 2 ** 52)
     for (const x of [...short, ...spelled]) {
       Math.random = () => x
       answers.add(fresh([p], pattern).length > 0)

@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints what semver-range-intersect 0.3.1 answers, or throws, for each range list of SemverRangeIntersectTest, the
-// lists pnpm 11.2.2's safeIntersect passes it: `<ranges as JSON> -> <answer as JSON>`.
-//
+// SemverRangeIntersectTest's rows: semver-range-intersect 0.3.1 over the range lists pnpm 11.2.2 passes it.
 // Usage: NODE_PATH=<dir holding semver-range-intersect@0.3.1> node semver-range-intersect.js
 'use strict';
 

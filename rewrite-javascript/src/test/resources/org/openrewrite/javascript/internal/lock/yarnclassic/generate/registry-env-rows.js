@@ -13,23 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints NpmResolverTest.resolvesUnderTheRegistryTheEnvironmentNames' rows: yarn 1.22.22 run live (the registry, a
-// scratch HOME and cache, no other variable) to install left-pad 1.3.0 with each variable set, and the registry its
-// lock's `resolved` names. Usage: node registry-env-rows.js <yarn>/lib/cli.js
+// NpmResolverTest's registry-environment rows: yarn 1.22.22 run live with each variable set, and the lock's url.
+// Usage: node registry-env-rows.js <yarn>/lib/cli.js
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const {execFileSync} = require('child_process')
 
 const cli = process.argv[2]
-const rows = [['none', ''], ['YARN_REGISTRY', 'https://registry.npmjs.org'], ['yarn_registry', 'https://registry.npmjs.org'],
+const rows = [['none', ''], ['YARN_REGISTRY', 'https://registry.npmjs.org'],
+  ['yarn_registry', 'https://registry.npmjs.org'],
   ['npm_config_registry', 'https://registry.npmjs.org'], ['NPM_CONFIG_REGISTRY', 'https://registry.npmjs.org']]
 for (const [variable, value] of rows) {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'registry-env-'))
   const project = path.join(scratch, 'project')
   fs.mkdirSync(project)
   fs.mkdirSync(path.join(scratch, 'home'))
-  fs.writeFileSync(path.join(project, 'package.json'), '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}')
+  fs.writeFileSync(path.join(project, 'package.json'),
+    '{"name":"p","version":"1.0.0","dependencies":{"left-pad":"1.3.0"}}')
   const env = {PATH: path.dirname(process.execPath) + ':/usr/bin:/bin', HOME: path.join(scratch, 'home'),
     YARN_CACHE_FOLDER: path.join(scratch, 'cache'), TMPDIR: scratch}
   if (value) env[variable] = value

@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints SpecTest's dependencyValue, dependencyValueNpaRejects and location rows as npm-package-arg answers them
-// (npa.resolve(name, value), the npa npm bundles: 13.0.2 for npm 11.17.0). A value npa rejects with
-// EUNSUPPORTEDPROTOCOL gets the pnpm, Yarn or Bun kind its prefix names, else unknown-protocol.
+// SpecTest's dependency-value rows as the npm-package-arg npm 11.17.0 bundles answers them (npa.resolve(name, value)).
 // Usage: node dependency-values.js
 const npa = require('./npm-modules.js')('npm-package-arg')
 

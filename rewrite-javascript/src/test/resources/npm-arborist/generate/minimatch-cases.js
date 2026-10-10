@@ -13,10 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Expectations for MinimatchTest and MapWorkspacesTest from the minimatch and @npmcli/map-workspaces npm
-// bundles: path/pattern pairs with minimatch's answer, workspace pattern lists over a directory tree
-// (written to a temp directory for map-workspaces, listed as manifests for the port) with the members
-// map-workspaces finds, and the same lists over a lock for mapWorkspaces.virtual.
+// MinimatchTest's and MapWorkspacesTest's rows from the minimatch and @npmcli/map-workspaces npm 11.17.0 bundles.
 // Usage: node minimatch-cases.js > ../minimatch-cases
 const fs = require('fs')
 const os = require('os')
@@ -29,8 +26,10 @@ const pairs = []
 const mm = (f, p, o) => pairs.push({ path: f, pattern: p, options: o || {}, matches: minimatch(f, p, o) })
 const partial = { partial: true }
 for (const [f, p] of [
-  ['node_modules', '**/node_modules/**'], ['node_modules/a', '**/node_modules/**'], ['a/node_modules', '**/node_modules/**'],
-  ['a/node_modules/b', '**/node_modules/**'], ['node_modules/', '**/node_modules/**'], ['x/node_modules/', '**/node_modules/**'],
+  ['node_modules', '**/node_modules/**'], ['node_modules/a', '**/node_modules/**'],
+  ['a/node_modules', '**/node_modules/**'],
+  ['a/node_modules/b', '**/node_modules/**'], ['node_modules/', '**/node_modules/**'],
+  ['x/node_modules/', '**/node_modules/**'],
   ['packages/a', 'packages/*/'], ['packages/a/', 'packages/*'], ['packages/a/', 'packages/*/'],
   ['packages/.a', 'packages/*'], ['packages/.a', 'packages/.*'], ['packages/a', '**'], ['.git/a', '**'],
   ['', '*'], ['', '**'], ['a', ''], ['', ''], ['a', '#a'], ['x', '{x,y}'], ['x3', 'x{1..5}'], ['x03', 'x{01..05}'],
@@ -89,8 +88,10 @@ const layouts = [
       ['apps/*', 'packages/*'], ['pack*/*'], ['packages/*/'], ['packages'], ['.'], [''], ['packages/c/**'],
       ['packages/*/*'], ['packages/*', '!packages/**'], ['**/*', '!**/node_modules/**'], ['packages/*', 'packages/*'],
       ['!!packages/a'], ['!packages/*', 'packages/a'],
-      ['!packages/b/**', '!packages/b/*', 'packages/b/nested'], ['!packages/b/*', '!packages/b/**', 'packages/b/nested'],
-      ['!packages/b', '!packages/*', '!packages/**', 'packages/b'], ['!packages/*', '!packages/b', 'packages/b', 'packages/a'],
+      ['!packages/b/**', '!packages/b/*', 'packages/b/nested'],
+      ['!packages/b/*', '!packages/b/**', 'packages/b/nested'],
+      ['!packages/b', '!packages/*', '!packages/**', 'packages/b'],
+      ['!packages/*', '!packages/b', 'packages/b', 'packages/a'],
     ],
   },
   {

@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes long-map-inherited-name.txt: yarn 1.22.22's own stringify of a 64-key map holding `constructor`,
-// whose inconsistent comparator leaves the order to V8's sort.
-//
+// long-map-inherited-name.txt: yarn 1.22.22's own stringify of a 64-key map holding `constructor`.
 // Usage: node long-map-inherited-name.js <yarn 1.22.22>/lib/cli.js > long-map-inherited-name.txt
 'use strict'
 const yarn = require('./yarn-bundle.js')(process.argv[2])

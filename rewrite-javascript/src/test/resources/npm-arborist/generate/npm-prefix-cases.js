@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints the rows of NpmLockRegeneratorTest and NpmInputsTest that hold npm's walk: `npm prefix` run in packages/a
-// under each layout, and for a walk that fails, the error @npmcli/map-workspaces raises there.
-//
-// Usage: node npm-prefix-cases.js (the npm beside the running node, 11.17.0 when the rows were written)
+// NpmLockRegeneratorTest's and NpmInputsTest's walk rows: `npm prefix` run in packages/a under each layout.
+// Usage: node npm-prefix-cases.js (with npm 11.17.0 beside the running node)
 const childProcess = require('child_process')
 const fs = require('fs')
 const os = require('os')

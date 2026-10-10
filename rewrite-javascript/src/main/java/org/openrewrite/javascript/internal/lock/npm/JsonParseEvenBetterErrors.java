@@ -90,7 +90,7 @@ public final class JsonParseEvenBetterErrors {
     }
 
     static Parsed parse(String raw) {
-        String txt = raw.startsWith("﻿") ? raw.substring(1) : raw;
+        String txt = raw.startsWith("\uFEFF") ? raw.substring(1) : raw;
         Object result;
         try {
             if (txt.trim().isEmpty()) {

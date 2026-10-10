@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Prints sort-cases.tsv: Array.prototype.sort of the running node (v24.19.0) over generated arrays, one per row:
-// comparator, pattern, seed, input (values, u undefined, h hole), output (input indexes, u, h), comparator calls.
-//
+// sort-cases.tsv: Array.prototype.sort of the running node (v24.19.0) over generated arrays, one per row.
 // Usage: node sort-cases.js | gzip -9n > sort-cases.tsv.gz
 const xorshift = seed => {
   let x = seed | 0 || 1

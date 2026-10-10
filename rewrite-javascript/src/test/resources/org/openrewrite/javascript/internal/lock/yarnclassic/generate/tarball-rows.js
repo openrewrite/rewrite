@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes the archives of TarballFetcherTest into <out>/<case>.tgz and prints, one TSV row per archive, what yarn
-// 1.22.22's own TarballFetcher (its bundle, in a scratch HOME) reads from it served over http: `ok <name, version,
-// dependencies, optionalDependencies as JSON>` or `<error name> <message>`, paths from the extraction directory.
+// TarballFetcherTest's archives and rows: what yarn 1.22.22's TarballFetcher reads from each one served over http.
 // Usage: node tarball-rows.js <yarn>/lib/cli.js <out dir> [<yarn's __tests__/fixtures/fetchers/tarball dir>]
 const fs = require('fs')
 const http = require('http')
@@ -89,7 +87,8 @@ const cases = {
   'package-and-yarn-json': tar(entry('package/yarn.json', JSON.stringify({name: 'y', version: '2.0.0'})),
     entry('package/package.json', pkg)),
   'metadata-manifest': tar(entry('package/.yarn-metadata.json',
-    JSON.stringify({manifest: {name: 'm', version: '3.0.0', dependencies: {c: '1'}}})), entry('package/package.json', pkg)),
+    JSON.stringify({manifest: {name: 'm', version: '3.0.0', dependencies: {c: '1'}}})),
+    entry('package/package.json', pkg)),
   'metadata-without-manifest': tar(entry('package/.yarn-metadata.json', '{}'), entry('package/package.json', pkg)),
   'metadata-manifest-null': tar(entry('package/.yarn-metadata.json', '{"manifest":null}')),
   'metadata-bin-number': tar(entry('package/.yarn-metadata.json', '{"manifest":{"name":"m","bin":{"x":5}}}')),
@@ -99,10 +98,12 @@ const cases = {
   'gnu-long-name': tar(entry('././@LongLink', 'package/package.json\0', 'L'), entry('ignored', pkg)),
   'ustar-prefix': tar(entry('package.json', pkg, '0', '', 'package')),
   'symlink': tar(entry('package/real.json', pkg), entry('package/package.json', '', '2', 'real.json')),
-  'symlink-absolute': tar(entry('package/real.json', pkg), entry('package/package.json', '', '2', '/package/real.json')),
+  'symlink-absolute': tar(entry('package/real.json', pkg),
+    entry('package/package.json', '', '2', '/package/real.json')),
   'symlink-dangling': tar(entry('package/package.json', '', '2', 'missing.json')),
   'hard-link': tar(entry('package/real.json', pkg), entry('package/package.json', '', '1', 'package/real.json')),
-  'hard-link-below': tar(entry('package/lib/real.json', pkg), entry('package/lib/x.json', '', '1', 'package/lib/real.json')),
+  'hard-link-below': tar(entry('package/lib/real.json', pkg),
+    entry('package/lib/x.json', '', '1', 'package/lib/real.json')),
   'manifest-directory': tar(entry('package/package.json/', '', '5')),
   'path-through-file': tar(entry('package/lib', 'x'), entry('package/lib/a.js', 'y')),
   'unsupported-type': tar(entry('package/fifo', '', '6')),

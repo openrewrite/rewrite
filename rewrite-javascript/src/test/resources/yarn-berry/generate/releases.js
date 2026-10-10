@@ -13,13 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes yarn-releases.json.gz, the data each Yarn 4.x release ships that reaches a lock: the builtin package
-// extensions (packages/yarnpkg-extensions), the packages the compat plugin patches, the node-gyp rule of the npm
-// semver resolver, the plugins the CLI bundles, whether the npm plugin sends the jsr scope to npm.jsr.io, whether the
-// lockfile writes a checksum without the lockfile's cache key, the names of the settings the release knows
-// (`yarn config --json` of the @yarnpkg/cli-dist bundle) and the command its unknown-setting errors name. Sources
-// are read at each @yarnpkg/cli/<version> tag of github.com/yarnpkg/berry; identical tables are stored once.
-//
+// yarn-releases.json.gz: the data each Yarn 4.x release ships that reaches a lock, read at its berry tag.
 // Usage: node releases.js <rewrite-javascript/src/main/resources/org/openrewrite/javascript/internal/lock/berry>
 'use strict';
 

@@ -53,7 +53,7 @@ class ManifestsTest {
      */
     @Test
     void readPackageYaml() {
-        String yaml = '﻿' + "name: c\nversion: 1.0.0\nengines:\n  runtime:\n    name: node\n    version: '24'\n" +
+        String yaml = '\uFEFF' + "name: c\nversion: 1.0.0\nengines:\n  runtime:\n    name: node\n    version: '24'\n" +
                       "    onFail: download\n";
         assertThat(json(Manifests.readPackageYaml(yaml, "packages/c/package.yaml")))
           .isEqualTo("{'name':'c','version':'1.0.0','engines':{'runtime':{'name':'node','version':'24'," +
