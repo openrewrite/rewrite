@@ -94,6 +94,66 @@ for (const [kind, value] of [['object', [['b', 1], ['2', true], ['a', 'x'], ['1'
   ask('Object.entries', 'entries', [kind, value], (k, x) => Object.entries(k === 'object' ? Object.fromEntries(x) : x))
 }
 
+// JSON.stringify(value, replacer, space): a value as the rows hold it, an object from [key, value] pairs, an array with
+// holes from [index, value] pairs, or a chain of containers along keys whose last member is the one at index back
+const replacers = {
+  none: undefined,
+  dropB: (k, v) => k === 'b' ? undefined : v,
+  wrapRoot: (k, v) => k === '' ? {wrapped: v} : v,
+  numbersAsStrings: (k, v) => typeof v === 'number' ? String(v) : v,
+  keyed: (k, v) => typeof v === 'string' ? k + '=' + v : v,
+  undefinedAsNull: (k, v) => v === undefined ? null : v,
+}
+function build(kind, value, extra) {
+  if (kind === 'object') {
+    return Object.fromEntries(value)
+  }
+  if (kind === 'sparse') {
+    const array = new Array(value)
+    for (const [i, v] of extra) {
+      array[i] = v
+    }
+    return array
+  }
+  if (kind === 'cycle') {
+    const chain = [typeof value[0] === 'number' ? [] : {}]
+    for (let i = 0; i < value.length - 1; i++) {
+      const next = typeof value[i + 1] === 'number' ? [] : {}
+      chain[i][value[i]] = next
+      chain.push(next)
+    }
+    chain[chain.length - 1][value[value.length - 1]] = chain[extra]
+    return chain[0]
+  }
+  return value
+}
+const stringified = [['value', 'x'], ['value', 1e21], ['value', -0], ['value', NaN], ['value', Infinity], ['value', null],
+  ['value', true], ['value', undefined], ['value', [1, undefined, null, 'a\n\u2028\ud800']], ['value', []], ['value', {}],
+  ['value', {a: [], b: {}, c: [{}, []]}], ['value', {b: 1, a: {c: 'x', d: [1, {e: null}]}}],
+  ['object', [['b', 1], ['2', true], ['a', [1, 2]], ['u', undefined], ['1', {x: 'y'}]]], ['sparse', 3, [[1, 'x']]],
+  ['cycle', ['a'], 0], ['cycle', ['a', 'b', 'c'], 1], ['cycle', [0, 0, 0, 0], 0], ['cycle', ['q', 0], 1],
+  ['cycle', ['k', 'k', 'k', 'z'], 0], ['cycle', ['k', 'k', 'k', 'k', 'z'], 0], ['cycle', ['2', 'x'], 0],
+  ['cycle', ['b', '', 'c'], 1], ['cycle', ['k0', 'k1', 'k2', 'k3', 'k4', 'k5', ''], 2], ['cycle', ['01', 1], 0]]
+const spaces = [undefined, 2, 0, -1, 1.5, 11, Infinity, NaN, '\t', '', ' ^_^ ', '12345678901', true, null]
+for (const [kind, value, extra] of stringified) {
+  for (const replacer of Object.keys(replacers)) {
+    for (const space of kind === 'cycle' ? [undefined] : replacer === 'none' ? spaces : [undefined, 2]) {
+      ask('JSON.stringify', 'jsonStringify', [kind, value, extra, replacer, space],
+        (k, v, x, r, s) => JSON.stringify(build(k, v, x), replacers[r], s))
+    }
+  }
+}
+
+for (const t of [0, -0, -1, 1.5, -1.5, 1791462896789, 253402300799999, 253402300800000, -62167219200000,
+  -62167219200001, 8.64e15, -8.64e15, 8.64e15 + 1, NaN, Infinity]) {
+  ask('Date.prototype.toISOString', 'toISOString', [t], x => new Date(x).toISOString())
+}
+for (const fields of [[2020, 0, 1, 0, 0, 0, 0], [99, 11, 31, 23, 59, 59, 999], [0, 0, 1, 0, 0, 0, 0], [100, 0, 1, 0, 0, 0, 0],
+  [2020, 1, 30, 0, 0, 0, 0], [2020, 13, 1, 0, 0, 0, 0], [2020, -1, 1, 0, 0, 0, 0], [275760, 8, 13, 0, 0, 0, 0],
+  [275760, 8, 13, 0, 0, 0, 1], [-271821, 3, 20, 0, 0, 0, 0], [-271821, 3, 19, 23, 59, 59, 999], [1970, 0, 0, 24, 0, 0, 0]]) {
+  ask('Date.UTC', 'utc', fields, (...f) => Date.UTC(...f))
+}
+
 for (const s of ['a b', "-_.!~*'()", '\u00e9', '\ud83d\ude00', '\ud83d', '\ude00x', '#?&=/:@+$,;', '%']) {
   ask('encodeURIComponent', 'encodeURIComponent', [s], x => encodeURIComponent(x))
 }

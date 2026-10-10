@@ -21,6 +21,7 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -200,8 +201,8 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
             return new Result(false, MINIMUM_RELEASE_AGE_VIOLATION_CODE, "publish timestamp is not a valid date");
         }
         if (ts > cutoff) {
-            return new Result(false, MINIMUM_RELEASE_AGE_VIOLATION_CODE, "was published at " + Js.toISOString(ts) +
-                    ", within the minimumReleaseAge cutoff (" + Js.toISOString(cutoff) + ")");
+            return new Result(false, MINIMUM_RELEASE_AGE_VIOLATION_CODE, "was published at " + V8Date.toISOString(ts) +
+                    ", within the minimumReleaseAge cutoff (" + V8Date.toISOString(cutoff) + ")");
         }
         return null;
     }
@@ -394,7 +395,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
                 earliestSeconds = seconds;
             }
         }
-        return earliestSeconds == null ? null : Js.toISOString(earliestSeconds * 1000);
+        return earliestSeconds == null ? null : V8Date.toISOString(earliestSeconds * 1000);
     }
 
     private static @Nullable Double readEarliestIntegratedTime(@Nullable Object attestation) {

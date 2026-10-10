@@ -20,10 +20,6 @@ import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -68,15 +64,6 @@ public final class JsYaml {
     private static final Options PNPM = new Options(Release.ZKOCHAN_0_0_11, false, LinkedHashMap::new);
 
     /**
-     * The TypeError js-yaml's own code raises.
-     */
-    public static final class TypeError extends RuntimeException {
-        TypeError(String message) {
-            super(message);
-        }
-    }
-
-    /**
      * js-yaml's {@code YAMLException}, its message carrying the position and the snippet as each release formats them.
      */
     @Getter
@@ -106,21 +93,8 @@ public final class JsYaml {
             this.time = time;
         }
 
-        /**
-         * {@code Date.prototype.toISOString}.
-         */
         public String toIsoString() {
-            if (Double.isNaN(time)) {
-                throw new IllegalStateException("RangeError: Invalid time value");
-            }
-            Instant instant = Instant.ofEpochMilli((long) time);
-            int year = instant.atZone(ZoneOffset.UTC).getYear();
-            String rest = DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
-                    .format(instant);
-            if (year >= 0 && year <= 9999) {
-                return String.format("%04d", year) + rest;
-            }
-            return (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year)) + rest;
+            return V8Date.toISOString(time);
         }
     }
 
@@ -1226,7 +1200,7 @@ public final class JsYaml {
             String alias = input.substring(start, position);
             // 3.13.1's alias test calls anchorMap.hasOwnProperty, which an anchor of that name shadows
             if (options.getRelease() == Release.V3_13_1 && anchorMap.containsKey("hasOwnProperty")) {
-                throw new TypeError("state.anchorMap.hasOwnProperty is not a function");
+                throw new JsError(JsError.TYPE_ERROR, "state.anchorMap.hasOwnProperty is not a function");
             }
             if (!anchorMap.containsKey(alias)) {
                 throw error("unidentified alias \"" + alias + "\"");
@@ -1616,7 +1590,7 @@ public final class JsYaml {
         double month = Integer.parseInt(match.group(2)) - 1;
         double day = Integer.parseInt(match.group(3));
         if (match.groupCount() < 4 || match.group(4) == null) {
-            return new Timestamp(dateUtc(year, month, day, 0, 0, 0, 0));
+            return new Timestamp(V8Date.utc(year, month, day, 0, 0, 0, 0));
         }
         double hour = Integer.parseInt(match.group(4));
         double minute = Integer.parseInt(match.group(5));
@@ -1639,26 +1613,11 @@ public final class JsYaml {
                 delta = -delta;
             }
         }
-        double time = dateUtc(year, month, day, hour, minute, second, fraction);
+        double time = V8Date.utc(year, month, day, hour, minute, second, fraction);
         if (delta != 0) {
-            time = timeClip(time - delta);
+            time = V8Date.timeClip(time - delta);
         }
         return new Timestamp(time);
-    }
-
-    // Date.UTC: a year from 0 to 99 is 1900 plus it
-    private static double dateUtc(double year, double month, double day, double hour, double minute, double second,
-                                  double ms) {
-        double y = 0 <= year && year <= 99 ? 1900 + year : year;
-        double ym = y + Math.floor(month / 12);
-        double mn = ((month % 12) + 12) % 12;
-        double days = LocalDate.of((int) ym, (int) mn + 1, 1).toEpochDay() + day - 1;
-        double time = hour * 3600000 + minute * 60000 + second * 1000 + ms;
-        return timeClip(days * 86400000 + time);
-    }
-
-    private static double timeClip(double time) {
-        return Math.abs(time) > 8.64e15 ? Double.NaN : time;
     }
 
     private static boolean resolveBinary(String data) {

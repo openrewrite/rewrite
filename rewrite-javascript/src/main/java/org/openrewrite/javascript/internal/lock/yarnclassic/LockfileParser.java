@@ -403,8 +403,6 @@ final class LockfileParser {
             return JsYaml.safeLoadFailsafe(str, YAML);
         } catch (JsYaml.YamlException e) {
             throw new JsError("YAMLException", String.valueOf(e.getMessage()));
-        } catch (JsYaml.TypeError e) {
-            throw new JsError(JsError.TYPE_ERROR, String.valueOf(e.getMessage()));
         }
     }
 

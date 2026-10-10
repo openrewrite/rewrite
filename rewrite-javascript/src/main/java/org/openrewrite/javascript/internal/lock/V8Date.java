@@ -17,24 +17,45 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * {@code Date.parse} as V8 reads the ECMAScript date-time string format.
+ * {@code Date.parse} as V8 reads the ECMAScript date-time string format, and {@code Date.prototype.toISOString}.
  */
 public final class V8Date {
 
     private static final Pattern DATE_TIME_STRING = Pattern.compile(
             "^([+-]\\d{6}|\\d{4})(?:-(\\d{2})(?:-(\\d{2}))?)?" +
             "(?:[T ](\\d{2}):(\\d{2})(?::(\\d{2})(?:\\.(\\d{1,3})\\d*)?)?(Z|[+-]\\d{2}:\\d{2})?)?$");
+    private static final double MAX_TIME = 8.64e15;
+    private static final DateTimeFormatter ISO_REST =
+            DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 
     private V8Date() {
     }
 
     public static boolean isDateTimeString(String text) {
         return DATE_TIME_STRING.matcher(text).matches();
+    }
+
+    /**
+     * {@code new Date(time).toISOString()}, a year outside 0 to 9999 in six digits with its sign.
+     * @throws JsError V8's RangeError for NaN or a time beyond the range of a Date
+     */
+    public static String toISOString(double time) {
+        if (Double.isNaN(time) || Math.abs(time) > MAX_TIME) {
+            throw new JsError(JsError.RANGE_ERROR, "Invalid time value");
+        }
+        Instant instant = Instant.ofEpochMilli((long) time);
+        int year = instant.atZone(ZoneOffset.UTC).getYear();
+        String yearText = year >= 0 && year <= 9999 ? String.format("%04d", year) :
+                (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year));
+        return yearText + ISO_REST.format(instant);
     }
 
     /**
@@ -70,9 +91,32 @@ public final class V8Date {
             }
             offset = (zone.charAt(0) == '-' ? -1 : 1) * (hours * 60L + minutes) * 60000L;
         }
-        // a day past the month's end rolls into the next, as V8's MakeDay does
-        long days = LocalDate.of(year, month, 1).toEpochDay() + day - 1;
-        double time = days * 86400000.0 + hour * 3600000L + minute * 60000L + second * 1000L + millis - offset;
-        return Math.abs(time) > 8.64e15 ? Double.NaN : time;
+        return timeClip(makeDay(year, month - 1, day) * 86400000.0 + hour * 3600000L + minute * 60000L +
+                        second * 1000L + millis - offset);
+    }
+
+    /**
+     * {@code Date.UTC(year, month, day, hours, minutes, seconds, ms)} of integers, a year from 0 to 99 read as 1900
+     * plus it.
+     */
+    public static double utc(double year, double month, double day, double hour, double minute, double second,
+                             double ms) {
+        double fullYear = 0 <= year && year <= 99 ? 1900 + year : year;
+        return timeClip(makeDay(fullYear, month, day) * 86400000.0 + hour * 3600000 + minute * 60000 + second * 1000 +
+                        ms);
+    }
+
+    /**
+     * TimeClip: NaN beyond the range of a Date.
+     */
+    public static double timeClip(double time) {
+        return Math.abs(time) > MAX_TIME ? Double.NaN : time;
+    }
+
+    // MakeDay: a day past the month's end rolls into the next
+    private static double makeDay(double year, double month, double day) {
+        double ym = year + Math.floor(month / 12);
+        double mn = (month % 12 + 12) % 12;
+        return LocalDate.of((int) ym, (int) mn + 1, 1).toEpochDay() + day - 1;
     }
 }

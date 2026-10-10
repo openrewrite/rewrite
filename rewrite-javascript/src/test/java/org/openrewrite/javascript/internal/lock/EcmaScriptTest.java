@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.entry;
@@ -120,13 +121,14 @@ class EcmaScriptTest {
     @Test
     void everyBuiltinRowIsReplayedSomewhere() {
         Map<String, Integer> cannotKnow = new LinkedHashMap<>();
-        List<String> elsewhere = Arrays.asList("encodeURIComponent", "decodeURIComponent", "replace", "match");
+        List<String> elsewhere = Arrays.asList("encodeURIComponent", "decodeURIComponent", "replace", "match",
+          "toISOString", "utc");
         for (Call call : UpstreamCalls.read(BUILTINS)) {
             if (elsewhere.contains(call.getFn())) {
                 continue;
             }
             assertThat(call.getFn()).isIn("parseInt", "slice", "repeat", "split", "toInt32", "isInteger", "toNumber",
-              "numberToString", "trim", "trimStart", "entries");
+              "numberToString", "trim", "trimStart", "entries", "jsonStringify");
             if (!knows(call)) {
                 cannotKnow.merge(call.getFn(), 1, Integer::sum);
             }
@@ -174,19 +176,86 @@ class EcmaScriptTest {
                 return EcmaScript.trimStart(text(call, 0));
             case "entries":
                 return entries(call);
+            case "jsonStringify": {
+                String json = EcmaScript.jsonStringify(stringified(call), REPLACERS.get(text(call, 3)), call.arg(4));
+                return json == null ? UNDEFINED : json;
+            }
             default:
                 return NOT_HERE;
         }
     }
 
+    private static final Map<String, EcmaScript.@Nullable JsonReplacer> REPLACERS = new LinkedHashMap<>();
+
+    static {
+        REPLACERS.put("none", null);
+        REPLACERS.put("dropB", (k, v) -> "b".equals(k) ? UNDEFINED : v);
+        REPLACERS.put("wrapRoot", (k, v) -> k.isEmpty() ? object(singletonList(Arrays.asList("wrapped", v))) : v);
+        REPLACERS.put("numbersAsStrings", (k, v) -> v instanceof Number ? EcmaScript.string(v) : v);
+        REPLACERS.put("keyed", (k, v) -> v instanceof String ? k + "=" + v : v);
+        REPLACERS.put("undefinedAsNull", (k, v) -> v == UNDEFINED ? null : v);
+    }
+
+    // the value node-builtins.js builds from the row: as given, from pairs, an array with holes, or a cycle
+    @SuppressWarnings("unchecked")
+    private static @Nullable Object stringified(Call call) {
+        Object value = call.arg(1);
+        switch (text(call, 0)) {
+            case "object":
+                return object((List<?>) Objects.requireNonNull(value));
+            case "sparse": {
+                List<@Nullable Object> array = new ArrayList<>();
+                for (int i = 0; i < (int) number(call, 1); i++) {
+                    array.add(HOLE);
+                }
+                for (Object pair : (List<?>) Objects.requireNonNull(call.arg(2))) {
+                    array.set((int) (double) (Double) ((List<?>) pair).get(0), ((List<?>) pair).get(1));
+                }
+                return array;
+            }
+            case "cycle": {
+                List<?> path = (List<?>) Objects.requireNonNull(value);
+                List<Object> chain = new ArrayList<>();
+                chain.add(container(path.get(0)));
+                for (int i = 0; i < path.size(); i++) {
+                    Object next = i + 1 < path.size() ? container(path.get(i + 1)) :
+                      chain.get((int) number(call, 2));
+                    Object holder = chain.get(i);
+                    if (holder instanceof List) {
+                        List<Object> array = (List<Object>) holder;
+                        int index = (int) (double) (Double) path.get(i);
+                        while (array.size() <= index) {
+                            array.add(HOLE);
+                        }
+                        array.set(index, next);
+                    } else {
+                        ((Map<String, Object>) holder).put((String) path.get(i), next);
+                    }
+                    chain.add(next);
+                }
+                return chain.get(0);
+            }
+            default:
+                return value;
+        }
+    }
+
+    private static Object container(@Nullable Object key) {
+        return key instanceof Double ? new ArrayList<>() : new LinkedHashMap<>();
+    }
+
+    private static Map<String, @Nullable Object> object(List<?> pairs) {
+        Map<String, @Nullable Object> object = new LinkedHashMap<>();
+        for (Object pair : pairs) {
+            object.put((String) ((List<?>) pair).get(0), ((List<?>) pair).get(1));
+        }
+        return object;
+    }
+
     private static List<List<@Nullable Object>> entries(Call call) {
         Object value = call.arg(1);
         if ("object".equals(call.arg(0))) {
-            Map<String, @Nullable Object> object = new LinkedHashMap<>();
-            for (Object pair : (List<?>) Objects.requireNonNull(value)) {
-                object.put((String) ((List<?>) pair).get(0), ((List<?>) pair).get(1));
-            }
-            value = object;
+            value = object((List<?>) Objects.requireNonNull(value));
         }
         List<List<@Nullable Object>> out = new ArrayList<>();
         for (Map.Entry<String, @Nullable Object> entry : EcmaScript.entries(value)) {

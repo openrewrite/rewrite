@@ -318,47 +318,142 @@ public class EcmaScript {
     }
 
     /**
-     * {@code JSON.stringify(value)} without indentation, objects in {@link #keys(Map)} order; null where it gives
-     * undefined, as it does for undefined and for anything that is not a JSON value.
+     * A {@code JSON.stringify} replacer function: what to write for the value a key holds.
      */
-    @SuppressWarnings("unchecked")
+    @FunctionalInterface
+    public interface JsonReplacer {
+        @Nullable Object replace(String key, @Nullable Object value);
+    }
+
+    /**
+     * {@code JSON.stringify(value)}, objects in {@link #keys(Map)} order; null where it gives undefined, as it does for
+     * undefined and for anything that is not a JSON value.
+     */
     public static @Nullable String jsonStringify(@Nullable Object value) {
-        if (value == null) {
-            return "null";
+        return jsonStringify(value, null, null);
+    }
+
+    /**
+     * {@code JSON.stringify(value, replacer, space)}, {@code space} a number of spaces or an indent string.
+     * @throws JsError JavaScript's TypeError for a circular structure, worded as V8 words it
+     */
+    public static @Nullable String jsonStringify(@Nullable Object value, @Nullable JsonReplacer replacer,
+                                                 @Nullable Object space) {
+        String gap = "";
+        if (space instanceof Number) {
+            double d = ((Number) space).doubleValue();
+            gap = repeat(" ", Double.isNaN(d) ? 0 : (int) Math.max(0, Math.min(10, Math.floor(d))));
+        } else if (space instanceof String) {
+            gap = slice((String) space, 0, 10);
         }
-        if (value instanceof String) {
-            return quote((String) value);
+        Map<String, @Nullable Object> wrapper = new LinkedHashMap<>();
+        wrapper.put("", value);
+        return new JsonStringifier(replacer, gap).property("", wrapper);
+    }
+
+    private static final class JsonStringifier {
+        private final @Nullable JsonReplacer replacer;
+        private final String gap;
+        private final List<Object> stack = new ArrayList<>();
+        private final List<String> stackKeys = new ArrayList<>();
+        private String indent = "";
+
+        JsonStringifier(@Nullable JsonReplacer replacer, String gap) {
+            this.replacer = replacer;
+            this.gap = gap;
         }
-        if (value instanceof Boolean) {
-            return value.toString();
-        }
-        if (value instanceof Number) {
-            double d = ((Number) value).doubleValue();
-            return Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString((Number) value);
-        }
-        if (value instanceof List) {
-            StringBuilder out = new StringBuilder("[");
-            List<?> array = (List<?>) value;
-            for (int i = 0; i < array.size(); i++) {
-                String element = jsonStringify(array.get(i));
-                out.append(i > 0 ? "," : "").append(element == null ? "null" : element);
+
+        // SerializeJSONProperty
+        @SuppressWarnings("unchecked")
+        @Nullable
+        String property(String key, Object holder) {
+            Object value = holder instanceof List ? ((List<?>) holder).get(Integer.parseInt(key)) :
+                    ((Map<String, ?>) holder).get(key);
+            if (value == HOLE) {
+                value = UNDEFINED;
             }
-            return out.append(']').toString();
-        }
-        if (value instanceof Map) {
-            StringBuilder out = new StringBuilder("{");
-            Map<String, ?> object = (Map<String, ?>) value;
-            for (String key : keys(object)) {
-                String member = jsonStringify(object.get(key));
-                if (member != null) {
-                    out.append(out.length() > 1 ? "," : "");
-                    quote(key, out);
-                    out.append(':').append(member);
+            if (replacer != null) {
+                value = replacer.replace(key, value);
+            }
+            if (value == null) {
+                return "null";
+            }
+            if (value instanceof String) {
+                return quote((String) value);
+            }
+            if (value instanceof Boolean) {
+                return value.toString();
+            }
+            if (value instanceof Number) {
+                double d = ((Number) value).doubleValue();
+                return Double.isNaN(d) || Double.isInfinite(d) ? "null" : numberToString((Number) value);
+            }
+            if (value instanceof List || value instanceof Map) {
+                enter(value, holder instanceof List ? "index " + key : key.isEmpty() ? "<anonymous>" :
+                        "property '" + key + "'");
+                String stepback = indent;
+                indent = indent + gap;
+                List<String> partial = new ArrayList<>();
+                if (value instanceof List) {
+                    for (int i = 0; i < ((List<?>) value).size(); i++) {
+                        String element = property(String.valueOf(i), value);
+                        partial.add(element == null ? "null" : element);
+                    }
+                } else {
+                    for (String k : keys((Map<String, ?>) value)) {
+                        String member = property(k, value);
+                        if (member != null) {
+                            partial.add(quote(k) + (gap.isEmpty() ? ":" : ": ") + member);
+                        }
+                    }
                 }
+                String open = value instanceof List ? "[" : "{";
+                String close = value instanceof List ? "]" : "}";
+                String out = partial.isEmpty() ? open + close : gap.isEmpty() ?
+                        open + String.join(",", partial) + close :
+                        open + "\n" + indent + String.join(",\n" + indent, partial) + "\n" + stepback + close;
+                stack.remove(stack.size() - 1);
+                stackKeys.remove(stackKeys.size() - 1);
+                indent = stepback;
+                return out;
             }
-            return out.append('}').toString();
+            return null;
         }
-        return null;
+
+        // V8's message names the circle: its first two links, an ellipsis, its last link, then the key that closes it
+        private void enter(Object value, String key) {
+            for (int start = 0; start < stack.size(); start++) {
+                if (stack.get(start) != value) {
+                    continue;
+                }
+                StringBuilder message = new StringBuilder("Converting circular structure to JSON\n    --> starting " +
+                                                          "at object with constructor ").append(constructor(value));
+                int index = start + 1;
+                int prefixEnd = Math.min(stack.size(), index + 2);
+                for (; index < prefixEnd; index++) {
+                    link(message, index);
+                }
+                if (stack.size() > index + 1) {
+                    message.append("\n    |     ...");
+                }
+                for (index = Math.max(index, stack.size() - 1); index < stack.size(); index++) {
+                    link(message, index);
+                }
+                throw new JsError(JsError.TYPE_ERROR, message.append("\n    --- ").append(key)
+                        .append(" closes the circle").toString());
+            }
+            stack.add(value);
+            stackKeys.add(key);
+        }
+
+        private void link(StringBuilder message, int index) {
+            message.append("\n    |     ").append(stackKeys.get(index)).append(" -> object with constructor ")
+                    .append(constructor(stack.get(index)));
+        }
+
+        private static String constructor(Object value) {
+            return value instanceof List ? "'Array'" : "'Object'";
+        }
     }
 
     /**

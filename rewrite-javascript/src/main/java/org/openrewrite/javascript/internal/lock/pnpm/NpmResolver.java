@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.Ssri;
+import org.openrewrite.javascript.internal.lock.V8Date;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -647,7 +648,7 @@ final class NpmResolver {
             return null;
         }
         return new ResolveDependencies.PolicyViolation(name, version, MINIMUM_RELEASE_AGE_VIOLATION_CODE,
-                "was published at " + Js.toISOString(ts) + ", within the minimumReleaseAge cutoff (" +
-                Js.toISOString(publishedBy.toEpochMilli()) + ")");
+                "was published at " + V8Date.toISOString(ts) + ", within the minimumReleaseAge cutoff (" +
+                V8Date.toISOString(publishedBy.toEpochMilli()) + ")");
     }
 }

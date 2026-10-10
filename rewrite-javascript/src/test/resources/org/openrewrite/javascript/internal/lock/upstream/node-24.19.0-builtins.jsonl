@@ -411,6 +411,453 @@
 {"test":"Object.entries","fn":"entries","args":["value",true],"out":[]}
 {"test":"Object.entries","fn":"entries","args":["value",null],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
 {"test":"Object.entries","fn":"entries","args":["value",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",0],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",-1],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",1.5],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",11],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none","\t"],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",""],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none"," ^_^ "],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none","12345678901"],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",true],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"none",null],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"dropB",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":\"x\"}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": \"x\"\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"numbersAsStrings",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"\"=x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"keyed",2],"out":"\"=x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value","x",{"$":"undefined"},"undefinedAsNull",2],"out":"\"x\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",0],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",-1],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",1.5],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",11],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none","\t"],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",""],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none"," ^_^ "],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none","12345678901"],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",true],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"none",null],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"dropB",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":1e+21}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": 1e+21\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"1e+21\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"numbersAsStrings",2],"out":"\"1e+21\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"keyed",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",1e+21,{"$":"undefined"},"undefinedAsNull",2],"out":"1e+21"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",0],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",-1],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",1.5],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",11],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none","\t"],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",""],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none"," ^_^ "],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none","12345678901"],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",true],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"none",null],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"dropB",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":0}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": 0\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"0\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"0\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"keyed",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"-0"},{"$":"undefined"},"undefinedAsNull",2],"out":"0"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"NaN\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"NaN\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"NaN"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"\"Infinity\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"numbersAsStrings",2],"out":"\"Infinity\""}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"number","value":"Infinity"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",0],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",-1],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",1.5],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",11],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none","\t"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",""],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none"," ^_^ "],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none","12345678901"],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",true],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"none",null],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"dropB",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"numbersAsStrings",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"keyed",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",null,{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",0],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",-1],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",1.5],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",11],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none","\t"],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",""],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none"," ^_^ "],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none","12345678901"],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",true],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"none",null],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"dropB",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":true}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": true\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"numbersAsStrings",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"keyed",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",true,{"$":"undefined"},"undefinedAsNull",2],"out":"true"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",0],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",-1],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",1.5],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",11],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none","\t"],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",""],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none"," ^_^ "],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none","12345678901"],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",true],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"none",null],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"dropB",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"wrapRoot",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"numbersAsStrings",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"keyed",2],"out":{"$":"undefined"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"$":"undefined"},{"$":"undefined"},"undefinedAsNull",2],"out":"null"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",0],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",-1],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",1.5],"out":"[\n 1,\n null,\n null,\n \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",11],"out":"[\n          1,\n          null,\n          null,\n          \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"[\n          1,\n          null,\n          null,\n          \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none","\t"],"out":"[\n\t1,\n\tnull,\n\tnull,\n\t\"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",""],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none"," ^_^ "],"out":"[\n ^_^ 1,\n ^_^ null,\n ^_^ null,\n ^_^ \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none","12345678901"],"out":"[\n12345678901,\n1234567890null,\n1234567890null,\n1234567890\"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",true],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"none",null],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"dropB",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[1,null,null,\"a\\n \\ud800\"]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": [\n    1,\n    null,\n    null,\n    \"a\\n \\ud800\"\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"[\"1\",null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"numbersAsStrings",2],"out":"[\n  \"1\",\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"[1,null,null,\"3=a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"keyed",2],"out":"[\n  1,\n  null,\n  null,\n  \"3=a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"[1,null,null,\"a\\n \\ud800\"]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[1,{"$":"undefined"},null,"a\n \ud800"],{"$":"undefined"},"undefinedAsNull",2],"out":"[\n  1,\n  null,\n  null,\n  \"a\\n \\ud800\"\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",0],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",-1],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",1.5],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",11],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none","\t"],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",""],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none"," ^_^ "],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none","12345678901"],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",true],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"none",null],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"dropB",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": []\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"numbersAsStrings",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"keyed",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",[],{"$":"undefined"},"undefinedAsNull",2],"out":"[]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",0],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",-1],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",1.5],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",11],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none","\t"],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",""],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none"," ^_^ "],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none","12345678901"],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",true],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"none",null],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"dropB",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"numbersAsStrings",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"keyed",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{},{"$":"undefined"},"undefinedAsNull",2],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",0],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",-1],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",1.5],"out":"{\n \"a\": [],\n \"b\": {},\n \"c\": [\n  {},\n  []\n ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",11],"out":"{\n          \"a\": [],\n          \"b\": {},\n          \"c\": [\n                    {},\n                    []\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"a\": [],\n          \"b\": {},\n          \"c\": [\n                    {},\n                    []\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none","\t"],"out":"{\n\t\"a\": [],\n\t\"b\": {},\n\t\"c\": [\n\t\t{},\n\t\t[]\n\t]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",""],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"a\": [],\n ^_^ \"b\": {},\n ^_^ \"c\": [\n ^_^  ^_^ {},\n ^_^  ^_^ []\n ^_^ ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"a\": [],\n1234567890\"b\": {},\n1234567890\"c\": [\n12345678901234567890{},\n12345678901234567890[]\n1234567890]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",true],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"none",null],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"a\":[],\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"dropB",2],"out":"{\n  \"a\": [],\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"a\":[],\"b\":{},\"c\":[{},[]]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"a\": [],\n    \"b\": {},\n    \"c\": [\n      {},\n      []\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"keyed",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"a\":[],\"b\":{},\"c\":[{},[]]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"a":[],"b":{},"c":[{},[]]},{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"a\": [],\n  \"b\": {},\n  \"c\": [\n    {},\n    []\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",0],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",-1],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",1.5],"out":"{\n \"b\": 1,\n \"a\": {\n  \"c\": \"x\",\n  \"d\": [\n   1,\n   {\n    \"e\": null\n   }\n  ]\n }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",11],"out":"{\n          \"b\": 1,\n          \"a\": {\n                    \"c\": \"x\",\n                    \"d\": [\n                              1,\n                              {\n                                        \"e\": null\n                              }\n                    ]\n          }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"b\": 1,\n          \"a\": {\n                    \"c\": \"x\",\n                    \"d\": [\n                              1,\n                              {\n                                        \"e\": null\n                              }\n                    ]\n          }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none","\t"],"out":"{\n\t\"b\": 1,\n\t\"a\": {\n\t\t\"c\": \"x\",\n\t\t\"d\": [\n\t\t\t1,\n\t\t\t{\n\t\t\t\t\"e\": null\n\t\t\t}\n\t\t]\n\t}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",""],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"b\": 1,\n ^_^ \"a\": {\n ^_^  ^_^ \"c\": \"x\",\n ^_^  ^_^ \"d\": [\n ^_^  ^_^  ^_^ 1,\n ^_^  ^_^  ^_^ {\n ^_^  ^_^  ^_^  ^_^ \"e\": null\n ^_^  ^_^  ^_^ }\n ^_^  ^_^ ]\n ^_^ }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"b\": 1,\n1234567890\"a\": {\n12345678901234567890\"c\": \"x\",\n12345678901234567890\"d\": [\n1234567890123456789012345678901,\n123456789012345678901234567890{\n1234567890123456789012345678901234567890\"e\": null\n123456789012345678901234567890}\n12345678901234567890]\n1234567890}\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",true],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"none",null],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"dropB",2],"out":"{\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"b\": 1,\n    \"a\": {\n      \"c\": \"x\",\n      \"d\": [\n        1,\n        {\n          \"e\": null\n        }\n      ]\n    }\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"b\":\"1\",\"a\":{\"c\":\"x\",\"d\":[\"1\",{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"b\": \"1\",\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      \"1\",\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"c=x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"keyed",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"c=x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"b\":1,\"a\":{\"c\":\"x\",\"d\":[1,{\"e\":null}]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["value",{"b":1,"a":{"c":"x","d":[1,{"e":null}]}},{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"b\": 1,\n  \"a\": {\n    \"c\": \"x\",\n    \"d\": [\n      1,\n      {\n        \"e\": null\n      }\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",0],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",-1],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",1.5],"out":"{\n \"1\": {\n  \"x\": \"y\"\n },\n \"2\": true,\n \"b\": 1,\n \"a\": [\n  1,\n  2\n ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",11],"out":"{\n          \"1\": {\n                    \"x\": \"y\"\n          },\n          \"2\": true,\n          \"b\": 1,\n          \"a\": [\n                    1,\n                    2\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"number","value":"Infinity"}],"out":"{\n          \"1\": {\n                    \"x\": \"y\"\n          },\n          \"2\": true,\n          \"b\": 1,\n          \"a\": [\n                    1,\n                    2\n          ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",{"$":"number","value":"NaN"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none","\t"],"out":"{\n\t\"1\": {\n\t\t\"x\": \"y\"\n\t},\n\t\"2\": true,\n\t\"b\": 1,\n\t\"a\": [\n\t\t1,\n\t\t2\n\t]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",""],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none"," ^_^ "],"out":"{\n ^_^ \"1\": {\n ^_^  ^_^ \"x\": \"y\"\n ^_^ },\n ^_^ \"2\": true,\n ^_^ \"b\": 1,\n ^_^ \"a\": [\n ^_^  ^_^ 1,\n ^_^  ^_^ 2\n ^_^ ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none","12345678901"],"out":"{\n1234567890\"1\": {\n12345678901234567890\"x\": \"y\"\n1234567890},\n1234567890\"2\": true,\n1234567890\"b\": 1,\n1234567890\"a\": [\n123456789012345678901,\n123456789012345678902\n1234567890]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",true],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"none",null],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"dropB",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"dropB",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2]}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"wrapRoot",2],"out":"{\n  \"wrapped\": {\n    \"1\": {\n      \"x\": \"y\"\n    },\n    \"2\": true,\n    \"b\": 1,\n    \"a\": [\n      1,\n      2\n    ]\n  }\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"numbersAsStrings",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":\"1\",\"a\":[\"1\",\"2\"]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"numbersAsStrings",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": \"1\",\n  \"a\": [\n    \"1\",\n    \"2\"\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"keyed",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"x=y\"},\"2\":true,\"b\":1,\"a\":[1,2]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"keyed",2],"out":"{\n  \"1\": {\n    \"x\": \"x=y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"undefinedAsNull",{"$":"undefined"}],"out":"{\"1\":{\"x\":\"y\"},\"2\":true,\"b\":1,\"a\":[1,2],\"u\":null}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["object",[["b",1],["2",true],["a",[1,2]],["u",{"$":"undefined"}],["1",{"x":"y"}]],{"$":"undefined"},"undefinedAsNull",2],"out":"{\n  \"1\": {\n    \"x\": \"y\"\n  },\n  \"2\": true,\n  \"b\": 1,\n  \"a\": [\n    1,\n    2\n  ],\n  \"u\": null\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",0],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",-1],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",1.5],"out":"[\n null,\n \"x\",\n null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",11],"out":"[\n          null,\n          \"x\",\n          null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"number","value":"Infinity"}],"out":"[\n          null,\n          \"x\",\n          null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",{"$":"number","value":"NaN"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none","\t"],"out":"[\n\tnull,\n\t\"x\",\n\tnull\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",""],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none"," ^_^ "],"out":"[\n ^_^ null,\n ^_^ \"x\",\n ^_^ null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none","12345678901"],"out":"[\n1234567890null,\n1234567890\"x\",\n1234567890null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",true],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"none",null],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"dropB",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"dropB",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"wrapRoot",{"$":"undefined"}],"out":"{\"wrapped\":[null,\"x\",null]}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"wrapRoot",2],"out":"{\n  \"wrapped\": [\n    null,\n    \"x\",\n    null\n  ]\n}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"numbersAsStrings",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"numbersAsStrings",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"keyed",{"$":"undefined"}],"out":"[null,\"1=x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"keyed",2],"out":"[\n  null,\n  \"1=x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"undefinedAsNull",{"$":"undefined"}],"out":"[null,\"x\",null]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["sparse",3,[[1,"x"]],"undefinedAsNull",2],"out":"[\n  null,\n  \"x\",\n  null\n]"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    --- property 'a' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"dropB",{"$":"undefined"}],"out":"{\"a\":{}}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["a","b","c"],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'b' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",[0,0,0,0],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    |     index 0 -> object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["q",0],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Array'\n    --- index 0 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","z"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k","k","k","k","z"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     property 'k' -> object with constructor 'Object'\n    |     ...\n    |     property 'k' -> object with constructor 'Object'\n    --- property 'z' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["2","x"],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '2' -> object with constructor 'Object'\n    --- property 'x' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"dropB",{"$":"undefined"}],"out":"{}"}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    |     property 'wrapped' -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["b","","c"],1,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'c' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     <anonymous> -> object with constructor 'Object'\n    --- property 'wrapped' closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["k0","k1","k2","k3","k4","k5",""],2,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property 'k2' -> object with constructor 'Object'\n    |     property 'k3' -> object with constructor 'Object'\n    |     ...\n    |     property 'k5' -> object with constructor 'Object'\n    --- <anonymous> closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"none",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"dropB",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"wrapRoot",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"numbersAsStrings",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"keyed",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"JSON.stringify","fn":"jsonStringify","args":["cycle",["01",1],0,"undefinedAsNull",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Converting circular structure to JSON\n    --> starting at object with constructor 'Object'\n    |     property '01' -> object with constructor 'Array'\n    --- index 1 closes the circle"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[0],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"-0"}],"out":"1970-01-01T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[1.5],"out":"1970-01-01T00:00:00.001Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-1.5],"out":"1969-12-31T23:59:59.999Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[1791462896789],"out":"2026-10-08T12:34:56.789Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300799999],"out":"9999-12-31T23:59:59.999Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[253402300800000],"out":"+010000-01-01T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200000],"out":"0000-01-01T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-62167219200001],"out":"-000001-12-31T23:59:59.999Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000000],"out":"+275760-09-13T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[-8640000000000000],"out":"-271821-04-20T00:00:00.000Z"}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[8640000000000001],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"NaN"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"Date.prototype.toISOString","fn":"toISOString","args":[{"$":"number","value":"Infinity"}],"threw":{"$":"error","name":"RangeError","message":"Invalid time value"}}
+{"test":"Date.UTC","fn":"utc","args":[2020,0,1,0,0,0,0],"out":1577836800000}
+{"test":"Date.UTC","fn":"utc","args":[99,11,31,23,59,59,999],"out":946684799999}
+{"test":"Date.UTC","fn":"utc","args":[0,0,1,0,0,0,0],"out":-2208988800000}
+{"test":"Date.UTC","fn":"utc","args":[100,0,1,0,0,0,0],"out":-59011459200000}
+{"test":"Date.UTC","fn":"utc","args":[2020,1,30,0,0,0,0],"out":1583020800000}
+{"test":"Date.UTC","fn":"utc","args":[2020,13,1,0,0,0,0],"out":1612137600000}
+{"test":"Date.UTC","fn":"utc","args":[2020,-1,1,0,0,0,0],"out":1575158400000}
+{"test":"Date.UTC","fn":"utc","args":[275760,8,13,0,0,0,0],"out":8640000000000000}
+{"test":"Date.UTC","fn":"utc","args":[275760,8,13,0,0,0,1],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.UTC","fn":"utc","args":[-271821,3,20,0,0,0,0],"out":-8640000000000000}
+{"test":"Date.UTC","fn":"utc","args":[-271821,3,19,23,59,59,999],"out":{"$":"number","value":"NaN"}}
+{"test":"Date.UTC","fn":"utc","args":[1970,0,0,24,0,0,0],"out":0}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["a b"],"out":"a%20b"}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["-_.!~*'()"],"out":"-_.!~*'()"}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["é"],"out":"%C3%A9"}

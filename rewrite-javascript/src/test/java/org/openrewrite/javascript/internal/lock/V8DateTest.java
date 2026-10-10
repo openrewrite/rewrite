@@ -15,13 +15,22 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.UpstreamCalls.Call;
+
+import java.util.Map;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * {@code Date.parse} in Node v24.19.0 over the ISO form, NaN where V8's ISO parser refuses.
+ * {@code Date.parse} in Node v24.19.0 over the ISO form, NaN where V8's ISO parser refuses; {@code toISOString} and
+ * {@code Date.UTC} as Node answers them ({@code generate/node-builtins.js}).
  */
 class V8DateTest {
 
@@ -44,5 +53,29 @@ class V8DateTest {
     })
     void parsesAsNode(String text, double expected) {
         assertThat(V8Date.parse(text)).isEqualTo(Double.valueOf(expected));
+    }
+
+    static Stream<Call> calls() {
+        return UpstreamCalls.read(EcmaScriptTest.BUILTINS).stream()
+          .filter(call -> "toISOString".equals(call.getFn()) || "utc".equals(call.getFn()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("calls")
+    void answersAsNodeDoes(Call call) {
+        Map<String, @Nullable Object> threw = call.getThrew();
+        if (threw != null) {
+            assertThatThrownBy(() -> V8Date.toISOString(number(call, 0))).isInstanceOf(JsError.class)
+              .hasToString(threw.get("name") + ": " + threw.get("message"));
+        } else if ("toISOString".equals(call.getFn())) {
+            assertThat(V8Date.toISOString(number(call, 0))).isEqualTo(call.getOut());
+        } else {
+            assertThat(V8Date.utc(number(call, 0), number(call, 1), number(call, 2), number(call, 3), number(call, 4),
+              number(call, 5), number(call, 6))).isEqualTo(call.getOut());
+        }
+    }
+
+    private static double number(Call call, int i) {
+        return (Double) Objects.requireNonNull(call.arg(i));
     }
 }

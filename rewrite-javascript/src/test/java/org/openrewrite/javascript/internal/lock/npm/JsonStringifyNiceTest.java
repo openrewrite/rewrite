@@ -61,12 +61,16 @@ class JsonStringifyNiceTest {
 
     @Test
     void throwsSameErrorOnCyclesAsJsonStringify() {
-        Map<String, Object> c = obj();
-        Map<String, Object> a = obj("b", obj("c", c));
-        c.put("a", a);
+        Map<String, Object> b = obj();
+        Map<String, Object> a = obj("b", b);
+        b.put("c", a);
         Map<String, Object> cycle = obj("a", a);
-        assertThatThrownBy(() -> JsonStringifyNice.stringify(cycle))
-          .hasMessageStartingWith("Converting circular structure to JSON");
+        String builtin = "TypeError: Converting circular structure to JSON\n" +
+                         "    --> starting at object with constructor 'Object'\n" +
+                         "    |     property 'b' -> object with constructor 'Object'\n" +
+                         "    --- property 'c' closes the circle";
+        assertThatThrownBy(() -> Js.jsonStringify(cycle)).hasToString(builtin);
+        assertThatThrownBy(() -> JsonStringifyNice.stringify(cycle)).hasToString(builtin);
     }
 
     private static Map<String, Object> spacesObj() {

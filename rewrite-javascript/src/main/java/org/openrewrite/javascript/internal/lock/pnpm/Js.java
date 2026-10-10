@@ -22,9 +22,6 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
-import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -160,18 +157,4 @@ final class Js extends EcmaScript {
         }
         return time;
     }
-
-    /**
-     * {@code Date.prototype.toISOString} of a valid time value.
-     */
-    static String toISOString(double time) {
-        Instant instant = Instant.ofEpochMilli((long) time);
-        int year = instant.atZone(ZoneOffset.UTC).getYear();
-        String yearText = year >= 0 && year <= 9999 ? String.format("%04d", year) :
-                (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year));
-        return yearText + ISO_REST.format(instant);
-    }
-
-    private static final DateTimeFormatter ISO_REST =
-            DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC);
 }
