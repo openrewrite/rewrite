@@ -32,6 +32,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -269,11 +270,47 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         for (List<Source> order : orders(s.workspaceSources(PackageManager.Pnpm))) {
             Outcome outcome = run(s, recipe, parse(order));
             String visited = visited(order);
-            assertThat(outcome.rows).as("visiting %s", visited).hasSize(1);
+            List<String> paths = order.stream().map(source -> source.path).collect(toList());
+            boolean lockFirst = paths.indexOf("pnpm-lock.yaml") < paths.indexOf("pnpm-workspace.yaml");
+            assertThat(outcome.rows).as("visiting %s", visited).singleElement()
+              .extracting(NodeLockRegenerationFailures.Row::getReason).isEqualTo(lockFirst ?
+                LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name() :
+                LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE.name());
             assertThat(print(outcome.file("pnpm-workspace.yaml"))).as("visiting %s", visited)
               .isEqualTo("packages: [apps/*]\n");
             assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
               .isEqualTo(s.file("pkg-before"));
+            // a lock visited first was written by the decision the flow-style revision overturns
+            if (lockFirst) {
+                assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)
+                  .isNotEqualTo(s.file("before"));
+            } else {
+                assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)
+                  .isEqualTo(s.file("before"));
+            }
+        }
+    }
+
+    // a recipe outside the composition changes the root: a lock written before the root's visit is warned, one row
+    @Test
+    void npmAfterAPlainEditOfTheRootInEveryVisitOrder() {
+        Scenario s = new Scenario("npm/override-recipe-compose");
+        Recipe recipe = new CompositeRecipe(Arrays.asList(new ChangeValue("$.dependencies.is-odd", "\"3.0.1\""),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null)));
+        for (List<Source> order : orders(s.workspaceSources(PackageManager.Npm))) {
+            List<String> paths = order.stream().map(source -> source.path).collect(toList());
+            if (paths.indexOf("package.json") < paths.indexOf("package-lock.json")) {
+                inOrder(s, recipe, order);
+                continue;
+            }
+            String visited = visited(order);
+            Outcome outcome = run(s, recipe, parse(order));
+            assertThat(print(outcome.file("package.json"))).as("visiting %s", visited).isEqualTo(s.file("pkg"));
+            assertThat(outcome.file("package.json").getMarkers().findFirst(Markup.Warn.class)).as("visiting %s",
+              visited).hasValueSatisfying(warn -> assertThat(warn.getMessage()).contains("wrote the lock from"));
+            assertThat(outcome.rows).as("visiting %s", visited).singleElement()
+              .extracting(NodeLockRegenerationFailures.Row::getReason)
+              .isEqualTo(LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name());
         }
     }
 

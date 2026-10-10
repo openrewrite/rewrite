@@ -90,13 +90,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         final Set<NodeDependencyProtocolsSkipped.Row> protocolRows = new HashSet<>();
         /** Each workspace root's override, decided from the revisions before this recipe it was last asked for. */
         final Map<Path, PackageJsonOverrides> overrides = new HashMap<>();
-        /** The override each root's files were first written by; a later decision must write as it does. */
+        /** The override each root's files visited so far were left by; a later one must leave them alike. */
         final Map<Path, PackageJsonOverrides> followed = new HashMap<>();
+        /** Each root's files visited so far, by path: the text as visited and as this recipe left it. */
+        final Map<Path, Map<Path, String[]>> left = new HashMap<>();
         final Set<Path> overturned = new HashSet<>();
         /** Why the file being visited is warned: its root's decision was overturned at this visit. */
         @Nullable String overturnedAt;
         /** What each root's regeneration last read, so it runs again only when that changed. */
         final Map<Path, List<Object>> regeneratedFrom = new HashMap<>();
+        /** What each root's lock was regenerated from when this recipe left it. */
+        final Map<Path, List<Object>> lockLeftFrom = new HashMap<>();
         /** The revision of each root package.json and pnpm-workspace.yaml as this recipe visited it. */
         final Map<Path, SourceFile> visited = new HashMap<>();
         final Set<Path> generated = new HashSet<>();
@@ -203,6 +207,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             NodeDependencyScan.ProjectState ips = acc.scan.projects.get(importer);
             if (ips == null || ips.capturedPackageJson == null) continue;
             LockFileRegeneration.Result result = regeneratedLock(acc, ctx, importer, ips, p);
+            Path root = rootOf(acc, ctx, importer);
+            if (root != null) {
+                left(acc, root, p, sf, result != null && result.isSuccess() ? result.getLockFileContent() : print(sf));
+                if (result != null && result.isSuccess() && importer.equals(root)) {
+                    acc.lockLeftFrom.putIfAbsent(root, acc.regeneratedFrom.get(root));
+                }
+            }
             if (result != null) {
                 if (result.isSuccess()) {
                     return PackageJsonHelper.reparseLock(sf, result.getLockFileContent());
@@ -212,6 +223,32 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             }
         }
         return sf;
+    }
+
+    private static void left(Accumulator acc, Path root, Path file, SourceFile visited, String leftAs) {
+        acc.left.computeIfAbsent(root, k -> new LinkedHashMap<>()).put(file, new String[]{print(visited), leftAs});
+    }
+
+    // whether override leaves the root's files visited so far as they were left; a lock, only when it leaves it be
+    private static boolean leavesAsLeft(Accumulator acc, Path root, PackageJsonOverrides override) {
+        boolean declined = override.declined() != null;
+        Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
+        for (Map.Entry<Path, String[]> file : acc.left.getOrDefault(root, emptyMap()).entrySet()) {
+            String visited = file.getValue()[0];
+            String expected = visited;
+            if (!declined && file.getKey().equals(root) && acc.visited.get(root) instanceof Json.Document) {
+                expected = print(override.apply((Json.Document) acc.visited.get(root)));
+            } else if (!declined && file.getKey().equals(workspaceManifest)) {
+                expected = override.getPlace() == PackageJsonOverrides.Place.WORKSPACE_MANIFEST ?
+                        override.applyToWorkspaceManifest() : visited;
+            } else if (!declined && !file.getKey().equals(root)) {
+                return false;
+            }
+            if (!expected.equals(file.getValue()[1])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private SourceFile editedManifest(Accumulator acc, ExecutionContext ctx, NodeDependencyScan.ProjectState ps,
@@ -229,14 +266,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         acc.visited.put(p, sf);
         PackageJsonOverrides override = overrideOf(acc, ctx, p);
         if (override == null || override.apply((Json.Document) sf) == sf) {
+            left(acc, p, p, sf, print(sf));
             return sf;
         }
         regenerate(acc, ctx, p, ps);
         if (ps.modifiedPackageJson == null) {
+            left(acc, p, p, sf, print(sf));
             return sf;
         }
         SourceFile out = NodeDependencyScan.modifiedFor(ps, sf);
         publish(acc, ctx, p, out);
+        left(acc, p, p, sf, print(out));
         if (ps.regenResult != null && !ps.regenResult.isSuccess()) {
             recordFailure(ctx, ps, p, ps.regenResult);
             return Markup.warn(out, new RuntimeException("lock regeneration failed: " +
@@ -258,9 +298,11 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }
         PackageJsonOverrides override = overrideOf(acc, ctx, root);
         if (override == null || override.getPlace() != PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
+            left(acc, root, path, sf, print(sf));
             return sf;
         }
         String content = override.applyToWorkspaceManifest();
+        left(acc, root, path, sf, content);
         if (content.equals(print(sf))) {
             return sf;
         }
@@ -326,6 +368,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
                 files.getPaths(), edited);
         if (inputs.equals(acc.regeneratedFrom.put(root, inputs))) {
             return;
+        }
+        List<Object> lockFrom = acc.lockLeftFrom.get(root);
+        if (lockFrom != null && !lockFrom.equals(inputs) && acc.overturned.add(root)) {
+            String why = "a recipe before this one changed " + root + " or a file its lock reads after this recipe " +
+                         "wrote the lock from their earlier revisions";
+            acc.overturnedAt = why;
+            failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, why);
         }
         Map<Path, String> read = new LinkedHashMap<>(edited);
         if (!(base instanceof Json.Document) || override.apply((Json.Document) base) != base || !edited.isEmpty()) {
@@ -421,11 +470,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return null;
         }
         PackageJsonOverrides followed = acc.followed.computeIfAbsent(root, k -> override);
-        if (!followed.writesAs(override)) {
+        if (!followed.writesAs(override) && leavesAsLeft(acc, root, override)) {
+            acc.followed.put(root, override);
+        } else if (!followed.writesAs(override)) {
             if (acc.overturned.add(root)) {
                 String why = "a recipe before this one changed " + root + " or its " +
-                             PackageJsonOverrides.WORKSPACE_MANIFEST + " after files visited earlier were written " +
-                             "by the override's place then, " + followed + "; it is now " + override;
+                             PackageJsonOverrides.WORKSPACE_MANIFEST + " after files visited earlier were left by " +
+                             "the override's place then, " + followed + "; it is now " + override;
                 acc.overturnedAt = why;
                 failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, why);
             }
