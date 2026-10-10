@@ -34,6 +34,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
+import java.util.zip.GZIPInputStream;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -95,6 +96,31 @@ class LockfileTest {
         dependencies.remove("dep-0");
         assertThat(LockfileStringifier.stringify(object("a@1.0.0", object("dependencies", dependencies)), false, false,
                 null)).contains("  dependencies:\n    constructor \"1.0.0\"\n");
+    }
+
+    static Stream<Arguments> inheritedNameMaps() throws IOException {
+        List<Arguments> rows = new ArrayList<>();
+        InputStream gzipped = requireNonNull(LockfileTest.class.getResourceAsStream("inherited-name-maps.jsonl.gz"));
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(new GZIPInputStream(gzipped),
+                StandardCharsets.UTF_8))) {
+            for (String line = reader.readLine(); line != null; line = reader.readLine()) {
+                JsonNode row = MAPPER.readTree(line);
+                rows.add(Arguments.of(rows.size() + 1, row));
+            }
+        }
+        return rows.stream();
+    }
+
+    // yarn's comparator orders two inherited names by the strings `>` converts their functions to
+    @ParameterizedTest(name = "map {0}")
+    @MethodSource("inheritedNameMaps")
+    void sortsAMapHoldingSeveralInheritedNamesAsYarnDoes(int map, JsonNode row) {
+        Map<String, @Nullable Object> dependencies = new LinkedHashMap<>();
+        for (int i = 0; i < row.get("keys").size(); i++) {
+            dependencies.put(row.get("keys").get(i).asText(), row.get("values").get(i).asText());
+        }
+        assertThat(LockfileStringifier.stringify(object("a@1.0.0", object("dependencies", dependencies)), false, false,
+                null)).isEqualTo(row.get("out").asText());
     }
 
     @Test

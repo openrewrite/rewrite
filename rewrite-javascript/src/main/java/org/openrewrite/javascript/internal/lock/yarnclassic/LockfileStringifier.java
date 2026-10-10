@@ -48,13 +48,19 @@ final class LockfileStringifier {
     }
 
     /**
-     * The members every object literal inherits from {@code Object.prototype}: {@code priorities[key]} is truthy
-     * for them and compares as {@code NaN}.
+     * The members every object literal inherits from {@code Object.prototype}, by the string {@code >} converts
+     * {@code priorities[key]} to: two of them compare as strings, one beside a number as {@code NaN}.
      */
-    private static final Set<String> OBJECT_PROTOTYPE = new HashSet<>(Arrays.asList(
-            "constructor", "__defineGetter__", "__defineSetter__", "hasOwnProperty", "__lookupGetter__",
-            "__lookupSetter__", "isPrototypeOf", "propertyIsEnumerable", "toString", "valueOf", "__proto__",
-            "toLocaleString"));
+    private static final Map<String, String> OBJECT_PROTOTYPE = new HashMap<>();
+
+    static {
+        for (String name : Arrays.asList("__defineGetter__", "__defineSetter__", "hasOwnProperty", "__lookupGetter__",
+                "__lookupSetter__", "isPrototypeOf", "propertyIsEnumerable", "toString", "valueOf", "toLocaleString")) {
+            OBJECT_PROTOTYPE.put(name, "function " + name + "() { [native code] }");
+        }
+        OBJECT_PROTOTYPE.put("constructor", "function Object() { [native code] }");
+        OBJECT_PROTOTYPE.put("__proto__", "[object Object]");
+    }
 
     private LockfileStringifier() {
     }
@@ -83,18 +89,26 @@ final class LockfileStringifier {
     }
 
     static int priorityThenAlphaSort(String a, String b) {
-        double pa = priority(a);
-        double pb = priority(b);
-        if (pa != 0 || pb != 0) {
-            return (pa == 0 ? 100 : pa) > (pb == 0 ? 100 : pb) ? 1 : -1;
+        Object pa = priority(a);
+        Object pb = priority(b);
+        if (pa != null || pb != null) {
+            return greaterThan(pa == null ? 100 : pa, pb == null ? 100 : pb) ? 1 : -1;
         }
         return Misc.sortAlpha(a, b);
     }
 
-    // 0 when `priorities[key]` is falsy, NaN when it is an inherited member
-    private static double priority(String key) {
+    // `priorities[key]`: its number, an inherited member's string, null when falsy
+    private static @Nullable Object priority(String key) {
         Integer p = PRIORITIES.get(key);
-        return p != null ? p : OBJECT_PROTOTYPE.contains(key) ? Double.NaN : 0;
+        return p != null ? p : OBJECT_PROTOTYPE.get(key);
+    }
+
+    // `>` over a number or a member's string: two strings by code units; a string beside a number is NaN
+    private static boolean greaterThan(Object a, Object b) {
+        if (a instanceof String && b instanceof String) {
+            return ((String) a).compareTo((String) b) > 0;
+        }
+        return a instanceof Integer && b instanceof Integer && (Integer) a > (Integer) b;
     }
 
     static List<String> sortKeys(List<String> keys) {
