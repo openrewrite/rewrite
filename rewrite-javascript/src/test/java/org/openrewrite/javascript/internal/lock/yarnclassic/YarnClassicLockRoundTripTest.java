@@ -125,8 +125,16 @@ class YarnClassicLockRoundTripTest {
             new Cli(inputs).start(rc);
             options = new Config(inputs, Rc.getRcArgs(rc), new ArrayList<>());
         } catch (CannotKnow | JsError | MessageError e) {
-            assertThat(lock.getScenario().expect()).matches("(cannot-know|pm-fails|pm-rejects) .*");
-            assumeFalse(true, "yarn 1.22.22 does not run this install: " + e.getMessage());
+            String log = installOver(lock);
+            if (e instanceof CannotKnow) {
+                assertThat(lock.getScenario().expect()).startsWith("cannot-know");
+                assertThat(log == null || log.contains("exit=0")).as("yarn ran the install over this lock").isTrue();
+                assumeFalse(true, "the engine cannot know what yarn does with this configuration: " +
+                                  e.getMessage());
+            }
+            assertThat(lock.getScenario().expect()).matches("(pm-fails|pm-rejects) .*");
+            assertThat(log == null || log.contains("exit=1")).as("yarn failed the install over this lock").isTrue();
+            assumeFalse(true, "yarn 1.22.22 fails on this configuration: " + e.getMessage());
         }
         Lockfile lockfile;
         try {
@@ -146,6 +154,16 @@ class YarnClassicLockRoundTripTest {
             return null;
         }
         return new Loaded(lock, inputs, requireNonNull(options), lockfile);
+    }
+
+    // the second install recorded over this lock: its own, or the scenario's when that ran over this lock
+    private static @Nullable String installOver(YarnClassicScenarios.Lock lock) {
+        String own = lock.againLog();
+        if (own != null) {
+            return own;
+        }
+        String log = lock.getScenario().file("yarnclassic-again.log");
+        return log != null && log.contains("over=" + lock.getFileName() + "\n") ? log : null;
     }
 
     private static String logs(YarnClassicScenarios.Scenario scenario) {
