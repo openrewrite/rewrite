@@ -31,6 +31,7 @@ import org.openrewrite.semver.NodeSemver;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -65,6 +66,12 @@ final class Config {
     private static final Pattern SCOPED_PKG = Pattern.compile("(?:^|/)(@[^/?]+?)(?=%2f|/)");
     private static final Pattern REGISTRY_PREFIX = Pattern.compile("^(https?:)?//", Pattern.CASE_INSENSITIVE);
     private static final Pattern UNDERSCORE = Pattern.compile("([^_])_");
+    private static final Pattern HTTP_PROTOCOL = Pattern.compile("^https?:", Pattern.CASE_INSENSITIVE);
+    private static final Pattern REGISTRY_SUFFIX = Pattern.compile("registry/?\\z");
+    private static final Pattern PREPENDED = Pattern.compile("^\\.*/|^(?!localhost)\\w+:");
+    private static final Pattern PARSED_URL = Pattern.compile(
+            "^([A-Za-z][A-Za-z0-9+.-]*:)//(?:[^@/?#]*@)?([^:/?#]*)(?::(\\d*))?(/[^?#]*)?([?#].*)?\\z");
+    private static final String URI_RESERVED = ";/?:@&=+$,#";
     private static final List<String> FALSY_STRINGS = Arrays.asList("0", "false");
 
     static {
@@ -687,6 +694,152 @@ final class Config {
             }
         }
         return DEFAULT_REGISTRY;
+    }
+
+    /**
+     * npm-registry.js {@code request}'s Authorization header for {@code packageIdent} at {@code requestUrl}: the
+     * credentials of the package's registry, sent to it under always-auth or for a scoped package; null for none.
+     */
+    @Nullable
+    String getAuthorization(String packageIdent, String requestUrl) {
+        String registry = getRegistry(packageIdent);
+        Object alwaysAuth = getRegistryOrGlobalOption(registry, "always-auth");
+        boolean isToRegistry = isRequestToRegistry(requestUrl, registry) || requestNeedsAuth(requestUrl);
+        if (!isToRegistry || !Js.truthy(alwaysAuth) && getScope(packageIdent).isEmpty()) {
+            return null;
+        }
+        String auth = getAuth(packageIdent);
+        return auth.isEmpty() ? null : auth;
+    }
+
+    private boolean isRequestToRegistry(String requestUrl, String registryUrl) {
+        String[] request = urlParts(requestUrl);
+        String[] registry = urlParts(registryUrl);
+        Object customHostSuffix = getRegistryOrGlobalOption(registryUrl, "custom-host-suffix");
+        boolean requestToRegistryHost = request[0].equals(registry[0]);
+        boolean requestToYarn = YARN_REGISTRY.contains(request[0]) && DEFAULT_REGISTRY.contains(registry[0]);
+        boolean requestToRegistryPath = request[1].startsWith(registry[1]);
+        boolean customHostSuffixInUse = customHostSuffix instanceof String &&
+                                        request[0].endsWith((String) customHostSuffix);
+        return (requestToRegistryHost || requestToYarn) && (requestToRegistryPath || customHostSuffixInUse);
+    }
+
+    private boolean requestNeedsAuth(String requestUrl) {
+        String[] request = urlParts(requestUrl);
+        for (String option : Js.keys(npmConfig)) {
+            String[] parts = option.split(":", -1);
+            if (parts.length > 1 && (parts.length == 2 && "_authToken".equals(parts[1]) ||
+                                     "_password".equals(parts[1]))) {
+                String[] registry = urlParts(parts[0]);
+                if (request[0].equals(registry[0]) && request[1].startsWith(registry[1])) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private String getAuth(String packageIdent) {
+        String baseRegistry = getRegistry(packageIdent);
+        List<String> registries = YARN_REGISTRY.equals(baseRegistry) ? Arrays.asList(baseRegistry, DEFAULT_REGISTRY) :
+                singletonList(baseRegistry);
+        for (String registry : registries) {
+            String auth = getAuthByRegistry(registry);
+            if (!auth.isEmpty()) {
+                return auth;
+            }
+        }
+        return "";
+    }
+
+    private String getAuthByRegistry(String registry) {
+        Object authToken = getRegistryOrGlobalOption(registry, "_authToken");
+        if (Js.truthy(authToken)) {
+            return "Bearer " + Js.string(authToken);
+        }
+        Object auth = getRegistryOrGlobalOption(registry, "_auth");
+        if (Js.truthy(auth)) {
+            return "Basic " + Js.string(auth);
+        }
+        Object username = getRegistryOrGlobalOption(registry, "username");
+        Object password = getRegistryOrGlobalOption(registry, "_password");
+        if (Js.truthy(username) && Js.truthy(password)) {
+            String pw = new String(Base64.getMimeDecoder().decode(Js.string(password)), StandardCharsets.UTF_8);
+            return "Basic " + Base64.getEncoder().encodeToString((Js.string(username) + ":" + pw)
+                    .getBytes(StandardCharsets.UTF_8));
+        }
+        return "";
+    }
+
+    private @Nullable Object getRegistryOption(String registry, String option) {
+        String reg = registry.endsWith("/") ? registry : registry + "/";
+        Object value = npmConfig.get(reg + ":" + option);
+        if (!Js.truthy(value) && HTTP_PROTOCOL.matcher(reg).find()) {
+            value = getRegistryOption(HTTP_PROTOCOL.matcher(reg).replaceFirst(""), option);
+        }
+        if (!Js.truthy(value) && REGISTRY_SUFFIX.matcher(reg).find()) {
+            value = getRegistryOption(REGISTRY_SUFFIX.matcher(reg).replaceFirst(""), option);
+        }
+        return value;
+    }
+
+    private @Nullable Object getRegistryOrGlobalOption(String registry, String option) {
+        Object value = getRegistryOption(registry, option);
+        return Js.truthy(value) ? value : npmConfig.get(option);
+    }
+
+    /**
+     * npm-registry.js {@code urlParts}: the host and path normalize-url 2.0.1 and url.parse give a url, for the urls a
+     * registry and its packages have; any other is one the engine cannot know the parts of.
+     */
+    private static String[] urlParts(String requestUrl) {
+        String str = requestUrl.trim();
+        if (!PREPENDED.matcher(str).find()) {
+            str = str.replaceFirst("^(?!(?:\\w+:)?//)", "http://");
+        }
+        str = str.replaceFirst("^//", "http://");
+        Matcher url = PARSED_URL.matcher(str);
+        String path = url.matches() && url.group(5) == null ? decodeUri(url.group(4) == null ? "" : url.group(4)) :
+                null;
+        if (path == null || path.contains("/./") || path.contains("/../") || path.matches(".*/\\.\\.?\\z") ||
+            !url.group(2).matches("[A-Za-z0-9.-]*")) {
+            throw new CannotKnow("the parts normalize-url gives " + requestUrl + " (yarn's credentials check)");
+        }
+        String protocol = url.group(1).toLowerCase(Locale.ROOT);
+        String hostname = url.group(2).toLowerCase(Locale.ROOT).replaceFirst("\\.\\z", "").replaceFirst("^www\\.", "");
+        String port = url.group(3);
+        if (port != null && ("http:".equals(protocol) && "80".equals(port) || "https:".equals(protocol) &&
+                                                                             "443".equals(port))) {
+            port = null;
+        }
+        path = path.replaceAll("/{2,}", "/");
+        if (path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
+        }
+        return new String[]{port == null ? hostname : hostname + ":" + port, path.isEmpty() ? "/" : path};
+    }
+
+    // decodeURI of an ASCII path: an escape of a reserved character stays; null for one the engine does not decode
+    private static @Nullable String decodeUri(String path) {
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < path.length(); i++) {
+            char c = path.charAt(i);
+            if (c != '%') {
+                out.append(c);
+                continue;
+            }
+            if (i + 2 >= path.length() || Character.digit(path.charAt(i + 1), 16) < 0 ||
+                Character.digit(path.charAt(i + 2), 16) < 0) {
+                return null;
+            }
+            int decoded = Integer.parseInt(path.substring(i + 1, i + 3), 16);
+            if (decoded >= 0x80) {
+                return null;
+            }
+            out.append(URI_RESERVED.indexOf(decoded) >= 0 ? path.substring(i, i + 3) : String.valueOf((char) decoded));
+            i += 2;
+        }
+        return out.toString();
     }
 
     // base-registry.js getAvailableRegistries over npm's config

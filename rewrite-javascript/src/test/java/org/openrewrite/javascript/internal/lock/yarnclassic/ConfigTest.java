@@ -15,6 +15,8 @@
  */
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -23,6 +25,10 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -31,6 +37,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -39,6 +46,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * {@code generate/bundle-rows.js} prints the rows), and the cases of yarn's tests of the registries and env-replace.
  */
 class ConfigTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     static Stream<Arguments> environments() {
         return Stream.of(
@@ -339,6 +348,30 @@ class ConfigTest {
     })
     void matchesScopeCorrectly(String pathname, String scope) {
         assertThat(Config.getScope(pathname)).isEqualTo(scope);
+    }
+
+    static Stream<Arguments> requestAuthorizations() throws IOException {
+        List<Arguments> rows = new ArrayList<>();
+        try (BufferedReader in = new BufferedReader(new InputStreamReader(requireNonNull(
+                ConfigTest.class.getResourceAsStream("request-authorization.jsonl")), StandardCharsets.UTF_8))) {
+            for (String line = in.readLine(); line != null; line = in.readLine()) {
+                JsonNode row = JSON.readTree(line);
+                rows.add(Arguments.of(row.get("npmrc").asText(), row.get("name").asText(), row.get("url").asText(),
+                        row.get("authorization").isNull() ? null : row.get("authorization").asText()));
+            }
+        }
+        return rows.stream();
+    }
+
+    /**
+     * The Authorization header yarn 1.22.22's own NpmRegistry.request sent for each .npmrc, package and url (the test
+     * resources' {@code generate/request-authorization.js}): unscoped packages only under always-auth.
+     */
+    @ParameterizedTest(name = "{1} {2}")
+    @MethodSource("requestAuthorizations")
+    void sendsTheCredentialsYarnSends(String npmrc, String name, String url, @Nullable String authorization) {
+        Config config = YarnClassicScenarios.config(Collections.singletonMap(".npmrc", npmrc), env());
+        assertThat(config.getAuthorization(NpmRegistry.escapeName(name), url)).isEqualTo(authorization);
     }
 
     /**

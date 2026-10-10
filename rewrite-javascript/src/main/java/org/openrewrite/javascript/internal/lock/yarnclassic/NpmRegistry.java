@@ -87,8 +87,9 @@ final class NpmRegistry {
             return cached;
         }
         String name = pathname.replaceFirst("%2f", "/");
+        String authorization = config.getAuthorization(pathname, url);
         Io<Object> io = Io.issue(loop, causal, () -> {
-            String body = source.packument(registry, name);
+            String body = source.packument(registry, name, authorization);
             if (body == null) {
                 throw new NotFound(url, name);
             }

@@ -58,14 +58,14 @@ class PackageFetcherTest {
         YarnClassicScenarioTest.ScenarioRegistry recorded = new YarnClassicScenarioTest.ScenarioRegistry(scenario);
         RegistrySource registry = new RegistrySource() {
             @Override
-            public @Nullable String packument(String url, String name) {
-                return recorded.packument(url, name);
+            public @Nullable String packument(String url, String name, @Nullable String authorization) {
+                return recorded.packument(url, name, authorization);
             }
 
             @Override
-            public byte @Nullable [] tarball(String url, String name, String version) {
+            public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
                 return freshTarballMissing && url.startsWith("https://registry.yarnpkg.com/hasown/") ? null :
-                        recorded.tarball(url, name, version);
+                        recorded.tarball(url, name, version, authorization);
             }
         };
         Result result = new YarnClassicLockRegenerator(scenario.inputs(YarnClassicScenarios.Phase.AFTER, before),

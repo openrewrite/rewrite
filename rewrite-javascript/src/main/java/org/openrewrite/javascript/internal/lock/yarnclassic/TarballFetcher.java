@@ -120,8 +120,10 @@ final class TarballFetcher {
         if (isFilePath || isRelativePath) {
             throw new CannotKnow("the tarball " + reference + " of " + pkg + " (a file on disk)");
         }
+        String packageIdent = Js.truthy(remote.packageName) ? NpmRegistry.escapeName(Js.string(remote.packageName)) :
+                reference;
         byte[] tarball = registry.tarball(reference, Js.string(Js.truthy(remote.packageName) ? remote.packageName :
-                name), Js.string(version));
+                name), Js.string(version), config.getAuthorization(packageIdent, reference));
         if (tarball == null) {
             throw new CannotKnow("whether yarn's cache holds " + pkg + ", whose tarball " + reference +
                                  " answers 404 (yarn fails on a cold cache and installs from a warm one)");

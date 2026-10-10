@@ -22,7 +22,9 @@ import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegen
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -65,8 +67,8 @@ final class YarnClassicInputs {
     }
 
     /**
-     * The registries as .npmrc lines; npm's own default, which the host also reports when nothing names a
-     * registry, is left unnamed.
+     * The registries and their credentials as .npmrc lines; npm's own default, which the host also reports when
+     * nothing names a registry, is left unnamed.
      */
     static String userNpmrc(NodeRegistries registries) {
         StringBuilder npmrc = new StringBuilder();
@@ -74,10 +76,30 @@ final class YarnClassicInputs {
         if (!NPM_DEFAULT_REGISTRY.equals(registry.getUrl()) || hasCredentials(registry)) {
             npmrc.append("registry=").append(registry.getUrl()).append('\n');
         }
+        credentials(npmrc, registry);
         for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
             npmrc.append(scoped.getKey()).append(":registry=").append(scoped.getValue().getUrl()).append('\n');
+            credentials(npmrc, scoped.getValue());
         }
         return npmrc.toString();
+    }
+
+    // keyed by the registry's url without its protocol, as yarn's getRegistryOption looks them up
+    private static void credentials(StringBuilder npmrc, NodeRegistry registry) {
+        String key = registry.getUrl().replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*:", "");
+        key = key.endsWith("/") ? key : key + "/";
+        if (registry.getAuthToken() != null) {
+            npmrc.append(key).append(":_authToken=").append(EcmaScript.quote(registry.getAuthToken())).append('\n');
+        } else if (registry.getAuthBase64() != null) {
+            npmrc.append(key).append(":_auth=").append(EcmaScript.quote(registry.getAuthBase64())).append('\n');
+        } else if (registry.getUsername() != null && registry.getPassword() != null) {
+            npmrc.append(key).append(":username=").append(EcmaScript.quote(registry.getUsername())).append('\n')
+                    .append(key).append(":_password=").append(EcmaScript.quote(Base64.getEncoder().encodeToString(
+                            registry.getPassword().getBytes(StandardCharsets.UTF_8)))).append('\n');
+        }
+        if (registry.isAlwaysAuth()) {
+            npmrc.append(key).append(":always-auth=true\n");
+        }
     }
 
     private static boolean hasCredentials(NodeRegistry registry) {

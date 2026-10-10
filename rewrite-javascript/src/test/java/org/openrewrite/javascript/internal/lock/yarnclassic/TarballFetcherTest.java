@@ -83,12 +83,12 @@ class TarballFetcherTest {
         remote.integrity = "sha512-AAAA whirlpool-AAAA";
         RegistrySource tarballs = new RegistrySource() {
             @Override
-            public @Nullable String packument(String r, String name) {
+            public @Nullable String packument(String r, String name, @Nullable String authorization) {
                 return null;
             }
 
             @Override
-            public byte[] tarball(String url, String name, String version) {
+            public byte[] tarball(String url, String name, String version, @Nullable String authorization) {
                 return new byte[0];
             }
         };

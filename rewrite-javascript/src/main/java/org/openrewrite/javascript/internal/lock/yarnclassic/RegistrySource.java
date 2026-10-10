@@ -18,7 +18,8 @@ package org.openrewrite.javascript.internal.lock.yarnclassic;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What yarn requests from a registry: packuments, and the tarballs of the versions it picks anew.
+ * What yarn requests from a registry: packuments, and the tarballs of the versions it picks anew, each with the
+ * Authorization header yarn sends, null for none.
  */
 public interface RegistrySource {
 
@@ -27,10 +28,10 @@ public interface RegistrySource {
      * registry has no such package.
      */
     @Nullable
-    String packument(String registry, String name);
+    String packument(String registry, String name, @Nullable String authorization);
 
     /**
      * {@code GET} of a version's {@code dist.tarball}: its bytes, or null when the registry answers 404.
      */
-    byte @Nullable [] tarball(String url, String name, String version);
+    byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization);
 }

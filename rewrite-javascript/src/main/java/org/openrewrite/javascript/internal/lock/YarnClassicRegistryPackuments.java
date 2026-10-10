@@ -16,15 +16,20 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
 /**
- * The packuments and tarballs a Yarn classic install reads, from the registry yarn's own config names.
+ * The packuments and tarballs a Yarn classic install reads, from the registry yarn's own config names, with the
+ * Authorization header yarn sends and the host's transport settings for the url.
  */
 final class YarnClassicRegistryPackuments implements RegistrySource {
+
+    private static final String BEARER = "Bearer ";
+    private static final String BASIC = "Basic ";
 
     private final NodeRegistries registries;
     private final NpmRegistryClient client;
@@ -35,9 +40,9 @@ final class YarnClassicRegistryPackuments implements RegistrySource {
     }
 
     @Override
-    public @Nullable String packument(String registry, String name) {
+    public @Nullable String packument(String registry, String name, @Nullable String authorization) {
         try {
-            return client.getPackumentText(registries.registryFor(name, registry), name, false);
+            return client.getPackumentText(request(name, registry, authorization), name, false);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
                 return null;
@@ -47,9 +52,9 @@ final class YarnClassicRegistryPackuments implements RegistrySource {
     }
 
     @Override
-    public byte @Nullable [] tarball(String url, String name, String version) {
+    public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
         try {
-            return client.getTarball(registries.registryFor(name, url), name, version, url);
+            return client.getTarball(request(name, url, authorization), name, version, url);
         } catch (NodeRegistryException e) {
             if (e.getReason() == NodeRegistryException.Reason.VERSION_NOT_FOUND ||
                 e.getReason() == NodeRegistryException.Reason.PACKAGE_NOT_FOUND) {
@@ -57,5 +62,15 @@ final class YarnClassicRegistryPackuments implements RegistrySource {
             }
             throw e;
         }
+    }
+
+    private NodeRegistry request(String name, String url, @Nullable String authorization) {
+        NodeRegistry host = registries.registryAt(name, url);
+        String token = authorization != null && authorization.startsWith(BEARER) ?
+                authorization.substring(BEARER.length()) : null;
+        String basic = authorization != null && authorization.startsWith(BASIC) ?
+                authorization.substring(BASIC.length()) : null;
+        return new NodeRegistry(null, url, token, null, null, basic, false, host.getCafile(), host.isStrictSsl(),
+                false);
     }
 }

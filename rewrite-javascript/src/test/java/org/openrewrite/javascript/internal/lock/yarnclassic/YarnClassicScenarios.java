@@ -377,12 +377,12 @@ final class YarnClassicScenarios {
     static RegistrySource packuments(Packuments packuments) {
         return new RegistrySource() {
             @Override
-            public @Nullable String packument(String registry, String name) {
+            public @Nullable String packument(String registry, String name, @Nullable String authorization) {
                 return packuments.packument(registry, name);
             }
 
             @Override
-            public byte @Nullable [] tarball(String url, String name, String version) {
+            public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
                 return null;
             }
         };

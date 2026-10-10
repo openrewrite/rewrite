@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.yarnclassic.RegistrySource;
 import org.openrewrite.javascript.internal.lock.yarnclassic.YarnClassicLockRegenerator;
@@ -36,12 +37,12 @@ class YarnClassicInputsTest {
 
     private static final RegistrySource NO_REGISTRY = new RegistrySource() {
         @Override
-        public @Nullable String packument(String registry, String name) {
+        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
             return null;
         }
 
         @Override
-        public byte @Nullable [] tarball(String url, String name, String version) {
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
             return null;
         }
     };
@@ -151,6 +152,25 @@ class YarnClassicInputsTest {
     }
 
     /**
+     * yarn run in a member that a lockless root lists installs at that root and creates its lock, leaving the
+     * member's own lock as it is ({@code probes/sr-walk/yarn-rootless-own}): the walk answers the root.
+     */
+    @Test
+    void aMemberTheRootListsInstallsAtTheRootThoughItHoldsNoLock() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"ms\":\"2.1.3\"}}")
+          .lock("# yarn lockfile v1\n\n\n")
+          .packageJsonPath(Paths.get("packages/a/package.json"))
+          .packageManagerFile(Paths.get("package.json"), "{\"private\":true,\"workspaces\":[\"packages/*\"]}")
+          .build();
+
+        InstallRoot root = YarnClassicInputs.installRoot(LockDirectory.of(request));
+
+        assertThat(root.isStopped()).isFalse();
+        assertThat(root.getDepth()).isEqualTo(2);
+    }
+
+    /**
      * The host's registries are the home directory's .npmrc ({@code user-npmrc-registry-bump}); npm's default,
      * the host's answer when nothing names a registry, stays unnamed.
      */
@@ -174,6 +194,24 @@ class YarnClassicInputsTest {
           .isEqualTo("registry=https://registry.npmmirror.com/\n@types:registry=https://registry.npmmirror.com/\n");
         assertThat(mirrored.getConfigFiles()).isEmpty();
         assertThat(unnamed.getHomeFiles().get(".npmrc")).isEmpty();
+    }
+
+    /**
+     * The host's credentials are the home .npmrc's, keyed by registry as yarn's getRegistryOption reads them, so the
+     * port sends them where yarn would (ConfigTest.sendsTheCredentialsYarnSends).
+     */
+    @Test
+    void theHostsCredentialsAreTheHomeDirectorysNpmrc() {
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@corp", new NodeRegistry("@corp", "https://corp.example.com/", "corp-token", null, null, null, false,
+          null, true, false));
+        NodeRegistry registry = new NodeRegistry(null, "https://r.example/npm", null, "u", "p", null, true, null, true,
+          false);
+
+        assertThat(YarnClassicInputs.userNpmrc(new NodeRegistries(registry, scopes, null, null, null))).isEqualTo(
+          "registry=https://r.example/npm\n//r.example/npm/:username=\"u\"\n//r.example/npm/:_password=\"cA==\"\n" +
+          "//r.example/npm/:always-auth=true\n@corp:registry=https://corp.example.com/\n" +
+          "//corp.example.com/:_authToken=\"corp-token\"\n");
     }
 
     private static NodeRegistry registry(String url) {

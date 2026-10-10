@@ -71,7 +71,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         }
 
         @Override
-        public @Nullable String packument(String registry, String name) {
+        public @Nullable String packument(String registry, String name, @Nullable String authorization) {
             String mirror = mirror(registry, "npmjs", "yarnpkg");
             String body = mirror == null ? scenario.http(name) : scenario.file(mirror + "/" + name);
             if (body == null) {
@@ -82,7 +82,7 @@ class YarnClassicScenarioTest extends LockScenarioTest {
         }
 
         @Override
-        public byte @Nullable [] tarball(String url, String name, String version) {
+        public byte @Nullable [] tarball(String url, String name, String version, @Nullable String authorization) {
             if (scenario.notFound(url)) {
                 return null;
             }
