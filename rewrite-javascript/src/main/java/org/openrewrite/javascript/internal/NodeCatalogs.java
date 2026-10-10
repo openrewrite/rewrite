@@ -734,7 +734,8 @@ public abstract class NodeCatalogs {
                 entry = entry.withPrefix(cut < 0 ? prefix : prefix.substring(0, cut) + lineBreak + indent);
             } else {
                 int cut = lineBreakAt(following[0]);
-                entry = entry.withPrefix((cut < 0 ? following[0] : following[0].substring(0, cut)) + lineBreak + indent);
+                entry = entry.withPrefix((cut < 0 ? following[0] : following[0].substring(0, cut)) + lineBreak +
+                                         indent);
                 following[0] = cut < 0 ? "" : following[0].substring(cut);
             }
             entries.add(at, entry);

@@ -559,10 +559,12 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    // Yarn 4.10.3 applies is-odd@^3.0.0/is-number nowhere (yarn-berry/override-key-ranged-parent)
+    // Yarn 4.10.3 applies is-odd@^3.0.0/is-number nowhere: its lock beside that resolution is the one before it
     @Test
     void yarnBerryCannotMatchARangedParent() {
-        Scenario s = new Scenario("yarn-berry/override-recipe-path");
+        Scenario s = new Scenario("yarn-berry/override-key-ranged-parent");
+        assertThat(s.file("pkg")).contains("\"is-odd@^3.0.0/is-number\": \"7.0.0\"");
+        assertThat(s.file("after")).isEqualTo(s.file("before"));
         rewriteRun(
           spec -> s.spec(spec, "7.0.0", "is-odd@^3.0.0")
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
@@ -587,14 +589,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         );
     }
 
-    // yarn 1.22.22 applies **/is-odd@3.0.0/is-number nowhere (yarn-classic/override-key-versioned-parent)
+    // yarn 1.22.22 applies **/is-odd@3.0.0/is-number nowhere: is-odd's is-number stays 6.0.0 beside that resolution
     @Test
     void yarnClassicCannotMatchAVersionedParent() {
-        Scenario s = new Scenario("yarn-classic/override-recipe-path");
+        Scenario s = new Scenario("yarn-classic/override-key-versioned-parent");
+        assertThat(s.file("pkg")).contains("\"**/is-odd@3.0.0/is-number\": \"7.0.0\"");
+        assertThat(s.file("after")).contains("is-number@^6.0.0:\n  version \"6.0.0\"");
         rewriteRun(
-          spec -> s.spec(spec, "7.0.0", "is-odd@3.0.1")
+          spec -> s.spec(spec, "7.0.0", "is-odd@3.0.0")
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
-              .satisfies(row -> assertThat(row.getReason()).contains("is-odd@3.0.1"))),
+              .satisfies(row -> assertThat(row.getReason()).contains("is-odd@3.0.0"))),
           s.root(PackageManager.YarnClassic, s.file("pkg-before")),
           s.lock(PackageManager.YarnClassic, null)
         );

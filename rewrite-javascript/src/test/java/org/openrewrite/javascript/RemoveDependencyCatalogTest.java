@@ -103,8 +103,6 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    // pnpm 11.2.2 rejects an override that is no string before it cleans up (catalog-cleanup-override-number: "The
-    // value of overrides.is-number should be a string, but got number"), so the workspace is left as it is
     @Test
     void aCleanupForAReleaseNoRecordingCoversDeclinesTheEdit() {
         String member = """
@@ -145,6 +143,8 @@ class RemoveDependencyCatalogTest implements RewriteTest {
         );
     }
 
+    // pnpm 11.2.2 rejects an override that is no string before it cleans up (catalog-cleanup-override-number: "The
+    // value of overrides.is-number should be a string, but got number"), so the workspace is left as it is
     @Test
     void noCleanupIsWrittenForAWorkspacePnpmRejects() {
         rewriteRun(

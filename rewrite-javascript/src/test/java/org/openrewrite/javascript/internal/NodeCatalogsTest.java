@@ -366,6 +366,35 @@ class NodeCatalogsTest {
           .withSpecifier("", "ms", "2.1.3"))).isEqualTo(file("yarn-berry/catalog-yarnrc-quoted-edit/yarnrc-after"));
     }
 
+    // Yarn writes no catalog entry, so a new one is the recipe's own edit: where pnpm 11 would put it, the text around
+    // it as it was
+    @Test
+    void yarnInsertsAnEntryInPlace() {
+        String[][] edits = {
+          {"catalog:\n  react: ^18.0.0\n# end\n", "catalog:\n  is-number: 7.0.0\n  react: ^18.0.0\n# end\n"},
+          {"catalog:\n  ms: 2.1.3 # pinned\nnodeLinker: pnp\n",
+            "catalog:\n  is-number: 7.0.0\n  ms: 2.1.3 # pinned\nnodeLinker: pnp\n"},
+          {"catalog:\n  a: 1.0.0 # first\n\n\nnodeLinker: pnp\n",
+            "catalog:\n  a: 1.0.0 # first\n  is-number: 7.0.0\n\n\nnodeLinker: pnp\n"},
+          {"catalog:\r\n  wrappy: 1.0.1\r\n", "catalog:\r\n  is-number: 7.0.0\r\n  wrappy: 1.0.1\r\n"},
+          {"enableTelemetry: false\n", "catalog:\n  is-number: 7.0.0\nenableTelemetry: false\n"}};
+        for (String[] edit : edits) {
+            NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.YarnBerry, yaml(edit[0])));
+            assertThat(edited(catalogs.withEntry("", "is-number", "7.0.0"))).as(edit[0]).isEqualTo(edit[1]);
+        }
+    }
+
+    // pnpm 9 never writes pnpm-workspace.yaml (catalog-cleanup-pnpm9), so its catalog upgrade is the recipe's own
+    // edit of the one scalar, where pnpm 10 and 11 print the whole document again
+    @Test
+    void pnpm9EditsTheEntryInPlace() {
+        String before = "savePrefix:\ncatalog: # c\n  wrappy: 1.0.1  \n\n\n# end";
+        NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(before),
+          "{\"packageManager\":\"pnpm@9.15.9\"}"));
+        assertThat(edited(catalogs.withSpecifier("default", "wrappy", "1.0.2")))
+          .isEqualTo(before.replace("1.0.1", "1.0.2"));
+    }
+
     @Test
     void bunReadsWorkspacesThenTheTopLevel() {
         assertThat(bun("catalog-both-places-edit-workspaces").specifier("", "ms")).isEqualTo("2.0.0");
