@@ -249,7 +249,7 @@ nodeTest.beforeEach = () => {}
 nodeTest.afterEach = () => {}
 nodeTest.mock = {fn: () => () => {}, method: () => {}}
 
-// mocha's interface: describe blocks run their bodies at once, its tests queue
+// mocha's BDD and TDD interfaces: describe and suite blocks run their bodies at once, their tests queue
 const mochaStack = []
 function describe(n, f) {
   mochaStack.push(String(n))
@@ -282,6 +282,12 @@ function installMocha() {
   global.afterEach = () => {}
   global.xit = () => {}
   global.xdescribe = () => {}
+  // mocha's TDD interface
+  global.suite = describe
+  global.test = it
+  global.suiteSetup = global.before
+  global.setup = global.beforeEach
+  global.teardown = global.afterEach
 }
 
 function ava(n, f) {

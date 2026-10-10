@@ -30,8 +30,15 @@ const dir = path.resolve(checkout)
 const rows = []
 let testFile = ''
 
-// a value as JSON: undefined, RegExp, functions, non-finite numbers and errors as {"$": kind, ...}
+// a value as JSON: undefined, RegExp, functions, non-finite numbers and errors (with js-yaml's reason) as {"$": kind}
+// a value of more than LARGE nodes (aliases shared many times over) is written as {"$": "large"}
+const LARGE = 200000
+let nodes = 0
 function encode(v, depth = 0) {
+  nodes = depth === 0 ? 0 : nodes + 1
+  if (nodes > LARGE) {
+    return {$: 'large'}
+  }
   if (depth > 40) {
     return {$: 'deep'}
   }
@@ -57,7 +64,7 @@ function encode(v, depth = 0) {
     return {$: 'regexp', source: v.source, flags: v.flags}
   }
   if (v instanceof Error) {
-    return {$: 'error', name: v.name, message: v.message, code: v.code}
+    return {$: 'error', name: v.name, message: v.message, code: v.code, reason: v.reason}
   }
   if (Buffer.isBuffer(v)) {
     return {$: 'buffer', hex: v.toString('hex')}
@@ -78,7 +85,8 @@ function encode(v, depth = 0) {
   }
   const out = {}
   for (const k of Object.keys(v)) {
-    out[k] = encode(v[k], depth + 1)
+    // an own __proto__ key stays a key
+    Object.defineProperty(out, k, {value: encode(v[k], depth + 1), enumerable: true, writable: true, configurable: true})
   }
   if (Object.getPrototypeOf(v) === null) {
     return {$: 'nullproto', value: out}
@@ -86,9 +94,17 @@ function encode(v, depth = 0) {
   return out
 }
 
+// the checkout's directory, wherever a value names it, as <checkout>
+function redact(line) {
+  for (const d of [fs.realpathSync(dir), dir]) {
+    line = line.split(JSON.stringify(d).slice(1, -1)).join('<checkout>')
+  }
+  return line
+}
+
 function record(row) {
   const r = Object.assign({test: testFile + (harness.state.current ? ' > ' + harness.state.current : '')}, row)
-  const line = JSON.stringify(r)
+  const line = redact(JSON.stringify(r))
   if (!spec.keep || spec.keep(r)) {
     rows.push(line)
   }

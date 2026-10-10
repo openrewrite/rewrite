@@ -278,6 +278,7 @@ public final class JsYaml {
             state.position = nullpos;
             throw state.error("null byte is not allowed in input");
         }
+        state.terminated = true;
         while (state.ch(state.position) == ' ') {
             state.lineIndent += 1;
             state.position += 1;
@@ -298,6 +299,8 @@ public final class JsYaml {
         int lineStart;
         int lineIndent;
         int firstTabInLine = -1;
+        // 4.1.0 appends the \0 that ends its input after the null byte check
+        boolean terminated;
         final List<@Nullable Object> documents = new ArrayList<>();
 
         @Nullable
@@ -328,7 +331,7 @@ public final class JsYaml {
             if (!v4) {
                 return new YamlException(message, message);
             }
-            String buffer = input.substring(0, input.length() - 1);
+            String buffer = input.substring(0, input.length() - (terminated ? 1 : 2));
             int column = position - lineStart;
             String snippet = makeSnippet(buffer, position, line);
             String where = "(" + (line + 1) + ":" + (column + 1) + ")";
