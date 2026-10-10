@@ -50,7 +50,7 @@ class MinimatchTest {
     // the options each release's port reads; any other option minimatch reads leaves a row out
     private static final List<String> READ_3_0_4 = Arrays.asList("dot", "nocomment", "nonegate", "nocase", "nobrace",
             "noglobstar", "noext", "matchBase", "flipNegate");
-    private static final List<String> READ_10_2_5 = Arrays.asList("dot", "nocomment", "nonegate", "partial",
+    private static final List<String> READ_10_2_5 = Arrays.asList("dot", "nocomment", "nonegate", "noext", "partial",
             "windowsPathsNoEscape");
     private static final List<String> MINIMATCH_OPTIONS = Arrays.asList("dot", "nocomment", "nonegate", "nocase",
             "nobrace", "noglobstar", "noext", "matchBase", "flipNegate", "partial", "windowsPathsNoEscape", "nonull",
@@ -86,12 +86,6 @@ class MinimatchTest {
         assertThat(Minimatch.minimatch(path, pattern, o)).isEqualTo(expected);
     }
 
-    @Test
-    void extglobsAreRefusedByName() {
-        assertThatThrownBy(() -> Minimatch.minimatch("a/b", "a/+(b|c)", V10))
-          .isInstanceOf(Minimatch.UnsupportedPattern.class)
-          .hasMessageContaining("\"a/+(b|c)\"");
-    }
 
     // rows printed by the yarnclassic test resources' generate/minimatch-rows.js
     @ParameterizedTest(name = "{0} {1}")
@@ -222,15 +216,6 @@ class MinimatchTest {
                 }
             }
         }
-        if (release == V10) {
-            try {
-                new Minimatch(pattern, options(release, options));
-            } catch (Minimatch.UnsupportedPattern e) {
-                return "an extglob, which the 10.2.5 port leaves out";
-            } catch (JsError e) {
-                return null;
-            }
-        }
         return null;
     }
 
@@ -298,7 +283,6 @@ class MinimatchTest {
         Map<String, Integer> expected = new LinkedHashMap<>();
         expected.put("V10_2_5 Minimatch#makeRe" + noSource, 395);
         expected.put("V10_2_5 an argument that is not a string, or a partial argument", 27);
-        expected.put("V10_2_5 an extglob, which the 10.2.5 port leaves out", 132);
         expected.put("V10_2_5 braceExpand" + noSource, 21);
         expected.put("V10_2_5 escape" + noSource, 406);
         expected.put("V10_2_5 filter" + noSource, 1);
@@ -307,7 +291,6 @@ class MinimatchTest {
         expected.put("V10_2_5 the matchBase" + option, 5);
         expected.put("V10_2_5 the maxGlobstarRecursion" + option, 1);
         expected.put("V10_2_5 the nocase" + option, 32);
-        expected.put("V10_2_5 the noext" + option, 2);
         expected.put("V10_2_5 the noglobstar" + option, 2);
         expected.put("V10_2_5 the nonull" + option, 18);
         expected.put("V10_2_5 the optimizationLevel" + option, 3);

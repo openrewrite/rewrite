@@ -24,16 +24,18 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 /**
- * Port of minimatch on POSIX paths: 3.0.4, which yarn 1.22.22 bundles, and 10.2.5, which npm 11.17.0 bundles,
- * without 10.2.5's extglobs, which no workspace pattern uses.
+ * Port of minimatch on POSIX paths: 3.0.4, which yarn 1.22.22 bundles, and 10.2.5, which npm 11.17.0 bundles.
  */
 public final class Minimatch {
 
@@ -43,8 +45,8 @@ public final class Minimatch {
     }
 
     /**
-     * The release and the options its port reads: 3.0.4's {@code nocase}, {@code nobrace}, {@code noglobstar},
-     * {@code noext}, {@code matchBase}, {@code flipNegate}; 10.2.5's {@code partial}, {@code windowsPathsNoEscape}.
+     * The release and the options it reads: {@code noext}; 3.0.4's {@code nocase}, {@code nobrace}, {@code noglobstar},
+     * {@code matchBase}, {@code flipNegate}; 10.2.5's {@code partial}, {@code windowsPathsNoEscape}.
      */
     @Value
     @Builder(builderMethodName = "hiddenBuilder")
@@ -68,15 +70,6 @@ public final class Minimatch {
 
         public static Options of(Release release) {
             return builder(release).build();
-        }
-    }
-
-    /**
-     * A 10.2.5 pattern with syntax this port does not implement.
-     */
-    public static final class UnsupportedPattern extends IllegalArgumentException {
-        UnsupportedPattern(String pattern, String what) {
-            super("The workspace pattern " + EcmaScript.quote(pattern) + " uses " + what + ", which is not supported");
         }
     }
 
@@ -589,7 +582,6 @@ public final class Minimatch {
     // 10.2.5
 
     private static final int MAX_GLOBSTAR_RECURSION = 200;
-    private static final Pattern EXTGLOB = Pattern.compile("[!?+*@]\\(");
     private static final Pattern RE_SPECIALS_10 = Pattern.compile("[-\\[\\]{}()*+?.,\\\\^$|#\\s]");
     private static final String STAR_10 = "[^/]*?";
     private static final String STAR_NO_EMPTY = "[^/]+?";
@@ -619,73 +611,544 @@ public final class Minimatch {
     }
 
     private Object parse10(String part) {
+        assertValidPattern(part);
         if ("**".equals(part)) {
             return GLOBSTAR;
         }
         if (part.isEmpty()) {
             return "";
         }
-        if (EXTGLOB.matcher(part).find()) {
-            throw new UnsupportedPattern(pattern, "an extglob");
-        }
-        boolean noEmpty = true;
-        boolean escaping = false;
-        boolean hasMagic = false;
-        StringBuilder re = new StringBuilder();
-        for (int i = 0; i < part.length(); i++) {
-            char c = part.charAt(i);
-            if (escaping) {
-                escaping = false;
-                re.append(RE_SPECIALS_10.matcher(String.valueOf(c)).matches() ? "\\" : "").append(c);
-                continue;
-            }
-            if (c == '\\') {
-                if (i == part.length() - 1) {
-                    re.append("\\\\");
-                } else {
-                    escaping = true;
-                }
-                continue;
-            }
-            if (c == '[') {
-                ParsedClass cls = parseClass(part, i);
-                if (cls.consumed > 0) {
-                    re.append(cls.src);
-                    i += cls.consumed - 1;
-                    hasMagic |= cls.magic;
-                    continue;
-                }
-            }
-            if (c == '*') {
-                re.append(noEmpty && "*".equals(part) ? STAR_NO_EMPTY : STAR_10);
-                hasMagic = true;
-                continue;
-            }
-            if (c == '?') {
-                re.append(QMARK_10);
-                hasMagic = true;
-                continue;
-            }
-            re.append(regExpEscape(String.valueOf(c)));
-        }
-        String src = re.toString();
-        if (!hasMagic) {
-            return unescape(src);
-        }
-        String start = "";
-        boolean dotTravAllowed = ".".equals(part) || "..".equals(part);
-        if (!dotTravAllowed) {
-            boolean needNoTrav = (options.isDot() && isPatternStart(src, 0)) ||
-                                 (src.startsWith("\\.") && isPatternStart(src, 2)) ||
-                                 (src.startsWith("\\.\\.") && isPatternStart(src, 4));
-            boolean needNoDot = !options.isDot() && isPatternStart(src, 0);
-            start = needNoTrav ? START_NO_TRAVERSAL : needNoDot ? START_NO_DOT : "";
-        }
-        return Pattern.compile("^" + start + src + "$");
+        return Ast.fromGlob(part, options).toMMPattern();
     }
 
     private static boolean isPatternStart(String src, int at) {
         return at < src.length() && (src.charAt(at) == '[' || src.charAt(at) == '.');
+    }
+
+    // the extglob types each type adopts the children of (adoptionMap, adoptionWithSpaceMap, adoptionAnyMap)
+    private static final Map<Character, String> ADOPTION = types("!@", "??@", "@@", "**+?@", "++@");
+    private static final Map<Character, String> ADOPTION_WITH_SPACE = types("!?", "@?", "+?*");
+    private static final Map<Character, String> ADOPTION_ANY = types("!?@", "??@", "@?@", "**+?@", "++@?*");
+    // usurpMap: for each parent type, pairs of an only child's type and the type the parent takes from it
+    private static final Map<Character, String> USURP = types("!!@", "?**+*", "@!!??@@**++", "+?***");
+    private static final String RE_SPECIALS_AST = "().*{}+?[]^$\\!";
+    private static final Pattern ALL_STARS = Pattern.compile("[*]+");
+
+    private static Map<Character, String> types(String... entries) {
+        Map<Character, String> out = new HashMap<>();
+        for (String entry : entries) {
+            out.put(entry.charAt(0), entry.substring(1));
+        }
+        return out;
+    }
+
+    private static boolean isExtglobType(char c) {
+        return "!?+*@".indexOf(c) >= 0;
+    }
+
+    private static char charAt(String s, int i) {
+        return i < s.length() ? s.charAt(i) : '\0';
+    }
+
+    private static final class Source {
+        final String re;
+        final String body;
+        final boolean hasMagic;
+
+        Source(String re, String body, boolean hasMagic) {
+            this.re = re;
+            this.body = body;
+            this.hasMagic = hasMagic;
+        }
+    }
+
+    /**
+     * Port of 10.2.5's {@code ast.ts}: one path portion parsed into extglobs, then made a regular expression.
+     */
+    private static final class Ast {
+        private @Nullable Character type;
+        private final Ast root;
+        private @Nullable Boolean hasMagic;
+        private List<Object> parts = new ArrayList<>();
+        private @Nullable Ast parent;
+        private final int parentIndex;
+        private final List<Ast> negs;
+        private boolean filledNegs;
+        private final Options options;
+        private @Nullable String asString;
+        private boolean emptyExt;
+
+        Ast(@Nullable Character type, @Nullable Ast parent, Options options) {
+            this.type = type;
+            if (type != null) {
+                hasMagic = true;
+            }
+            this.parent = parent;
+            this.root = parent != null ? parent.root : this;
+            this.options = root == this ? options : root.options;
+            this.negs = root == this ? new ArrayList<>() : root.negs;
+            if (is('!') && !root.filledNegs) {
+                negs.add(this);
+            }
+            this.parentIndex = parent != null ? parent.parts.size() : 0;
+        }
+
+        private boolean is(char t) {
+            return type != null && type == t;
+        }
+
+        @Override
+        public String toString() {
+            if (asString == null) {
+                List<String> strings = new ArrayList<>();
+                for (Object p : parts) {
+                    strings.add(p.toString());
+                }
+                asString = type == null ? String.join("", strings) : type + "(" + String.join("|", strings) + ")";
+            }
+            return asString;
+        }
+
+        private void fillNegs() {
+            if (filledNegs) {
+                return;
+            }
+            toString();
+            filledNegs = true;
+            while (!negs.isEmpty()) {
+                Ast n = negs.remove(negs.size() - 1);
+                if (!n.is('!')) {
+                    continue;
+                }
+                Ast p = n;
+                Ast pp = p.parent;
+                while (pp != null) {
+                    for (int i = p.parentIndex + 1; pp.type == null && i < pp.parts.size(); i++) {
+                        for (Object part : n.parts) {
+                            ((Ast) part).copyIn(pp.parts.get(i));
+                        }
+                    }
+                    p = pp;
+                    pp = p.parent;
+                }
+            }
+        }
+
+        private void push(Object... pushed) {
+            for (Object p : pushed) {
+                if (!"".equals(p)) {
+                    parts.add(p);
+                }
+            }
+        }
+
+        private boolean isStart() {
+            if (root == this) {
+                return true;
+            }
+            Ast p = Objects.requireNonNull(parent);
+            if (!p.isStart()) {
+                return false;
+            }
+            if (parentIndex == 0) {
+                return true;
+            }
+            for (int i = 0; i < parentIndex; i++) {
+                Object pp = i < p.parts.size() ? p.parts.get(i) : null;
+                if (!(pp instanceof Ast && ((Ast) pp).is('!'))) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private boolean isEnd() {
+            if (root == this) {
+                return true;
+            }
+            Ast p = Objects.requireNonNull(parent);
+            if (p.is('!')) {
+                return true;
+            }
+            if (!p.isEnd()) {
+                return false;
+            }
+            if (type == null) {
+                return p.isEnd();
+            }
+            return parentIndex == p.parts.size() - 1;
+        }
+
+        private void copyIn(Object part) {
+            push(part instanceof String ? part : ((Ast) part).cloneInto(this));
+        }
+
+        private Ast cloneInto(Ast parent) {
+            Ast c = new Ast(type, parent, options);
+            for (Object p : parts) {
+                c.copyIn(p);
+            }
+            return c;
+        }
+
+        private static int parseAst(String str, Ast ast, int pos, Options opt, int extDepth) {
+            int maxDepth = 2;
+            boolean escaping = false;
+            boolean inBrace = false;
+            int braceStart = -1;
+            boolean braceNeg = false;
+            StringBuilder acc = new StringBuilder();
+            if (ast.type == null) {
+                int i = pos;
+                while (i < str.length()) {
+                    char c = str.charAt(i++);
+                    if (escaping || c == '\\') {
+                        escaping = !escaping;
+                        acc.append(c);
+                        continue;
+                    }
+                    if (inBrace) {
+                        if (i == braceStart + 1) {
+                            braceNeg |= c == '^' || c == '!';
+                        } else if (c == ']' && !(i == braceStart + 2 && braceNeg)) {
+                            inBrace = false;
+                        }
+                        acc.append(c);
+                        continue;
+                    } else if (c == '[') {
+                        inBrace = true;
+                        braceStart = i;
+                        braceNeg = false;
+                        acc.append(c);
+                        continue;
+                    }
+                    if (!opt.isNoext() && isExtglobType(c) && charAt(str, i) == '(' && extDepth <= maxDepth) {
+                        ast.push(acc.toString());
+                        acc.setLength(0);
+                        Ast ext = new Ast(c, ast, opt);
+                        i = parseAst(str, ext, i, opt, extDepth + 1);
+                        ast.push(ext);
+                        continue;
+                    }
+                    acc.append(c);
+                }
+                ast.push(acc.toString());
+                return i;
+            }
+
+            int i = pos + 1;
+            Ast part = new Ast(null, ast, opt);
+            List<Ast> alternatives = new ArrayList<>();
+            while (i < str.length()) {
+                char c = str.charAt(i++);
+                if (escaping || c == '\\') {
+                    escaping = !escaping;
+                    acc.append(c);
+                    continue;
+                }
+                if (inBrace) {
+                    if (i == braceStart + 1) {
+                        braceNeg |= c == '^' || c == '!';
+                    } else if (c == ']' && !(i == braceStart + 2 && braceNeg)) {
+                        inBrace = false;
+                    }
+                    acc.append(c);
+                    continue;
+                } else if (c == '[') {
+                    inBrace = true;
+                    braceStart = i;
+                    braceNeg = false;
+                    acc.append(c);
+                    continue;
+                }
+                if (!opt.isNoext() && isExtglobType(c) && charAt(str, i) == '(' &&
+                    (extDepth <= maxDepth || ast.canAdoptType(c, ADOPTION_ANY))) {
+                    int depthAdd = ast.canAdoptType(c, ADOPTION_ANY) ? 0 : 1;
+                    part.push(acc.toString());
+                    acc.setLength(0);
+                    Ast ext = new Ast(c, part, opt);
+                    part.push(ext);
+                    i = parseAst(str, ext, i, opt, extDepth + depthAdd);
+                    continue;
+                }
+                if (c == '|') {
+                    part.push(acc.toString());
+                    acc.setLength(0);
+                    alternatives.add(part);
+                    part = new Ast(null, ast, opt);
+                    continue;
+                }
+                if (c == ')') {
+                    if (acc.length() == 0 && ast.parts.isEmpty()) {
+                        ast.emptyExt = true;
+                    }
+                    part.push(acc.toString());
+                    acc.setLength(0);
+                    ast.push(alternatives.toArray());
+                    ast.push(part);
+                    return i;
+                }
+                acc.append(c);
+            }
+            // an unfinished extglob is no extglob
+            ast.type = null;
+            ast.hasMagic = null;
+            ast.parts = new ArrayList<>(Collections.singletonList(str.substring(pos - 1)));
+            return i;
+        }
+
+        private boolean canAdopt(Object child, Map<Character, String> map) {
+            if (!(child instanceof Ast) || ((Ast) child).type != null || ((Ast) child).parts.size() != 1 ||
+                type == null) {
+                return false;
+            }
+            Object gc = ((Ast) child).parts.get(0);
+            return gc instanceof Ast && ((Ast) gc).type != null && canAdoptType(((Ast) gc).type, map);
+        }
+
+        private boolean canAdoptType(char c, Map<Character, String> map) {
+            String adopted = type == null ? null : map.get(type);
+            return adopted != null && adopted.indexOf(c) >= 0;
+        }
+
+        private void adoptWithSpace(Ast child, int index) {
+            Ast gc = (Ast) child.parts.get(0);
+            Ast blank = new Ast(null, gc, options);
+            blank.parts.add("");
+            gc.push(blank);
+            adopt(child, index);
+        }
+
+        private void adopt(Ast child, int index) {
+            Ast gc = (Ast) child.parts.get(0);
+            parts.remove(index);
+            parts.addAll(index, gc.parts);
+            for (Object p : gc.parts) {
+                if (p instanceof Ast) {
+                    ((Ast) p).parent = this;
+                }
+            }
+            asString = null;
+        }
+
+        private @Nullable Character usurpedType(char c) {
+            String pairs = type == null ? null : USURP.get(type);
+            for (int i = 0; pairs != null && i < pairs.length(); i += 2) {
+                if (pairs.charAt(i) == c) {
+                    return pairs.charAt(i + 1);
+                }
+            }
+            return null;
+        }
+
+        private boolean canUsurp(Object child) {
+            if (!(child instanceof Ast) || ((Ast) child).type != null || ((Ast) child).parts.size() != 1 ||
+                type == null || parts.size() != 1) {
+                return false;
+            }
+            Object gc = ((Ast) child).parts.get(0);
+            return gc instanceof Ast && ((Ast) gc).type != null && usurpedType(((Ast) gc).type) != null;
+        }
+
+        private void usurp(Ast child) {
+            Ast gc = (Ast) child.parts.get(0);
+            Character nt = usurpedType(Objects.requireNonNull(gc.type));
+            if (nt == null) {
+                return;
+            }
+            parts = gc.parts;
+            for (Object p : parts) {
+                if (p instanceof Ast) {
+                    ((Ast) p).parent = this;
+                }
+            }
+            type = nt;
+            asString = null;
+            emptyExt = false;
+        }
+
+        static Ast fromGlob(String pattern, Options options) {
+            Ast ast = new Ast(null, null, options);
+            parseAst(pattern, ast, 0, options, 0);
+            return ast;
+        }
+
+        // the regular expression if there is magic, else the unescaped string
+        Object toMMPattern() {
+            Source source = toRegExpSource(null);
+            if (!source.hasMagic && !Boolean.TRUE.equals(hasMagic)) {
+                return source.body;
+            }
+            return Pattern.compile("^" + source.re + "$");
+        }
+
+        private Source toRegExpSource(@Nullable Boolean allowDot) {
+            boolean dot = allowDot != null ? allowDot : options.isDot();
+            if (root == this) {
+                flatten();
+                fillNegs();
+            }
+            if (type == null) {
+                boolean noEmpty = isStart() && isEnd();
+                for (Object p : parts) {
+                    noEmpty &= p instanceof String;
+                }
+                StringBuilder src = new StringBuilder();
+                for (Object p : parts) {
+                    boolean magic = Boolean.TRUE.equals(hasMagic);
+                    Source s = p instanceof String ? parseGlob((String) p, magic, noEmpty) :
+                            ((Ast) p).toRegExpSource(allowDot);
+                    hasMagic = magic || s.hasMagic;
+                    src.append(s.re);
+                }
+                String start = "";
+                if (isStart() && !parts.isEmpty() && parts.get(0) instanceof String) {
+                    boolean dotTravAllowed = parts.size() == 1 && (".".equals(parts.get(0)) ||
+                                                                    "..".equals(parts.get(0)));
+                    if (!dotTravAllowed) {
+                        String s = src.toString();
+                        boolean needNoTrav = dot && isPatternStart(s, 0) ||
+                                             s.startsWith("\\.") && isPatternStart(s, 2) ||
+                                             s.startsWith("\\.\\.") && isPatternStart(s, 4);
+                        boolean needNoDot = !dot && !Boolean.TRUE.equals(allowDot) && isPatternStart(s, 0);
+                        start = needNoTrav ? START_NO_TRAVERSAL : needNoDot ? START_NO_DOT : "";
+                    }
+                }
+                String end = isEnd() && root.filledNegs && parent != null && parent.is('!') ? "(?:$|\\/)" : "";
+                hasMagic = Boolean.TRUE.equals(hasMagic);
+                return new Source(start + src + end, unescape(src.toString()), hasMagic);
+            }
+
+            boolean repeated = is('*') || is('+');
+            String start = is('!') ? "(?:(?!(?:" : "(?:";
+            String body = partsToRegExp(dot);
+            if (isStart() && isEnd() && body.isEmpty() && !is('!')) {
+                // an extglob that is the whole portion must match something
+                String s = toString();
+                parts = new ArrayList<>(Collections.singletonList(s));
+                type = null;
+                hasMagic = null;
+                return new Source(s, unescape(toString()), false);
+            }
+            String bodyDotAllowed = !repeated || Boolean.TRUE.equals(allowDot) || dot ? "" : partsToRegExp(true);
+            if (bodyDotAllowed.equals(body)) {
+                bodyDotAllowed = "";
+            }
+            if (!bodyDotAllowed.isEmpty()) {
+                body = "(?:" + body + ")(?:" + bodyDotAllowed + ")*?";
+            }
+            String fin;
+            if (is('!') && emptyExt) {
+                fin = (isStart() && !dot ? START_NO_DOT : "") + STAR_NO_EMPTY;
+            } else {
+                String close = is('!') ? "))" + (isStart() && !dot && !Boolean.TRUE.equals(allowDot) ? START_NO_DOT :
+                        "") + STAR_10 + ")" :
+                        is('@') ? ")" :
+                        is('?') ? ")?" :
+                        is('+') && !bodyDotAllowed.isEmpty() ? ")" :
+                        is('*') && !bodyDotAllowed.isEmpty() ? ")?" :
+                        ")" + type;
+                fin = start + body + close;
+            }
+            hasMagic = Boolean.TRUE.equals(hasMagic);
+            return new Source(fin, unescape(body), hasMagic);
+        }
+
+        private void flatten() {
+            if (type == null) {
+                for (Object p : parts) {
+                    if (p instanceof Ast) {
+                        ((Ast) p).flatten();
+                    }
+                }
+            } else {
+                int iterations = 0;
+                boolean done;
+                do {
+                    done = true;
+                    for (int i = 0; i < parts.size(); i++) {
+                        Object c = parts.get(i);
+                        if (c instanceof Ast) {
+                            ((Ast) c).flatten();
+                            if (canAdopt(c, ADOPTION)) {
+                                done = false;
+                                adopt((Ast) c, i);
+                            } else if (canAdopt(c, ADOPTION_WITH_SPACE)) {
+                                done = false;
+                                adoptWithSpace((Ast) c, i);
+                            } else if (canUsurp(c)) {
+                                done = false;
+                                usurp((Ast) c);
+                            }
+                        }
+                    }
+                } while (!done && ++iterations < 10);
+            }
+            asString = null;
+        }
+
+        private String partsToRegExp(boolean dot) {
+            List<String> sources = new ArrayList<>();
+            for (Object p : parts) {
+                sources.add(((Ast) p).toRegExpSource(dot).re);
+            }
+            boolean whole = isStart() && isEnd();
+            List<String> kept = new ArrayList<>();
+            for (String s : sources) {
+                if (!whole || !s.isEmpty()) {
+                    kept.add(s);
+                }
+            }
+            return String.join("|", kept);
+        }
+
+        private static Source parseGlob(String glob, boolean hasMagic, boolean noEmpty) {
+            boolean escaping = false;
+            boolean inStar = false;
+            StringBuilder re = new StringBuilder();
+            for (int i = 0; i < glob.length(); i++) {
+                char c = glob.charAt(i);
+                if (escaping) {
+                    escaping = false;
+                    re.append(RE_SPECIALS_AST.indexOf(c) >= 0 ? "\\" : "").append(c);
+                    continue;
+                }
+                if (c == '*') {
+                    if (inStar) {
+                        continue;
+                    }
+                    inStar = true;
+                    re.append(noEmpty && ALL_STARS.matcher(glob).matches() ? STAR_NO_EMPTY : STAR_10);
+                    hasMagic = true;
+                    continue;
+                }
+                inStar = false;
+                if (c == '\\') {
+                    if (i == glob.length() - 1) {
+                        re.append("\\\\");
+                    } else {
+                        escaping = true;
+                    }
+                    continue;
+                }
+                if (c == '[') {
+                    ParsedClass cls = parseClass(glob, i);
+                    if (cls.consumed > 0) {
+                        re.append(cls.src);
+                        i += cls.consumed - 1;
+                        hasMagic |= cls.magic;
+                        continue;
+                    }
+                }
+                if (c == '?') {
+                    re.append(QMARK_10);
+                    hasMagic = true;
+                    continue;
+                }
+                re.append(regExpEscape(String.valueOf(c)));
+            }
+            return new Source(re.toString(), unescape(glob), hasMagic);
+        }
     }
 
     private static String regExpEscape(String s) {
