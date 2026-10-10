@@ -22,7 +22,6 @@ import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -54,17 +53,9 @@ class BunLockRoundTripTest {
     @MethodSource("locks")
     void writesBackWhatBunWrites(String name, BunScenarios.Lock lock) {
         BunScenarios.Scenario scenario = lock.getScenario();
-        BunLockRegenerator.Inputs inputs = BunLockRegenerator.Inputs.builder()
-          .lock(lock.getText())
-          .manifests(lock.manifests())
-          .npmrc(lock.npmrc())
-          .bunfig(lock.bunfig())
-          .files(patches(scenario.tree(lock.isBefore())))
-          .files(lock.isBefore() ? Collections.emptyMap() : patches(scenario.filesAbove()))
-          .runsIn(lock.isBefore() ? "" : scenario.runDir())
-          .parentManifests(lock.isBefore() ? Collections.emptyMap() : scenario.parentManifests())
-          .env(Collections.emptyMap())
-          .now(scenario.now())
+        BunLockRegenerator.Inputs inputs = lock.inputs()
+          .files(patches(scenario.tree(lock.getPhase())))
+          .files(patches(scenario.filesAbove(lock.getPhase())))
           .build();
         String loadError = lock.loadError();
         boolean resolves = loadError == null && lock.resolvesAgain();

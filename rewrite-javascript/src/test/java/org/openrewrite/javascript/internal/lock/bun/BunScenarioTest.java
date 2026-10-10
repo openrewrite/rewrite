@@ -28,7 +28,6 @@ import org.openrewrite.javascript.internal.lock.LockScenarioTest;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -86,18 +85,10 @@ class BunScenarioTest extends LockScenarioTest {
 
     static BunLockRegenerator.Inputs inputs(BunScenarios.Scenario scenario) {
         String before = scenario.file("before");
-        return BunLockRegenerator.Inputs.builder()
-          .lock(before)
-          .manifests(scenario.manifests(false, before == null ? "" : before))
-          .npmrc(scenario.config(false, "npmrc", ".npmrc"))
-          .bunfig(scenario.config(false, "bunfig", "bunfig.toml"))
-          .files(scenario.tree(false))
-          .paths(scenario.paths(false, before))
-          .runsIn(scenario.runDir())
+        return scenario.inputs(BunScenarios.Phase.AFTER, before)
+          .files(scenario.tree(BunScenarios.Phase.AFTER))
+          .paths(scenario.paths(BunScenarios.Phase.AFTER, before))
           .host(scenario.host())
-          .parentManifests(scenario.parentManifests())
-          .env(Collections.emptyMap())
-          .now(scenario.now())
           .build();
     }
 

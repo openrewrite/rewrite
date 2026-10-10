@@ -26,6 +26,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,35 +53,32 @@ final class BunScenarios {
     }
 
     /**
-     * One lock of a scenario with what bun had when it wrote it: the manifests of the root and the workspace
-     * members, the project's npmrc and bunfig.
+     * A phase of a recording: the install of {@code pkg-before} in the lock's directory, and the edit's install of
+     * {@code pkg} where {@code run-dir} names, under what {@code above/} holds.
+     */
+    enum Phase {
+        BEFORE, AFTER
+    }
+
+    /**
+     * One lock of a scenario with what bun had in the phase that wrote it.
      */
     @Getter
     static final class Lock {
         private final Scenario scenario;
         private final String fileName;
         private final String text;
-        private final boolean before;
+        private final Phase phase;
 
-        Lock(Scenario scenario, String fileName, String text) {
+        Lock(Scenario scenario, String fileName, String text, Phase phase) {
             this.scenario = scenario;
             this.fileName = fileName;
             this.text = text;
-            this.before = fileName.startsWith("before");
+            this.phase = phase;
         }
 
-        Map<String, String> manifests() {
-            return scenario.manifests(before, text);
-        }
-
-        @Nullable
-        String npmrc() {
-            return scenario.config(before, "npmrc", ".npmrc");
-        }
-
-        @Nullable
-        String bunfig() {
-            return scenario.config(before, "bunfig", "bunfig.toml");
+        BunLockRegenerator.Inputs.InputsBuilder inputs() {
+            return scenario.inputs(phase, text);
         }
 
         /**
@@ -188,25 +186,42 @@ final class BunScenarios {
         List<Lock> locks() {
             List<Lock> locks = new ArrayList<>();
             for (String file : LOCKS) {
+                Phase phase = "before".equals(file) ? Phase.BEFORE : Phase.AFTER;
                 String text = file(file);
                 if (text != null) {
-                    locks.add(new Lock(this, file, text));
+                    locks.add(new Lock(this, file, text, phase));
                 }
                 String again = "after".equals(file) ? "again" : file + "-again";
                 String rewritten = file(again);
                 if (rewritten != null) {
-                    locks.add(new Lock(this, again, rewritten));
+                    locks.add(new Lock(this, again, rewritten, phase));
                 }
             }
             return locks;
         }
 
         /**
+         * What bun had in a phase over a lock: the manifests, npmrc and bunfig, the directory it ran in and the
+         * package.json files above it, the day. Each test adds the project files it gives.
+         */
+        BunLockRegenerator.Inputs.InputsBuilder inputs(Phase phase, @Nullable String lock) {
+            return BunLockRegenerator.Inputs.builder()
+                    .lock(lock)
+                    .manifests(manifests(phase, lock == null ? "" : lock))
+                    .npmrc(config(phase, "npmrc", ".npmrc"))
+                    .bunfig(config(phase, "bunfig", "bunfig.toml"))
+                    .runsIn(runDir(phase))
+                    .parentManifests(parentManifests(phase))
+                    .env(Collections.emptyMap())
+                    .now(now());
+        }
+
+        /**
          * The files of the project directory in a phase: {@code tree-before/}, then {@code tree/} over it after.
          */
-        Map<String, String> tree(boolean before) {
+        Map<String, String> tree(Phase phase) {
             Map<String, String> out = new TreeMap<>(tree("tree-before"));
-            if (!before) {
+            if (phase == Phase.AFTER) {
                 out.putAll(tree("tree"));
             }
             return out;
@@ -215,9 +230,9 @@ final class BunScenarios {
         /**
          * Every path the project holds in a phase: its tree, its manifests and its lock.
          */
-        Set<String> paths(boolean before, @Nullable String lock) {
-            Set<String> paths = new TreeSet<>(tree(before).keySet());
-            for (String location : manifests(before, lock == null ? "" : lock).keySet()) {
+        Set<String> paths(Phase phase, @Nullable String lock) {
+            Set<String> paths = new TreeSet<>(tree(phase).keySet());
+            for (String location : manifests(phase, lock == null ? "" : lock).keySet()) {
                 paths.add(location.isEmpty() ? "package.json" : location + "/package.json");
             }
             if (lock != null) {
@@ -227,10 +242,10 @@ final class BunScenarios {
         }
 
         /**
-         * The directory bun ran the edit in, relative to the lock's: {@code run-dir}, else the lock's own.
+         * The directory bun ran in, relative to the lock's: {@code run-dir} for the edit, else the lock's own.
          */
-        String runDir() {
-            String runDir = file("run-dir");
+        String runDir(Phase phase) {
+            String runDir = phase == Phase.AFTER ? file("run-dir") : null;
             return runDir == null ? "" : RootRelativePath.normalize(runDir.trim());
         }
 
@@ -238,11 +253,14 @@ final class BunScenarios {
          * The package.json of each directory above the one bun ran the edit in, nearest first, keyed by that directory
          * as seen from there; {@code above/} holds those above the lock's, by path from where {@code lock-dir} starts.
          */
-        Map<String, String> parentManifests() {
+        Map<String, String> parentManifests(Phase phase) {
             Map<String, String> parents = new LinkedHashMap<>();
+            if (phase == Phase.BEFORE) {
+                return parents;
+            }
             String before = file("before");
-            Map<String, String> manifests = manifests(false, before == null ? "" : before);
-            String runDir = runDir();
+            Map<String, String> manifests = manifests(phase, before == null ? "" : before);
+            String runDir = runDir(phase);
             List<String> within = runDir.isEmpty() ? new ArrayList<>() : Arrays.asList(runDir.split("/"));
             for (int up = 1; up <= within.size(); up++) {
                 String manifest = manifests.get(String.join("/", within.subList(0, within.size() - up)));
@@ -268,12 +286,13 @@ final class BunScenarios {
         }
 
         /**
-         * The files of {@code above/} by path relative to the lock's directory ({@code ../../patches/x.patch}).
+         * The files of {@code above/} in a phase, by path relative to the lock's directory
+         * ({@code ../../patches/x.patch}).
          */
-        Map<String, String> filesAbove() {
+        Map<String, String> filesAbove(Phase phase) {
             Map<String, String> out = new TreeMap<>();
             String lockDir = file("lock-dir");
-            if (lockDir != null) {
+            if (lockDir != null && phase == Phase.AFTER) {
                 for (Map.Entry<String, String> file : tree("above").entrySet()) {
                     out.put(RootRelativePath.relative(lockDir.trim(), file.getKey()), file.getValue());
                 }
@@ -282,12 +301,12 @@ final class BunScenarios {
         }
 
         @Nullable
-        String config(boolean before, String file, String treeFile) {
-            String fromTree = tree(before).get(treeFile);
+        String config(Phase phase, String file, String treeFile) {
+            String fromTree = tree(phase).get(treeFile);
             if (fromTree != null) {
                 return fromTree;
             }
-            if (before && has(file + "-before")) {
+            if (phase == Phase.BEFORE && has(file + "-before")) {
                 return file(file + "-before");
             }
             return file(file);
@@ -296,14 +315,14 @@ final class BunScenarios {
         /**
          * The project's manifests in a phase by location: {@code ""} the root, a member's path otherwise.
          */
-        Map<String, String> manifests(boolean before, String lock) {
+        Map<String, String> manifests(Phase phase, String lock) {
             Map<String, String> manifests = new LinkedHashMap<>();
-            String root = before ? (has("pkg-before") ? file("pkg-before") : file("pkg-root")) :
+            String root = phase == Phase.BEFORE ? (has("pkg-before") ? file("pkg-before") : file("pkg-root")) :
                     has("pkg") ? file("pkg") : has("pkg-after") ? file("pkg-after") : file("pkg-root");
             if (root != null) {
                 manifests.put("", root);
             }
-            for (Map.Entry<String, String> entry : tree(before).entrySet()) {
+            for (Map.Entry<String, String> entry : tree(phase).entrySet()) {
                 String path = entry.getKey();
                 if (path.endsWith("/package.json")) {
                     manifests.put(path.substring(0, path.length() - "/package.json".length()), entry.getValue());
@@ -317,11 +336,11 @@ final class BunScenarios {
                 if (!m.matches() || Arrays.asList("before", "after", "root").contains(m.group(1))) {
                     continue;
                 }
-                String phase = m.group(2);
-                if (phase != null && !phase.equals(before ? "before" : "after")) {
+                String suffix = m.group(2);
+                if (suffix != null && !suffix.equals(phase == Phase.BEFORE ? "before" : "after")) {
                     continue;
                 }
-                if (phase == null && memberFiles.containsKey(m.group(1))) {
+                if (suffix == null && memberFiles.containsKey(m.group(1))) {
                     continue;
                 }
                 memberFiles.put(m.group(1), file);
