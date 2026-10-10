@@ -232,21 +232,11 @@ class AddDependencyCatalogTest implements RewriteTest {
     }
 
     @Test
-    void aWorkspaceInAnotherLayoutGetsTheEntryInPlace() {
+    void aWorkspaceInAnotherLayoutGetsTheEntryAsPnpmWritesIt() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-add-prefer");
         rewriteRun(
           spec -> spec.recipe(new AddDependency("wrappy", "1.0.2", null)).executionContext(recording.ctx()),
-          recording.sourcesWithTheWorkspaceEditedInPlace("""
-            # workspace
-            packages:
-            - packages/*
-
-            catalogMode: prefer
-
-            catalog:
-                is-number: 7.0.0
-                wrappy: 1.0.2
-            """)
+          recording.sources()
         );
     }
 

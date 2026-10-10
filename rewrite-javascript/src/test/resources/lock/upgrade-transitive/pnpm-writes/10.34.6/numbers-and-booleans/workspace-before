@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+zz-int: 010
+zz-plus: +5
+zz-float: 1.50
+zz-dot: 1.
+zz-hex: 0x1F
+zz-oct: 0o17
+zz-inf: -.Inf
+zz-nan: .NaN
+zz-true: True
+zz-false: FALSE
+zz-minus-zero: -0

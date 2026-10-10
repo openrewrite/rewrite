@@ -1,0 +1,3 @@
+# yaml-language-server: $schema=https://json.schemastore.org/pnpm-workspace.json
+packages:
+  - a

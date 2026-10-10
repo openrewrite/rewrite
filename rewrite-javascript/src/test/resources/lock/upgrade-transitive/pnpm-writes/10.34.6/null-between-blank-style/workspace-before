@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+
+savePrefix:
+
+catalog:
+  ms: 2.1.3

@@ -1,0 +1,14 @@
+packages:
+  # all packages in direct subdirs of packages/
+  - 'packages/*'
+  # all packages in subdirs of components/
+  - 'components/**'
+  # exclude packages that are inside test directories
+  - '!**/test/**'
+
+catalog:
+  react: ^18.2.0
+  wrappy: 1.0.1
+
+overrides:
+  is-number: 7.0.0

@@ -1,0 +1,6 @@
+packages:
+- a
+# about b
+- b
+catalog:
+  ms: 2.1.3

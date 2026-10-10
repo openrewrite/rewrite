@@ -1,0 +1,13 @@
+# Workspace config
+packages:
+  - apps/*
+  - packages/*
+
+# Shared versions
+catalog:
+  is-number: 7.0.0
+  react: ^18.2.0
+
+# Native builds
+onlyBuiltDependencies:
+  - esbuild

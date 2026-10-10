@@ -1,0 +1,7 @@
+# a
+
+# b
+packages:
+  - apps/*
+overrides:
+  is-number: 7.0.0

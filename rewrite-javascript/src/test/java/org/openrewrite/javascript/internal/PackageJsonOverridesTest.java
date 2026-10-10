@@ -31,7 +31,6 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markup;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -64,12 +63,6 @@ class PackageJsonOverridesTest {
 
     private static final String WRITES = "lock/upgrade-transitive/pnpm-writes/";
 
-    /**
-     * Cases where pnpm re-indents what the edit leaves alone; the recipe keeps it, and the keys come in pnpm's order.
-     */
-    private static final List<String> RE_INDENTED = Arrays.asList("overrides-four-spaces",
-            "packages-sequence-unindented");
-
     static Stream<Arguments> writes() throws IOException, URISyntaxException {
         Path root = Paths.get(Objects.requireNonNull(PackageJsonOverridesTest.class.getClassLoader()
                 .getResource(WRITES)).toURI());
@@ -101,14 +94,7 @@ class PackageJsonOverridesTest {
         String written = PackageJsonOverrides.of(Pnpm, root, before,
                 gt < 0 ? added.getKey() : added.getKey().substring(gt + 1), added.getValue(), path)
                 .applyToWorkspaceManifest();
-        String pnpm = read(dir.resolve("workspace"));
-        if (RE_INDENTED.contains(name.substring(name.indexOf('/') + 1))) {
-            ObjectMapper json = new ObjectMapper();
-            assertThat(json.writeValueAsString(new Yaml().load(written)))
-              .isEqualTo(json.writeValueAsString(new Yaml().load(pnpm)));
-        } else {
-            assertThat(written).isEqualTo(pnpm);
-        }
+        assertThat(written).isEqualTo(read(dir.resolve("workspace")));
     }
 
     @Test
@@ -180,7 +166,8 @@ class PackageJsonOverridesTest {
         assertThat(changed.writesAs(scanned)).isFalse();
         assertThat(changed.toString()).isEqualTo("pnpm-workspace.yaml for pnpm 11.2.2");
         assertThat(changed.writesAs(changed.from(pnpm11, workspace + "autoInstallPeers: false\n"))).isTrue();
-        assertThat(changed.from(pnpm11, "packages: [apps/*]\n").declined()).contains("does not edit");
+        assertThat(changed.from(pnpm11, "packages: [apps/*]\n").declined()).isNull();
+        assertThat(changed.from(pnpm11, "packages:\n  - &apps apps/*\n").declined()).contains("an anchor");
     }
 
     @Test

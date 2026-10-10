@@ -1,0 +1,9 @@
+catalogs:
+  zeta:
+    # legacy
+    wrappy: 1.0.1
+
+  alpha:
+    ms: 2.1.3
+overrides:
+  is-number: 7.0.0

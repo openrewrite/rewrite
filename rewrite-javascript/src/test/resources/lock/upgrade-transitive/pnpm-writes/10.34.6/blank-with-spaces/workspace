@@ -1,0 +1,7 @@
+packages:
+  - packages/*
+
+catalog:
+  wrappy: 1.0.1
+overrides:
+  is-number: 7.0.0

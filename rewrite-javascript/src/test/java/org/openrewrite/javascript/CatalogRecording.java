@@ -291,18 +291,6 @@ final class CatalogRecording {
      * leaving its text as it was.
      */
     SourceSpecs[] sources(@Nullable String member, @Nullable String warning) {
-        return sources(member, warning, null);
-    }
-
-    /**
-     * {@link #sources()} where pnpm re-renders pnpm-workspace.yaml in its own layout and the recipe edits it in place:
-     * the workspace comes out as {@code inPlace}, which must read as the same document pnpm wrote.
-     */
-    SourceSpecs[] sourcesWithTheWorkspaceEditedInPlace(String inPlace) {
-        return sources(null, null, inPlace);
-    }
-
-    private SourceSpecs[] sources(@Nullable String member, @Nullable String warning, @Nullable String inPlace) {
         List<SourceSpecs> sources = new ArrayList<>();
         Map<String, String> before = tree("tree-before");
         Map<String, String> after = new TreeMap<>(before);
@@ -332,12 +320,7 @@ final class CatalogRecording {
                     s -> s.path(path).noTrim()));
         }
         String workspace = workspace();
-        if (inPlace != null) {
-            Object written = new Yaml().load(read("workspace"));
-            sources.add(yaml(workspace, inPlace, s -> s.path("pnpm-workspace.yaml").noTrim()
-                    .afterRecipe(doc -> assertThat((Object) new Yaml().load(doc.printAll(new PrintOutputCapture<>(0,
-                            PrintOutputCapture.MarkerPrinter.SANITIZED)))).isEqualTo(written))));
-        } else if (workspace != null) {
+        if (workspace != null) {
             String edited = failed ? null : has("workspace") ? read("workspace") : workspace;
             sources.add(yamlFile(workspace, changed(workspace, edited), "pnpm-workspace.yaml"));
         }

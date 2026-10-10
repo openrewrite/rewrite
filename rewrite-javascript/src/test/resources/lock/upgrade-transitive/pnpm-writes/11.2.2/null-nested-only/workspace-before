@@ -1,0 +1,5 @@
+packages:
+  - apps/*
+zz-empty:
+  a:
+  b: ~

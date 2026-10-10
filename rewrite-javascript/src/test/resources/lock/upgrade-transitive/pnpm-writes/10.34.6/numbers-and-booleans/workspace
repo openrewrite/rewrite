@@ -1,0 +1,15 @@
+packages:
+  - apps/*
+overrides:
+  is-number: 7.0.0
+zz-dot: 1
+zz-false: FALSE
+zz-float: 1.50
+zz-hex: 0x1f
+zz-inf: -.inf
+zz-int: 10
+zz-minus-zero: -0
+zz-nan: .nan
+zz-oct: 0o17
+zz-plus: 5
+zz-true: True

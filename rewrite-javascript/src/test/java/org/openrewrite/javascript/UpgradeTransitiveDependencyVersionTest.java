@@ -282,7 +282,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void pnpmWorkspaceManifestAnEarlierRecipeLeftNotEditableInPlaceIsDeclinedOrWarnedInEveryVisitOrder() {
         Scenario s = new Scenario("pnpm/override-recipe-two-pins");
         Recipe recipe = new CompositeRecipe(Arrays.asList(new FindAndReplace("packages:\n  - apps/*",
-          "packages: [apps/*]", null, null, null, null, "pnpm-workspace.yaml", null),
+          "packages:\n  - &apps apps/*", null, null, null, null, "pnpm-workspace.yaml", null),
           new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null)));
         for (List<Source> order : orders(s.workspaceSources(PackageManager.Pnpm))) {
             Outcome outcome = run(s, recipe, parse(order));
@@ -300,13 +300,13 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 assertThat(outcome.rows).as("visiting %s", visited).isEmpty();
                 assertThat(outcome.declines).as("visiting %s", visited).singleElement()
                   .extracting(NodeDependencyEditsDeclined.Row::getReason).asString()
-                  .contains("has a value it does not edit");
+                  .contains("an anchor or a tag");
             }
             assertThat(print(outcome.file("pnpm-workspace.yaml"))).as("visiting %s", visited)
-              .isEqualTo("packages: [apps/*]\n");
+              .isEqualTo("packages:\n  - &apps apps/*\n");
             assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
               .isEqualTo(s.file("pkg-before"));
-            // a lock visited first was written by the decision the flow-style revision overturns, so it is warned: pnpm
+            // a lock visited first was written by the decision the anchored revision overturns, so it is warned: pnpm
             // 11.2.2's lock for the block-style workspace with the override (override-recipe-one-pin)
             if (lockFirst) {
                 assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)

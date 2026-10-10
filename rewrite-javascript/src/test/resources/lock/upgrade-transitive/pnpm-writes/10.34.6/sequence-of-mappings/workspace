@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+overrides:
+  is-number: 7.0.0
+zz-items:
+  - name: b
+    value: 1
+  - a

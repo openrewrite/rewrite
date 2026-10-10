@@ -1,0 +1,5 @@
+packages:
+  - apps/*
+catalog: # k
+
+  ms: 2.1.3

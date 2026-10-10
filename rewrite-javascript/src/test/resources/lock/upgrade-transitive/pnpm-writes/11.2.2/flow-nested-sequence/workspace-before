@@ -1,0 +1,3 @@
+packages:
+  - apps/*
+zz-list: [[a, b], 'c']

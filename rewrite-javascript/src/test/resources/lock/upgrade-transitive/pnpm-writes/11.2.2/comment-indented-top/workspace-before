@@ -1,0 +1,5 @@
+packages:
+  - packages/*
+  # sequence note
+catalog:
+  wrappy: 1.0.1

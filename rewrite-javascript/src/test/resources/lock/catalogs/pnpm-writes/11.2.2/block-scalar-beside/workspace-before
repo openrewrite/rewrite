@@ -1,0 +1,7 @@
+packages:
+  - apps/*
+catalog:
+  a: 1.0.0
+  b: >
+    ~1.4.1
+  c: 'npm:@acme/c@^1.4.1'

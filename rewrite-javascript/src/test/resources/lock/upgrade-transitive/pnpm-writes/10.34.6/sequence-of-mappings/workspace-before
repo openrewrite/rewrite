@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+zz-items:
+  - name: b
+    value: 1
+  - a

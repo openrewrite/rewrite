@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+catalog:
+  '7': 2.0.0
+  '123': 1.0.0
+  wrappy: 1.0.2
+overrides:
+  is-number: 7.0.0

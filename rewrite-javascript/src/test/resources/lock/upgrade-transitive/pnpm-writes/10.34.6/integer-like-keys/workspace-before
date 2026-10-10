@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+catalog:
+  wrappy: 1.0.2
+  '123': 1.0.0
+  '7': 2.0.0

@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+catalog:
+  a: "2.1.3"
+  b: "x\"y"
+  c: 'it''s'
+  d: '---a'
+  e: "back\\slash"
+overrides:
+  is-number: 7.0.0

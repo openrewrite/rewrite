@@ -121,17 +121,11 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
     }
 
     @Test
-    void aWorkspaceInAnotherLayoutIsEditedInPlace() {
+    void aWorkspaceInAnotherLayoutIsWrittenAsPnpmWritesIt() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-update-latest");
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("wrappy", null, "1.0.2")).executionContext(recording.ctx()),
-          recording.sourcesWithTheWorkspaceEditedInPlace("""
-            packages:
-            - packages/*
-            catalog:
-                # pinned
-                wrappy: 1.0.2
-            """)
+          recording.sources()
         );
     }
 

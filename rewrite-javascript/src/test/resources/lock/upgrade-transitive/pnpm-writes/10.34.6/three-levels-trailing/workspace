@@ -1,0 +1,11 @@
+packages:
+  - apps/*
+catalogs:
+  tools:
+    ms: 2.1.3
+    # in tools
+    # in catalogs
+    # top
+overrides:
+  is-number: 7.0.0
+zz: 1

@@ -1,0 +1,11 @@
+packages:
+  - packages/*
+catalogs:
+  # current
+  react19:
+    react: ^19.0.0
+    react-dom: ^19.0.0
+  # legacy
+  react18:
+    react-dom: ^18.0.0
+    react: ^18.0.0

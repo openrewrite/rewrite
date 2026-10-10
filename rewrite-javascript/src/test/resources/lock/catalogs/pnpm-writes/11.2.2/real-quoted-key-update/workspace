@@ -1,0 +1,10 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+catalog:
+  react: ^18.3.0
+  '@types/react': ^18.0.0
+
+onlyBuiltDependencies:
+  - esbuild

@@ -1,0 +1,9 @@
+packages:
+  - packages/*
+catalog:
+  react: ^18.0.0
+  zod: ^3.1.0
+onlyBuiltDependencies:
+  - esbuild
+overrides:
+  foo: 1.0.0

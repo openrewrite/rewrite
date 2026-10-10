@@ -282,7 +282,7 @@ public final class PackageJsonOverrides {
             if (rejected != null) {
                 return "pnpm rejects the override selector " + selector + ": " + rejected;
             }
-        } else if (pm == PackageManager.Bun && depth > 0) {
+        } else if (pm == PackageManager.Bun && depth > 0) { // override-nested
             return "bun does not support nested overrides";
         } else if (pm == PackageManager.YarnBerry && Resolution.rejects(berryKey(packageName, path)) != null) {
             return "Yarn drops the resolution " + berryKey(packageName, path) + " (YN0057): " +
@@ -358,19 +358,19 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * The pnpm-workspace.yaml this override was decided from (none when null) with the override where pnpm writes a
-     * new key or entry; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors).
+     * The pnpm-workspace.yaml this override was decided from (none when null) with the override as pnpm writes it;
+     * an {@link IllegalArgumentException} names why it is not written (an anchor, a block scalar).
      */
     public String applyToWorkspaceManifest() {
-        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, rootText())).print();
+        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, requireNonNull(release))).print();
     }
 
     /**
-     * {@code workspace}, a revision of pnpm-workspace.yaml, with the override as {@link #applyToWorkspaceManifest()}
-     * writes it, by the one editor of that file.
+     * {@code workspace}, the revision of pnpm-workspace.yaml this override was decided from, with the override as
+     * {@link #applyToWorkspaceManifest()} writes it, by the one editor of that file.
      */
     public NodeCatalogs applyTo(NodeCatalogs.Pnpm workspace) {
-        return workspace.forRoot(rootText()).withOverride(pnpmKey(packageName, path), newVersion);
+        return workspace.forRelease(requireNonNull(release)).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
     // the selector of the whole path, which pnpm reads with one parent only

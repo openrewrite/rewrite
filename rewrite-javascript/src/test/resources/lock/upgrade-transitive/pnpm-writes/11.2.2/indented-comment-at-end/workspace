@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+catalog:
+  ms: 2.1.3 # deep end
+overrides:
+  is-number: 7.0.0

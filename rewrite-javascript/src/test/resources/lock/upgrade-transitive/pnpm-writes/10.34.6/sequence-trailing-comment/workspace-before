@@ -1,0 +1,5 @@
+packages:
+  - a
+  # end of packages
+catalog:
+  ms: 2.1.3

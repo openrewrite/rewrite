@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+catalog:
+  ms: 2.1.3
+  # same indent
+
+overrides:
+  is-number: 7.0.0
+zz: 1

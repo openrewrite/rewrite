@@ -1,0 +1,5 @@
+strictPeerDependencies: false
+  
+# workspace packages
+packages:
+  - a

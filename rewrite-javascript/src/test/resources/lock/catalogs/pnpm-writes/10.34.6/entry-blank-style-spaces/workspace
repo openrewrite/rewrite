@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+catalog:
+  is-number: 7.0.0
+
+minimumReleaseAge: 1440

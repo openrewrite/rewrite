@@ -1,0 +1,5 @@
+catalog:
+  ms: 2.1.3
+overrides:
+  is-number: 7.0.0
+strictPeerDependencies: false # under

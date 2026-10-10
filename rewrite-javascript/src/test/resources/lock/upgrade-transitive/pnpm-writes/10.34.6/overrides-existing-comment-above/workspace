@@ -1,0 +1,7 @@
+
+packages:
+  - packages/*
+# pins
+overrides:
+  aaa: 1.0.0
+  is-number: 7.0.0

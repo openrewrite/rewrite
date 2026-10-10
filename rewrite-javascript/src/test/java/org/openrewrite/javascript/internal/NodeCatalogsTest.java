@@ -18,7 +18,9 @@ package org.openrewrite.javascript.internal;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
@@ -29,12 +31,17 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
@@ -126,6 +133,38 @@ class NodeCatalogsTest {
         assertThat(catalogs.withSpecifier("default", "wrappy", "1.0.2")).isNull();
         assertThat(catalogs.withEntry("default", "ms", "2.1.3")).isNull();
         assertThat(catalogs.withoutUnused(projects(singletonList(emptyMap())))).isNull();
+    }
+
+    static Stream<Arguments> catalogWrites() throws IOException, URISyntaxException {
+        Path root = Paths.get(requireNonNull(NodeCatalogsTest.class.getResource("/lock/catalogs/pnpm-writes/"))
+          .toURI());
+        List<Arguments> cases = new ArrayList<>();
+        try (Stream<Path> releases = Files.list(root)) {
+            for (Path release : (Iterable<Path>) releases.sorted()::iterator) {
+                if (!release.getFileName().toString().matches("\\d+\\.\\d+\\.\\d+")) {
+                    continue;
+                }
+                try (Stream<Path> dirs = Files.list(release)) {
+                    dirs.sorted().forEach(d -> cases.add(Arguments.of(release.getFileName() + "/" + d.getFileName(),
+                      d)));
+                }
+            }
+        }
+        return cases.stream();
+    }
+
+    // pnpm's own writes of a catalog (config set --location=project --json catalog), each the edit named in `edit`
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("catalogWrites")
+    void writesTheCatalogAsPnpmDoes(String name, Path dir) throws IOException {
+        String[] edit = new String(Files.readAllBytes(dir.resolve("edit")), StandardCharsets.UTF_8).split(" ", 4);
+        NodeCatalogs catalogs = requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(new String(
+          Files.readAllBytes(dir.resolve("workspace-before")), StandardCharsets.UTF_8)),
+          "{\"name\":\"p\",\"packageManager\":\"pnpm@" + name.substring(0, name.indexOf('/')) + "\"}"));
+        NodeCatalogs written = "entry".equals(edit[0]) ? catalogs.withEntry(edit[1], edit[2], edit[3]) :
+          catalogs.withSpecifier(edit[1], edit[2], edit[3]);
+        assertThat(edited(written))
+          .isEqualTo(new String(Files.readAllBytes(dir.resolve("workspace")), StandardCharsets.UTF_8));
     }
 
     @Test

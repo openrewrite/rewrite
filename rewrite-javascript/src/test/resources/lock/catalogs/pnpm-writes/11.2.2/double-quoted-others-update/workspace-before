@@ -1,0 +1,3 @@
+catalog:
+  "@types/node": "^20.0.0"
+  wrappy: "1.0.1"

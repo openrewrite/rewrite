@@ -1,0 +1,5 @@
+packages:
+  - apps/*
+overrides:
+  is-number: 7.0.0
+zz-list: [ [ a, b ], 'c' ]

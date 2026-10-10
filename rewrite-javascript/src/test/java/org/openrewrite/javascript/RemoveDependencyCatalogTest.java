@@ -224,17 +224,11 @@ class RemoveDependencyCatalogTest implements RewriteTest {
     }
 
     @Test
-    void aWorkspaceInAnotherLayoutIsCleanedInPlace() {
+    void aWorkspaceInAnotherLayoutIsCleanedAsPnpmWritesIt() {
         CatalogRecording recording = new CatalogRecording("pnpm", "catalog-layout-remove-cleanup");
         rewriteRun(
           spec -> spec.recipe(new RemoveDependency("wrappy", null)).executionContext(recording.ctx()),
-          recording.sourcesWithTheWorkspaceEditedInPlace("""
-            packages:
-            - packages/*
-            cleanupUnusedCatalogs: true
-            catalog:
-                is-number: 7.0.0
-            """)
+          recording.sources()
         );
     }
 
