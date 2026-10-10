@@ -138,18 +138,9 @@ final class Install {
 
     // the fetch step, then the link step's read of each package's .yarn-metadata.json in yarn's cache
     private void fetchStep(PackageResolver resolver, PackageCompatibility compatibility) {
-        List<Manifest> manifests = resolver.getManifests();
-        if (options.getFlags().isUpdateChecksums()) {
-            for (Manifest manifest : manifests) {
-                if (manifest.reference != null && "tarball".equals(manifest.reference.remote.type)) {
-                    throw new CannotKnow("whether yarn's cache holds " + manifest + ": --update-checksums rewrites " +
-                                         "the integrity of each package it downloads, not of one it finds there");
-                }
-            }
-        }
         Set<String> unfetched = new HashSet<>();
-        resolver.updateManifests(PackageFetcher.fetch(manifests, PackageFetcher.remote(resolver, registry, options),
-                warnings, unfetched));
+        resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), PackageFetcher.remote(resolver,
+                registry, options), warnings, unfetched));
         compatibility.check(resolver.getManifests(), options.getFlags().isIgnoreEngines());
         for (Manifest manifest : resolver.getManifests()) {
             PackageReference ref = manifest.reference;
@@ -387,6 +378,14 @@ final class Install {
         YarnClassicOptions.Flags flags = config.getFlags();
         if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
             return null;
+        }
+        if (flags.isUpdateChecksums()) {
+            for (Manifest manifest : resolver.getManifests()) {
+                if (manifest.reference != null && "tarball".equals(manifest.reference.remote.type)) {
+                    throw new CannotKnow("whether yarn's cache holds " + manifest + ": --update-checksums rewrites " +
+                                         "the integrity of each package it downloads, not of one it finds there");
+                }
+            }
         }
 
         boolean lockFileHasAllPatterns = true;

@@ -1,0 +1,1 @@
+.yarnrc --update-checksums true with --pure-lockfile true, adding a dependency: yarn downloads it and writes no lock, so the integrity it would rewrite never matters.
