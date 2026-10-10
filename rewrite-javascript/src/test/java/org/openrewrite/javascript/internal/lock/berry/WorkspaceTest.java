@@ -20,6 +20,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -247,8 +248,8 @@ class WorkspaceTest {
     }
 
     private static List<String> workspaces(YarnBerryLockRegenerator.Inputs.InputsBuilder inputs) {
-        Project project = new YarnBerryLockRegenerator(inputs.now(Instant.EPOCH).build()).load(YarnRelease.of("4.10.3"))
-                .getProject();
+        Project project = new YarnBerryLockRegenerator(inputs.now(Instant.EPOCH).build(), BerryScenarios.NO_REGISTRY)
+                .load(YarnRelease.of("4.10.3"), Collections.emptyMap()).getProject();
         List<String> out = new ArrayList<>();
         for (Workspace workspace : project.workspaces) {
             out.add(workspace.getRelativeCwd());
@@ -280,7 +281,8 @@ class WorkspaceTest {
         for (String member : directories) {
             inputs.manifest(member, "{\"name\": \"" + member.replace('/', '-') + "\"}");
         }
-        Project project = new YarnBerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3")).getProject();
+        Project project = new YarnBerryLockRegenerator(inputs.build(), BerryScenarios.NO_REGISTRY)
+                .load(YarnRelease.of("4.10.3"), Collections.emptyMap()).getProject();
         List<String> out = new ArrayList<>();
         for (Workspace workspace : project.workspaces) {
             if (!".".equals(workspace.getRelativeCwd())) {

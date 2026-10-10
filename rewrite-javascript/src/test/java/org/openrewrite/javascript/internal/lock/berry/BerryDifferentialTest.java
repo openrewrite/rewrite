@@ -34,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -240,8 +241,8 @@ class BerryDifferentialTest {
             String actual;
             try {
                 List<String> members = new ArrayList<>();
-                for (Workspace workspace : new YarnBerryLockRegenerator(inputs.build()).load(YarnRelease.of("4.10.3"))
-                        .getProject().workspaces) {
+                for (Workspace workspace : new YarnBerryLockRegenerator(inputs.build(), BerryScenarios.NO_REGISTRY)
+                        .load(YarnRelease.of("4.10.3"), Collections.emptyMap()).getProject().workspaces) {
                     if (!".".equals(workspace.getRelativeCwd())) {
                         members.add(workspace.getRelativeCwd());
                     }

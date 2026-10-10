@@ -36,7 +36,6 @@ import org.openrewrite.javascript.internal.lock.SharedError;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -145,20 +144,6 @@ public final class YarnBerryLockRegenerator {
     public YarnBerryLockRegenerator(Inputs inputs, RegistrySource registry) {
         this.inputs = inputs;
         this.registry = registry;
-    }
-
-    YarnBerryLockRegenerator(Inputs inputs) {
-        this(inputs, new RegistrySource() {
-            @Override
-            public @Nullable String packument(String registry, String name) {
-                return null;
-            }
-
-            @Override
-            public byte @Nullable [] tarball(String url, String name, String version) {
-                return null;
-            }
-        });
     }
 
     /**
@@ -276,10 +261,6 @@ public final class YarnBerryLockRegenerator {
                                  YarnRelease.PORTED + ")");
         }
         return release;
-    }
-
-    Loaded load(YarnRelease release) {
-        return load(release, Collections.emptyMap());
     }
 
     /**

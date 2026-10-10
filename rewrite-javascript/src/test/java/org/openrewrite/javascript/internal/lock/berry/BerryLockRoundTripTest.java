@@ -21,6 +21,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsYaml;
 
+import java.util.Collections;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,7 +55,7 @@ class BerryLockRoundTripTest {
     @MethodSource("locks")
     void writesTheLockYarnWrites(String name, BerryScenarios.Lock lock) {
         String expect = lock.getScenario().expect();
-        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(lock.inputs());
+        YarnBerryLockRegenerator regenerator = new YarnBerryLockRegenerator(lock.inputs(), BerryScenarios.NO_REGISTRY);
         YarnRelease release;
         try {
             release = regenerator.release();
@@ -63,7 +64,7 @@ class BerryLockRoundTripTest {
         }
         YarnBerryLockRegenerator.Loaded loaded;
         try {
-            loaded = regenerator.load(release);
+            loaded = regenerator.load(release, Collections.emptyMap());
         } catch (JsYaml.YamlException e) {
             assertThat(expect).as("Yarn fails on the lock").isEqualTo("pm-fails " + e);
             return;

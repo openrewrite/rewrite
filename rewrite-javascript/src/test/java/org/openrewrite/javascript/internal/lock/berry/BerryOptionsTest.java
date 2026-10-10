@@ -113,14 +113,14 @@ class BerryOptionsTest {
                 .manifest("", "{\"name\": \"p\", \"packageManager\": \"yarn@4.5.3\"}")
                 .configFile(".yarnrc.yml", "catalog:\n  ms: ^2.1.0\n")
                 .now(Instant.EPOCH)
-                .build());
+                .build(), BerryScenarios.NO_REGISTRY);
         YarnRelease release = regenerator.release();
         assertThat(release.getVersion()).isEqualTo("4.5.3");
-        assertThatThrownBy(() -> regenerator.load(release))
+        assertThatThrownBy(() -> regenerator.load(release, Collections.emptyMap()))
                 .isInstanceOf(BerryOptions.UsageError.class)
                 .hasMessageStartingWith("Unrecognized or legacy configuration settings found: catalog");
-        assertThat(regenerator.load(YarnRelease.of("4.10.3")).getProject().configuration.getRelease()
-                .hasPlugin("@yarnpkg/plugin-catalog")).isTrue();
+        assertThat(regenerator.load(YarnRelease.of("4.10.3"), Collections.emptyMap()).getProject().configuration
+                .getRelease().hasPlugin("@yarnpkg/plugin-catalog")).isTrue();
     }
 
     @Test
@@ -131,12 +131,12 @@ class BerryOptionsTest {
                 .configFile(".yarnrc.yml", "catalog:\n  ms: ^2.1.0\n")
                 .env(Collections.singletonMap("YARN_ENABLE_STRICT_SETTINGS", "false"))
                 .now(Instant.EPOCH)
-                .build());
-        YarnBerryLockRegenerator.Loaded first = regenerator.load(YarnRelease.of("4.5.3"));
+                .build(), BerryScenarios.NO_REGISTRY);
+        YarnBerryLockRegenerator.Loaded first = regenerator.load(YarnRelease.of("4.5.3"), Collections.emptyMap());
         assertThat(first.getProject().configuration.getOptions().getMap("catalog")).isEmpty();
         assertThat(first.getMigratedSettings()).containsOnlyKeys("enableGlobalCache", "compressionLevel");
 
-        YarnBerryLockRegenerator.Loaded second = regenerator.load(YarnRelease.of("4.10.3"));
+        YarnBerryLockRegenerator.Loaded second = regenerator.load(YarnRelease.of("4.10.3"), Collections.emptyMap());
         assertThat(second.getProject().configuration.getOptions().getMap("catalog")).containsEntry("ms", "^2.1.0");
         assertThat(second.getMigratedSettings()).isEqualTo(first.getMigratedSettings());
     }

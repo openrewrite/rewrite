@@ -105,8 +105,8 @@ class YarnBerryLockRegeneratorTest {
                             .lock(header + version + rest)
                             .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}\n")
                             .now(Instant.EPOCH)
-                            .build());
-            Project project = regenerator.load(regenerator.release()).getProject();
+                            .build(), BerryScenarios.NO_REGISTRY);
+            Project project = regenerator.load(regenerator.release(), Collections.emptyMap()).getProject();
             assertThat(project.lockfileNeedsRefresh).isFalse();
             assertThat(regenerator.write(project)).isEqualTo(header + "8" + rest);
         }
@@ -132,8 +132,9 @@ class YarnBerryLockRegeneratorTest {
                 .env(recorded.getEnv())
                 .host(recorded.getHost())
                 .now(recorded.getNow())
-                .build());
-        Map<String, Object> migrated = regenerator.load(regenerator.release()).getMigratedSettings();
+                .build(), BerryScenarios.NO_REGISTRY);
+        Map<String, Object> migrated = regenerator.load(regenerator.release(), Collections.emptyMap())
+                .getMigratedSettings();
         assertThat(migrated).isNotEmpty();
         assertThat(Syml.stringifySyml(new LinkedHashMap<>(migrated))).isEqualTo(written);
     }
@@ -167,6 +168,6 @@ class YarnBerryLockRegeneratorTest {
         if (yarnrc != null) {
             inputs.configFile(".yarnrc.yml", yarnrc);
         }
-        return new YarnBerryLockRegenerator(inputs.build()).release().getVersion();
+        return new YarnBerryLockRegenerator(inputs.build(), BerryScenarios.NO_REGISTRY).release().getVersion();
     }
 }
