@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes the override is-number 7.0.0 into a shared workspace whose pnpm-workspace.yaml and lock already hold the override left-pad 1.3.0 (config set), as the recipe writes it.

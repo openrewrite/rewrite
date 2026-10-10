@@ -1,0 +1,1 @@
+pnpm 10.34.6 -r update --latest wrappy, the default catalog {wrappy, ms} and the top level {packages, catalogMode, catalog} unsorted: whether pnpm 10 re-sorts the document for an entry it edits.

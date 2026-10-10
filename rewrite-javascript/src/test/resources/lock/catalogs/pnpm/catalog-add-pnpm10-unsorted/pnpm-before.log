@@ -1,0 +1,14 @@
+Scope: all 2 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+
+   ╭──────────────────────────────────────────────────────────────────────╮
+   │                                                                      │
+   │                 Update available! 10.34.6 → 12.10.1.                 │
+   │                 Changelog: https://pnpm.io/v/12.10.1                 │
+   │   To update, run: curl -fsSL https://get.pnpm.io/install.sh | sh -   │
+   │                                                                      │
+   ╰──────────────────────────────────────────────────────────────────────╯
+
+Progress: resolved 3, reused 0, downloaded 0, added 0, done
+
+Done in 415ms using pnpm v10.34.6

@@ -125,7 +125,11 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
                     entry = entry == null ? catalogs.specifier(catalog, oldPackageName) : entry;
                 }
                 String newEntry = entry;
-                if (catalogs != null && catalogs.isFlowStyle()) {
+                if (catalogs != null && catalogs.declined() != null) {
+                    String why = oldPackageName + " was not renamed: " + catalogs.declined();
+                    decision.warn(why);
+                    decision.decline(why);
+                } else if (catalogs != null && catalogs.isFlowStyle()) {
                     decline(decision, ctx, declared.getKey(), value, spec,
                             "its catalogs are written in flow style, which is not edited in place");
                 } else if (catalog == null || entry == null) {

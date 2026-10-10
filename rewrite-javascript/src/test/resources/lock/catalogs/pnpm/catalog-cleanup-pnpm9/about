@@ -1,0 +1,1 @@
+pnpm 9.15.9 add is-odd@3.0.1 -w under cleanupUnusedCatalogs: true, the default catalog holding ms, which no project references: whether pnpm 9 drops it.

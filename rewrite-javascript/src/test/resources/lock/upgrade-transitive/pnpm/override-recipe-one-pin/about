@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes the override is-number 7.0.0 into the override-recipe-two-pins workspace (config set): the one pin, without left-pad.

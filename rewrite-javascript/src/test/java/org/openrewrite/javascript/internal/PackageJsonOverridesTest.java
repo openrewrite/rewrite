@@ -71,12 +71,6 @@ class PackageJsonOverridesTest {
             "11.2.2/packages-sequence-unindented", "10.34.6/overrides-four-spaces",
             "10.34.6/packages-sequence-unindented");
 
-    /**
-     * Cases where pnpm 10 sorts the keys the edit leaves alone; the recipe keeps their order.
-     */
-    private static final List<String> RE_SORTED = Arrays.asList("10.34.6/unordered", "10.34.6/overrides-unordered",
-            "10.34.6/overrides-empty", "10.34.6/blank-lines-first");
-
     static Stream<Arguments> writes() throws IOException, URISyntaxException {
         Path root = Paths.get(Objects.requireNonNull(PackageJsonOverridesTest.class.getClassLoader()
                 .getResource(WRITES)).toURI());
@@ -113,8 +107,6 @@ class PackageJsonOverridesTest {
             ObjectMapper json = new ObjectMapper();
             assertThat(json.writeValueAsString(new Yaml().load(written)))
               .isEqualTo(json.writeValueAsString(new Yaml().load(pnpm)));
-        } else if (RE_SORTED.contains(name)) {
-            assertThat((Map<?, ?>) new Yaml().load(written)).isEqualTo(new Yaml().load(pnpm));
         } else {
             assertThat(written).isEqualTo(pnpm);
         }

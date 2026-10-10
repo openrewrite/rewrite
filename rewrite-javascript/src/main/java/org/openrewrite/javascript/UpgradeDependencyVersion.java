@@ -138,7 +138,14 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
     private boolean followCatalog(NodeDependencyEdits.Decision decision, String name, String value) {
         NodeCatalogs catalogs = decision.catalogs();
         String catalog = catalogs == null ? null : catalogs.catalogOf(value);
-        return catalog != null && decision.editCatalogs(c -> c.withSpecifier(catalog, name, newVersion));
+        if (catalog == null) {
+            return false;
+        }
+        if (catalogs.declined() != null) {
+            decision.decline(name + "'s catalog entry was not upgraded: " + catalogs.declined());
+            return true;
+        }
+        return decision.editCatalogs(c -> c.withSpecifier(catalog, name, newVersion));
     }
 
     private Predicate<String> buildNameMatcher() {

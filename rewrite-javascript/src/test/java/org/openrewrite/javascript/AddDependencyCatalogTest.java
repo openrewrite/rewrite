@@ -81,17 +81,49 @@ class AddDependencyCatalogTest implements RewriteTest {
     }
 
     // recorded with pnpm 9.15.9, whose add writes the version, and 10.34.6, which follows the default catalog as 11
+    // and writes pnpm-workspace.yaml sorted at every level
     @ParameterizedTest
     @CsvSource(delimiter = '|', textBlock = """
-      catalog-add-pnpm9  | 9.15.9
-      catalog-add-pnpm10 | 10.34.6
+      catalog-add-pnpm9           | 9.15.9  | 6.0.0
+      catalog-add-pnpm10          | 10.34.6 | 6.0.0
+      catalog-add-pnpm10-unsorted | 10.34.6 | 7.0.0
       """)
-    void addedAsTheReleaseTheProjectNamesAddsIt(String scenario, String release) {
+    void addedAsTheReleaseTheProjectNamesAddsIt(String scenario, String release, String version) {
         CatalogRecording recording = new CatalogRecording("pnpm", scenario);
         rewriteRun(
-          spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null)).executionContext(recording.ctx()),
+          spec -> spec.recipe(new AddDependency("is-number", version, null)).executionContext(recording.ctx()),
           recording.sourcesWhoseInstallFails("the lock pnpm " + release + " writes")
         );
+    }
+
+    // recorded with Yarn 4.10.3 and Bun 1.3.10, which have no catalog setting for add: the version, the field sorted
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      yarn-berry | catalog-add-yarn-in-catalog
+      yarn-berry | catalog-add-yarn-not-in-catalog
+      yarn-berry | catalog-add-yarn-unsorted-member
+      bun        | catalog-add-bun-in-catalog
+      bun        | catalog-add-bun-not-in-catalog
+      bun        | catalog-add-bun-unsorted-member
+      """)
+    void addedAsYarnAndBunAddIt(String family, String scenario) {
+        CatalogRecording recording = new CatalogRecording(family, scenario);
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("is-number", "7.0.0", null)).executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new AddDependency("is-number", "7.0.0", null));
+    }
+
+    // recorded with pnpm 11.2.2: a member's add in a shared workspace whose lock holds an overrides: section
+    @Test
+    void addedBesideTheOverridesTheLockAlreadyHolds() {
+        CatalogRecording recording = new CatalogRecording("upgrade-transitive", "pnpm", "override-section-member-add");
+        rewriteRun(
+          spec -> spec.recipe(new AddDependency("is-odd", "3.0.0", null)).executionContext(recording.ctx()),
+          recording.sources()
+        );
+        recording.assertEveryVisitOrder(new AddDependency("is-odd", "3.0.0", null));
     }
 
     @ParameterizedTest
@@ -141,7 +173,7 @@ class AddDependencyCatalogTest implements RewriteTest {
         );
     }
 
-    // PnpmOptions.releaseMajor leaves a range open between majors to the registry, which pnpm 9 and 10 answer apart
+    // a range open between majors is left to the registry, and pnpm 9 and 10 add differently (PnpmRelease)
     @Test
     void aReleaseRangeOpenBetweenMajorsIsDeclined() {
         String manifest = """
@@ -155,8 +187,8 @@ class AddDependencyCatalogTest implements RewriteTest {
             }
           }
           """;
-        String why = "is-number@6.0.0 was not added: what pnpm add of the release the project names writes is " +
-          "not known";
+        String why = "is-number@6.0.0 was not added: the pnpm release the project names is not one major (a range " +
+          "the registry decides between majors, or a value pnpm cannot read)";
         rewriteRun(
           spec -> spec.recipe(new AddDependency("is-number", "6.0.0", null))
             .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()

@@ -1,0 +1,5 @@
+Scope: all 2 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+ WARN  Skip adding wrappy to the default catalog because it already exists as 1.0.1. Please use `pnpm update` to update the catalogs.
+Progress: resolved 2, reused 0, downloaded 0, added 0, done
+Done in 190ms using pnpm v10.34.6

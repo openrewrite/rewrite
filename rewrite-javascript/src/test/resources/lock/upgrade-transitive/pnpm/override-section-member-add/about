@@ -1,0 +1,1 @@
+pnpm 11.2.2 add is-odd@3.0.0 in member apps/a of a shared workspace whose pnpm-workspace.yaml and lock hold the override is-number 7.0.0, the root declaring is-odd 3.0.0: the member edit beside the overrides: section.

@@ -1,0 +1,16 @@
+(node:56443) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Scope: all 2 workspace projects
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Progress: resolved 3, reused 0, downloaded 0, added 0, done
+
+Done in 317ms using pnpm v9.15.9
+
+   ╭───────────────────────────────────────────────────────────────────╮
+   │                                                                   │
+   │                Update available! 9.15.9 → 12.10.1.                │
+   │   Changelog: https://github.com/pnpm/pnpm/releases/tag/v12.10.1   │
+   │            Run "corepack use pnpm@12.10.1" to update.             │
+   │                                                                   │
+   ╰───────────────────────────────────────────────────────────────────╯
+

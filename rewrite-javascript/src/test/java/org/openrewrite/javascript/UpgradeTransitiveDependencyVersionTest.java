@@ -192,6 +192,14 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           s.workspaceSources(PackageManager.Pnpm));
     }
 
+    // recorded with pnpm 11.2.2: the lock already holds an overrides: section, which the new override joins
+    @Test
+    void pnpmBesideAnOverridesSectionTheLockAlreadyHoldsInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-beside-overrides-section");
+        inEveryOrder(s, new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null),
+          s.workspaceSources(PackageManager.Pnpm));
+    }
+
     @Test
     void pnpmTwoOverridesInOneRunInEveryVisitOrder() {
         Scenario s = new Scenario("pnpm/override-recipe-two-pins");
@@ -298,10 +306,11 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               .isEqualTo("packages: [apps/*]\n");
             assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
               .isEqualTo(s.file("pkg-before"));
-            // a lock visited first was written by the decision the flow-style revision overturns, so it is warned
+            // a lock visited first was written by the decision the flow-style revision overturns, so it is warned: pnpm
+            // 11.2.2's lock for the block-style workspace with the override (override-recipe-one-pin)
             if (lockFirst) {
                 assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)
-                  .isNotEqualTo(s.file("before"));
+                  .isEqualTo(new Scenario("pnpm/override-recipe-one-pin").file("after"));
             } else {
                 assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)
                   .isEqualTo(s.file("before"));

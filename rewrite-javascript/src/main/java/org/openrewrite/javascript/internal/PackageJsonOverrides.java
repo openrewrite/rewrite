@@ -27,9 +27,7 @@ import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.berry.Resolution;
 import org.openrewrite.javascript.internal.lock.bun.OverrideMap;
 import org.openrewrite.javascript.internal.lock.pnpm.ParseOverrides;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
-import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.internal.lock.yarnclassic.ResolutionMap;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -63,8 +61,9 @@ public final class PackageJsonOverrides {
     private final String newVersion;
     private final @Nullable List<DependencyPathSegment> path;
     private final Json.Document root;
+    private final String rootText;
     private final WorkspaceSettings workspace;
-    private final int release;
+    private final PnpmRelease release;
     private final Place place;
     private @Nullable String declined;
     private boolean declinedKnown;
@@ -77,8 +76,9 @@ public final class PackageJsonOverrides {
         this.newVersion = newVersion;
         this.path = path;
         this.workspace = workspace;
-        this.release = pm == PackageManager.Pnpm ? pnpmRelease(root, workspace) : -1;
-        this.place = place(pm, root, workspace, release);
+        this.rootText = PackageJsonHelper.printed(root);
+        this.release = PnpmRelease.of(pm == PackageManager.Pnpm ? rootText : "{}", workspace.settings());
+        this.place = place(pm, root, rootText, workspace, release.getMajor());
     }
 
     /**
@@ -109,7 +109,8 @@ public final class PackageJsonOverrides {
      * Whether {@code other} writes the override where this one does, for the same pnpm release, or declines it alike.
      */
     public boolean writesAs(PackageJsonOverrides other) {
-        return place == other.place && release == other.release && Objects.equals(declined(), other.declined());
+        return place == other.place && getRelease() == other.getRelease() &&
+               Objects.equals(declined(), other.declined());
     }
 
     @Override
@@ -120,7 +121,7 @@ public final class PackageJsonOverrides {
         }
         String where = place == Place.WORKSPACE_MANIFEST ? WORKSPACE_MANIFEST : place == Place.PNPM_FIELD ?
                 "pnpm.overrides" : place == Place.RESOLUTIONS ? "resolutions" : "overrides";
-        return pm == PackageManager.Pnpm ? where + " for pnpm " + release : where;
+        return pm == PackageManager.Pnpm ? where + " for " + release : where;
     }
 
     /**
@@ -131,7 +132,7 @@ public final class PackageJsonOverrides {
     }
 
     int getRelease() {
-        return release;
+        return pm == PackageManager.Pnpm ? release.getMajor() : -1;
     }
 
     /**
@@ -196,10 +197,11 @@ public final class PackageJsonOverrides {
         return new DependencyPathSegment(part, null);
     }
 
-    private static Place place(PackageManager pm, Json.Document root, WorkspaceSettings workspace, int release) {
+    private static Place place(PackageManager pm, Json.Document root, String rootText, WorkspaceSettings workspace,
+                               int release) {
         switch (pm) {
             case Bun:
-                return "resolutions".equals(OverrideMap.readsFrom(PackageJsonHelper.printed(root))) ?
+                return "resolutions".equals(OverrideMap.readsFrom(rootText)) ?
                         Place.RESOLUTIONS : Place.OVERRIDES;
             case YarnClassic:
             case YarnBerry:
@@ -263,9 +265,9 @@ public final class PackageJsonOverrides {
     private @Nullable String decline() {
         int depth = path == null ? 0 : path.size();
         if (pm == PackageManager.Pnpm) {
-            if (release < 9 || release > 11) {
-                return "where pnpm " + (release < 0 ? "of the release the project names" : release + ".x") +
-                       " reads overrides is not known";
+            String declined = release.declined();
+            if (declined != null) {
+                return "the override is not written: " + declined;
             }
             String selector = pnpmSelector(packageName, path);
             String rejected = ParseOverrides.rejects(selector);
@@ -351,7 +353,7 @@ public final class PackageJsonOverrides {
      * new key or entry; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors).
      */
     public String applyToWorkspaceManifest() {
-        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, PackageJsonHelper.printed(root))).print();
+        return applyTo(NodeCatalogs.Pnpm.parse(workspace.text, rootText)).print();
     }
 
     /**
@@ -359,11 +361,7 @@ public final class PackageJsonOverrides {
      * writes it, by the one editor of that file.
      */
     public NodeCatalogs applyTo(NodeCatalogs.Pnpm workspace) {
-        return workspace.withOverride(new WorkspaceManifestWriter(release), pnpmKey(packageName, path), newVersion);
-    }
-
-    private static int pnpmRelease(Json.Document root, WorkspaceSettings workspace) {
-        return PnpmOptions.releaseMajor(PackageJsonHelper.printed(root), workspace.settings());
+        return workspace.forRoot(rootText).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
     // the selector of the whole path, which pnpm reads with one parent only
@@ -452,7 +450,7 @@ public final class PackageJsonOverrides {
     private Map<String, @Nullable Object> parsedResolutions() {
         Object parsed;
         try {
-            parsed = EcmaScript.jsonParse(PackageJsonHelper.printed(root));
+            parsed = EcmaScript.jsonParse(rootText);
         } catch (RuntimeException e) {
             return emptyMap();
         }

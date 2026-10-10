@@ -84,16 +84,41 @@ class NodeCatalogsTest {
         assertThat(catalogs.specifier("default", "wrappy")).isEqualTo("1.0.1");
     }
 
-    // the writer of the release the root names: pnpm 10 sorts every level (pnpm-writes/10.34.6/unordered), 11 appends
+    // pnpm 10.34.6 writes the document sorted at every level, packages first, for an add and for an update alike
     @Test
-    void aNewEntryIsPlacedByTheWriterOfTheReleaseTheRootNames() {
-        String workspace = "catalog:\n  d: 1.0.0\n  b: 1.0.0\n";
-        assertThat(edited(requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(workspace),
-          "{\"packageManager\":\"pnpm@10.34.6\"}")).withEntry("default", "c", "1.0.0")))
-          .isEqualTo("catalog:\n  d: 1.0.0\n  c: 1.0.0\n  b: 1.0.0\n");
-        assertThat(edited(requireNonNull(NodeCatalogs.read(PackageManager.Pnpm, yaml(workspace),
-          "{\"packageManager\":\"pnpm@11.2.2\"}")).withEntry("default", "c", "1.0.0")))
-          .isEqualTo("catalog:\n  d: 1.0.0\n  b: 1.0.0\n  c: 1.0.0\n");
+    void pnpm10SortsEveryLevelOfTheDocumentItWrites() {
+        assertThat(edited(pnpmOfRoot("catalog-add-pnpm10-unsorted").withEntry("default", "is-number", "7.0.0")))
+          .isEqualTo(file("pnpm/catalog-add-pnpm10-unsorted/workspace"));
+        assertThat(edited(pnpmOfRoot("catalog-update-pnpm10-unsorted").withSpecifier("default", "wrappy", "1.0.2")))
+          .isEqualTo(file("pnpm/catalog-update-pnpm10-unsorted/workspace"));
+    }
+
+    // pnpm 9.15.9 never writes pnpm-workspace.yaml and has no cleanupUnusedCatalogs (catalog-cleanup-pnpm9)
+    @Test
+    void pnpm9WritesNoNewEntryAndCleansNothingUp() {
+        NodeCatalogs.Pnpm catalogs = pnpmOfRoot("catalog-cleanup-pnpm9");
+        assertThat(catalogs.isCleanupUnusedCatalogs()).isTrue();
+        assertThat(catalogs.cleansUp()).isFalse();
+        assertThat(catalogs.withoutUnused(projects(Arrays.asList(emptyMap(), declares("wrappy", "catalog:")))))
+          .isSameAs(catalogs);
+        assertThat(catalogs.withEntry("default", "is-number", "7.0.0")).isNull();
+        assertThat(edited(catalogs.withSpecifier("default", "wrappy", "1.0.1")))
+          .isEqualTo(file("pnpm/catalog-cleanup-pnpm9/workspace").replace("wrappy: 1.0.2", "wrappy: 1.0.1"));
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      {"devEngines":{"packageManager":{"name":"pnpm","version":">=9"}}} | not one major
+      {"packageManager":"pnpm@12.0.0"}                                  | pnpm 12.x
+      {"packageManager":"pnpm@8.15.9"}                                  | pnpm 8.x
+      """)
+    void aReleaseNoRecordingCoversIsDeclined(String root, String why) {
+        NodeCatalogs.Pnpm catalogs = (NodeCatalogs.Pnpm) requireNonNull(NodeCatalogs.read(PackageManager.Pnpm,
+          yaml("cleanupUnusedCatalogs: true\ncatalog:\n  wrappy: 1.0.1\n"), root));
+        assertThat(catalogs.declined()).contains(why);
+        assertThat(catalogs.withSpecifier("default", "wrappy", "1.0.2")).isNull();
+        assertThat(catalogs.withEntry("default", "ms", "2.1.3")).isNull();
+        assertThat(catalogs.withoutUnused(projects(singletonList(emptyMap())))).isNull();
     }
 
     @Test
@@ -299,6 +324,12 @@ class NodeCatalogsTest {
 
     private static NodeCatalogs.Pnpm pnpm(String scenario) {
         return pnpmOf(file("pnpm/" + scenario + "/workspace-before"));
+    }
+
+    // the recording's workspace for the release its root names
+    private static NodeCatalogs.Pnpm pnpmOfRoot(String scenario) {
+        return (NodeCatalogs.Pnpm) requireNonNull(NodeCatalogs.read(PackageManager.Pnpm,
+          yaml(file("pnpm/" + scenario + "/workspace-before")), file("pnpm/" + scenario + "/pkg-before")));
     }
 
     private static NodeCatalogs.Pnpm pnpmOf(String text) {

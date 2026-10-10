@@ -1,0 +1,1 @@
+pnpm 10.34.6 add is-number@7.0.0 in member a under catalogMode prefer, the default catalog {wrappy, ms} and the top level {packages, catalogMode, catalog} unsorted, the root declaring is-number 7.0.0: where pnpm 10 writes the new entry.

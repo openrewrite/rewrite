@@ -1,0 +1,3 @@
+bun 1.3.10, 2026-10-10
+before exit=0, after exit=0, frozen-over-after exit=0
+phase 2: bun add is-number@7.0.0 --lockfile-only in packages/a

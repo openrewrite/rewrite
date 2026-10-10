@@ -385,7 +385,9 @@ class PackageJsonHelperTest {
         PackageJsonHelper.EditAndRegenerateResult result = PackageJsonHelper.editAndRegenerate(
                 withMarker,
                 d -> PackageJsonHelper.addDependency(d, "uuid", "^9.0.0", "dependencies"),
+                Collections.emptyMap(),
                 null,
+                NodeDependencyScan.ProjectFiles.NONE,
                 new InMemoryExecutionContext());
 
         assertThat(result.isChanged()).isTrue();

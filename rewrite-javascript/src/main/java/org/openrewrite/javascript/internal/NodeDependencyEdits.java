@@ -571,7 +571,7 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     // pnpm's cleanupUnusedCatalogs, which any install it runs applies, when this cycle edits the workspace; each
     // project as this recipe's decision leaves it
     private @Nullable NodeCatalogs output(ManagedFile file, NodeCatalogs edited) {
-        if (!(edited instanceof NodeCatalogs.Pnpm) || !((NodeCatalogs.Pnpm) edited).isCleanupUnusedCatalogs()) {
+        if (!(edited instanceof NodeCatalogs.Pnpm) || !((NodeCatalogs.Pnpm) edited).cleansUp()) {
             return edited;
         }
         boolean touched = false;
@@ -592,6 +592,13 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
     private @Nullable String cleanupDeclined(ManagedFile file) {
         NodeCatalogs current = file.current();
         if (!(current instanceof NodeCatalogs.Pnpm) || !((NodeCatalogs.Pnpm) current).isCleanupUnusedCatalogs()) {
+            return null;
+        }
+        if (current.declined() != null) {
+            return "cleanupUnusedCatalogs makes pnpm rewrite " + file.path + ", and " + current.declined() +
+                   ", so this edit was not made";
+        }
+        if (!((NodeCatalogs.Pnpm) current).cleansUp()) {
             return null;
         }
         Map<String, Path> unread = new HashMap<>();

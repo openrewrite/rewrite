@@ -22,10 +22,11 @@ import org.openrewrite.*;
 import org.openrewrite.javascript.internal.NodeCatalogs;
 import org.openrewrite.javascript.internal.NodeDependencyEdits;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
+import org.openrewrite.javascript.internal.PnpmRelease;
 import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.pnpm.InstallSome;
-import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeDependencyEditsDeclined;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
 import org.openrewrite.json.tree.Json;
@@ -113,8 +114,11 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
         }
         boolean pnpm = catalogs instanceof NodeCatalogs.Pnpm;
         String value = pnpm ? pnpmAdd(decision, (NodeCatalogs.Pnpm) catalogs) : version;
+        // pnpm, Yarn and Bun add sort the field (catalog-add-unsorted, catalog-add-{yarn,bun}-unsorted-member)
+        PackageManager pm = decision.getPackageManager();
+        boolean sorted = pnpm || pm == PackageManager.YarnBerry || pm == PackageManager.Bun;
         if (value != null) {
-            decision.editManifest(doc -> !matchesAdd(doc) ? doc : pnpm ?
+            decision.editManifest(doc -> !matchesAdd(doc) ? doc : sorted ?
                     PackageJsonHelper.sortMembers(PackageJsonHelper.addDependency(doc, packageName, value,
                             targetScope()), targetScope()) :
                     PackageJsonHelper.addDependency(doc, packageName, value, targetScope()));
@@ -124,14 +128,13 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
     // what the pnpm release that runs writes, recorded: 9.15.9 the version, 10.34.6 and 11.2.2 by the catalogs
     private @Nullable String pnpmAdd(NodeDependencyEdits.Decision decision, NodeCatalogs.Pnpm catalogs) {
         SourceFile root = decision.manifestOf(catalogs.getPath().resolveSibling("package.json"));
-        int release = root == null ? 0 : PnpmOptions.releaseMajor(PackageJsonHelper.printed(root),
-                catalogs.getSettings());
-        if (release < 0) {
-            declined(decision, packageName + "@" + version + " was not added: what pnpm add of the release the " +
-                               "project names writes is not known");
+        PnpmRelease release = (root == null ? catalogs : catalogs.forRoot(PackageJsonHelper.printed(root)))
+                .getRelease();
+        if (release.declined() != null) {
+            declined(decision, packageName + "@" + version + " was not added: " + release.declined());
             return null;
         }
-        if (root != null && release < 10) {
+        if (release.getMajor() == 9) {
             return version;
         }
         InstallSome.Saved saved;
