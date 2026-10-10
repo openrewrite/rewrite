@@ -1,0 +1,8 @@
+{
+  "name": "p",
+  "version": "1.0.0",
+  "packageManager": "pnpm@9.15.9",
+  "dependencies": {
+    "is-odd": "3.0.1"
+  }
+}

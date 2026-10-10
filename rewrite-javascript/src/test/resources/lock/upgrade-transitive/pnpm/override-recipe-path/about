@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes overrides is-odd>is-number 7.0.0 into a pnpm-workspace.yaml without overrides (config set).

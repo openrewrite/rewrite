@@ -1,0 +1,4 @@
+packages:
+  - .
+overrides:
+  is-odd>is-number: ^7.0.0

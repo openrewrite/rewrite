@@ -1,0 +1,1 @@
+UpgradeTransitiveDependencyVersion("is-number", "^7.0.0", null): is-number 6.0.0 -> 7.0.0; before and after byte-identical to the #8928 test goldens.

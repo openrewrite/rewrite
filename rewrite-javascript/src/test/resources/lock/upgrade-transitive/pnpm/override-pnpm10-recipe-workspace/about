@@ -1,0 +1,1 @@
+pnpm 10.34.6 (no pnpm field) writes overrides is-odd>is-number 7.0.0 into an existing pnpm-workspace.yaml (config set).

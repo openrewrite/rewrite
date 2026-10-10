@@ -15,20 +15,54 @@
  */
 package org.openrewrite.javascript.internal;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.util.DefaultIndenter;
+import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.Tree;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.json.tree.JsonRightPadded;
+import org.openrewrite.json.tree.JsonValue;
+import org.openrewrite.json.tree.Space;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.semver.NodeSemver;
+import org.yaml.snakeyaml.LoaderOptions;
+import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
+
+import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 
 /**
- * Ports {@code parseDependencyPath} and {@code applyOverrideToPackageJson}
- * from {@code dependency-manager.ts}.
+ * Writes an override of a transitive dependency where the workspace root's package manager reads it, in its own key
+ * syntax: npm's and Bun's {@code overrides}, Yarn's {@code resolutions}, pnpm's by the release the project names.
  */
 public final class PackageJsonOverrides {
 
+    public static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
+
+    private static final String PNPM_RELEASE = "11.2.2";
+
     private PackageJsonOverrides() {
+    }
+
+    /**
+     * Where a package manager reads overrides.
+     */
+    public enum Place {
+        OVERRIDES, RESOLUTIONS, PNPM_FIELD, WORKSPACE_MANIFEST
     }
 
     /**
@@ -37,55 +71,36 @@ public final class PackageJsonOverrides {
      */
     public static List<DependencyPathSegment> parsePath(String path) {
         List<DependencyPathSegment> segments = new ArrayList<>();
-
-        String[] gtParts = path.split(">");
-
-        for (String gtPart : gtParts) {
-            if (gtPart.contains("/")) {
-                if (gtPart.startsWith("@")) {
-                    // Scoped package: @scope/pkg or @scope/pkg@version or @scope/pkg/dep (yarn-style)
-                    int firstSlash = gtPart.indexOf('/');
-                    String afterFirstSlash = gtPart.substring(firstSlash + 1);
-
-                    // Check if there's another '/' after the scope (yarn-style nesting)
-                    int secondSlash = afterFirstSlash.indexOf('/');
-                    if (secondSlash != -1) {
-                        // yarn-style: @scope/pkg/dep — split further
-                        String scopedPart = gtPart.substring(0, firstSlash + 1 + secondSlash);
-                        segments.add(parseSegment(scopedPart));
-
-                        String rest = afterFirstSlash.substring(secondSlash + 1);
-                        for (String subPart : rest.split("/")) {
-                            if (!subPart.isEmpty()) {
-                                segments.add(parseSegment(subPart));
-                            }
-                        }
-                    } else {
-                        // Simple scoped package: @scope/pkg or @scope/pkg@version
-                        segments.add(parseSegment(gtPart));
-                    }
+        for (String gtPart : path.split(">")) {
+            if (!gtPart.contains("/")) {
+                segments.add(parseSegment(gtPart));
+            } else if (gtPart.startsWith("@")) {
+                int firstSlash = gtPart.indexOf('/');
+                String afterFirstSlash = gtPart.substring(firstSlash + 1);
+                int secondSlash = afterFirstSlash.indexOf('/');
+                if (secondSlash == -1) {
+                    segments.add(parseSegment(gtPart));
                 } else {
-                    // Non-scoped with '/': yarn-style path like "express/accepts"
-                    for (String slashPart : gtPart.split("/")) {
-                        if (!slashPart.isEmpty()) {
-                            segments.add(parseSegment(slashPart));
+                    segments.add(parseSegment(gtPart.substring(0, firstSlash + 1 + secondSlash)));
+                    for (String subPart : afterFirstSlash.substring(secondSlash + 1).split("/")) {
+                        if (!subPart.isEmpty()) {
+                            segments.add(parseSegment(subPart));
                         }
                     }
                 }
             } else {
-                segments.add(parseSegment(gtPart));
+                for (String slashPart : gtPart.split("/")) {
+                    if (!slashPart.isEmpty()) {
+                        segments.add(parseSegment(slashPart));
+                    }
+                }
             }
         }
-
         return segments;
     }
 
-    /**
-     * Parses a single segment (package name, possibly with a {@code @version} suffix).
-     */
     private static DependencyPathSegment parseSegment(String part) {
         if (part.startsWith("@")) {
-            // Scoped package: find version separator after the slash
             int slashIndex = part.indexOf('/');
             if (slashIndex == -1) {
                 return new DependencyPathSegment(part, null);
@@ -93,13 +108,11 @@ public final class PackageJsonOverrides {
             String afterSlash = part.substring(slashIndex + 1);
             int atIndex = afterSlash.lastIndexOf('@');
             if (atIndex > 0) {
-                return new DependencyPathSegment(
-                        part.substring(0, slashIndex + 1 + atIndex),
+                return new DependencyPathSegment(part.substring(0, slashIndex + 1 + atIndex),
                         afterSlash.substring(atIndex + 1));
             }
             return new DependencyPathSegment(part, null);
         }
-
         int atIndex = part.lastIndexOf('@');
         if (atIndex > 0) {
             return new DependencyPathSegment(part.substring(0, atIndex), part.substring(atIndex + 1));
@@ -108,250 +121,325 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Why the package manager would not read an override written to {@code package.json}, or null when it reads it:
-     * pnpm 11 reads overrides from pnpm-workspace.yaml only, and bun warns that it does not support nested overrides.
+     * Where the package manager of the workspace root {@code root} reads an override.
      */
-    public static @Nullable String unreadOverride(PackageManager pm, @Nullable List<DependencyPathSegment> path) {
-        if (pm == PackageManager.Pnpm) {
-            return "pnpm 11 reads overrides from pnpm-workspace.yaml, not from package.json";
+    public static Place place(PackageManager pm, Json.Document root) {
+        switch (pm) {
+            case Bun:
+                return member(root, "overrides") == null && member(root, "resolutions") != null ?
+                        Place.RESOLUTIONS : Place.OVERRIDES;
+            case YarnClassic:
+            case YarnBerry:
+                return Place.RESOLUTIONS;
+            case Pnpm:
+                int release = pnpmRelease(root);
+                if (release == 9 || release == 10 && member(root, "pnpm") != null) {
+                    return Place.PNPM_FIELD;
+                }
+                return Place.WORKSPACE_MANIFEST;
+            case Npm:
+            default:
+                return Place.OVERRIDES;
         }
-        if (pm == PackageManager.Bun && path != null && !path.isEmpty()) {
+    }
+
+    /**
+     * Why the root's package manager would not read the override along {@code path}, or null when it would.
+     */
+    public static @Nullable String declined(PackageManager pm, Json.Document root,
+                                            @Nullable List<DependencyPathSegment> path) {
+        int depth = path == null ? 0 : path.size();
+        if (pm == PackageManager.Pnpm) {
+            int release = pnpmRelease(root);
+            if (release < 9 || release > 11) {
+                return "where pnpm " + (release < 0 ? "of the release the project names" : release + ".x") +
+                       " reads overrides is not known";
+            }
+            if (depth > 1) {
+                return "pnpm reads an override selector of one parent only (ERR_PNPM_INVALID_SELECTOR)";
+            }
+        } else if (pm == PackageManager.Bun && depth > 0) {
             return "bun does not support nested overrides";
+        } else if (pm == PackageManager.YarnBerry && depth > 1) {
+            return "Yarn reads a resolution of one parent only (YN0057)";
+        } else if (pm == PackageManager.YarnClassic && path != null) {
+            for (DependencyPathSegment segment : path) {
+                if (segment.getVersion() != null) {
+                    return "yarn matches a resolution's path by package names only, not " + segment.getName() +
+                           "@" + segment.getVersion();
+                }
+            }
+        }
+        Place place = place(pm, root);
+        String field = place == Place.OVERRIDES ? "overrides" : place == Place.RESOLUTIONS ? "resolutions" :
+                place == Place.PNPM_FIELD ? "pnpm" : null;
+        Json value = field == null ? null : member(root, field);
+        if (value != null && !(value instanceof Json.JsonObject)) {
+            return "the root's " + field + " is not an object";
+        }
+        if (place == Place.PNPM_FIELD && value != null) {
+            Json overrides = member((Json.JsonObject) value, "overrides");
+            if (overrides != null && !(overrides instanceof Json.JsonObject)) {
+                return "the root's pnpm.overrides is not an object";
+            }
         }
         return null;
     }
 
     /**
-     * Applies a transitive-dependency override to a package.json in its package manager's dialect, keeping the
-     * formatting for a global override and re-serializing for a nested path.
+     * The package.json with the override where the root's package manager reads it there; unchanged when it reads
+     * pnpm-workspace.yaml or the entry already holds {@code newVersion}.
      */
-    public static Json.Document applyOverride(Json.Document doc,
-                                              PackageManager pm,
-                                              String packageName,
-                                              String newVersion,
-                                              @Nullable List<DependencyPathSegment> path) {
-        boolean hasPath = path != null && !path.isEmpty();
-
-        switch (pm) {
-            case Npm:
-            case Bun:
-                return applyNpmOverride(doc, packageName, newVersion, path, hasPath);
-            case YarnClassic:
-            case YarnBerry:
-                return applyYarnResolution(doc, packageName, newVersion, path, hasPath);
-            case Pnpm:
-                return applyPnpmOverride(doc, packageName, newVersion, path, hasPath);
+    public static Json.Document applyOverride(Json.Document doc, PackageManager pm, String packageName,
+                                              String newVersion, @Nullable List<DependencyPathSegment> path) {
+        switch (place(pm, doc)) {
+            case OVERRIDES:
+                if (path == null || path.isEmpty()) {
+                    return setFlatEntry(doc, "overrides", packageName, newVersion);
+                }
+                if (newVersion.equals(nestedOverrideValue(doc, path, packageName))) {
+                    return doc;
+                }
+                return setNestedOverride(doc, path, packageName, newVersion);
+            case RESOLUTIONS:
+                return setFlatEntry(doc, "resolutions", resolutionKey(pm, packageName, path), newVersion);
+            case PNPM_FIELD:
+                return PackageJsonHelper.setNestedEntry(doc, "pnpm", "overrides", pnpmKey(packageName, path),
+                        newVersion);
+            case WORKSPACE_MANIFEST:
             default:
                 return doc;
         }
     }
 
-    // npm and Bun: "overrides", nested objects
-
-    private static Json.Document applyNpmOverride(Json.Document doc,
-                                                   String packageName,
-                                                   String newVersion,
-                                                   @Nullable List<DependencyPathSegment> path,
-                                                   boolean hasPath) {
-        if (!hasPath) {
-            // Simple case: set overrides[packageName] = newVersion (formatting-preserved)
-            return setFlatEntry(doc, "overrides", packageName, newVersion);
-        }
-
-        // Deep-nested case: build nested JSON string and reparse
-        String overrideValue = buildNpmNestedOverride(packageName, newVersion, path);
-        return mergeTopLevelObjectReparse(doc, "overrides", overrideValue);
+    /**
+     * pnpm-workspace.yaml with the override placed as the root's pnpm release writes a new key or entry, created when
+     * null; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors, documents).
+     */
+    public static String applyWorkspaceOverride(@Nullable String workspaceManifest, Json.Document root,
+                                                String packageName, String newVersion,
+                                                @Nullable List<DependencyPathSegment> path) {
+        return new WorkspaceManifest(workspaceManifest, pnpmRelease(root))
+                .withOverride(pnpmKey(packageName, path), newVersion);
     }
 
     /**
-     * Builds a JSON object string for an npm nested override, e.g.:
-     * {@code {"express":{"accepts":"^2.0.0"}}}.
+     * The major of the pnpm release the root names in {@code devEngines.packageManager} or {@code packageManager},
+     * pnpm's own precedence; 11 when it names none, the ported release; -1 when a range leaves it open.
      */
-    private static String buildNpmNestedOverride(String packageName, String newVersion,
-                                                  List<DependencyPathSegment> path) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(jsonString(packageName)).append(": ").append(jsonString(newVersion));
-
-        for (int i = path.size() - 1; i >= 0; i--) {
-            DependencyPathSegment seg = path.get(i);
-            String key = seg.getVersion() != null
-                    ? seg.getName() + "@" + seg.getVersion()
-                    : seg.getName();
-            sb.insert(0, jsonString(key) + ": {").append("}");
-        }
-        return "{" + sb + "}";
-    }
-
-    // Yarn classic and Berry: "resolutions", flat path keys
-
-    private static Json.Document applyYarnResolution(Json.Document doc,
-                                                      String packageName,
-                                                      String newVersion,
-                                                      @Nullable List<DependencyPathSegment> path,
-                                                      boolean hasPath) {
-        String key;
-        if (!hasPath) {
-            key = packageName;
-        } else {
-            // Yarn uses / separator: "express/accepts"
-            DependencyPathSegment parent = path.get(path.size() - 1);
-            String parentKey = parent.getVersion() != null
-                    ? parent.getName() + "@" + parent.getVersion()
-                    : parent.getName();
-            key = parentKey + "/" + packageName;
-        }
-        return setFlatEntry(doc, "resolutions", key, newVersion);
-    }
-
-    // pnpm: "pnpm.overrides", flat > path keys
-
-    private static Json.Document applyPnpmOverride(Json.Document doc,
-                                                    String packageName,
-                                                    String newVersion,
-                                                    @Nullable List<DependencyPathSegment> path,
-                                                    boolean hasPath) {
-        String key;
-        if (!hasPath) {
-            key = packageName;
-        } else {
-            StringBuilder sb = new StringBuilder();
-            for (DependencyPathSegment seg : path) {
-                if (sb.length() > 0) sb.append(">");
-                sb.append(seg.getVersion() != null ? seg.getName() + "@" + seg.getVersion() : seg.getName());
+    static int pnpmRelease(Json.Document root) {
+        Json devEngines = member(root, "devEngines");
+        Json engine = devEngines instanceof Json.JsonObject ?
+                member((Json.JsonObject) devEngines, "packageManager") : null;
+        if (engine instanceof Json.Array && !((Json.Array) engine).getValues().isEmpty()) {
+            List<JsonValue> engines = ((Json.Array) engine).getValues();
+            engine = engines.get(0);
+            for (JsonValue candidate : engines) {
+                if ("pnpm".equals(literal(candidate, "name"))) {
+                    engine = candidate;
+                    break;
+                }
             }
-            sb.append(">").append(packageName);
-            key = sb.toString();
         }
-        return setPnpmOverridesEntry(doc, key, newVersion);
+        String name = engine == null ? null : literal(engine, "name");
+        if (name != null && !name.isEmpty()) {
+            String range = "pnpm".equals(name) ? literal(engine, "version") : null;
+            return range != null && NodeSemver.validRange(range, NodeSemver.Options.DEFAULT) != null ?
+                    releaseOf(range) : 11;
+        }
+        Json packageManager = member(root, "packageManager");
+        String named = packageManager instanceof Json.Literal ? literalString(packageManager) : null;
+        if (named != null && named.startsWith("pnpm@") && !named.contains(":")) {
+            String version = named.substring("pnpm@".length()).split("\\+", -1)[0];
+            if (version.equals(NodeSemver.valid(version, NodeSemver.Options.DEFAULT))) {
+                return Integer.parseInt(version.substring(0, version.indexOf('.')));
+            }
+        }
+        return 11;
     }
 
-    /**
-     * Sets {@code topLevelKey[entryKey] = entryValue} in a flat top-level object,
-     * creating the parent object if absent. Preserves formatting.
-     */
-    private static Json.Document setFlatEntry(Json.Document doc,
-                                               String topLevelKey,
-                                               String entryKey,
-                                               String entryValue) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
-        Json.JsonObject root = (Json.JsonObject) doc.getValue();
-
-        Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
-        if (existingScope == null) {
-            return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
+    private static int releaseOf(String range) {
+        if (NodeSemver.satisfies(PNPM_RELEASE, range, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            return 11;
         }
+        int found = -1;
+        for (int major = 9; major <= 12; major++) {
+            if (NodeSemver.intersects(range, "^" + major + ".0.0", NodeSemver.Options.DEFAULT)) {
+                if (found != -1) {
+                    return -1;
+                }
+                found = major;
+            }
+        }
+        return found;
+    }
 
-        for (org.openrewrite.json.tree.Json m : existingScope.getMembers()) {
-            if (m instanceof Json.Member) {
-                Json.Member member = (Json.Member) m;
-                if (entryKey.equals(literalString(member.getKey()))) {
-                    // If already set to the same value, return unchanged to stay single-cycle
-                    if (entryValue.equals(literalString(member.getValue()))) {
+    private static String pnpmKey(String packageName, @Nullable List<DependencyPathSegment> path) {
+        return path == null || path.isEmpty() ? packageName : segment(path.get(path.size() - 1)) + ">" + packageName;
+    }
+
+    private static String resolutionKey(PackageManager pm, String packageName,
+                                        @Nullable List<DependencyPathSegment> path) {
+        if (path == null || path.isEmpty()) {
+            return packageName;
+        }
+        if (pm == PackageManager.YarnBerry) {
+            return segment(path.get(path.size() - 1)) + "/" + packageName;
+        }
+        StringBuilder key = new StringBuilder("**/");
+        for (DependencyPathSegment segment : path) {
+            key.append(segment.getName()).append('/');
+        }
+        return key.append(packageName).toString();
+    }
+
+    private static String segment(DependencyPathSegment segment) {
+        return segment.getVersion() == null ? segment.getName() : segment.getName() + "@" + segment.getVersion();
+    }
+
+    private static Json.Document setNestedOverride(Json.Document doc, List<DependencyPathSegment> path,
+                                                   String packageName, String newVersion) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        String indent = PackageJsonHelper.detectIndentUnit(root);
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            // an earlier recipe's warning would otherwise print into the JSON
+            JsonNode rootNode = mapper.readTree(doc.printAll(
+                    new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)));
+            ObjectNode overrides = rootNode.path("overrides").isObject() ?
+                    (ObjectNode) rootNode.get("overrides") : mapper.createObjectNode();
+            ObjectNode at = overrides;
+            for (DependencyPathSegment seg : path) {
+                String key = segment(seg);
+                JsonNode existing = at.get(key);
+                if (existing != null && existing.isObject()) {
+                    at = (ObjectNode) existing;
+                } else {
+                    ObjectNode nested = at.putObject(key);
+                    if (existing != null && existing.isTextual()) {
+                        nested.put(".", existing.asText());
+                    }
+                    at = nested;
+                }
+            }
+            if (at.path(packageName).isObject()) {
+                ((ObjectNode) at.get(packageName)).put(".", newVersion);
+            } else {
+                at.put(packageName, newVersion);
+            }
+
+            JsonValue value = parseFragment(doc, mapper, overrides, indent);
+            if (findObjectMember(root, "overrides") != null) {
+                return doc.withValue(replaceMemberValue(root, "overrides", value));
+            }
+            List<JsonRightPadded<Json>> members = new ArrayList<>(root.getPadding().getMembers());
+            Space closing = Space.EMPTY;
+            if (!members.isEmpty()) {
+                int last = members.size() - 1;
+                closing = members.get(last).getAfter();
+                members.set(last, members.get(last).withAfter(Space.EMPTY));
+            }
+            members.add(new JsonRightPadded<>(
+                    PackageJsonHelper.makeMember("overrides", value, Space.build("\n" + indent, emptyList())),
+                    closing, Markers.EMPTY));
+            return doc.withValue(root.getPadding().withMembers(members));
+        } catch (IOException e) {
+            throw new IllegalStateException("could not write the override of " + packageName, e);
+        }
+    }
+
+    private static JsonValue parseFragment(Json.Document doc, ObjectMapper mapper, ObjectNode overrides,
+                                           String indent) throws IOException {
+        DefaultPrettyPrinter printer = new DefaultPrettyPrinter() {
+            @Override
+            public DefaultPrettyPrinter createInstance() {
+                return this;
+            }
+
+            @Override
+            public void writeObjectFieldValueSeparator(JsonGenerator g) throws IOException {
+                g.writeRaw(": ");
+            }
+        };
+        printer.indentObjectsWith(new DefaultIndenter(indent, "\n"));
+        String printed = mapper.writer(printer).writeValueAsString(overrides);
+        StringBuilder sb = new StringBuilder();
+        String[] lines = printed.split("\n", -1);
+        for (int i = 0; i < lines.length; i++) {
+            sb.append(i == 0 ? "" : "\n" + indent).append(lines[i]);
+        }
+        Json.Document holder = PackageJsonHelper.reparseJson(doc, sb.toString());
+        if (!(holder.getValue() instanceof Json.JsonObject)) {
+            throw new IllegalStateException("the overrides object did not reparse as one");
+        }
+        return ((Json.JsonObject) holder.getValue()).withPrefix(Space.build(" ", emptyList()));
+    }
+
+    private static @Nullable String nestedOverrideValue(Json.Document doc, List<DependencyPathSegment> path,
+                                                        String packageName) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return null;
+        }
+        Json.JsonObject at = findObjectMember((Json.JsonObject) doc.getValue(), "overrides");
+        for (DependencyPathSegment seg : path) {
+            if (at == null) {
+                return null;
+            }
+            at = findObjectMember(at, segment(seg));
+        }
+        if (at == null) {
+            return null;
+        }
+        Json.JsonObject pinned = findObjectMember(at, packageName);
+        String key = pinned == null ? packageName : ".";
+        for (Json m : (pinned == null ? at : pinned).getMembers()) {
+            if (m instanceof Json.Member && key.equals(literalString(((Json.Member) m).getKey()))) {
+                return literalString(((Json.Member) m).getValue());
+            }
+        }
+        return null;
+    }
+
+    private static Json.Document setFlatEntry(Json.Document doc, String topLevelKey, String entryKey,
+                                              String entryValue) {
+        if (!(doc.getValue() instanceof Json.JsonObject)) {
+            return doc;
+        }
+        Json.JsonObject root = (Json.JsonObject) doc.getValue();
+        Json.JsonObject existingScope = findObjectMember(root, topLevelKey);
+        if (existingScope != null) {
+            for (Json m : existingScope.getMembers()) {
+                if (m instanceof Json.Member && entryKey.equals(literalString(((Json.Member) m).getKey()))) {
+                    if (entryValue.equals(literalString(((Json.Member) m).getValue()))) {
                         return doc;
                     }
-                    Json.JsonObject updated = replaceMemberValue(existingScope, entryKey, entryValue);
+                    Json.JsonObject updated = replaceMemberValue(existingScope, entryKey,
+                            makeStringLiteral(entryValue));
                     return doc.withValue(replaceMemberValue(root, topLevelKey, updated));
                 }
             }
         }
-
         return PackageJsonHelper.addDependency(doc, entryKey, entryValue, topLevelKey);
     }
 
-    /**
-     * Sets {@code pnpm.overrides[key] = value}, creating {@code pnpm} and/or
-     * {@code pnpm.overrides} objects as needed. Preserves formatting.
-     */
-    private static Json.Document setPnpmOverridesEntry(Json.Document doc, String key, String value) {
-        if (!(doc.getValue() instanceof Json.JsonObject)) return doc;
-        Json.JsonObject root = (Json.JsonObject) doc.getValue();
-
-        Json.JsonObject pnpmObj = findObjectMember(root, "pnpm");
-        if (pnpmObj == null) {
-            // no pnpm object yet: build pnpm: { overrides: { key: value } } by reparsing
-            String newJson = buildPnpmSnippet(doc, key, value);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        }
-
-        // a pnpm object exists: rebuild its overrides by reparsing
-        String newJson = buildPnpmSnippet(doc, key, value);
-        return PackageJsonHelper.reparseJson(doc, newJson);
+    private static @Nullable Json member(Json.Document doc, String name) {
+        return doc.getValue() instanceof Json.JsonObject ? member((Json.JsonObject) doc.getValue(), name) : null;
     }
 
-    /**
-     * Merges {@code newObjectJson} into the existing {@code topLevelKey} object
-     * (or creates it) by re-serializing the whole document.
-     */
-    private static Json.Document mergeTopLevelObjectReparse(Json.Document doc,
-                                                             String topLevelKey,
-                                                             String newObjectJson) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> newFragment =
-                    mapper.readValue(newObjectJson, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> existing =
-                    (java.util.Map<String, Object>) root.getOrDefault(topLevelKey, new java.util.LinkedHashMap<>());
-            java.util.Map<String, Object> merged = mergeDeep(existing, newFragment);
-            root.put(topLevelKey, merged);
-
-            String newJson = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-            return PackageJsonHelper.reparseJson(doc, newJson);
-        } catch (Exception e) {
-            return doc;
-        }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static java.util.Map<String, Object> mergeDeep(java.util.Map<String, Object> base,
-                                                             java.util.Map<String, Object> overlay) {
-        java.util.Map<String, Object> result = new java.util.LinkedHashMap<>(base);
-        for (java.util.Map.Entry<String, Object> e : overlay.entrySet()) {
-            Object existing = result.get(e.getKey());
-            if (existing instanceof java.util.Map && e.getValue() instanceof java.util.Map) {
-                result.put(e.getKey(), mergeDeep(
-                        (java.util.Map<String, Object>) existing,
-                        (java.util.Map<String, Object>) e.getValue()));
-            } else {
-                result.put(e.getKey(), e.getValue());
+    private static @Nullable Json member(Json.JsonObject obj, String name) {
+        for (Json m : obj.getMembers()) {
+            if (m instanceof Json.Member && name.equals(literalString(((Json.Member) m).getKey()))) {
+                return ((Json.Member) m).getValue();
             }
         }
-        return result;
+        return null;
     }
 
-    /**
-     * Builds a new full JSON document string with the pnpm.overrides[key] = value set.
-     */
-    private static String buildPnpmSnippet(Json.Document doc, String key, String value) {
-        String serialized = doc.printAll();
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper =
-                    new com.fasterxml.jackson.databind.ObjectMapper();
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> root =
-                    mapper.readValue(serialized, java.util.Map.class);
-
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> pnpm =
-                    (java.util.Map<String, Object>) root.computeIfAbsent("pnpm",
-                            k -> new java.util.LinkedHashMap<>());
-            @SuppressWarnings("unchecked")
-            java.util.Map<String, Object> overrides =
-                    (java.util.Map<String, Object>) pnpm.computeIfAbsent("overrides",
-                            k -> new java.util.LinkedHashMap<>());
-            overrides.put(key, value);
-
-            return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(root);
-        } catch (Exception e) {
-            return serialized;
-        }
+    private static @Nullable String literal(Json obj, String name) {
+        return obj instanceof Json.JsonObject ? literalString(member((Json.JsonObject) obj, name)) : null;
     }
 
     private static @Nullable String literalString(@Nullable Object node) {
@@ -363,57 +451,356 @@ public final class PackageJsonOverrides {
     }
 
     private static Json.@Nullable JsonObject findObjectMember(Json.JsonObject obj, String name) {
-        for (org.openrewrite.json.tree.Json m : obj.getMembers()) {
-            if (m instanceof Json.Member) {
-                Json.Member member = (Json.Member) m;
-                if (name.equals(literalString(member.getKey()))
-                        && member.getValue() instanceof Json.JsonObject) {
-                    return (Json.JsonObject) member.getValue();
-                }
-            }
-        }
-        return null;
+        Json value = member(obj, name);
+        return value instanceof Json.JsonObject ? (Json.JsonObject) value : null;
     }
 
-    /**
-     * Returns a copy of {@code obj} with the string value of member {@code key}
-     * replaced by a new literal for {@code newValue}.
-     */
-    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key, String newValue) {
-        org.openrewrite.json.tree.JsonValue newLit = makeStringLiteral(newValue);
-        return replaceMemberValue(obj, key, newLit);
-    }
-
-    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key,
-            org.openrewrite.json.tree.JsonValue newValue) {
-        java.util.List<org.openrewrite.json.tree.JsonRightPadded<org.openrewrite.json.tree.Json>> members =
-                new java.util.ArrayList<>(obj.getPadding().getMembers());
+    private static Json.JsonObject replaceMemberValue(Json.JsonObject obj, String key, JsonValue newValue) {
+        List<JsonRightPadded<Json>> members = new ArrayList<>(obj.getPadding().getMembers());
         for (int i = 0; i < members.size(); i++) {
-            org.openrewrite.json.tree.Json elem = members.get(i).getElement();
-            if (elem instanceof Json.Member) {
+            Json elem = members.get(i).getElement();
+            if (elem instanceof Json.Member && key.equals(literalString(((Json.Member) elem).getKey()))) {
                 Json.Member member = (Json.Member) elem;
-                if (key.equals(literalString(member.getKey()))) {
-                    org.openrewrite.json.tree.JsonValue spaced = newValue;
-                    if (spaced instanceof Json.Literal) {
-                        spaced = ((Json.Literal) spaced).withPrefix(member.getValue().getPrefix());
-                    }
-                    members.set(i, members.get(i).withElement(member.withValue(spaced)));
-                    break;
-                }
+                JsonValue spaced = newValue instanceof Json.Literal ?
+                        ((Json.Literal) newValue).withPrefix(member.getValue().getPrefix()) : newValue;
+                members.set(i, members.get(i).withElement(member.withValue(spaced)));
+                break;
             }
         }
         return obj.getPadding().withMembers(members);
     }
 
     private static Json.Literal makeStringLiteral(String value) {
-        return new Json.Literal(
-                org.openrewrite.Tree.randomId(),
-                org.openrewrite.json.tree.Space.EMPTY,
-                org.openrewrite.marker.Markers.EMPTY,
-                "\"" + value + "\"", value);
+        return new Json.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "\"" + value + "\"", value);
     }
 
-    private static String jsonString(String value) {
-        return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    /**
+     * pnpm-workspace.yaml as lines, with its top-level entries and those of its {@code overrides}, edited in place
+     * where pnpm's workspace manifest writer puts a new key or entry.
+     */
+    private static final class WorkspaceManifest {
+        private static final Pattern PLAIN_UNSAFE = Pattern.compile(
+                "^[\\n\\t ,\\[\\]{}#&*!|>'\"%@`]|^[?-]$|^[?-][ \\t]|[\\n:][ \\t]|[ \\t]\\n|[\\n\\t ]#|[\\n\\t :]$");
+        private static final Pattern CORE_SCHEMA = Pattern.compile(
+                "^(?:~|[Nn]ull|NULL)?$|^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$|^0o[0-7]+$|^[-+]?[0-9]+$|^0x[0-9a-fA-F]+$|" +
+                "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.nan|\\.NaN|\\.NAN)$|" +
+                "^[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)[eE][-+]?[0-9]+$|^[-+]?(?:\\.[0-9]+|[0-9]+\\.[0-9]*)$");
+        private static final Pattern DOCUMENT_MARKER = Pattern.compile("^(%|---|\\.\\.\\.)", Pattern.MULTILINE);
+
+        private final @Nullable String text;
+        private final int release;
+        private final List<String> lines = new ArrayList<>();
+        private final List<Entry> entries;
+
+        WorkspaceManifest(@Nullable String text, int release) {
+            this.text = text;
+            this.release = release;
+            if (text == null) {
+                entries = emptyList();
+                return;
+            }
+            if (text.indexOf('\r') >= 0) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml has CR line ends");
+            }
+            lines.addAll(Arrays.asList(text.split("\n", -1)));
+            if (lines.get(lines.size() - 1).isEmpty()) {
+                lines.remove(lines.size() - 1);
+            }
+            entries = scan(0, lines.size(), true);
+            Object loaded = new Yaml(new SafeConstructor(new LoaderOptions())).load(text);
+            if (!keys(entries).equals(keysOf(loaded))) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping of plain keys");
+            }
+            Entry overrides = entry(entries, "overrides");
+            Object loadedOverrides = overrides == null ? null : ((Map<?, ?>) loaded).get("overrides");
+            if (overrides != null && (overrides.inline != null ||
+                                      !keys(children(overrides)).equals(keysOf(loadedOverrides)))) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml's overrides is not a block mapping");
+            }
+        }
+
+        String withOverride(String key, String value) {
+            String entry = scalar(key) + ": " + scalar(value);
+            List<String> out = new ArrayList<>(lines);
+            Entry overrides = entry(entries, "overrides");
+            if (entries.isEmpty()) {
+                if (!out.isEmpty() && !out.get(out.size() - 1).trim().isEmpty()) {
+                    out.add("");
+                }
+                out.add("overrides:");
+                out.add("  " + entry);
+            } else if (overrides == null) {
+                out.addAll(topLevelIndex(), topLevelBlock(entry));
+            } else {
+                List<Entry> children = children(overrides);
+                Entry existing = entry(children, key);
+                if (existing != null) {
+                    if (existing.inline == null || existing.end > existing.keyLine + 1) {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml's override of " + key +
+                                                           " is not a scalar");
+                    }
+                    if (value.equals(unquote(existing.inline))) {
+                        return requireNonNull(text);
+                    }
+                    out.set(existing.keyLine, lines.get(existing.keyLine).substring(0, existing.valueStart) +
+                                              restyle(existing.inline, value) + existing.comment);
+                } else if (children.isEmpty()) {
+                    out.add(overrides.keyLine + 1, "  " + entry);
+                } else {
+                    String indent = lines.get(children.get(0).keyLine).substring(0, children.get(0).indent);
+                    int at = insertionIndex(keys(children), key);
+                    out.add(at < children.size() ? children.get(at).prefixStart :
+                            children.get(children.size() - 1).end, indent + entry);
+                }
+            }
+            return String.join("\n", out) + "\n";
+        }
+
+        private int topLevelIndex() {
+            int at = insertionIndex(keys(entries), "overrides");
+            return at < entries.size() ? entries.get(at).prefixStart : entries.get(entries.size() - 1).end;
+        }
+
+        // pnpm 11 gives a new top-level key a blank line before it as its neighbours have one
+        private List<String> topLevelBlock(String entry) {
+            int at = insertionIndex(keys(entries), "overrides");
+            boolean spaceBefore = false;
+            boolean spaceBeforeNext = false;
+            if (release >= 11) {
+                boolean blankLineStyle = entries.size() > 1;
+                for (int i = 1; i < entries.size(); i++) {
+                    blankLineStyle &= entries.get(i).spaceBefore;
+                }
+                if (blankLineStyle) {
+                    spaceBefore = at > 0;
+                    spaceBeforeNext = at == 0 && !entries.get(0).spaceBefore;
+                } else if (at > 0) {
+                    spaceBefore = at < entries.size() ? entries.get(at).spaceBefore : entries.get(at - 1).spaceBefore;
+                }
+            }
+            List<String> block = new ArrayList<>();
+            if (spaceBefore) {
+                block.add("");
+            }
+            block.add("overrides:");
+            block.add("  " + entry);
+            int trailer = entries.get(entries.size() - 1).end;
+            if (spaceBeforeNext || at == entries.size() && trailer < lines.size() &&
+                                   !lines.get(trailer).trim().isEmpty()) {
+                block.add("");
+            }
+            return block;
+        }
+
+        // pnpm 11 sorts a new key in where a level's keys were sorted (packages first or not) and appends it
+        // otherwise; pnpm 10 sorts every level, packages first
+        private int insertionIndex(List<String> keys, String key) {
+            if (release >= 11 && !sorted(keys)) {
+                return keys.size();
+            }
+            boolean packagesFirst = release < 11 || keys.isEmpty() || "packages".equals(keys.get(0));
+            int at = 0;
+            for (String existing : keys) {
+                if (compare(existing, key, packagesFirst) < 0) {
+                    at++;
+                }
+            }
+            return at;
+        }
+
+        private static boolean sorted(List<String> keys) {
+            int start = !keys.isEmpty() && "packages".equals(keys.get(0)) ? 1 : 0;
+            for (int i = start + 1; i < keys.size(); i++) {
+                if (keys.get(i - 1).compareTo(keys.get(i)) > 0) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        private static int compare(String left, String right, boolean packagesFirst) {
+            if (packagesFirst && "packages".equals(left) != "packages".equals(right)) {
+                return "packages".equals(left) ? -1 : 1;
+            }
+            return left.compareTo(right);
+        }
+
+        // the entries of lines [from, to) whose keys sit at the column of the first key there
+        private List<Entry> scan(int from, int to, boolean topLevel) {
+            List<Entry> found = new ArrayList<>();
+            int column = -1;
+            int lastContent = from - 1;
+            Entry current = null;
+            for (int i = from; i < to; i++) {
+                String line = lines.get(i);
+                String trimmed = line.trim();
+                int indent = 0;
+                while (indent < line.length() && (line.charAt(indent) == ' ' || line.charAt(indent) == '\t')) {
+                    indent++;
+                }
+                if (trimmed.isEmpty() || trimmed.startsWith("#") && (column < 0 || indent <= column)) {
+                    continue;
+                }
+                if (topLevel && (line.startsWith("---") || line.startsWith("...") || line.startsWith("%"))) {
+                    throw new IllegalArgumentException("pnpm-workspace.yaml has document markers");
+                }
+                if (column < 0) {
+                    column = indent;
+                }
+                boolean sequenceItem = "-".equals(trimmed) || trimmed.startsWith("- ");
+                if (indent == column && !sequenceItem) {
+                    if (current != null) {
+                        current.end = lastContent + 1;
+                    }
+                    current = Entry.parse(line, i, indent, lastContent + 1, blankBetween(lastContent + 1, i));
+                    found.add(current);
+                } else if (indent < column || current == null) {
+                    throw new IllegalArgumentException("pnpm-workspace.yaml is not a block mapping");
+                }
+                lastContent = i;
+            }
+            if (current != null) {
+                current.end = lastContent + 1;
+            }
+            return found;
+        }
+
+        private List<Entry> children(Entry parent) {
+            return parent.inline != null ? emptyList() : scan(parent.keyLine + 1, parent.end, false);
+        }
+
+        private boolean blankBetween(int from, int to) {
+            for (int i = from; i < to; i++) {
+                if (lines.get(i).trim().isEmpty()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static @Nullable Entry entry(List<Entry> entries, String key) {
+            for (Entry e : entries) {
+                if (e.key.equals(key)) {
+                    return e;
+                }
+            }
+            return null;
+        }
+
+        private static List<String> keys(List<Entry> entries) {
+            List<String> keys = new ArrayList<>();
+            for (Entry e : entries) {
+                keys.add(e.key);
+            }
+            return keys;
+        }
+
+        private static List<?> keysOf(@Nullable Object loaded) {
+            if (loaded == null) {
+                return emptyList();
+            }
+            if (!(loaded instanceof Map)) {
+                throw new IllegalArgumentException("pnpm-workspace.yaml is not a mapping");
+            }
+            return new ArrayList<>(((Map<?, ?>) loaded).keySet());
+        }
+
+        static String scalar(String value) {
+            if (PLAIN_UNSAFE.matcher(value).find() || CORE_SCHEMA.matcher(value).find() ||
+                DOCUMENT_MARKER.matcher(value).find()) {
+                return value.contains("'") && !value.contains("\"") ? doubleQuoted(value) :
+                        "'" + value.replace("'", "''") + "'";
+            }
+            return value;
+        }
+
+        private static String doubleQuoted(String value) {
+            return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+        }
+
+        // a scalar keeps its quotes when its value changes
+        private static String restyle(String old, String value) {
+            if (old.startsWith("'")) {
+                return "'" + value.replace("'", "''") + "'";
+            }
+            return old.startsWith("\"") ? doubleQuoted(value) : scalar(value);
+        }
+
+        private static String unquote(String scalar) {
+            if (scalar.length() >= 2 && scalar.startsWith("'") && scalar.endsWith("'")) {
+                return scalar.substring(1, scalar.length() - 1).replace("''", "'");
+            }
+            if (scalar.length() >= 2 && scalar.startsWith("\"") && scalar.endsWith("\"")) {
+                return scalar.substring(1, scalar.length() - 1).replace("\\\"", "\"").replace("\\\\", "\\");
+            }
+            return scalar;
+        }
+
+        private static final class Entry {
+            final String key;
+            final int keyLine;
+            final int indent;
+            final int prefixStart;
+            final boolean spaceBefore;
+            final int valueStart;
+            final @Nullable String inline;
+            final String comment;
+            int end;
+
+            Entry(String key, int keyLine, int indent, int prefixStart, boolean spaceBefore, int valueStart,
+                  @Nullable String inline, String comment) {
+                this.key = key;
+                this.keyLine = keyLine;
+                this.indent = indent;
+                this.prefixStart = prefixStart;
+                this.spaceBefore = spaceBefore;
+                this.valueStart = valueStart;
+                this.inline = inline;
+                this.comment = comment;
+            }
+
+            static Entry parse(String line, int keyLine, int indent, int prefixStart, boolean spaceBefore) {
+                char first = line.charAt(indent);
+                int colon;
+                String key;
+                if (first == '\'' || first == '"') {
+                    int close = indent + 1;
+                    while (close < line.length() && line.charAt(close) != first) {
+                        close += first == '"' && line.charAt(close) == '\\' ||
+                                 first == '\'' && line.startsWith("''", close) ? 2 : 1;
+                    }
+                    key = unquote(line.substring(indent, Math.min(close + 1, line.length())));
+                    colon = close + 1;
+                    while (colon < line.length() && line.charAt(colon) == ' ') {
+                        colon++;
+                    }
+                    if (colon >= line.length() || line.charAt(colon) != ':') {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml has a key it cannot read: " + line);
+                    }
+                } else {
+                    colon = line.indexOf(':', indent);
+                    while (colon >= 0 && colon + 1 < line.length() && line.charAt(colon + 1) != ' ' &&
+                           line.charAt(colon + 1) != '\t') {
+                        colon = line.indexOf(':', colon + 1);
+                    }
+                    if (colon < 0 || first == '?' || first == '{' || first == '[') {
+                        throw new IllegalArgumentException("pnpm-workspace.yaml has a key it cannot read: " + line);
+                    }
+                    key = line.substring(indent, colon).trim();
+                }
+                int valueStart = colon + 1;
+                while (valueStart < line.length() && line.charAt(valueStart) == ' ') {
+                    valueStart++;
+                }
+                String rest = line.substring(valueStart);
+                int hash = rest.startsWith("'") || rest.startsWith("\"") ? -1 : rest.indexOf(" #");
+                String value = (hash < 0 ? rest : rest.substring(0, hash)).trim();
+                if (!value.isEmpty() && "&*|>!{[".indexOf(value.charAt(0)) >= 0) {
+                    throw new IllegalArgumentException("pnpm-workspace.yaml has a value it does not edit: " + line);
+                }
+                return new Entry(key, keyLine, indent, prefixStart, spaceBefore, valueStart,
+                        value.isEmpty() ? null : value, hash < 0 ? "" : rest.substring(hash));
+            }
+        }
     }
 }

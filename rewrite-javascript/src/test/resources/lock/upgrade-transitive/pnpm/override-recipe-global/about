@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes overrides is-number 7.0.0 where no pnpm-workspace.yaml exists (config set), then installs.

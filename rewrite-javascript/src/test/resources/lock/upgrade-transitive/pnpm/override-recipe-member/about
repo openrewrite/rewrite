@@ -1,0 +1,1 @@
+pnpm 11.2.2 writes overrides is-number 7.0.0 into the workspace root's pnpm-workspace.yaml while only member a reaches is-number (config set at the root).

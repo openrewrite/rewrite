@@ -1,0 +1,1 @@
+pnpm 10.34.6 whose package.json has a pnpm field: the recipe adds is-number 7.0.0 to pnpm.overrides, as pnpm 10 writes.

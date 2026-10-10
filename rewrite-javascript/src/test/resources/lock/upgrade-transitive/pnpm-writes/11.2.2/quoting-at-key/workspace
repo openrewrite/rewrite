@@ -1,0 +1,4 @@
+packages:
+  - .
+overrides:
+  '@types/node': '>=18.0.0'

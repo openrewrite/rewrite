@@ -1,0 +1,4 @@
+overrides:
+  wrappy: 1.0.2
+  left-pad: 1.3.0
+  is-number: 7.0.0
