@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -67,16 +68,16 @@ class EditedFilesTest {
     @Test
     void everyPortReadsTheEditedVersion() {
         LockDirectory dir = LockDirectory.of(REQUEST);
-        assertThat(PnpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getFiles().get("pnpm-workspace.yaml"))
+        assertThat(PnpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH).getFiles().get("pnpm-workspace.yaml"))
           .endsWith("catalog:\n  ms: 2.1.3\n");
-        assertThat(YarnBerryInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getConfigFiles().get(".yarnrc.yml"))
-          .isEqualTo("nodeLinker: node-modules\n");
-        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN).getConfigFiles().get(".yarnrc"))
+        assertThat(YarnBerryInputs.from(dir, Host.UNKNOWN, Instant.EPOCH, null, null).getConfigFiles()
+          .get(".yarnrc.yml")).isEqualTo("nodeLinker: node-modules\n");
+        assertThat(YarnClassicInputs.from(dir, Host.UNKNOWN, null, null).getConfigFiles().get(".yarnrc"))
           .isEqualTo("--install.frozen-lockfile false\n");
-        assertThat(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getNpmrc())
+        assertThat(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH).getNpmrc())
           .isEqualTo("registry=https://edited.example/\n");
-        assertThat(NpmInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getManifests().get("packages/a"))
+        assertThat(NpmInputs.from(dir, null, Host.UNKNOWN, Instant.EPOCH).getManifests().get("packages/a"))
           .contains("catalog:");
-        assertThat(BunInputs.from(dir, Host.UNKNOWN, Instant.EPOCH).getBunfig()).isEqualTo("[install]\n");
+        assertThat(BunInputs.from(dir, emptyList(), Host.UNKNOWN, Instant.EPOCH).getBunfig()).isEqualTo("[install]\n");
     }
 }

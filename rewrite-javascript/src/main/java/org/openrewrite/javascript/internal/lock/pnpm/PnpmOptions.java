@@ -119,7 +119,7 @@ public final class PnpmOptions {
 
     /**
      * {@code getConfig} over the project's pnpm-workspace.yaml and .npmrc (null without one), the user's .npmrc as
-     * {@link RegistryMetadata#userConfig} gives it, the root manifest and the environment (null when unknown).
+     * the inputs give it (the host's registries), the root manifest and the environment (null when unknown).
      */
     @SuppressWarnings("unchecked")
     static PnpmOptions load(@Nullable String workspaceManifest, @Nullable String npmrc, Map<String, String> userNpmrc,

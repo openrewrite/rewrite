@@ -101,6 +101,13 @@ public final class PnpmLockRegenerator {
         Host host = Host.UNKNOWN;
 
         /**
+         * The host's registries as the user's .npmrc pnpm reads under the project's: {@code registry} and each
+         * {@code @scope:registry}; empty when the host names none.
+         */
+        @Builder.Default
+        Map<String, String> userConfig = Collections.emptyMap();
+
+        /**
          * The files the project holds relative to its root, when the host says.
          */
         @Nullable
@@ -187,7 +194,7 @@ public final class PnpmLockRegenerator {
      * main.ts up to the command, then the install command up to the resolution of the lock.
      */
     Install.Result install() {
-        Main main = new Main(inputs, registry.userConfig(), envInstaller, stores, lockFile);
+        Main main = new Main(inputs, envInstaller, stores, lockFile);
         PnpmOptions options = main.config();
         boolean workspace = options.getWorkspacePackagePatterns() != null;
         String lockfileDir = workspace ? options.getLockfileDir(inputs.getLockDir()) : null;

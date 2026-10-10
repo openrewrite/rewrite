@@ -206,7 +206,7 @@ class SwitchCliVersionTest {
         }
         PnpmLockRegenerator.Inputs built = inputs.build();
         EnvLockfile.OnDisk lockFile = new EnvLockfile.OnDisk(MAIN_DOCUMENT);
-        Main main = new Main(built, Collections.emptyMap(), new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
+        Main main = new Main(built, new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
           new CreateNewStoreController(NO_REGISTRY, NOW), lockFile);
         main.checkWantedPackageManager(main.config());
         return main;

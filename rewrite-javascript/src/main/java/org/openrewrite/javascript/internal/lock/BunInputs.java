@@ -28,18 +28,15 @@ import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
-import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toList;
 
 /**
  * The Bun regenerator's inputs: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and
@@ -68,19 +65,14 @@ public final class BunInputs {
         if (!explicit.isEmpty() || marker == null || marker.getNpmrcConfigs() == null) {
             return explicit;
         }
-        List<Npmrc> user = marker.getNpmrcConfigs().stream()
-                .filter(npmrc -> npmrc.getScope() == NpmrcScope.User).collect(toList());
-        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker.withNpmrcConfigs(user), env);
+        NodeRegistries registries = RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.User));
         List<NodeRegistry> named = new ArrayList<>();
-        if (user.stream().anyMatch(npmrc -> npmrc.getProperties().containsKey("registry"))) {
+        if (marker.getNpmrcConfigs().stream().anyMatch(npmrc -> npmrc.getScope() == NpmrcScope.User &&
+                                                                npmrc.getProperties().containsKey("registry"))) {
             named.add(registries.getDefaultRegistry());
         }
         named.addAll(registries.getByScope().values());
         return named;
-    }
-
-    static Inputs from(LockDirectory dir, Host host, Instant now) {
-        return from(dir, emptyList(), host, now);
     }
 
     /**

@@ -37,6 +37,7 @@ import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
+import static org.openrewrite.javascript.internal.registry.NodeRegistries.hasCredentials;
 
 /**
  * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, the
@@ -74,10 +75,6 @@ final class YarnBerryInputs {
     static NodeRegistries hostCredentials(ExecutionContext ctx, @Nullable NodeResolutionResult marker,
                                           Environment env) {
         return YarnClassicInputs.hostCredentials(ctx, marker, env);
-    }
-
-    static Inputs from(LockDirectory dir, Host host, Instant now) {
-        return from(dir, host, now, null, null);
     }
 
     /**
@@ -141,11 +138,6 @@ final class YarnBerryInputs {
     // npmRegistries' key, as getRegistryConfiguration's lookup without the protocol finds it
     private static String key(NodeRegistry registry) {
         return registry.getUrl().replaceFirst("/\\z", "").replaceFirst("^[a-z]+:", "");
-    }
-
-    private static boolean hasCredentials(NodeRegistry registry) {
-        return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
-               registry.getUsername() != null && registry.getPassword() != null;
     }
 
     private static void credentials(StringBuilder yarnrc, NodeRegistry registry) {

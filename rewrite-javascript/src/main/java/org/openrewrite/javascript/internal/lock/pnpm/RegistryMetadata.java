@@ -17,21 +17,10 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.Map;
-
 /**
- * The registry documents a pnpm install reads, and the host's registry configuration.
+ * The registry documents a pnpm install reads.
  */
 public interface RegistryMetadata {
-
-    /**
-     * The host's registry configuration as the user's .npmrc pnpm reads under the project's: {@code registry} and
-     * each {@code @scope:registry}; empty when the host names none.
-     */
-    default Map<String, String> userConfig() {
-        return Collections.emptyMap();
-    }
 
     /**
      * {@code GET <registry><name>}: the abbreviated document, or the full one when {@code fullMetadata}; null when the

@@ -15,13 +15,22 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
+import org.openrewrite.javascript.internal.registry.Environment;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.nio.file.Paths;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -57,8 +66,26 @@ final class PnpmInputs {
         return PnpmLockRegenerator.installRoot(project(dir).build());
     }
 
-    static Inputs from(LockDirectory dir, Host host, Instant now) {
-        return project(dir).host(host).now(now).build();
+    /**
+     * The host's registries as pnpm's user .npmrc: the view's, else the marker's user npmrc; pnpm reads no global npmrc,
+     * and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc.
+     */
+    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
+        return RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.User));
+    }
+
+    /**
+     * @param registries the host's registries, pnpm's user .npmrc; null when the host gives none
+     */
+    static Inputs from(LockDirectory dir, @Nullable NodeRegistries registries, Host host, Instant now) {
+        Map<String, String> userConfig = new LinkedHashMap<>();
+        if (registries != null) {
+            userConfig.put("registry", registries.getDefaultRegistry().getUrl());
+            for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
+                userConfig.put(scoped.getKey() + ":registry", scoped.getValue().getUrl());
+            }
+        }
+        return project(dir).userConfig(userConfig).host(host).now(now).build();
     }
 
     // what pnpm reads of the project, which is all its walk reads

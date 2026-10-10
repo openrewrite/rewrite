@@ -48,7 +48,6 @@ public final class Main {
     static final String WORKSPACE_DIR = "";
 
     private final PnpmLockRegenerator.Inputs inputs;
-    private final Map<String, String> userConfig;
     private final EnvInstaller envInstaller;
     private final CreateNewStoreController stores;
     private final EnvLockfile.OnDisk lockFile;
@@ -67,10 +66,9 @@ public final class Main {
         ProjectsGraph.Result allProjectsGraph;
     }
 
-    Main(PnpmLockRegenerator.Inputs inputs, Map<String, String> userConfig, EnvInstaller envInstaller,
-         CreateNewStoreController stores, EnvLockfile.OnDisk lockFile) {
+    Main(PnpmLockRegenerator.Inputs inputs, EnvInstaller envInstaller, CreateNewStoreController stores,
+         EnvLockfile.OnDisk lockFile) {
         this.inputs = inputs;
-        this.userConfig = userConfig;
         this.envInstaller = envInstaller;
         this.stores = stores;
         this.lockFile = lockFile;
@@ -95,8 +93,8 @@ public final class Main {
                 return InstallRoot.HERE;
             }
             // under lockfileDir pnpm run here would start a lock of every project; run at the root, it writes that one
-            PnpmOptions options = getConfig(inputs, Collections.emptyMap(),
-                    WorkspaceRootFinder.findWorkspaceDir(inputs::holds, lockDir, inputs.getEnv()));
+            PnpmOptions options = getConfig(inputs, WorkspaceRootFinder.findWorkspaceDir(inputs::holds, lockDir,
+                    inputs.getEnv()));
             return Js.truthy(options.get("lockfileDir")) && FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                     options.getWorkspacePackagePatterns()).contains(lockDir) ?
                     InstallRoot.stops(workspaceRoot, InstallRoot.Stop.WALK_FAILS) : InstallRoot.HERE;
@@ -117,7 +115,7 @@ public final class Main {
         if (!workspaceDir.isEmpty()) {
             return workspaceDir;
         }
-        PnpmOptions options = getConfig(inputs, Collections.emptyMap(), workspaceDir);
+        PnpmOptions options = getConfig(inputs, workspaceDir);
         String lockfileDir = options.getLockfileDir(dir);
         boolean listed = FindPackages.findWorkspaceProjects(manifestDirs(inputs),
                 options.getWorkspacePackagePatterns()).contains(dir);
@@ -135,7 +133,7 @@ public final class Main {
                                  "NPM_CONFIG_WORKSPACE_DIR names (the inputs are those of the workspace found from " +
                                  "the lock up)");
         }
-        PnpmOptions options = getConfig(inputs, userConfig, workspaceDir);
+        PnpmOptions options = getConfig(inputs, workspaceDir);
         requireSettings(options);
         return options;
     }
@@ -196,8 +194,7 @@ public final class Main {
         return inputs.getDir() != null ? inputs.getDir() : inputs.getLockDir();
     }
 
-    private static PnpmOptions getConfig(PnpmLockRegenerator.Inputs inputs, Map<String, String> userConfig,
-                                         @Nullable String workspaceDir) {
+    private static PnpmOptions getConfig(PnpmLockRegenerator.Inputs inputs, @Nullable String workspaceDir) {
         String rootManifestText = inputs.getManifests().get("");
         Map<String, @Nullable Object> rootManifest = rootManifestText == null ? null : rootManifest(rootManifestText);
         requireConfigFiles(inputs);
@@ -206,8 +203,8 @@ public final class Main {
             // workspace-manifest-reader reads a missing pnpm-workspace.yaml as an empty one
             workspaceManifest = "";
         }
-        return PnpmOptions.load(workspaceManifest, inputs.getFiles().get(".npmrc"), userConfig, rootManifest,
-                inputs.getEnv());
+        return PnpmOptions.load(workspaceManifest, inputs.getFiles().get(".npmrc"), inputs.getUserConfig(),
+                rootManifest, inputs.getEnv());
     }
 
     // Node reads the package.json pnpm runs beside before pnpm starts, and stops at one that is not JSON; config

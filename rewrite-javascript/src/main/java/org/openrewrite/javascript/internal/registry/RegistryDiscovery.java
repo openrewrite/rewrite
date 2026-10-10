@@ -22,14 +22,17 @@ import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Resolves the npm registries (and their credentials) a project locks against: host-supplied
@@ -71,6 +74,17 @@ public final class RegistryDiscovery {
 
         return new NodeRegistries(defaultRegistry, byScope,
                 config.getProxy(), config.getHttpsProxy(), config.getNoProxy());
+    }
+
+    /**
+     * The registries a package manager reads as its user's own config: the view's, else those of the marker's npmrc
+     * files of the {@code scopes} it reads.
+     */
+    public static NodeRegistries discover(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env,
+                                          Set<NpmrcScope> scopes) {
+        return discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .filter(npmrc -> scopes.contains(npmrc.getScope())).collect(toList())), env);
     }
 
     private static NodeRegistries fromExplicit(List<NodeRegistry> registries) {

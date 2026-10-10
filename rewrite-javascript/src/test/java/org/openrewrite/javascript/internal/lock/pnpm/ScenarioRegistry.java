@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.RecordedRegistry;
 
 import java.io.ByteArrayOutputStream;
@@ -27,7 +26,6 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
@@ -52,25 +50,6 @@ final class ScenarioRegistry extends RecordedRegistry<PnpmScenarios.Scenario> im
     ScenarioRegistry(PnpmScenarios.Scenario scenario, String phase) {
         super(scenario);
         this.phase = phase;
-    }
-
-    // the host's registries: the recording's user .npmrc (user-npmrc), read as the host reads one
-    @Override
-    public Map<String, String> userConfig() {
-        String npmrc = scenario.file("user-npmrc");
-        Map<String, String> config = new LinkedHashMap<>();
-        if (npmrc == null) {
-            return config;
-        }
-        Map<String, @Nullable Object> decoded = Ini.decode(npmrc, Ini.Release.V6_0_0);
-        for (Map.Entry<String, @Nullable Object> entry : decoded.entrySet()) {
-            String key = entry.getKey();
-            if (entry.getValue() instanceof String && ("registry".equals(key) ||
-                                                       key.startsWith("@") && key.endsWith(":registry"))) {
-                config.put(key, (String) entry.getValue());
-            }
-        }
-        return config;
     }
 
     @Override

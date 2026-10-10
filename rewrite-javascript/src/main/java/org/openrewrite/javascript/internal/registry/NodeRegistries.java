@@ -70,7 +70,7 @@ public class NodeRegistries {
      */
     public NodeRegistry registryAt(String packageName, String url) {
         NodeRegistry match = null;
-        for (NodeRegistry candidate : candidates()) {
+        for (NodeRegistry candidate : all()) {
             if (under(url, candidate) && (match == null || outranks(candidate, match))) {
                 match = candidate;
             }
@@ -86,7 +86,10 @@ public class NodeRegistries {
         return trimSlash(candidate.getUrl()).length() > trimSlash(match.getUrl()).length();
     }
 
-    private static boolean hasCredentials(NodeRegistry registry) {
+    /**
+     * A token, a base64 auth or a username with its password.
+     */
+    public static boolean hasCredentials(NodeRegistry registry) {
         return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
                registry.getUsername() != null && registry.getPassword() != null;
     }
@@ -106,11 +109,12 @@ public class NodeRegistries {
                 registryFor(packageName).isStrictSsl(), false);
     }
 
-    private List<NodeRegistry> candidates() {
-        List<NodeRegistry> candidates = new ArrayList<>();
-        candidates.add(defaultRegistry);
-        candidates.addAll(byScope.values());
-        return candidates;
+    /** The default registry, then the scoped ones in their configured order. */
+    public List<NodeRegistry> all() {
+        List<NodeRegistry> all = new ArrayList<>();
+        all.add(defaultRegistry);
+        all.addAll(byScope.values());
+        return all;
     }
 
     private static String trimSlash(String url) {

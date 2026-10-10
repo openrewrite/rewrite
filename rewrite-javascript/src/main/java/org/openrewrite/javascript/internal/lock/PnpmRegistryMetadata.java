@@ -16,18 +16,13 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.lock.pnpm.RegistryMetadata;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * The packuments and attestations a pnpm install reads, from the registry pnpm's own config names for each package,
- * and the host's registries as the user's .npmrc.
+ * The packuments and attestations a pnpm install reads, from the registry pnpm's own config names for each package.
  */
 final class PnpmRegistryMetadata implements RegistryMetadata {
 
@@ -37,16 +32,6 @@ final class PnpmRegistryMetadata implements RegistryMetadata {
     PnpmRegistryMetadata(NodeRegistries registries, NpmRegistryClient client) {
         this.registries = registries;
         this.client = client;
-    }
-
-    @Override
-    public Map<String, String> userConfig() {
-        Map<String, String> config = new LinkedHashMap<>();
-        config.put("registry", registries.getDefaultRegistry().getUrl());
-        for (Map.Entry<String, NodeRegistry> scoped : registries.getByScope().entrySet()) {
-            config.put(scoped.getKey() + ":registry", scoped.getValue().getUrl());
-        }
-        return config;
     }
 
     @Override

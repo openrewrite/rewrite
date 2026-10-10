@@ -31,6 +31,7 @@ import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -39,6 +40,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.javascript.internal.registry.NodeRegistries.hasCredentials;
 
 /**
  * The Yarn classic regenerator's inputs: the config files of the lock's directory, of each directory above it and of
@@ -66,9 +68,7 @@ final class YarnClassicInputs {
      * project npmrc (the repository root's) yarn reads as a project file, under the home one from a member.
      */
     static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
-        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
-                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
-                        .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
+        return RegistryDiscovery.discover(ctx, marker, env, EnumSet.of(NpmrcScope.Global, NpmrcScope.User));
     }
 
     /**
@@ -91,10 +91,6 @@ final class YarnClassicInputs {
             }
         }
         return npmrc.withProperties(registries);
-    }
-
-    static Inputs from(LockDirectory dir, Host host) {
-        return from(dir, host, null, null);
     }
 
     /**
@@ -162,11 +158,6 @@ final class YarnClassicInputs {
     private static String key(NodeRegistry registry) {
         String key = registry.getUrl().replaceFirst("^[A-Za-z][A-Za-z0-9+.-]*:", "");
         return key.endsWith("/") ? key : key + "/";
-    }
-
-    private static boolean hasCredentials(NodeRegistry registry) {
-        return registry.getAuthToken() != null || registry.getAuthBase64() != null ||
-               registry.getUsername() != null && registry.getPassword() != null;
     }
 
     // what yarn reads of the project, which is all its walk reads

@@ -22,9 +22,6 @@ import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 import org.openrewrite.javascript.internal.registry.NpmRegistryClient;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * The packuments a Bun install reads, through the run's {@link NpmRegistryClient}, from the registry Bun's own
  * configuration names for each package, with the credentials bun gives that registry.
@@ -58,7 +55,7 @@ final class BunRegistryManifests implements ManifestSource {
     NodeRegistry scope(String name, String url) {
         String host = host(url);
         NodeRegistry scope = null;
-        for (NodeRegistry candidate : candidates()) {
+        for (NodeRegistry candidate : registries.all()) {
             if (!host.equals(host(candidate.getUrl()))) {
                 continue;
             }
@@ -70,13 +67,6 @@ final class BunRegistryManifests implements ManifestSource {
         }
         return scope != null ? scope : new NodeRegistry(null, url, null, null, null, null, false, null,
                 registries.registryFor(name).isStrictSsl(), false);
-    }
-
-    private List<NodeRegistry> candidates() {
-        List<NodeRegistry> candidates = new ArrayList<>();
-        candidates.add(registries.getDefaultRegistry());
-        candidates.addAll(registries.getByScope().values());
-        return candidates;
     }
 
     private static @Nullable String later(@Nullable String later, @Nullable String earlier) {

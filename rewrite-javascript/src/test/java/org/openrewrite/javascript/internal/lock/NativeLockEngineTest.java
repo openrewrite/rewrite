@@ -24,6 +24,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.javascript.NodeExecutionContextView;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.NodeRegistryCredentials;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Reason;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
@@ -306,6 +307,121 @@ class NativeLockEngineTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getFailure().getReason()).isEqualTo(Reason.MALFORMED_LOCK);
+    }
+
+    /**
+     * The credentials the host holds for a registry the project's .npmrc names reach yarn's request for a scoped
+     * package there, as the home .npmrc's (Yarn Berry's as its npmRegistries entry).
+     */
+    @Test
+    void yarnSendsTheHostsCredentialsToARegistryTheProjectNames() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(Arrays.asList(
+                new NodeRegistryCredentials("corp.example", "corp-token", null, null),
+                new NodeRegistryCredentials("registry.npmjs.org", "npm-token", null, null)));
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("@corp:registry", "https://corp.example/"));
+
+        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"@corp/a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"),
+                        "npmScopes:\n  corp:\n    npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString()).containsExactly(
+                "https://corp.example/@corp%2Fa", "https://corp.example/@corp%2Fa");
+        assertThat(requests).allSatisfy(r ->
+                assertThat(r.getRequestHeaders()).containsEntry("Authorization", "Bearer corp-token"));
+    }
+
+    /**
+     * An unscoped package from the private registry a project names gets the host's credentials too: the home file
+     * holds them with always-auth (Yarn Berry: its npmRegistries entry's npmAlwaysAuth).
+     */
+    @Test
+    void yarnSendsTheHostsCredentialsForAnUnscopedPackage() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(singletonList(
+                new NodeRegistryCredentials("corp.example", "corp-token", null, null)));
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("registry", "https://corp.example/"));
+
+        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString())
+                .containsExactly("https://corp.example/a", "https://corp.example/a");
+        assertThat(requests).allSatisfy(r ->
+                assertThat(r.getRequestHeaders()).containsEntry("Authorization", "Bearer corp-token"));
+    }
+
+    /**
+     * A project's own token stays in its .npmrc: yarn sends it for an unscoped package only under always-auth, and
+     * Yarn Berry never reads that file.
+     */
+    @Test
+    void yarnLeavesTheProjectsOwnTokenInItsNpmrc() {
+        NodeExecutionContextView.view(ctx).setRegistries(emptyList());
+        NodeExecutionContextView.view(ctx).setRegistryCredentials(emptyList());
+        List<HttpSender.Request> requests = new ArrayList<>();
+        HttpSenderExecutionContextView.view(ctx).setHttpSender(request -> {
+            requests.add(request);
+            return new HttpSender.Response(404, new ByteArrayInputStream(new byte[0]), () -> {
+            });
+        });
+        Request.RequestBuilder request = Request.builder()
+                .lock("# yarn lockfile v1\n\n\n")
+                .packageJsonPath(Paths.get("package.json"))
+                .marker(projectNpmrc("registry", "https://corp.example/", "//corp.example/:_authToken",
+                        "project-token"));
+
+        NativeLockEngine.regenerate(PackageManager.YarnClassic, request
+                .packageJson("{\"name\":\"p\",\"version\":\"1.0.0\",\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .build(), ctx);
+        NativeLockEngine.regenerate(PackageManager.YarnBerry, request
+                .packageJson("{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"," +
+                             "\"dependencies\":{\"a\":\"^1.0.0\"}}")
+                .lock("__metadata:\n  version: 8\n  cacheKey: 10c0\n\n\"p@workspace:.\":\n" +
+                      "  version: 0.0.0-use.local\n  resolution: \"p@workspace:.\"\n  languageName: unknown\n" +
+                      "  linkType: soft\n")
+                .packageManagerFile(Paths.get(".yarnrc.yml"), "npmRegistryServer: \"https://corp.example\"\n")
+                .build(), ctx);
+
+        assertThat(requests).extracting(r -> r.getUrl().toString())
+                .containsExactly("https://corp.example/a", "https://corp.example/a");
+        assertThat(requests).allSatisfy(r -> assertThat(r.getRequestHeaders()).doesNotContainKey("Authorization"));
     }
 
     private static String npmLock(String lockedVersion) {
