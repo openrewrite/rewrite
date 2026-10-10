@@ -303,7 +303,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         ps.edit = override::apply;
         Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
         String written = edited.get(workspaceManifest);
-        if (written != null && !acc.visited.containsKey(workspaceManifest) && !acc.generated.contains(workspaceManifest)) {
+        if (written != null && !acc.visited.containsKey(workspaceManifest) &&
+            !acc.generated.contains(workspaceManifest)) {
             YamlParser.builder().build().parse(ctx, written).findFirst().ifPresent(yaml ->
                     publish(acc, ctx, workspaceManifest, yaml.withSourcePath(workspaceManifest)));
         }

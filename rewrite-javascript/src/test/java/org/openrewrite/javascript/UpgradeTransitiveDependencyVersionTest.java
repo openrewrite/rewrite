@@ -173,7 +173,8 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     void pnpmAfterAnEarlierRecipeChangedTheRootInEveryVisitOrder() {
         Scenario s = new Scenario("pnpm/override-recipe-compose");
         inEveryOrder(s, new CompositeRecipe(Arrays.asList(new UpgradeDependencyVersion("is-odd", null, "3.0.1"),
-          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), s.workspaceSources(PackageManager.Pnpm));
+            new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))),
+          s.workspaceSources(PackageManager.Pnpm));
     }
 
     @Test
