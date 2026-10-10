@@ -127,7 +127,7 @@ class PackageResolverTest {
         Config options = YarnClassicScenarios.defaults();
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
                 new ResolutionMap(options), YarnClassicScenarios.packuments((url, name) -> registry.get(name)),
-                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN);
         List<DependencyRequestPattern> requests = new ArrayList<>();
         for (String root : roots) {
             requests.add(DependencyRequestPattern.builder().pattern(root).registry(NpmResolver.NPM_REGISTRY_ID)

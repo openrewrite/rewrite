@@ -56,7 +56,7 @@ final class LinkResolver {
                                      "manifests do not include");
             } else {
                 manifest = Config.tryManifest(location, text, request.config.isLooseSemver(),
-                        false, "", resolver.warnings);
+                        false, "");
             }
             PackageRemote remote = new PackageRemote();
             remote.type = "link";

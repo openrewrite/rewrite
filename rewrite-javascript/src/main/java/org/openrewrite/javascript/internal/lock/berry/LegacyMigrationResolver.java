@@ -80,7 +80,7 @@ final class LegacyMigrationResolver implements Resolver {
      * {@code setup}: nothing for a missing or modern lockfile; otherwise every entry with a {@code resolved} URL
      * an imported pattern matches is pinned, and the rest are reported.
      */
-    void setup(Project project, List<String> warnings) {
+    void setup(Project project) {
         Map<String, @Nullable Object> parsed = project.parsedLockfile;
         if (parsed == null) {
             return;
@@ -92,7 +92,6 @@ final class LegacyMigrationResolver implements Resolver {
         for (String key : Js.keys(parsed)) {
             Descriptor parsedDescriptor = StructUtils.tryParseDescriptor(key);
             if (parsedDescriptor == null) {
-                warnings.add("Failed to parse the string \"" + key + "\" into a proper descriptor");
                 continue;
             }
             Descriptor descriptor = SemverUtils.validRange(parsedDescriptor.range) != null ?
@@ -114,8 +113,6 @@ final class LegacyMigrationResolver implements Resolver {
                 }
             }
             if (reference == null) {
-                warnings.add(StructUtils.stringifyDescriptor(descriptor) + ": Only some patterns can be imported " +
-                             "from legacy lockfiles (not \"" + Js.string(resolved) + "\")");
                 continue;
             }
             Ident actualDescriptor = descriptor;

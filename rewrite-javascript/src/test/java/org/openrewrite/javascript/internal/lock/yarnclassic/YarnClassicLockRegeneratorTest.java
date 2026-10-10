@@ -32,7 +32,6 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.registry.NodeRegistryException;
 
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -438,7 +437,7 @@ class YarnClassicLockRegeneratorTest {
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
                 YarnClassicScenarios.NO_REGISTRY, new ProjectFiles(built.getManifests(), built.getPaths(),
                 built.getCwd()),
-                Host.UNKNOWN, new ArrayList<>());
+                Host.UNKNOWN);
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("x@lib")
                 .registry("npm").optional(false).parentNames(new ArrayList<>()).build(), resolver);
         EventLoop.Promise<String> range = request.normalizeRange("lib");
@@ -503,9 +502,7 @@ class YarnClassicLockRegeneratorTest {
             "\"packages/*\", \"dependencies\": {\"ms\": \"2.1.3\"}}|ms@2.1.3",
     })
     void requestsTheAggregatorOfAnyWorkspaceRoot(String label, String manifest, String patterns) {
-        List<String> warnings = new ArrayList<>();
-        Run install = install(YarnClassicLockRegenerator.Inputs.builder().manifest("", manifest)
-                .build(), warnings);
+        Run install = install(YarnClassicLockRegenerator.Inputs.builder().manifest("", manifest).build());
         Install.InstallCwdRequest request = install.install.fetchRequestFromCwd(install.install.lockfile(),
                 new ResolutionMap(install.options));
         List<String> requested = new ArrayList<>();
@@ -534,32 +531,28 @@ class YarnClassicLockRegeneratorTest {
     }
 
     @Test
-    void warnsOfANohoistListWhileNohoistIsOff() {
-        YarnClassicLockRegenerator.Inputs inputs = withMember("{\"name\": \"r\", \"version\": \"1.0.0\", " +
-                                                            "\"private\": true, \"workspaces\": {\"packages\": [], " +
-                                                            "\"nohoist\": [\"**/x\"]}}",
-                "workspaces-nohoist-experimental false\n");
-        List<String> warnings = new ArrayList<>();
-        Run install = install(inputs, warnings);
-        install.install.fetchRequestFromCwd(install.install.lockfile(), new ResolutionMap(install.options));
-        assertThat(warnings).contains("\"r\" defines nohoist but the feature is disabled in your Yarn config " +
-                                      "(\"workspaces-nohoist-experimental\" in .yarnrc file)");
+    void dropsANohoistListWhileNohoistIsOff() {
+        String root = "{\"name\": \"r\", \"version\": \"1.0.0\", \"private\": true, \"workspaces\": " +
+                      "{\"packages\": [], \"nohoist\": [\"**/x\"]}}";
+        Run install = install(withMember(root, "workspaces-nohoist-experimental false\n"));
+        Manifest manifest = Config.tryManifest("", root, true, true, "");
+        assertThat(install.options.getWorkspaces(manifest, true)).containsEntry("nohoist", null);
     }
 
     /**
-     * root-dep-in-two-scopes: yarn warns of the collision from both reads of the root manifest that pass isRoot.
+     * Recorded with yarn 1.22.22: a root listing one name in dependencies and devDependencies requests the first
+     * non-trivial range once, its warning aside.
      */
     @Test
-    void warnsOfACollisionUnderEachRootRead() {
-        List<String> warnings = new ArrayList<>();
+    void aNameInTwoFieldsIsRequestedOnceAtItsFirstRange() {
         Run install = install(YarnClassicLockRegenerator.Inputs.builder()
                 .manifest("", "{\"name\": \"p\", \"version\": \"1.0.0\", \"dependencies\": " +
                               "{\"ms\": \"^2.1.0\"}, \"devDependencies\": {\"ms\": \"2.1.2\"}}")
-                .build(), warnings);
-        install.install.fetchRequestFromCwd(install.install.lockfile(), new ResolutionMap(install.options));
-        String collision = ": \"dependencies\" has dependency \"ms\" with range \"^2.1.0\" that collides with a " +
-                           "dependency in \"devDependencies\" of the same name with version \"2.1.2\"";
-        assertThat(warnings).containsExactly("package.json" + collision, "p@1.0.0" + collision);
+                .build());
+        Install.InstallCwdRequest request = install.install.fetchRequestFromCwd(install.install.lockfile(),
+                new ResolutionMap(install.options));
+        assertThat(request.getPatterns()).containsExactly("ms@^2.1.0");
+        assertThat(request.getManifest().get("devDependencies")).isEqualTo(Collections.emptyMap());
     }
 
     /**
@@ -711,10 +704,10 @@ class YarnClassicLockRegeneratorTest {
         }
     }
 
-    private static Run install(YarnClassicLockRegenerator.Inputs inputs, List<String> warnings) {
+    private static Run install(YarnClassicLockRegenerator.Inputs inputs) {
         Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
-        Config config = new Config(inputs, flags, warnings);
-        return new Run(new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY, warnings), config);
+        Config config = new Config(inputs, flags);
+        return new Run(new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY), config);
     }
 
     private static Map<String, String> env(String... keysAndValues) {
@@ -735,8 +728,7 @@ class YarnClassicLockRegeneratorTest {
      */
     private static String untilTheFirstStep(YarnClassicLockRegenerator.Inputs inputs) {
         try {
-            List<String> warnings = new ArrayList<>();
-            Run install = install(inputs, warnings);
+            Run install = install(inputs);
             Lockfile lockfile = install.install.lockfile();
             StringBuilder out = new StringBuilder("requests");
             for (DependencyRequestPattern request : install.install.fetchRequestFromCwd(lockfile,

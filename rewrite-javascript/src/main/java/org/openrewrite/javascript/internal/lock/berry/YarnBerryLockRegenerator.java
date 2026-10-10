@@ -131,14 +131,10 @@ public final class YarnBerryLockRegenerator {
          */
         private final Map<String, Object> migratedSettings;
 
-        private final List<String> warnings;
-
-        Loaded(Project project, LegacyMigrationResolver legacyMigrationResolver, Map<String, Object> migratedSettings,
-               List<String> warnings) {
+        Loaded(Project project, LegacyMigrationResolver legacyMigrationResolver, Map<String, Object> migratedSettings) {
             this.project = project;
             this.legacyMigrationResolver = legacyMigrationResolver;
             this.migratedSettings = migratedSettings;
-            this.warnings = warnings;
         }
     }
 
@@ -318,10 +314,9 @@ public final class YarnBerryLockRegenerator {
             }
         }
 
-        List<String> warnings = new ArrayList<>();
         LegacyMigrationResolver legacyMigrationResolver = new LegacyMigrationResolver(configuration.makeResolver());
-        legacyMigrationResolver.setup(project, warnings);
-        return new Loaded(project, legacyMigrationResolver, migratedSettings, warnings);
+        legacyMigrationResolver.setup(project);
+        return new Loaded(project, legacyMigrationResolver, migratedSettings);
     }
 
     /**

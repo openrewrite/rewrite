@@ -46,7 +46,6 @@ final class PackageResolver {
     final NpmRegistry npmRegistry;
     final ProjectFiles files;
     final Host host;
-    final List<String> warnings;
 
     final Map<String, List<String>> patternsByPackage = new LinkedHashMap<>();
     final Set<String> fetchingPatterns = new LinkedHashSet<>();
@@ -102,7 +101,7 @@ final class PackageResolver {
     }
 
     PackageResolver(Config config, Lockfile lockfile, ResolutionMap resolutionMap,
-                    RegistrySource registry, ProjectFiles files, Host host, List<String> warnings) {
+                    RegistrySource registry, ProjectFiles files, Host host) {
         this.config = config;
         this.lockfile = lockfile;
         this.resolutionMap = resolutionMap;
@@ -110,7 +109,6 @@ final class PackageResolver {
         this.npmRegistry = new NpmRegistry(config, loop, registry);
         this.files = files;
         this.host = host;
-        this.warnings = warnings;
     }
 
     void updateManifests(List<Manifest> newPkgs) {
@@ -387,8 +385,6 @@ final class PackageResolver {
                     NormalizedPattern normalized = NormalizedPattern.normalizePattern(req.getPattern());
                     if (isLockfileEntryOutdated(lockfileEntry.get("version"), normalized.getRange(),
                             normalized.isHasVersion())) {
-                        warnings.add(Lang.format("Lockfile has incorrect entry for $0. Ignoring it.",
-                                req.getPattern()));
                         removePattern(req.getPattern());
                         lockfile.removePattern(req.getPattern());
                         fresh = true;

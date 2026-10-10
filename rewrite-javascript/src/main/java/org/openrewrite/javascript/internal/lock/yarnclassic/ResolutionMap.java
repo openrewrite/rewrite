@@ -50,7 +50,6 @@ public final class ResolutionMap {
     final Map<String, List<Resolution>> resolutionsByPackage = new LinkedHashMap<>();
     final Config config;
     final Set<DependencyRequestPattern> delayQueue = new LinkedHashSet<>();
-    final List<String> warnings = new ArrayList<>();
 
     ResolutionMap(Config config) {
         this.config = config;
@@ -79,8 +78,6 @@ public final class ResolutionMap {
     @Nullable
     Resolution parsePatternInfo(String globPattern, @Nullable Object range) {
         if (!isValidPackagePath(globPattern)) {
-            warnings.add(Lang.format("Resolution field $0 does not end with a valid package name and will be ignored",
-                    globPattern));
             return null;
         }
         List<String> directories = parsePackagePath(globPattern);
@@ -89,7 +86,6 @@ public final class ResolutionMap {
         boolean validRange = range instanceof String &&
                              NodeSemver.validRange((String) range, Config.SEMVER) != null;
         if (!validRange && ExoticResolvers.getExoticResolver(range) == null) {
-            warnings.add(Lang.format("Resolution field $0 has an invalid version entry and may be ignored", range));
             return null;
         }
         String r = Js.string(range);
@@ -116,14 +112,6 @@ public final class ResolutionMap {
         String modulePath = String.join("/", path);
         for (Resolution resolution : resolutions) {
             if (Minimatch.minimatch(modulePath, resolution.getGlobPattern(), Minimatch.Release.V3_0_4)) {
-                String range = resolution.getRange();
-                String reqRange = normalized.getRange();
-                if (NodeSemver.validRange(reqRange, Config.SEMVER) != null &&
-                    NodeSemver.valid(range, Config.SEMVER) != null &&
-                    !NodeSemver.satisfies(range, reqRange, Config.SEMVER)) {
-                    warnings.add(Lang.format("Resolution field $0 is incompatible with requested version $1",
-                            resolution.getPattern(), reqPattern));
-                }
                 return resolution.getPattern();
             }
         }

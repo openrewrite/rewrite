@@ -93,7 +93,7 @@ class TarballFetcherTest {
             }
         };
         assertThatThrownBy(() -> new TarballFetcher(remote, "x", "1.0.0", "dest", tarballs,
-                YarnClassicScenarios.defaults(), new ArrayList<>()).fetch())
+                YarnClassicScenarios.defaults()).fetch())
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("the whirlpool digest the integrity of x@1.0.0 names");
     }
@@ -101,7 +101,7 @@ class TarballFetcherTest {
     private static String read(byte[] tarball) {
         try {
             Object pkg = TarballFetcher.manifest(TarballFetcher.untar(URL, tarball), "", "npm", "fallback", "9.9.9",
-                    true, new ArrayList<>());
+                    true);
             Map<String, @Nullable Object> data = pkg instanceof Manifest ? ((Manifest) pkg).data : null;
             Map<String, @Nullable Object> shown = new LinkedHashMap<>();
             if (data != null) {

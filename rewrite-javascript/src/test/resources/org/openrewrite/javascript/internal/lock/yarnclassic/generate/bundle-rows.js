@@ -17,8 +17,7 @@
 // of the test method or row source it belongs to, each answered by yarn's bundle (lib/cli.js) with HOME, the global
 // prefix and the project in an empty scratch directory: NpmResolverTest (findVersionInRegistryResponse), JsYamlTest
 // (js-yaml safeLoad under FAILSAFE_SCHEMA), ConfigTest (the registries' init and getRegistry, rc.js
-// getRcConfigForCwd) and NormalizeManifestTest (normalize-manifest, resolve-relative; of its warnings, the collision,
-// since the port does not warn of a missing license).
+// getRcConfigForCwd) and NormalizeManifestTest (normalize-manifest, resolve-relative).
 //
 // Usage: node bundle-rows.js <yarn 1.22.22>/lib/cli.js
 'use strict'
@@ -264,16 +263,14 @@ async function normalize() {
   // readJsonAndFile reads a manifest through util/map.js, which gives every object a null prototype
   const run = async manifest => {
     const info = nullify(manifest)
-    const warnings = []
     const reporter = new NoopReporter()
-    reporter.warn = msg => warnings.push(msg)
     reporter.lang = Object.getPrototypeOf(Object.getPrototypeOf(reporter)).lang.bind(reporter)
     const dir = fs.mkdtempSync(path.join(scratch, 'normalize-'))
     const config = {reporter, cwd: dir, globalFolder: path.join(scratch, 'global'), lockfileFolder: dir,
       looseSemver: true}
     try {
       await normalizeManifest(info, dir, config, true)
-      return {warnings: warnings.filter(w => /collides/.test(w))}
+      return {info}
     } catch (e) {
       return {error: e}
     }
@@ -290,10 +287,10 @@ async function normalize() {
 
   rows.length = 0
   for (const [label, name] of [['empty name', ''], ['name', 'x']]) {
-    const {warnings} = await run({name, version: '1.0.0', dependencies: {a: '1'}, devDependencies: {a: '2'}})
-    rows.push(csv([label, name, warnings.join('; ')]))
+    const {info} = await run({name, version: '1.0.0', dependencies: {a: '1'}, devDependencies: {a: '2'}})
+    rows.push(csv([label, name, JSON.stringify(info.dependencies), JSON.stringify(info.devDependencies)]))
   }
-  section('NormalizeManifestTest.prefixesTheCollisionWarningWhenThereIsAName', rows)
+  section('NormalizeManifestTest.keepsTheFirstOfACollisionWhateverTheName', rows)
 
   rows.length = 0
   const PREFIX = 'TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string. Received '

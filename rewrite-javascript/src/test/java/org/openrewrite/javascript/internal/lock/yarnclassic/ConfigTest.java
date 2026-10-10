@@ -396,7 +396,7 @@ class ConfigTest {
         YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .configFiles(configFiles).env(env()).build();
         Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
-        return new Install.Flags(new Config(inputs, flags, new ArrayList<>()), flags);
+        return new Install.Flags(new Config(inputs, flags), flags);
     }
 
     private static Map<String, String> env(String... keysAndValues) {

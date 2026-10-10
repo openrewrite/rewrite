@@ -25,7 +25,6 @@ import org.openrewrite.javascript.internal.lock.EventLoop;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Stream;
@@ -177,8 +176,7 @@ class NpmResolverTest {
                       (variant == null ? "" : "  prebuiltVariants:\n    " + variant + "\n");
         PackageResolver resolver = new PackageResolver(options, Lockfile.fromDirectory(lock),
                 new ResolutionMap(options), YarnClassicScenarios.NO_REGISTRY,
-                new ProjectFiles(Collections.emptyMap(), null), Host.builder().os("darwin").cpu("arm64").build(),
-                new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.builder().os("darwin").cpu("arm64").build());
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern("left-pad@1.3.0")
                 .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
         String answer;
@@ -195,7 +193,7 @@ class NpmResolverTest {
     private static Manifest resolve(Config options, String pattern, String packument) {
         PackageResolver resolver = new PackageResolver(options, new Lockfile(), new ResolutionMap(options),
                 YarnClassicScenarios.packuments((registry, name) -> packument),
-                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN);
         PackageRequest request = new PackageRequest(DependencyRequestPattern.builder().pattern(pattern)
                 .registry(NpmResolver.NPM_REGISTRY_ID).build(), resolver);
         NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);

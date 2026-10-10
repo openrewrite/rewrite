@@ -38,19 +38,15 @@ final class PackageCompatibility {
             "cldr", "icu", "llhttp", "merve", "modules", "napi", "nbytes", "ncrypto", "nghttp2", "nghttp3", "ngtcp2",
             "openssl", "simdjson", "simdutf", "sqlite", "tz", "undici", "unicode", "uv", "uvwasi", "v8", "zlib",
             "zstd");
-    private static final List<String> IGNORE = Arrays.asList("npm", "teleport", "rhino", "cordovaDependencies",
-            "parcel");
 
     private final Config config;
     private final Host host;
     private final List<String> errors;
-    private final List<String> warnings;
 
-    PackageCompatibility(Config config, Host host, List<String> errors, List<String> warnings) {
+    PackageCompatibility(Config config, Host host, List<String> errors) {
         this.config = config;
         this.host = host;
         this.errors = errors;
-        this.warnings = warnings;
     }
 
     private static boolean isValid(List<?> items, String actual) {
@@ -138,13 +134,9 @@ final class PackageCompatibility {
                 if (actual == null) {
                     continue;
                 }
-                if (!actual.isEmpty()) {
-                    if (!testEngine(name, range, actual, config.isLooseSemver())) {
-                        pushed.add(Lang.format("The engine $0 is incompatible with this module. Expected version " +
-                                               "$1. Got $2", name, range, actual));
-                    }
-                } else if (!IGNORE.contains(name)) {
-                    warnings.add(human + ": " + Lang.format("The engine $0 appears to be invalid.", name));
+                if (!actual.isEmpty() && !testEngine(name, range, actual, config.isLooseSemver())) {
+                    pushed.add(Lang.format("The engine $0 is incompatible with this module. Expected version " +
+                                           "$1. Got $2", name, range, actual));
                 }
             }
         }

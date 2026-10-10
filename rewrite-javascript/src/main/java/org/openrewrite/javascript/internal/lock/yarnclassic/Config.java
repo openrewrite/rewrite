@@ -141,7 +141,7 @@ final class Config {
      * {@code init} with the command line's {@code flags}: the workspace root from where yarn runs up, the focus check,
      * the registries' config, the manifest of the lock's directory, the workspaces check.
      */
-    Config(Inputs inputs, Map<String, @Nullable Object> flags, List<String> warnings) {
+    Config(Inputs inputs, Map<String, @Nullable Object> flags) {
         this.inputs = inputs;
         looseSemver = !Js.truthy(flags.get("strictSemver"));
         focus = Js.truthy(flags.get("focus"));
@@ -150,7 +150,7 @@ final class Config {
         offline = preferOffline || Js.truthy(flags.get("offline"));
 
         requireWorkspaceRootAbove(inputs, looseSemver);
-        workspaceRoot = findWorkspaceRoot(inputs, looseSemver, warnings);
+        workspaceRoot = findWorkspaceRoot(inputs, looseSemver);
         if (focus && (workspaceRoot < 0 || workspaceRoot == 0 && inputs.getCwd().isEmpty())) {
             throw new MessageError("This command can only be run inside an individual workspace.");
         }
@@ -158,7 +158,7 @@ final class Config {
             throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + ", which no workspaces list, it " +
                                  "makes that directory its lockfileFolder and writes its yarn.lock, not this lock");
         }
-        focusedWorkspaceName = focus ? readRootManifest(looseSemver, warnings).getName() : null;
+        focusedWorkspaceName = focus ? readRootManifest().getName() : null;
 
         Map<String, String> configFiles = inputs.configFilesFromCwd();
         Map<String, String> env = inputs.getEnv();
@@ -175,7 +175,7 @@ final class Config {
         String manifest = up.isEmpty() ? inputs.getManifests().get("") :
                 inputs.getConfigFiles().get(up + "package.json");
         lockfileFolderManifest = manifest == null ? null :
-                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder, warnings);
+                tryManifest(lockfileFolder, manifest, looseSemver, false, lockfileFolder);
 
         workspacesEnabled = !Boolean.FALSE.equals(getOption("workspaces-experimental"));
         workspacesNohoistEnabled = !Boolean.FALSE.equals(getOption("workspaces-nohoist-experimental"));
@@ -210,7 +210,7 @@ final class Config {
     }
 
     // readRootManifest: the manifest where yarn runs, which yarn requires
-    private Manifest readRootManifest(boolean looseSemver, List<String> warnings) {
+    private Manifest readRootManifest() {
         String cwd = inputs.getCwd();
         String text = inputs.getManifests().get(cwd);
         if (text == null) {
@@ -219,7 +219,7 @@ final class Config {
             }
             throw CannotKnow.unread(cwd + "/package.json");
         }
-        return tryManifest(cwd, text, looseSemver, true, "", warnings);
+        return tryManifest(cwd, text, looseSemver, true, "");
     }
 
     // findWorkspaceRoot starts where yarn runs: a manifest with workspaces below this lock's stops it there
@@ -236,8 +236,7 @@ final class Config {
                 }
                 continue;
             }
-            Map<String, @Nullable Object> ws = extractWorkspaces(tryManifest(dir, text, looseSemver, true, null,
-                    new ArrayList<>()));
+            Map<String, @Nullable Object> ws = extractWorkspaces(tryManifest(dir, text, looseSemver, true, null));
             if (ws != null && Js.truthy(ws.get("packages"))) {
                 throw new CannotKnow("the lock yarn writes: run in " + inputs.getCwd() + " it stops at the " +
                                      "workspaces of " + file + ", not at this lock");
@@ -249,10 +248,10 @@ final class Config {
      * {@code findWorkspaceRoot}: how many directories above the project's the nearest manifest with a workspaces
      * list is when it is where yarn runs or that list matches the path from it to there, 0 the project's, else -1.
      */
-    static int findWorkspaceRoot(Inputs inputs, boolean looseSemver, List<String> warnings) {
+    static int findWorkspaceRoot(Inputs inputs, boolean looseSemver) {
         String cwd = inputs.getCwd();
         for (int depth = 0; depth <= inputs.reach(); depth++) {
-            Manifest manifest = findManifest(inputs, depth, looseSemver, warnings);
+            Manifest manifest = findManifest(inputs, depth, looseSemver);
             Map<String, @Nullable Object> ws = manifest == null ? null : extractWorkspaces(manifest);
             if (ws != null && Js.truthy(ws.get("packages"))) {
                 String relativePath = depth == 0 ? cwd : cwd.isEmpty() ? inputs.relativePath(depth) :
@@ -265,13 +264,11 @@ final class Config {
     }
 
     // findManifest: the directory's package.json, else its yarn.json
-    private static @Nullable Manifest findManifest(Inputs inputs, int depth, boolean looseSemver,
-                                                   List<String> warnings) {
+    private static @Nullable Manifest findManifest(Inputs inputs, int depth, boolean looseSemver) {
         String up = up(depth);
         String text = depth == 0 ? inputs.getManifests().get("") : inputs.getConfigFiles().get(up + "package.json");
         if (text != null) {
-            return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null,
-                    warnings);
+            return tryManifest(depth == 0 ? "" : up.substring(0, up.length() - 1), text, looseSemver, true, null);
         }
         Set<String> paths = inputs.getPaths();
         for (String name : depth == 0 ? singletonList("yarn.json") : Arrays.asList("package.json", "yarn.json")) {
@@ -286,12 +283,12 @@ final class Config {
      * {@code tryManifest}: the manifest read, its registry and location set, then normalized.
      */
     static Manifest tryManifest(String location, String text, boolean looseSemver, boolean isRoot,
-                                @Nullable String lockfileFolder, List<String> warnings) {
+                                @Nullable String lockfileFolder) {
         String file = location.isEmpty() ? "package.json" : location + "/package.json";
         Manifest manifest = manifest(Fs.readJson(file, text), "_registry");
         manifest.put("_registry", NpmResolver.NPM_REGISTRY_ID);
         manifest.put("_loc", file);
-        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver, warnings);
+        return NormalizeManifest.normalizeManifest(manifest, location, lockfileFolder, isRoot, looseSemver);
     }
 
     /**
@@ -303,8 +300,7 @@ final class Config {
      * {@code readManifest} of a directory a fetch extracted into yarn's cache: its .yarn-metadata.json's manifest as
      * it is, else its package.json or yarn.json normalized, else {@link #NO_MANIFEST}.
      */
-    static @Nullable Object readManifest(TarFs dest, String dir, Object registry, boolean looseSemver,
-                                         List<String> warnings) {
+    static @Nullable Object readManifest(TarFs dest, String dir, Object registry, boolean looseSemver) {
         TarFs.Node metadata = dest.get(".yarn-metadata.json");
         if (metadata != null) {
             Object json = Fs.readJson(PosixPath.join(dir, ".yarn-metadata.json"), text(metadata));
@@ -327,7 +323,7 @@ final class Config {
             Manifest manifest = manifest(Fs.readJson(loc, text(file)), "_registry");
             manifest.put("_registry", "yarn.json".equals(filename) ? "yarn" : NpmResolver.NPM_REGISTRY_ID);
             manifest.put("_loc", loc);
-            return NormalizeManifest.normalizeManifest(manifest, null, "", false, looseSemver, warnings);
+            return NormalizeManifest.normalizeManifest(manifest, null, "", false, looseSemver);
         }
         return NO_MANIFEST;
     }
@@ -393,7 +389,7 @@ final class Config {
      * @throws MessageError members or a nohoist list in a root that is not private, when {@code shouldThrow}.
      */
     @Nullable
-    Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow, List<String> warnings) {
+    Map<String, @Nullable Object> getWorkspaces(Manifest manifest, boolean shouldThrow) {
         if (!workspacesEnabled) {
             return null;
         }
@@ -402,7 +398,6 @@ final class Config {
             return null;
         }
         Map<String, @Nullable Object> wsCopy = new LinkedHashMap<>(ws);
-        List<String> warned = new ArrayList<>();
         List<String> errors = new ArrayList<>();
         boolean isPrivate = Js.truthy(manifest.get("private"));
         Object packages = wsCopy.get("packages");
@@ -412,8 +407,6 @@ final class Config {
         }
         if (wsCopy != null && Js.truthy(wsCopy.get("nohoist")) && Js.length(wsCopy.get("nohoist")) > 0) {
             if (!workspacesNohoistEnabled) {
-                warned.add(Lang.format("$0 defines nohoist but the feature is disabled in your Yarn config " +
-                                       "(\"workspaces-nohoist-experimental\" in .yarnrc file)", manifest.getName()));
                 wsCopy.put("nohoist", null);
             } else if (!isPrivate) {
                 errors.add(Lang.format("nohoist config is ignored in $0 because it is not a private package. If " +
@@ -425,11 +418,6 @@ final class Config {
         if (!errors.isEmpty() && shouldThrow) {
             throw new MessageError(String.join("\n", errors));
         }
-        List<String> msg = new ArrayList<>(errors);
-        msg.addAll(warned);
-        if (!msg.isEmpty()) {
-            warnings.add(String.join("\n", msg));
-        }
         return wsCopy;
     }
 
@@ -437,25 +425,20 @@ final class Config {
      * {@code resolveWorkspaces}: the members whose package.json a {@code packages} glob finds, in the order glob lists
      * them, outside any node_modules.
      */
-    Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root, List<String> warnings) {
+    Map<String, WorkspaceLayout.Workspace> resolveWorkspaces(Manifest root) {
         Map<String, WorkspaceLayout.Workspace> workspaces = new LinkedHashMap<>();
         if (!workspacesEnabled) {
             return workspaces;
         }
         Set<String> files = new LinkedHashSet<>();
-        for (Object pattern : workspacePatterns(root, warnings)) {
+        for (Object pattern : workspacePatterns(root)) {
             files.addAll(glob((String) pattern));
         }
         for (String file : files) {
             String loc = Objects.requireNonNull(ProjectFiles.location(PosixPath.dirname(file)));
             Manifest manifest = tryManifest(loc, Objects.requireNonNull(inputs.getManifests().get(loc)),
-                    looseSemver, false, "", warnings);
-            if (!Js.truthy(manifest.getName())) {
-                warnings.add(Lang.format("Missing name in workspace at $0, ignoring.", loc));
-                continue;
-            }
-            if (!Js.truthy(manifest.getVersion())) {
-                warnings.add(Lang.format("Missing version in workspace at $0, ignoring.", loc));
+                    looseSemver, false, "");
+            if (!Js.truthy(manifest.getName()) || !Js.truthy(manifest.getVersion())) {
                 continue;
             }
             String name = Js.string(manifest.getName());
@@ -470,8 +453,8 @@ final class Config {
     /**
      * {@code resolveWorkspaces} up to its glob, which calls replace on every pattern before the first glob starts.
      */
-    List<?> workspacePatterns(Manifest root, List<String> warnings) {
-        Map<String, @Nullable Object> ws = getWorkspaces(root, true, warnings);
+    List<?> workspacePatterns(Manifest root) {
+        Map<String, @Nullable Object> ws = getWorkspaces(root, true);
         Object patterns = ws != null && Js.truthy(ws.get("packages")) ? ws.get("packages") : new ArrayList<>();
         if (!(patterns instanceof List)) {
             throw new MessageError("The workspaces field in package.json must be an array.");

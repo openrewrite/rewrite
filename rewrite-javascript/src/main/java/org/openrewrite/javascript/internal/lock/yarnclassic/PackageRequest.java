@@ -180,9 +180,6 @@ final class PackageRequest {
             awaited(exists);
             return exists.promise.then(found -> {
                 if (Boolean.TRUE.equals(found)) {
-                    resolver.warnings.add(Lang.format("Using the \"file:\" protocol implicitly is deprecated. " +
-                                                      "Please either prepend the protocol or prepend the path $0 " +
-                                                      "with \"./\".", pattern));
                     return Promise.resolved(loop, "file:" + pattern);
                 }
                 return Promise.resolved(loop, pattern);
@@ -251,8 +248,7 @@ final class PackageRequest {
                         info.getVersion()));
             }
             info.fresh = fresh;
-            NormalizeManifest.cleanDependencies(info, false, msg -> {
-            });
+            NormalizeManifest.cleanDependencies(info);
 
             NormalizedPattern normalized = NormalizedPattern.normalizePattern(pattern);
             String name = normalized.getName();

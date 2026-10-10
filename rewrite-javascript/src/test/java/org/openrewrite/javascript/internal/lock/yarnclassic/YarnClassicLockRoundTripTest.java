@@ -107,7 +107,7 @@ class YarnClassicLockRoundTripTest {
         Map<String, @Nullable Object> flags = Rc.getRcArgs(Rc.getRcConfigForCwd(inputs.configFilesFromCwd(),
                 inputs.getHomeFiles()));
         boolean looseSemver = !Js.truthy(flags.get("strictSemver"));
-        int workspaceRoot = Config.findWorkspaceRoot(inputs, looseSemver, new ArrayList<>());
+        int workspaceRoot = Config.findWorkspaceRoot(inputs, looseSemver);
         if (workspaceRoot == 0 || workspaceRoot < 0 && inputs.getCwd().isEmpty()) {
             return false;
         }
@@ -122,7 +122,7 @@ class YarnClassicLockRoundTripTest {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         Config options = null;
         try {
-            options = new Config(inputs, YarnClassicLockRegenerator.start(inputs), new ArrayList<>());
+            options = new Config(inputs, YarnClassicLockRegenerator.start(inputs));
         } catch (CannotKnow | JsError | MessageError | Rejected e) {
             if (e instanceof CannotKnow) {
                 assertThat(lock.getScenario().expect()).startsWith("cannot-know");
@@ -181,7 +181,6 @@ class YarnClassicLockRoundTripTest {
         final Config options;
         final Lockfile lockfile;
         final PackageResolver resolver;
-        final List<String> warnings = new ArrayList<>();
 
         Loaded(YarnClassicScenarios.Lock lock, YarnClassicLockRegenerator.Inputs inputs, Config options,
                Lockfile lockfile) {
@@ -189,7 +188,7 @@ class YarnClassicLockRoundTripTest {
             this.inputs = inputs;
             this.options = options;
             this.lockfile = lockfile;
-            this.resolver = reuseEveryEntry(lockfile, options, warnings);
+            this.resolver = reuseEveryEntry(lockfile, options);
         }
 
         String write() {
@@ -201,9 +200,9 @@ class YarnClassicLockRoundTripTest {
         @Nullable
         String save() {
             Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
-            Config config = new Config(inputs, flags, warnings);
-            Install.InstallCwdRequest request = new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY,
-                    warnings).fetchRequestFromCwd(lockfile, new ResolutionMap(config));
+            Config config = new Config(inputs, flags);
+            Install.InstallCwdRequest request = new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY)
+                    .fetchRequestFromCwd(lockfile, new ResolutionMap(config));
             return Install.saveLockfileAndIntegrity(resolver, request.getPatterns(), request.getWorkspaceLayout(),
                     config, new Install.Flags(config, flags), lockfile, lock.getText(), lock.getScenario().host());
         }
@@ -214,10 +213,10 @@ class YarnClassicLockRoundTripTest {
          */
         boolean resolvesAgain() {
             Map<String, @Nullable Object> flags = YarnClassicLockRegenerator.start(inputs);
-            Config config = new Config(inputs, flags, warnings);
+            Config config = new Config(inputs, flags);
             ResolutionMap resolutionMap = new ResolutionMap(config);
-            Install.InstallCwdRequest request = new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY,
-                    warnings).fetchRequestFromCwd(lockfile, resolutionMap);
+            Install.InstallCwdRequest request = new Install(inputs, config, flags, YarnClassicScenarios.NO_REGISTRY)
+                    .fetchRequestFromCwd(lockfile, resolutionMap);
             for (String pattern : request.getPatterns()) {
                 if ((request.getWorkspaceLayout() == null ||
                      request.getWorkspaceLayout().getManifestByPattern(pattern) == null) &&
@@ -244,7 +243,7 @@ class YarnClassicLockRoundTripTest {
      * The resolver's state after an install that reuses every entry of the lock, the fetch's manifests included.
      */
     @SuppressWarnings("unchecked")
-    static PackageResolver reuseEveryEntry(Lockfile lockfile, Config options, List<String> warnings) {
+    static PackageResolver reuseEveryEntry(Lockfile lockfile, Config options) {
         PackageResolver resolver = YarnClassicScenarios.resolver(options, lockfile);
         if (!(lockfile.getCache() instanceof Map)) {
             return resolver;
@@ -277,7 +276,7 @@ class YarnClassicLockRoundTripTest {
             pkg.put("dependencies", entry.get("dependencies"));
             pkg.put("optionalDependencies", entry.get("optionalDependencies"));
             return pkg;
-        }, warnings, new HashSet<>()));
+        }, new HashSet<>()));
         return resolver;
     }
 

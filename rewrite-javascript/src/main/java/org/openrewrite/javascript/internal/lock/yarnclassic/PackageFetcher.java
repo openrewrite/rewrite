@@ -58,7 +58,7 @@ final class PackageFetcher {
         return ref -> {
             for (PackageResolver.Race race : resolver.races) {
                 if (race.getFirst().reference == ref) {
-                    requireOneTarball(race, ref, registry, config, resolver.warnings);
+                    requireOneTarball(race, ref, registry, config);
                 }
             }
             if ("link".equals(ref.remote.type)) {
@@ -74,9 +74,9 @@ final class PackageFetcher {
                 // workspace-fetcher.js reads the workspace's own manifest again after fetching the registry's tarball
                 String loc = String.valueOf(ref.remote.reference);
                 Manifest local = Config.tryManifest(loc, String.valueOf(resolver.files.manifest(loc)),
-                        config.isLooseSemver(), false, "", resolver.warnings);
-                new TarballFetcher(registryRemote, local.getName(), local.getVersion(), dest, registry, config,
-                        resolver.warnings).fetch();
+                        config.isLooseSemver(), false, "");
+                new TarballFetcher(registryRemote, local.getName(), local.getVersion(), dest, registry, config)
+                        .fetch();
                 local.put("_uid", local.getVersion());
                 return local;
             }
@@ -87,8 +87,7 @@ final class PackageFetcher {
             }
             Map<String, @Nullable Object> entry = pkg.locked;
             if (entry == null && "tarball".equals(ref.remote.type)) {
-                return new TarballFetcher(ref.remote, ref.name, ref.version, dest, registry, config,
-                        resolver.warnings).fetch();
+                return new TarballFetcher(ref.remote, ref.name, ref.version, dest, registry, config).fetch();
             }
             Manifest locked = new Manifest();
             locked.put("name", entry == null ? pkg.getName() : entry.get("name"));
@@ -105,9 +104,9 @@ final class PackageFetcher {
      * the one it names by its sha1 or integrity, one picked anew is downloaded.
      */
     private static void requireOneTarball(PackageResolver.Race race, PackageReference ref, RegistrySource registry,
-                                          Config config, List<String> warnings) {
-        TarballFetcher first = tarballFetcher(race, race.getFirst(), ref, registry, config, warnings);
-        TarballFetcher other = tarballFetcher(race, race.getOther(), ref, registry, config, warnings);
+                                          Config config) {
+        TarballFetcher first = tarballFetcher(race, race.getFirst(), ref, registry, config);
+        TarballFetcher other = tarballFetcher(race, race.getOther(), ref, registry, config);
         byte[] firstTarball = download(race, race.getFirst(), first);
         byte[] otherTarball = download(race, race.getOther(), other);
         boolean same;
@@ -126,14 +125,12 @@ final class PackageFetcher {
     }
 
     private static TarballFetcher tarballFetcher(PackageResolver.Race race, Manifest side, PackageReference ref,
-                                                 RegistrySource registry, Config config,
-                                                 List<String> warnings) {
+                                                 RegistrySource registry, Config config) {
         PackageRemote remote = side.remote;
         if (remote == null || side.locked == null && !"tarball".equals(remote.type)) {
             throw race.cannotKnow(RACED_FETCH + "one of them is not a registry tarball");
         }
-        return new TarballFetcher(remote, ref.name, ref.version, generateModuleCachePath(ref), registry, config,
-                warnings);
+        return new TarballFetcher(remote, ref.name, ref.version, generateModuleCachePath(ref), registry, config);
     }
 
     private static byte @Nullable [] download(PackageResolver.Race race, Manifest side, TarballFetcher fetcher) {
@@ -161,7 +158,7 @@ final class PackageFetcher {
      * {@code fetch}: each package's fetched manifest in place of the resolver's; an optional one whose fetch fails
      * keeps the resolver's, and its cache directory, which yarn removes, goes into {@code unfetched}.
      */
-    static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, List<String> warnings, Set<String> unfetched) {
+    static List<Manifest> fetch(List<Manifest> pkgs, Fetcher fetcher, Set<String> unfetched) {
         Map<String, PackageReference> pkgsPerDest = new HashMap<>();
         List<Manifest> kept = new ArrayList<>();
         for (Manifest pkg : pkgs) {
@@ -172,9 +169,6 @@ final class PackageFetcher {
             String dest = generateModuleCachePath(ref);
             PackageReference otherPkg = pkgsPerDest.get(dest);
             if (otherPkg != null) {
-                warnings.add(Lang.format("Pattern $0 is trying to unpack in the same destination $1 as pattern $2. " +
-                                         "This could result in non-deterministic behavior, skipping.",
-                        ref.patterns, dest, otherPkg.patterns));
                 continue;
             }
             pkgsPerDest.put(dest, ref);
@@ -191,7 +185,6 @@ final class PackageFetcher {
                 if (!Js.truthy(ref.optional)) {
                     throw e;
                 }
-                warnings.add(String.valueOf(e.getMessage()));
                 unfetched.add(generateModuleCachePath(ref));
                 fetched = null;
             }

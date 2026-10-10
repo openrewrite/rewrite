@@ -86,15 +86,12 @@ final class Install {
     private final Config config;
     private final Flags flags;
     private final RegistrySource registry;
-    private final List<String> warnings;
 
-    Install(Inputs inputs, Config config, Map<String, @Nullable Object> flags, RegistrySource registry,
-            List<String> warnings) {
+    Install(Inputs inputs, Config config, Map<String, @Nullable Object> flags, RegistrySource registry) {
         this.inputs = inputs;
         this.config = config;
         this.flags = new Flags(config, flags);
         this.registry = registry;
-        this.warnings = warnings;
     }
 
     /**
@@ -137,7 +134,7 @@ final class Install {
         }
 
         List<String> errors = new ArrayList<>();
-        PackageCompatibility compatibility = new PackageCompatibility(config, inputs.getHost(), errors, warnings);
+        PackageCompatibility compatibility = new PackageCompatibility(config, inputs.getHost(), errors);
         try {
             if (PackageCompatibility.shouldCheck(request.getManifest(), flags.isIgnoreEngines(),
                     flags.isIgnorePlatform())) {
@@ -145,8 +142,7 @@ final class Install {
             }
 
             PackageResolver resolver = new PackageResolver(config, lockfile, resolutionMap, registry,
-                    new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost(),
-                    warnings);
+                    new ProjectFiles(inputs.getManifests(), inputs.getPaths(), inputs.getCwd()), inputs.getHost());
             resolver.focus = config.isFocus();
             resolver.focusedWorkspaceName = config.getFocusedWorkspaceName();
             resolver.init(request.getRequests(), request.isFlat(), flags.isFrozenLockfile(),
@@ -174,7 +170,7 @@ final class Install {
     private void fetchStep(PackageResolver resolver, PackageCompatibility compatibility) {
         Set<String> unfetched = new HashSet<>();
         resolver.updateManifests(PackageFetcher.fetch(resolver.getManifests(), PackageFetcher.remote(resolver,
-                registry, config), warnings, unfetched));
+                registry, config), unfetched));
         compatibility.check(resolver.getManifests(), flags.isIgnoreEngines());
         for (Manifest manifest : resolver.getManifests()) {
             PackageReference ref = manifest.reference;
@@ -254,11 +250,11 @@ final class Install {
             String cwd = up.substring(0, up.length() - 1);
             String text = Objects.requireNonNull(inputs.getConfigFiles().get(up + "package.json"));
             Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(up +
-                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver(), warnings);
+                    "package.json", text), "_registry"), cwd, cwd, true, config.isLooseSemver());
             Map<String, @Nullable Object> resolutions = new LinkedHashMap<>();
             Js.assign(resolutions, projectManifestJson.get("resolutions"));
             new ResolutionMap(config).init(resolutions);
-            config.workspacePatterns(root, warnings);
+            config.workspacePatterns(root);
         }
         throw new CannotKnow("the lock yarn writes for this edit: yarn installs at the workspace root " + up +
                              ", whose workspaces list " + inputs.relativePath(workspaceRoot) + ", and writes " + up +
@@ -292,7 +288,7 @@ final class Install {
         }
         String registry = NpmResolver.NPM_REGISTRY_ID;
         Manifest projectManifestJson = NormalizeManifest.normalizeManifest(Config.manifest(Fs.readJson(
-                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver(), warnings);
+                "package.json", rootText), "_registry"), "", "", true, config.isLooseSemver());
         Manifest manifest = projectManifestJson;
         boolean workspaceRootFolder = Config.isWorkspaceRoot(projectManifestJson);
 
@@ -333,7 +329,7 @@ final class Install {
 
         WorkspaceLayout workspaceLayout = null;
         if (workspaceRootFolder) {
-            Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson, warnings);
+            Map<String, WorkspaceLayout.Workspace> workspaces = config.resolveWorkspaces(projectManifestJson);
             workspaceLayout = new WorkspaceLayout(workspaces, config);
             Map<String, @Nullable Object> workspaceDependencies = new LinkedHashMap<>();
             Js.assign(workspaceDependencies, projectManifestJson.get("dependencies"));

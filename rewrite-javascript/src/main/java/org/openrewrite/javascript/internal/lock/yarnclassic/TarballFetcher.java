@@ -21,7 +21,6 @@ import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.Ssri;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -41,21 +40,19 @@ final class TarballFetcher {
     private final String dest;
     private final RegistrySource registry;
     private final Config config;
-    private final List<String> warnings;
 
     /**
      * What package-fetcher.js {@code fetchOneRemote} hands the fetcher: the remote, the name and version a package
      * without a manifest gets, the cache directory.
      */
     TarballFetcher(PackageRemote remote, @Nullable Object name, @Nullable Object version, String dest,
-                   RegistrySource registry, Config config, List<String> warnings) {
+                   RegistrySource registry, Config config) {
         this.remote = remote;
         this.name = name;
         this.version = version;
         this.dest = dest;
         this.registry = registry;
         this.config = config;
-        this.warnings = warnings;
     }
 
     /**
@@ -64,21 +61,20 @@ final class TarballFetcher {
      */
     @Nullable
     Object fetch() {
-        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver(),
-                warnings);
+        return manifest(fetchTarball(), dest, Js.string(remote.registry), name, version, config.isLooseSemver());
     }
 
     /**
      * The package base-fetcher.js reads from an extracted directory, its bins' targets checked as it links them.
      */
     static @Nullable Object manifest(TarFs extracted, String dest, String registry, @Nullable Object name,
-                                     @Nullable Object version, boolean looseSemver, List<String> warnings) {
-        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver, warnings);
+                                     @Nullable Object version, boolean looseSemver) {
+        Object pkg = Config.readManifest(extracted, dest, registry, looseSemver);
         if (pkg == Config.NO_MANIFEST) {
             Manifest defaultManifest = new Manifest();
             defaultManifest.put("name", name);
             defaultManifest.put("version", version);
-            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver, warnings);
+            pkg = NormalizeManifest.normalizeManifest(defaultManifest, null, "", false, looseSemver);
         }
         Object data = pkg instanceof Manifest ? ((Manifest) pkg).data : pkg;
         Object bin = Js.get(data, "bin");

@@ -56,7 +56,7 @@ final class NormalizeManifest {
      * the project); throws MessageError for a name yarn rejects, or a name or version that is not a string.
      */
     static Manifest normalizeManifest(Manifest info, @Nullable String moduleLoc, @Nullable String lockfileFolder,
-                                      boolean isRoot, boolean looseSemver, List<String> warnings) {
+                                      boolean isRoot, boolean looseSemver) {
         Object name = info.getName();
         Object version = info.getVersion();
         String human = null;
@@ -74,7 +74,7 @@ final class NormalizeManifest {
         fix(info, looseSemver);
         resolveRelative(info, moduleLoc, lockfileFolder);
         try {
-            validate(info, isRoot, msg -> warnings.add(prefix + msg));
+            validate(info);
         } catch (MessageError err) {
             throw new MessageError(prefix + err.getMessage(), err.getCode());
         }
@@ -214,11 +214,7 @@ final class NormalizeManifest {
         return project.append("/\0").toString();
     }
 
-    interface Warn {
-        void warn(String msg);
-    }
-
-    static void validate(Manifest info, boolean isRoot, Warn warn) {
+    static void validate(Manifest info) {
         Object name = info.getName();
         if (name instanceof String) {
             String n = (String) name;
@@ -239,7 +235,7 @@ final class NormalizeManifest {
                 throw new MessageError(Lang.format("$0 is not a string", key));
             }
         }
-        cleanDependencies(info, isRoot, warn);
+        cleanDependencies(info);
     }
 
     static boolean isValidName(String name) {
@@ -270,7 +266,7 @@ final class NormalizeManifest {
      * A name listed in several dependency maps keeps the first non-trivial range found in the order
      * optionalDependencies, dependencies, devDependencies, and stays only in the first map that lists it.
      */
-    static void cleanDependencies(Manifest info, boolean isRoot, Warn warn) {
+    static void cleanDependencies(Manifest info) {
         List<String> types = new ArrayList<>();
         List<Map<String, @Nullable Object>> depTypes = new ArrayList<>();
         for (String type : DEPENDENCY_KEYS) {
@@ -300,12 +296,6 @@ final class NormalizeManifest {
                 Object version = deps.get(name);
                 DependencyTuple dep = nonTrivialDeps.get(name);
                 if (dep != null) {
-                    if (Js.truthy(version) && !"*".equals(version) && !Js.strictEquals(version, dep.version) &&
-                        isRoot) {
-                        warn.warn(Lang.format("$0 has dependency $1 with range $2 that collides with a dependency in " +
-                                              "$3 of the same name with version $4", dep.type, name,
-                                shown(dep.version), types.get(t), shown(version)));
-                    }
                     version = dep.version;
                 }
                 if (setDeps.contains(name)) {
@@ -328,8 +318,4 @@ final class NormalizeManifest {
         }
     }
 
-    // a warning reaches no lock, so one naming a path yarn makes relative to the disk need not know it
-    private static @Nullable Object shown(@Nullable Object version) {
-        return version instanceof UnknownPath ? version.toString() : version;
-    }
 }

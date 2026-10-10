@@ -396,7 +396,7 @@ final class YarnClassicScenarios {
     static Config config(Map<String, String> configFiles, @Nullable Map<String, String> env) {
         YarnClassicLockRegenerator.Inputs inputs = YarnClassicLockRegenerator.Inputs.builder()
                 .configFiles(configFiles).env(env).build();
-        return new Config(inputs, YarnClassicLockRegenerator.start(inputs), new ArrayList<>());
+        return new Config(inputs, YarnClassicLockRegenerator.start(inputs));
     }
 
     static Config defaults() {
@@ -405,7 +405,7 @@ final class YarnClassicScenarios {
 
     static PackageResolver resolver(Config options, Lockfile lockfile) {
         return new PackageResolver(options, lockfile, new ResolutionMap(options), NO_REGISTRY,
-                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN, new ArrayList<>());
+                new ProjectFiles(Collections.emptyMap(), null), Host.UNKNOWN);
     }
 
     private static boolean isScenario(Path dir) {

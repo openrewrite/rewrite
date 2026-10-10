@@ -31,11 +31,9 @@ import org.openrewrite.javascript.internal.lock.LockOnlyInstall;
 import org.openrewrite.javascript.internal.lock.Rejected;
 import org.openrewrite.javascript.internal.lock.SharedError;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -206,10 +204,9 @@ public final class YarnClassicLockRegenerator {
     String install(String lock) {
         Inputs these = lock.equals(inputs.getLock()) ? inputs : inputs.toBuilder().lock(lock).build();
         requireConfigFiles(these);
-        List<String> warnings = new ArrayList<>();
         Map<String, @Nullable Object> flags = start(these);
-        Config config = new Config(these, flags, warnings);
-        String saved = new Install(these, config, flags, registry, warnings).run();
+        Config config = new Config(these, flags);
+        String saved = new Install(these, config, flags, registry).run();
         return saved == null ? lock : saved;
     }
 
@@ -246,8 +243,7 @@ public final class YarnClassicLockRegenerator {
     public static InstallRoot installRoot(Inputs inputs) {
         try {
             Map<String, @Nullable Object> flags = start(inputs);
-            int workspaceRoot = Config.findWorkspaceRoot(inputs, !Js.truthy(flags.get("strictSemver")),
-                    new ArrayList<>());
+            int workspaceRoot = Config.findWorkspaceRoot(inputs, !Js.truthy(flags.get("strictSemver")));
             return InstallRoot.at(Math.max(workspaceRoot, 0));
         } catch (RuntimeException e) {
             return InstallRoot.STOPS_HERE;
