@@ -48,10 +48,6 @@ final class Strings {
         return Integer.compare(remainA == 0 ? 0 : 1, remainB == 0 ? 0 : 1);
     }
 
-    static boolean cmpStringsAsc(String a, String b) {
-        return order(a, b) < 0;
-    }
-
     static String trim(String s, String chars) {
         return trimRight(trimLeft(s, chars), chars);
     }

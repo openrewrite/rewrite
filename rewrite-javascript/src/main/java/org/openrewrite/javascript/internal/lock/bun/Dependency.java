@@ -39,10 +39,6 @@ final class Dependency {
         this(Wyhash11.stringHash(name), name, version, behavior);
     }
 
-    static Dependency empty() {
-        return new Dependency(0, "", DependencyVersion.ZEROED, Behavior.NONE);
-    }
-
     Dependency copy() {
         return new Dependency(nameHash, name, version, behavior);
     }
@@ -50,14 +46,6 @@ final class Dependency {
     /**
      * Sorting order for dependencies: behavior ({@link Behavior#cmp}), then name.
      */
-    static boolean isLessThan(Dependency lhs, Dependency rhs) {
-        int behavior = lhs.behavior.cmp(rhs.behavior);
-        if (behavior != 0) {
-            return behavior < 0;
-        }
-        return Strings.cmpStringsAsc(lhs.name, rhs.name);
-    }
-
     static int compare(Dependency lhs, Dependency rhs) {
         int behavior = lhs.behavior.cmp(rhs.behavior);
         if (behavior != 0) {

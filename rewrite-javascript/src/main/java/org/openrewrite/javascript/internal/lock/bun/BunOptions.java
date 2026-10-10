@@ -45,10 +45,7 @@ public final class BunOptions {
     private final Map<String, String> scopes = new LinkedHashMap<>();
 
     private boolean linkWorkspacePackages = true;
-    private @Nullable Boolean saveTextLockfile;
     private boolean frozenLockfile;
-    private boolean exactVersions;
-    private boolean dryRun;
     private boolean loadLockfile = true;
     private @Nullable Double minimumReleaseAgeMs;
     private List<String> minimumReleaseAgeExcludes = Collections.emptyList();
@@ -60,10 +57,6 @@ public final class BunOptions {
     private boolean remotePeerDependencies = true;
 
     private BunOptions() {
-    }
-
-    public static BunOptions defaults() {
-        return new BunOptions();
     }
 
     /**
@@ -121,21 +114,12 @@ public final class BunOptions {
             remotePeerDependencies = install.savePeer;
             localPeerDependencies = install.savePeer;
         }
-        if (install.exact != null) {
-            exactVersions = install.exact;
-        }
         if (Boolean.TRUE.equals(install.production)) {
             localDevDependencies = false;
             frozenLockfile = true;
         }
         if (Boolean.TRUE.equals(install.frozenLockfile)) {
             frozenLockfile = true;
-        }
-        if (install.saveTextLockfile != null) {
-            saveTextLockfile = install.saveTextLockfile;
-        }
-        if (install.dryRun != null) {
-            dryRun = install.dryRun;
         }
         minimumReleaseAgeMs = install.minimumReleaseAgeMs;
         minimumReleaseAgeExcludes = install.minimumReleaseAgeExcludes;
@@ -173,16 +157,12 @@ public final class BunOptions {
         @Nullable Boolean saveDev;
         @Nullable Boolean saveOptional;
         @Nullable Boolean savePeer;
-        @Nullable Boolean exact;
         @Nullable Boolean production;
         @Nullable Boolean frozenLockfile;
-        @Nullable Boolean saveTextLockfile;
-        @Nullable Boolean dryRun;
         @Nullable Double minimumReleaseAgeMs;
         List<String> minimumReleaseAgeExcludes = Collections.emptyList();
 
         void readBunfig(Json.Expr installObj) {
-            exact = bool(installObj, "exact", exact);
             Json.Expr registry = installObj.get("registry");
             if (registry != null) {
                 defaultRegistry = parseRegistry(registry);
@@ -197,10 +177,8 @@ public final class BunOptions {
                     scoped.put(name.charAt(0) == '@' ? name.substring(1) : name, parseRegistry(prop.value));
                 }
             }
-            dryRun = bool(installObj, "dryRun", dryRun);
             production = bool(installObj, "production", production);
             frozenLockfile = bool(installObj, "frozenLockfile", frozenLockfile);
-            saveTextLockfile = bool(installObj, "saveTextLockfile", saveTextLockfile);
             saveOptional = bool(installObj, "optional", saveOptional);
             savePeer = bool(installObj, "peer", savePeer);
             saveDev = bool(installObj, "dev", saveDev);
@@ -238,18 +216,12 @@ public final class BunOptions {
             return b != null ? b : current;
         }
 
-        // ini.zig loadNpmrc: the top-level keys it reads, each of the type it takes
+        // ini.zig loadNpmrc: the top-level keys a lock-only install uses, each of the type it takes
         void readNpmrc(String npmrc, HostEnvironment env) {
             Map<String, @Nullable Object> out = Ini.parse(npmrc, env);
             Object registry = out.get("registry");
             if (registry instanceof String) {
                 defaultRegistry = (String) registry;
-            }
-            Object dry = out.get("dry-run");
-            if (dry instanceof String) {
-                dryRun = "true".equals(dry);
-            } else if (dry instanceof Boolean) {
-                dryRun = (Boolean) dry;
             }
             for (String key : new String[]{"omit", "include"}) {
                 boolean include = "include".equals(key);
@@ -268,10 +240,6 @@ public final class BunOptions {
             Object link = out.get("link-workspace-packages");
             if (link instanceof Boolean) {
                 linkWorkspacePackages = (Boolean) link;
-            }
-            Object saveExact = out.get("save-exact");
-            if (saveExact instanceof Boolean) {
-                exact = (Boolean) saveExact;
             }
             for (Map.Entry<String, @Nullable Object> entry : out.entrySet()) {
                 String key = entry.getKey();

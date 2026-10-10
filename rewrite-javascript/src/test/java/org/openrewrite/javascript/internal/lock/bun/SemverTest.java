@@ -15,6 +15,7 @@
  */
 package org.openrewrite.javascript.internal.lock.bun;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -43,11 +44,21 @@ class SemverTest {
         }
         SemverVersion leftVersion = leftResult.version.min();
         SemverQuery.Group rightGroup = SemverQuery.parse(right);
-        SemverVersion rightVersion = rightGroup.getExactVersion();
+        SemverVersion rightVersion = exactVersion(rightGroup);
         if (rightVersion != null) {
             return leftVersion.eql(rightVersion);
         }
         return rightGroup.satisfies(leftVersion);
+    }
+
+    // SemverQuery.zig Group.getExactVersion
+    private static @Nullable SemverVersion exactVersion(SemverQuery.Group group) {
+        SemverRange range = group.head.head.range;
+        if (group.head.next == null && group.head.head.next == null && range.hasLeft() &&
+            range.left.op == SemverRange.Op.EQL && !range.hasRight()) {
+            return range.left.version;
+        }
+        return null;
     }
 
     // SemverObject.zig order

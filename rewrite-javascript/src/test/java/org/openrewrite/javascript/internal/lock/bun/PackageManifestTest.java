@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -87,7 +88,7 @@ class PackageManifestTest {
         assertThat(manifest).isNotNull();
         PackageManifest.FindResult found = version.tag == DependencyVersion.Tag.NPM ?
           manifest.findBestVersion(version.npm().version) : manifest.findByDistTag(version.distTag().tag);
-        Lockfile lockfile = TextLockfileReader.load(fresh, BunOptions.defaults());
+        Lockfile lockfile = TextLockfileReader.load(fresh, BunOptions.load(null, null, HostEnvironment.UNKNOWN));
         Package locked = topLevel(lockfile, alias);
         if (found == null) {
             assertThat(locked).as("bun installed nothing for " + alias).isNull();

@@ -808,6 +808,7 @@ final class PackageManager {
         }
         return lockfile.dependencies.get(edge.dependencyId).name;
     }
+
     /**
      * {@code verifyResolutions}: each required dependency that did not resolve, as bun reports it.
      */

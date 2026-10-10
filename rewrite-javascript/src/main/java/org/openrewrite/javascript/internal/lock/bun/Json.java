@@ -45,7 +45,7 @@ final class Json {
             return new Expr(Kind.OBJECT, new ArrayList<Property>());
         }
         Json p = new Json(source);
-        if (source.charAt(0) == '﻿') {
+        if (source.charAt(0) == '\uFEFF') {
             p.pos = 1;
         }
         p.skipWhitespace();
@@ -145,7 +145,7 @@ final class Json {
         while (pos < source.length()) {
             char c = source.charAt(pos);
             if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\u000B' || c == '\u000C' ||
-                c == ' ' || c == '﻿' || c == ' ' || c == ' ') {
+                c == '\u00A0' || c == '\uFEFF' || c == '\u2028' || c == '\u2029') {
                 pos++;
             } else if (c == '/' && pos + 1 < source.length() && source.charAt(pos + 1) == '/') {
                 while (pos < source.length() && source.charAt(pos) != '\n' && source.charAt(pos) != '\r') {

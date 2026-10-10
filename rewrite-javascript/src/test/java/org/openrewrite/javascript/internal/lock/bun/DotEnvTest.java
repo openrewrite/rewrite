@@ -207,8 +207,8 @@ class DotEnvTest {
     // bun 1.3.10 `bun -e` over this .env: the loader skips and trims the byte 0xa0, never the c2 before it
     @Test
     void aNoBreakSpaceIsWhiteSpaceByItsLastByteOnly() {
-        Map<String, String> env = parse("A= x\nB=x \n C=x\nD=\"x \"\n");
-        assertThat(env).containsEntry("A", " x").containsEntry("B", "x�").containsEntry("D", "x ")
+        Map<String, String> env = parse("A=\u00A0x\nB=x\u00A0\n\u00A0C=x\nD=\"x\u00A0\"\n");
+        assertThat(env).containsEntry("A", "\u00A0x").containsEntry("B", "x\uFFFD").containsEntry("D", "x\u00A0")
           .doesNotContainKey("C");
     }
 

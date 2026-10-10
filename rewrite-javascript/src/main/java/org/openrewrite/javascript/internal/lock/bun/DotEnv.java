@@ -43,7 +43,7 @@ public final class DotEnv {
     public static final List<String> FILES = Collections.unmodifiableList(Arrays.asList(".env.production.local",
             ".env.local", ".env.production", ".env"));
 
-    private static final String WHITESPACE = "\t\u000B\f  \n\r";
+    private static final String WHITESPACE = "\t\u000B\f \u00A0\n\r";
 
     private DotEnv() {
     }

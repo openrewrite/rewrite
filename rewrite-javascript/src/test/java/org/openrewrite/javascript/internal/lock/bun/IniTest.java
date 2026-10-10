@@ -117,7 +117,7 @@ class IniTest {
     void unicode() {
         assertThat(parse("\nhi👋lol = 'lol hi 👋'\n"))
           .isEqualTo(map("hi👋lol", "lol hi 👋"));
-        String facepalm = "🤦‍♀️";
+        String facepalm = "\uD83E\uDD26\u200D\u2640\uFE0F";
         assertThat(parse("\n[😎.🫒." + facepalm + "]\nlol = 'wtf'\n    "))
           .isEqualTo(map("😎", map("🫒", map(facepalm, map("lol", "wtf")))));
     }

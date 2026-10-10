@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.bun;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.HostEnvironment;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -154,7 +155,8 @@ class PackageManagerTest {
     }
 
     private static PackageManager manager(Lockfile lockfile) {
-        return new PackageManager(lockfile, BunOptions.defaults(), new Log(), Collections.emptyMap(),
+        return new PackageManager(lockfile, BunOptions.load(null, null, HostEnvironment.UNKNOWN), new Log(),
+          Collections.emptyMap(),
           (registry, name, extended) -> {
               throw new AssertionError("no packument is needed: " + name);
           }, 0);

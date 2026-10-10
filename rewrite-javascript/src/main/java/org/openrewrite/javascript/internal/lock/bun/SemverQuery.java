@@ -121,21 +121,6 @@ final class SemverQuery {
             return group;
         }
 
-        @Nullable
-        SemverVersion getExactVersion() {
-            SemverRange range = head.head.range;
-            if (head.next == null && head.head.next == null && range.hasLeft() && range.left.op == SemverRange.Op.EQL &&
-                !range.hasRight()) {
-                return range.left.version;
-            }
-            return null;
-        }
-
-        boolean isExact() {
-            return head.next == null && head.head.next == null && !head.head.range.hasRight() &&
-                   head.head.range.left.op == SemverRange.Op.EQL;
-        }
-
         boolean isStar() {
             SemverRange.Comparator left = head.head.range.left;
             return head.head.range.right.op == SemverRange.Op.UNSET && left.op == SemverRange.Op.GTE &&
