@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
 import org.openrewrite.javascript.internal.lock.LockScenario;
+import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -121,11 +122,8 @@ class YarnClassicLockRoundTripTest {
         YarnClassicLockRegenerator.Inputs inputs = lock.inputs();
         Config options = null;
         try {
-            Map<String, @Nullable Object> rc = Rc.getRcConfigForCwd(inputs.configFilesFromCwd(),
-                    inputs.getHomeFiles());
-            new Cli(inputs).start(rc);
-            options = new Config(inputs, Rc.getRcArgs(rc), new ArrayList<>());
-        } catch (CannotKnow | JsError | MessageError e) {
+            options = new Config(inputs, YarnClassicLockRegenerator.start(inputs), new ArrayList<>());
+        } catch (CannotKnow | JsError | MessageError | Rejected e) {
             if (e instanceof CannotKnow) {
                 assertThat(lock.getScenario().expect()).startsWith("cannot-know");
                 assumeFalse(true, "the engine cannot know what yarn does with this configuration: " +
