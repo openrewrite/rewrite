@@ -16,9 +16,11 @@
 package org.openrewrite.javascript.internal.lock.yarnclassic;
 
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -28,6 +30,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,7 @@ import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * yarn's __tests__/fetchers.js tarball cases and archives for each branch of gunzip-maybe, tar-stream, tar-fs and the
@@ -65,6 +69,33 @@ class TarballFetcherTest {
         } else {
             assertThat(actual).isEqualTo(outcome);
         }
+    }
+
+    /**
+     * yarn creates a hash for every algorithm the integrity names; beyond these six, Node's OpenSSL build answers.
+     */
+    @Test
+    void cannotKnowAnIntegrityAlgorithmBeyondTheSixEveryNodeDigests() {
+        PackageRemote remote = new PackageRemote();
+        remote.type = "tarball";
+        remote.registry = "npm";
+        remote.reference = "https://registry.npmjs.org/x/-/x-1.0.0.tgz";
+        remote.integrity = "sha512-AAAA whirlpool-AAAA";
+        RegistrySource tarballs = new RegistrySource() {
+            @Override
+            public @Nullable String packument(String r, String name) {
+                return null;
+            }
+
+            @Override
+            public byte[] tarball(String url, String name, String version) {
+                return new byte[0];
+            }
+        };
+        assertThatThrownBy(() -> new TarballFetcher(remote, "x", "1.0.0", "dest", tarballs,
+                YarnClassicOptions.load(Collections.emptyMap(), new LinkedHashMap<>()), new ArrayList<>()).fetch())
+                .isInstanceOf(CannotKnow.class)
+                .hasMessageContaining("the whirlpool digest the integrity of x@1.0.0 names");
     }
 
     private static String read(byte[] tarball) {

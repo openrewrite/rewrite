@@ -159,9 +159,9 @@ final class TarballFetcher {
         for (String candidate : Js.keys(expected.hashes)) {
             String lower = candidate.toLowerCase(Locale.ROOT);
             if (!digestible(lower)) {
-                throw new CannotKnow("whether the Node yarn runs under has the " + candidate + " digest the integrity " +
-                                     "of " + Js.string(name) + "@" + Js.string(version) + " names (its OpenSSL " +
-                                     "build decides, and yarn checks every algorithm named)");
+                throw new CannotKnow("whether the Node yarn runs under has the " + candidate + " digest the " +
+                                     "integrity of " + Js.string(name) + "@" + Js.string(version) + " names (its " +
+                                     "OpenSSL build decides, and yarn checks every algorithm named)");
             }
             if (algorithm == null ||
                 DEFAULT_PRIORITY.indexOf(algorithm.toLowerCase(Locale.ROOT)) < DEFAULT_PRIORITY.indexOf(lower)) {
