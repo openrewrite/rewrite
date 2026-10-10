@@ -492,6 +492,57 @@ class NodeDependencyScanTest {
     }
 
     /**
+     * Recorded in a member with its own lock under a root that lists it: npm writes the root's npm-shrinkwrap.json in
+     * place of its lock; bun rewrites a bun.lockb, and migrates a package-lock.json or yarn.lock before a pnpm-lock.yaml.
+     */
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+      "Npm | npm-shrinkwrap.json                   | member | it installs at the workspace root ../..",
+      "Npm | npm-shrinkwrap.json package-lock.json | root   | it reads and writes the npm-shrinkwrap.json beside",
+      "Bun | bun.lockb                             | member | it installs at the workspace root ../..",
+      "Bun | pnpm-lock.yaml package-lock.json      |        |",
+      "Bun | pnpm-lock.yaml yarn.lock              |        |"
+    })
+    void aMemberWhoseRootHoldsFilesItsPackageManagerReadsThere(PackageManager pm, String held,
+                                                               @Nullable String written, @Nullable String reported) {
+        String lockName = LockFileRegeneration.forPackageManager(pm).getLockFile();
+        NodeDependencyScan.Accumulator acc = new NodeDependencyScan.Accumulator();
+        for (String file : held.split(" ")) {
+            if (file.equals("npm-shrinkwrap.json") || file.equals("bun.lockb")) {
+                capture(acc, file, "unread");
+            } else {
+                captureFile(acc, file, "root lock");
+            }
+        }
+        if (held.contains("pnpm-lock.yaml")) {
+            capture(acc, "pnpm-workspace.yaml", "packages:\n  - packages/*\n");
+        }
+        captureFile(acc, "packages/a/" + lockName, "member lock");
+        project(acc, ROOT, "{\"name\":\"root\",\"private\":true,\"workspaces\":[\"packages/*\"]}",
+          nodeResolutionResult(pm, singletonList("packages/a/package.json")));
+        SourceFile member = project(acc, MEMBER,
+          "{\"name\":\"a\",\"version\":\"1.0.0\",\"dependencies\":{\"is-number\":\"^7.0.0\"}}",
+          nodeResolutionResult(pm));
+
+        NodeDependencyScan.linkWorkspaceMembers(acc);
+
+        Path lock = written == null ? null : Paths.get("member".equals(written) ? "packages/a/" + lockName : lockName);
+        assertThat(NodeDependencyScan.lockFor(acc, MEMBER)).isEqualTo(lock);
+        if (reported == null) {
+            return;
+        }
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        LockFileRegeneration.Result result = PackageJsonHelper.regenerateLockContent(member,
+          acc.projects.get(MEMBER).capturedLockContent, NodeDependencyScan.projectFiles(acc, ctx, MEMBER), ctx);
+        assertThat(result).isNotNull();
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(LockFileRegeneration.Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).startsWith("the engine cannot know the lock " +
+                                                               (pm == PackageManager.Npm ? "npm" : "bun") +
+                                                               " writes: " + reported);
+    }
+
+    /**
      * Which lock npm 11.17.0, yarn 1.22.22, Yarn 4.10.3, pnpm 11.2.2 and bun 1.3.10 write run in a member, recorded;
      * none where it writes none the host holds. Yarn rejects an unlisted member, as the root lock's regeneration does.
      */

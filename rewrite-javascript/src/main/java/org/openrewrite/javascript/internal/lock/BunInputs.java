@@ -63,13 +63,21 @@ final class BunInputs {
     }
 
     /**
-     * bun's walk from where it runs; without a bun.lock where it installs it migrates a pnpm-lock.yaml there and
-     * rewrites that package.json (pnpm.zig), which no regeneration writes, so a walk to one the host holds stops.
+     * bun's walk from where it runs. Without a bun.lock where it installs it rewrites a bun.lockb, or migrates the first
+     * of package-lock.json, yarn.lock and pnpm-lock.yaml, rewriting package.json after pnpm's: there the walk stops.
      */
     static InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = BunLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
         String root = dir.aboveRunsIn(walked.getDepth());
-        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "pnpm-lock.yaml")) ? walked :
-                new InstallRoot(walked.getDepth(), true);
+        if (walked.isStopped() || root.isEmpty() && dir.getLock() != null || holds(dir, root, "bun.lock")) {
+            return walked;
+        }
+        boolean rewritten = holds(dir, root, "bun.lockb") || !holds(dir, root, "package-lock.json") &&
+                            !holds(dir, root, "yarn.lock") && holds(dir, root, "pnpm-lock.yaml");
+        return rewritten ? new InstallRoot(walked.getDepth(), true) : walked;
+    }
+
+    private static boolean holds(LockDirectory dir, String root, String file) {
+        return dir.holds(RootRelativePath.join(root, file));
     }
 }

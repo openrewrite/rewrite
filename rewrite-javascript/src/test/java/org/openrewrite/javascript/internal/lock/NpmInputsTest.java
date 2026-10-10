@@ -140,4 +140,30 @@ class NpmInputsTest {
         assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know yarn.lock, which npm reads and " +
                                                               "rewrites beside its lock (its contents were not read)");
     }
+
+    /**
+     * npm 11.17.0 run beside an npm-shrinkwrap.json and a package-lock.json rewrites the shrinkwrap and leaves the lock
+     * as it was (shrinkwrap.js load).
+     */
+    @Test
+    void anNpmShrinkwrapBesideTheLockIsTheLockNpmWrites() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"a\",\"version\":\"1.0.0\"}")
+          .lock("{\"name\":\"a\",\"version\":\"1.0.0\",\"lockfileVersion\":3,\"requires\":true,\"packages\":" +
+                "{\"\":{\"name\":\"a\",\"version\":\"1.0.0\"}}}\n")
+          .packageJsonPath(Paths.get("app/package.json"))
+          .manifest(Paths.get("app/package.json"), "{\"name\":\"a\",\"version\":\"1.0.0\"}")
+          .projectPaths(new HashSet<>(Arrays.asList(Paths.get("app/package.json"),
+            Paths.get("app/npm-shrinkwrap.json"))))
+          .build();
+
+        Result result = new NpmLockRegenerator(NpmInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH),
+          NO_REGISTRY).regenerate();
+
+        assertThat(result.getFailure()).isNotNull();
+        assertThat(result.getFailure().getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(result.getFailure().getDetail()).isEqualTo("the engine cannot know the lock npm writes: it reads " +
+                                                              "and writes the npm-shrinkwrap.json beside this lock in " +
+                                                              "its place");
+    }
 }

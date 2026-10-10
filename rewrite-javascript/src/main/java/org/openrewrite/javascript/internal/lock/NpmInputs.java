@@ -49,13 +49,14 @@ final class NpmInputs {
     }
 
     /**
-     * npm's walk from where it runs; where it installs it reads and rewrites a yarn.lock (shrinkwrap.js save), which
-     * no regeneration writes, so a walk to one the host holds stops.
+     * npm's walk from where it runs; where it installs it writes an npm-shrinkwrap.json in place of its lock and
+     * rewrites a yarn.lock (shrinkwrap.js), which no regeneration writes, so a walk to either the host holds stops.
      */
     static InstallRoot installRoot(LockDirectory dir) {
         InstallRoot walked = NpmLockRegenerator.installRoot(from(dir, Host.UNKNOWN, Instant.EPOCH));
         String root = dir.aboveRunsIn(walked.getDepth());
-        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "yarn.lock")) ? walked :
+        return walked.isStopped() || !dir.holds(RootRelativePath.join(root, "npm-shrinkwrap.json")) &&
+                                     !dir.holds(RootRelativePath.join(root, "yarn.lock")) ? walked :
                 new InstallRoot(walked.getDepth(), true);
     }
 }

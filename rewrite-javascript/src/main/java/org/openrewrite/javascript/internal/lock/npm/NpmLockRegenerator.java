@@ -146,6 +146,10 @@ public final class NpmLockRegenerator {
                 throw new CannotKnow("the lock npm writes: run in " + inputs.getRunsIn() + " it installs " +
                                      localPrefix + " directories above it, not at this lock");
             }
+            if (inputs.getPaths() != null && inputs.getPaths().contains("npm-shrinkwrap.json")) {
+                throw new CannotKnow("the lock npm writes: it reads and writes the npm-shrinkwrap.json beside this " +
+                                     "lock in its place");
+            }
             if (inputs.getNpmrc() == null && inputs.getPaths() != null && inputs.getPaths().contains(".npmrc")) {
                 throw new CannotKnow(".npmrc (its contents were not read)");
             }
