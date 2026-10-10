@@ -164,7 +164,7 @@ class BerryDifferentialTest {
 
     @Test
     void normalizesARegistryPackageAsYarnDoes() {
-        Configuration configuration = Configuration.defaults().withRelease(YarnRelease.of("4.10.3"));
+        Configuration configuration = BerryScenarios.restricted(Configuration.defaults(), YarnRelease.of("4.10.3"));
         List<String> differences = new ArrayList<>();
         for (String[] row : rows("normalize.tsv.gz")) {
             JsonNode actual = answer(() -> {

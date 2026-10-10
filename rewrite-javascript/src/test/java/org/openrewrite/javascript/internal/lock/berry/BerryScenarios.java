@@ -485,6 +485,15 @@ final class BerryScenarios {
         }
     }
 
+    /**
+     * The configuration as an install reads it for a release: a copy restricted to the release's settings.
+     */
+    static Configuration restricted(Configuration options, YarnRelease release) {
+        Configuration configuration = options.copy();
+        configuration.restrictTo(release);
+        return configuration;
+    }
+
     static List<Scenario> discover() {
         return LockScenario.discover(FAMILY, BerryScenarios::isScenario, Scenario::new);
     }

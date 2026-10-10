@@ -195,6 +195,8 @@ public final class YarnBerryLockRegenerator {
             throw new CannotKnow("what the plugin " + options().getThirdPartyPlugin() + " does to the lock (Yarn " +
                                  "runs its code)");
         }
+        // Configuration.find's plugin pass rejects a setting the release does not know before install reads the lock
+        options().copy().restrictTo(release);
         if (lock.contains(MERGE_CONFLICT_START)) {
             throw new CannotKnow("how Yarn repairs the lock's merge conflict (it asks git for each side)");
         }

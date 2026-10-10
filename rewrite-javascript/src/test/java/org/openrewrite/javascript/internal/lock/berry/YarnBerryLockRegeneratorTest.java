@@ -19,7 +19,10 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Failure;
+import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.Rejected;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,6 +34,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -88,6 +92,47 @@ class YarnBerryLockRegeneratorTest {
                 .isInstanceOf(CannotKnow.class)
                 .hasMessageContaining("Yarn 4.14.0");
         assertThat(release("yarn@4.0.0", null, Collections.emptyMap())).isEqualTo("4.0.0");
+    }
+
+    /**
+     * corepack's findProjectSpec refuses a project naming another package manager, yarnPath or not
+     * ({@code open-corepack-member-names-pnpm}); a version it accepts that no release is spelled as is unknown.
+     */
+    @Test
+    void corepackDecidesBeforeTheReleaseIsRead() {
+        assertThatThrownBy(() -> release("pnpm@9.15.0", YARN_PATH, Collections.emptyMap()))
+                .isInstanceOf(Rejected.class)
+                .hasMessage("This project is configured to use pnpm because package.json has a \"packageManager\" " +
+                            "field (corepack)");
+        for (String spec : new String[]{"yarn@v4.10.3", "yarn@4.10.3 "}) {
+            assertThatThrownBy(() -> release(spec, null, Collections.emptyMap())).as(spec)
+                    .isInstanceOf(CannotKnow.class)
+                    .hasMessageContaining("the Yarn release corepack runs for " + spec + " (");
+        }
+    }
+
+    /**
+     * install.ts runs Configuration.find, whose plugin pass rejects a setting the release does not know, before
+     * autofixMergeConflicts reads the lock.
+     */
+    @Test
+    void anUnknownSettingIsRejectedBeforeTheLocksMergeConflict() {
+        String conflicted = "<<<<<<< HEAD\n=======\n>>>>>>> other\n";
+        YarnBerryLockRegenerator.Inputs.InputsBuilder inputs = YarnBerryLockRegenerator.Inputs.builder()
+                .lock(conflicted)
+                .manifest("", "{\"name\":\"p\",\"packageManager\":\"yarn@4.10.3\"}")
+                .now(Instant.EPOCH);
+
+        Failure unknown = new YarnBerryLockRegenerator(inputs.configFile(".yarnrc.yml", "unknownSetting: true\n")
+                .build(), BerryScenarios.NO_REGISTRY).regenerate().getFailure();
+        Failure conflict = new YarnBerryLockRegenerator(inputs.clearConfigFiles().build(),
+                BerryScenarios.NO_REGISTRY).regenerate().getFailure();
+
+        assertThat(requireNonNull(unknown).getKind()).isEqualTo(Kind.PM_REJECTS);
+        assertThat(unknown.getDetail()).contains("Usage Error: Unrecognized or legacy configuration settings found: " +
+                                                 "unknownSetting");
+        assertThat(requireNonNull(conflict).getKind()).isEqualTo(Kind.CANNOT_KNOW);
+        assertThat(conflict.getDetail()).contains("merge conflict");
     }
 
     /**

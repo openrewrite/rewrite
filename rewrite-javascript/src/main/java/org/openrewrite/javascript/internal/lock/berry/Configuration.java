@@ -695,15 +695,6 @@ public final class Configuration {
     }
 
     /**
-     * A copy read for {@code release}, without restrictTo's check of the keys against it.
-     */
-    Configuration withRelease(YarnRelease release) {
-        Configuration copy = copy();
-        copy.release = release;
-        return copy;
-    }
-
-    /**
      * The release {@link #restrictTo} named.
      */
     YarnRelease getRelease() {

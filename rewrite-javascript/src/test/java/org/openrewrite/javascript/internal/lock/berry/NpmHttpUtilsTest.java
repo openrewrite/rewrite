@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class NpmHttpUtilsTest {
 
-    private final Configuration configuration = Configuration.defaults().withRelease(YarnRelease.of("4.10.3"));
+    private final Configuration configuration = BerryScenarios.restricted(Configuration.defaults(), YarnRelease.of("4.10.3"));
     private final String registry = configuration.getString("npmRegistryServer");
 
     @Test
@@ -78,7 +78,7 @@ class NpmHttpUtilsTest {
         Configuration options = Configuration.load(Collections.singletonMap(".yarnrc.yml",
                 "npmRegistryServer: \"https://mirror.example\"\nnpmScopes:\n  corp:\n    npmAuthToken: x\n"),
                 HostEnvironment.of(Collections.emptyMap()));
-        Configuration configuration = options.withRelease(YarnRelease.of("4.10.3"));
+        Configuration configuration = BerryScenarios.restricted(options, YarnRelease.of("4.10.3"));
         assertThat(NpmHttpUtils.getScopeRegistry(null, configuration)).isEqualTo("https://mirror.example");
         assertThat(NpmHttpUtils.getScopeRegistry("corp", configuration)).isEqualTo("https://registry.yarnpkg.com");
         assertThat(NpmHttpUtils.getScopeRegistry("jsr", configuration)).isEqualTo("https://npm.jsr.io");
@@ -89,9 +89,9 @@ class NpmHttpUtilsTest {
     void theJsrScopeIsTheProjectsRegistryBeforeYarn49() {
         Configuration options = Configuration.load(Collections.singletonMap(".yarnrc.yml",
                 "npmRegistryServer: \"https://mirror.example\"\n"), HostEnvironment.of(Collections.emptyMap()));
-        assertThat(NpmHttpUtils.getScopeRegistry("jsr", options.withRelease(YarnRelease.of("4.8.1"))))
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", BerryScenarios.restricted(options, YarnRelease.of("4.8.1"))))
                 .isEqualTo("https://mirror.example");
-        assertThat(NpmHttpUtils.getScopeRegistry("jsr", options.withRelease(YarnRelease.of("4.9.0"))))
+        assertThat(NpmHttpUtils.getScopeRegistry("jsr", BerryScenarios.restricted(options, YarnRelease.of("4.9.0"))))
                 .isEqualTo("https://npm.jsr.io");
     }
 
