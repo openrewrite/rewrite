@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.function.Supplier;
@@ -45,7 +44,7 @@ final class SyncEnvLockfile {
         EnvLockfile locked = envLockfile.get();
         Object lockedVersion = EnvInstaller.lockedVersion(locked == null ? null : locked.packageManagerDependencies(),
                 "pnpm");
-        if (lockedVersion != null && lockedVersion != JsYaml.UNDEFINED &&
+        if (lockedVersion != null && lockedVersion != Js.UNDEFINED &&
             NodeSemver.satisfies(lockedVersion, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
             return null;
         }

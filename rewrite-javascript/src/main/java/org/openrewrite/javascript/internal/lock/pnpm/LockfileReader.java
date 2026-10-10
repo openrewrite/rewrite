@@ -85,7 +85,7 @@ final class LockfileReader {
                 lockfile = autofixMergeConflicts(lockfileRawContent);
             }
             Object version = lockfile.getLockfileVersion();
-            String lockfileSemver = comverToSemver(Js.string(version == null || version == JsYaml.UNDEFINED ?
+            String lockfileSemver = comverToSemver(Js.string(version == null || version == Js.UNDEFINED ?
                     0.0 : version));
             if (semverMajor(lockfileSemver) != semverMajor(comverToSemver(LockfileObject.LOCKFILE_VERSION))) {
                 throw new IgnoredLockfile("Lockfile " + WANTED_LOCKFILE + " not compatible with current pnpm");

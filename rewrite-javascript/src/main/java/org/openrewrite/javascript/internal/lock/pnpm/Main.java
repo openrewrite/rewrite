@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.semver.NodeSemver;
 
@@ -334,7 +333,7 @@ public final class Main {
         }
         Object pnpmfile = options.get("pnpmfile");
         new RequireHooks(inputs).requireHooks(lockfileDir == null ? dir() : lockfileDir,
-                options.get("globalPnpmfile"), pnpmfile == null || pnpmfile == JsYaml.UNDEFINED ?
+                options.get("globalPnpmfile"), pnpmfile == null || pnpmfile == Js.UNDEFINED ?
                         Collections.emptyList() : pnpmfile instanceof List ? (List<?>) pnpmfile :
                         Collections.singletonList(pnpmfile), tryLoadDefaultPnpmfile(options));
     }
@@ -344,7 +343,7 @@ public final class Main {
      */
     static boolean tryLoadDefaultPnpmfile(PnpmOptions options) {
         Object pnpmfile = options.get("pnpmfile");
-        return pnpmfile == null || pnpmfile == JsYaml.UNDEFINED;
+        return pnpmfile == null || pnpmfile == Js.UNDEFINED;
     }
 
     private static boolean isPluginName(String configDepName) {

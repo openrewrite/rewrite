@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * fill-range 2.2.4's and 7.0.1's own tests and the arguments braces passes ({@code upstream/fill-range-*}), for the
@@ -125,5 +126,17 @@ class FillRangeTest {
         expected.put("V7_0_1 options.toRegex: braces does not pass it", 26);
         expected.put("V7_0_1 options.transform: braces does not pass it", 1);
         assertThat(notPorted).isEqualTo(expected);
+    }
+
+    // randomatic's while (length--) never ends for a length that is not a whole number: node hangs or runs out of heap
+    @Test
+    void aRandomRangeOfNoWholeLengthNeverEnds() {
+        for (String[] range : new String[][]{{"x", "Infinity"}, {"a", "2.5"}, {"a", "-1"}}) {
+            assertThatThrownBy(() -> FillRange.fill(range[0], range[1], "?",
+              new FillRange.Options(FillRange.Release.V2_2_4, false)))
+              .isInstanceOf(Rejected.class)
+              .satisfies(e -> assertThat(((Rejected) e).getOutcome()).isEqualTo(Rejected.Outcome.CRASH))
+              .hasMessageContaining("never ends");
+        }
     }
 }

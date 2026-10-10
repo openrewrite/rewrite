@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
 import java.util.LinkedHashMap;
@@ -40,12 +39,12 @@ final class LockfileUtils {
                                                               Map<String, @Nullable Object> resolution,
                                                               String registry, boolean lockfileIncludeTarballUrl) {
         Object integrity = resolution.get("integrity");
-        boolean typed = resolution.containsKey("type") && resolution.get("type") != JsYaml.UNDEFINED;
+        boolean typed = resolution.containsKey("type") && resolution.get("type") != Js.UNDEFINED;
         if (typed || !Js.truthy(integrity)) {
             return resolution;
         }
         Object tarball = resolution.get("tarball");
-        if (tarball == null || tarball == JsYaml.UNDEFINED) {
+        if (tarball == null || tarball == Js.UNDEFINED) {
             Map<String, @Nullable Object> out = new LinkedHashMap<>();
             out.put("integrity", integrity);
             return out;

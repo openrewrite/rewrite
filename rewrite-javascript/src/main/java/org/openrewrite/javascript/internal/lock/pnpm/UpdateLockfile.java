@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolveDependencies.PeerDependency;
 import org.openrewrite.javascript.internal.lock.pnpm.ResolvePeers.DependenciesGraphNode;
 
@@ -115,7 +114,7 @@ final class UpdateLockfile {
         }
         Map<String, @Nullable Object> info = resolved.getAdditionalInfo();
         Object engines = info.get("engines");
-        if (engines != null && engines != JsYaml.UNDEFINED) {
+        if (engines != null && engines != Js.UNDEFINED) {
             Map<String, @Nullable Object> lockEngines = null;
             for (Map.Entry<String, @Nullable Object> engine : entries(engines).entrySet()) {
                 if ("*".equals(engine.getValue())) {
@@ -159,7 +158,7 @@ final class UpdateLockfile {
     }
 
     private static boolean present(@Nullable Object value) {
-        return value != null && value != JsYaml.UNDEFINED;
+        return value != null && value != Js.UNDEFINED;
     }
 
     // Object.entries of an engines value: an object's members, an array's or a string's by index
@@ -296,7 +295,7 @@ final class UpdateLockfile {
                     .computeIfAbsent(dep.getCatalogLookup().getCatalogName(), k -> new LinkedHashMap<>());
             Map<String, @Nullable Object> entry = new LinkedHashMap<>();
             entry.put("specifier", dep.getCatalogLookup().getSpecifier());
-            entry.put("version", dep.getVersion() == null ? JsYaml.UNDEFINED : dep.getVersion());
+            entry.put("version", dep.getVersion() == null ? Js.UNDEFINED : dep.getVersion());
             snapshot.put(dep.getAlias(), entry);
         }
         return catalogSnapshots;

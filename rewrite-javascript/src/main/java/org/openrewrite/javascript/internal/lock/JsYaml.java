@@ -75,7 +75,7 @@ public final class JsYaml {
     }
 
     /**
-     * js-yaml's {@code YAMLException}; 4.1.0's message carries the position and the snippet as it formats them.
+     * js-yaml's {@code YAMLException}, its message carrying the position and the snippet as each release formats them.
      */
     @Getter
     public static final class YamlException extends RuntimeException {
@@ -226,21 +226,16 @@ public final class JsYaml {
         SIMPLE_ESCAPES['P'] = "\u2029";
     }
 
-    /**
-     * A JavaScript {@code undefined}: what {@code load} returns for a stream without documents.
-     */
-    public static final Object UNDEFINED = EcmaScript.UNDEFINED;
-
     private JsYaml() {
     }
 
     /**
-     * @zkochan/js-yaml's {@code load}: the stream's one document, {@link #UNDEFINED} for a stream without documents.
+     * The fork's {@code load}: the stream's one document, {@link EcmaScript#UNDEFINED} for a stream without documents.
      */
     public static @Nullable Object load(String input) {
         List<@Nullable Object> documents = loadDocuments(input, PNPM);
         if (documents.isEmpty()) {
-            return UNDEFINED;
+            return EcmaScript.UNDEFINED;
         }
         return single(documents);
     }
@@ -328,7 +323,9 @@ public final class JsYaml {
 
         YamlException error(String message) {
             if (!v4) {
-                return new YamlException(message, message);
+                String mark = "at line " + (line + 1) + ", column " + (position - lineStart + 1);
+                String snippet = snippet3(terminated ? input : input.substring(0, input.length() - 1));
+                return new YamlException(message, message + " " + (snippet == null ? mark : mark + ":\n" + snippet));
             }
             String buffer = input.substring(0, input.length() - (terminated ? 1 : 2));
             int column = position - lineStart;
@@ -338,6 +335,39 @@ public final class JsYaml {
                 where += "\n\n" + snippet;
             }
             return new YamlException(message, message + " " + where);
+        }
+
+        // 3.x Mark#getSnippet(4, 75): the line around the position, cut to 37 characters each way
+        private @Nullable String snippet3(String buffer) {
+            if (buffer.isEmpty()) {
+                return null;
+            }
+            String head = "";
+            int start = position;
+            while (start > 0 && start <= buffer.length() && !isBreak3(buffer.charAt(start - 1))) {
+                start -= 1;
+                if (position - start > 36.5) {
+                    head = " ... ";
+                    start += 5;
+                    break;
+                }
+            }
+            String tail = "";
+            int end = position;
+            while (end < buffer.length() && !isBreak3(buffer.charAt(end))) {
+                end += 1;
+                if (end - position > 36.5) {
+                    tail = " ... ";
+                    end -= 5;
+                    break;
+                }
+            }
+            return repeat(" ", 4) + head + EcmaScript.slice(buffer, start, end) + tail + "\n" +
+                   repeat(" ", 4 + position - start + head.length()) + "^";
+        }
+
+        private boolean isBreak3(char c) {
+            return c == 0 || c == '\r' || c == '\n' || c == 0x85 || c == 0x2028 || c == 0x2029;
         }
 
         void append(String s) {
@@ -452,7 +482,7 @@ public final class JsYaml {
             } else {
                 if (!options.isJson() && !overridableKeys.contains(key) && mapping.containsKey(key)) {
                     line = startLine != 0 ? startLine : line;
-                    lineStart = startLineStart != 0 ? startLineStart : lineStart;
+                    lineStart = v4 && startLineStart != 0 ? startLineStart : lineStart;
                     position = startPos != 0 ? startPos : position;
                     throw error("duplicated mapping key");
                 }
@@ -766,6 +796,10 @@ public final class JsYaml {
                     composeNode(nodeIndent, CONTEXT_FLOW_IN, false, true);
                     valueNode = result;
                 }
+                // 3.x reports a duplicated key where the reading stands, 4.1.0 where the key starts
+                if (!v4) {
+                    savedLine = savedLineStart = savedPos = 0;
+                }
                 if (isMapping) {
                     storeMappingPair((Map<String, @Nullable Object>) collection, overridableKeys, keyTag, keyNode,
                             valueNode, savedLine, savedLineStart, savedPos);
@@ -967,11 +1001,12 @@ public final class JsYaml {
                 }
                 int following = ch(position + 1);
                 int savedLine = line;
+                int savedPos = position;
                 if ((c == '?' || c == ':') && isWsOrEol(following)) {
                     if (c == '?') {
                         if (atExplicitKey) {
-                            storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine, keyLineStart,
-                                    keyPos);
+                            storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, v4 ? keyLine : 0,
+                                    keyLineStart, v4 ? keyPos : 0);
                             keyTag = null;
                             keyNode = valueNode = null;
                         }
@@ -1006,8 +1041,8 @@ public final class JsYaml {
                                             "within a block mapping");
                             }
                             if (atExplicitKey) {
-                                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine,
-                                        keyLineStart, keyPos);
+                                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, v4 ? keyLine : 0,
+                                        keyLineStart, v4 ? keyPos : 0);
                                 keyTag = null;
                                 keyNode = valueNode = null;
                             }
@@ -1045,8 +1080,8 @@ public final class JsYaml {
                         }
                     }
                     if (!atExplicitKey) {
-                        storeMappingPair(mapping, overridableKeys, keyTag, keyNode, valueNode, keyLine, keyLineStart,
-                                keyPos);
+                        storeMappingPair(mapping, overridableKeys, keyTag, keyNode, valueNode,
+                                v4 ? keyLine : savedLine, keyLineStart, v4 ? keyPos : savedPos);
                         keyTag = null;
                         keyNode = valueNode = null;
                     }
@@ -1060,7 +1095,8 @@ public final class JsYaml {
                 }
             }
             if (atExplicitKey) {
-                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine, keyLineStart, keyPos);
+                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, v4 ? keyLine : 0, keyLineStart,
+                        v4 ? keyPos : 0);
             }
             if (detected) {
                 tag = savedTag;
@@ -1763,8 +1799,10 @@ public final class JsYaml {
         return repeat(" ", max - s.length()) + s;
     }
 
-    // String(key), which for a Date follows the host's time zone
-    private static String string(@Nullable Object value) {
+    /**
+     * {@code String(value)} of a loaded value; a date's text follows the host's time zone, which is cannot-know.
+     */
+    public static String string(@Nullable Object value) {
         if (holdsDate(value)) {
             throw new CannotKnow("the text of a date (Date.prototype.toString follows the host's time zone)");
         }

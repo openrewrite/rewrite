@@ -113,7 +113,7 @@ class JsYamlTest {
         boolean json = EcmaScript.truthy(((Map<?, ?>) call.arg(1)).get("json"));
         Object document = JsYaml.safeLoadFailsafe(input, new JsYaml.Options(release, json, LinkedHashMap::new));
         // safeLoadFailsafe answers null where 3.x's safeLoad answers undefined, for a stream without documents
-        return document == null && JsYaml.load(input) == JsYaml.UNDEFINED ? EcmaScript.UNDEFINED : document;
+        return document == null && JsYaml.load(input) == EcmaScript.UNDEFINED ? EcmaScript.UNDEFINED : document;
     }
 
     @ParameterizedTest(name = "{0} {1}")
@@ -121,11 +121,9 @@ class JsYamlTest {
     void answersAsTheReleaseDoes(JsYaml.Release release, Call call) {
         Map<String, @Nullable Object> threw = call.getThrew();
         if (threw == null) {
-            assertThat(written(answer(release, call))).isEqualTo(call.getOut());
-        } else if (release == JsYaml.Release.ZKOCHAN_0_0_11 || threw.get("reason") == null) {
-            assertThatThrownBy(() -> answer(release, call)).hasMessage((String) threw.get("message"));
+            assertThat(UpstreamCalls.shape(written(answer(release, call)))).isEqualTo(UpstreamCalls.shape(call.getOut()));
         } else {
-            assertThatThrownBy(() -> answer(release, call)).hasMessage((String) threw.get("reason"));
+            assertThatThrownBy(() -> answer(release, call)).hasMessage((String) threw.get("message"));
         }
     }
 

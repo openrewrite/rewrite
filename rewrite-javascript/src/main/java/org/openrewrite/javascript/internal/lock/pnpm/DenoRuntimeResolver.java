@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/engine.runtime.deno-resolver src/index.ts (pnpm 11.2.2): a {@code deno} dependency of
@@ -74,7 +73,7 @@ final class DenoRuntimeResolver {
         String release = fetch.document(releaseUrl);
         Object data = release == null ? null : Manifests.parseValue(release, releaseUrl);
         Object assetsData = data instanceof Map ? ((Map<String, @Nullable Object>) data).get("assets") : null;
-        if (assetsData == null || assetsData == JsYaml.UNDEFINED) {
+        if (assetsData == null || assetsData == Js.UNDEFINED) {
             throw new PnpmError("DENO_MISSING_ASSETS", "No assets found for Deno v" + version);
         }
         if (!(assetsData instanceof List)) {

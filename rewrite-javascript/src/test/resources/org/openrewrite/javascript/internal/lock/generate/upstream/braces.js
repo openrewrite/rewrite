@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// braces 1.8.5 and 3.0.2 for upstream-calls.js: braces() and 3.0.2's expand, compile, parse and stringify, a parsed
-// tree written as {"$": "ast"}. Each release's dependencies are the ones yarn 1.22.22 (expand-range 1.8.2, fill-range
-// 2.2.4, randomatic 3.0.0) and Yarn 4.10.3 (fill-range 7.0.1) bundle, installed beside its checkout.
+// braces 1.8.5 and 3.0.2 for upstream-calls.js: braces() and 3.0.2's expand, compile, parse, stringify ({"$": "ast"}),
+// with the dependencies yarn 1.22.22 and Yarn 4.10.3 bundle installed beside each checkout.
 const fs = require('fs')
 const path = require('path')
 

@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.PosixPath;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.Spec;
@@ -105,7 +104,7 @@ final class ProjectsGraph {
     private @Nullable String edge(Verification.Project project, String depName, @Nullable Object raw,
                                   @Nullable Boolean linkWorkspacePackages) {
         if (!(raw instanceof String)) {
-            throw new JsError(JsError.ERROR, raw == null || raw == JsYaml.UNDEFINED ?
+            throw new JsError(JsError.ERROR, raw == null || raw == Js.UNDEFINED ?
                     "Cannot read properties of " + Js.string(raw) + " (reading 'startsWith')" :
                     "rawSpec.startsWith is not a function");
         }

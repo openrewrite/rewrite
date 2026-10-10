@@ -289,7 +289,7 @@ public final class JsYamlDumper {
         String savedTag = tag;
         for (Object value : object) {
             if (writeNode(level, value, false, false, false, false, null, false) ||
-                value == JsYaml.UNDEFINED && writeNode(level, null, false, false, false, false, null, false)) {
+                value == EcmaScript.UNDEFINED && writeNode(level, null, false, false, false, false, null, false)) {
                 if (result.length() > 0) {
                     result.append(", ");
                 }
@@ -305,7 +305,7 @@ public final class JsYamlDumper {
         String savedTag = tag;
         for (Object value : object) {
             if (writeNode(level + 1, value, true, true, false, true, null, false) ||
-                value == JsYaml.UNDEFINED && writeNode(level + 1, null, true, true, false, true, null, false)) {
+                value == EcmaScript.UNDEFINED && writeNode(level + 1, null, true, true, false, true, null, false)) {
                 if (!compact || result.length() > 0) {
                     result.append(generateNextLine(level, false));
                 }
@@ -474,7 +474,7 @@ public final class JsYamlDumper {
                               boolean isblockseq, @Nullable String objectKey, boolean singleLineOnly) {
         tag = null;
         dump = object;
-        if (object == JsYaml.UNDEFINED) {
+        if (object == EcmaScript.UNDEFINED) {
             return false;
         }
         detectType(object);

@@ -20,7 +20,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 
@@ -243,7 +242,7 @@ final class PackageRequester {
     }
 
     private static void putIfPresent(Map<String, @Nullable Object> manifest, String key, @Nullable Object value) {
-        if (value != null && value != JsYaml.UNDEFINED) {
+        if (value != null && value != Js.UNDEFINED) {
             manifest.put(key, value);
         }
     }

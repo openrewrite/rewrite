@@ -13,10 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Runs an upstream release's own test files against that release and prints, as JSON lines, every call the tests
-// make into the library with its answer: the rows its port's test replays. A spec module (upstream/<library>.js)
-// names the entry the tests load and the functions to record.
-//
+// Every call a release's own tests make into it, with its answer, as JSON lines (spec: upstream/<library>.js).
 // Usage: node upstream-calls.js <spec> <release checkout> <release> [<test file>...] > <rows.jsonl>
 const Module = require('module')
 const fs = require('fs')
@@ -87,7 +84,8 @@ function encode(v, depth = 0) {
   const out = {}
   for (const k of Object.keys(v)) {
     // an own __proto__ key stays a key
-    Object.defineProperty(out, k, {value: encode(v[k], depth + 1), enumerable: true, writable: true, configurable: true})
+    Object.defineProperty(out, k,
+      {value: encode(v[k], depth + 1), enumerable: true, writable: true, configurable: true})
   }
   if (Object.getPrototypeOf(v) === null) {
     return {$: 'nullproto', value: out}

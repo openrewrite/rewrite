@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// minimatch 3.0.4 and 10.2.5 for upstream-calls.js: minimatch(), match, makeRe, filter, braceExpand, and the match
-// and makeRe of a Minimatch the tests construct, whose receiver is written as its pattern and options. 10.2.5's tests
-// import its build, which is the copy npm 11.17.0 bundles: MINIMATCH_10 names that package's directory.
+// minimatch 3.0.4 and 10.2.5 (MINIMATCH_10: npm 11.17.0's copy) for upstream-calls.js: minimatch(), match, makeRe,
+// filter, braceExpand, a Minimatch's match and makeRe (its receiver as its pattern and options).
 const fs = require('fs')
 const path = require('path')
 

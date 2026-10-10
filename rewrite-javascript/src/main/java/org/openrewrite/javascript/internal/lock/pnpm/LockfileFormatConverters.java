@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -136,7 +135,7 @@ final class LockfileFormatConverters {
         }
         for (String key : new String[]{"catalogs", "overrides", "patchedDependencies"}) {
             Object value = lockfileToSave.get(key);
-            if (value != null && value != JsYaml.UNDEFINED && isEmpty(value)) {
+            if (value != null && value != Js.UNDEFINED && isEmpty(value)) {
                 lockfileToSave.remove(key);
             }
         }
@@ -195,7 +194,7 @@ final class LockfileFormatConverters {
      */
     @SuppressWarnings("unchecked")
     static LockfileObject convertToLockfileObject(@Nullable Object file) {
-        if (file == null || file == JsYaml.UNDEFINED) {
+        if (file == null || file == Js.UNDEFINED) {
             throw new TypeError("Cannot destructure property 'importers' of 'lockfile' as it is " +
                                 (file == null ? "null" : "undefined") + ".");
         }
@@ -208,7 +207,7 @@ final class LockfileFormatConverters {
         Map<String, PackageSnapshot> packages = new LinkedHashMap<>();
         Object snapshots = map.get("snapshots");
         Object filePackages = map.get("packages");
-        if (snapshots != null && snapshots != JsYaml.UNDEFINED) {
+        if (snapshots != null && snapshots != Js.UNDEFINED) {
             for (Map.Entry<String, @Nullable Object> entry : entries(snapshots, "snapshots")) {
                 String depPath = entry.getKey();
                 Object pkg = entry.getValue();
@@ -242,7 +241,7 @@ final class LockfileFormatConverters {
             }
         }
         Object patchedDependencies = migratePatchedDependencies(map.get("patchedDependencies"));
-        if (patchedDependencies == JsYaml.UNDEFINED) {
+        if (patchedDependencies == Js.UNDEFINED) {
             lockfile.getRest().remove("patchedDependencies");
         } else {
             lockfile.set("patchedDependencies", patchedDependencies);
@@ -250,7 +249,7 @@ final class LockfileFormatConverters {
         lockfile.getRest().remove("packages");
         lockfile.setPackages(packages);
         Object importers = map.get("importers");
-        if (importers != null && importers != JsYaml.UNDEFINED) {
+        if (importers != null && importers != Js.UNDEFINED) {
             for (Map.Entry<String, @Nullable Object> importer : entries(importers, "importers")) {
                 lockfile.getImporters().put(importer.getKey(), revertProjectSnapshot(importer.getValue(),
                         "importers." + importer.getKey()));
@@ -264,7 +263,7 @@ final class LockfileFormatConverters {
         if (resolution == null) {
             return;
         }
-        if (resolution.containsKey("type") && resolution.get("type") != JsYaml.UNDEFINED) {
+        if (resolution.containsKey("type") && resolution.get("type") != Js.UNDEFINED) {
             return;
         }
         if (resolution.get("gitHosted") != null) {
@@ -289,7 +288,7 @@ final class LockfileFormatConverters {
     @SuppressWarnings("unchecked")
     private static @Nullable Object migratePatchedDependencies(@Nullable Object patchedDependencies) {
         if (!Js.truthy(undefinedToNull(patchedDependencies))) {
-            return JsYaml.UNDEFINED;
+            return Js.UNDEFINED;
         }
         Map<String, @Nullable Object> result = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable Object> entry : entries(patchedDependencies, "patchedDependencies")) {
@@ -300,7 +299,7 @@ final class LockfileFormatConverters {
                 throw new TypeError("Cannot read properties of null (reading 'hash')");
             } else {
                 Object hash = value instanceof Map ? ((Map<String, @Nullable Object>) value).get("hash") : null;
-                result.put(entry.getKey(), hash == null ? JsYaml.UNDEFINED : hash);
+                result.put(entry.getKey(), hash == null ? Js.UNDEFINED : hash);
             }
         }
         return result;
@@ -330,9 +329,9 @@ final class LockfileFormatConverters {
         }
         for (String depName : Js.keys(resolvedDependencies)) {
             Map<String, @Nullable Object> ref = new LinkedHashMap<>();
-            ref.put("specifier", specifiers.containsKey(depName) ? specifiers.get(depName) : JsYaml.UNDEFINED);
+            ref.put("specifier", specifiers.containsKey(depName) ? specifiers.get(depName) : Js.UNDEFINED);
             String version = resolvedDependencies.get(depName);
-            ref.put("version", version == null ? JsYaml.UNDEFINED : version);
+            ref.put("version", version == null ? Js.UNDEFINED : version);
             out.put(depName, ref);
         }
         return out;
@@ -363,7 +362,7 @@ final class LockfileFormatConverters {
     private static @Nullable Map<String, @Nullable String> moveSpecifiers(@Nullable Object from,
                                                                           Map<String, @Nullable String> specifiers,
                                                                           String path) {
-        if (from == null || from == JsYaml.UNDEFINED) {
+        if (from == null || from == Js.UNDEFINED) {
             return null;
         }
         Map<String, @Nullable String> resolvedDependencies = new LinkedHashMap<>();
@@ -482,7 +481,7 @@ final class LockfileFormatConverters {
     private static Map<String, @Nullable Object> stringValues(Map<String, @Nullable String> refs) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
         for (Map.Entry<String, @Nullable String> ref : refs.entrySet()) {
-            out.put(ref.getKey(), ref.getValue() == null ? JsYaml.UNDEFINED : ref.getValue());
+            out.put(ref.getKey(), ref.getValue() == null ? Js.UNDEFINED : ref.getValue());
         }
         return out;
     }
@@ -532,7 +531,7 @@ final class LockfileFormatConverters {
     }
 
     private static @Nullable Object undefinedToNull(@Nullable Object value) {
-        return value == JsYaml.UNDEFINED ? null : value;
+        return value == Js.UNDEFINED ? null : value;
     }
 
     @SuppressWarnings("unchecked")
@@ -555,7 +554,7 @@ final class LockfileFormatConverters {
     }
 
     private static @Nullable String string(@Nullable Object value, String path) {
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return null;
         }
         if (value instanceof String) {

@@ -39,7 +39,7 @@ final class ProjectConfigs {
      */
     static @Nullable Map<String, Map<String, @Nullable Object>> createProjectConfigRecord(
             @Nullable Object configSet) {
-        if (configSet == null || configSet == JsYaml.UNDEFINED) {
+        if (configSet == null || configSet == Js.UNDEFINED) {
             return null;
         }
         if (!isObject(configSet) && !(configSet instanceof List)) {
@@ -105,7 +105,7 @@ final class ProjectConfigs {
         }
         if (Boolean.FALSE.equals(map.get("hoist"))) {
             Map<String, @Nullable Object> result = new LinkedHashMap<>(map);
-            result.put("hoistPattern", JsYaml.UNDEFINED);
+            result.put("hoistPattern", Js.UNDEFINED);
             return result;
         }
         return map;
@@ -129,7 +129,7 @@ final class ProjectConfigs {
     }
 
     private static boolean isDefined(Map<String, @Nullable Object> config, String field) {
-        return config.containsKey(field) && config.get(field) != JsYaml.UNDEFINED;
+        return config.containsKey(field) && config.get(field) != Js.UNDEFINED;
     }
 
     private static PnpmError invalidValueType(String expectedType, @Nullable Object actualValue) {

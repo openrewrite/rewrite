@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.UriComponent;
 import org.openrewrite.semver.NodeSemver;
@@ -168,9 +167,9 @@ final class Verification {
         if (!Js.equals(dependenciesMeta == null ? new LinkedHashMap<>() : dependenciesMeta,
                 importer.getDependenciesMeta() == null ? new LinkedHashMap<>() : importer.getDependenciesMeta())) {
             return new Satisfies(false, "importer dependencies meta (" + Js.jsonStringify(
-                    importer.getDependenciesMeta() == null ? JsYaml.UNDEFINED : importer.getDependenciesMeta()) +
+                    importer.getDependenciesMeta() == null ? Js.UNDEFINED : importer.getDependenciesMeta()) +
                     ") doesn't match package manifest dependencies meta (" +
-                    Js.jsonStringify(dependenciesMeta == null ? JsYaml.UNDEFINED : dependenciesMeta) + ")");
+                    Js.jsonStringify(dependenciesMeta == null ? Js.UNDEFINED : dependenciesMeta) + ")");
         }
         for (String depField : ProjectSnapshot.DEPENDENCIES_FIELDS) {
             Map<String, @Nullable String> importerDeps = importer.field(depField) == null ? new LinkedHashMap<>() :

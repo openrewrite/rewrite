@@ -24,7 +24,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/lockfile.preferred-versions src/index.ts and resolver-base's version selector
@@ -127,7 +126,7 @@ final class PreferredVersions {
         Map<String, Set<String>> uniqueNameVersions = new LinkedHashMap<>();
         for (Map.Entry<String, PackageSnapshot> entry : snapshots.entrySet()) {
             DepPath.DependencyPath pkgInfo = DepPath.parse(entry.getKey());
-            String name = Js.string(pkgInfo.getName() == null ? JsYaml.UNDEFINED : pkgInfo.getName());
+            String name = Js.string(pkgInfo.getName() == null ? Js.UNDEFINED : pkgInfo.getName());
             String version = entry.getValue().getVersion() != null ? entry.getValue().getVersion() :
                     pkgInfo.getVersion() != null ? pkgInfo.getVersion() : "undefined";
             uniqueNameVersions.computeIfAbsent(name, n -> new LinkedHashSet<>()).add(version);

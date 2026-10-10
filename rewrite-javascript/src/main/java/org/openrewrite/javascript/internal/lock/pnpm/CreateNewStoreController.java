@@ -17,7 +17,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.time.Instant;
 
@@ -76,7 +75,7 @@ final class CreateNewStoreController {
     }
 
     NpmResolver createNewStoreController(PnpmOptions options, @Nullable Object fetchFullMetadata) {
-        boolean fullMetadata = fetchFullMetadata != null && fetchFullMetadata != JsYaml.UNDEFINED ?
+        boolean fullMetadata = fetchFullMetadata != null && fetchFullMetadata != Js.UNDEFINED ?
                 Js.truthy(fetchFullMetadata) : ("time-based".equals(options.get("resolutionMode")) ||
                                                 "no-downgrade".equals(options.get("trustPolicy"))) &&
                                                !options.isTrue("registrySupportsTimeField");

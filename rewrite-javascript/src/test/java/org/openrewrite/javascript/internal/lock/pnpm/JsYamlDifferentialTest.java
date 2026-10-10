@@ -110,7 +110,7 @@ class JsYamlDifferentialTest {
         JsonNode v = entry.getValue();
         switch (entry.getKey()) {
             case "u":
-                return JsYaml.UNDEFINED;
+                return Js.UNDEFINED;
             case "z":
                 return null;
             case "s":
@@ -150,7 +150,7 @@ class JsYamlDifferentialTest {
     @SuppressWarnings("unchecked")
     private static JsonNode tag(@Nullable Object value) {
         ObjectNode out = NODES.objectNode();
-        if (value == JsYaml.UNDEFINED) {
+        if (value == Js.UNDEFINED) {
             out.put("u", 1);
         } else if (value == null) {
             out.put("z", 1);

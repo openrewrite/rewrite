@@ -63,7 +63,7 @@ class ProjectConfigsTest {
     @Test
     void returnsUndefinedForUndefined() {
         assertThat(record(null)).isNull();
-        assertThat(record(JsYaml.UNDEFINED)).isNull();
+        assertThat(record(Js.UNDEFINED)).isNull();
     }
 
     @Test
@@ -91,7 +91,7 @@ class ProjectConfigsTest {
           ProjectConfigs.createProjectConfigRecord(obj("{'project-1':{'hoist':false}}"));
         assertThat(record).isNotNull();
         assertThat(record.get("project-1")).containsEntry("hoist", false).containsEntry("hoistPattern",
-          JsYaml.UNDEFINED);
+          Js.UNDEFINED);
     }
 
     @Test
@@ -130,8 +130,8 @@ class ProjectConfigsTest {
     @Test
     void recordDoesNotErrorOnUnsupportedButUndefinedFields() {
         Map<String, @Nullable Object> config = new LinkedHashMap<>();
-        config.put("ignoreScripts", JsYaml.UNDEFINED);
-        config.put("hoistPattern", JsYaml.UNDEFINED);
+        config.put("ignoreScripts", Js.UNDEFINED);
+        config.put("hoistPattern", Js.UNDEFINED);
         Map<String, Map<String, @Nullable Object>> record = ProjectConfigs.createProjectConfigRecord(project1(config));
         assertThat(record).isNotNull();
         assertThat(record.get("project-1")).isEqualTo(config);
@@ -160,7 +160,7 @@ class ProjectConfigsTest {
           ProjectConfigs.createProjectConfigRecord(list("[{'match':['project-1'],'hoist':false}]"));
         assertThat(record).isNotNull();
         assertThat(record.get("project-1")).containsEntry("hoist", false).containsEntry("hoistPattern",
-          JsYaml.UNDEFINED).doesNotContainKey("match");
+          Js.UNDEFINED).doesNotContainKey("match");
     }
 
     @Test
@@ -183,7 +183,7 @@ class ProjectConfigsTest {
         throwsCode(list("[{'match':'some string'}]"), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY",
           "received \"some string\"");
         throwsCode(list("[{'match':true}]"), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY", "received true");
-        throwsCode(singletonList(matchOnly(JsYaml.UNDEFINED)), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY",
+        throwsCode(singletonList(matchOnly(Js.UNDEFINED)), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY",
           "received undefined");
         throwsCode(list("[{'match':null}]"), "PROJECT_CONFIGS_ARRAY_ITEM_MATCH_IS_NOT_AN_ARRAY", "received null");
     }
@@ -245,8 +245,8 @@ class ProjectConfigsTest {
 
     @Test
     void arrayDoesNotErrorOnUnsupportedButUndefinedFields() {
-        Map<String, @Nullable Object> item = matching("ignoreScripts", JsYaml.UNDEFINED);
-        item.put("hoistPattern", JsYaml.UNDEFINED);
+        Map<String, @Nullable Object> item = matching("ignoreScripts", Js.UNDEFINED);
+        item.put("hoistPattern", Js.UNDEFINED);
         Map<String, Map<String, @Nullable Object>> record =
           ProjectConfigs.createProjectConfigRecord(singletonList(item));
         assertThat(record).isNotNull();

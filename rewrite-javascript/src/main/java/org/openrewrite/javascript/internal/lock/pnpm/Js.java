@@ -63,21 +63,7 @@ final class Js extends EcmaScript {
      * {@code String(value)} for the values a YAML document or package.json holds; a date's text is cannot-know.
      */
     public static String string(@Nullable Object value) {
-        if (holdsDate(value)) {
-            throw new CannotKnow("the text of a date (Date.prototype.toString follows the host's time zone)");
-        }
-        return EcmaScript.string(value);
-    }
-
-    private static boolean holdsDate(@Nullable Object value) {
-        if (value instanceof List) {
-            for (Object item : (List<?>) value) {
-                if (holdsDate(item)) {
-                    return true;
-                }
-            }
-        }
-        return value instanceof JsYaml.Timestamp;
+        return JsYaml.string(value);
     }
 
     /**

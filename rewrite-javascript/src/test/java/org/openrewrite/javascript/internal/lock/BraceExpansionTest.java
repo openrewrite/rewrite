@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * brace-expansion 1.1.11's and 5.0.6's own tests and the inputs where their sources differ, and balanced-match
@@ -136,5 +137,29 @@ class BraceExpansionTest {
         expected.put("balanced-match-4.0.4 balanced of other delimiters: brace-expansion asks for { and } only", 9);
         expected.put("brace-expansion-5.0.6 expand with a max: minimatch 10.2.5 passes none", 2);
         assertThat(notPorted).isEqualTo(expected);
+    }
+
+    // Node 24.19.0's answers: a sequence counts in doubles, and 5.0.6 takes a zero step as 1
+    @Test
+    void sequencesCountInDoubles() {
+        for (BraceExpansion.Release release : BraceExpansion.Release.values()) {
+            assertThat(BraceExpansion.expand("{18446744073709551616..18446744073709555712..4096}", release))
+              .containsExactly("18446744073709552000", "18446744073709556000");
+            assertThat(BraceExpansion.expand("{-0..0}", release)).containsExactly("0");
+        }
+        assertThat(BraceExpansion.expand("{1..3..0}", BraceExpansion.Release.V5_0_6)).containsExactly("1", "2", "3");
+        assertThat(BraceExpansion.expand("{18446744073709551616..18446744073709551617}", BraceExpansion.Release.V5_0_6))
+          .hasSize(100_000);
+    }
+
+    // 1.1.11 never leaves a sequence whose step does not move it: node runs out of heap
+    @Test
+    void aSequenceThatDoesNotMoveExhausts1_1_11sHeap() {
+        for (String pattern : new String[]{"a{1..5..0}b", "{18446744073709551616..18446744073709551617}"}) {
+            assertThatThrownBy(() -> BraceExpansion.expand(pattern, BraceExpansion.Release.V1_1_11))
+              .isInstanceOf(Rejected.class)
+              .satisfies(e -> assertThat(((Rejected) e).getOutcome()).isEqualTo(Rejected.Outcome.CRASH))
+              .hasMessageContaining("JavaScript heap out of memory");
+        }
     }
 }

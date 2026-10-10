@@ -19,7 +19,6 @@ import lombok.Getter;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -110,14 +109,14 @@ final class PackageIsInstallable {
             return platformError;
         }
         Object engines = manifest.get("engines");
-        if (engines == null || engines == JsYaml.UNDEFINED) {
+        if (engines == null || engines == Js.UNDEFINED) {
             return null;
         }
         return checkEngine(pkgId, engines, nodeVersion != null ? nodeVersion : host.getNodeVersion(), pnpmVersion);
     }
 
     private static Object orAny(@Nullable Object value) {
-        return value == null || value == JsYaml.UNDEFINED ? Collections.singletonList("any") : value;
+        return value == null || value == Js.UNDEFINED ? Collections.singletonList("any") : value;
     }
 
     /**
@@ -266,6 +265,6 @@ final class PackageIsInstallable {
     @SuppressWarnings("unchecked")
     private static @Nullable Object property(@Nullable Object value, String key) {
         Object property = value instanceof Map ? ((Map<String, @Nullable Object>) value).get(key) : null;
-        return property == JsYaml.UNDEFINED ? null : property;
+        return property == Js.UNDEFINED ? null : property;
     }
 }

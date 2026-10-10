@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.ArrayList;
@@ -43,7 +42,7 @@ final class LockfileMerger {
         Object ourVersion = ours.getLockfileVersion();
         newLockfile.set("lockfileVersion", gt(LockfileReader.comverToSemver(versionString(theirVersion)),
                 LockfileReader.comverToSemver(versionString(ourVersion))) ? theirVersion : ourVersion);
-        Object pnpmfileChecksum = ours.getPnpmfileChecksum() != null && ours.getPnpmfileChecksum() != JsYaml.UNDEFINED ?
+        Object pnpmfileChecksum = ours.getPnpmfileChecksum() != null && ours.getPnpmfileChecksum() != Js.UNDEFINED ?
                 ours.getPnpmfileChecksum() : theirs.getPnpmfileChecksum();
         if (Js.truthy(pnpmfileChecksum)) {
             newLockfile.set("pnpmfileChecksum", pnpmfileChecksum);
@@ -196,7 +195,7 @@ final class LockfileMerger {
 
     // lockfileVersion.toString(): undefined throws, as JavaScript does reading a property of it
     private static String versionString(@Nullable Object version) {
-        if (version == null || version == JsYaml.UNDEFINED) {
+        if (version == null || version == Js.UNDEFINED) {
             throw new LockfileFormatConverters.TypeError("Cannot read properties of " + Js.string(version) +
                                                          " (reading 'toString')");
         }
@@ -205,7 +204,7 @@ final class LockfileMerger {
 
     private static List<@Nullable Object> iterable(@Nullable Object value) {
         List<@Nullable Object> out = new ArrayList<>();
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return out;
         }
         if (value instanceof List) {

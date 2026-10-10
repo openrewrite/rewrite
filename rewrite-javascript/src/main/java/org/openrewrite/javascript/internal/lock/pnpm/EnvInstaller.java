@@ -19,7 +19,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.semver.NodeSemver;
 
 import java.time.Instant;
@@ -70,7 +69,7 @@ final class EnvInstaller {
                     String[] parsed = parseIntegrity(name, spec);
                     Object tarball = value instanceof Map ? ((Map<String, @Nullable Object>) value).get("tarball") :
                             null;
-                    migrate(envLockfile, name, parsed, tarball == null || tarball == JsYaml.UNDEFINED ?
+                    migrate(envLockfile, name, parsed, tarball == null || tarball == Js.UNDEFINED ?
                             LockfileUtils.getNpmTarballUrl(name, parsed[0], registry) : tarball, registry);
                     lockfileChanged = true;
                 }
@@ -233,7 +232,7 @@ final class EnvInstaller {
      * {@code parseIntegrity}: the version and integrity of {@code <version>+<integrity>}.
      */
     static String[] parseIntegrity(String pkgName, @Nullable Object pkgSpec) {
-        if (pkgSpec == null || pkgSpec == JsYaml.UNDEFINED) {
+        if (pkgSpec == null || pkgSpec == Js.UNDEFINED) {
             throw new JsError(JsError.ERROR,
                     "Cannot read properties of " + Js.string(pkgSpec) + " (reading 'indexOf')");
         }
@@ -357,13 +356,13 @@ final class EnvInstaller {
         Map<String, @Nullable Object> configDeps = lockfile.configDependencies();
         for (String pkgName : Js.keys(configDeps)) {
             Object entry = configDeps.get(pkgName);
-            if (entry == null || entry == JsYaml.UNDEFINED) {
+            if (entry == null || entry == Js.UNDEFINED) {
                 throw new JsError(JsError.ERROR,
                         "Cannot destructure property 'version' of '" + Js.string(entry) + "' as it is " +
                                   Js.string(entry) + ".");
             }
             Object version = entry instanceof Map ? ((Map<String, @Nullable Object>) entry).get("version") : null;
-            String pkgKey = pkgName + "@" + Js.string(version == null ? JsYaml.UNDEFINED : version);
+            String pkgKey = pkgName + "@" + Js.string(version == null ? Js.UNDEFINED : version);
             requireIntegrity(lockfile, pkgKey, "referenced from importers['.'].configDependencies");
             Object snapshot = lockfile.snapshots().get(pkgKey);
             Object optionalDependencies = snapshot instanceof Map ?
@@ -391,7 +390,7 @@ final class EnvInstaller {
                                                           "packages entry for \"" + pkgKey + "\" " + referencedFrom);
         }
         Object resolution = pkgInfo instanceof Map ? ((Map<String, @Nullable Object>) pkgInfo).get("resolution") : null;
-        if (resolution == null || resolution == JsYaml.UNDEFINED) {
+        if (resolution == null || resolution == Js.UNDEFINED) {
             throw new JsError(JsError.ERROR,
                     "Cannot read properties of " + Js.string(resolution) + " (reading 'integrity')");
         }

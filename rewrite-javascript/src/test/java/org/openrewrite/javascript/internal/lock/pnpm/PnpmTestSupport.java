@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -65,7 +64,7 @@ final class PnpmTestSupport {
             List<String> members = new ArrayList<>();
             Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) value;
             for (String key : Js.keys(map)) {
-                if (map.get(key) != JsYaml.UNDEFINED) {
+                if (map.get(key) != Js.UNDEFINED) {
                     members.add("'" + key + "':" + json(map.get(key)));
                 }
             }
@@ -182,7 +181,7 @@ final class PnpmTestSupport {
     }
 
     private static void putIfPresent(Map<String, @Nullable Object> out, String key, @Nullable Object value) {
-        if (value != null && value != JsYaml.UNDEFINED) {
+        if (value != null && value != Js.UNDEFINED) {
             out.put(key, value);
         }
     }

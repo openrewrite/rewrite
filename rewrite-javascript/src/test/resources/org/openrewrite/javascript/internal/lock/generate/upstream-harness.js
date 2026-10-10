@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// The test APIs an upstream suite calls (tap, tape, mocha's globals, node:test, ava), run in this process one test
-// after another; each assertion is checked with node:assert and a failed one is counted, so a suite that runs here
-// as it does under its own runner fails nothing.
+// The test APIs an upstream suite calls (tap, tape, mocha's globals, node:test, ava), run here one test after another,
+// each assertion checked with node:assert and counted when it fails.
 const assert = require('assert')
 
 const queue = []

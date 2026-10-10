@@ -44,7 +44,7 @@ public final class WorkspaceManifest {
 
     @SuppressWarnings("unchecked")
     static @Nullable Map<String, @Nullable Object> validateWorkspaceManifest(@Nullable Object manifest) {
-        if (manifest == null || manifest == JsYaml.UNDEFINED) {
+        if (manifest == null || manifest == Js.UNDEFINED) {
             return null;
         }
         if (manifest instanceof List) {

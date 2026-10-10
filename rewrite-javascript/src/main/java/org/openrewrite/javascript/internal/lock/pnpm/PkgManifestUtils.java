@@ -24,7 +24,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/pkg-manifest.utils src/convertEnginesRuntimeToDependencies.ts (pnpm 11.2.2).
@@ -45,7 +44,7 @@ final class PkgManifestUtils {
                                                     String dependenciesFieldName) {
         for (String runtimeName : RUNTIME_NAMES) {
             Object enginesFieldRuntime = property(manifest.get(enginesFieldName), "runtime");
-            if (enginesFieldRuntime == null || enginesFieldRuntime == JsYaml.UNDEFINED ||
+            if (enginesFieldRuntime == null || enginesFieldRuntime == Js.UNDEFINED ||
                 Js.truthy(property(manifest.get(dependenciesFieldName), runtimeName))) {
                 continue;
             }
@@ -60,7 +59,7 @@ final class PkgManifestUtils {
                 continue;
             }
             Object deps = manifest.get(dependenciesFieldName);
-            if (deps == null || deps == JsYaml.UNDEFINED) {
+            if (deps == null || deps == Js.UNDEFINED) {
                 deps = new LinkedHashMap<String, @Nullable Object>();
                 manifest.put(dependenciesFieldName, deps);
             }
@@ -79,7 +78,7 @@ final class PkgManifestUtils {
     static void applyRuntimeOnFailOverride(Map<String, @Nullable Object> manifest, Object onFailOverride) {
         for (String[] fields : new String[][]{{"devEngines", "devDependencies"}, {"engines", "dependencies"}}) {
             Object enginesFieldRuntime = property(manifest.get(fields[0]), "runtime");
-            if (enginesFieldRuntime == null || enginesFieldRuntime == JsYaml.UNDEFINED) {
+            if (enginesFieldRuntime == null || enginesFieldRuntime == Js.UNDEFINED) {
                 continue;
             }
             List<@Nullable Object> runtimes = enginesFieldRuntime instanceof List ?
@@ -89,7 +88,7 @@ final class PkgManifestUtils {
                     ((Map<String, @Nullable Object>) runtime).put("onFail", onFailOverride);
                 } else if (!(runtime instanceof List)) {
                     // pnpm's bundle is an ES module, where a property set on a primitive throws
-                    throw new JsError(JsError.ERROR, runtime == null || runtime == JsYaml.UNDEFINED ?
+                    throw new JsError(JsError.ERROR, runtime == null || runtime == Js.UNDEFINED ?
                             "Cannot set properties of " + Js.string(runtime) + " (setting 'onFail')" :
                             "Cannot create property 'onFail' on " + Js.typeOf(runtime) + " '" + Js.string(runtime) +
                             "'");
@@ -114,7 +113,7 @@ final class PkgManifestUtils {
     // runtimes.find((runtime) => runtime.name === runtimeName)
     private static @Nullable Object find(List<@Nullable Object> runtimes, String runtimeName) {
         for (Object runtime : runtimes) {
-            if (runtime == null || runtime == JsYaml.UNDEFINED) {
+            if (runtime == null || runtime == Js.UNDEFINED) {
                 throw new JsError(JsError.ERROR,
                         "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
             }

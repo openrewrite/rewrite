@@ -490,7 +490,7 @@ public final class PnpmLockRegenerator {
                     "minimumReleaseAgeExclude"));
         }
         Object trustPolicy = options.get("trustPolicy");
-        ctx.setTrustPolicy(trustPolicy == null || trustPolicy == JsYaml.UNDEFINED ? null : Js.string(trustPolicy));
+        ctx.setTrustPolicy(trustPolicy == null || trustPolicy == Js.UNDEFINED ? null : Js.string(trustPolicy));
         List<String> trustPolicyExclude = options.getStrings("trustPolicyExclude");
         if (trustPolicyExclude != null) {
             ctx.setTrustPolicyExclude(PackageVersionPolicy.createPackageVersionPolicyOrThrow(trustPolicyExclude,
@@ -750,11 +750,11 @@ public final class PnpmLockRegenerator {
         if (needsFullResolution) {
             wantedLockfile.set("overrides", overridesMap);
             wantedLockfile.set("packageExtensionsChecksum",
-                    packageExtensionsChecksum == null ? JsYaml.UNDEFINED : packageExtensionsChecksum);
+                    packageExtensionsChecksum == null ? Js.UNDEFINED : packageExtensionsChecksum);
             wantedLockfile.set("ignoredOptionalDependencies",
-                    options.get("ignoredOptionalDependencies") == null ? JsYaml.UNDEFINED :
+                    options.get("ignoredOptionalDependencies") == null ? Js.UNDEFINED :
                             options.get("ignoredOptionalDependencies"));
-            wantedLockfile.set("pnpmfileChecksum", JsYaml.UNDEFINED);
+            wantedLockfile.set("pnpmfileChecksum", Js.UNDEFINED);
             wantedLockfile.set("patchedDependencies", patchedDependencies);
             return new Install(null, outdatedLockfileSettings ? outdatedLockfileSettingName :
                     "lockfileVersion " + Js.string(wantedLockfile.getLockfileVersion()), ctx,

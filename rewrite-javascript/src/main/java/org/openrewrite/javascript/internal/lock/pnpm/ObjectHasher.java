@@ -68,7 +68,7 @@ final class ObjectHasher {
         void dispatch(@Nullable Object value) {
             if (value == null) {
                 out.append("Null");
-            } else if (value == JsYaml.UNDEFINED) {
+            } else if (value == Js.UNDEFINED) {
                 out.append("Undefined");
             } else if (value instanceof String) {
                 String s = (String) value;

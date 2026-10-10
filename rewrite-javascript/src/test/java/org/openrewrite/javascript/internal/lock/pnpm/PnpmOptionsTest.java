@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -126,7 +125,7 @@ class PnpmOptionsTest {
     private static String pairsToObject(List<PnpmOptions.ConfigPair> pairs) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
         for (PnpmOptions.ConfigPair pair : pairs) {
-            out.put(pair.key, pair.value == JsYaml.UNDEFINED ? "<undefined>" : pair.value);
+            out.put(pair.key, pair.value == Js.UNDEFINED ? "<undefined>" : pair.value);
         }
         return json(out);
     }

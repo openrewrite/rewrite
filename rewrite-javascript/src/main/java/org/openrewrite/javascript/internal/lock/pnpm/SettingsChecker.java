@@ -19,7 +19,6 @@ import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 
 import java.util.ArrayList;
@@ -135,17 +134,17 @@ final class SettingsChecker {
     }
 
     private static Object orEmptyObject(@Nullable Object value) {
-        return value == null || value == JsYaml.UNDEFINED ? new LinkedHashMap<String, Object>() : value;
+        return value == null || value == Js.UNDEFINED ? new LinkedHashMap<String, Object>() : value;
     }
 
     private static @Nullable Object undefinedToNull(@Nullable Object value) {
-        return value == JsYaml.UNDEFINED ? null : value;
+        return value == Js.UNDEFINED ? null : value;
     }
 
     // value?.sort() ?? []: the array sorted in place by its elements' strings
     @SuppressWarnings("unchecked")
     private static Object sorted(@Nullable Object value) {
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return new ArrayList<>();
         }
         if (!(value instanceof List)) {

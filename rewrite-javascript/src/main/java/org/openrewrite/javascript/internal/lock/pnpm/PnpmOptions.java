@@ -23,7 +23,6 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Ini;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.RootRelativePath;
 import org.openrewrite.javascript.internal.lock.StripBom;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
@@ -223,7 +222,7 @@ public final class PnpmOptions {
 
         Map<String, String> fromEnv = new LinkedHashMap<>();
         for (ConfigPair pair : parseEnvVars(ENV_TYPES, env)) {
-            if (pair.value == JsYaml.UNDEFINED) {
+            if (pair.value == Js.UNDEFINED) {
                 continue;
             }
             if (CLI_OPTIONS.contains(kebabCase(pair.key))) {
@@ -319,14 +318,14 @@ public final class PnpmOptions {
             Object engines = manifest.get(enginesFieldName);
             Object enginesRuntime = engines instanceof Map ? ((Map<String, @Nullable Object>) engines).get("runtime") :
                     null;
-            if (enginesRuntime == null || enginesRuntime == JsYaml.UNDEFINED) {
+            if (enginesRuntime == null || enginesRuntime == Js.UNDEFINED) {
                 continue;
             }
             List<@Nullable Object> runtimes = enginesRuntime instanceof List ? (List<@Nullable Object>) enginesRuntime :
                     Collections.singletonList(enginesRuntime);
             Object nodeRuntime = null;
             for (Object runtime : runtimes) {
-                if (runtime == null || runtime == JsYaml.UNDEFINED) {
+                if (runtime == null || runtime == Js.UNDEFINED) {
                     throw new JsError(JsError.ERROR,
                             "Cannot read properties of " + Js.string(runtime) + " (reading 'name')");
                 }
@@ -336,7 +335,7 @@ public final class PnpmOptions {
                 }
             }
             Object version = nodeRuntime == null ? null : ((Map<String, @Nullable Object>) nodeRuntime).get("version");
-            if (version == null || version == JsYaml.UNDEFINED) {
+            if (version == null || version == Js.UNDEFINED) {
                 continue;
             }
             if (!(version instanceof String)) {
@@ -451,12 +450,12 @@ public final class PnpmOptions {
     // value.key where pnpm reads a property: undefined on a primitive, a TypeError on null or undefined
     @SuppressWarnings("unchecked")
     private static @Nullable Object property(@Nullable Object value, String key) {
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             throw new JsError(JsError.ERROR,
                     "Cannot read properties of " + Js.string(value) + " (reading '" + key + "')");
         }
         Object property = value instanceof Map ? ((Map<String, @Nullable Object>) value).get(key) : null;
-        return property == JsYaml.UNDEFINED ? null : property;
+        return property == Js.UNDEFINED ? null : property;
     }
 
     // config/reader's defaultOptions, by pnpm's own (kebab-case) names, as far as a lock-only install reads them
@@ -750,7 +749,7 @@ public final class PnpmOptions {
             Arrays.asList("init-version", "node-version", "umask").contains(key) ? null : ConfigTypes.TYPES.get(key);
 
     /**
-     * src/env.ts {@code parseEnvVars}: the {@code pnpm_config_} variables by camelCase key, {@link JsYaml#UNDEFINED}
+     * src/env.ts {@code parseEnvVars}: the {@code pnpm_config_} variables by camelCase key, {@link Js#UNDEFINED}
      * where the schema does not parse one.
      */
     static List<ConfigPair> parseEnvVars(Function<String, @Nullable Object> getSchema,
@@ -790,19 +789,19 @@ public final class PnpmOptions {
             for (Object variant : sorted) {
                 Object value;
                 if (variant instanceof String) {
-                    value = envVar.equals(variant) ? variant : JsYaml.UNDEFINED;
+                    value = envVar.equals(variant) ? variant : Js.UNDEFINED;
                 } else if (variant instanceof Boolean) {
-                    value = variant.toString().equals(envVar) ? variant : JsYaml.UNDEFINED;
+                    value = variant.toString().equals(envVar) ? variant : Js.UNDEFINED;
                 } else if (variant == ConfigTypes.NULL) {
-                    value = "null".equals(envVar) ? null : JsYaml.UNDEFINED;
+                    value = "null".equals(envVar) ? null : Js.UNDEFINED;
                 } else {
                     value = parseValueByType((ConfigTypes.Type) variant, envVar, env);
                 }
-                if (value != JsYaml.UNDEFINED) {
+                if (value != Js.UNDEFINED) {
                     return value;
                 }
             }
-            return JsYaml.UNDEFINED;
+            return Js.UNDEFINED;
         }
         return parseValueByType((ConfigTypes.Type) schema, envVar, env);
     }
@@ -814,15 +813,15 @@ public final class PnpmOptions {
                 try {
                     value = Manifests.parseValue(envVar, "the environment");
                 } catch (PnpmError e) {
-                    return JsYaml.UNDEFINED;
+                    return Js.UNDEFINED;
                 }
-                return value instanceof List ? value : JsYaml.UNDEFINED;
+                return value instanceof List ? value : Js.UNDEFINED;
             }
             case BOOLEAN:
-                return "true".equals(envVar) ? Boolean.TRUE : "false".equals(envVar) ? Boolean.FALSE : JsYaml.UNDEFINED;
+                return "true".equals(envVar) ? Boolean.TRUE : "false".equals(envVar) ? Boolean.FALSE : Js.UNDEFINED;
             case NUMBER: {
                 double value = Js.toNumber(envVar);
-                return Double.isNaN(value) ? JsYaml.UNDEFINED : value;
+                return Double.isNaN(value) ? Js.UNDEFINED : value;
             }
             case STRING:
                 return envVar;
@@ -842,7 +841,7 @@ public final class PnpmOptions {
                 return url.toString();
             }
             default:
-                return JsYaml.UNDEFINED;
+                return Js.UNDEFINED;
         }
     }
 
@@ -1120,7 +1119,7 @@ public final class PnpmOptions {
      */
     String getTag() {
         Object tag = config.get("tag");
-        if (tag == null || tag == JsYaml.UNDEFINED) {
+        if (tag == null || tag == Js.UNDEFINED) {
             return "latest";
         }
         if (!(tag instanceof String) || ((String) tag).isEmpty()) {
@@ -1159,14 +1158,14 @@ public final class PnpmOptions {
     @Nullable
     Object getNodeVersion() {
         Object nodeVersion = config.get("nodeVersion");
-        return nodeVersion == JsYaml.UNDEFINED ? null : nodeVersion;
+        return nodeVersion == Js.UNDEFINED ? null : nodeVersion;
     }
 
     @SuppressWarnings("unchecked")
     @Nullable
     Map<String, @Nullable Object> getNamedRegistries() {
         Object value = config.get("namedRegistries");
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return null;
         }
         if (!(value instanceof Map)) {
@@ -1193,7 +1192,7 @@ public final class PnpmOptions {
     @Nullable
     Double getNumber(String name) {
         Object value = config.get(name);
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return null;
         }
         if (!(value instanceof Number)) {
@@ -1209,7 +1208,7 @@ public final class PnpmOptions {
     }
 
     private static @Nullable List<String> strings(@Nullable Object value, String name) {
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return null;
         }
         List<String> out = new ArrayList<>();
@@ -1235,7 +1234,7 @@ public final class PnpmOptions {
     @Nullable
     List<@Nullable Object> getIgnoredOptionalDependencies() {
         Object value = config.get("ignoredOptionalDependencies");
-        if (value == null || value == JsYaml.UNDEFINED) {
+        if (value == null || value == Js.UNDEFINED) {
             return null;
         }
         if (!(value instanceof List)) {
@@ -1248,7 +1247,7 @@ public final class PnpmOptions {
     @SuppressWarnings("unchecked")
     ReportPeerDependencyIssues.@Nullable PeerDependencyRules getPeerDependencyRules() {
         Object rules = config.get("peerDependencyRules");
-        if (rules == null || rules == JsYaml.UNDEFINED) {
+        if (rules == null || rules == Js.UNDEFINED) {
             return null;
         }
         if (!(rules instanceof Map)) {
@@ -1258,7 +1257,7 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) rules;
         Map<String, String> allowedVersions = null;
         Object allowed = map.get("allowedVersions");
-        if (allowed != null && allowed != JsYaml.UNDEFINED) {
+        if (allowed != null && allowed != Js.UNDEFINED) {
             if (!(allowed instanceof Map)) {
                 throw new CannotKnow("what pnpm makes of peerDependencyRules.allowedVersions (" + Js.typeOf(allowed) +
                                      ", where pnpm reads an object)");
@@ -1285,7 +1284,7 @@ public final class PnpmOptions {
         Map<String, @Nullable Object> settings = new LinkedHashMap<>();
         settings.put("autoInstallPeers", undefinedIfAbsent(config.get("autoInstallPeers")));
         Object dedupePeers = config.get("dedupePeers");
-        settings.put("dedupePeers", Js.truthy(dedupePeers) ? dedupePeers : JsYaml.UNDEFINED);
+        settings.put("dedupePeers", Js.truthy(dedupePeers) ? dedupePeers : Js.UNDEFINED);
         settings.put("excludeLinksFromLockfile", undefinedIfAbsent(config.get("excludeLinksFromLockfile")));
         settings.put("peersSuffixMaxLength", undefinedIfAbsent(config.get("peersSuffixMaxLength")));
         settings.put("injectWorkspacePackages", undefinedIfAbsent(config.get("injectWorkspacePackages")));
@@ -1293,6 +1292,6 @@ public final class PnpmOptions {
     }
 
     private static Object undefinedIfAbsent(@Nullable Object value) {
-        return value == null ? JsYaml.UNDEFINED : value;
+        return value == null ? Js.UNDEFINED : value;
     }
 }

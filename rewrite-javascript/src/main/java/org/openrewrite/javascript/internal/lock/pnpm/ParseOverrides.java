@@ -144,7 +144,6 @@ public final class ParseOverrides {
         return new ParsedWantedDependency(null, rawWantedDependency);
     }
 
-
     /**
      * @pnpm/lockfile.settings-checker {@code createOverridesMapFromParsed}: the {@code overrides} block of the lock.
      */

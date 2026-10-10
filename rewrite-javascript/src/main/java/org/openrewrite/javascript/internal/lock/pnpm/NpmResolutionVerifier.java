@@ -21,7 +21,6 @@ import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.JsError;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.javascript.internal.lock.WhatwgUrl;
 import org.openrewrite.semver.NodeSemver;
 
@@ -453,7 +452,7 @@ final class NpmResolutionVerifier implements ResolutionVerifier {
             return false;
         }
         Map<?, ?> map = (Map<?, ?>) resolution;
-        if (map.containsKey("type") && map.get("type") != null && map.get("type") != JsYaml.UNDEFINED) {
+        if (map.containsKey("type") && map.get("type") != null && map.get("type") != Js.UNDEFINED) {
             return false;
         }
         if (map.containsKey("gitHosted") && Js.truthy(map.get("gitHosted"))) {

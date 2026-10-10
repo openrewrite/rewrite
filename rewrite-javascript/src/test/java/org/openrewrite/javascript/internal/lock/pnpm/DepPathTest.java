@@ -16,7 +16,6 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -37,7 +36,7 @@ class DepPathTest {
 
     @Test
     void parse() {
-        assertThatThrownBy(() -> DepPath.parse(JsYaml.UNDEFINED)).hasMessageContaining("got `undefined`");
+        assertThatThrownBy(() -> DepPath.parse(Js.UNDEFINED)).hasMessageContaining("got `undefined`");
         assertThatThrownBy(() -> DepPath.parse(PnpmTestSupport.obj("{}"))).hasMessageContaining("got `object`");
         assertThatThrownBy(() -> DepPath.parse(1.0)).hasMessageContaining("got `number`");
         assertThat(DepPath.parse("foo@1.0.0")).isEqualTo(new DepPath.DependencyPath("foo", null, "1.0.0", null, null));

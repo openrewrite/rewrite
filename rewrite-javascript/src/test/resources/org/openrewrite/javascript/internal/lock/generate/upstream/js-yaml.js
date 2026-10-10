@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// js-yaml 3.13.1, 3.14.1 and @zkochan/js-yaml 0.0.11 for upstream-calls.js: load, safeLoad, loadAll, dump. The fork has
-// no tests: js-yaml 4.1.0's run against it, JS_YAML_ENTRY naming the fork's index.js. A schema is written by name,
-// a Date by its time and bytes as hex.
+// js-yaml 3.13.1, 3.14.1 and @zkochan/js-yaml 0.0.11 (js-yaml 4.1.0's tests, JS_YAML_ENTRY its index.js) for
+// upstream-calls.js: load, safeLoad, loadAll, dump; a schema by name, a Date by its time, bytes as hex.
 const SCHEMAS = ['FAILSAFE_SCHEMA', 'JSON_SCHEMA', 'CORE_SCHEMA', 'DEFAULT_SAFE_SCHEMA', 'DEFAULT_FULL_SCHEMA',
   'DEFAULT_SCHEMA']
 let real

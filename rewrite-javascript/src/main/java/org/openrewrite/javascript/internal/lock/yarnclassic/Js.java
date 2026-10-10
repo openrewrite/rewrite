@@ -163,7 +163,6 @@ final class Js extends EcmaScript {
     private static final Pattern DECIMAL = Pattern.compile("[+-]?(Infinity|([0-9]+\\.?[0-9]*|\\.[0-9]+)" +
                                                            "([eE][+-]?[0-9]+)?)");
 
-
     public static String string(@Nullable Object value) {
         if (value instanceof UnknownPath) {
             throw ((UnknownPath) value).read();

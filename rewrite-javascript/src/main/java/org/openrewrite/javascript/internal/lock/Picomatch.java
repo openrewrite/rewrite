@@ -47,7 +47,6 @@ public final class Picomatch {
         boolean posix;
     }
 
-
     static final int MAX_LENGTH = 1024 * 64;
     static final int DEFAULT_MAX_EXTGLOB_RECURSION = 0;
 
