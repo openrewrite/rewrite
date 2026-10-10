@@ -20,14 +20,11 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.V8Date;
 
-import java.util.AbstractMap.SimpleImmutableEntry;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeMap;
 
 /**
  * JavaScript's semantics for the values and strings npm reads from package and lock data.
@@ -108,43 +105,6 @@ final class Js extends EcmaScript {
             return INHERITED;
         }
         return objectPrototypeMember(key) != null ? INHERITED : UNDEFINED;
-    }
-
-    /**
-     * {@code Object.entries(value)} for a value parsed from JSON (integer keys ascending, then the rest as inserted, or
-     * an array's or string's indexes); IllegalArgumentException for JavaScript's TypeError on null or undefined.
-     */
-    @SuppressWarnings("unchecked")
-    static List<Map.Entry<String, @Nullable Object>> entries(@Nullable Object value) {
-        if (value == null || value == UNDEFINED) {
-            throw new IllegalArgumentException("Cannot convert undefined or null to object");
-        }
-        List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
-        if (value instanceof Map) {
-            Map<Long, Map.Entry<String, @Nullable Object>> indexed = new TreeMap<>();
-            for (Map.Entry<String, @Nullable Object> entry : ((Map<String, @Nullable Object>) value).entrySet()) {
-                long index = arrayIndex(entry.getKey());
-                if (index >= 0) {
-                    indexed.put(index, entry);
-                } else {
-                    entries.add(entry);
-                }
-            }
-            entries.addAll(0, indexed.values());
-        } else if (value instanceof List) {
-            List<?> array = (List<?>) value;
-            for (int i = 0; i < array.size(); i++) {
-                if (array.get(i) != HOLE) {
-                    entries.add(new SimpleImmutableEntry<>(String.valueOf(i), array.get(i)));
-                }
-            }
-        } else if (value instanceof String) {
-            String string = (String) value;
-            for (int i = 0; i < string.length(); i++) {
-                entries.add(new SimpleImmutableEntry<>(String.valueOf(i), String.valueOf(string.charAt(i))));
-            }
-        }
-        return entries;
     }
 
     /**

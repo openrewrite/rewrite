@@ -402,6 +402,15 @@
 {"test":"String.prototype.trimStart","fn":"trimStart","args":["᠎x᠎"],"out":"᠎x᠎"}
 {"test":"String.prototype.trim","fn":"trim","args":["x​"],"out":"x​"}
 {"test":"String.prototype.trimStart","fn":"trimStart","args":["x​"],"out":"x​"}
+{"test":"Object.entries","fn":"entries","args":["object",[["b",1],["2",true],["a","x"],["1",null],["01",0],["4294967295",2],["4294967294",[1]]]],"out":[["1",null],["2",true],["4294967294",[1]],["b",1],["a","x"],["01",0],["4294967295",2]]}
+{"test":"Object.entries","fn":"entries","args":["object",[]],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",["x",null,["y"]]],"out":[["0","x"],["1",null],["2",["y"]]]}
+{"test":"Object.entries","fn":"entries","args":["value","a😀"],"out":[["0","a"],["1","\ud83d"],["2","\ude00"]]}
+{"test":"Object.entries","fn":"entries","args":["value",""],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",5],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",true],"out":[]}
+{"test":"Object.entries","fn":"entries","args":["value",null],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
+{"test":"Object.entries","fn":"entries","args":["value",{"$":"undefined"}],"threw":{"$":"error","name":"TypeError","message":"Cannot convert undefined or null to object"}}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["a b"],"out":"a%20b"}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["-_.!~*'()"],"out":"-_.!~*'()"}
 {"test":"encodeURIComponent","fn":"encodeURIComponent","args":["é"],"out":"%C3%A9"}

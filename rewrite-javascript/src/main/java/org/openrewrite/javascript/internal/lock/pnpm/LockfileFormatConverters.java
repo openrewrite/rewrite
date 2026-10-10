@@ -18,7 +18,6 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 
-import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -534,14 +533,8 @@ final class LockfileFormatConverters {
         return value == Js.UNDEFINED ? null : value;
     }
 
-    @SuppressWarnings("unchecked")
     private static List<Map.Entry<String, @Nullable Object>> entries(Object value, String path) {
-        Map<String, @Nullable Object> map = objectAt(value, path);
-        List<Map.Entry<String, @Nullable Object>> out = new ArrayList<>();
-        for (String key : Js.keys(map)) {
-            out.add(new AbstractMap.SimpleEntry<>(key, map.get(key)));
-        }
-        return out;
+        return Js.entries(objectAt(value, path));
     }
 
     @SuppressWarnings("unchecked")

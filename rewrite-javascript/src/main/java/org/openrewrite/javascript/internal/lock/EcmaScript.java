@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -199,6 +200,30 @@ public class EcmaScript {
             }
         }
         return indices;
+    }
+
+    /**
+     * {@code Object.entries(value)}: each of {@link #keys(Object)} with its value, a string's characters as values.
+     * @throws JsError JavaScript's TypeError on null or undefined
+     */
+    @SuppressWarnings("unchecked")
+    public static List<Map.Entry<String, @Nullable Object>> entries(@Nullable Object value) {
+        if (value == null || value == UNDEFINED) {
+            throw new JsError(JsError.TYPE_ERROR, "Cannot convert undefined or null to object");
+        }
+        List<Map.Entry<String, @Nullable Object>> entries = new ArrayList<>();
+        for (String key : ownKeys(value)) {
+            Object v;
+            if (value instanceof Map) {
+                v = ((Map<String, @Nullable Object>) value).get(key);
+            } else if (value instanceof List) {
+                v = ((List<?>) value).get(Integer.parseInt(key));
+            } else {
+                v = String.valueOf(((String) value).charAt(Integer.parseInt(key)));
+            }
+            entries.add(new SimpleImmutableEntry<>(key, v));
+        }
+        return entries;
     }
 
     /**

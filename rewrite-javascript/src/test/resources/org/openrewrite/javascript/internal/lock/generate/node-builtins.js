@@ -86,6 +86,14 @@ for (const s of ['abc', '\t a b \n', '\u3000\u2028x\u2029\ufeff', '\u180ex\u180e
   ask('String.prototype.trimStart', 'trimStart', [s], x => x.trimStart())
 }
 
+// Object.entries of an object made from [key, value] pairs in their order, or of the value itself
+const emoji = 'a' + String.fromCharCode(0xd83d, 0xde00)
+for (const [kind, value] of [['object', [['b', 1], ['2', true], ['a', 'x'], ['1', null], ['01', 0], ['4294967295', 2],
+  ['4294967294', [1]]]], ['object', []], ['value', ['x', null, ['y']]], ['value', emoji], ['value', ''], ['value', 5],
+  ['value', true], ['value', null], ['value', undefined]]) {
+  ask('Object.entries', 'entries', [kind, value], (k, x) => Object.entries(k === 'object' ? Object.fromEntries(x) : x))
+}
+
 for (const s of ['a b', "-_.!~*'()", '\u00e9', '\ud83d\ude00', '\ud83d', '\ude00x', '#?&=/:@+$,;', '%']) {
   ask('encodeURIComponent', 'encodeURIComponent', [s], x => encodeURIComponent(x))
 }

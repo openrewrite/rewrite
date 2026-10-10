@@ -116,7 +116,7 @@ final class UpdateLockfile {
         Object engines = info.get("engines");
         if (engines != null && engines != Js.UNDEFINED) {
             Map<String, @Nullable Object> lockEngines = null;
-            for (Map.Entry<String, @Nullable Object> engine : entries(engines).entrySet()) {
+            for (Map.Entry<String, @Nullable Object> engine : Js.entries(engines)) {
                 if ("*".equals(engine.getValue())) {
                     continue;
                 }
@@ -159,29 +159,6 @@ final class UpdateLockfile {
 
     private static boolean present(@Nullable Object value) {
         return value != null && value != Js.UNDEFINED;
-    }
-
-    // Object.entries of an engines value: an object's members, an array's or a string's by index
-    private static Map<String, @Nullable Object> entries(Object value) {
-        Map<String, @Nullable Object> out = new LinkedHashMap<>();
-        if (value instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) value;
-            for (String key : Js.keys(map)) {
-                out.put(key, map.get(key));
-            }
-        } else if (value instanceof List) {
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                out.put(String.valueOf(i), list.get(i));
-            }
-        } else if (value instanceof String) {
-            String s = (String) value;
-            for (int i = 0; i < s.length(); i++) {
-                out.put(String.valueOf(i), String.valueOf(s.charAt(i)));
-            }
-        }
-        return out;
     }
 
     private static Map<String, @Nullable String> updateResolvedDeps(Map<String, String> updatedDeps,

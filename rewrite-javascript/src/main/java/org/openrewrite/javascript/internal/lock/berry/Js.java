@@ -19,15 +19,13 @@ import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.EcmaScript.JsonSyntaxError;
 
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import org.openrewrite.javascript.internal.lock.JsError;
 
+import java.util.List;
+import java.util.Map;
+
 /**
- * Yarn's plain objects as the port holds them: property reads, {@code Object.entries} and {@code JSON.parse}.
+ * Yarn's plain objects as the port holds them: property reads and {@code JSON.parse}.
  */
 final class Js extends EcmaScript {
 
@@ -66,26 +64,6 @@ final class Js extends EcmaScript {
 
     static boolean isObject(@Nullable Object value) {
         return value instanceof Map || value instanceof List;
-    }
-
-    /**
-     * {@code Object.entries} of an object, or of an array by index.
-     */
-    @SuppressWarnings("unchecked")
-    static List<Map.Entry<String, @Nullable Object>> entries(@Nullable Object value) {
-        List<Map.Entry<String, @Nullable Object>> out = new ArrayList<>();
-        if (value instanceof Map) {
-            Map<String, @Nullable Object> map = (Map<String, @Nullable Object>) value;
-            for (String key : keys(map)) {
-                out.add(new AbstractMap.SimpleEntry<>(key, map.get(key)));
-            }
-        } else if (value instanceof List) {
-            List<?> list = (List<?>) value;
-            for (int i = 0; i < list.size(); i++) {
-                out.add(new AbstractMap.SimpleEntry<>(String.valueOf(i), list.get(i)));
-            }
-        }
-        return out;
     }
 
     /**

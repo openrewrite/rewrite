@@ -80,15 +80,10 @@ final class DeepEqual {
         return true;
     }
 
-    @SuppressWarnings("unchecked")
     private static Map<String, @Nullable Object> entries(Object value) {
         Map<String, @Nullable Object> out = new LinkedHashMap<>();
-        if (value instanceof Map) {
-            out.putAll((Map<String, @Nullable Object>) value);
-        } else if (value instanceof List) {
-            Js.assign(out, value);
-        } else if (value instanceof String) {
-            Js.assign(out, value);
+        for (Map.Entry<String, @Nullable Object> entry : Js.entries(value)) {
+            out.put(entry.getKey(), entry.getValue());
         }
         return out;
     }

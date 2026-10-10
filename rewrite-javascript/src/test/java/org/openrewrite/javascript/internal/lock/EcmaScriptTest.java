@@ -108,6 +108,12 @@ class EcmaScriptTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("builtins")
     void answersAsNodeDoes(Call call) {
+        Map<String, @Nullable Object> threw = call.getThrew();
+        if (threw != null) {
+            assertThatThrownBy(() -> answer(call)).isInstanceOf(JsError.class)
+              .hasToString(threw.get("name") + ": " + threw.get("message"));
+            return;
+        }
         assertThat(answer(call)).isEqualTo(call.getOut());
     }
 
@@ -120,7 +126,7 @@ class EcmaScriptTest {
                 continue;
             }
             assertThat(call.getFn()).isIn("parseInt", "slice", "repeat", "split", "toInt32", "isInteger", "toNumber",
-              "numberToString", "trim", "trimStart");
+              "numberToString", "trim", "trimStart", "entries");
             if (!knows(call)) {
                 cannotKnow.merge(call.getFn(), 1, Integer::sum);
             }
@@ -134,6 +140,8 @@ class EcmaScriptTest {
             return answer(call) != NOT_HERE;
         } catch (CannotKnow e) {
             return false;
+        } catch (JsError e) {
+            return true;
         }
     }
 
@@ -164,9 +172,27 @@ class EcmaScriptTest {
                 return EcmaScript.trim(text(call, 0));
             case "trimStart":
                 return EcmaScript.trimStart(text(call, 0));
+            case "entries":
+                return entries(call);
             default:
                 return NOT_HERE;
         }
+    }
+
+    private static List<List<@Nullable Object>> entries(Call call) {
+        Object value = call.arg(1);
+        if ("object".equals(call.arg(0))) {
+            Map<String, @Nullable Object> object = new LinkedHashMap<>();
+            for (Object pair : (List<?>) Objects.requireNonNull(value)) {
+                object.put((String) ((List<?>) pair).get(0), ((List<?>) pair).get(1));
+            }
+            value = object;
+        }
+        List<List<@Nullable Object>> out = new ArrayList<>();
+        for (Map.Entry<String, @Nullable Object> entry : EcmaScript.entries(value)) {
+            out.add(Arrays.asList(entry.getKey(), entry.getValue()));
+        }
+        return out;
     }
 
     private static String text(Call call, int i) {
@@ -185,5 +211,10 @@ class EcmaScriptTest {
         assertThat(EcmaScript.ownKeys(null)).isEmpty();
         assertThatThrownBy(() -> EcmaScript.keys((Object) null))
           .hasMessage("Cannot convert undefined or null to object");
+    }
+
+    @Test
+    void entriesLeaveOutAHole() {
+        assertThat(EcmaScript.entries(Arrays.asList(HOLE, "x"))).containsExactly(entry("1", "x"));
     }
 }
