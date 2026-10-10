@@ -131,8 +131,11 @@ public class AddDependency extends ScanningRecipe<NodeDependencyEdits> {
 
     // the manifest as each package manager's add saves it (add-<pm>-sorts-every-field, add-<pm>-beside-empty-field)
     private Json.Document saved(@Nullable PackageManager pm, Json.Document doc) {
-        if (pm == null || pm == PackageManager.Bun) {
-            return pm == null ? doc : PackageJsonHelper.sortMembers(doc, targetScope(), String::compareTo);
+        if (pm == null) {
+            return doc;
+        }
+        if (pm == PackageManager.Bun) {
+            return PackageJsonHelper.sortMembers(doc, targetScope(), String::compareTo);
         }
         Comparator<String> order = pm == PackageManager.Npm ? LocaleCompare::en : String::compareTo;
         Json.Document sorted = doc;

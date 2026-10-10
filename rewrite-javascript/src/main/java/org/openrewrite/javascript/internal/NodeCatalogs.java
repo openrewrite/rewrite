@@ -1296,7 +1296,6 @@ public abstract class NodeCatalogs {
             return last >= 0 && last + 2 < lines.length;
         }
 
-        // whether a full line of the text is a comment indented by at least `columns`
         private static boolean commentIndented(String text, int columns) {
             for (String line : fullLines(text).split("\n", -1)) {
                 if (line.trim().startsWith("#") && line.indexOf('#') >= columns) {
