@@ -85,9 +85,12 @@ changes only when a recording says so.
   manager an `*Inputs` mapper from it to that port's own `Inputs` value, which selects the files the package manager
   reads and declares their names, so the recipes' scan captures only those, and a registry source over the host's
   client;
-- the failure model: `CannotKnow`, `Rejected`, `SharedError`, and `LockOnlyInstall`, which words a failure with the
-  package manager's command, gives it one of four kinds (cannot know, the package manager rejects, it fails, the
-  second install rejects or rewrites the lock) and runs the second install;
+- the failure model: `CannotKnow` (with the one rule for a file the host holds without its contents), `Rejected`,
+  `SharedError`, `JsError` (an error JavaScript or Node raises inside a package manager, by its name), and
+  `LockOnlyInstall`, which words a failure with the package manager's command, gives it one of four kinds (cannot
+  know, the package manager rejects, it fails, the second install rejects or rewrites the lock), checks that a walk
+  installs at the lock and runs the second install; a `Result` carries the files the install writes besides the lock
+  (npm's yarn.lock);
 - Node's and V8's behavior: `EcmaScript`, `EventLoop`, `V8Date`, `V8RegExp`, `V8Sort` (V8's TimSort at any length),
   `WhatwgUrl`, `UriComponent`, `PosixPath`, `RootRelativePath`, `Ini`, `LocaleCompare`, `Host`, `HostEnvironment`;
 - one port of some upstream libraries that several package managers bundle, the release an option: `Spec`
@@ -117,9 +120,10 @@ Overrides are written where the project's package manager reads them, at the wor
   they hold any; 9 reads package.json only. The recipe writes where that release's own writer would, editing
   pnpm-workspace.yaml in place or creating the key or file as pnpm places it; a release other than 11.2.2 makes the
   regeneration cannot-know.
-- An override the package manager cannot read, or one that would win over a declaration through a value that is no
-  version range (a catalog or workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes
-  nothing; an override scoped to a parent that pnpm or Berry applies before a global one is named in such a row.
+- An override the package manager cannot read (its own parser's answer: pnpm's `parsePkgAndParentSelector`, Berry's
+  `parseResolution`), or one that would win over a declaration through a value that is no version range (a catalog or
+  workspace reference), is declined with a `NodeDependencyEditsDeclined` row and writes nothing; an override scoped to
+  a parent that pnpm, Berry or Yarn classic's `find` applies before a global one is named in such a row.
 
 Catalogs are read where each package manager reads them (pnpm's pnpm-workspace.yaml, Bun's root `workspaces` with its
 top-level fallback, Yarn 4.10's `.yarnrc.yml`), as `NodeCatalogs`, whose entries come from the OpenRewrite YAML or JSON
@@ -127,10 +131,13 @@ tree and whose pnpm settings come from pnpm's own reader. A recipe that changes 
 in place, quoting kept, and the regeneration reads the edited file. ChangeDependency renames the key and gives the
 catalog the new name's entry; RemoveDependency does what `pnpm remove` does under `cleanupUnusedCatalogs`, the cleanup
 counting the projects the workspace's `packages` match; AddDependency saves what `pnpm add` saves (`lock.pnpm.
-InstallSome`: the default catalog's match, `catalogMode`, `saveCatalogName`), the version for pnpm 9, and the member's
-dependencies sorted, as pnpm writes them. pnpm-workspace.yaml is edited by two editors, a line editor for an override
-and the YAML tree for a catalog entry; both place a new key through one port of pnpm's workspace manifest writer, the
-catalogs at pnpm 11's rules.
+ParseWantedDependencies`, `InstallSome`'s `catalogMode` check, `ResolveDependencyTree`'s catalog lookup for
+`saveCatalogName`), the version for pnpm 9, and the member's dependencies sorted, as pnpm writes them; a release range
+open between majors is declined. pnpm's cleanup is the port's (`WorkspaceManifestWriter.cleanupUnusedCatalogs`, the
+recipes removing from the tree what it removed). pnpm-workspace.yaml has one editor, the YAML tree, placing a new key
+by the port of pnpm's workspace manifest writer for the release the root names, for an override as for a catalog
+entry. A catalog reference is read by each port's own parse, and the package manager a manifest names by pnpm's
+`getWantedPackageManager`.
 
 The five dependency recipes are one engine, `NodeDependencyEdits`: each adds its edits of manifests and
 package-manager files to the cycle in the order its `generate` runs (`PackageJsonHelper.FileEditor`), decides from the
