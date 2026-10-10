@@ -37,7 +37,6 @@ import static java.util.Arrays.asList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
-import static java.util.Objects.requireNonNull;
 
 /**
  * Regenerates a JavaScript project's lock without running its package manager, through the port that
@@ -46,10 +45,10 @@ import static java.util.Objects.requireNonNull;
 public final class LockFileRegeneration {
 
     public static final LockFileRegeneration NPM = new LockFileRegeneration(PackageManager.Npm, "package-lock.json");
-    public static final LockFileRegeneration YARN_CLASSIC = new LockFileRegeneration(PackageManager.YarnClassic, "yar" +
-            "n.lock");
-    public static final LockFileRegeneration YARN_BERRY = new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lo" +
-            "ck");
+    public static final LockFileRegeneration YARN_CLASSIC =
+            new LockFileRegeneration(PackageManager.YarnClassic, "yarn.lock");
+    public static final LockFileRegeneration YARN_BERRY =
+            new LockFileRegeneration(PackageManager.YarnBerry, "yarn.lock");
     public static final LockFileRegeneration PNPM = new LockFileRegeneration(PackageManager.Pnpm, "pnpm-lock.yaml");
     public static final LockFileRegeneration BUN = new LockFileRegeneration(PackageManager.Bun, "bun.lock");
     public static final List<LockFileRegeneration> ALL = unmodifiableList(asList(NPM, YARN_CLASSIC, YARN_BERRY, PNPM,
@@ -264,15 +263,6 @@ public final class LockFileRegeneration {
             }
             return message.append(": ").append(failure.getDetail()).toString();
         }
-    }
-
-    /**
-     * Insert a data-table row for a failed regeneration, naming the recipe's target package when the failure names
-     * none.
-     */
-    public static void insertFailureRow(ExecutionContext ctx, NodeLockRegenerationFailures table,
-                                        Path packageJsonPath, Result result, @Nullable String defaultPackageName) {
-        table.insertRow(ctx, failureRow(packageJsonPath, requireNonNull(result.getFailure()), defaultPackageName));
     }
 
     public static NodeLockRegenerationFailures.Row failureRow(Path packageJsonPath, Failure failure,

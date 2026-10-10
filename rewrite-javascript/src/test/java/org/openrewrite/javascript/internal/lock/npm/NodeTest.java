@@ -1176,8 +1176,8 @@ class NodeTest {
         assertThat(root.getInventory().filter(Node::canDedupe).stream().map(Node::getLocation)).as("preferDedupe=false")
           .containsExactly("node_modules/c/node_modules/a", "node_modules/b/node_modules/e",
             "node_modules/b/node_modules/c/node_modules/a/node_modules/e");
-        assertThat(root.getInventory().filter(n -> n.canDedupe(true)).stream().map(Node::getLocation)).as("preferDedu" +
-                "pe=true")
+        assertThat(root.getInventory().filter(n -> n.canDedupe(true)).stream().map(Node::getLocation))
+          .as("preferDedupe=true")
           .containsExactly("node_modules/c/node_modules/a", "node_modules/b/node_modules/a",
           "node_modules/b/node_modules/e",
             "node_modules/b/node_modules/c/node_modules/a/node_modules/e");
