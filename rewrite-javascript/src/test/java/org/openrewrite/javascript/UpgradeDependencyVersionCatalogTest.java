@@ -256,6 +256,15 @@ class UpgradeDependencyVersionCatalogTest implements RewriteTest {
                                                                           String version) {
         Recipe upgrade = new UpgradeDependencyVersion(name, null, version);
         Recipe override = new UpgradeTransitiveDependencyVersion(name, version.replace("^", ""), null);
+        CatalogRecording recording = new CatalogRecording(family, scenario);
+        rewriteRun(
+          spec -> spec.recipes(upgrade, override).executionContext(recording.ctx())
+            .dataTable(NodeDependencyProtocolsSkipped.Row.class, rows -> assertThat(rows).allSatisfy(row -> {
+                assertThat(row.getPackageName()).isEqualTo(name);
+                assertThat(row.getProtocol()).isEqualTo("catalog:");
+            })),
+          recording.sources()
+        );
         new CatalogRecording(family, scenario).assertEveryVisitOrder(override, upgrade);
         new CatalogRecording(family, scenario).assertEveryVisitOrder(upgrade, override);
     }

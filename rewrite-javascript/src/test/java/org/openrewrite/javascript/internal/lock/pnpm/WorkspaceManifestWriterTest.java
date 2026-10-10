@@ -57,7 +57,7 @@ class WorkspaceManifestWriterTest {
     void aValueThatWouldNeedAnEscapeIsRefused() {
         assertThatThrownBy(() -> WorkspaceManifestWriter.scalar("1.0.0\u0007"))
           .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> WorkspaceManifestWriter.scalar("1.0.0 "))
+        assertThatThrownBy(() -> WorkspaceManifestWriter.scalar("1.0.0\u2028"))
           .isInstanceOf(IllegalArgumentException.class);
     }
 

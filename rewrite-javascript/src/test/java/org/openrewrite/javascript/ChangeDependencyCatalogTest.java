@@ -68,17 +68,17 @@ class ChangeDependencyCatalogTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(nullValues = "null", textBlock = """
-      workspace:^,                       workspace:, null
-      workspace:^,                       workspace:, ^2.0.0
-      patch:acme-logger@1.4.1#fix.patch, patch:,     ^2.0.0
-      npm:@acme/other@^1.0.0,            npm:,       null
-      jsr:@acme/logger@^1.0.0,           jsr:,       ^2.0.0
-      future:x,                          future:,    ^2.0.0
-      catalog:,                          catalog:,   null
-      github:me/old-fork,                github:,    null
+    @CsvSource(nullValues = "null", delimiter = '|', textBlock = """
+      workspace:^                       | workspace: | null   | rename it where the value points first
+      workspace:^                       | workspace: | ^2.0.0 | rename it where the value points first
+      patch:acme-logger@1.4.1#fix.patch | patch:     | ^2.0.0 | rename it where the value points first
+      npm:@acme/other@^1.0.0            | npm:       | null   | rename it where the value points first
+      jsr:@acme/logger@^1.0.0           | jsr:       | ^2.0.0 | rename it where the value points first
+      future:x                          | future:    | ^2.0.0 | rename it where the value points first
+      catalog:                          | catalog:   | null   | its catalog holds no entry for it
+      github:me/old-fork                | github:    | null   | pass a newVersion to replace it with a registry version
       """)
-    void declinedAndMarkedUntilItSettles(String value, String protocol, @Nullable String newVersion) {
+    void declinedAndMarkedUntilItSettles(String value, String protocol, @Nullable String newVersion, String remedy) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("acme-logger", "acme-log", newVersion, null))
             .cycles(2).expectedCyclesThatMakeChanges(1)
@@ -94,7 +94,7 @@ class ChangeDependencyCatalogTest implements RewriteTest {
                   .isEqualTo(manifest(value));
                 assertThat(doc.getMarkers().getMarkers()).filteredOn(Markup.Warn.class::isInstance).singleElement()
                   .satisfies(w -> assertThat(((Markup.Warn) w).getMessage()).contains("acme-logger is declared as " +
-                    value).contains("left unchanged").doesNotContain("Exception"));
+                    value + " (" + protocol + ")").contains("left unchanged: " + remedy).doesNotContain("Exception"));
             }))
         );
     }

@@ -22,6 +22,8 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FindSourceFiles;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -269,7 +271,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     @Test
-    void pnpmWorkspaceManifestAnEarlierRecipeLeftNotEditableInPlaceIsDeclinedInEveryVisitOrder() {
+    void pnpmWorkspaceManifestAnEarlierRecipeLeftNotEditableInPlaceIsDeclinedOrWarnedInEveryVisitOrder() {
         Scenario s = new Scenario("pnpm/override-recipe-two-pins");
         Recipe recipe = new CompositeRecipe(Arrays.asList(new FindAndReplace("packages:\n  - apps/*",
           "packages: [apps/*]", null, null, null, null, "pnpm-workspace.yaml", null),
@@ -283,6 +285,9 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
                 assertThat(outcome.rows).as("visiting %s", visited).singleElement()
                   .extracting(NodeLockRegenerationFailures.Row::getReason)
                   .isEqualTo(LockFileRegeneration.Reason.RESOLUTION_REQUIRED.name());
+                assertThat(outcome.file("pnpm-workspace.yaml").getMarkers().findFirst(Markup.Warn.class))
+                  .as("visiting %s", visited).hasValueSatisfying(warn -> assertThat(warn.getMessage())
+                    .contains("after this recipe wrote the lock from its earlier revision"));
             } else {
                 assertThat(outcome.rows).as("visiting %s", visited).isEmpty();
                 assertThat(outcome.declines).as("visiting %s", visited).singleElement()
@@ -293,7 +298,7 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
               .isEqualTo("packages: [apps/*]\n");
             assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
               .isEqualTo(s.file("pkg-before"));
-            // a lock visited first was written by the decision the flow-style revision overturns
+            // a lock visited first was written by the decision the flow-style revision overturns, so it is warned
             if (lockFirst) {
                 assertThat(print(outcome.file("pnpm-lock.yaml"))).as("visiting %s", visited)
                   .isNotEqualTo(s.file("before"));
@@ -490,6 +495,24 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
           s.root(PackageManager.Pnpm, s.file("pkg-before")),
           SourceSpecs.other(s.file("workspace-before"), spec -> spec.path("pnpm-workspace.yaml")),
           s.lock(PackageManager.Pnpm, null)
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', textBlock = """
+      Pnpm | {"name": "p", "packageManager": "pnpm@10.34.6", "pnpm": "hoist"}                 | pnpm is not an object
+      Pnpm | {"name": "p", "packageManager": "pnpm@10.34.6", "pnpm": {"overrides": "none"}} | pnpm.overrides is not an object
+      Npm  | {"name": "p", "overrides": []}                                                  | overrides is not an object
+      """)
+    void anOverridesFieldThatIsNoObjectIsDeclinedWithOneRowAndNothingElse(PackageManager pm, String manifest,
+                                                                          String reason) {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))
+            .dataTable(NodeDependencyEditsDeclined.Row.class, rows -> assertThat(rows).singleElement()
+              .extracting(NodeDependencyEditsDeclined.Row::getReason).isEqualTo("the root's " + reason))
+            .afterRecipe(run -> assertThat(run.getDataTableRows(NodeLockRegenerationFailures.class)).isEmpty()),
+          packageJson(manifest, null, nodeResolutionResult(pm),
+            s -> s.afterRecipe(UpgradeTransitiveDependencyVersionTest::noWarning))
         );
     }
 
