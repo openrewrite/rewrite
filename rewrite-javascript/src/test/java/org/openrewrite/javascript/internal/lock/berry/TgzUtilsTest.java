@@ -16,13 +16,19 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.EcmaScript;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -75,6 +81,25 @@ class TgzUtilsTest {
         assertThat(Cache.checksum(tgz, StructUtils.makeIdent(null, "carbon-icons-svelte"), Configuration.defaults()))
                 .isEqualTo("10c0/84acc5fd20f022a17adb1d948a9e38247e447999a0f4a172dde8e70b3692ca09041506c31ab4e943" +
                            "8d875ea4c5210ef15ab3fca0c97aaef102ae54107eccb5f2");
+    }
+
+    // node-tar 6.1.11's entries for headers with a NUL before a line terminator and long pax numbers (tar-headers.js)
+    @Test
+    @SuppressWarnings("unchecked")
+    void readsHeadersAsNodeTarDoes() throws IOException {
+        List<Map<String, Object>> expected = (List<Map<String, Object>>) EcmaScript.jsonParse(
+                new String(resource("node-tar-headers.json"), StandardCharsets.UTF_8));
+        List<Map<String, Object>> entries = new ArrayList<>();
+        for (TgzUtils.TarEntry entry : TgzUtils.parseTar(TgzUtils.maybeGunzip(resource("node-tar-headers.tgz")))) {
+            Map<String, Object> read = new LinkedHashMap<>();
+            read.put("type", entry.type);
+            read.put("path", entry.path);
+            read.put("linkpath", Js.truthy(entry.linkpath) ? entry.linkpath : null);
+            read.put("length", (double) entry.body.length);
+            read.put("text", new String(entry.body, StandardCharsets.UTF_8).replaceAll("\0+\\z", ""));
+            entries.add(read);
+        }
+        assertThat(entries).isEqualTo(expected);
     }
 
     private static String sha512(byte[] tgz, String prefixPath, int stripComponents) {

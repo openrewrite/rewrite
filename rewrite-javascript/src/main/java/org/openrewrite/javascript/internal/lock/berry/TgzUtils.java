@@ -17,6 +17,7 @@ package org.openrewrite.javascript.internal.lock.berry;
 
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.javascript.internal.lock.PosixPath;
+import org.openrewrite.javascript.internal.lock.V8RegExp;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -36,6 +38,8 @@ import java.util.zip.GZIPInputStream;
 final class TgzUtils {
 
     private static final int MAX_META_ENTRY_SIZE = 1024 * 1024;
+    private static final Pattern NUL_AND_REST = V8RegExp.of("\\0.*");
+    private static final Pattern NUL_TO_END = V8RegExp.of("\\0.*$");
 
     private TgzUtils() {
     }
@@ -171,11 +175,10 @@ final class TgzUtils {
             if (link == (header.linkpath == null || header.linkpath.isEmpty())) {
                 continue;
             }
-            int size = header.size == null ? 0 : (int) (long) header.size;
-            int blocks = 512 * (int) Math.ceil(size / 512.0);
-            byte[] body = new byte[Math.max(0, Math.min(size, tar.length - position))];
+            long size = header.size == null ? 0 : header.size;
+            byte[] body = new byte[(int) Math.max(0, Math.min(size, tar.length - position))];
             System.arraycopy(tar, position, body, 0, body.length);
-            position += blocks;
+            position = (int) Math.min(tar.length, position + 512 * (long) Math.ceil(size / 512.0));
 
             boolean meta = false;
             boolean ignored = false;
@@ -218,11 +221,11 @@ final class TgzUtils {
                     case "NextFileHasLongPath":
                     case "OldGnuLongPath":
                         ex = ex == null ? new LinkedHashMap<>() : ex;
-                        ex.put("path", cutAtNul(metaText));
+                        ex.put("path", V8RegExp.replace(metaText, NUL_AND_REST, false, ""));
                         break;
                     default:
                         ex = ex == null ? new LinkedHashMap<>() : ex;
-                        ex.put("linkpath", cutAtNul(metaText));
+                        ex.put("linkpath", V8RegExp.replace(metaText, NUL_AND_REST, false, ""));
                 }
                 continue;
             }
@@ -249,11 +252,6 @@ final class TgzUtils {
         return out;
     }
 
-    private static String cutAtNul(String s) {
-        int nul = s.indexOf('\0');
-        return nul == -1 ? s : s.substring(0, nul);
-    }
-
     // Pax.parse(string, previous): the records over the previous header's, numeric values as numbers
     private static Map<String, Object> pax(String string, @Nullable Map<String, Object> previous) {
         Map<String, Object> kv = new LinkedHashMap<>();
@@ -269,15 +267,15 @@ final class TgzUtils {
                 continue;
             }
             String v = eq == -1 ? "" : line.substring(eq + 1);
-            kv.put(k, v.matches("[0-9]+") ? (Object) Long.parseLong(v) : v);
+            kv.put(k, v.matches("[0-9]+") ? (Object) Js.toNumber(v) : v);
         }
         Map<String, Object> merged = previous == null ? new LinkedHashMap<>() : previous;
         merged.putAll(kv);
         Map<String, Object> result = new LinkedHashMap<>();
         for (String field : new String[]{"path", "linkpath", "size"}) {
             Object value = merged.get(field);
-            if (value != null && !"".equals(value) && !Long.valueOf(0).equals(value)) {
-                result.put(field, "size".equals(field) ? value : String.valueOf(value));
+            if (Js.truthy(value)) {
+                result.put(field, "size".equals(field) ? value : Js.string(value));
             }
         }
         return result;
@@ -352,7 +350,7 @@ final class TgzUtils {
                         linkpath = (String) field.getValue();
                         break;
                     case "size":
-                        size = (Long) field.getValue();
+                        size = ((Number) field.getValue()).longValue();
                         break;
                     default:
                         break;
@@ -408,7 +406,7 @@ final class TgzUtils {
         }
 
         private static String decString(byte[] buf, int off, int size) {
-            return cutAtNul(new String(buf, off, size, StandardCharsets.UTF_8));
+            return V8RegExp.replace(new String(buf, off, size, StandardCharsets.UTF_8), NUL_AND_REST, false, "");
         }
 
         private static @Nullable Long decNumber(byte[] buf, int off, int size) {
@@ -419,7 +417,8 @@ final class TgzUtils {
                 }
                 return value;
             }
-            double value = Js.parseInt(Js.trim(cutAtNul(new String(buf, off, size, StandardCharsets.UTF_8))), 8);
+            String field = V8RegExp.replace(new String(buf, off, size, StandardCharsets.UTF_8), NUL_TO_END, false, "");
+            double value = Js.parseInt(Js.trim(field), 8);
             return Double.isNaN(value) ? null : (long) value;
         }
     }
