@@ -316,14 +316,17 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : acc.scan.projects.entrySet()) {
             Path member = project.getKey();
             NodeDependencyScan.ProjectState ps = project.getValue();
+            SourceFile captured = ps.capturedPackageJson;
+            NodeResolutionResult marker = captured == null ? null :
+                    captured.getMarkers().findFirst(NodeResolutionResult.class).orElse(null);
             Path lock = NodeDependencyScan.lockFor(acc.scan, member);
-            if (member.equals(root) || ps.capturedPackageJson == null || ps.capturedLockContent == null ||
-                ps.regenResult != null || !canApply(ps.capturedPackageJson) || lock == null ||
+            if (captured == null || member.equals(root) || marker == null || marker.getPackageManager() != pm ||
+                ps.capturedLockContent == null || ps.regenResult != null || lock == null ||
                 !member.equals(acc.scan.lockToPackage.get(lock)) || !root.equals(workspaceRoot(acc.scan, member, pm))) {
                 continue;
             }
             SourceFile pkg = PackageJsonHelper.getLiveTree(ctx, member);
-            ps.regenResult = PackageJsonHelper.regenerateLockContent(pkg == null ? ps.capturedPackageJson : pkg,
+            ps.regenResult = PackageJsonHelper.regenerateLockContent(pkg == null ? captured : pkg,
                     ps.capturedLockContent, NodeDependencyScan.projectFiles(acc.scan, ctx, member), edited, ctx);
         }
     }
