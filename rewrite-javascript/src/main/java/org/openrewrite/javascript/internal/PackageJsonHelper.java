@@ -796,12 +796,28 @@ public class PackageJsonHelper {
             @Nullable String capturedLockContent,
             NodeDependencyScan.ProjectFiles projectFiles,
             ExecutionContext ctx) {
+        return editAndRegenerate(packageJson, editFn, editedFiles, Collections.emptyMap(), capturedLockContent,
+                projectFiles, ctx);
+    }
+
+    /**
+     * @param editedFrom revisions before the edit of {@code editedFiles}, by path, null for a file it creates; a file
+     *                   is changed when it differs from its revision here, else from the scan's
+     */
+    public static EditAndRegenerateResult editAndRegenerate(
+            SourceFile packageJson,
+            Function<Json.Document, Json.Document> editFn,
+            Map<Path, String> editedFiles,
+            Map<Path, @Nullable String> editedFrom,
+            @Nullable String capturedLockContent,
+            NodeDependencyScan.ProjectFiles projectFiles,
+            ExecutionContext ctx) {
         if (!(packageJson instanceof Json.Document)) {
             return EditAndRegenerateResult.unchanged();
         }
         Json.Document before = (Json.Document) packageJson;
         Json.Document after = editFn.apply(before);
-        Map<Path, String> changed = changedFiles(editedFiles, projectFiles);
+        Map<Path, String> changed = changedFiles(editedFiles, editedFrom, projectFiles);
         if (after == before && changed.isEmpty()) {
             return EditAndRegenerateResult.unchanged();
         }
@@ -811,13 +827,18 @@ public class PackageJsonHelper {
         return new EditAndRegenerateResult(after == before ? null : withResolvedDeps(refreshed, regen), regen, changed);
     }
 
-    private static Map<Path, String> changedFiles(Map<Path, String> editedFiles,
+    private static Map<Path, String> changedFiles(Map<Path, String> editedFiles, Map<Path, @Nullable String> editedFrom,
                                                   NodeDependencyScan.ProjectFiles projectFiles) {
         Map<Path, String> changed = new LinkedHashMap<>();
         for (Map.Entry<Path, String> file : editedFiles.entrySet()) {
-            String captured = projectFiles.getPackageManagerFiles().get(file.getKey());
-            if (captured == null) {
-                captured = projectFiles.getManifests().get(file.getKey());
+            String captured;
+            if (editedFrom.containsKey(file.getKey())) {
+                captured = editedFrom.get(file.getKey());
+            } else {
+                captured = projectFiles.getPackageManagerFiles().get(file.getKey());
+                if (captured == null) {
+                    captured = projectFiles.getManifests().get(file.getKey());
+                }
             }
             if (!file.getValue().equals(captured)) {
                 changed.put(file.getKey(), file.getValue());

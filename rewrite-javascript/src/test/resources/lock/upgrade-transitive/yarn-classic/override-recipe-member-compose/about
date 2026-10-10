@@ -1,0 +1,1 @@
+Yarn 1.22.22 workspace whose member apps/a sorts before the root: the member bumps is-odd 3.0.0 to 3.0.1 and the root gains resolutions is-number 7.0.0, as UpgradeDependencyVersion then the recipe write them in one run.

@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 import org.openrewrite.*;
-import org.openrewrite.javascript.internal.DependencyPathSegment;
 import org.openrewrite.javascript.internal.LockFileRegeneration;
 import org.openrewrite.javascript.internal.NodeDependencyScan;
 import org.openrewrite.javascript.internal.PackageJsonHelper;
@@ -78,8 +77,13 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
 
     public static class Accumulator {
         final NodeDependencyScan.Accumulator scan = new NodeDependencyScan.Accumulator();
-        /** Each workspace root's override, decided once; null when declined. */
-        final Map<Path, @Nullable PackageJsonOverrides> overrides = new HashMap<>();
+        /** Each workspace root's override, decided from the revisions before this recipe it was last asked for. */
+        final Map<Path, PackageJsonOverrides> overrides = new HashMap<>();
+        /** The override each root's files were first written by; a later decision must write as it does. */
+        final Map<Path, PackageJsonOverrides> followed = new HashMap<>();
+        final Set<Path> overturned = new HashSet<>();
+        /** Why the file being visited is warned: its root's decision was overturned at this visit. */
+        @Nullable String overturnedAt;
         /** What each root's regeneration last read, so it runs again only when that changed. */
         final Map<Path, List<Object>> regeneratedFrom = new HashMap<>();
         /** The revision of each root package.json and pnpm-workspace.yaml as this recipe visited it. */
@@ -152,34 +156,38 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             @Override public Tree preVisit(Tree tree, ExecutionContext ctx) {
                 stopAfterPreVisit();
                 if (!(tree instanceof SourceFile)) return tree;
-                SourceFile sf = (SourceFile) tree;
-                Path p = sf.getSourcePath();
-
-                if (PackageJsonOverrides.WORKSPACE_MANIFEST.equals(String.valueOf(p.getFileName()))) {
-                    return editedWorkspaceManifest(acc, ctx, sf);
-                }
-
-                NodeDependencyScan.ProjectState ps = acc.scan.projects.get(p);
-                if (ps != null && ps.capturedPackageJson != null) {
-                    return editedManifest(acc, ctx, ps, sf);
-                }
-
-                for (Path importer : NodeDependencyScan.lockImporters(acc.scan, p)) {
-                    NodeDependencyScan.ProjectState ips = acc.scan.projects.get(importer);
-                    if (ips == null || ips.capturedPackageJson == null) continue;
-                    LockFileRegeneration.Result result = regeneratedLock(acc, ctx, importer, ips, p);
-                    if (result != null) {
-                        if (result.isSuccess()) {
-                            return PackageJsonHelper.reparseLock(sf, result.getLockFileContent());
-                        }
-                        recordFailure(ctx, ips, importer, result);
-                        return Markup.warn(sf, new RuntimeException(
-                                "lock regeneration failed: " + result.getErrorMessage()));
-                    }
-                }
-                return tree;
+                SourceFile out = edited(acc, ctx, (SourceFile) tree);
+                String overturned = acc.overturnedAt;
+                acc.overturnedAt = null;
+                return overturned == null ? out : Markup.warn(out, new RuntimeException(overturned));
             }
         };
+    }
+
+    private SourceFile edited(Accumulator acc, ExecutionContext ctx, SourceFile sf) {
+        Path p = sf.getSourcePath();
+        if (PackageJsonOverrides.WORKSPACE_MANIFEST.equals(String.valueOf(p.getFileName()))) {
+            return editedWorkspaceManifest(acc, ctx, sf);
+        }
+
+        NodeDependencyScan.ProjectState ps = acc.scan.projects.get(p);
+        if (ps != null && ps.capturedPackageJson != null) {
+            return editedManifest(acc, ctx, ps, sf);
+        }
+
+        for (Path importer : NodeDependencyScan.lockImporters(acc.scan, p)) {
+            NodeDependencyScan.ProjectState ips = acc.scan.projects.get(importer);
+            if (ips == null || ips.capturedPackageJson == null) continue;
+            LockFileRegeneration.Result result = regeneratedLock(acc, ctx, importer, ips, p);
+            if (result != null) {
+                if (result.isSuccess()) {
+                    return PackageJsonHelper.reparseLock(sf, result.getLockFileContent());
+                }
+                recordFailure(ctx, ips, importer, result);
+                return Markup.warn(sf, new RuntimeException("lock regeneration failed: " + result.getErrorMessage()));
+            }
+        }
+        return sf;
     }
 
     private SourceFile editedManifest(Accumulator acc, ExecutionContext ctx, NodeDependencyScan.ProjectState ps,
@@ -191,7 +199,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         }
         Path root = workspaceRoot(acc.scan, p, pm);
         if (!root.equals(p)) {
-            overrideOf(acc, ctx, p);
+            rootOf(acc, ctx, p);
             return sf;
         }
         acc.visited.put(p, sf);
@@ -217,7 +225,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         Path path = sf.getSourcePath();
         Path root = path.resolveSibling("package.json");
         NodeDependencyScan.ProjectState ps = acc.scan.projects.get(root);
-        if (ps == null || ps.capturedPackageJson == null) {
+        NodeResolutionResult.PackageManager pm = ps == null ? null : packageManager(ps.capturedPackageJson);
+        if (pm != NodeResolutionResult.PackageManager.Pnpm || !root.equals(workspaceRoot(acc.scan, root, pm))) {
             return sf;
         }
         if (!acc.generated.contains(path)) {
@@ -227,14 +236,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (override == null || override.getPlace() != PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
             return sf;
         }
-        String text = print(sf);
-        String content;
-        try {
-            content = override.applyToWorkspaceManifest(text);
-        } catch (IllegalArgumentException e) {
-            return Markup.warn(sf, e);
-        }
-        if (content.equals(text)) {
+        String content = override.applyToWorkspaceManifest();
+        if (content.equals(print(sf))) {
             return sf;
         }
         SourceFile out = PackageJsonHelper.reparseLock(sf, content);
@@ -286,6 +289,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return;
         }
         SourceFile base = base(acc, ctx, root, ps);
+        Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
         Map<Path, String> edited = workspaceEdit(acc, ctx, root, override);
         NodeDependencyScan.ProjectFiles files = NodeDependencyScan.projectFiles(acc.scan, ctx, root);
         Map<Path, String> otherManifests = new HashMap<>(files.getManifests());
@@ -296,12 +300,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return;
         }
         PackageJsonHelper.EditAndRegenerateResult r = PackageJsonHelper.editAndRegenerate(base,
-                override::apply, edited, ps.capturedLockContent, files, ctx);
+                override::apply, edited, singletonMap(workspaceManifest, workspaceBase(acc, ctx, workspaceManifest)),
+                ps.capturedLockContent, files, ctx);
         ps.modifiedPackageJson = r.getModifiedPackageJson();
         ps.regenResult = r.getRegenResult();
         ps.editedFrom = base;
         ps.edit = override::apply;
-        Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
         String written = edited.get(workspaceManifest);
         if (written != null && !acc.visited.containsKey(workspaceManifest) &&
             !acc.generated.contains(workspaceManifest)) {
@@ -317,13 +321,8 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
             return emptyMap();
         }
         Path path = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
-        String before = workspaceBase(acc, ctx, path);
-        try {
-            String written = override.applyToWorkspaceManifest(before);
-            return written.equals(before) ? emptyMap() : singletonMap(path, written);
-        } catch (IllegalArgumentException e) {
-            return emptyMap();
-        }
+        String written = override.applyToWorkspaceManifest();
+        return written.equals(workspaceBase(acc, ctx, path)) ? emptyMap() : singletonMap(path, written);
     }
 
     private @Nullable String workspaceManifest(Accumulator acc, ExecutionContext ctx, Path root) {
@@ -364,8 +363,39 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         PackageJsonHelper.putLiveTree(ctx, path, revision);
     }
 
-    // the override of the workspace root of packageJson, decided once from the root's revision before this recipe
+    // the override of packageJson's workspace root, from the revisions before this recipe of the root and its
+    // pnpm-workspace.yaml; null when declined, or when they overturn the decision files were written by
     private @Nullable PackageJsonOverrides overrideOf(Accumulator acc, ExecutionContext ctx, Path packageJson) {
+        Path root = rootOf(acc, ctx, packageJson);
+        if (root == null) {
+            return null;
+        }
+        NodeDependencyScan.ProjectState ps = requireNonNull(acc.scan.projects.get(root));
+        PackageJsonOverrides override = decide(acc, ctx, root, ps);
+        if (override == null) {
+            return null;
+        }
+        PackageJsonOverrides followed = acc.followed.computeIfAbsent(root, k -> override);
+        if (!followed.writesAs(override)) {
+            if (acc.overturned.add(root)) {
+                String why = "a recipe before this one changed " + root + " or its " +
+                             PackageJsonOverrides.WORKSPACE_MANIFEST + " after files visited earlier were written " +
+                             "by the override's place then, " + followed + "; it is now " + override;
+                acc.overturnedAt = why;
+                failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, why);
+            }
+            return null;
+        }
+        String declined = override.declined();
+        if (declined != null) {
+            failure(ctx, ps, root, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, declined);
+            return null;
+        }
+        return override;
+    }
+
+    // packageJson's workspace root; null, with a row, when that is not a package.json the recipe edits
+    private @Nullable Path rootOf(Accumulator acc, ExecutionContext ctx, Path packageJson) {
         NodeDependencyScan.ProjectState ps = acc.scan.projects.get(packageJson);
         NodeResolutionResult.PackageManager pm = ps == null ? null : packageManager(ps.capturedPackageJson);
         if (pm == null) {
@@ -374,16 +404,15 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         Path root = workspaceRoot(acc.scan, packageJson, pm);
         NodeDependencyScan.ProjectState rootPs = acc.scan.projects.get(root);
         if (rootPs == null || packageManager(rootPs.capturedPackageJson) == null) {
-            decline(ctx, ps, packageJson, "the override belongs in the workspace root's " + root +
-                                          ", which is not a package.json the recipe edits");
+            failure(ctx, ps, packageJson, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE, "the override " +
+                    "belongs in the workspace root's " + root + ", which is not a package.json the recipe edits");
             return null;
         }
-        if (!acc.overrides.containsKey(root)) {
-            acc.overrides.put(root, decide(acc, ctx, root, rootPs));
-        }
-        return acc.overrides.get(root);
+        return root;
     }
 
+    // the root's override as its package.json and pnpm-workspace.yaml stand before this recipe, decided again when
+    // either has changed since it was last asked for
     private @Nullable PackageJsonOverrides decide(Accumulator acc, ExecutionContext ctx, Path root,
                                                   NodeDependencyScan.ProjectState ps) {
         SourceFile pkg = base(acc, ctx, root, ps);
@@ -391,33 +420,22 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         if (!(pkg instanceof Json.Document) || pm == null) {
             return null;
         }
-        Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
-        String current = acc.scan.packageManagerFiles.get(workspaceManifest);
-        if (pm == NodeResolutionResult.PackageManager.Pnpm && current == null &&
-            acc.scan.paths.contains(workspaceManifest)) {
-            ps.failureRecorded = true;
-            lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(root.toString(),
-                    packageName, LockFileRegeneration.Reason.RESOLUTION_REQUIRED.toString(),
-                    "the engine cannot know " + PackageJsonOverrides.WORKSPACE_MANIFEST +
-                    " (its contents were not read)"));
-            return null;
-        }
-        List<DependencyPathSegment> path = dependencyPath == null ? null :
-                PackageJsonOverrides.parsePath(dependencyPath);
-        PackageJsonOverrides override = PackageJsonOverrides.of(pm, (Json.Document) pkg, current, packageName,
-                newVersion, path);
-        String declined = override.declined();
-        if (declined == null && override.getPlace() == PackageJsonOverrides.Place.WORKSPACE_MANIFEST) {
-            try {
-                override.applyToWorkspaceManifest(current);
-            } catch (IllegalArgumentException e) {
-                declined = String.valueOf(e.getMessage());
+        String workspace = null;
+        if (pm == NodeResolutionResult.PackageManager.Pnpm) {
+            Path workspaceManifest = root.resolveSibling(PackageJsonOverrides.WORKSPACE_MANIFEST);
+            if (acc.scan.paths.contains(workspaceManifest) &&
+                !acc.scan.packageManagerFiles.containsKey(workspaceManifest)) {
+                failure(ctx, ps, root, LockFileRegeneration.Reason.RESOLUTION_REQUIRED, "the engine cannot know " +
+                        PackageJsonOverrides.WORKSPACE_MANIFEST + " (its contents were not read)");
+                return null;
             }
+            workspace = workspaceBase(acc, ctx, workspaceManifest);
         }
-        if (declined != null) {
-            decline(ctx, ps, root, declined);
-            return null;
-        }
+        PackageJsonOverrides last = acc.overrides.get(root);
+        PackageJsonOverrides override = last != null ? last.from((Json.Document) pkg, workspace) :
+                PackageJsonOverrides.of(pm, (Json.Document) pkg, workspace, packageName, newVersion,
+                        dependencyPath == null ? null : PackageJsonOverrides.parsePath(dependencyPath));
+        acc.overrides.put(root, override);
         return override;
     }
 
@@ -462,11 +480,12 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<UpgradeTr
         return sf.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
     }
 
-    private void decline(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path path, String why) {
+    private void failure(ExecutionContext ctx, NodeDependencyScan.ProjectState ps, Path path,
+                         LockFileRegeneration.Reason reason, String why) {
         if (!ps.failureRecorded) {
             ps.failureRecorded = true;
             lockRegenerationFailures.insertRow(ctx, new NodeLockRegenerationFailures.Row(path.toString(),
-                    packageName, LockFileRegeneration.Reason.UNSUPPORTED_ENTRY_TYPE.toString(), why));
+                    packageName, reason.toString(), why));
         }
     }
 

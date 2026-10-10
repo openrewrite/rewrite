@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -63,16 +64,17 @@ public final class PackageJsonOverrides {
     private final WorkspaceSettings workspace;
     private final int release;
     private final Place place;
-    private @Nullable WorkspaceManifest scanned;
+    private @Nullable String declined;
+    private boolean declinedKnown;
 
-    private PackageJsonOverrides(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
+    private PackageJsonOverrides(PackageManager pm, Json.Document root, WorkspaceSettings workspace,
                                  String packageName, String newVersion, @Nullable List<DependencyPathSegment> path) {
         this.pm = pm;
         this.root = root;
         this.packageName = packageName;
         this.newVersion = newVersion;
         this.path = path;
-        this.workspace = new WorkspaceSettings(workspaceManifest);
+        this.workspace = workspace;
         this.release = pm == PackageManager.Pnpm ? pnpmRelease(root, workspace) : -1;
         this.place = place(pm, root, workspace, release);
     }
@@ -84,7 +86,39 @@ public final class PackageJsonOverrides {
     public static PackageJsonOverrides of(PackageManager pm, Json.Document root, @Nullable String workspaceManifest,
                                           String packageName, String newVersion,
                                           @Nullable List<DependencyPathSegment> path) {
-        return new PackageJsonOverrides(pm, root, workspaceManifest, packageName, newVersion, path);
+        return new PackageJsonOverrides(pm, root, new WorkspaceSettings(workspaceManifest), packageName, newVersion,
+                path);
+    }
+
+    /**
+     * This override decided again for other revisions of the root and its pnpm-workspace.yaml; this one when it was
+     * decided from them. A pnpm-workspace.yaml of the same text is not read again.
+     */
+    public PackageJsonOverrides from(Json.Document root, @Nullable String workspaceManifest) {
+        boolean sameWorkspace = workspace.isText(workspaceManifest);
+        if (root == this.root && sameWorkspace) {
+            return this;
+        }
+        return new PackageJsonOverrides(pm, root, sameWorkspace ? workspace : new WorkspaceSettings(workspaceManifest),
+                packageName, newVersion, path);
+    }
+
+    /**
+     * Whether {@code other} writes the override where this one does, for the same pnpm release, or declines it alike.
+     */
+    public boolean writesAs(PackageJsonOverrides other) {
+        return place == other.place && release == other.release && Objects.equals(declined(), other.declined());
+    }
+
+    @Override
+    public String toString() {
+        String why = declined();
+        if (why != null) {
+            return "declined (" + why + ")";
+        }
+        String where = place == Place.WORKSPACE_MANIFEST ? WORKSPACE_MANIFEST : place == Place.PNPM_FIELD ?
+                "pnpm.overrides" : place == Place.RESOLUTIONS ? "resolutions" : "overrides";
+        return pm == PackageManager.Pnpm ? where + " for pnpm " + release : where;
     }
 
     /**
@@ -206,9 +240,25 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * Why the root's package manager would not read the override where it is written, or null when it would.
+     * Why the root's package manager would not read the override where it is written, or why pnpm-workspace.yaml is
+     * not edited in place; null when neither.
      */
     public @Nullable String declined() {
+        if (!declinedKnown) {
+            declined = decline();
+            if (declined == null && place == Place.WORKSPACE_MANIFEST) {
+                try {
+                    applyToWorkspaceManifest();
+                } catch (IllegalArgumentException e) {
+                    declined = String.valueOf(e.getMessage());
+                }
+            }
+            declinedKnown = true;
+        }
+        return declined;
+    }
+
+    private @Nullable String decline() {
         int depth = path == null ? 0 : path.size();
         if (pm == PackageManager.Pnpm) {
             if (release < 9 || release > 11) {
@@ -292,20 +342,11 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * A revision of pnpm-workspace.yaml (null for none) with the override where pnpm writes a new key or entry; an
-     * {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors, documents).
+     * The pnpm-workspace.yaml this override was decided from (none when null) with the override where pnpm writes a
+     * new key or entry; an {@link IllegalArgumentException} for a layout not edited in place (flow style, anchors).
      */
-    public String applyToWorkspaceManifest(@Nullable String workspaceManifest) {
-        WorkspaceManifest manifest;
-        if (workspace.isText(workspaceManifest)) {
-            if (scanned == null) {
-                scanned = new WorkspaceManifest(workspace, release);
-            }
-            manifest = scanned;
-        } else {
-            manifest = new WorkspaceManifest(new WorkspaceSettings(workspaceManifest), release);
-        }
-        return manifest.withOverride(pnpmKey(packageName, path), newVersion);
+    public String applyToWorkspaceManifest() {
+        return workspace.manifest(release).withOverride(pnpmKey(packageName, path), newVersion);
     }
 
     // the major of the pnpm release that installs the root: the one it names, unless onFail or the workspace's
@@ -581,12 +622,16 @@ public final class PackageJsonOverrides {
     }
 
     /**
-     * A revision of pnpm-workspace.yaml as a YAML document, loaded once; no settings when absent or unreadable.
+     * A revision of pnpm-workspace.yaml as a YAML document and as lines, each read once; no settings when absent or
+     * unreadable.
      */
     private static final class WorkspaceSettings {
         private final @Nullable String text;
         private final @Nullable Object loaded;
         private final @Nullable RuntimeException unreadable;
+        private @Nullable WorkspaceManifest manifest;
+        private @Nullable IllegalArgumentException refused;
+        private int manifestRelease;
 
         WorkspaceSettings(@Nullable String text) {
             this.text = text;
@@ -605,6 +650,23 @@ public final class PackageJsonOverrides {
 
         boolean isText(@Nullable String other) {
             return text == null ? other == null : text.equals(other);
+        }
+
+        WorkspaceManifest manifest(int release) {
+            if (manifest == null && refused == null || manifestRelease != release) {
+                manifestRelease = release;
+                manifest = null;
+                refused = null;
+                try {
+                    manifest = new WorkspaceManifest(this, release);
+                } catch (IllegalArgumentException e) {
+                    refused = e;
+                }
+            }
+            if (refused != null) {
+                throw refused;
+            }
+            return requireNonNull(manifest);
         }
 
         @Nullable

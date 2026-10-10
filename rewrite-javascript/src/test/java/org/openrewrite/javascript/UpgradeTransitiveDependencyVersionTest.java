@@ -24,7 +24,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Recipe;
+import org.openrewrite.RecipeRun;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.config.CompositeRecipe;
@@ -34,11 +36,14 @@ import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Dependency;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.javascript.table.NodeLockRegenerationFailures;
+import org.openrewrite.json.ChangeValue;
 import org.openrewrite.json.JsonParser;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.text.FindAndReplace;
+import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.yaml.ChangePropertyValue;
 import org.openrewrite.yaml.YamlParser;
 
@@ -53,7 +58,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -62,6 +66,7 @@ import java.util.Map;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.dependency;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
@@ -183,6 +188,82 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         inEveryOrder(s, new CompositeRecipe(Arrays.asList(
           new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null),
           new UpgradeTransitiveDependencyVersion("left-pad", "1.3.0", null))), s.workspaceSources(PackageManager.Pnpm));
+    }
+
+    @Test
+    void npmAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
+        memberCompose("npm/override-recipe-member-compose", PackageManager.Npm);
+    }
+
+    @Test
+    void pnpmAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
+        memberCompose("pnpm/override-recipe-member-compose", PackageManager.Pnpm);
+    }
+
+    @Test
+    void bunAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
+        memberCompose("bun/override-recipe-member-compose", PackageManager.Bun);
+    }
+
+    @Test
+    void yarnClassicAfterAnEarlierRecipeChangedAMemberInEveryVisitOrder() {
+        memberCompose("yarn-classic/override-recipe-member-compose", PackageManager.YarnClassic);
+    }
+
+    @Test
+    void pnpmAfterAnEarlierRecipeChangedTheReleaseInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-release-changed-earlier");
+        s.release = "9.15.9";
+        Recipe recipe = new CompositeRecipe(Arrays.asList(new ChangeValue("$.packageManager", "\"pnpm@11.2.2\""),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null)));
+        for (List<Source> order : orders(s.workspaceSources(PackageManager.Pnpm))) {
+            List<String> paths = order.stream().map(source -> source.path).collect(toList());
+            int root = paths.indexOf("package.json");
+            if (root < paths.indexOf("pnpm-workspace.yaml") && root < paths.indexOf("pnpm-lock.yaml")) {
+                inOrder(s, recipe, order);
+            } else {
+                overturned(s, recipe, order, "it is now pnpm-workspace.yaml for pnpm 11");
+            }
+        }
+    }
+
+    @Test
+    void pnpmPinThenRepinCreatingTheWorkspaceManifestInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-repin");
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null),
+          new UpgradeTransitiveDependencyVersion("is-number", "6.0.0", null))), Arrays.asList(
+          s.manifest("package.json", PackageManager.Pnpm, null, "pkg-before", "pkg"),
+          s.source("pnpm-lock.yaml", "before", "after"),
+          s.generated("pnpm-workspace.yaml", "workspace")));
+    }
+
+    @Test
+    void pnpmRepinBackToTheWorkspaceManifestAsItWasRegeneratesTheLockInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-repin-again");
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null),
+          new UpgradeTransitiveDependencyVersion("is-number", "6.0.0", null))), Arrays.asList(
+          s.manifest("package.json", PackageManager.Pnpm, null, "pkg-before", "pkg"),
+          s.source("pnpm-workspace.yaml", "workspace-before", "workspace"),
+          s.source("pnpm-lock.yaml", "before", "after")));
+    }
+
+    @Test
+    void pnpmWorkspaceManifestAnEarlierRecipeLeftNotEditableInPlaceIsDeclinedInEveryVisitOrder() {
+        Scenario s = new Scenario("pnpm/override-recipe-two-pins");
+        Recipe recipe = new CompositeRecipe(Arrays.asList(new FindAndReplace("packages:\n  - apps/*",
+          "packages: [apps/*]", null, null, null, null, "pnpm-workspace.yaml", null),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null)));
+        for (List<Source> order : orders(s.workspaceSources(PackageManager.Pnpm))) {
+            Outcome outcome = run(s, recipe, parse(order));
+            String visited = visited(order);
+            assertThat(outcome.rows).as("visiting %s", visited).hasSize(1);
+            assertThat(print(outcome.file("pnpm-workspace.yaml"))).as("visiting %s", visited)
+              .isEqualTo("packages: [apps/*]\n");
+            assertThat(print(outcome.file("package.json"))).as("visiting %s", visited)
+              .isEqualTo(s.file("pkg-before"));
+        }
     }
 
     @Test
@@ -399,33 +480,105 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         rewriteRun(spec -> s.spec(spec, version, path), sources.toArray(new SourceSpecs[0]));
     }
 
+    private static void memberCompose(String scenario, PackageManager pm) {
+        Scenario s = new Scenario(scenario);
+        inEveryOrder(s, new CompositeRecipe(Arrays.asList(new UpgradeDependencyVersion("is-odd", null, "3.0.1"),
+          new UpgradeTransitiveDependencyVersion("is-number", "7.0.0", null))), s.workspaceSources(pm));
+    }
+
+    // every order of the sources the run visits; a generated one is expected in each
     private static void inEveryOrder(Scenario s, Recipe recipe, List<Source> sources) {
-        for (List<Source> order : orders(sources)) {
+        List<Source> generated = sources.stream().filter(source -> source.before == null).collect(toList());
+        List<Source> parsed = sources.stream().filter(source -> source.before != null).collect(toList());
+        for (List<Source> order : orders(parsed)) {
+            order.addAll(generated);
             inOrder(s, recipe, order);
         }
     }
 
-    // RewriteTest visits the sources grouped by parser, so this run fixes the order itself, over two cycles
+    // RewriteTest visits the sources grouped by parser, so this run fixes the order itself: one cycle, as a host
+    // runs the recipe, then a fresh run over its output, which changes nothing
     private static void inOrder(Scenario s, Recipe recipe, List<Source> order) {
-        List<SourceFile> before = new ArrayList<>();
+        String visited = visited(order);
+        Outcome first = run(s, recipe, parse(order));
         for (Source source : order) {
-            before.add(source.parse());
+            SourceFile out = first.file(source.path);
+            noWarning(out);
+            assertThat(out.printAll()).as("%s, visiting %s", source.path, visited).isEqualTo(source.after);
         }
-        Map<Path, SourceFile> after = new HashMap<>();
-        for (Result result : recipe.run(new InMemoryLargeSourceSet(before), s.ctx(), 2, 2).getChangeset()
-          .getAllResults()) {
-            if (result.getAfter() != null) {
-                after.put(result.getAfter().getSourcePath(), result.getAfter());
+        assertThat(first.generated).as("generated, visiting %s", visited).containsExactlyInAnyOrderElementsOf(
+          order.stream().filter(source -> source.before == null).map(source -> Paths.get(source.path))
+            .collect(toList()));
+        assertThat(first.rows).as("visiting %s", visited).isEmpty();
+        Outcome second = run(s, recipe, new ArrayList<>(first.files.values()));
+        for (Map.Entry<Path, SourceFile> file : second.files.entrySet()) {
+            assertThat(file.getValue().printAll()).as("a second run over %s, visiting %s", file.getKey(), visited)
+              .isEqualTo(first.files.get(file.getKey()).printAll());
+        }
+        assertThat(second.generated).as("a second run, visiting %s", visited).isEmpty();
+    }
+
+    // files written by a decision an earlier recipe overturned later in the visit: nothing more is written, the
+    // root is warned, one row
+    private static void overturned(Scenario s, Recipe recipe, List<Source> order, String overturnedTo) {
+        String visited = visited(order);
+        Outcome outcome = run(s, recipe, parse(order));
+        for (Source source : order) {
+            String expected = "package.json".equals(source.path) ? source.after : source.before;
+            assertThat(print(outcome.file(source.path))).as("%s, visiting %s", source.path, visited)
+              .isEqualTo(expected);
+        }
+        assertThat(outcome.file("package.json").getMarkers().findFirst(Markup.Warn.class)).as("visiting %s", visited)
+          .hasValueSatisfying(warn -> assertThat(warn.getMessage()).contains(overturnedTo));
+        assertThat(outcome.rows).as("visiting %s", visited).hasSize(1);
+    }
+
+    private static Outcome run(Scenario s, Recipe recipe, List<SourceFile> before) {
+        Outcome outcome = new Outcome();
+        for (SourceFile source : before) {
+            outcome.files.put(source.getSourcePath(), source);
+        }
+        RecipeRun run = recipe.run(new InMemoryLargeSourceSet(before), s.ctx(), 1, 1);
+        for (Result result : run.getChangeset().getAllResults()) {
+            SourceFile after = requireNonNull(result.getAfter());
+            if (result.getBefore() == null) {
+                outcome.generated.add(after.getSourcePath());
+            }
+            outcome.files.put(after.getSourcePath(), after);
+        }
+        outcome.rows = run.getDataTableRows(NodeLockRegenerationFailures.class);
+        return outcome;
+    }
+
+    private static List<SourceFile> parse(List<Source> order) {
+        List<SourceFile> parsed = new ArrayList<>();
+        for (Source source : order) {
+            if (source.before != null) {
+                parsed.add(source.parse());
             }
         }
-        String visited = order.stream().map(source -> source.path).collect(joining(", "));
-        for (Source source : order) {
-            SourceFile out = after.get(Paths.get(source.path));
-            if (out != null) {
-                noWarning(out);
-            }
-            assertThat(out == null ? source.before : out.printAll()).as("%s, visiting %s", source.path, visited)
-              .isEqualTo(source.after);
+        return parsed;
+    }
+
+    private static String visited(List<Source> order) {
+        return order.stream().filter(source -> source.before != null).map(source -> source.path)
+          .collect(joining(", "));
+    }
+
+    private static String print(SourceFile file) {
+        return file.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED));
+    }
+
+    /**
+     * The files after a run, by path, those it generated, and its failure rows.
+     */
+    private static final class Outcome {
+        final Map<Path, SourceFile> files = new LinkedHashMap<>();
+        final List<Path> generated = new ArrayList<>();
+        List<NodeLockRegenerationFailures.Row> rows = new ArrayList<>();
+
+        SourceFile file(String path) {
+            return requireNonNull(files.get(Paths.get(path)), path);
         }
     }
 
@@ -486,15 +639,16 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
     }
 
     /**
-     * A file of a run in a fixed visit order: its text before and the text the recording ends with.
+     * A file of a run in a fixed visit order: its text before (null for one the run generates) and the text the
+     * recording ends with.
      */
     private static final class Source {
         final String path;
-        final String before;
+        final @Nullable String before;
         final String after;
         final @Nullable NodeResolutionResult marker;
 
-        Source(String path, String before, String after, @Nullable NodeResolutionResult marker) {
+        Source(String path, @Nullable String before, String after, @Nullable NodeResolutionResult marker) {
             this.path = path;
             this.before = before;
             this.after = after;
@@ -502,10 +656,12 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         }
 
         SourceFile parse() {
-            Parser parser = path.endsWith(".json") ? JsonParser.builder().build() : YamlParser.builder().build();
+            Parser parser = path.endsWith(".json") ? JsonParser.builder().build() : path.endsWith(".yaml") ?
+              YamlParser.builder().build() : PlainTextParser.builder().build();
             SourceFile parsed = parser.parse(new InMemoryExecutionContext(t -> {
                 throw new RuntimeException(t);
-            }), before).findFirst().orElseThrow(IllegalStateException::new).withSourcePath(Paths.get(path));
+            }), requireNonNull(before)).findFirst().orElseThrow(IllegalStateException::new)
+              .withSourcePath(Paths.get(path));
             return marker == null ? parsed : parsed.withMarkers(parsed.getMarkers().add(marker));
         }
     }
@@ -549,6 +705,10 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
             return new Source(path, requireNonNull(file(before)), requireNonNull(file(after)), null);
         }
 
+        Source generated(String path, String after) {
+            return new Source(path, null, requireNonNull(file(after)), null);
+        }
+
         Source manifest(String path, PackageManager pm, @Nullable List<String> members, String before, String after) {
             String text = requireNonNull(file(before));
             return new Source(path, text, requireNonNull(file(after)), nodeResolutionResult(pm, members,
@@ -558,13 +718,15 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         // the root, its member apps/a (sorting before the root), pnpm-workspace.yaml when recorded, the root's lock
         List<Source> workspaceSources(PackageManager pm) {
             String member = requireNonNull(file("tree-before/" + APPS_MEMBER));
+            String memberAfter = file("tree/" + APPS_MEMBER);
             List<Source> sources = new ArrayList<>();
             sources.add(manifest("package.json", pm, singletonList(APPS_MEMBER), "pkg-before", "pkg"));
-            sources.add(new Source(APPS_MEMBER, member, member, nodeResolutionResult(pm, dependencies(member))));
+            sources.add(new Source(APPS_MEMBER, member, memberAfter == null ? member : memberAfter,
+              nodeResolutionResult(pm, dependencies(member))));
             if (file("workspace-before") != null) {
                 sources.add(source("pnpm-workspace.yaml", "workspace-before", "workspace"));
             }
-            sources.add(source(pm == PackageManager.Npm ? "package-lock.json" : "pnpm-lock.yaml", "before", "after"));
+            sources.add(source(lockPath(pm), "before", "after"));
             return sources;
         }
 
@@ -577,8 +739,12 @@ class UpgradeTransitiveDependencyVersionTest implements RewriteTest {
         }
 
         SourceSpecs lock(PackageManager pm, @Nullable String after) {
-            return lock(pm, "before", after, pm == PackageManager.Npm ? "package-lock.json" :
-              pm == PackageManager.Pnpm ? "pnpm-lock.yaml" : pm == PackageManager.Bun ? "bun.lock" : "yarn.lock");
+            return lock(pm, "before", after, lockPath(pm));
+        }
+
+        String lockPath(PackageManager pm) {
+            return pm == PackageManager.Npm ? "package-lock.json" : pm == PackageManager.Pnpm ? "pnpm-lock.yaml" :
+              pm == PackageManager.Bun ? "bun.lock" : "yarn.lock";
         }
 
         SourceSpecs lock(PackageManager pm, String beforeFile, @Nullable String after, String lockPath) {

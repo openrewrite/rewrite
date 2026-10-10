@@ -1,0 +1,1 @@
+pnpm 9.15.9 shared workspace whose member apps/a sorts before the root: packageManager moves to pnpm@11.2.2 and pnpm 11.2.2 writes overrides is-number 7.0.0 into pnpm-workspace.yaml (config set) and installs, as a JSON edit of packageManager then the recipe leave them in one run.

@@ -1,0 +1,14 @@
+{
+  "name": "root",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/a"
+  ],
+  "dependencies": {
+    "left-pad": "1.3.0"
+  },
+  "overrides": {
+    "is-number": "7.0.0"
+  }
+}

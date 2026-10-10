@@ -1,0 +1,1 @@
+pnpm 11.2.2 installs again over the lock it wrote for overrides is-number 6.0.0 in pnpm-workspace.yaml, and changes nothing, as a pin of 7.0.0 then a pin of 6.0.0 run again over their own output leave it.

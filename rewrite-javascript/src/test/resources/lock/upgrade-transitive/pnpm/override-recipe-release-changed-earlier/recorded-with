@@ -1,0 +1,4 @@
+pnpm 11.2.2, node v24.19.0, 2026-10-10T05:57:54Z
+before exit=0, after exit=0
+before by pnpm 9.15.9 through corepack 0.35.0
+config set exit=0
