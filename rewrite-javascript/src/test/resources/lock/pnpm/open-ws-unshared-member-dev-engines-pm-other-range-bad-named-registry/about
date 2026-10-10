@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace, b adding abbrev; the edit adds a namedRegistries alias whose URL is not http(s), and devEngines.packageManager pnpm ^10.0.0 to the root: every way switchCliVersion takes to another release creates a store controller, which rejects.

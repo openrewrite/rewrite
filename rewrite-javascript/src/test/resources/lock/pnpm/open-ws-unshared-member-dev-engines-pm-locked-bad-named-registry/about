@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace, b adding abbrev; the edit adds a namedRegistries alias whose URL is not http(s). The root pins devEngines.packageManager pnpm 11.2.2, which phase 1 records into the root's lock, so switchCliVersion creates no store controller and installDeps' rejects.

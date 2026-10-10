@@ -1,0 +1,1 @@
+cannot-know whether pnpm resolves the config dependencies, which fail here (Your config dependency called "is-positive" doesn't have an integrity checksum) unless the env document of the workspace's pnpm-lock.yaml locks them

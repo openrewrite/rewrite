@@ -46,17 +46,16 @@ final class SwitchCliVersion {
         if (!persistLockfile && Main.PNPM_VERSION.equals(version)) {
             return;
         }
-        // readEnvLockfile(rootProjectManifestDir): another lock's env document, which the inputs do not hold
+        // readEnvLockfile(rootProjectManifestDir): another lock's env document, which the inputs do not hold; only when
+        // it records the running release resolved does pnpm go on without a store controller
         boolean ownEnvDocument = lockDir.equals(rootProjectManifestDir);
-        if (!ownEnvDocument && persistLockfile) {
-            if (Main.PNPM_VERSION.equals(version)) {
-                Main.createStoreControllerUnlessLocked(stores, options);
-                return;
-            }
-            if (NodeSemver.valid(version, NodeSemver.Options.DEFAULT) == null) {
+        if (!ownEnvDocument && persistLockfile &&
+            NodeSemver.satisfies(Main.PNPM_VERSION, version, NodeSemver.Options.INCLUDE_PRERELEASE)) {
+            if (stores.createStoreControllerUnlessLocked(options) && !Main.PNPM_VERSION.equals(version)) {
                 throw new CannotKnow("which pnpm release the workspace's " + LockfileReader.WANTED_LOCKFILE +
                                      " pins for " + version + " (pnpm runs that release)");
             }
+            return;
         }
         boolean save = persistLockfile && ownEnvDocument;
         EnvLockfile envLockfile = save ? lockFile.readEnvLockfile() : null;

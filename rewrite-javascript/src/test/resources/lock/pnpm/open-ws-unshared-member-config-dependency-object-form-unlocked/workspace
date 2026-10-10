@@ -1,0 +1,7 @@
+packages:
+  - 'packages/*'
+sharedWorkspaceLockfile: false
+configDependencies:
+  is-positive:
+    integrity: "sha512-8ND1j3y9/HP94TOvGzr69/FgbkX2ruOldhLEsTWwcJVfo4oRjwemJmJxt7RJkKYH8tz7vYBP9JcKQY8CLuJ90Q=="
+    tarball: https://registry.npmjs.org/is-positive/-/is-positive-3.1.0.tgz

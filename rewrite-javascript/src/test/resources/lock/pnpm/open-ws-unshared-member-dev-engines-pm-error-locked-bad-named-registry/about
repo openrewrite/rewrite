@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace, b adding abbrev; the edit adds a namedRegistries alias whose URL is not http(s). The root pins devEngines.packageManager pnpm 11.2.2 with onFail error, which phase 1's syncEnvLockfile records into the root's lock, so syncEnvLockfile creates no store controller and installDeps' rejects.

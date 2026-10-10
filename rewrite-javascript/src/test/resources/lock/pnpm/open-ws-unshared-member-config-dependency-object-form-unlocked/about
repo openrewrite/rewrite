@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace, b adding abbrev; the edit writes configDependencies is-positive in the object form (integrity, tarball), which pnpm reads only for a dependency the env document of the root's lock does not lock. The root's lock locks none.

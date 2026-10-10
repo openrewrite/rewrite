@@ -19,6 +19,7 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
 import org.openrewrite.javascript.internal.lock.Host;
 
@@ -62,25 +63,30 @@ class SwitchCliVersionTest {
         switchCliVersion(pm, lock, null, "");
     }
 
-    private static void switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
-                                         @Nullable String workspaceManifest, String lockDir) {
+    private static CreateNewStoreController switchCliVersion(PnpmOptions.WantedPackageManager pm, String lock,
+                                                             @Nullable String workspaceManifest, String lockDir) {
         EnvLockfile.OnDisk lockFile = new EnvLockfile.OnDisk(lock);
-        new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN),
-          new CreateNewStoreController(NO_REGISTRY, NOW), lockFile, lockDir)
-          .switchCliVersion(pm, PnpmOptions.load(workspaceManifest, null, null, Collections.emptyMap()), "");
+        CreateNewStoreController stores = new CreateNewStoreController(NO_REGISTRY, NOW);
+        new SwitchCliVersion(new EnvInstaller(NO_REGISTRY, NOW, Host.UNKNOWN), stores, lockFile, lockDir)
+          .switchCliVersion(pm, options(workspaceManifest), "");
+        return stores;
+    }
+
+    private static PnpmOptions options(@Nullable String workspaceManifest) {
+        return PnpmOptions.load(workspaceManifest, null, null, Collections.emptyMap());
     }
 
     /**
      * The release pnpm 11.2.2 hands the install to, when it cannot be 11.2.2, is cannot-know before the registry is
-     * asked for it: an exact pin, a range without 11.2.2, or a locked release the range admits.
+     * asked for it: an exact pin, a range without 11.2.2, a locked release the range admits, or a member's range.
      */
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"9.15.0|false|", "10.18.3|false|", "^10.0.0|true|", ">=12|true|",
-      "^11.0.0|true|11.3.0", "^10.0.0|true|10.18.3"})
+    @CsvSource(delimiter = '|', value = {"9.15.0|false||", "10.18.3|false||", "^10.0.0|true||", ">=12|true||",
+      "^11.0.0|true|11.3.0|", "^10.0.0|true|10.18.3|", "^10.0.0|true||packages/a", "^11.0.0|true||packages/a"})
     void anotherReleaseIsCannotKnowBeforeAnyResolution(String version, boolean fromDevEngines,
-                                                       @Nullable String locked) {
+                                                       @Nullable String locked, @Nullable String lockDir) {
         assertThatThrownBy(() -> switchCliVersion(pm(version, fromDevEngines),
-          locked == null ? MAIN_DOCUMENT : envDocument(locked)))
+          locked == null ? MAIN_DOCUMENT : envDocument(locked), null, lockDir == null ? "" : lockDir))
           .isInstanceOfSatisfying(CannotKnow.class,
             e -> assertThat(e.getSubject()).contains(locked == null ? version : locked));
     }
@@ -102,16 +108,17 @@ class SwitchCliVersionTest {
     private static final String BAD_NAMED_REGISTRY = "namedRegistries:\n  foo: ftp://example.com/\n";
 
     /**
-     * open-pm-pin-other-release-bad-named-registry and open-dev-engines-pm-other-range-bad-named-registry, as pnpm
-     * 11.2.2 rejected them: every way to another release creates the store controller first.
+     * open-pm-pin-other-release-bad-named-registry, open-dev-engines-pm-other-range-bad-named-registry and a member's
+     * open-ws-unshared-member-dev-engines-pm-other-range-bad-named-registry: every way to another release checks first.
      */
     @ParameterizedTest
-    @CsvSource(delimiter = '|', value = {"10.18.3|false|", "^10.0.0|true|", "^11.0.0|true|11.3.0",
-      "^10.0.0|true|10.18.3"})
+    @CsvSource(delimiter = '|', value = {"10.18.3|false||", "^10.0.0|true||", "^11.0.0|true|11.3.0|",
+      "^10.0.0|true|10.18.3|", "^10.0.0|true||packages/a"})
     void theStoreControllerBeforeAnotherReleaseChecksTheNamedRegistries(String version, boolean fromDevEngines,
-                                                                       @Nullable String locked) {
+                                                                       @Nullable String locked,
+                                                                       @Nullable String lockDir) {
         assertThatThrownBy(() -> switchCliVersion(pm(version, fromDevEngines),
-          locked == null ? MAIN_DOCUMENT : envDocument(locked), BAD_NAMED_REGISTRY, ""))
+          locked == null ? MAIN_DOCUMENT : envDocument(locked), BAD_NAMED_REGISTRY, lockDir == null ? "" : lockDir))
           .isInstanceOfSatisfying(PnpmError.class,
             e -> assertThat(e.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL"));
     }
@@ -122,16 +129,34 @@ class SwitchCliVersionTest {
     }
 
     /**
-     * A member's own lock: the env document pnpm reads is the workspace root's lock's, which decides whether pnpm
-     * creates a store controller for the running release.
+     * A member's own lock: the workspace root's env document decides whether switchCliVersion creates a store
+     * controller; installDeps creates one either way (open-ws-unshared-member-dev-engines-pm-locked-, -unlocked-).
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"11.2.2", "^11.0.0"})
+    void aMembersStoreControllerFailsAtTheNextOne(String version) {
+        CreateNewStoreController stores = switchCliVersion(pm(version, true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY,
+          "packages/a");
+        assertThatThrownBy(() -> stores.createStoreController(options(BAD_NAMED_REGISTRY)))
+          .isInstanceOfSatisfying(PnpmError.class, next -> {
+              assertThat(next.getCode()).isEqualTo("ERR_PNPM_INVALID_NAMED_REGISTRY_URL");
+              assertThat(stores.beforeNextStoreController(next)).isSameAs(next);
+          });
+    }
+
+    /**
+     * open-ws-unshared-member-dev-engines-pm-locked-bad-named-registry-missing-pnpmfile and its -unlocked- twin: what
+     * fails before installDeps' store controller fails first only when the root's lock records the release.
      */
     @Test
-    void anotherLocksEnvDocumentDecidesWhetherTheStoreControllerIsCreated() {
-        switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, null, "packages/a");
-        assertThatThrownBy(() -> switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY,
-          "packages/a"))
-          .isInstanceOfSatisfying(CannotKnow.class,
-            e -> assertThat(e.getSubject()).contains("store controller").contains("ftp://example.com/"));
+    void aFailureBeforeTheNextStoreControllerIsEitherOne() {
+        PnpmError missing = new PnpmError("PNPMFILE_NOT_FOUND", "pnpmfile at \"missing.cjs\" is not found");
+        assertThat(switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, BAD_NAMED_REGISTRY, "packages/a")
+          .beforeNextStoreController(missing))
+          .isInstanceOfSatisfying(CannotKnow.class, e -> assertThat(e.getSubject())
+            .contains("ERR_PNPM_INVALID_NAMED_REGISTRY_URL", "ftp://example.com/", "ERR_PNPM_PNPMFILE_NOT_FOUND"));
+        assertThat(switchCliVersion(pm("11.2.2", true), MAIN_DOCUMENT, null, "packages/a")
+          .beforeNextStoreController(missing)).isSameAs(missing);
     }
 
     /**

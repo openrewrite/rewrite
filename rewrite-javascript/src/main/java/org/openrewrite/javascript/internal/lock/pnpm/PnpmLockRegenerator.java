@@ -595,15 +595,20 @@ public final class PnpmLockRegenerator {
         String lockDir = inputs.getLockDir();
         String lockfileDir = workspace ? options.getLockfileDir(lockDir) : null;
         main.checkWantedPackageManager(options);
-        main.installConfigDepsAndLoadHooks(options, lockfileDir);
-        List<Verification.Project> allProjects = workspace ? main.filterProjectsFromDir(options) : null;
-        if (options.isTrue("global")) {
-            throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. Use \"pnpm " +
-                                                                "add -g <pkg>\" to install global packages.");
+        List<Verification.Project> allProjects;
+        ProjectsGraph.Result projectsGraph;
+        try {
+            main.installConfigDepsAndLoadHooks(options, lockfileDir);
+            allProjects = workspace ? main.filterProjectsFromDir(options) : null;
+            if (options.isTrue("global")) {
+                throw new PnpmError("GLOBAL_INSTALL_NOT_SUPPORTED", "\"pnpm install -g\" is not supported. Use " +
+                                                                    "\"pnpm add -g <pkg>\" to install global packages.");
+            }
+            projectsGraph = allProjects == null ? null : ProjectsGraph.createProjectsGraph(allProjects, false,
+                    Js.truthy(options.get("linkWorkspacePackages")));
+        } catch (RuntimeException e) {
+            throw stores.beforeNextStoreController(e);
         }
-        ProjectsGraph.Result projectsGraph = allProjects == null ? null :
-                ProjectsGraph.createProjectsGraph(allProjects, false, Js.truthy(options.get(
-                        "linkWorkspacePackages")));
         NpmResolver storeController = stores.createNewStoreController(options, options.getFetchFullMetadata());
 
         // in a workspace pnpm install is recursive over the projects it lists, which all install into the lock of

@@ -1,0 +1,5 @@
+[ERROR] The named registry alias 'foo' is mapped to 'ftp://example.com/', which is not a valid http(s) URL.
+Provide a URL that starts with http:// or https://, e.g. https://npm.pkg.example.com/
+pnpm , node v24.19.0, 2026-10-10T05:24:54Z
+exit=1
+no lock written

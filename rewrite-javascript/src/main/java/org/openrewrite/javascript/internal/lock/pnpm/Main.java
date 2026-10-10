@@ -245,7 +245,7 @@ final class Main {
         checkPackageManager(pm, underCorepack);
         if (!inputs.getLockDir().equals(WORKSPACE_DIR)) {
             if (SyncEnvLockfile.syncEnvLockfile(pm, () -> null) != null) {
-                createStoreControllerUnlessLocked(stores, options);
+                stores.createStoreControllerUnlessLocked(options);
             }
             return;
         }
@@ -253,20 +253,6 @@ final class Main {
         if (version != null) {
             envInstaller.resolvePackageManagerIntegrities(version, lockFile.readEnvLockfile(), true, lockFile,
                     stores.createStoreController(options), options);
-        }
-    }
-
-    /**
-     * The store controller switchCliVersion or syncEnvLockfile creates unless the env document of the lock in
-     * rootProjectManifestDir, which the inputs do not hold, records the release: cannot-know when creating it fails.
-     */
-    static void createStoreControllerUnlessLocked(CreateNewStoreController stores, PnpmOptions options) {
-        try {
-            stores.createStoreController(options);
-        } catch (PnpmError e) {
-            throw new CannotKnow("whether pnpm creates the store controller that rejects the named registries (" +
-                                 e.getMessage() + "): the env document of the workspace's " +
-                                 LockfileReader.WANTED_LOCKFILE + " decides");
         }
     }
 
@@ -315,10 +301,21 @@ final class Main {
                 throw new CannotKnow("what pnpm makes of configDependencies (" + Js.typeOf(configDependencies) +
                                      ", where pnpm reads an object)");
             }
-            if (lockDir.equals(lockfileDir == null ? WORKSPACE_DIR : lockfileDir)) {
-                @SuppressWarnings("unchecked")
-                Map<String, @Nullable Object> configDeps = (Map<String, @Nullable Object>) configDependencies;
+            @SuppressWarnings("unchecked")
+            Map<String, @Nullable Object> configDeps = (Map<String, @Nullable Object>) configDependencies;
+            String rootDir = lockfileDir == null ? WORKSPACE_DIR : lockfileDir;
+            if (lockDir.equals(rootDir)) {
                 envInstaller.resolveAndInstallConfigDeps(configDeps, lockFile, options);
+            } else {
+                // into the env document of rootDir's lock, which the inputs do not hold: what it does not lock resolves
+                try {
+                    envInstaller.resolveAndInstallConfigDeps(configDeps, new EnvLockfile.OnDisk(null), options);
+                } catch (PnpmError | JsError e) {
+                    throw new CannotKnow("whether pnpm resolves the config dependencies, which fail here (" +
+                                         e.getMessage() + ") unless the env document of " +
+                                         (rootDir.isEmpty() ? "the workspace's " : rootDir + "/") +
+                                         LockfileReader.WANTED_LOCKFILE + " locks them");
+                }
             }
         }
         if (options.isTrue("ignorePnpmfile")) {

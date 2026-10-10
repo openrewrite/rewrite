@@ -1,0 +1,4 @@
+Scope: all 2 workspace projects
+[ERR_PNPM_INVALID_NAMED_REGISTRY_URL] The named registry alias 'foo' is mapped to 'ftp://example.com/', which is not a valid http(s) URL.
+
+Provide a URL that starts with http:// or https://, e.g. https://npm.pkg.example.com/

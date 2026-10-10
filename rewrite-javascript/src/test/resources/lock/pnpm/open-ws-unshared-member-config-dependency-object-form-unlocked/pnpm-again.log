@@ -1,0 +1,10 @@
+[ERROR] Your config dependency called "is-positive" doesn't have an integrity checksum
+Integrity checksum should be inlined in the version specifier. For example:
+
+pnpm-workspace.yaml:
+configDependencies:
+  my-config: "1.0.0+sha512-Xg0tn4HcfTijTwfDwYlvVCl43V6h4KyVVX2aEm4qdO/PC6L2YvzLHFdmxhoeSA3eslcE6+ZVXHgWwopXYLNq4Q=="
+
+pnpm , node v24.19.0, 2026-10-10T05:31:17Z
+exit=1
+no lock written

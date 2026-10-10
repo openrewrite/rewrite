@@ -1,0 +1,5 @@
+[ERROR] pnpmfile at "<tmp>/project/packages/b/missing.cjs" is not found
+For help, run: pnpm help install
+pnpm , node v24.19.0, 2026-10-10T05:24:59Z
+exit=1
+no lock written

@@ -1,0 +1,1 @@
+pnpm run in packages/b of an unshared workspace, b adding abbrev; the edit adds a namedRegistries alias whose URL is not http(s) and pnpmfile missing.cjs, which the project does not hold. The root's lock records its devEngines.packageManager pnpm 11.2.2 (phase 1), so no store controller comes before getConfig's requireHooks, which rejects first.
