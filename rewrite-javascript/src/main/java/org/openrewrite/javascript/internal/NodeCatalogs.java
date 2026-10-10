@@ -21,14 +21,14 @@ import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.SourceFile;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 import org.openrewrite.javascript.internal.lock.Spec;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
-import org.openrewrite.yaml.tree.YamlKey;
 
-import java.math.BigInteger;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +40,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -54,13 +53,7 @@ import static org.openrewrite.Tree.randomId;
 public abstract class NodeCatalogs {
 
     private static final String PROTOCOL = "catalog:";
-    private static final Pattern YAML_NON_STRING = Pattern.compile(
-            "[-+]?(\\.[0-9][0-9_]*|[0-9][0-9_]*(\\.[0-9_]*)?)([eE][-+]?[0-9]+)?" +
-            "|[-+]?0[xXbBoO][0-9a-fA-F_]+" +
-            "|[-+]?\\.(inf|Inf|INF)|\\.(nan|NaN|NAN)" +
-            "|~|[nN]ull|NULL" +
-            "|[tT]rue|TRUE|[fF]alse|FALSE|[yY]es|YES|[nN]o|NO|[oO]n|ON|[oO]ff|OFF");
-    private static final String PLAIN_SCALAR_INDICATORS = "-?:,[]{}#&*!|>'\"%@`";
+    private static final WorkspaceManifestWriter WRITER = new WorkspaceManifestWriter(11);
 
     /**
      * The file the package manager reads them from.
@@ -184,8 +177,35 @@ public abstract class NodeCatalogs {
 
         private static final String DEFAULT = "default";
 
+        private @Nullable Map<String, @Nullable Object> settings;
+        private boolean settingsRead;
+        private boolean rejected;
+
         Pnpm(Yaml.Documents document) {
             super(document, read(yamlRoot(document)));
+        }
+
+        /**
+         * pnpm-workspace.yaml as pnpm's workspace-manifest-reader reads it, once; null when empty or {@link #isRejected}.
+         */
+        public @Nullable Map<String, @Nullable Object> getSettings() {
+            if (!settingsRead) {
+                settingsRead = true;
+                try {
+                    settings = WorkspaceManifest.readWorkspaceManifest(print());
+                } catch (RuntimeException e) {
+                    rejected = true;
+                }
+            }
+            return settings;
+        }
+
+        /**
+         * Whether pnpm rejects the file as no workspace manifest (INVALID_WORKSPACE_CONFIGURATION, not YAML).
+         */
+        public boolean isRejected() {
+            getSettings();
+            return rejected;
         }
 
         private static Map<String, Map<String, String>> read(Yaml.@Nullable Mapping root) {
@@ -220,32 +240,28 @@ public abstract class NodeCatalogs {
          * pnpm add a version outside the catalog, as prefer does.
          */
         public CatalogMode getCatalogMode() {
-            Yaml.Block mode = setting("catalogMode");
-            if (mode == null || mode instanceof Yaml.Scalar && "manual".equals(value((Yaml.Scalar) mode))) {
+            Map<String, @Nullable Object> read = getSettings();
+            if (read == null || !read.containsKey("catalogMode") || "manual".equals(read.get("catalogMode"))) {
                 return CatalogMode.MANUAL;
             }
-            return mode instanceof Yaml.Scalar && "strict".equals(value((Yaml.Scalar) mode)) ? CatalogMode.STRICT :
-                    CatalogMode.PREFER;
+            return "strict".equals(read.get("catalogMode")) ? CatalogMode.STRICT : CatalogMode.PREFER;
         }
 
         /**
          * Whether {@code cleanupUnusedCatalogs} is a value JavaScript holds true.
          */
         public boolean isCleanupUnusedCatalogs() {
-            Yaml.Block cleanup = setting("cleanupUnusedCatalogs");
-            if (cleanup == null) {
-                return false;
-            }
-            return !(cleanup instanceof Yaml.Scalar) || EcmaScript.truthy(value((Yaml.Scalar) cleanup));
+            Map<String, @Nullable Object> read = getSettings();
+            return read != null && EcmaScript.truthy(read.get("cleanupUnusedCatalogs"));
         }
 
         /**
          * {@code saveCatalogName} as pnpm reads it into a string; null when unset or null.
          */
         public @Nullable String getSaveCatalogName() {
-            Yaml.Block name = setting("saveCatalogName");
-            Object value = name instanceof Yaml.Scalar ? value((Yaml.Scalar) name) : null;
-            return value == null ? null : EcmaScript.string(value);
+            Map<String, @Nullable Object> read = getSettings();
+            Object value = read == null ? null : read.get("saveCatalogName");
+            return value == null || value instanceof Map || value instanceof List ? null : EcmaScript.string(value);
         }
 
         /**
@@ -332,18 +348,6 @@ public abstract class NodeCatalogs {
                 }
             }
             return singletonList("catalog");
-        }
-
-        private Yaml.@Nullable Block setting(String key) {
-            Yaml.Mapping root = yamlRoot((Yaml.Documents) getDocument());
-            if (root != null) {
-                for (Yaml.Mapping.Entry entry : root.getEntries()) {
-                    if (key.equals(entry.getKey().getValue())) {
-                        return entry.getValue();
-                    }
-                }
-            }
-            return null;
         }
 
         // the entries of `catalog` (name null) or `catalogs.<name>` a reference keeps
@@ -571,7 +575,12 @@ public abstract class NodeCatalogs {
             }
             Yaml.Mapping base = root == null ?
                     new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null, null) : root;
-            Yaml.Mapping edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base));
+            Yaml.Mapping edited;
+            try {
+                edited = put(base, yamlPath(catalog), 0, alias, specifier, indentUnit(base));
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
             return edited == null ? null : reread(withRoot(docs, edited));
         }
 
@@ -582,9 +591,13 @@ public abstract class NodeCatalogs {
                 scalar.getStyle() == Yaml.Scalar.Style.FOLDED) {
                 return null;
             }
-            Yaml.Scalar rewritten = scalar.withValue(specifier);
-            if (scalar.getStyle() == Yaml.Scalar.Style.PLAIN && !canBePlainScalar(specifier)) {
-                rewritten = rewritten.withStyle(Yaml.Scalar.Style.SINGLE_QUOTED);
+            Yaml.Scalar rewritten;
+            try {
+                Yaml.Scalar written = scalar("", specifier);
+                rewritten = scalar.getStyle() == Yaml.Scalar.Style.PLAIN ?
+                        scalar.withStyle(written.getStyle()).withValue(written.getValue()) : scalar.withValue(specifier);
+            } catch (IllegalArgumentException e) {
+                return null;
             }
             return reread(replaceScalar(docs, scalar, rewritten));
         }
@@ -723,68 +736,41 @@ public abstract class NodeCatalogs {
         return child == null ? null : insert(mapping, newEntry(indent, key, child), depth == 0);
     }
 
-    // where pnpm's reorderRecursive puts a new key: sorted in when the keys are sorted (packages first at the top
-    // level), else last; at the top level propagateBlankLinesToNewPairs decides its blank line
+    // where pnpm's writer puts a new key and, at the top level, its blank line
     private static Yaml.Mapping insert(Yaml.Mapping mapping, Yaml.Mapping.Entry entry, boolean topLevel) {
         List<Yaml.Mapping.Entry> entries = new ArrayList<>(mapping.getEntries());
         List<String> keys = new ArrayList<>();
+        List<Boolean> blankBefore = new ArrayList<>();
         for (Yaml.Mapping.Entry e : entries) {
             keys.add(e.getKey().getValue());
+            blankBefore.add(e.getPrefix().startsWith("\n\n"));
         }
-        String key = entry.getKey().getValue();
-        int at = entries.size();
-        if (sorted(keys)) {
-            at = !keys.isEmpty() && "packages".equals(keys.get(0)) && !"packages".equals(key) ? 1 : 0;
-            while (at < keys.size() && keys.get(at).compareTo(key) < 0) {
-                at++;
-            }
-        }
+        int at = WRITER.insertionIndex(keys, entry.getKey().getValue());
         if (topLevel && entries.isEmpty()) {
             entry = entry.withPrefix("");
+        } else if (topLevel && at == 0) {
+            Yaml.Mapping.Entry first = entries.get(0);
+            entry = entry.withPrefix(first.getPrefix());
+            entries.set(0, first.withPrefix(WRITER.blankLineStyle(blankBefore) ? "\n\n" : "\n"));
         } else if (topLevel) {
-            boolean blankStyle = entries.size() > 1;
-            for (int i = 1; i < entries.size() && blankStyle; i++) {
-                blankStyle = blank(entries.get(i));
-            }
-            Yaml.Mapping.Entry next = at < entries.size() ? entries.get(at) : null;
-            boolean blank = blankStyle || next != null && at > 0 && blank(next) ||
-                            next == null && at > 1 && blank(entries.get(at - 1));
-            if (at == 0) {
-                Yaml.Mapping.Entry first = entries.get(0);
-                entry = entry.withPrefix(first.getPrefix());
-                entries.set(0, first.withPrefix(blankStyle ? "\n\n" : "\n"));
-            } else {
-                entry = entry.withPrefix(blank ? "\n\n" : "\n");
-            }
+            entry = entry.withPrefix(WRITER.blankBefore(blankBefore, at) ? "\n\n" : "\n");
         }
         entries.add(at, entry);
         return mapping.withEntries(entries);
     }
 
-    private static boolean blank(Yaml.Mapping.Entry entry) {
-        return entry.getPrefix().startsWith("\n\n");
-    }
-
-    // pnpm's detectKeyLayout: alphabetical after an optional leading `packages`, by lexCompare (code units)
-    private static boolean sorted(List<String> keys) {
-        int start = !keys.isEmpty() && "packages".equals(keys.get(0)) ? 1 : 0;
-        for (int i = start + 1; i < keys.size(); i++) {
-            if (keys.get(i - 1).compareTo(keys.get(i)) > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     private static Yaml.Mapping.Entry newEntry(String indent, String key, Yaml.Block value) {
-        Yaml.Scalar.Style style = canBePlainScalar(key) ? Yaml.Scalar.Style.PLAIN : Yaml.Scalar.Style.SINGLE_QUOTED;
-        YamlKey yamlKey = new Yaml.Scalar(randomId(), "", Markers.EMPTY, style, null, null, key);
+        Yaml.Scalar yamlKey = scalar("", key);
         return new Yaml.Mapping.Entry(randomId(), "\n" + indent, Markers.EMPTY, yamlKey, "", value);
     }
 
+    // a new scalar as pnpm's yaml writes it, quotes and escapes in the printed text
     private static Yaml.Scalar scalar(String prefix, String value) {
-        return new Yaml.Scalar(randomId(), prefix, Markers.EMPTY, canBePlainScalar(value) ? Yaml.Scalar.Style.PLAIN :
-                Yaml.Scalar.Style.SINGLE_QUOTED, null, null, value);
+        String written = WorkspaceManifestWriter.scalar(value);
+        Yaml.Scalar.Style style = written.startsWith("'") ? Yaml.Scalar.Style.SINGLE_QUOTED :
+                written.startsWith("\"") ? Yaml.Scalar.Style.DOUBLE_QUOTED : Yaml.Scalar.Style.PLAIN;
+        return new Yaml.Scalar(randomId(), prefix, Markers.EMPTY, style, null, null,
+                style == Yaml.Scalar.Style.PLAIN ? written : written.substring(1, written.length() - 1));
     }
 
     private static String indentUnit(Yaml.Mapping root) {
@@ -842,64 +828,6 @@ public abstract class NodeCatalogs {
         return mapping.withEntries(firstPrefix(mapping.getEntries(), kept));
     }
 
-    // a plain scalar as js-yaml's core schema reads it (null, boolean, number or string), a quoted one as a string
-    private static @Nullable Object value(Yaml.Scalar scalar) {
-        String text = scalar.getValue();
-        if (scalar.getStyle() != Yaml.Scalar.Style.PLAIN) {
-            return text;
-        }
-        switch (text) {
-            case "":
-            case "~":
-            case "null":
-            case "Null":
-            case "NULL":
-                return null;
-            case "true":
-            case "True":
-            case "TRUE":
-                return true;
-            case "false":
-            case "False":
-            case "FALSE":
-                return false;
-            default:
-                Double number = yamlNumber(text);
-                return number == null ? text : number;
-        }
-    }
-
-    private static final Pattern YAML_INT = Pattern.compile(
-            "[-+]?(?:0b[01_]*[01][01_]*|0x[0-9a-fA-F_]*[0-9a-fA-F][0-9a-fA-F_]*|0o[0-7_]*[0-7][0-7_]*" +
-            "|0|0?[0-9][0-9_]*)");
-    private static final Pattern YAML_FLOAT = Pattern.compile(
-            "[-+]?[0-9][0-9_]*(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?" +
-            "|[-+]?\\.(?:inf|Inf|INF)|\\.(?:nan|NaN|NAN)");
-
-    private static @Nullable Double yamlNumber(String text) {
-        if (text.endsWith("_")) {
-            return null;
-        }
-        String value = text.replace("_", "");
-        double sign = value.startsWith("-") ? -1 : 1;
-        String digits = value.startsWith("-") || value.startsWith("+") ? value.substring(1) : value;
-        if (YAML_INT.matcher(text).matches()) {
-            int radix = digits.startsWith("0b") ? 2 : digits.startsWith("0x") ? 16 : digits.startsWith("0o") ? 8 : 10;
-            return sign * new BigInteger(radix == 10 ? digits : digits.substring(2), radix).doubleValue();
-        }
-        if (!YAML_FLOAT.matcher(text).matches()) {
-            return null;
-        }
-        String lower = digits.toLowerCase();
-        if (".inf".equals(lower)) {
-            return sign * Double.POSITIVE_INFINITY;
-        }
-        if (".nan".equals(lower)) {
-            return Double.NaN;
-        }
-        return sign * Double.parseDouble(lower.startsWith(".") ? "0" + lower : lower);
-    }
-
     static @Nullable Json member(Json.JsonObject object, String key) {
         for (Json m : object.getMembers()) {
             if (m instanceof Json.Member && key.equals(string(((Json.Member) m).getKey()))) {
@@ -914,29 +842,6 @@ public abstract class NodeCatalogs {
             return (String) ((Json.Literal) node).getValue();
         }
         return null;
-    }
-
-    /**
-     * Whether YAML reads {@code value} written without quotes as this string.
-     */
-    static boolean canBePlainScalar(String value) {
-        if (value.isEmpty() || "---".equals(value) || "...".equals(value)) {
-            return false;
-        }
-        if (PLAIN_SCALAR_INDICATORS.indexOf(value.charAt(0)) >= 0 || !value.equals(value.trim())) {
-            return false;
-        }
-        if (value.contains(": ") || value.contains(" #") || value.endsWith(":") ||
-            YAML_NON_STRING.matcher(value).matches()) {
-            return false;
-        }
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if (c < 0x20 || c == 0x7F) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private static String printed(SourceFile document) {

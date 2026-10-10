@@ -50,17 +50,12 @@ public final class FindPackages {
     }
 
     /**
-     * The projects of the workspace whose pnpm-workspace.yaml holds {@code workspaceManifest}, among the directories
-     * holding a package.json, as getConfig reads its packages; null for a manifest pnpm rejects.
+     * The projects of the workspace whose pnpm-workspace.yaml {@link WorkspaceManifest#readWorkspaceManifest} read as
+     * {@code workspaceManifest}, among the directories holding a manifest, as getConfig reads its packages.
      */
-    public static @Nullable List<String> workspaceProjects(String workspaceManifest, Collection<String> manifestDirs) {
-        Map<String, @Nullable Object> manifest;
-        try {
-            manifest = WorkspaceManifest.readWorkspaceManifest(workspaceManifest);
-        } catch (PnpmError | JsYaml.YamlException e) {
-            return null;
-        }
-        return findWorkspaceProjects(manifestDirs, PnpmOptions.workspacePackagePatterns(manifest));
+    public static List<String> workspaceProjects(@Nullable Map<String, @Nullable Object> workspaceManifest,
+                                                 Collection<String> manifestDirs) {
+        return findWorkspaceProjects(manifestDirs, PnpmOptions.workspacePackagePatterns(workspaceManifest));
     }
 
     /**

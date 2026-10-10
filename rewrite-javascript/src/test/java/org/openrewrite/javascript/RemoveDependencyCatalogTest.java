@@ -26,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 import static org.openrewrite.javascript.Assertions.packageJson;
+import static org.openrewrite.test.SourceSpecs.text;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 /**
@@ -93,6 +94,38 @@ class RemoveDependencyCatalogTest implements RewriteTest {
               - packages/*
             cleanupUnusedCatalogs: true
             catalog: {wrappy: 1.0.2}
+            """, s -> s.path("pnpm-workspace.yaml"))
+        );
+    }
+
+    // pnpm's cleanup counts a member's package.yaml, whose dependencies the recipes do not read
+    @Test
+    void declinedWhenTheCleanupCountsAMemberInAnotherManifestFormat() {
+        String member = """
+          {
+            "name": "a",
+            "dependencies": {
+              "wrappy": "catalog:"
+            }
+          }
+          """;
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("wrappy", null)).cycles(2).expectedCyclesThatMakeChanges(1),
+          packageJson(member, null, nodeResolutionResult(PackageManager.Pnpm), s -> s.path("packages/a/package.json")
+            .noTrim().after(actual -> actual).afterRecipe(doc -> {
+                assertThat(doc.printAll(new PrintOutputCapture<>(0, PrintOutputCapture.MarkerPrinter.SANITIZED)))
+                  .isEqualTo(member);
+                assertThat(doc.getMarkers().findFirst(Markup.Warn.class)).hasValueSatisfying(w ->
+                  assertThat(w.getMessage()).contains("packages/b/package.yaml"));
+            })),
+          text("name: b\ndependencies:\n  ms: 'catalog:'\n", s -> s.path("packages/b/package.yaml")),
+          yaml("""
+            packages:
+              - packages/*
+            cleanupUnusedCatalogs: true
+            catalog:
+              ms: 2.1.3
+              wrappy: 1.0.2
             """, s -> s.path("pnpm-workspace.yaml"))
         );
     }

@@ -27,6 +27,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.javascript.internal.lock.pnpm.Main;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmOptions;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifest;
+import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceManifestWriter;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.JsonRightPadded;
@@ -41,7 +42,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
@@ -655,21 +655,14 @@ public final class PackageJsonOverrides {
      * where pnpm's workspace manifest writer puts a new key or entry.
      */
     private static final class WorkspaceLines {
-        private static final Pattern PLAIN_UNSAFE = Pattern.compile(
-                "^[\\n\\t ,\\[\\]{}#&*!|>'\"%@`]|^[?-]$|^[?-][ \\t]|[\\n:][ \\t]|[ \\t]\\n|[\\n\\t ]#|[\\n\\t :]$");
-        private static final Pattern CORE_SCHEMA = Pattern.compile(
-                "^(?:~|[Nn]ull|NULL)?$|^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$|^0o[0-7]+$|^[-+]?[0-9]+$|^0x[0-9a-fA-F]+$|" +
-                "^(?:[-+]?\\.(?:inf|Inf|INF)|\\.nan|\\.NaN|\\.NAN)$|" +
-                "^[-+]?(?:\\.[0-9]+|[0-9]+(?:\\.[0-9]*)?)[eE][-+]?[0-9]+$|^[-+]?(?:\\.[0-9]+|[0-9]+\\.[0-9]*)$");
-
         private final @Nullable String text;
-        private final int release;
+        private final WorkspaceManifestWriter writer;
         private final List<String> lines = new ArrayList<>();
         private final List<Entry> entries;
 
         WorkspaceLines(WorkspaceSettings settings, int release) {
             this.text = settings.text;
-            this.release = release;
+            this.writer = new WorkspaceManifestWriter(release);
             if (text == null) {
                 entries = emptyList();
                 return;
@@ -698,7 +691,7 @@ public final class PackageJsonOverrides {
         }
 
         String withOverride(String key, String value) {
-            String entry = scalar(key) + ": " + scalar(value);
+            String entry = WorkspaceManifestWriter.scalar(key) + ": " + WorkspaceManifestWriter.scalar(value);
             List<String> out = new ArrayList<>(lines);
             Entry overrides = entry(entries, "overrides");
             if (entries.isEmpty()) {
@@ -726,7 +719,7 @@ public final class PackageJsonOverrides {
                     out.add(overrides.keyLine + 1, "  " + entry);
                 } else {
                     String indent = lines.get(children.get(0).keyLine).substring(0, children.get(0).indent);
-                    int at = insertionIndex(keys(children), key);
+                    int at = writer.insertionIndex(keys(children), key);
                     out.add(at < children.size() ? children.get(at).prefixStart :
                             children.get(children.size() - 1).end, indent + entry);
                 }
@@ -735,72 +728,28 @@ public final class PackageJsonOverrides {
         }
 
         private int topLevelIndex() {
-            int at = insertionIndex(keys(entries), "overrides");
+            int at = writer.insertionIndex(keys(entries), "overrides");
             return at < entries.size() ? entries.get(at).prefixStart : entries.get(entries.size() - 1).end;
         }
 
-        // pnpm 11 gives a new top-level key a blank line before it as its neighbours have one
         private List<String> topLevelBlock(String entry) {
-            int at = insertionIndex(keys(entries), "overrides");
-            boolean spaceBefore = false;
-            boolean spaceBeforeNext = false;
-            if (release >= 11) {
-                boolean blankLineStyle = entries.size() > 1;
-                for (int i = 1; i < entries.size(); i++) {
-                    blankLineStyle &= entries.get(i).spaceBefore;
-                }
-                if (blankLineStyle) {
-                    spaceBefore = at > 0;
-                    spaceBeforeNext = at == 0 && !entries.get(0).spaceBefore;
-                } else if (at > 0) {
-                    spaceBefore = at < entries.size() ? entries.get(at).spaceBefore : entries.get(at - 1).spaceBefore;
-                }
+            int at = writer.insertionIndex(keys(entries), "overrides");
+            List<Boolean> blankBefore = new ArrayList<>();
+            for (Entry e : entries) {
+                blankBefore.add(e.spaceBefore);
             }
             List<String> block = new ArrayList<>();
-            if (spaceBefore) {
+            if (writer.blankBefore(blankBefore, at)) {
                 block.add("");
             }
             block.add("overrides:");
             block.add("  " + entry);
             int trailer = entries.get(entries.size() - 1).end;
-            if (spaceBeforeNext || at == entries.size() && trailer < lines.size() &&
-                                   !lines.get(trailer).trim().isEmpty()) {
+            if (at == 0 && writer.blankLineStyle(blankBefore) && !entries.get(0).spaceBefore ||
+                at == entries.size() && trailer < lines.size() && !lines.get(trailer).trim().isEmpty()) {
                 block.add("");
             }
             return block;
-        }
-
-        // pnpm 11 sorts a new key in where a level's keys were sorted (packages first or not) and appends it
-        // otherwise; pnpm 10 sorts every level, packages first
-        private int insertionIndex(List<String> keys, String key) {
-            if (release >= 11 && !sorted(keys)) {
-                return keys.size();
-            }
-            boolean packagesFirst = release < 11 || keys.isEmpty() || "packages".equals(keys.get(0));
-            int at = 0;
-            for (String existing : keys) {
-                if (compare(existing, key, packagesFirst) < 0) {
-                    at++;
-                }
-            }
-            return at;
-        }
-
-        private static boolean sorted(List<String> keys) {
-            int start = !keys.isEmpty() && "packages".equals(keys.get(0)) ? 1 : 0;
-            for (int i = start + 1; i < keys.size(); i++) {
-                if (keys.get(i - 1).compareTo(keys.get(i)) > 0) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
-        private static int compare(String left, String right, boolean packagesFirst) {
-            if (packagesFirst && "packages".equals(left) != "packages".equals(right)) {
-                return "packages".equals(left) ? -1 : 1;
-            }
-            return left.compareTo(right);
         }
 
         // the entries of lines [from, to) whose keys sit at the column of the first key there
@@ -883,30 +832,13 @@ public final class PackageJsonOverrides {
             return new ArrayList<>(((Map<?, ?>) loaded).keySet());
         }
 
-        static String scalar(String value) {
-            for (int i = 0; i < value.length(); i++) {
-                char c = value.charAt(i);
-                if (c < 0x20 || c >= 0x7f && c <= 0x9f || c == 0x2028 || c == 0x2029) {
-                    throw new IllegalArgumentException("pnpm-workspace.yaml would need an escape for " + value);
-                }
-            }
-            if (PLAIN_UNSAFE.matcher(value).find() || CORE_SCHEMA.matcher(value).find()) {
-                return value.contains("'") && !value.contains("\"") ? doubleQuoted(value) :
-                        "'" + value.replace("'", "''") + "'";
-            }
-            return value;
-        }
-
-        private static String doubleQuoted(String value) {
-            return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-        }
-
         // a scalar keeps its quotes when its value changes
         private static String restyle(String old, String value) {
             if (old.startsWith("'")) {
                 return "'" + value.replace("'", "''") + "'";
             }
-            return old.startsWith("\"") ? doubleQuoted(value) : scalar(value);
+            return old.startsWith("\"") ? WorkspaceManifestWriter.doubleQuoted(value) :
+                    WorkspaceManifestWriter.scalar(value);
         }
 
         private static String unquote(String scalar) {

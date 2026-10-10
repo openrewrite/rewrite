@@ -24,6 +24,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.javascript.internal.lock.pnpm.FindPackages;
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.marker.NodeResolutionResult;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 import org.openrewrite.json.tree.Json;
@@ -224,11 +225,11 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         decider.decide(decision, ctx);
         CatalogFile file = decision.edits() ? catalogFile(path) : null;
-        if (file != null && file.current().isFlowStyle() && output(file, file.current()) == null) {
+        String cleanupDeclined = file == null ? null : cleanupDeclined(file);
+        if (cleanupDeclined != null) {
             decision.manifestEdit = null;
             decision.catalogEdits.clear();
-            decision.decline("cleanupUnusedCatalogs would make pnpm rewrite the flow-style catalogs of " +
-                             file.path + ", so this edit was not made");
+            decision.decline(cleanupDeclined);
             rebuild();
         }
         if (previous != null) {
@@ -390,6 +391,9 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         }
         boolean touched = false;
         Set<Path> workspaceProjects = workspaceProjects(file);
+        if (otherManifest(workspaceProjects) != null) {
+            return null;
+        }
         List<Map<String, Map<String, String>>> projects = new ArrayList<>();
         for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
             SourceFile captured = project.getValue().capturedPackageJson;
@@ -410,27 +414,65 @@ public final class NodeDependencyEdits implements PackageJsonHelper.FileEditor {
         return touched ? ((NodeCatalogs.Pnpm) edited).withoutUnused(projects) : edited;
     }
 
-    // pnpm's allProjects: the scanned projects pnpm-workspace.yaml's packages match; null when pnpm rejects the file
+    // why pnpm's cleanupUnusedCatalogs, which an edit of the workspace makes pnpm run, is not written in place
+    private @Nullable String cleanupDeclined(CatalogFile file) {
+        NodeCatalogs current = file.current();
+        if (!(current instanceof NodeCatalogs.Pnpm) || !((NodeCatalogs.Pnpm) current).isCleanupUnusedCatalogs()) {
+            return null;
+        }
+        if (current.isFlowStyle() && output(file, current) == null) {
+            return "cleanupUnusedCatalogs would make pnpm rewrite the flow-style catalogs of " + file.path +
+                   ", so this edit was not made";
+        }
+        Path other = otherManifest(workspaceProjects(file));
+        return other == null ? null : "cleanupUnusedCatalogs counts the dependencies of " + other +
+                                      ", which the recipes do not read, so this edit was not made";
+    }
+
+    private static @Nullable Path otherManifest(@Nullable Set<Path> projects) {
+        if (projects != null) {
+            for (Path project : projects) {
+                if (!project.endsWith("package.json")) {
+                    return project;
+                }
+            }
+        }
+        return null;
+    }
+
+    // pnpm's allProjects: the scanned projects pnpm-workspace.yaml's packages match, a member in another manifest
+    // format by that file; null when pnpm rejects the file
     private @Nullable Set<Path> workspaceProjects(CatalogFile file) {
+        if (!(file.base instanceof NodeCatalogs.Pnpm) || ((NodeCatalogs.Pnpm) file.base).isRejected()) {
+            return null;
+        }
+        NodeCatalogs.Pnpm workspace = (NodeCatalogs.Pnpm) file.base;
         Path dir = file.path.getParent();
         Map<String, Path> manifestDirs = new HashMap<>();
         for (Map.Entry<Path, NodeDependencyScan.ProjectState> project : scan.projects.entrySet()) {
-            Path projectDir = project.getKey().getParent();
-            boolean under = dir == null || projectDir != null && projectDir.startsWith(dir);
-            if (project.getValue().capturedPackageJson != null && under) {
-                Path relative = dir == null ? projectDir : dir.relativize(projectDir);
-                manifestDirs.put(relative == null ? "" : relative.toString().replace('\\', '/'), project.getKey());
+            if (project.getValue().capturedPackageJson != null) {
+                putUnder(manifestDirs, dir, project.getKey());
             }
         }
-        List<String> found = FindPackages.workspaceProjects(file.base.print(), manifestDirs.keySet());
-        if (found == null) {
-            return null;
+        // pnpm reads a package.yaml or package.json5 beside a package.json in its place
+        for (Path held : scan.paths) {
+            if (PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(String.valueOf(held.getFileName()))) {
+                putUnder(manifestDirs, dir, held);
+            }
         }
         Set<Path> projects = new HashSet<>();
-        for (String project : found) {
+        for (String project : FindPackages.workspaceProjects(workspace.getSettings(), manifestDirs.keySet())) {
             projects.add(manifestDirs.get(project));
         }
         return projects;
+    }
+
+    private static void putUnder(Map<String, Path> manifestDirs, @Nullable Path dir, Path manifest) {
+        Path projectDir = manifest.getParent();
+        if (dir == null || projectDir != null && projectDir.startsWith(dir)) {
+            Path relative = dir == null ? projectDir : dir.relativize(projectDir);
+            manifestDirs.put(relative == null ? "" : relative.toString().replace('\\', '/'), manifest);
+        }
     }
 
     // NodeCatalogs.Bun's root manifest with this cycle's catalog edits

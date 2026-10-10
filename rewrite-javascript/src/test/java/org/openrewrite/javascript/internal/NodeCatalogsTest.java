@@ -279,20 +279,6 @@ class NodeCatalogsTest {
           .isEqualTo(file("bun/catalog-rename/pkg"));
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"~1.5.0", "^1.2.3", "1.4.1", "10.1.0-rc.1", "1.4.2-beta.00001", "1.x", "v2", "latest",
-      "next", "1.0.0-alpha.1+build.7"})
-    void constraintsThatCanStandUnquoted(String constraint) {
-        assertThat(NodeCatalogs.canBePlainScalar(constraint)).isTrue();
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {">=2.0.0", "*", "-1.0.0", "?1", "|1", ">1", "2", "2.0", "1_0", "0x1F", "0b11", ".inf",
-      "true", "False", "yes", "NO", "on", "off", "null", "~", "a: b", "a #c", "---", " 1.0.0", "1.0.0 "})
-    void constraintsThatMustBeQuoted(String constraint) {
-        assertThat(NodeCatalogs.canBePlainScalar(constraint)).isFalse();
-    }
-
     private static Map<String, Map<String, String>> declares(String name, String value) {
         return singletonMap("dependencies", singletonMap(name, value));
     }
