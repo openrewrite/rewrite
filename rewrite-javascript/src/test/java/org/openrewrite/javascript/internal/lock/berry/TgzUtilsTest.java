@@ -16,6 +16,8 @@
 package org.openrewrite.javascript.internal.lock.berry;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.javascript.internal.lock.EcmaScript;
 
 import java.io.ByteArrayOutputStream;
@@ -83,15 +85,17 @@ class TgzUtilsTest {
                            "8d875ea4c5210ef15ab3fca0c97aaef102ae54107eccb5f2");
     }
 
-    // node-tar 6.1.11's entries for headers with a NUL before a line terminator and long pax numbers (tar-headers.js)
-    @Test
-    void readsHeadersAsNodeTarDoes() throws IOException {
+    // node-tar 6.1.11's entries for headers with a NUL before a line terminator and long pax numbers, and for an
+    // entry larger than the archive with a valid header after it (tar-headers.js)
+    @ParameterizedTest
+    @ValueSource(strings = {"node-tar-headers", "node-tar-oversize"})
+    void readsHeadersAsNodeTarDoes(String archive) throws IOException {
         List<Object> expected = new ArrayList<>();
-        for (String line : new String(resource("node-tar-headers.jsonl"), StandardCharsets.UTF_8).split("\n")) {
+        for (String line : new String(resource(archive + ".jsonl"), StandardCharsets.UTF_8).split("\n")) {
             expected.add(EcmaScript.jsonParse(line));
         }
         List<Object> entries = new ArrayList<>();
-        for (TgzUtils.TarEntry entry : TgzUtils.parseTar(TgzUtils.maybeGunzip(resource("node-tar-headers.tgz")))) {
+        for (TgzUtils.TarEntry entry : TgzUtils.parseTar(TgzUtils.maybeGunzip(resource(archive + ".tgz")))) {
             Map<String, Object> read = new LinkedHashMap<>();
             read.put("type", entry.type);
             read.put("path", entry.path);

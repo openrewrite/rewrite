@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-// Writes tgz-utils/node-tar-headers.tgz, whose headers hold a NUL before a line terminator and pax numbers past
-// Number's safe integers, and node-tar-headers.jsonl, the entries node-tar 6.1.11's Parse (Yarn 4.10.3's) emits for it.
+// Writes tgz-utils/node-tar-headers.tgz (a NUL before a line terminator, pax numbers past Number's safe integers) and
+// node-tar-oversize.tgz (an entry larger than the archive), each beside the .jsonl of what node-tar 6.1.11 emits.
 // Usage: NODE_PATH=<dir holding tar 6.1.11> node tar-headers.js <out-dir>
 const fs = require('fs')
 const path = require('path')
@@ -71,20 +71,32 @@ const archive = zlib.gzipSync(Buffer.concat([
   Buffer.alloc(1024),
 ]))
 
-const entries = []
-const parser = new tar.Parse()
-parser.on('entry', entry => {
-  const chunks = []
-  entry.on('data', c => chunks.push(c))
-  entry.on('end', () => {
-    const data = Buffer.concat(chunks)
-    entries.push({type: entry.type, path: entry.path, linkpath: entry.linkpath || null, length: data.length,
-      text: data.toString('utf8').replace(/\0+$/, '')})
+// a pax size past the archive, then a header node-tar reads as part of that entry's body
+const oversize = zlib.gzipSync(Buffer.concat([
+  ...pax([['size', '99999999999999999999']]), header('package/big', '0', '00000000005\0'), body('hello'),
+  header('package/after', '0', '00000000001\0'), body('x'),
+  Buffer.alloc(1024),
+]))
+
+function record(name, tgz) {
+  const entries = []
+  const parser = new tar.Parse()
+  parser.on('entry', entry => {
+    const chunks = []
+    entry.on('data', c => chunks.push(c))
+    entry.on('end', () => {
+      const data = Buffer.concat(chunks)
+      entries.push({type: entry.type, path: entry.path, linkpath: entry.linkpath || null, length: data.length,
+        text: data.toString('utf8').replace(/\0+$/, '')})
+    })
   })
-})
-parser.on('end', () => {
-  const out = process.argv[2]
-  fs.writeFileSync(path.join(out, 'node-tar-headers.tgz'), archive)
-  fs.writeFileSync(path.join(out, 'node-tar-headers.jsonl'), entries.map(e => JSON.stringify(e)).join('\n') + '\n')
-})
-parser.end(archive)
+  parser.on('end', () => {
+    const out = process.argv[2]
+    fs.writeFileSync(path.join(out, name + '.tgz'), tgz)
+    fs.writeFileSync(path.join(out, name + '.jsonl'), entries.map(e => JSON.stringify(e)).join('\n') + '\n')
+  })
+  parser.end(tgz)
+}
+
+record('node-tar-headers', archive)
+record('node-tar-oversize', oversize)

@@ -178,7 +178,8 @@ final class TgzUtils {
             long size = header.size == null ? 0 : header.size;
             byte[] body = new byte[(int) Math.max(0, Math.min(size, tar.length - position))];
             System.arraycopy(tar, position, body, 0, body.length);
-            position = (int) Math.min(tar.length, position + 512 * (long) Math.ceil(size / 512.0));
+            position = size >= tar.length - position ? tar.length :
+                    (int) Math.min(tar.length, position + 512 * (long) Math.ceil(size / 512.0));
 
             boolean meta = false;
             boolean ignored = false;
