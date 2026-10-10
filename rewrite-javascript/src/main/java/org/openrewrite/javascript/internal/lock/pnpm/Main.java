@@ -281,10 +281,10 @@ public final class Main {
         if (other == null) {
             throw CannotKnow.unread(path);
         }
-        if (!path.endsWith("/package.yaml") && !"package.yaml".equals(path)) {
-            throw new CannotKnow("what pnpm reads from " + path + " (json5's parse is not ported)");
+        if (path.endsWith("/package.yaml") || "package.yaml".equals(path)) {
+            return Manifests.readPackageYaml(other, path);
         }
-        return Manifests.readPackageYaml(other, path);
+        return Manifests.readJson5(other, path);
     }
 
     // the directories holding a manifest findPackages' patterns can match

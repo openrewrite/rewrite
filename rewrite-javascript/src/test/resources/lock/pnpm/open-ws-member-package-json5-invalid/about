@@ -1,0 +1,1 @@
+A workspace member c whose package.json5 is not JSON5 (an unquoted version) joins packages/*; the root adds abbrev.

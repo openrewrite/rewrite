@@ -1,0 +1,10 @@
+// a member written in JSON5
+{
+  name: 'c',
+  version: '1.0.0',
+  dependencies: {
+    once: '1.4.0', /* trailing comma */
+    'is-positive': "3.1.0",
+  },
+  "x-\u0041": +0x10,
+}

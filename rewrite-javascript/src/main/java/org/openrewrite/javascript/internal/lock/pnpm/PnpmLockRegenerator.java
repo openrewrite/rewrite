@@ -261,6 +261,7 @@ public final class PnpmLockRegenerator {
             case "ERR_PNPM_WORKSPACE_PKG_NOT_FOUND":
                 return Reason.PACKAGE_NOT_FOUND;
             case "ERR_PNPM_JSON_PARSE":
+            case "ERR_PNPM_JSON5_PARSE":
             case "ERR_PNPM_INVALID_PEER_DEPENDENCY_SPECIFICATION":
             case "ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC":
                 return Reason.MALFORMED_MANIFEST;

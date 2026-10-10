@@ -75,6 +75,24 @@ final class Manifests {
         return convertManifestAfterRead((Map<String, @Nullable Object>) value);
     }
 
+    /**
+     * project-manifest-reader's readJson5File: json5 2.2.3's parse, {@code ERR_PNPM_JSON5_PARSE} for text it rejects,
+     * then {@code convertManifestAfterRead}.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, @Nullable Object> readJson5(String text, String path) {
+        Object value;
+        try {
+            value = Json5.parse(LockfileReader.stripBom(text));
+        } catch (Json5.SyntaxError e) {
+            throw new PnpmError("JSON5_PARSE", e.getMessage() + " in " + path);
+        }
+        if (!(value instanceof Map)) {
+            throw new CannotKnow("what pnpm makes of " + path + " (JSON5, but not an object)");
+        }
+        return convertManifestAfterRead((Map<String, @Nullable Object>) value);
+    }
+
     static Map<String, @Nullable Object> convertManifestAfterRead(Map<String, @Nullable Object> manifest) {
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "devEngines", "devDependencies");
         PkgManifestUtils.convertEnginesRuntimeToDependencies(manifest, "engines", "dependencies");
