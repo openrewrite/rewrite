@@ -131,7 +131,7 @@ final class Lockfile {
         Map<String, @Nullable Object> imploded = new LinkedHashMap<>();
         imploded.put("name", inferredName.equals(obj.get("name")) ? null : obj.get("name"));
         imploded.put("version", obj.get("version"));
-        imploded.put("uid", strictEquals(obj.get("uid"), obj.get("version")) ? null : obj.get("uid"));
+        imploded.put("uid", Js.strictEquals(obj.get("uid"), obj.get("version")) ? null : obj.get("uid"));
         imploded.put("resolved", obj.get("resolved"));
         imploded.put("registry", "npm".equals(obj.get("registry")) ? null : obj.get("registry"));
         imploded.put("dependencies", blankObjectUndefined(obj.get("dependencies")));
@@ -164,16 +164,6 @@ final class Lockfile {
     private static void or(Map<String, @Nullable Object> obj, String key, @Nullable Object fallback) {
         Object value = obj.get(key);
         obj.put(key, Js.truthy(value) ? value : fallback);
-    }
-
-    private static boolean strictEquals(@Nullable Object a, @Nullable Object b) {
-        if (a == null || b == null) {
-            return a == b;
-        }
-        if (a instanceof Map || a instanceof List) {
-            return a == b;
-        }
-        return a.equals(b);
     }
 
     /**

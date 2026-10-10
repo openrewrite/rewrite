@@ -551,7 +551,7 @@ public final class BerryOptions {
         } else {
             if (!(value instanceof String)) {
                 throw new JsError(JsError.ERROR, "Expected configuration setting \"" + path +
-                                                 "\" to be a string, got " + typeOf(value));
+                                                 "\" to be a string, got " + Js.typeOf(value));
             }
             String replaced = MiscUtils.replaceEnvVariables((String) value, env);
             switch (definition.type) {
@@ -629,16 +629,6 @@ public final class BerryOptions {
                 return definition.defaultValue instanceof List ? new ArrayList<>((List<?>) definition.defaultValue) :
                         definition.defaultValue;
         }
-    }
-
-    private static String typeOf(@Nullable Object value) {
-        if (value == null || value instanceof Map || value instanceof List) {
-            return "object";
-        }
-        if (value instanceof Boolean) {
-            return "boolean";
-        }
-        return value instanceof Number ? "number" : "undefined";
     }
 
     // parseInt: the leading integer of the string, hexadecimal after 0x, NaN when there is none
