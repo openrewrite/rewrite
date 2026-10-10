@@ -23,25 +23,25 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
+import static org.openrewrite.javascript.internal.lock.berry.BerryOptions.DEFAULT_RC_FILENAME;
+
 /**
  * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
  * {@code .yarnrc.yml} of each directory from where Yarn runs up.
  */
 final class YarnBerryInputs {
 
-    private static final String RC_FILENAME = ".yarnrc.yml";
-
     private YarnBerryInputs() {
     }
 
     static boolean reads(String fileName) {
-        return RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");
+        return DEFAULT_RC_FILENAME.equals(fileName) || fileName.endsWith(".patch");
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
         Map<String, String> rcFiles = new LinkedHashMap<>();
         for (Map.Entry<String, String> file : dir.getFiles().entrySet()) {
-            if (file.getKey().equals(RC_FILENAME) || file.getKey().endsWith("/" + RC_FILENAME)) {
+            if (file.getKey().equals(DEFAULT_RC_FILENAME) || file.getKey().endsWith("/" + DEFAULT_RC_FILENAME)) {
                 rcFiles.put(file.getKey(), file.getValue());
             }
         }

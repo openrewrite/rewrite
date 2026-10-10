@@ -158,13 +158,8 @@ public final class YarnClassicLockRegenerator {
         YarnClassicOptions.Flags flags = config.getFlags();
         String lock = Objects.requireNonNull(inputs.getLock());
         String saved = install(config, flags.isLockfile() ? lockfile(config) : Lockfile.fromDirectory(lock), warnings);
+        // saveLockfileAndIntegrity returns before writing: yarn exits 0 and the lock stays as it was
         if (!flags.isLockfile() || flags.isPureLockfile() || flags.isFrozenLockfile()) {
-            if (saved != null && !saved.equals(lock)) {
-                String flag = !flags.isLockfile() ? "--no-lockfile" : flags.isPureLockfile() ? "--pure-lockfile" :
-                        "--frozen-lockfile";
-                throw Rejected.rejects(Reason.RESOLUTION_REQUIRED, flag + " in .yarnrc (yarn exits 0 and writes no " +
-                                                                   "lock)");
-            }
             return lock;
         }
         return saved == null ? lock : saved;

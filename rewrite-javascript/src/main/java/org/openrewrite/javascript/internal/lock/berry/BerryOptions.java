@@ -40,7 +40,7 @@ import java.util.regex.Pattern;
 @Getter
 public final class BerryOptions {
 
-    static final String DEFAULT_RC_FILENAME = ".yarnrc.yml";
+    public static final String DEFAULT_RC_FILENAME = ".yarnrc.yml";
     private static final String ENVIRONMENT_PREFIX = "yarn_";
     private static final Pattern YARN_RELEASE = Pattern.compile("(?:^|/)yarn-(\\d+\\.\\d+\\.\\d+[^/]*?)\\.c?js$");
     private static final Pattern PACKAGE_MANAGER = Pattern.compile("^yarn@(\\d+\\.\\d+\\.\\d+(?:-[^+]*)?)(?:\\+.*)?$");
