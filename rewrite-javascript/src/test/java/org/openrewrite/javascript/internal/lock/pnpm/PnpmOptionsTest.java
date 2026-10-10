@@ -299,6 +299,47 @@ class PnpmOptionsTest {
           .get("nodeVersion")).isEqualTo("22.20.0");
     }
 
+    // upstream sets runtime-on-fail on the command line; pnpm-workspace.yaml sets it too, and the install applies it to
+    // every project's manifest (PnpmLockRegenerator.install) where config/reader applies it to the root's
+    @Test
+    void runtimeOnFailDownloadOverridesDevEnginesRuntimeOnFailAndAddsNodeToDevDependencies() {
+        Map<String, @Nullable Object> manifest = obj("{'devEngines':{'runtime':{'name':'node','version':'22.20.0'}}}");
+        PnpmOptions options = PnpmOptions.load("runtimeOnFail: download\n", null, manifest, env());
+        assertThat(options.get("runtimeOnFail")).isEqualTo("download");
+        PkgManifestUtils.applyRuntimeOnFailOverride(manifest, options.get("runtimeOnFail"));
+        assertThat(json(manifest)).isEqualTo("{'devEngines':{'runtime':{'name':'node','version':'22.20.0'," +
+                                             "'onFail':'download'}},'devDependencies':{'node':'runtime:22.20.0'}}");
+    }
+
+    @Test
+    void runtimeOnFailIgnoreOverridesAnExistingOnFailDownloadAndRemovesNodeFromDevDependencies() {
+        Map<String, @Nullable Object> manifest = obj("{'devEngines':{'runtime':{'name':'node','version':'22.20.0'," +
+                                                     "'onFail':'download'}}}");
+        PnpmOptions options = PnpmOptions.load("runtimeOnFail: ignore\n", null, manifest, env());
+        assertThat(options.get("runtimeOnFail")).isEqualTo("ignore");
+        PkgManifestUtils.applyRuntimeOnFailOverride(manifest, options.get("runtimeOnFail"));
+        assertThat(json(manifest)).isEqualTo("{'devEngines':{'runtime':{'name':'node','version':'22.20.0'," +
+                                             "'onFail':'ignore'}},'devDependencies':{}}");
+    }
+
+    @Test
+    void devEnginesPackageManagerWithoutOnFailResolvesToTheDocumentedPmOnFailDefaultDownload() {
+        PnpmOptions.WantedPackageManager pm = PnpmOptions.load(null, null, obj("{'devEngines':{'packageManager':" +
+          "{'name':'pnpm','version':'11.0.0'}}}"), env()).getWantedPackageManager();
+        assertThat(pm).isNotNull();
+        assertThat(pm.getName()).isEqualTo("pnpm");
+        assertThat(pm.getVersion()).isEqualTo("11.0.0");
+        assertThat(pm.getOnFail()).isEqualTo("download");
+    }
+
+    @Test
+    void devEnginesPackageManagerWithExplicitOnFailIsRespected() {
+        PnpmOptions.WantedPackageManager pm = PnpmOptions.load(null, null, obj("{'devEngines':{'packageManager':" +
+          "{'name':'pnpm','version':'11.0.0','onFail':'error'}}}"), env()).getWantedPackageManager();
+        assertThat(pm).isNotNull();
+        assertThat(pm.getOnFail()).isEqualTo("error");
+    }
+
     @Test
     void registriesOfScopedPackagesAreReadAndNormalized() {
         String npmrc = "@foo:registry=https://foo.com\n@bar:registry=https://bar.com\n" +
