@@ -31,7 +31,7 @@ final class Cache {
     private Cache() {
     }
 
-    static String getCacheKey(BerryOptions options) {
+    static String getCacheKey(Configuration options) {
         Object compressionLevel = options.get("compressionLevel");
         String cacheSpec = !"mixed".equals(compressionLevel) ? "c" + Js.string(compressionLevel) : "";
         return CACHE_VERSION + cacheSpec;
@@ -80,7 +80,7 @@ final class Cache {
      * {@code <cacheKey>/<sha512>} of the archive {@code NpmSemverFetcher} makes from the tarball: the package under
      * {@code node_modules/<ident>}, the tarball's first path component stripped.
      */
-    static String checksum(byte[] tgz, Ident ident, BerryOptions options) {
+    static String checksum(byte[] tgz, Ident ident, Configuration options) {
         Object compressionLevel = options.get("compressionLevel");
         if (!Integer.valueOf(0).equals(compressionLevel)) {
             String name = ident instanceof Locator ? StructUtils.stringifyLocator((Locator) ident) :

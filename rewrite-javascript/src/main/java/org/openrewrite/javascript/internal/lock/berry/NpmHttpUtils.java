@@ -56,7 +56,7 @@ final class NpmHttpUtils {
      * the public registry and not to the project's own; else {@code npmRegistryServer}.
      */
     static String getScopeRegistry(@Nullable String scope, Configuration configuration) {
-        BerryOptions options = configuration.getOptions();
+        Configuration options = configuration;
         Object scopeConfiguration = scope == null ? null : options.getMap("npmScopes").get(scope);
         if (!(scopeConfiguration instanceof Map)) {
             if ("jsr".equals(scope) && configuration.getRelease().isJsrScope()) {
@@ -76,7 +76,7 @@ final class NpmHttpUtils {
      * and {@code time}; throws ReportError YN0035 when the registry has no such package.
      */
     static Map<String, @Nullable Object> getPackageMetadata(Ident ident, Project project, RegistrySource registry) {
-        if (project.configuration.getOptions().getBoolean("enableOfflineMode")) {
+        if (project.configuration.getBoolean("enableOfflineMode")) {
             throw new CannotKnow("enableOfflineMode: what Yarn resolves depends on its cache, which holds the " +
                                  "only versions it offers");
         }

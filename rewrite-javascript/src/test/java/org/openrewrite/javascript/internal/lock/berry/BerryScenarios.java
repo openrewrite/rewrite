@@ -209,7 +209,7 @@ final class BerryScenarios {
             Map<String, String> configFiles = new LinkedHashMap<>();
             String yarnrc = yarnrc(phase);
             if (yarnrc != null) {
-                configFiles.put(BerryOptions.DEFAULT_RC_FILENAME, yarnrc);
+                configFiles.put(Configuration.DEFAULT_RC_FILENAME, yarnrc);
             }
             Map<String, String> env = new LinkedHashMap<>();
             if (has("recorded-with")) {
@@ -227,11 +227,11 @@ final class BerryScenarios {
                 String path = file.getKey();
                 if (path.endsWith(".patch")) {
                     patchFiles.put(path, file.getValue());
-                } else if (path.endsWith("/" + BerryOptions.DEFAULT_RC_FILENAME)) {
+                } else if (path.endsWith("/" + Configuration.DEFAULT_RC_FILENAME)) {
                     rcFiles.put(path, file.getValue());
                 }
             }
-            configFiles.putAll(BerryOptions.findRcFiles(runsIn, rcFiles));
+            configFiles.putAll(Configuration.findRcFiles(runsIn, rcFiles));
             return YarnBerryLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))
@@ -267,7 +267,7 @@ final class BerryScenarios {
             paths.add("package.json");
             paths.add("yarn.lock");
             if (yarnrc) {
-                paths.add(BerryOptions.DEFAULT_RC_FILENAME);
+                paths.add(Configuration.DEFAULT_RC_FILENAME);
             }
             return paths;
         }
@@ -295,7 +295,7 @@ final class BerryScenarios {
                     return file(f);
                 }
             }
-            String tree = tree(phase).get(BerryOptions.DEFAULT_RC_FILENAME);
+            String tree = tree(phase).get(Configuration.DEFAULT_RC_FILENAME);
             return tree != null ? tree : file("workspace-yarnrc");
         }
 

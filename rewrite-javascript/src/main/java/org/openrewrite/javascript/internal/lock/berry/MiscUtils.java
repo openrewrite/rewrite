@@ -105,7 +105,7 @@ final class MiscUtils {
     }
 
     /**
-     * @throws BerryOptions.UsageError when a variable without a fallback is not set.
+     * @throws Configuration.UsageError when a variable without a fallback is not set.
      */
     static String replaceEnvVariables(String value, HostEnvironment env) {
         Matcher m = ENV_VARIABLE.matcher(value);
@@ -122,7 +122,7 @@ final class MiscUtils {
             } else if (m.group("fallback") != null) {
                 replacement = m.group("fallback");
             } else {
-                throw new BerryOptions.UsageError("Environment variable not found (" + variableName + ")");
+                throw new Configuration.UsageError("Environment variable not found (" + variableName + ")");
             }
             m.appendReplacement(out, Matcher.quoteReplacement(replacement == null ? "undefined" : replacement));
         }

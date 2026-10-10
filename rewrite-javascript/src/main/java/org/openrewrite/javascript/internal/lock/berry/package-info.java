@@ -57,7 +57,7 @@
  * 2014-present, Jon Schlinkert); {@code Braces} braces 3.0.2 (Copyright (c) 2014-2018, Jon Schlinkert);
  * {@code FillRange} fill-range 7.0.1 (Copyright (c) 2014-present, Jon Schlinkert); {@code GlobParent} is-glob 4.0.3
  * (Copyright (c) 2014-2017, Jon Schlinkert) and is-extglob 2.1.1 (Copyright (c) 2014-2016, Jon Schlinkert);
- * {@code BerryOptions} camelcase 5.3.1 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
+ * {@code Configuration} camelcase 5.3.1 (Copyright (c) Sindre Sorhus &lt;sindresorhus@gmail.com&gt;
  * (sindresorhus.com)); {@code SpecUtils} corepack 0.35.0's {@code loadSpec} and {@code parseSpec} (Copyright (c)
  * Corepack contributors); and {@code Tinylogic} tinylogic 2.0.0 (Copyright (c) 2020 Mael Nison) with the parser
  * pegjs 0.10 generates for it (Copyright (c) 2010-2016 David Majda), all distributed under the MIT License:

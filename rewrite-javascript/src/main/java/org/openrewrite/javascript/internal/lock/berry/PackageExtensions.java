@@ -64,7 +64,7 @@ final class PackageExtensions {
     }
 
     @SuppressWarnings("unchecked")
-    static Map<String, List<RangeExtensions>> load(YarnRelease release, BerryOptions options) {
+    static Map<String, List<RangeExtensions>> load(YarnRelease release, Configuration options) {
         Map<String, List<RangeExtensions>> packageExtensions = new LinkedHashMap<>();
         for (Map.Entry<String, Map<String, @Nullable Object>> builtin : release.getPackageExtensions()) {
             register(packageExtensions, StructUtils.parseDescriptor(builtin.getKey(), true), builtin.getValue());

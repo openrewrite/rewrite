@@ -76,7 +76,7 @@ final class PortalResolver implements Resolver {
         Configuration configuration = project.configuration;
         return new Package(locator, manifest.version != null && !manifest.version.isEmpty() ? manifest.version :
                 "0.0.0", manifest.languageName != null && !manifest.languageName.isEmpty() ? manifest.languageName :
-                configuration.getOptions().getString("defaultLanguageName"), Package.SOFT, manifest.getConditions(),
+                configuration.getString("defaultLanguageName"), Package.SOFT, manifest.getConditions(),
                 configuration.normalizeDependencyMap(manifest.dependencies), manifest.peerDependencies,
                 manifest.dependenciesMeta, manifest.peerDependenciesMeta, manifest.bin);
     }

@@ -95,7 +95,7 @@ class CacheTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("checksums")
     void reproducesTheChecksumYarnWrote(String name, Locator locator, byte[] tgz, String checksum) {
-        assertThat(Cache.checksum(tgz, locator, BerryOptions.defaults())).isEqualTo(checksum);
+        assertThat(Cache.checksum(tgz, locator, Configuration.defaults())).isEqualTo(checksum);
     }
 
     /**
@@ -118,7 +118,7 @@ class CacheTest {
             }
             tgz = out.toByteArray();
         }
-        assertThat(Cache.checksum(tgz, StructUtils.parseIdent(name), BerryOptions.defaults())).isEqualTo(checksum);
+        assertThat(Cache.checksum(tgz, StructUtils.parseIdent(name), Configuration.defaults())).isEqualTo(checksum);
     }
 
     static Stream<Arguments> downloadedTarballs() {
@@ -149,7 +149,7 @@ class CacheTest {
 
     @Test
     void cacheKeyFollowsTheCompressionLevel() {
-        assertThat(Cache.getCacheKey(BerryOptions.defaults())).isEqualTo("10c0");
+        assertThat(Cache.getCacheKey(Configuration.defaults())).isEqualTo("10c0");
         assertThat(Cache.getCacheKey(options("compressionLevel: mixed\n"))).isEqualTo("10");
         assertThat(Cache.getCacheKey(options("compressionLevel: 9\n"))).isEqualTo("10c9");
     }
@@ -207,8 +207,8 @@ class CacheTest {
         return new YarnBerryLockRegenerator(inputs, scenario.registry()).regenerate();
     }
 
-    private static BerryOptions options(String yarnrc) {
-        return BerryOptions.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
+    private static Configuration options(String yarnrc) {
+        return Configuration.load(Collections.singletonMap(".yarnrc.yml", yarnrc),
                 HostEnvironment.of(Collections.emptyMap()));
     }
 

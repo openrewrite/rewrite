@@ -101,7 +101,7 @@ final class Workspace {
         if (WorkspaceResolver.PROTOCOL.equals(protocol)) {
             return semverRange.test(manifest.version != null ? manifest.version : "0.0.0");
         }
-        if (!project.configuration.getOptions().getBoolean("enableTransparentWorkspaces")) {
+        if (!project.configuration.getBoolean("enableTransparentWorkspaces")) {
             return false;
         }
         if (manifest.version != null) {

@@ -159,7 +159,7 @@ final class Project {
         lockfileLocators.clear();
         lockfileContent = content;
         parsedLockfile = null;
-        String defaultLanguageName = configuration.getOptions().getString("defaultLanguageName");
+        String defaultLanguageName = configuration.getString("defaultLanguageName");
         if (content == null) {
             return;
         }
@@ -1107,7 +1107,7 @@ final class Project {
         }
         Map<String, Object> optimizedLockfile = new LinkedHashMap<>();
         Map<String, Object> metadata = new LinkedHashMap<>();
-        String cacheKey = Cache.getCacheKey(configuration.getOptions());
+        String cacheKey = Cache.getCacheKey(configuration);
         metadata.put("version", LOCKFILE_VERSION);
         metadata.put("cacheKey", cacheKey);
         optimizedLockfile.put("__metadata", metadata);

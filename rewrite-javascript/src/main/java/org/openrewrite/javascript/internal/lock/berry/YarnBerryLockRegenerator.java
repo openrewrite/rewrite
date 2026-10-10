@@ -137,7 +137,7 @@ public final class YarnBerryLockRegenerator {
     private final Inputs inputs;
     private final RegistrySource registry;
 
-    private @Nullable BerryOptions options;
+    private @Nullable Configuration options;
 
     // each manifest parsed once, with the same throw on every read
     private final Map<String, Object> manifests = new LinkedHashMap<>();
@@ -197,7 +197,7 @@ public final class YarnBerryLockRegenerator {
             throw Rejected.discardsLock(lock.trim().isEmpty() ? "the lock is empty" : "the lock has no __metadata");
         }
         settings.putAll(loaded.getMigratedSettings());
-        boolean hardened = project.configuration.getOptions().getBoolean("enableHardenedMode");
+        boolean hardened = project.configuration.getBoolean("enableHardenedMode");
         if (hardened) {
             project.lockfileNeedsRefresh = true;
         }
@@ -228,7 +228,7 @@ public final class YarnBerryLockRegenerator {
                                  (levels - projectCwd) + " directories below this lock's");
         }
         if (project.tryWorkspaceByCwd(runsIn) == null) {
-            throw new BerryOptions.UsageError("The nearest package directory (" + runsIn + ") doesn't seem to be " +
+            throw new Configuration.UsageError("The nearest package directory (" + runsIn + ") doesn't seem to be " +
                                               "part of the project declared in .");
         }
     }
@@ -239,16 +239,16 @@ public final class YarnBerryLockRegenerator {
      */
     YarnRelease release() {
         String packageManager = packageManager();
-        BerryOptions options = options();
+        Configuration options = options();
         Object yarnPath = options.get("yarnPath");
         String version;
         if (yarnPath != null && !options.getBoolean("ignorePath")) {
-            version = BerryOptions.yarnPathVersion(Js.string(yarnPath));
+            version = Configuration.yarnPathVersion(Js.string(yarnPath));
             if (version == null) {
                 throw new CannotKnow("the Yarn release " + Js.string(yarnPath) + " is (yarnPath names no version)");
             }
         } else {
-            version = BerryOptions.packageManagerVersion(packageManager);
+            version = Configuration.packageManagerVersion(packageManager);
             if (version == null) {
                 throw new CannotKnow("the Yarn release that runs (no packageManager in package.json and no " +
                                      "yarnPath)");
@@ -267,16 +267,16 @@ public final class YarnBerryLockRegenerator {
 
     /**
      * Under the release, the configuration, the project found, and the migration rules applied ({@code settings} from
-     * an earlier install's migration); throws BerryOptions.UsageError where the configuration rejects a setting.
+     * an earlier install's migration); throws Configuration.UsageError where the configuration rejects a setting.
      */
     Loaded load(YarnRelease release, Map<String, Object> settings) {
-        BerryOptions options = options().copy();
+        Configuration options = options().copy();
         options.restrictTo(release);
         for (Map.Entry<String, Object> setting : settings.entrySet()) {
             options.useCompat(setting.getKey(), setting.getValue());
         }
 
-        Configuration configuration = new Configuration(options, release);
+        Configuration configuration = options;
         Project project = new Project(configuration, inputs.getNow(), inputs.getPaths(), inputs.getFiles(),
                 inputs.getHost());
         project.setupResolutions(inputs.getLock());
@@ -342,7 +342,7 @@ public final class YarnBerryLockRegenerator {
         if (e instanceof JsYaml.YamlException) {
             return Rejected.crashes(Reason.MALFORMED_LOCK, null, e.toString());
         }
-        if (e instanceof BerryOptions.UsageError) {
+        if (e instanceof Configuration.UsageError) {
             return Rejected.rejects(Reason.RESOLUTION_REQUIRED, "Usage Error: " + e.getMessage());
         }
         if (e instanceof Js.SyntaxError) {
@@ -373,10 +373,10 @@ public final class YarnBerryLockRegenerator {
     }
 
     // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
-    private BerryOptions options() {
+    private Configuration options() {
         if (options == null) {
             try {
-                options = BerryOptions.load(inputs.getConfigFiles(), HostEnvironment.of(inputs.getEnv()));
+                options = Configuration.load(inputs.getConfigFiles(), HostEnvironment.of(inputs.getEnv()));
             } catch (JsError e) {
                 throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
             }

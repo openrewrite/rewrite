@@ -69,7 +69,7 @@ final class LinkResolver implements Resolver {
 
     @Override
     public Package resolve(Locator locator, ResolveOptions opts) {
-        return new Package(locator, "0.0.0", opts.getProject().configuration.getOptions()
+        return new Package(locator, "0.0.0", opts.getProject().configuration
                 .getString("defaultLanguageName"), Package.SOFT, null, new LinkedHashMap<>(), new LinkedHashMap<>(),
                 new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
     }

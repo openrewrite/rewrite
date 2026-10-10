@@ -42,7 +42,7 @@ final class NpmSemverFetcher implements Fetcher {
         Project project = opts.getProject();
         return Cache.fetchPackageFromCache(locator, () -> {
             byte[] tgz = fetchFromNetwork(locator, opts);
-            return () -> Cache.checksum(tgz, locator, project.configuration.getOptions());
+            return () -> Cache.checksum(tgz, locator, project.configuration);
         }, project);
     }
 

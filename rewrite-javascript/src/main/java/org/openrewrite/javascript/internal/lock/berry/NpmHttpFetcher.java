@@ -50,7 +50,7 @@ final class NpmHttpFetcher implements Fetcher {
             }
             byte[] tgz = NpmHttpUtils.get((String) archiveUrl, locator, range.getSelector(), project,
                     opts.getRegistry());
-            return () -> Cache.checksum(tgz, locator, project.configuration.getOptions());
+            return () -> Cache.checksum(tgz, locator, project.configuration);
         }, project);
     }
 }

@@ -67,7 +67,7 @@ public final class Catalogs {
                                                    Resolver.ResolveOptions opts) {
         String catalogName = getCatalogName(dependency);
         Map<String, @Nullable Object> catalog;
-        BerryOptions options = project.configuration.getOptions();
+        Configuration options = project.configuration;
         if (catalogName == null) {
             catalog = options.getMap("catalog");
         } else {

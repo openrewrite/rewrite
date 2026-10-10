@@ -17,7 +17,7 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
-import org.openrewrite.javascript.internal.lock.berry.BerryOptions;
+import org.openrewrite.javascript.internal.lock.berry.Configuration;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
 
 import java.time.Instant;
@@ -25,7 +25,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
 
-import static org.openrewrite.javascript.internal.lock.berry.BerryOptions.DEFAULT_RC_FILENAME;
+import static org.openrewrite.javascript.internal.lock.berry.Configuration.DEFAULT_RC_FILENAME;
 
 /**
  * The Yarn Berry regenerator's inputs: the manifests, paths and patch files under the lock's directory, and the
@@ -60,7 +60,7 @@ final class YarnBerryInputs {
         return Inputs.builder()
                 .lock(dir.getLock())
                 .manifests(dir.manifestsUnder(""))
-                .configFiles(BerryOptions.findRcFiles(dir.getRunsIn(), rcFiles))
+                .configFiles(Configuration.findRcFiles(dir.getRunsIn(), rcFiles))
                 .runsIn(dir.getRunsIn())
                 .files(patches)
                 .paths(dir.pathsUnder(""))
