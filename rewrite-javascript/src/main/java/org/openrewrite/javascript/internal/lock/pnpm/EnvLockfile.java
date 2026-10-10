@@ -22,6 +22,7 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/lockfile.types {@code EnvLockfile} and @pnpm/lockfile.fs src/envLockfile.ts (pnpm 11.2.2): the

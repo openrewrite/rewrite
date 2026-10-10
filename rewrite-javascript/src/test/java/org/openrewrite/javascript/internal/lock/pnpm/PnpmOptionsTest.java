@@ -18,6 +18,7 @@ package org.openrewrite.javascript.internal.lock.pnpm;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.javascript.internal.lock.CannotKnow;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;

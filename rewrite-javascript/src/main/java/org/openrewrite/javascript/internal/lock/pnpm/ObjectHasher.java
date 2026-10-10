@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;

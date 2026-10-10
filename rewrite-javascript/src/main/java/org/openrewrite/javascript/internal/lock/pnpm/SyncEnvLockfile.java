@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 import org.openrewrite.semver.NodeSemver;
 
 import java.util.function.Supplier;

@@ -16,6 +16,7 @@
 package org.openrewrite.javascript.internal.lock.pnpm;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 import java.util.Arrays;
 import java.util.Collections;

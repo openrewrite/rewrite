@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/engine.runtime.deno-resolver src/index.ts (pnpm 11.2.2): a {@code deno} dependency of

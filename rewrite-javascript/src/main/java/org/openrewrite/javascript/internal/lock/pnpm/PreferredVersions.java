@@ -24,6 +24,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import org.openrewrite.javascript.internal.lock.JsError;
+import org.openrewrite.javascript.internal.lock.JsYaml;
 
 /**
  * Port of @pnpm/lockfile.preferred-versions src/index.ts and resolver-base's version selector

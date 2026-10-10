@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.javascript.internal.lock.pnpm;
+package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 
@@ -28,7 +28,7 @@ import java.util.Set;
  * Port of @zkochan/js-yaml 0.0.11 lib/dumper.js {@code dump} under the options of pnpm 11.2.2's
  * {@code lockfileYamlDump}.
  */
-final class JsYamlDumper {
+public final class JsYamlDumper {
 
     private static final int INDENT = 2;
     private static final int LINE_WIDTH = -1;
@@ -77,7 +77,7 @@ final class JsYamlDumper {
     /**
      * {@code dump}: the YAML text of a value, or the empty string for one js-yaml skips ({@code undefined}).
      */
-    static String dump(@Nullable Object input) {
+    public static String dump(@Nullable Object input) {
         JsYamlDumper state = new JsYamlDumper();
         if (state.writeNode(0, input, true, true, false, false, null, false)) {
             return state.dump + "\n";
@@ -324,7 +324,7 @@ final class JsYamlDumper {
     private void writeFlowMapping(int level, Map<String, @Nullable Object> object, boolean singleLineOnly) {
         StringBuilder result = new StringBuilder();
         String savedTag = tag;
-        for (String objectKey : Js.keys(object)) {
+        for (String objectKey : EcmaScript.keys(object)) {
             StringBuilder pairBuffer = new StringBuilder();
             if (result.length() > 0) {
                 pairBuffer.append(", ");
@@ -352,7 +352,7 @@ final class JsYamlDumper {
                                    boolean doubleLine) {
         StringBuilder result = new StringBuilder();
         String savedTag = tag;
-        for (String objectKey : Js.keys(object)) {
+        for (String objectKey : EcmaScript.keys(object)) {
             StringBuilder pairBuffer = new StringBuilder();
             if (!compact || result.length() > 0) {
                 pairBuffer.append(generateNextLine(level, doubleLine));
@@ -407,7 +407,7 @@ final class JsYamlDumper {
             tag = "?";
             boolean negativeZero = d == 0 && 1 / d < 0;
             if (!Double.isNaN(d) && !Double.isInfinite(d) && d % 1 == 0 && !negativeZero) {
-                dump = Js.numberToString(d);
+                dump = EcmaScript.numberToString(d);
             } else if (Double.isNaN(d)) {
                 dump = ".nan";
             } else if (d == Double.POSITIVE_INFINITY) {
@@ -417,7 +417,7 @@ final class JsYamlDumper {
             } else if (negativeZero) {
                 dump = "-0.0";
             } else {
-                String res = Js.numberToString(d);
+                String res = EcmaScript.numberToString(d);
                 dump = res.matches("^[-+]?[0-9]+e.*") ? res.replaceFirst("e", ".e") : res;
             }
             return true;

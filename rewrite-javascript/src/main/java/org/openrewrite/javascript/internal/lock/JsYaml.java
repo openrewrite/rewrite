@@ -15,26 +15,42 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.math.BigInteger;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Port of js-yaml lib/js-yaml/loader.js {@code safeLoad} under {@code FAILSAFE_SCHEMA}: 3.13.1, which yarn 1.22.22
- * bundles, and 3.14.1, which @yarnpkg/parsers 3.0.3 calls with {@code json: true}.
+ * Port of js-yaml's loader: {@code safeLoad} under {@code FAILSAFE_SCHEMA} of 3.13.1 (yarn 1.22.22) and 3.14.1
+ * (@yarnpkg/parsers 3.0.3), {@code load} under {@code DEFAULT_SCHEMA} of @zkochan/js-yaml 0.0.11 (pnpm 11.2.2).
  */
 public final class JsYaml {
 
+    /**
+     * The release; @zkochan/js-yaml 0.0.11 is js-yaml 4.1.0's loader with {@code setProperty} in mergeMappings.
+     */
     public enum Release {
         V3_13_1,
-        V3_14_1
+        V3_14_1,
+        ZKOCHAN_0_0_11
     }
 
     /**
@@ -48,6 +64,8 @@ public final class JsYaml {
         Supplier<Map<String, @Nullable Object>> objects;
     }
 
+    private static final Options PNPM = new Options(Release.ZKOCHAN_0_0_11, false, LinkedHashMap::new);
+
     /**
      * The TypeError js-yaml's own code raises.
      */
@@ -57,9 +75,16 @@ public final class JsYaml {
         }
     }
 
+    /**
+     * js-yaml's {@code YAMLException}; 4.1.0's message carries the position and the snippet as it formats them.
+     */
+    @Getter
     public static final class YamlException extends RuntimeException {
-        YamlException(String message) {
+        private final String reason;
+
+        YamlException(String reason, String message) {
             super(message);
+            this.reason = reason;
         }
 
         @Override
@@ -68,6 +93,55 @@ public final class JsYaml {
         }
     }
 
+    /**
+     * A JavaScript {@code Date} the timestamp type constructs: milliseconds since the epoch.
+     */
+    @Getter
+    @EqualsAndHashCode
+    public static final class Timestamp {
+        private final double time;
+
+        public Timestamp(double time) {
+            this.time = time;
+        }
+
+        /**
+         * {@code Date.prototype.toISOString}.
+         */
+        public String toIsoString() {
+            if (Double.isNaN(time)) {
+                throw new IllegalStateException("RangeError: Invalid time value");
+            }
+            Instant instant = Instant.ofEpochMilli((long) time);
+            int year = instant.atZone(ZoneOffset.UTC).getYear();
+            String rest = DateTimeFormatter.ofPattern("-MM-dd'T'HH:mm:ss.SSS'Z'").withZone(ZoneOffset.UTC)
+                    .format(instant);
+            if (year >= 0 && year <= 9999) {
+                return String.format("%04d", year) + rest;
+            }
+            return (year < 0 ? "-" : "+") + String.format("%06d", Math.abs(year)) + rest;
+        }
+    }
+
+    static final String TAG_STR = "tag:yaml.org,2002:str";
+    static final String TAG_SEQ = "tag:yaml.org,2002:seq";
+    static final String TAG_MAP = "tag:yaml.org,2002:map";
+    static final String TAG_NULL = "tag:yaml.org,2002:null";
+    static final String TAG_BOOL = "tag:yaml.org,2002:bool";
+    static final String TAG_INT = "tag:yaml.org,2002:int";
+    static final String TAG_FLOAT = "tag:yaml.org,2002:float";
+    static final String TAG_TIMESTAMP = "tag:yaml.org,2002:timestamp";
+    static final String TAG_MERGE = "tag:yaml.org,2002:merge";
+    static final String TAG_BINARY = "tag:yaml.org,2002:binary";
+    static final String TAG_OMAP = "tag:yaml.org,2002:omap";
+    static final String TAG_PAIRS = "tag:yaml.org,2002:pairs";
+    static final String TAG_SET = "tag:yaml.org,2002:set";
+
+    static final List<String> IMPLICIT = Collections.unmodifiableList(Arrays.asList(
+            TAG_NULL, TAG_BOOL, TAG_INT, TAG_FLOAT, TAG_TIMESTAMP, TAG_MERGE));
+
+    private static final Map<String, Map<String, String>> TYPE_MAP = new HashMap<>();
+    private static final Map<String, Map<String, String>> FAILSAFE_TYPE_MAP = new HashMap<>();
     private static final String PROTO = "__proto__";
 
     private static final int CONTEXT_FLOW_IN = 1;
@@ -79,17 +153,60 @@ public final class JsYaml {
     private static final int CHOMPING_STRIP = 2;
     private static final int CHOMPING_KEEP = 3;
 
-    private static final Map<String, String> TYPE_KINDS = new HashMap<>();
     private static final String[] SIMPLE_ESCAPES = new String[256];
     private static final Pattern PATTERN_TAG_HANDLE = Pattern.compile("^(?:!|!!|![a-z\\-]+!)\\z",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern YAML_VERSION = Pattern.compile("^([0-9]+)\\.([0-9]+)\\z");
     private static final String TAG_URI_CHARS = "-#;/?:@&=+$,_.!~*'()[]";
+    private static final Pattern YAML_FLOAT_PATTERN = Pattern.compile(
+            "^(?:[-+]?(?:[0-9][0-9_]*)(?:\\.[0-9_]*)?(?:[eE][-+]?[0-9]+)?" +
+            "|\\.[0-9_]+(?:[eE][-+]?[0-9]+)?" +
+            "|[-+]?\\.(?:inf|Inf|INF)" +
+            "|\\.(?:nan|NaN|NAN))\\z");
+    private static final Pattern YAML_DATE_REGEXP = Pattern.compile(
+            "^([0-9][0-9][0-9][0-9])-([0-9][0-9])-([0-9][0-9])\\z");
+    private static final Pattern YAML_TIMESTAMP_REGEXP = Pattern.compile(
+            "^([0-9][0-9][0-9][0-9])" +
+            "-([0-9][0-9]?)" +
+            "-([0-9][0-9]?)" +
+            "(?:[Tt]|[ \\t]+)" +
+            "([0-9][0-9]?)" +
+            ":([0-9][0-9])" +
+            ":([0-9][0-9])" +
+            "(?:\\.([0-9]*))?" +
+            "(?:[ \\t]*(Z|([-+])([0-9][0-9]?)" +
+            "(?::([0-9][0-9]))?))?\\z");
+    private static final String BASE64_MAP = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=\n\r";
 
     static {
-        TYPE_KINDS.put("tag:yaml.org,2002:str", "scalar");
-        TYPE_KINDS.put("tag:yaml.org,2002:seq", "sequence");
-        TYPE_KINDS.put("tag:yaml.org,2002:map", "mapping");
+        Map<String, String> scalar = new HashMap<>();
+        for (String tag : new String[]{TAG_STR, TAG_NULL, TAG_BOOL, TAG_INT, TAG_FLOAT, TAG_TIMESTAMP, TAG_MERGE,
+                TAG_BINARY}) {
+            scalar.put(tag, "scalar");
+        }
+        Map<String, String> sequence = new HashMap<>();
+        for (String tag : new String[]{TAG_SEQ, TAG_OMAP, TAG_PAIRS}) {
+            sequence.put(tag, "sequence");
+        }
+        Map<String, String> mapping = new HashMap<>();
+        for (String tag : new String[]{TAG_MAP, TAG_SET}) {
+            mapping.put(tag, "mapping");
+        }
+        Map<String, String> fallback = new HashMap<>();
+        fallback.putAll(scalar);
+        fallback.putAll(sequence);
+        fallback.putAll(mapping);
+        TYPE_MAP.put("scalar", scalar);
+        TYPE_MAP.put("sequence", sequence);
+        TYPE_MAP.put("mapping", mapping);
+        TYPE_MAP.put("fallback", fallback);
+        Map<String, String> failsafe = new HashMap<>();
+        for (String[] type : new String[][]{{TAG_STR, "scalar"}, {TAG_SEQ, "sequence"}, {TAG_MAP, "mapping"}}) {
+            FAILSAFE_TYPE_MAP.put(type[1], Collections.singletonMap(type[0], type[1]));
+            failsafe.put(type[0], type[1]);
+        }
+        FAILSAFE_TYPE_MAP.put("fallback", failsafe);
+
         SIMPLE_ESCAPES['0'] = "\0";
         SIMPLE_ESCAPES['a'] = "\u0007";
         SIMPLE_ESCAPES['b'] = "\b";
@@ -105,26 +222,44 @@ public final class JsYaml {
         SIMPLE_ESCAPES['/'] = "/";
         SIMPLE_ESCAPES['\\'] = "\\";
         SIMPLE_ESCAPES['N'] = "\u0085";
-        SIMPLE_ESCAPES['_'] = "\u00A0";
+        SIMPLE_ESCAPES['_'] = "\u00a0";
         SIMPLE_ESCAPES['L'] = "\u2028";
         SIMPLE_ESCAPES['P'] = "\u2029";
     }
+
+    /**
+     * A JavaScript {@code undefined}: what {@code load} returns for a stream without documents.
+     */
+    public static final Object UNDEFINED = EcmaScript.UNDEFINED;
 
     private JsYaml() {
     }
 
     /**
-     * The stream's one document, null for a stream without documents.
+     * @zkochan/js-yaml's {@code load}: the stream's one document, {@link #UNDEFINED} for a stream without documents.
+     */
+    public static @Nullable Object load(String input) {
+        List<@Nullable Object> documents = loadDocuments(input, PNPM);
+        if (documents.isEmpty()) {
+            return UNDEFINED;
+        }
+        return single(documents);
+    }
+
+    /**
+     * 3.x's {@code safeLoad} under {@code FAILSAFE_SCHEMA}: the stream's one document, null for a stream without any.
      */
     public static @Nullable Object safeLoadFailsafe(String input, Options options) {
         List<@Nullable Object> documents = loadDocuments(input, options);
-        if (documents.isEmpty()) {
-            return null;
-        }
+        return documents.isEmpty() ? null : single(documents);
+    }
+
+    private static @Nullable Object single(List<@Nullable Object> documents) {
         if (documents.size() == 1) {
             return documents.get(0);
         }
-        throw new YamlException("expected a single document in the stream, but found more");
+        throw new YamlException("expected a single document in the stream, but found more",
+                "expected a single document in the stream, but found more");
     }
 
     private static List<@Nullable Object> loadDocuments(String input, Options options) {
@@ -139,7 +274,7 @@ public final class JsYaml {
         }
         State state = new State(input, options);
         int nullpos = input.indexOf('\0');
-        if (options.release != Release.V3_13_1 && nullpos != -1) {
+        if (options.getRelease() != Release.V3_13_1 && nullpos != -1) {
             state.position = nullpos;
             throw state.error("null byte is not allowed in input");
         }
@@ -156,11 +291,13 @@ public final class JsYaml {
     private static final class State {
         final String input;
         final Options options;
+        final boolean v4;
         final int length;
         int position;
         int line;
         int lineStart;
         int lineIndent;
+        int firstTabInLine = -1;
         final List<@Nullable Object> documents = new ArrayList<>();
 
         @Nullable
@@ -178,17 +315,27 @@ public final class JsYaml {
 
         State(String input, Options options) {
             this.options = options;
+            this.v4 = options.getRelease() == Release.ZKOCHAN_0_0_11;
             this.length = input.length();
             this.input = input + '\0';
         }
 
-        // charCodeAt, -1 standing for its NaN past either end
         int ch(int i) {
             return i >= 0 && i < input.length() ? input.charAt(i) : -1;
         }
 
         YamlException error(String message) {
-            return new YamlException(message);
+            if (!v4) {
+                return new YamlException(message, message);
+            }
+            String buffer = input.substring(0, input.length() - 1);
+            int column = position - lineStart;
+            String snippet = makeSnippet(buffer, position, line);
+            String where = "(" + (line + 1) + ":" + (column + 1) + ")";
+            if (snippet != null) {
+                where += "\n\n" + snippet;
+            }
+            return new YamlException(message, message + " " + where);
         }
 
         void append(String s) {
@@ -227,6 +374,13 @@ public final class JsYaml {
             if (!isTagUri(prefix)) {
                 throw error("ill-formed tag prefix (second argument) of the TAG directive");
             }
+            if (v4) {
+                try {
+                    prefix = UriComponent.decodeURIComponent(prefix);
+                } catch (IllegalArgumentException e) {
+                    throw error("tag prefix is malformed: " + prefix);
+                }
+            }
             tagMap.put(handle, prefix);
         }
 
@@ -247,44 +401,71 @@ public final class JsYaml {
             }
         }
 
+        @SuppressWarnings("unchecked")
+        void mergeMappings(Map<String, @Nullable Object> destination, @Nullable Object source,
+                           Set<String> overridableKeys) {
+            if (!(source instanceof Map) && !(source instanceof List) && !(source instanceof Timestamp) &&
+                !(source instanceof byte[])) {
+                throw error("cannot merge mappings; the provided source object is unacceptable");
+            }
+            for (String key : EcmaScript.ownKeys(source)) {
+                if (!destination.containsKey(key)) {
+                    Object value = source instanceof Map ? ((Map<String, Object>) source).get(key) :
+                            source instanceof List ? ((List<Object>) source).get(Integer.parseInt(key)) : null;
+                    destination.put(key, value);
+                    overridableKeys.add(key);
+                }
+            }
+        }
+
+        @SuppressWarnings("unchecked")
         Map<String, @Nullable Object> storeMappingPair(@Nullable Map<String, @Nullable Object> mapping,
-                                                       @Nullable Object keyNode, @Nullable Object valueNode) {
-            String key;
+                                                       Set<String> overridableKeys, @Nullable String keyTag,
+                                                       @Nullable Object keyNode, @Nullable Object valueNode,
+                                                       int startLine, int startLineStart, int startPos) {
             if (keyNode instanceof List) {
-                StringBuilder joined = new StringBuilder();
-                List<?> items = (List<?>) keyNode;
-                for (int index = 0; index < items.size(); index++) {
-                    Object item = items.get(index);
-                    if (item instanceof List) {
+                List<@Nullable Object> copy = new ArrayList<>((List<Object>) keyNode);
+                for (int index = 0; index < copy.size(); index++) {
+                    if (copy.get(index) instanceof List) {
                         throw error("nested arrays are not supported inside keys");
                     }
-                    if (index > 0) {
-                        joined.append(',');
+                    if (copy.get(index) instanceof Map) {
+                        copy.set(index, "[object Object]");
                     }
-                    joined.append(item == null ? "" : item instanceof Map ? "[object Object]" : item);
                 }
-                key = joined.toString();
-            } else if (keyNode instanceof Map) {
-                key = "[object Object]";
-            } else {
-                key = String.valueOf(keyNode);
+                keyNode = copy;
             }
+            String key = keyNode instanceof Map ? "[object Object]" : string(keyNode);
             if (mapping == null) {
-                mapping = options.objects.get();
+                mapping = options.getObjects().get();
             }
-            if (!options.json && mapping.containsKey(key)) {
-                throw error("duplicated mapping key");
-            }
-            // `{}.__proto__ = value` makes no key
-            if (!PROTO.equals(key)) {
-                mapping.put(key, valueNode);
+            if (TAG_MERGE.equals(keyTag)) {
+                if (valueNode instanceof List) {
+                    for (Object source : (List<Object>) valueNode) {
+                        mergeMappings(mapping, source, overridableKeys);
+                    }
+                } else {
+                    mergeMappings(mapping, valueNode, overridableKeys);
+                }
+            } else {
+                if (!options.isJson() && !overridableKeys.contains(key) && mapping.containsKey(key)) {
+                    line = startLine != 0 ? startLine : line;
+                    lineStart = startLineStart != 0 ? startLineStart : lineStart;
+                    position = startPos != 0 ? startPos : position;
+                    throw error("duplicated mapping key");
+                }
+                // 3.x assigns `__proto__` as {}.__proto__ = value, which makes no key
+                if (v4 || !PROTO.equals(key)) {
+                    mapping.put(key, valueNode);
+                }
+                overridableKeys.remove(key);
             }
             return mapping;
         }
 
-        // anchorMap[name] = value, which for `__proto__` likewise makes no key
+        // 3.x's anchorMap is a {} as well
         void putAnchor(String name, @Nullable Object value) {
-            if (!PROTO.equals(name)) {
+            if (v4 || !PROTO.equals(name)) {
                 anchorMap.put(name, value);
             }
         }
@@ -303,6 +484,7 @@ public final class JsYaml {
             }
             line += 1;
             lineStart = position;
+            firstTabInLine = -1;
         }
 
         int skipSeparationSpace(boolean allowComments) {
@@ -310,6 +492,9 @@ public final class JsYaml {
             int c = ch(position);
             while (c != 0) {
                 while (isWhiteSpace(c)) {
+                    if (c == 0x09 && firstTabInLine == -1) {
+                        firstTabInLine = position;
+                    }
                     c = ch(++position);
                 }
                 if (allowComments && c == '#') {
@@ -422,7 +607,7 @@ public final class JsYaml {
             return false;
         }
 
-        boolean readSingleQuotedScalar(int nodeIndent) {
+        boolean readSingleQuotedScalar() {
             int c = ch(position);
             if (c != '\'') {
                 return false;
@@ -457,7 +642,7 @@ public final class JsYaml {
             throw error("unexpected end of the stream within a single quoted scalar");
         }
 
-        boolean readDoubleQuotedScalar(int nodeIndent) {
+        boolean readDoubleQuotedScalar() {
             int c = ch(position);
             if (c != '"') {
                 return false;
@@ -517,6 +702,7 @@ public final class JsYaml {
             boolean readNext = true;
             String savedTag = tag;
             String savedAnchor = anchor;
+            Set<String> overridableKeys = new HashSet<>();
             int c = ch(position);
             int terminator;
             boolean isMapping;
@@ -528,7 +714,7 @@ public final class JsYaml {
             } else if (c == '{') {
                 terminator = '}';
                 isMapping = true;
-                collection = options.objects.get();
+                collection = options.getObjects().get();
             } else {
                 return false;
             }
@@ -548,7 +734,10 @@ public final class JsYaml {
                     return true;
                 } else if (!readNext) {
                     throw error("missed comma between flow collection entries");
+                } else if (v4 && c == ',') {
+                    throw error("expected the node content, but found ','");
                 }
+                String keyTag;
                 Object keyNode;
                 Object valueNode = null;
                 boolean isPair = false;
@@ -561,7 +750,10 @@ public final class JsYaml {
                     }
                 }
                 int savedLine = line;
+                int savedLineStart = lineStart;
+                int savedPos = position;
                 composeNode(nodeIndent, CONTEXT_FLOW_IN, false, true);
+                keyTag = tag;
                 keyNode = result;
                 skipSeparationSpace(true);
                 c = ch(position);
@@ -573,9 +765,11 @@ public final class JsYaml {
                     valueNode = result;
                 }
                 if (isMapping) {
-                    storeMappingPair((Map<String, @Nullable Object>) collection, keyNode, valueNode);
+                    storeMappingPair((Map<String, @Nullable Object>) collection, overridableKeys, keyTag, keyNode,
+                            valueNode, savedLine, savedLineStart, savedPos);
                 } else if (isPair) {
-                    ((List<@Nullable Object>) collection).add(storeMappingPair(null, keyNode, valueNode));
+                    ((List<@Nullable Object>) collection).add(storeMappingPair(null, overridableKeys, keyTag, keyNode,
+                            valueNode, savedLine, savedLineStart, savedPos));
                 } else {
                     ((List<@Nullable Object>) collection).add(keyNode);
                 }
@@ -698,20 +892,29 @@ public final class JsYaml {
             String savedAnchor = anchor;
             List<@Nullable Object> sequence = new ArrayList<>();
             boolean detected = false;
+            if (v4 && firstTabInLine != -1) {
+                return false;
+            }
             if (anchor != null) {
                 putAnchor(anchor, sequence);
             }
             int c = ch(position);
             while (c != 0) {
+                if (v4 && firstTabInLine != -1) {
+                    position = firstTabInLine;
+                    throw error("tab characters must not be used in indentation");
+                }
                 if (c != '-' || !isWsOrEol(ch(position + 1))) {
                     break;
                 }
                 detected = true;
                 position++;
-                if (skipSeparationSpace(true) != 0 && lineIndent <= nodeIndent) {
-                    sequence.add(null);
-                    c = ch(position);
-                    continue;
+                if (skipSeparationSpace(true) != 0) {
+                    if (lineIndent <= nodeIndent) {
+                        sequence.add(null);
+                        c = ch(position);
+                        continue;
+                    }
                 }
                 int savedLine = line;
                 composeNode(nodeIndent, CONTEXT_BLOCK_IN, false, true);
@@ -737,23 +940,37 @@ public final class JsYaml {
         boolean readBlockMapping(int nodeIndent, int flowIndent) {
             String savedTag = tag;
             String savedAnchor = anchor;
-            Map<String, @Nullable Object> mapping = options.objects.get();
+            Map<String, @Nullable Object> mapping = options.getObjects().get();
+            Set<String> overridableKeys = new HashSet<>();
+            String keyTag = null;
             Object keyNode = null;
             Object valueNode = null;
             boolean atExplicitKey = false;
             boolean detected = false;
             boolean allowCompact = false;
+            int keyLine = 0;
+            int keyLineStart = 0;
+            int keyPos = 0;
+            if (v4 && firstTabInLine != -1) {
+                return false;
+            }
             if (anchor != null) {
                 putAnchor(anchor, mapping);
             }
             int c = ch(position);
             while (c != 0) {
+                if (v4 && !atExplicitKey && firstTabInLine != -1) {
+                    position = firstTabInLine;
+                    throw error("tab characters must not be used in indentation");
+                }
                 int following = ch(position + 1);
                 int savedLine = line;
                 if ((c == '?' || c == ':') && isWsOrEol(following)) {
                     if (c == '?') {
                         if (atExplicitKey) {
-                            storeMappingPair(mapping, keyNode, null);
+                            storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine, keyLineStart,
+                                    keyPos);
+                            keyTag = null;
                             keyNode = valueNode = null;
                         }
                         detected = true;
@@ -768,7 +985,13 @@ public final class JsYaml {
                     }
                     position += 1;
                     c = following;
-                } else if (composeNode(flowIndent, CONTEXT_FLOW_OUT, false, true)) {
+                } else {
+                    keyLine = line;
+                    keyLineStart = lineStart;
+                    keyPos = position;
+                    if (!composeNode(flowIndent, CONTEXT_FLOW_OUT, false, true)) {
+                        break;
+                    }
                     if (line == savedLine) {
                         c = ch(position);
                         while (isWhiteSpace(c)) {
@@ -781,12 +1004,15 @@ public final class JsYaml {
                                             "within a block mapping");
                             }
                             if (atExplicitKey) {
-                                storeMappingPair(mapping, keyNode, null);
-                                valueNode = null;
+                                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine,
+                                        keyLineStart, keyPos);
+                                keyTag = null;
+                                keyNode = valueNode = null;
                             }
                             detected = true;
                             atExplicitKey = false;
                             allowCompact = false;
+                            keyTag = tag;
                             keyNode = result;
                         } else if (detected) {
                             throw error("can not read an implicit mapping pair; a colon is missed");
@@ -802,11 +1028,13 @@ public final class JsYaml {
                         anchor = savedAnchor;
                         return true;
                     }
-                } else {
-                    break;
                 }
-
                 if (line == savedLine || lineIndent > nodeIndent) {
+                    if (atExplicitKey) {
+                        keyLine = line;
+                        keyLineStart = lineStart;
+                        keyPos = position;
+                    }
                     if (composeNode(nodeIndent, CONTEXT_BLOCK_OUT, true, allowCompact)) {
                         if (atExplicitKey) {
                             keyNode = result;
@@ -815,20 +1043,22 @@ public final class JsYaml {
                         }
                     }
                     if (!atExplicitKey) {
-                        storeMappingPair(mapping, keyNode, valueNode);
+                        storeMappingPair(mapping, overridableKeys, keyTag, keyNode, valueNode, keyLine, keyLineStart,
+                                keyPos);
+                        keyTag = null;
                         keyNode = valueNode = null;
                     }
                     skipSeparationSpace(true);
                     c = ch(position);
                 }
-                if (lineIndent > nodeIndent && c != 0) {
+                if ((v4 && line == savedLine || lineIndent > nodeIndent) && c != 0) {
                     throw error("bad indentation of a mapping entry");
                 } else if (lineIndent < nodeIndent) {
                     break;
                 }
             }
             if (atExplicitKey) {
-                storeMappingPair(mapping, keyNode, null);
+                storeMappingPair(mapping, overridableKeys, keyTag, keyNode, null, keyLine, keyLineStart, keyPos);
             }
             if (detected) {
                 tag = savedTag;
@@ -899,6 +1129,13 @@ public final class JsYaml {
             if (!tagName.isEmpty() && !isTagUri(tagName)) {
                 throw error("tag name cannot contain such characters: " + tagName);
             }
+            if (v4) {
+                try {
+                    tagName = UriComponent.decodeURIComponent(tagName);
+                } catch (IllegalArgumentException e) {
+                    throw error("tag name is malformed: " + tagName);
+                }
+            }
             if (isVerbatim) {
                 tag = tagName;
             } else if (tagMap.containsKey(tagHandle)) {
@@ -948,7 +1185,7 @@ public final class JsYaml {
             }
             String alias = input.substring(start, position);
             // 3.13.1's alias test calls anchorMap.hasOwnProperty, which an anchor of that name shadows
-            if (options.release == Release.V3_13_1 && anchorMap.containsKey("hasOwnProperty")) {
+            if (options.getRelease() == Release.V3_13_1 && anchorMap.containsKey("hasOwnProperty")) {
                 throw new TypeError("state.anchorMap.hasOwnProperty is not a function");
             }
             if (!anchorMap.containsKey(alias)) {
@@ -999,7 +1236,7 @@ public final class JsYaml {
                         hasContent = true;
                     } else {
                         if ((allowBlockScalars && readBlockScalar(flowIndent)) ||
-                            readSingleQuotedScalar(flowIndent) || readDoubleQuotedScalar(flowIndent)) {
+                            readSingleQuotedScalar() || readDoubleQuotedScalar()) {
                             hasContent = true;
                         } else if (readAlias()) {
                             hasContent = true;
@@ -1020,25 +1257,41 @@ public final class JsYaml {
                     hasContent = allowBlockCollections && readBlockSequence(blockIndent);
                 }
             }
-            // FAILSAFE_SCHEMA has no implicit types, so `?` resolves nothing
-            if (options.release != Release.V3_13_1 && "?".equals(tag) && result != null && !"scalar".equals(kind)) {
-                throw error("unacceptable node kind for !<?> tag; it should be \"scalar\", not \"" + kind + "\"");
-            }
-            if (tag != null && !"!".equals(tag) && !"?".equals(tag)) {
-                String typeKind = TYPE_KINDS.get(tag);
-                if (typeKind == null || (kind != null && !typeKind.equals(kind))) {
+            if (tag == null) {
+                if (v4 && anchor != null) {
+                    putAnchor(anchor, result);
+                }
+            } else if ("?".equals(tag)) {
+                if (options.getRelease() != Release.V3_13_1 && result != null && !"scalar".equals(kind)) {
+                    throw error("unacceptable node kind for !<?> tag; it should be \"scalar\", not \"" + kind + "\"");
+                }
+                for (String type : v4 ? IMPLICIT : Collections.<String>emptyList()) {
+                    if (resolve(type, result)) {
+                        result = construct(type, result);
+                        tag = type;
+                        if (anchor != null) {
+                            putAnchor(anchor, result);
+                        }
+                        break;
+                    }
+                }
+            } else if (!"!".equals(tag)) {
+                String typeKind = (v4 ? TYPE_MAP : FAILSAFE_TYPE_MAP).get(kind == null ? "fallback" : kind).get(tag);
+                if (typeKind == null) {
                     throw error("unknown tag !<" + tag + ">");
                 }
                 if (result != null && !typeKind.equals(kind)) {
                     throw error("unacceptable node kind for !<" + tag + "> tag; it should be \"" + typeKind +
                                 "\", not \"" + kind + "\"");
                 }
-                if (result == null) {
-                    result = "scalar".equals(typeKind) ? "" : "sequence".equals(typeKind) ?
-                            new ArrayList<>() : options.objects.get();
-                }
-                if (anchor != null) {
-                    putAnchor(anchor, result);
+                if (!resolve(tag, result)) {
+                    throw error("cannot resolve a node with !<" + tag + "> explicit tag");
+                } else {
+                    result = result == null && TAG_MAP.equals(tag) ? options.getObjects().get() :
+                            construct(tag, result);
+                    if (anchor != null) {
+                        putAnchor(anchor, result);
+                    }
                 }
             }
             return tag != null || anchor != null || hasContent;
@@ -1089,7 +1342,6 @@ public final class JsYaml {
                 if (c != 0) {
                     readLineBreak();
                 }
-                // any other directive is only a warning
                 if ("YAML".equals(directiveName)) {
                     yamlDirective(directiveArgs);
                 } else if ("TAG".equals(directiveName)) {
@@ -1117,6 +1369,431 @@ public final class JsYaml {
                 throw error("end of the stream or a document separator is expected");
             }
         }
+    }
+
+    /**
+     * The {@code resolve} of a {@code DEFAULT_SCHEMA} type.
+     */
+    @SuppressWarnings("unchecked")
+    static boolean resolve(String tag, @Nullable Object data) {
+        switch (tag) {
+            case TAG_NULL:
+                return data == null || "~".equals(data) || "null".equals(data) || "Null".equals(data) ||
+                       "NULL".equals(data);
+            case TAG_BOOL:
+                return data != null && ("true".equals(data) || "True".equals(data) || "TRUE".equals(data) ||
+                                        "false".equals(data) || "False".equals(data) || "FALSE".equals(data));
+            case TAG_INT:
+                return data != null && resolveInteger((String) data);
+            case TAG_FLOAT:
+                if (data == null) {
+                    return false;
+                }
+                String s = (String) data;
+                return YAML_FLOAT_PATTERN.matcher(s).find() && s.charAt(s.length() - 1) != '_';
+            case TAG_TIMESTAMP:
+                return data != null && (YAML_DATE_REGEXP.matcher((String) data).find() ||
+                                        YAML_TIMESTAMP_REGEXP.matcher((String) data).find());
+            case TAG_MERGE:
+                return data == null || "<<".equals(data);
+            case TAG_BINARY:
+                return data != null && resolveBinary((String) data);
+            case TAG_OMAP:
+                return data == null || resolveOmap((List<Object>) data);
+            case TAG_PAIRS:
+                if (data == null) {
+                    return true;
+                }
+                for (Object pair : (List<Object>) data) {
+                    if (!(pair instanceof Map) || ((Map<String, Object>) pair).size() != 1) {
+                        return false;
+                    }
+                }
+                return true;
+            case TAG_SET:
+                if (data == null) {
+                    return true;
+                }
+                for (Object value : ((Map<String, Object>) data).values()) {
+                    if (value != null) {
+                        return false;
+                    }
+                }
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    /**
+     * The {@code construct} of a {@code DEFAULT_SCHEMA} type.
+     */
+    @SuppressWarnings("unchecked")
+    static @Nullable Object construct(String tag, @Nullable Object data) {
+        switch (tag) {
+            case TAG_STR:
+                return data != null ? data : "";
+            case TAG_SEQ:
+            case TAG_OMAP:
+                return data != null ? data : new ArrayList<>();
+            case TAG_MAP:
+            case TAG_SET:
+                return data != null ? data : new LinkedHashMap<>();
+            case TAG_NULL:
+                return null;
+            case TAG_BOOL:
+                return "true".equals(data) || "True".equals(data) || "TRUE".equals(data);
+            case TAG_INT:
+                return constructInteger((String) data);
+            case TAG_FLOAT:
+                return constructFloat((String) data);
+            case TAG_TIMESTAMP:
+                return constructTimestamp((String) data);
+            case TAG_BINARY:
+                return constructBinary((String) data);
+            case TAG_PAIRS: {
+                List<Object> result = new ArrayList<>();
+                if (data == null) {
+                    return result;
+                }
+                for (Object pair : (List<Object>) data) {
+                    Map<String, Object> object = (Map<String, Object>) pair;
+                    String key = EcmaScript.keys(object).get(0);
+                    List<Object> entry = new ArrayList<>();
+                    entry.add(key);
+                    entry.add(object.get(key));
+                    result.add(entry);
+                }
+                return result;
+            }
+            default:
+                return data;
+        }
+    }
+
+    private static boolean resolveInteger(String data) {
+        int max = data.length();
+        int index = 0;
+        boolean hasDigits = false;
+        if (max == 0) {
+            return false;
+        }
+        char ch = data.charAt(index);
+        if (ch == '-' || ch == '+') {
+            ch = ++index < max ? data.charAt(index) : 0;
+        }
+        if (ch == '0') {
+            if (index + 1 == max) {
+                return true;
+            }
+            ch = data.charAt(++index);
+            if (ch == 'b' || ch == 'x' || ch == 'o') {
+                char base = ch;
+                index++;
+                for (; index < max; index++) {
+                    ch = data.charAt(index);
+                    if (ch == '_') {
+                        continue;
+                    }
+                    boolean digit = base == 'b' ? ch == '0' || ch == '1' :
+                            base == 'o' ? '0' <= ch && ch <= '7' :
+                                    ('0' <= ch && ch <= '9') || ('A' <= ch && ch <= 'F') || ('a' <= ch && ch <= 'f');
+                    if (!digit) {
+                        return false;
+                    }
+                    hasDigits = true;
+                }
+                return hasDigits && ch != '_';
+            }
+        }
+        if (ch == '_') {
+            return false;
+        }
+        for (; index < max; index++) {
+            ch = data.charAt(index);
+            if (ch == '_') {
+                continue;
+            }
+            if (ch < '0' || ch > '9') {
+                return false;
+            }
+            hasDigits = true;
+        }
+        return hasDigits && ch != '_';
+    }
+
+    private static double constructInteger(String data) {
+        String value = data.replace("_", "");
+        double sign = 1;
+        char ch = value.charAt(0);
+        if (ch == '-' || ch == '+') {
+            if (ch == '-') {
+                sign = -1;
+            }
+            value = value.substring(1);
+            ch = value.charAt(0);
+        }
+        if ("0".equals(value)) {
+            return 0;
+        }
+        if (ch == '0') {
+            if (value.charAt(1) == 'b') {
+                return sign * parseInt(value.substring(2), 2);
+            }
+            if (value.charAt(1) == 'x') {
+                return sign * parseInt(value.substring(2), 16);
+            }
+            if (value.charAt(1) == 'o') {
+                return sign * parseInt(value.substring(2), 8);
+            }
+        }
+        return sign * parseInt(value, 10);
+    }
+
+    // parseInt over digits the resolver already checked, as JavaScript sums them in doubles
+    private static double parseInt(String digits, int radix) {
+        if (radix == 10) {
+            return Double.parseDouble(digits);
+        }
+        BigInteger value = new BigInteger(digits, radix);
+        return value.doubleValue();
+    }
+
+    private static double constructFloat(String data) {
+        String value = data.replace("_", "").toLowerCase();
+        double sign = value.charAt(0) == '-' ? -1 : 1;
+        if ("+-".indexOf(value.charAt(0)) >= 0) {
+            value = value.substring(1);
+        }
+        if (".inf".equals(value)) {
+            return sign == 1 ? Double.POSITIVE_INFINITY : Double.NEGATIVE_INFINITY;
+        } else if (".nan".equals(value)) {
+            return Double.NaN;
+        }
+        return sign * Double.parseDouble(value.startsWith(".") ? "0" + value : value);
+    }
+
+    private static Timestamp constructTimestamp(String data) {
+        Matcher match = YAML_DATE_REGEXP.matcher(data);
+        if (!match.find()) {
+            match = YAML_TIMESTAMP_REGEXP.matcher(data);
+            if (!match.find()) {
+                throw new IllegalStateException("Date resolve error");
+            }
+        }
+        double year = Integer.parseInt(match.group(1));
+        double month = Integer.parseInt(match.group(2)) - 1;
+        double day = Integer.parseInt(match.group(3));
+        if (match.groupCount() < 4 || match.group(4) == null) {
+            return new Timestamp(dateUtc(year, month, day, 0, 0, 0, 0));
+        }
+        double hour = Integer.parseInt(match.group(4));
+        double minute = Integer.parseInt(match.group(5));
+        double second = Integer.parseInt(match.group(6));
+        double fraction = 0;
+        if (match.group(7) != null && !match.group(7).isEmpty()) {
+            StringBuilder f = new StringBuilder(match.group(7).length() > 3 ? match.group(7).substring(0, 3) :
+                    match.group(7));
+            while (f.length() < 3) {
+                f.append('0');
+            }
+            fraction = Integer.parseInt(f.toString());
+        }
+        double delta = 0;
+        if (match.group(9) != null) {
+            double tzHour = Integer.parseInt(match.group(10));
+            double tzMinute = match.group(11) == null ? 0 : Integer.parseInt(match.group(11));
+            delta = (tzHour * 60 + tzMinute) * 60000;
+            if ("-".equals(match.group(9))) {
+                delta = -delta;
+            }
+        }
+        double time = dateUtc(year, month, day, hour, minute, second, fraction);
+        if (delta != 0) {
+            time = timeClip(time - delta);
+        }
+        return new Timestamp(time);
+    }
+
+    // Date.UTC: a year from 0 to 99 is 1900 plus it
+    private static double dateUtc(double year, double month, double day, double hour, double minute, double second,
+                                  double ms) {
+        double y = 0 <= year && year <= 99 ? 1900 + year : year;
+        double ym = y + Math.floor(month / 12);
+        double mn = ((month % 12) + 12) % 12;
+        double days = LocalDate.of((int) ym, (int) mn + 1, 1).toEpochDay() + day - 1;
+        double time = hour * 3600000 + minute * 60000 + second * 1000 + ms;
+        return timeClip(days * 86400000 + time);
+    }
+
+    private static double timeClip(double time) {
+        return Math.abs(time) > 8.64e15 ? Double.NaN : time;
+    }
+
+    private static boolean resolveBinary(String data) {
+        int bitlen = 0;
+        for (int idx = 0; idx < data.length(); idx++) {
+            int code = BASE64_MAP.indexOf(data.charAt(idx));
+            if (code > 64) {
+                continue;
+            }
+            if (code < 0) {
+                return false;
+            }
+            bitlen += 6;
+        }
+        return bitlen % 8 == 0;
+    }
+
+    private static byte[] constructBinary(String data) {
+        String input = data.replaceAll("[\\r\\n=]", "");
+        int max = input.length();
+        int bits = 0;
+        List<Integer> result = new ArrayList<>();
+        for (int idx = 0; idx < max; idx++) {
+            if (idx % 4 == 0 && idx != 0) {
+                result.add((bits >> 16) & 0xFF);
+                result.add((bits >> 8) & 0xFF);
+                result.add(bits & 0xFF);
+            }
+            bits = (bits << 6) | BASE64_MAP.indexOf(input.charAt(idx));
+        }
+        int tailbits = (max % 4) * 6;
+        if (tailbits == 0) {
+            result.add((bits >> 16) & 0xFF);
+            result.add((bits >> 8) & 0xFF);
+            result.add(bits & 0xFF);
+        } else if (tailbits == 18) {
+            result.add((bits >> 10) & 0xFF);
+            result.add((bits >> 2) & 0xFF);
+        } else if (tailbits == 12) {
+            result.add((bits >> 4) & 0xFF);
+        }
+        byte[] bytes = new byte[result.size()];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) (int) result.get(i);
+        }
+        return bytes;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean resolveOmap(List<Object> data) {
+        List<String> objectKeys = new ArrayList<>();
+        for (Object pair : data) {
+            if (!(pair instanceof Map)) {
+                return false;
+            }
+            Map<String, Object> object = (Map<String, Object>) pair;
+            if (object.size() != 1) {
+                return false;
+            }
+            String pairKey = EcmaScript.keys(object).get(0);
+            if (objectKeys.contains(pairKey)) {
+                return false;
+            }
+            objectKeys.add(pairKey);
+        }
+        return true;
+    }
+
+    // snippet.js makeSnippet with its defaults
+    private static @Nullable String makeSnippet(String buffer, int position, int markLine) {
+        int maxLength = 79;
+        int indent = 1;
+        int linesBefore = 3;
+        int linesAfter = 2;
+        Matcher re = Pattern.compile("\\r?\\n|\\r|\\x00").matcher(buffer);
+        List<Integer> lineStarts = new ArrayList<>();
+        List<Integer> lineEnds = new ArrayList<>();
+        lineStarts.add(0);
+        int foundLineNo = -1;
+        while (re.find()) {
+            lineEnds.add(re.start());
+            lineStarts.add(re.end());
+            if (position <= re.start() && foundLineNo < 0) {
+                foundLineNo = lineStarts.size() - 2;
+            }
+        }
+        if (foundLineNo < 0) {
+            foundLineNo = lineStarts.size() - 1;
+        }
+        if (buffer.isEmpty()) {
+            return null;
+        }
+        StringBuilder result = new StringBuilder();
+        int lineNoLength = String.valueOf(Math.min(markLine + linesAfter, lineEnds.size())).length();
+        int maxLineLength = maxLength - (indent + lineNoLength + 3);
+        for (int i = 1; i <= linesBefore; i++) {
+            if (foundLineNo - i < 0) {
+                break;
+            }
+            String[] line = getLine(buffer, lineStarts.get(foundLineNo - i), lineEnds.get(foundLineNo - i),
+                    position - (lineStarts.get(foundLineNo) - lineStarts.get(foundLineNo - i)), maxLineLength);
+            result.insert(0, repeat(" ", indent) + padStart(String.valueOf(markLine - i + 1), lineNoLength) +
+                             " | " + line[0] + "\n");
+        }
+        String[] line = getLine(buffer, lineStarts.get(foundLineNo),
+                foundLineNo < lineEnds.size() ? lineEnds.get(foundLineNo) : buffer.length(), position, maxLineLength);
+        result.append(repeat(" ", indent)).append(padStart(String.valueOf(markLine + 1), lineNoLength))
+                .append(" | ").append(line[0]).append('\n');
+        result.append(repeat("-", indent + lineNoLength + 3 + Integer.parseInt(line[1]))).append("^\n");
+        for (int i = 1; i <= linesAfter; i++) {
+            if (foundLineNo + i >= lineEnds.size()) {
+                break;
+            }
+            String[] after = getLine(buffer, lineStarts.get(foundLineNo + i), lineEnds.get(foundLineNo + i),
+                    position - (lineStarts.get(foundLineNo) - lineStarts.get(foundLineNo + i)), maxLineLength);
+            result.append(repeat(" ", indent)).append(padStart(String.valueOf(markLine + i + 1), lineNoLength))
+                    .append(" | ").append(after[0]).append('\n');
+        }
+        String out = result.toString();
+        return out.endsWith("\n") ? out.substring(0, out.length() - 1) : out;
+    }
+
+    private static String[] getLine(String buffer, int lineStart, int lineEnd, int position, int maxLineLength) {
+        String head = "";
+        String tail = "";
+        int maxHalfLength = (int) Math.floor(maxLineLength / 2.0) - 1;
+        if (position - lineStart > maxHalfLength) {
+            head = " ... ";
+            lineStart = position - maxHalfLength + head.length();
+        }
+        if (lineEnd - position > maxHalfLength) {
+            tail = " ...";
+            lineEnd = position + maxHalfLength - tail.length();
+        }
+        String str = head + slice(buffer, lineStart, lineEnd).replace('\t', '→') + tail;
+        return new String[]{str, String.valueOf(position - lineStart + head.length())};
+    }
+
+    // String.prototype.slice over clamped bounds
+    private static String slice(String s, int start, int end) {
+        int from = Math.max(0, Math.min(start, s.length()));
+        int to = Math.max(0, Math.min(end, s.length()));
+        return from < to ? s.substring(from, to) : "";
+    }
+
+    private static String padStart(String s, int max) {
+        return repeat(" ", max - s.length()) + s;
+    }
+
+    // String(key), which for a Date follows the host's time zone
+    private static String string(@Nullable Object value) {
+        if (holdsDate(value)) {
+            throw new CannotKnow("the text of a date (Date.prototype.toString follows the host's time zone)");
+        }
+        return EcmaScript.string(value);
+    }
+
+    private static boolean holdsDate(@Nullable Object value) {
+        if (value instanceof List) {
+            for (Object item : (List<?>) value) {
+                if (holdsDate(item)) {
+                    return true;
+                }
+            }
+        }
+        return value instanceof Timestamp;
     }
 
     private static boolean isEol(int c) {
@@ -1151,7 +1828,6 @@ public final class JsYaml {
         return '0' <= c && c <= '9' ? c - '0' : -1;
     }
 
-    // String.fromCharCode, each code unit taken modulo 2^16
     private static String charFromCodepoint(int c) {
         if (c <= 0xFFFF) {
             return String.valueOf((char) c);
@@ -1160,7 +1836,7 @@ public final class JsYaml {
                 (char) (((c - 0x010000) & 0x03FF) + 0xDC00)});
     }
 
-    private static String repeat(String s, int count) {
+    static String repeat(String s, int count) {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < count; i++) {
             out.append(s);
@@ -1168,7 +1844,6 @@ public final class JsYaml {
         return out.toString();
     }
 
-    // PATTERN_NON_PRINTABLE, over UTF-16 code units as JavaScript's regex reads them
     private static boolean isNonPrintable(String s) {
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
@@ -1182,7 +1857,6 @@ public final class JsYaml {
         return false;
     }
 
-    // PATTERN_TAG_URI, case-insensitively and by UTF-16 code unit
     private static boolean isTagUri(String s) {
         if (s.isEmpty() || ",[]{}".indexOf(s.charAt(0)) >= 0) {
             return false;
