@@ -15,15 +15,21 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.bun.BunOptions;
+import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
 import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
 import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
@@ -118,5 +124,44 @@ class BunInputsTest {
 
         assertThat(inputs.getNpmrc()).contains("registry=https://project.example/");
         assertThat(inputs.getBunfig()).isNull();
+    }
+
+    // bun 1.3.10 run in repo/mid/app under a repo/.npmrc naming a mirror asks npmjs, or the registry its user .npmrc
+    // or its own bunfig.toml names: the marker's project npmrc is that root's file, which bun does not read there
+    @Test
+    void aNestedProjectsUserNpmrcIsTheMarkersUserNpmrcNotTheRootsProjectNpmrc(@TempDir Path home) {
+        Npmrc root = new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://registry.npmmirror.com/"));
+        Npmrc user = new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.yarnpkg.com/"));
+        String bunfig = "[install]\nregistry = \"https://registry.yarnpkg.com/\"\n";
+
+        assertThat(userRegistry(home, "mid/app", null, root)).isEqualTo("https://registry.npmjs.org/");
+        assertThat(userRegistry(home, "mid/app", null, root, user)).isEqualTo("https://registry.yarnpkg.com/");
+        assertThat(userRegistry(home, "mid/app", bunfig, root)).isEqualTo("https://registry.yarnpkg.com/");
+    }
+
+    // bun 1.3.10 reads neither NPM_CONFIG_GLOBALCONFIG nor $PREFIX/etc/npmrc naming yarnpkg: it asks npmjs, writes ""
+    @Test
+    void theMarkersGlobalNpmrcIsNoConfigOfBuns(@TempDir Path home) {
+        Npmrc global = new Npmrc(NpmrcScope.Global, singletonMap("registry", "https://registry.yarnpkg.com/"));
+
+        assertThat(userRegistry(home, "", null, global)).isEqualTo("https://registry.npmjs.org/");
+        assertThat(userRegistry(home, "mid/app", null, global)).isEqualTo("https://registry.npmjs.org/");
+    }
+
+    private static String userRegistry(Path home, String dir, @Nullable String bunfig, Npmrc... marker) {
+        Request.RequestBuilder request = Request.builder()
+          .packageJson("{\"name\":\"app\"}")
+          .lock("{}")
+          .packageJsonPath(Paths.get(dir, "package.json"))
+          .marker(nodeResolutionResult(PackageManager.Bun).withNpmrcConfigs(Arrays.asList(marker)));
+        if (bunfig != null) {
+            request.packageManagerFile(Paths.get(dir, "bunfig.toml"), bunfig);
+        }
+        Request built = request.build();
+        NodeRegistries user = BunInputs.userConfig(new InMemoryExecutionContext(), built.getMarker(),
+          HostRegistries.environment(home));
+        Inputs inputs = BunInputs.from(LockDirectory.of(built), user, Host.UNKNOWN, Instant.EPOCH);
+        return BunOptions.load(inputs.getBunfig(), inputs.getUserConfig(), inputs.getNpmrc(), HostEnvironment.UNKNOWN)
+          .getRegistry();
     }
 }

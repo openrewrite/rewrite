@@ -16,11 +16,16 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.npm.Shrinkwrap;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
 import java.util.Arrays;
@@ -28,6 +33,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * The npm regenerator's inputs: the host's registries as the user's config, the lock's directory's own .npmrc and the
@@ -48,6 +55,16 @@ final class NpmInputs {
 
     static boolean writesBesideLock(String fileName) {
         return Shrinkwrap.writesBesideLock(fileName::equals);
+    }
+
+    /**
+     * The host's registries as npm's user-level config: the view's, else the marker's global and user npmrc; its
+     * project npmrc (the repository root's) npm reads only as {@link #from}'s .npmrc where it installs there.
+     */
+    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
+        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .filter(npmrc -> npmrc.getScope() != NpmrcScope.Project).collect(toList())), env);
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {

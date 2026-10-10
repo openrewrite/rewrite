@@ -17,18 +17,26 @@ package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Kind;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Result;
 import org.openrewrite.javascript.NodeRegistry;
+import org.openrewrite.javascript.internal.lock.npm.HostRegistries;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.npm.NpmLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.lock.npm.NpmOptions;
 import org.openrewrite.javascript.internal.lock.npm.PackumentSource;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.marker.NodeResolutionResult.Npmrc;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
+import org.openrewrite.javascript.marker.NodeResolutionResult.PackageManager;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
@@ -36,8 +44,10 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 
+import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.entry;
+import static org.openrewrite.javascript.Assertions.nodeResolutionResult;
 
 class NpmInputsTest {
 
@@ -237,6 +247,39 @@ class NpmInputsTest {
         Inputs inputs = NpmInputs.from(LockDirectory.of(member().build()), registries, Host.UNKNOWN, Instant.EPOCH);
 
         assertThat(inputs.getUserConfig()).isSameAs(registries);
+    }
+
+    // npm 11.17.0 run in repo/mid/app under a repo/.npmrc naming a mirror asks npmjs, or the registry its user config
+    // names: the marker's project npmrc is that root's file, which npm does not read there
+    @Test
+    void aNestedProjectsUserConfigIsTheMarkersUserNpmrcNotTheRootsProjectNpmrc(@TempDir Path home) {
+        Npmrc root = new Npmrc(NpmrcScope.Project, singletonMap("registry", "https://registry.npmmirror.com/"));
+        Npmrc user = new Npmrc(NpmrcScope.User, singletonMap("registry", "https://registry.yarnpkg.com/"));
+
+        assertThat(userRegistry(home, "mid/app", root)).isEqualTo("https://registry.npmjs.org/");
+        assertThat(userRegistry(home, "mid/app", root, user)).isEqualTo("https://registry.yarnpkg.com/");
+    }
+
+    // npm 11.17.0 with an empty user config and NPM_CONFIG_GLOBALCONFIG naming yarnpkg asks yarnpkg
+    @Test
+    void theMarkersGlobalNpmrcIsNpmsUserLevelConfigToo(@TempDir Path home) {
+        Npmrc global = new Npmrc(NpmrcScope.Global, singletonMap("registry", "https://registry.yarnpkg.com/"));
+
+        assertThat(userRegistry(home, "", global)).isEqualTo("https://registry.yarnpkg.com/");
+        assertThat(userRegistry(home, "mid/app", global)).isEqualTo("https://registry.yarnpkg.com/");
+    }
+
+    private static String userRegistry(Path home, String dir, Npmrc... marker) {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"app\"}")
+          .lock(MEMBER_LOCK)
+          .packageJsonPath(Paths.get(dir, "package.json"))
+          .marker(nodeResolutionResult(PackageManager.Npm).withNpmrcConfigs(Arrays.asList(marker)))
+          .build();
+        NodeRegistries user = NpmInputs.userConfig(new InMemoryExecutionContext(), request.getMarker(),
+          HostRegistries.environment(home));
+        Inputs inputs = NpmInputs.from(LockDirectory.of(request), user, Host.UNKNOWN, Instant.EPOCH);
+        return NpmOptions.fromNpmrc(inputs.getUserConfig(), inputs.getNpmrc()).registryFor("is-number");
     }
 
     private static Request.RequestBuilder member() {

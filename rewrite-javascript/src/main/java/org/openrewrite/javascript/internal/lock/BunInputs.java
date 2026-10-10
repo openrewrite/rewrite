@@ -16,17 +16,24 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.jspecify.annotations.Nullable;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.javascript.internal.LockFileRegeneration.InstallRoot;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator;
 import org.openrewrite.javascript.internal.lock.bun.BunLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.bun.DotEnv;
 import org.openrewrite.javascript.internal.lock.bun.Lockfile;
+import org.openrewrite.javascript.internal.registry.Environment;
 import org.openrewrite.javascript.internal.registry.NodeRegistries;
+import org.openrewrite.javascript.internal.registry.RegistryDiscovery;
+import org.openrewrite.javascript.marker.NodeResolutionResult;
+import org.openrewrite.javascript.marker.NodeResolutionResult.NpmrcScope;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Predicate;
+
+import static java.util.stream.Collectors.toList;
 
 /**
  * The Bun regenerator's inputs: the host's registries as the user's .npmrc, the lock's directory's own .npmrc and
@@ -43,6 +50,16 @@ final class BunInputs {
 
     static boolean readsOnlyBesideLock(String fileName) {
         return ".npmrc".equals(fileName) || "bunfig.toml".equals(fileName) || DotEnv.FILES.contains(fileName);
+    }
+
+    /**
+     * The host's registries as bun's user .npmrc: the view's, else the marker's user npmrc. bun reads no global npmrc,
+     * and the marker's project npmrc (the repository root's) only as {@link #from}'s .npmrc where it installs there.
+     */
+    static NodeRegistries userConfig(ExecutionContext ctx, @Nullable NodeResolutionResult marker, Environment env) {
+        return RegistryDiscovery.discover(ctx, marker == null || marker.getNpmrcConfigs() == null ? marker :
+                marker.withNpmrcConfigs(marker.getNpmrcConfigs().stream()
+                        .filter(npmrc -> npmrc.getScope() == NpmrcScope.User).collect(toList())), env);
     }
 
     static Inputs from(LockDirectory dir, Host host, Instant now) {
