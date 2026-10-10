@@ -229,6 +229,17 @@ public final class Spec {
     }
 
     /**
+     * {@link #ofDependency}, which the recipes ask; null for a value npa rejects outright.
+     */
+    public static @Nullable Spec ofDependencyOrNull(String name, String value) {
+        try {
+            return ofDependency(name, value);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    /**
      * What a manifest's dependency value is: {@code npa.resolve(name, value)}, a pnpm, Yarn or Bun protocol, or a
      * protocol npa does not support; npa's {@link InvalidSpecException} for a value that is none of those.
      */
@@ -292,13 +303,6 @@ public final class Spec {
     public boolean isLocation() {
         return type == Type.GIT || type == Type.FILE || type == Type.DIRECTORY || type == Type.REMOTE ||
                type == Type.LINK || type == Type.PORTAL;
-    }
-
-    /**
-     * The text after {@code catalog:}, as written; null for any other kind.
-     */
-    public @Nullable String getCatalogName() {
-        return type == Type.CATALOG ? rawSpec.substring("catalog:".length()) : null;
     }
 
     private static Spec resolve(@Nullable String name, @Nullable String spec, @Nullable String where,

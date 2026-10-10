@@ -391,9 +391,6 @@ class SpecTest {
 
     @Test
     void catalogName() {
-        assertThat(Spec.ofDependency("ms", "catalog:").getCatalogName()).isEmpty();
-        assertThat(Spec.ofDependency("ms", "catalog: legacy ").getCatalogName()).isEqualTo(" legacy ");
-        assertThat(Spec.ofDependency("ms", "^1.0.0").getCatalogName()).isNull();
     }
 
     @Test

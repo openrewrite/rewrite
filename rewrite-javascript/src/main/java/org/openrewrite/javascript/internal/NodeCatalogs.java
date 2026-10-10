@@ -97,17 +97,6 @@ public abstract class NodeCatalogs {
         return null;
     }
 
-    /**
-     * What a declared dependency value is ({@link Spec#ofDependency}); null for one npa rejects outright.
-     */
-    public static @Nullable Spec classify(String name, String value) {
-        try {
-            return Spec.ofDependency(name, value);
-        } catch (IllegalArgumentException e) {
-            return null;
-        }
-    }
-
     public Path getPath() {
         return document.getSourcePath();
     }
@@ -167,7 +156,7 @@ public abstract class NodeCatalogs {
     }
 
     private static boolean isVersionSpec(String alias, String value) {
-        Spec spec = classify(alias, value);
+        Spec spec = Spec.ofDependencyOrNull(alias, value);
         return spec != null && spec.isVersionSpec();
     }
 

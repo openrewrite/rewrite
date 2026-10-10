@@ -181,7 +181,7 @@ public class UpgradeTransitiveDependencyVersion extends ScanningRecipe<NodeDepen
             for (Map.Entry<String, Map<String, String>> scope :
                     PackageJsonHelper.declaredDependencies(manifest).entrySet()) {
                 String value = scope.getValue().get(packageName);
-                Spec spec = value == null ? null : NodeCatalogs.classify(packageName, value);
+                Spec spec = value == null ? null : Spec.ofDependencyOrNull(packageName, value);
                 if (value != null && (spec == null || !spec.isVersionSpec())) {
                     rows.add(new NodeDependencyProtocolsSkipped.Row(root.toString(), project.toString(),
                             packageName, scope.getKey(), spec == null || spec.getProtocol() == null ? "" :

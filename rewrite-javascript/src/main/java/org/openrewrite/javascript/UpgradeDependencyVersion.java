@@ -118,7 +118,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<NodeDependencyEdits
                 if (!nameMatcher.test(name) || newVersion.equals(value)) {
                     continue;
                 }
-                Spec spec = NodeCatalogs.classify(name, value);
+                Spec spec = Spec.ofDependencyOrNull(name, value);
                 if (spec != null && spec.isVersionSpec()) {
                     matches.add(new MatchedDependency(name, scope.getKey(), value));
                 } else if (spec == null || spec.getType() != Spec.Type.CATALOG ||

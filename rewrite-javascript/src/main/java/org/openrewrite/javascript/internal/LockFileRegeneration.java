@@ -124,15 +124,9 @@ public final class LockFileRegeneration {
         @Nullable Path packageJsonPath;
         Map<Path, String> manifests;
         Map<Path, String> packageManagerFiles;
-
-        /**
-         * The files the edit changes or creates beside the manifest (pnpm-workspace.yaml, .yarnrc.yml, a workspace
-         * root's package.json), which {@link #manifests}, {@link #packageManagerFiles} and the paths hold as edited.
-         */
-        Map<Path, String> editedFiles;
-
         @Nullable Set<Path> projectPaths;
 
+        // editedFiles: the files the edit changes or creates beside the manifest, which the other fields then hold
         @Builder
         private Request(String packageJson, @Nullable String lock, @Nullable NodeResolutionResult marker,
                         @Nullable Path packageJsonPath, @Singular("manifest") Map<Path, String> manifests,
@@ -142,7 +136,6 @@ public final class LockFileRegeneration {
             this.lock = lock;
             this.marker = marker;
             this.packageJsonPath = packageJsonPath;
-            this.editedFiles = editedFiles;
             if (editedFiles.isEmpty()) {
                 this.manifests = manifests;
                 this.packageManagerFiles = packageManagerFiles;
@@ -202,24 +195,35 @@ public final class LockFileRegeneration {
         }
     }
 
+    /**
+     * The regenerated lock, or the failure that stands in its place.
+     */
     @Value
     public static class Result {
-        boolean success;
         @Nullable String lockFileContent;
-        @Nullable String errorMessage;
         @Nullable Failure failure;
 
         public static Result success(String lockFileContent) {
-            return new Result(true, lockFileContent, null, null);
+            return new Result(lockFileContent, null);
         }
 
         public static Result failure(Failure failure) {
+            return new Result(null, failure);
+        }
+
+        public boolean isSuccess() {
+            return failure == null;
+        }
+
+        public @Nullable String getErrorMessage() {
+            if (failure == null) {
+                return null;
+            }
             StringBuilder message = new StringBuilder(failure.getReason().toString());
             if (failure.getPackageName() != null) {
                 message.append(" [").append(failure.getPackageName()).append(']');
             }
-            message.append(": ").append(failure.getDetail());
-            return new Result(false, null, message.toString(), failure);
+            return message.append(": ").append(failure.getDetail()).toString();
         }
     }
 

@@ -15,15 +15,14 @@
  */
 package org.openrewrite.javascript.internal.lock;
 
+import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator;
 import org.openrewrite.javascript.internal.lock.pnpm.PnpmLockRegenerator.Inputs;
 import org.openrewrite.javascript.internal.lock.pnpm.WorkspaceRootFinder;
 
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -34,8 +33,7 @@ import java.util.Set;
 final class PnpmInputs {
 
     private static final String WORKSPACE_MANIFEST = "pnpm-workspace.yaml";
-    private static final List<String> NOT_READ = Arrays.asList(".env", ".env.local", ".env.production",
-            ".env.production.local", "bunfig.toml", ".yarnrc", ".yarnrc.yml");
+    private static final String LOCK = "pnpm-lock.yaml";
 
     private PnpmInputs() {
     }
@@ -56,7 +54,7 @@ final class PnpmInputs {
                 manifests.put("", file.getValue());
             } else if (path.endsWith("/package.json")) {
                 manifests.put(path.substring(0, path.length() - "/package.json".length()), file.getValue());
-            } else if (!NOT_READ.contains(name)) {
+            } else if (reads(name) || LOCK.equals(name) || PnpmLockRegenerator.OTHER_MANIFEST_NAMES.contains(name)) {
                 files.put(path, file.getValue());
             }
         }

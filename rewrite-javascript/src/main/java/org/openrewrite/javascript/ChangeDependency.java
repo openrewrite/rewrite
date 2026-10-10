@@ -112,7 +112,7 @@ public class ChangeDependency extends ScanningRecipe<NodeDependencyEdits> {
             if (value == null || scope != null && !scope.equals(declared.getKey())) {
                 continue;
             }
-            Spec spec = NodeCatalogs.classify(oldPackageName, value);
+            Spec spec = Spec.ofDependencyOrNull(oldPackageName, value);
             if (spec != null && (spec.isVersionSpec() || spec.isLocation() && newVersion != null)) {
                 keepValue.put(declared.getKey(), false);
             } else if (spec != null && spec.getType() == Spec.Type.CATALOG) {
