@@ -110,8 +110,9 @@ final class Main {
         String workspaceDir = WorkspaceRootFinder.findWorkspaceDir(inputs::holds, dir(), inputs.getEnv());
         if (workspaceDir != null && !workspaceDir.equals(WORKSPACE_DIR)) {
             // the inputs are rooted at the workspace found from the lock up; the environment names another directory
-            throw new CannotKnow("the config of the workspace in " + workspaceDir + ", which NPM_CONFIG_WORKSPACE_DIR " +
-                                 "names (the inputs are those of the workspace found from the lock up)");
+            throw new CannotKnow("the config of the workspace in " + workspaceDir + ", which " +
+                                 "NPM_CONFIG_WORKSPACE_DIR names (the inputs are those of the workspace found from " +
+                                 "the lock up)");
         }
         return getConfig(inputs, workspaceDir);
     }
