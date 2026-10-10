@@ -197,7 +197,7 @@ public final class Picomatch {
     /**
      * A regular expression literal of the ported module's source.
      */
-    static Pattern regExp(String source) {
+    public static Pattern regExp(String source) {
         String java = V8RegExp.toJava(source);
         if (java == null) {
             throw new IllegalArgumentException("V8 rejects /" + source + "/");

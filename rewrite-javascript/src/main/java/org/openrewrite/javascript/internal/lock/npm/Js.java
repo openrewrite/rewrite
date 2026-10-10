@@ -47,9 +47,6 @@ final class Js extends EcmaScript {
     };
 
     // the prototypes of V8 13.6, which Node 24 runs npm 11 on
-    private static final Set<String> OBJECT_MEMBERS = members(
-            "__defineGetter__ __defineSetter__ __lookupGetter__ __lookupSetter__ __proto__ constructor " +
-            "hasOwnProperty isPrototypeOf propertyIsEnumerable toLocaleString toString valueOf");
     private static final Set<String> ARRAY_MEMBERS = members(
             "at concat copyWithin entries every fill filter find findIndex findLast findLastIndex flat flatMap " +
             "forEach includes indexOf join keys lastIndexOf map pop push reduce reduceRight reverse shift slice " +
@@ -114,7 +111,7 @@ final class Js extends EcmaScript {
         } else if (receiver instanceof Number && NUMBER_MEMBERS.contains(key)) {
             return INHERITED;
         }
-        return OBJECT_MEMBERS.contains(key) ? INHERITED : UNDEFINED;
+        return objectPrototypeMember(key) != null ? INHERITED : UNDEFINED;
     }
 
     /**
