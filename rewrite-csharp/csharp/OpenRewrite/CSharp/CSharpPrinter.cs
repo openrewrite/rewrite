@@ -2988,16 +2988,7 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
             var paddedVar = varDecl.Variables[i];
             var namedVar = paddedVar.Element;
 
-            BeforeSyntax(namedVar, p);
-            Visit(namedVar.Name, p);
-
-            if (namedVar.Initializer != null)
-            {
-                VisitSpace(namedVar.Initializer.Before, p);
-                p.Append('=');
-                Visit(namedVar.Initializer.Element, p);
-            }
-            AfterSyntax(namedVar, p);
+            Visit(namedVar, p);
 
             if (i < varDecl.Variables.Count - 1)
             {
@@ -3005,6 +2996,22 @@ public class CSharpPrinter<P> : CSharpVisitor<PrintOutputCapture<P>>
                 p.Append(',');
             }
         }
+    }
+
+    public override J VisitNamedVariable(NamedVariable namedVar, PrintOutputCapture<P> p)
+    {
+        BeforeSyntax(namedVar, p);
+        Visit(namedVar.Name, p);
+
+        if (namedVar.Initializer != null)
+        {
+            VisitSpace(namedVar.Initializer.Before, p);
+            p.Append('=');
+            Visit(namedVar.Initializer.Element, p);
+        }
+
+        AfterSyntax(namedVar, p);
+        return namedVar;
     }
 
     public override J VisitPrimitive(Primitive primitive, PrintOutputCapture<P> p)
