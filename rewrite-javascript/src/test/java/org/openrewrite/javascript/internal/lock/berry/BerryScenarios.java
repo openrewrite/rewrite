@@ -203,7 +203,7 @@ final class BerryScenarios {
 
         /**
          * What Yarn had in a phase: the phase's manifests, {@code .yarnrc.yml} and patch files, the recorder's
-         * environment, the machine and the day.
+         * environment, the machine and the day, and after the edit the home's {@code user-yarnrc-yml}.
          */
         YarnBerryLockRegenerator.Inputs inputs(Phase phase, @Nullable String lock) {
             Map<String, String> configFiles = new LinkedHashMap<>();
@@ -232,10 +232,16 @@ final class BerryScenarios {
                 }
             }
             configFiles.putAll(Configuration.findRcFiles(runsIn, rcFiles));
+            Map<String, String> home = new LinkedHashMap<>();
+            String userYarnrc = file("user-yarnrc-yml");
+            if (phase == Phase.AFTER && userYarnrc != null) {
+                home.put(Configuration.DEFAULT_RC_FILENAME, userYarnrc);
+            }
             return YarnBerryLockRegenerator.Inputs.builder()
                     .lock(lock)
                     .manifests(manifests(phase))
                     .configFiles(configFiles)
+                    .homeFiles(home)
                     .runsIn(runsIn)
                     .files(patchFiles)
                     .paths(paths(phase, yarnrc != null))
@@ -388,7 +394,8 @@ final class BerryScenarios {
     }
 
     /**
-     * {@link Scenario#registry()}, with every route it was asked for and does not have.
+     * {@link Scenario#registry()} ({@code http-<mirror>/} for a mirror's urls), with every route it was asked for and
+     * does not have.
      */
     static final class ScenarioRegistry extends RecordedRegistry<Scenario> implements RegistrySource {
         private static final ObjectMapper JSON = new ObjectMapper();
@@ -399,19 +406,23 @@ final class BerryScenarios {
 
         @Override
         public @Nullable String packument(String registry, String name) {
-            byte[] body = scenario.httpBytes(name);
+            String mirror = mirror(registry, "npmjs", "yarnpkg");
+            byte[] body = http(mirror, name);
             if (body == null) {
-                notRecorded(name);
+                notRecorded(mirror == null ? name : mirror + "/" + name);
                 return null;
             }
-            String text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), false);
+            String text = withRecordedVersions(mirror, name, new String(body, StandardCharsets.UTF_8), false);
+            if (mirror != null) {
+                return text;
+            }
             byte[] cached = scenario.getHttpCache() == null ? null : scenario.cached(name);
             if (text == null && cached != null) {
-                text = withRecordedVersions(name, new String(cached, StandardCharsets.UTF_8), false);
+                text = withRecordedVersions(null, name, new String(cached, StandardCharsets.UTF_8), false);
             }
             if (text == null) {
                 notRecorded(name + "-<version> for the versions recorded empty");
-                text = withRecordedVersions(name, new String(body, StandardCharsets.UTF_8), true);
+                text = withRecordedVersions(null, name, new String(body, StandardCharsets.UTF_8), true);
             }
             String recorded = scenario.recordingRegistry();
             return recorded == null ? text : text.replace(NPM_REGISTRY, recorded + "/");
@@ -420,16 +431,29 @@ final class BerryScenarios {
         @Override
         public byte @Nullable [] tarball(String url, String name, String version) {
             String file = name + "-" + version + ".tgz";
-            byte[] tgz = scenario.httpBytes(file);
+            byte[] tgz = http(mirror(url, "npmjs", "yarnpkg"), file);
             if (tgz == null) {
                 notRecorded(file);
             }
             return tgz;
         }
 
+        private byte @Nullable [] http(@Nullable String mirror, String file) {
+            if (mirror == null) {
+                return scenario.httpBytes(file);
+            }
+            try {
+                Path path = scenario.getDir().resolve(mirror).resolve(file);
+                return Files.isRegularFile(path) ? Files.readAllBytes(path) : null;
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
+
         // the packument with each recorded version document in its entry; null when an entry is left empty unless
         // that is acceptable
-        private @Nullable String withRecordedVersions(String name, String body, boolean incomplete) {
+        private @Nullable String withRecordedVersions(@Nullable String mirror, String name, String body,
+                                                      boolean incomplete) {
             Object packument = Js.jsonParse(body);
             Object versions = Js.get(packument, "versions");
             if (!(versions instanceof Map)) {
@@ -439,7 +463,7 @@ final class BerryScenarios {
             int unrecorded = 0;
             @SuppressWarnings("unchecked") Map<String, Object> byVersion = (Map<String, Object>) versions;
             for (Map.Entry<String, Object> entry : byVersion.entrySet()) {
-                byte[] manifest = scenario.httpBytes(name + "-" + entry.getKey());
+                byte[] manifest = http(mirror, name + "-" + entry.getKey());
                 if (manifest != null) {
                     entry.setValue(Js.jsonParse(new String(manifest, StandardCharsets.UTF_8)));
                     filled = true;

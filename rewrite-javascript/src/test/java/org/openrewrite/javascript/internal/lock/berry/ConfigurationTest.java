@@ -245,6 +245,25 @@ class ConfigurationTest {
                 "npmScopes:\n  s:\n    npmRegistryServer: baz\n"))).isEqualTo("{s=false baz}");
     }
 
+    /**
+     * Configuration.find puts the home directory's rc file first, under every rc file of the project
+     * ({@code user-yarnrc-registry-bump}, {@code user-yarnrc-project-yarnrc-bump}).
+     */
+    @Test
+    void theHomeRcFileIsReadUnderTheProjects() {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("~/.yarnrc.yml", "npmRegistryServer: \"https://registry.npmmirror.com\"\n" +
+                                   "npmScopes:\n  types:\n    npmRegistryServer: \"https://registry.npmmirror.com\"\n");
+        files.put("../.yarnrc.yml", "npmScopes:\n  types:\n    npmAlwaysAuth: true\n");
+        Configuration home = Configuration.load(files, HostEnvironment.of(Collections.emptyMap()));
+        assertThat(home.getString("npmRegistryServer")).isEqualTo("https://registry.npmmirror.com");
+        assertThat(scopes(home)).isEqualTo("{types=true https://registry.npmmirror.com}");
+
+        files.put(".yarnrc.yml", "npmRegistryServer: \"https://registry.npmjs.org\"\n");
+        assertThat(Configuration.load(files, HostEnvironment.of(Collections.emptyMap()))
+                .getString("npmRegistryServer")).isEqualTo("https://registry.npmjs.org");
+    }
+
     private static Configuration load(String far, String mid, String near) {
         Map<String, String> files = new LinkedHashMap<>();
         files.put("../../.yarnrc.yml", far);

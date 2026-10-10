@@ -16,13 +16,17 @@
 package org.openrewrite.javascript.internal.lock;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.javascript.NodeRegistry;
 import org.openrewrite.javascript.internal.LockFileRegeneration.Request;
 import org.openrewrite.javascript.internal.lock.berry.YarnBerryLockRegenerator.Inputs;
+import org.openrewrite.javascript.internal.registry.NodeRegistries;
 
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -76,5 +80,36 @@ class YarnBerryInputsTest {
         assertThat(inputs.getPaths()).containsExactlyInAnyOrder("package.json", ".yarnrc.yml",
           "packages/a/package.json");
         assertThat(inputs.getConfigFiles()).isEmpty();
+    }
+
+    /**
+     * The host's registries are the home directory's .yarnrc.yml ({@code user-yarnrc-registry-bump},
+     * {@code user-yarnrc-scoped-add}); npm's default, the host's answer when nothing names a registry, stays unnamed.
+     */
+    @Test
+    void theHostsRegistriesAreTheHomeDirectorysYarnrc() {
+        Request request = Request.builder()
+          .packageJson("{\"name\":\"p\"}")
+          .lock("")
+          .packageJsonPath(Paths.get("package.json"))
+          .build();
+        Map<String, NodeRegistry> scopes = new LinkedHashMap<>();
+        scopes.put("@types", registry("https://registry.npmmirror.com/"));
+
+        Inputs mirrored = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
+          new NodeRegistries(registry("https://registry.npmmirror.com/"), scopes, null, null, null));
+        Inputs unnamed = YarnBerryInputs.from(LockDirectory.of(request), Host.UNKNOWN, Instant.EPOCH,
+          new NodeRegistries(registry("https://registry.npmjs.org/"), new LinkedHashMap<>(), null, null, null));
+
+        assertThat(mirrored.getHomeFiles()).containsOnlyKeys(".yarnrc.yml");
+        assertThat(mirrored.getHomeFiles().get(".yarnrc.yml")).isEqualTo(
+          "npmRegistryServer: \"https://registry.npmmirror.com/\"\n" +
+          "npmScopes:\n  \"types\":\n    npmRegistryServer: \"https://registry.npmmirror.com/\"\n");
+        assertThat(mirrored.getConfigFiles()).isEmpty();
+        assertThat(unnamed.getHomeFiles().get(".yarnrc.yml")).isEmpty();
+    }
+
+    private static NodeRegistry registry(String url) {
+        return new NodeRegistry(null, url, null, null, null, null, false, null, true, false);
     }
 }

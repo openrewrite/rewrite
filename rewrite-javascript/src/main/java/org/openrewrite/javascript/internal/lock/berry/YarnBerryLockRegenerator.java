@@ -92,6 +92,13 @@ public final class YarnBerryLockRegenerator {
         Map<String, String> configFiles;
 
         /**
+         * The files of the user's home directory Yarn reads, by name ({@code .yarnrc.yml}): the host's registry
+         * configuration is its .yarnrc.yml.
+         */
+        @Singular
+        Map<String, String> homeFiles;
+
+        /**
          * The directory Yarn runs in, the edited manifest's, relative to the root.
          */
         @Builder.Default
@@ -375,8 +382,12 @@ public final class YarnBerryLockRegenerator {
     // an Error the configuration throws reaches the CLI outside any report, which prints it as an Internal Error
     private Configuration options() {
         if (options == null) {
+            Map<String, String> rcFiles = new LinkedHashMap<>(inputs.getConfigFiles());
+            for (Map.Entry<String, String> file : inputs.getHomeFiles().entrySet()) {
+                rcFiles.put(Configuration.HOME + file.getKey(), file.getValue());
+            }
             try {
-                options = Configuration.load(inputs.getConfigFiles(), HostEnvironment.of(inputs.getEnv()));
+                options = Configuration.load(rcFiles, HostEnvironment.of(inputs.getEnv()));
             } catch (JsError e) {
                 throw Rejected.crashes(Reason.RESOLUTION_REQUIRED, null, "Internal Error: " + e.getMessage());
             }

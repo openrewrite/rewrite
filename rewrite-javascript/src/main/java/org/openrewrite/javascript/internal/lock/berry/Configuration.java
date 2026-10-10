@@ -50,6 +50,7 @@ import static java.util.Objects.requireNonNull;
 public final class Configuration {
 
     public static final String DEFAULT_RC_FILENAME = ".yarnrc.yml";
+    public static final String HOME = "~/";
     private static final String ENVIRONMENT_PREFIX = "yarn_";
     private static final Pattern YARN_RELEASE = Pattern.compile("(?:^|/)yarn-(\\d+\\.\\d+\\.\\d+[^/]*?)\\.c?js$");
     private static final Pattern PACKAGE_MANAGER = Pattern.compile("^yarn@(\\d+\\.\\d+\\.\\d+(?:-[^+]*)?)(?:\\+.*)?$");
@@ -265,8 +266,8 @@ public final class Configuration {
     }
 
     /**
-     * Reads {@code configFiles}, the rc files by path from the project's directory, from where Yarn runs up (another
-     * name only as {@code YARN_RC_FILENAME} names it), under {@code env}; throws UsageError where Yarn rejects one.
+     * Reads {@code configFiles}, the rc files by path from the project's directory from where Yarn runs up and the
+     * home directory's under {@code ~/}, read first, under {@code env}; throws UsageError where Yarn rejects one.
      */
     public static Configuration load(Map<String, String> configFiles, HostEnvironment env) {
         Configuration options = new Configuration(env);
@@ -281,7 +282,10 @@ public final class Configuration {
                 up++;
             }
             int slash = rest.lastIndexOf('/');
-            if (slash >= 0 && up == 0) {
+            if (rest.startsWith(HOME)) {
+                up = Integer.MAX_VALUE;
+                rest = rest.substring(HOME.length());
+            } else if (slash >= 0 && up == 0) {
                 up = -rest.substring(0, slash).split("/").length;
                 rest = rest.substring(slash + 1);
             }
