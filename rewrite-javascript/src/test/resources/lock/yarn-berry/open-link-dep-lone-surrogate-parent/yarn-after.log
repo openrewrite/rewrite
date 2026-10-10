@@ -1,0 +1,19 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0085: │ + x@link:./x::locator=p%F0%90%81%80workspace%3A.
+➤ YN0085: │ - p@workspace:.
+➤ YN0000: └ Completed
+➤ YN0000: ┌ Fetch step
+➤ YN0001: │ Error: x@link:./x::locator=p%F0%90%81%80workspace%3A.: Invalid locator (p𐁀workspace:.)
+    at Qp (<corepack>/v1/yarn/4.10.3/yarn.js:140:103383)
+    at Object.z$e (<corepack>/v1/yarn/4.10.3/yarn.js:140:104548)
+    at vD.fetch (<corepack>/v1/yarn/4.10.3/yarn.js:587:7948)
+    at aI.fetch (<corepack>/v1/yarn/4.10.3/yarn.js:141:490)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:209:11871
+    at <corepack>/v1/yarn/4.10.3/yarn.js:132:3751
+    at new Promise (<anonymous>)
+    at gne.exports (<corepack>/v1/yarn/4.10.3/yarn.js:132:3733)
+    at a (<corepack>/v1/yarn/4.10.3/yarn.js:132:3975)
+    at n (<corepack>/v1/yarn/4.10.3/yarn.js:132:4024)
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 9ms

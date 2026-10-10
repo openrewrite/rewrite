@@ -1,0 +1,1 @@
+open-file-dep-lone-surrogate-parent with portal:./x: the bound range's locator, escaped by querystring with the surrogate paired with the @ after it, has no reference, and PortalFetcher's parseFileStyleRange fails when the resolver reads the manifest.

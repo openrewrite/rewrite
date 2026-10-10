@@ -81,15 +81,13 @@ final class PortalResolver implements Resolver {
     }
 
     /**
-     * The target's package.json: the path joined to the directory of the workspace that depends on it.
+     * The target's package.json, after PortalFetcher's bindings: the path joined to the directory of the workspace
+     * that depends on it.
      */
     private static Manifest find(Locator locator, Project project) {
-        StructUtils.Range range = StructUtils.parseRange(locator.reference,
-                new StructUtils.RangeOptions(true, PROTOCOL, false, false));
-        String path = range.getSelector();
-        Object parent = range.getParams() == null ? null : range.getParams().get("locator");
-        Workspace workspace = parent instanceof String && !path.startsWith("/") ?
-                project.tryWorkspaceByLocator(StructUtils.parseLocator((String) parent, true)) : null;
+        StructUtils.FileStyleRange range = StructUtils.parseFileStyleRange(locator.reference, PROTOCOL);
+        String path = range.getPath();
+        Workspace workspace = path.startsWith("/") ? null : project.tryWorkspaceByLocator(range.getParentLocator());
         if (workspace == null) {
             throw new CannotKnow("the package.json of " + StructUtils.stringifyLocator(locator) + " (a path from " +
                                  "outside the project's workspaces)");

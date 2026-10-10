@@ -1,0 +1,1 @@
+open-file-dep-lone-surrogate-parent with exec:./gen.js: execUtils reads the bound locator loosely (reference unknown), and loadGeneratorFile's parseFileStyleRange rejects it before the generator runs.

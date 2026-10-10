@@ -54,9 +54,19 @@ final class ExecResolver implements Resolver {
         return Collections.emptyMap();
     }
 
+    /**
+     * {@code getCandidates} up to the generator: execUtils' parseSpec (the same as fileUtils') and loadGeneratorFile's
+     * bindings; the generator's hash needs the file Yarn runs.
+     */
     @Override
     public List<Locator> getCandidates(Descriptor descriptor, Map<String, Package> dependencies,
                                        ResolveOptions opts) {
+        FileUtils.Spec spec = FileUtils.parseSpec(descriptor.range);
+        if (spec.getParentLocator() == null) {
+            throw new JsError(JsError.ERROR, "Assertion failed: The descriptor should have been bound");
+        }
+        StructUtils.parseFileStyleRange(StructUtils.makeRange(PROTOCOL, spec.getPath(), spec.getPath(),
+                Collections.singletonMap("locator", StructUtils.stringifyLocator(spec.getParentLocator()))), PROTOCOL);
         throw new CannotKnow("what the generator of " + StructUtils.stringifyDescriptor(descriptor) + " makes " +
                              "(Yarn runs it on every install)");
     }

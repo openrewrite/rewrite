@@ -28,8 +28,13 @@ final class LinkFetcher implements Fetcher {
                locator.reference.startsWith(PortalResolver.PROTOCOL);
     }
 
+    /**
+     * The bindings either fetcher parses before the target, which a soft link has no checksum for.
+     */
     @Override
     public @Nullable String fetch(Locator locator, FetchOptions opts) {
+        StructUtils.parseFileStyleRange(locator.reference, locator.reference.startsWith(LinkResolver.PROTOCOL) ?
+                LinkResolver.PROTOCOL : PortalResolver.PROTOCOL);
         return null;
     }
 }

@@ -1,0 +1,18 @@
+➤ YN0000: · Yarn 4.10.3
+➤ YN0000: ┌ Resolution step
+➤ YN0001: │ Error: x@portal:./x::locator=p%F0%90%81%80workspace%3A.: Invalid locator (p𐁀workspace:.)
+    at Qp (<corepack>/v1/yarn/4.10.3/yarn.js:140:103383)
+    at Object.z$e (<corepack>/v1/yarn/4.10.3/yarn.js:140:104548)
+    at DD.fetch (<corepack>/v1/yarn/4.10.3/yarn.js:587:9664)
+    at aI.fetch (<corepack>/v1/yarn/4.10.3/yarn.js:141:490)
+    at PD.resolve (<corepack>/v1/yarn/4.10.3/yarn.js:587:10943)
+    at rm.resolve (<corepack>/v1/yarn/4.10.3/yarn.js:141:1488)
+    at rm.resolve (<corepack>/v1/yarn/4.10.3/yarn.js:141:1488)
+    at <corepack>/v1/yarn/4.10.3/yarn.js:209:7257
+    at qE (<corepack>/v1/yarn/4.10.3/yarn.js:140:45033)
+    at X (<corepack>/v1/yarn/4.10.3/yarn.js:209:7237)
+➤ YN0000: └ Completed
+➤ YN0000: · Failed with errors in 0s 8ms
+over=before
+exit=1
+no lock written
