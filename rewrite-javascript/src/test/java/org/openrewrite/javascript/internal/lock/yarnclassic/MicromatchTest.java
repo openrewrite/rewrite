@@ -88,6 +88,56 @@ class MicromatchTest {
                 .isInstanceOf(CannotKnow.class);
     }
 
+    /**
+     * A path matches alike for every id, five digits or shorter, or the bundle answered both ways
+     * ({@code micromatch-draws.tsv}, from {@code generate/micromatch-draws.js}).
+     */
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("draws")
+    void answersForEveryIdPreserveDrawsOrCannotKnow(String pattern, String path, String outcome) {
+        if ("random".equals(outcome)) {
+            assertThatThrownBy(() -> Micromatch.micromatch(singletonList(path), pattern))
+                    .isInstanceOf(CannotKnow.class);
+        } else {
+            assertThat(!Micromatch.micromatch(singletonList(path), pattern).isEmpty())
+                    .isEqualTo(Boolean.parseBoolean(outcome));
+        }
+    }
+
+    @Test
+    void countsTheMathRandomValuesWhoseIdIsShorterThanFiveDigits() throws IOException {
+        int shortIds = 0;
+        for (int j = 0; j < 10000; j++) {
+            String decimals = String.format("%04d", j).replaceFirst("0+\\z", "");
+            if (Micromatch.isShortId(decimals)) {
+                shortIds++;
+            }
+        }
+        assertThat("#short\t" + shortIds).isEqualTo(lines("micromatch-draws.tsv").get(0));
+    }
+
+    static Stream<Arguments> draws() throws IOException {
+        List<Arguments> rows = new ArrayList<>();
+        for (String line : lines("micromatch-draws.tsv")) {
+            String[] cells = line.split("\t", -1);
+            if (!line.startsWith("#")) {
+                rows.add(Arguments.of(cells[0], cells[1], cells[2]));
+            }
+        }
+        return rows.stream();
+    }
+
+    private static List<String> lines(String resource) throws IOException {
+        List<String> lines = new ArrayList<>();
+        try (InputStream is = requireNonNull(MicromatchTest.class.getResourceAsStream(resource));
+             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
+            for (String line; (line = reader.readLine()) != null; ) {
+                lines.add(line);
+            }
+        }
+        return lines;
+    }
+
     // preserve draws its ids from Math.random(), and with makeRe braces leaves one in the regex
     private static String withoutRandomIds(JsonNode node) {
         return RANDOM_ID.matcher(node.toString()).replaceAll("__ID_____");

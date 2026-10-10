@@ -20,9 +20,11 @@ import org.openrewrite.javascript.internal.lock.CannotKnow;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
@@ -60,6 +62,8 @@ final class Micromatch {
     private static final Pattern DOT_WORD = Pattern.compile("\\.([*\\w]+)");
     private static final Pattern NOT_SLASH_CLASS = Pattern.compile("\\[\\^[\\\\/]+]");
     private static final Pattern SLASHES = Pattern.compile("/+");
+    private static final Pattern FIVE_DIGITS = Pattern.compile("[0-9]{5}");
+    private static final Pattern SPELLED_ID = Pattern.compile("([0-9]{0,4})__");
     private static final Pattern BACKSLASHES = Pattern.compile("\\\\{2,}");
     private static final Pattern LEADING_CLASS_OR_WILDCARD = Pattern.compile("^[\\[?*]");
     private static final Pattern ESCAPED = Pattern.compile("[\"\\\\](['\"]?[^\"'\\\\]['\"]?)");
@@ -155,50 +159,142 @@ final class Micromatch {
     }
 
     /**
-     * Whether a path matches alike for every five digits preserve can draw per id: drawing from the path's digits and
-     * one it lacks covers every case, since a drawn digit decides a match only by which of them it equals.
+     * Whether a path matches alike for every id preserve can draw ({@code Math.random().toString().slice(2, 7)}),
+     * trying one id for each way an id can decide a match ({@link #draws}).
      */
     private static boolean sameForEveryDraw(String source, List<String> ids, String fp, boolean matches) {
-        StringBuilder digits = new StringBuilder();
-        String lacked = null;
-        for (char c = '0'; c <= '9'; c++) {
-            if (fp.indexOf(c) >= 0) {
-                digits.append(c);
-            } else if (lacked == null) {
-                lacked = String.valueOf(c);
-            }
+        List<List<String>> draws = new ArrayList<>();
+        for (String id : ids) {
+            draws.add(draws(source, "__ID" + id + "__", fp));
         }
-        if (digits.length() == 0) {
-            return true;
-        }
-        if (lacked != null) {
-            digits.append(lacked);
-        }
-        int[] draw = new int[5 * ids.size()];
-        if (Math.pow(digits.length(), draw.length) > MAX_DRAWS) {
-            return false;
-        }
-        Pattern id = Pattern.compile("ID(" + String.join("|", ids) + ")_");
+        Pattern token = Pattern.compile("__ID(" + String.join("|", ids) + ")__");
+        int[] draw = new int[ids.size()];
         do {
-            Matcher m = id.matcher(source);
+            Matcher m = token.matcher(source);
             StringBuffer drawn = new StringBuffer();
             while (m.find()) {
-                int at = 5 * ids.indexOf(m.group(1));
-                StringBuilder replacement = new StringBuilder("ID");
-                for (int i = at; i < at + 5; i++) {
-                    replacement.append(digits.charAt(draw[i]));
-                }
-                m.appendReplacement(drawn, replacement.append('_').toString());
+                int i = ids.indexOf(m.group(1));
+                m.appendReplacement(drawn, Matcher.quoteReplacement("__ID" + draws.get(i).get(draw[i]) + "__"));
             }
             m.appendTail(drawn);
             if (find(JsRegExp.compile(drawn.toString()), fp) != matches) {
                 return false;
             }
-        } while (next(draw, digits.length()));
+        } while (next(draw, draws));
         return true;
     }
 
-    private static final int MAX_DRAWS = 100_000;
+    /**
+     * The ids that decide a match differently: a drawn id is a literal the path may spell after {@code __ID} (each it
+     * spells, one it does not), and inside a class only which of the path's digits it holds counts.
+     */
+    private static List<String> draws(String source, String token, String fp) {
+        Set<String> spelled = new LinkedHashSet<>();
+        for (int at = fp.indexOf("__ID"); at >= 0; at = fp.indexOf("__ID", at + 1)) {
+            Matcher id = SPELLED_ID.matcher(fp.substring(at + 4));
+            if (id.lookingAt() && (id.group(1).length() == 5 || isShortId(id.group(1)))) {
+                spelled.add(id.group(1));
+            }
+            if (fp.length() >= at + 9 && FIVE_DIGITS.matcher(fp.substring(at + 4, at + 9)).matches()) {
+                spelled.add(fp.substring(at + 4, at + 9));
+            }
+        }
+        StringBuilder digits = new StringBuilder();
+        char lacked = 0;
+        for (char c = '0'; c <= '9'; c++) {
+            if (fp.indexOf(c) >= 0) {
+                digits.append(c);
+            } else if (lacked == 0) {
+                lacked = c;
+            }
+        }
+        List<String> draws = new ArrayList<>(spelled);
+        if (inClass(source, token)) {
+            for (int set = 0; set < 1 << digits.length(); set++) {
+                if (Integer.bitCount(set) <= 5) {
+                    StringBuilder held = new StringBuilder();
+                    for (int i = 0; i < digits.length(); i++) {
+                        if ((set & 1 << i) != 0) {
+                            held.append(digits.charAt(i));
+                        }
+                    }
+                    addUnspelled(draws, spelled, held.toString(), lacked == 0 ? held.toString() : held.toString() +
+                                                                                              lacked);
+                }
+            }
+            if (!spelled.contains("")) {
+                draws.add("");
+            }
+        } else {
+            addUnspelled(draws, spelled, "", "0123456789");
+        }
+        return draws;
+    }
+
+    /**
+     * Whether a Math.random() value V8 can draw, a multiple of 2^-52, prints as {@code 0.<digits>} with four decimals
+     * or fewer (3342 values; none prints in exponent form): preserve's id is then shorter than five digits.
+     */
+    static boolean isShortId(String digits) {
+        if (digits.isEmpty()) {
+            return true;
+        }
+        double x = Double.parseDouble("0." + digits);
+        double lattice = Math.scalb(x, 52);
+        return lattice == Math.rint(lattice) && ("0." + digits).equals(Js.numberToString(x));
+    }
+
+    // five digits of the pool that hold every digit of `held`, unlike any the path spells
+    private static void addUnspelled(List<String> draws, Set<String> spelled, String held, String pool) {
+        if (pool.isEmpty()) {
+            return;
+        }
+        int[] at = new int[5];
+        do {
+            StringBuilder id = new StringBuilder();
+            for (int i : at) {
+                id.append(pool.charAt(i));
+            }
+            String s = id.toString();
+            boolean holdsAll = true;
+            for (int i = 0; i < held.length(); i++) {
+                holdsAll &= s.indexOf(held.charAt(i)) >= 0;
+            }
+            if (holdsAll && !spelled.contains(s)) {
+                draws.add(s);
+                return;
+            }
+        } while (next(at, pool.length()));
+    }
+
+    // whether the token sits inside a character class of the source, as V8 reads `[` and `]`
+    private static boolean inClass(String source, String token) {
+        boolean inClass = false;
+        for (int i = 0; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (inClass && (source.startsWith(token, i) || c == '\\' && source.startsWith(token, i + 1))) {
+                return true;
+            }
+            if (c == '\\') {
+                i++;
+            } else if (!inClass && c == '[') {
+                inClass = true;
+            } else if (inClass && c == ']') {
+                inClass = false;
+            }
+        }
+        return false;
+    }
+
+    private static boolean next(int[] draw, List<List<String>> draws) {
+        for (int i = draw.length - 1; i >= 0; i--) {
+            if (++draw[i] < draws.get(i).size()) {
+                return true;
+            }
+            draw[i] = 0;
+        }
+        return false;
+    }
 
     private static boolean next(int[] draw, int base) {
         for (int i = draw.length - 1; i >= 0; i--) {
